@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/favorites/favorites_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
@@ -99,8 +100,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/favorites',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: '收藏'),
+                builder: (context, state) => const FavoritesScreen(),
               ),
             ],
           ),
