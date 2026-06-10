@@ -4,7 +4,7 @@
 
 ## 你需要
 
-- Flutter 3.41+ / Dart 3.11+(`flutter --version` 確認;安裝見 [flutter.dev](https://docs.flutter.dev/get-started/install))
+- Flutter 3.41+ / Dart 3.11.3+(`pubspec.yaml` 要求 `sdk: ^3.11.3`;`flutter --version` 確認;安裝見 [flutter.dev](https://docs.flutter.dev/get-started/install))
 - iOS Simulator(macOS + Xcode)或 Android Emulator 其一
 - 一組 trip-planner 的**測試帳號**(app 連的是 prod API,不要拿正式資料操作)
 
@@ -43,6 +43,10 @@ app 啟動後停在登入頁(沒有 session 時 router 自動導向 `/login`)。
 - **行程** tab:卡片清單(下拉更新、長按刪除)
 - 點一張卡 → **時間軸**(上方 day pills 換日)→ 右上角進**地圖**與**筆記**
 - **帳號** tab:統計與登出
+
+> ⚠️ **本 app 連的是正式 API,沒有 staging。** 教學階段請只做唯讀操作 —
+> **不要試「長按刪除」**,它會打真的 `DELETE /trips/:id` 刪掉後端資料(且無法復原)。
+> 等之後 `--dart-define=TRIPLINE_API_URL` 覆寫實作後才有安全的本機後端可玩。
 
 聊天/全域地圖/收藏三個 tab 目前是「即將推出」佔位(P1 範圍)。
 

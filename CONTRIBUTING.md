@@ -5,7 +5,7 @@
 ## 環境
 
 ```bash
-flutter --version    # 需 Flutter 3.41+ / Dart 3.11+
+flutter --version    # 需 Flutter 3.41+ / Dart 3.11.3+（pubspec: sdk ^3.11.3）
 flutter pub get
 flutter test         # 全綠才算環境就緒(144+ tests)
 ```

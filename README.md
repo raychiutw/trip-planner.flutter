@@ -56,7 +56,7 @@ docs/
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 
-技術棧：Flutter 3.41 / Dart 3.11、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
+技術棧：Flutter 3.41 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 

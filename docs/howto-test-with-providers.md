@@ -77,13 +77,16 @@ final fakeRouter = GoRouter(
 測 `ApiClient`/repository 本身時不 mock repository,改 mock HTTP 層:
 
 ```dart
-final dio = Dio(BaseOptions(baseUrl: 'https://trip-planner-dby.pages.dev/api'));
+// 不必在 BaseOptions 設 baseUrl — ApiClient 建構子會用 origin 覆寫成
+// '<origin>/api'。要改 base 走 ApiClient(origin:),不是 Dio(BaseOptions(...))。
+final dio = Dio();
 final dioAdapter = DioAdapter(dio: dio);
 final client = ApiClient(
   sessionStore: InMemorySessionStore()..write('token-123'),
   dio: dio,
 );
 
+// path 對齊 '<origin>/api' 後的相對路徑
 dioAdapter.onGet('/my-trips', (server) => server.reply(200, fixtureJson));
 ```
 
@@ -113,7 +116,7 @@ flutter test test/features/trips/trips_list_screen_test.dart   # 跑單檔
 | `MissingPluginException`(secure storage) | 沒 override `sessionStoreProvider`/資料 provider,測試走到了 `SecureSessionStore` — override 鏈上任一節點即可 |
 | `pumpAndSettle` timeout | 畫面有無限動畫(如 `CircularProgressIndicator`)— 改用固定次數 `pump()` |
 | mocktail 丟 `Null is not a subtype` | mutation 方法忘了 `thenAnswer((_) async {})`,或參數 matcher 該用 `any()` |
-| override 沒生效 | override 的 provider 與畫面 watch 的不是同一個實例(family 要連 key 一起 override:`tripDaysProvider(tripId)` 用 `.overrideWith` 處理 family 整體) |
+| override 沒生效 | override 的 provider 與畫面 watch 的不是同一個實例。family provider 用 `tripDaysProvider.overrideWith((ref, tripId) async => fakeDays)` 覆寫所有 key(callback 收得到 `tripId` 參數),畫面 watch `tripDaysProvider(tripId)` 即取得假值 |
 
 ## 相關文件
 
