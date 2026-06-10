@@ -4,7 +4,7 @@
 
 ## P1(第二波)
 
-- [ ] 探索 + 加入行程(ExplorePage poi-search/find-or-create、add-to-trip;**收藏清單已於 2026-06-10 完成**)
+- [ ] 加入行程（add-to-trip favorite/direct mode、409 conflict;**探索已於 2026-06-11 完成**）
 - [ ] Entry CRUD 表單群(新增/編輯/刪除停留點;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
 - [ ] 建立/編輯行程(行程基本資料表單)
 - [ ] AI 聊天(chat tab 轉正;request queue)

@@ -37,8 +37,12 @@ class ApiClient {
   /// 供 AuthRepository 直接讀 response headers（set-cookie）用。
   Dio get dio => _dio;
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
-      _send('GET', path, query: query);
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    CancelToken? cancelToken,
+  }) =>
+      _send('GET', path, query: query, cancelToken: cancelToken);
 
   Future<dynamic> post(String path, {Object? body}) =>
       _send('POST', path, body: body);
@@ -77,6 +81,7 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     Object? body,
+    CancelToken? cancelToken,
     bool isRetryAttempt = false,
   }) async {
     final requestHeaders = <String, dynamic>{};
@@ -95,6 +100,7 @@ class ApiClient {
       queryParameters: query,
       data: body,
       options: Options(method: method, headers: requestHeaders),
+      cancelToken: cancelToken,
     );
 
     final statusCode = response.statusCode ?? 0;
@@ -103,7 +109,10 @@ class ApiClient {
           parseRetryAfterSeconds(response.headers.value('retry-after'));
       await Future<void>.delayed(Duration(seconds: waitSeconds));
       return _send(method, path,
-          query: query, body: body, isRetryAttempt: true);
+          query: query,
+          body: body,
+          cancelToken: cancelToken,
+          isRetryAttempt: true);
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);
