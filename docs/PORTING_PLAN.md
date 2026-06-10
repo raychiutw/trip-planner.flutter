@@ -18,7 +18,7 @@
 
 ## API client 必守規則（來自 web `src/lib/apiClient.ts` 行為）
 
-1. Base URL `https://trip-planner-dby.pages.dev/api`；`--dart-define=TRIPLINE_API_URL` 覆寫為規劃項尚未實作（目前以 `ApiClient(origin:)` 建構參數覆寫，測試即用此法）
+1. Base URL `https://trip-planner-dby.pages.dev/api`；origin 可用 `--dart-define=TRIPLINE_API_ORIGIN`（值為 origin，不含 /api）覆寫，同一 origin 也用於 CSRF Origin header；測試另可用 `ApiClient(origin:)` 建構參數覆寫（見 `docs/howto-local-backend.md`）
 2. 認證：`Cookie: tripline_session=<token>` header（secure storage 持久化）
 3. POST/PUT/PATCH/DELETE 一律帶 `Origin: https://trip-planner-dby.pages.dev`（缺少 → 403）
 4. `/api/oauth/*` 路徑免 Origin；userinfo 只吃 cookie

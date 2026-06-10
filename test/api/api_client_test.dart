@@ -254,4 +254,21 @@ void main() {
       expect(apiClient.dio.options.baseUrl, '$kTriplineOrigin/api');
     });
   });
+
+  group('dart-define TRIPLINE_API_ORIGIN', () {
+    test('kTriplineOrigin 為純 origin（不含 /api 路徑、無結尾斜線）', () {
+      expect(kTriplineOrigin.endsWith('/api'), isFalse);
+      expect(kTriplineOrigin.endsWith('/'), isFalse);
+      expect(Uri.parse(kTriplineOrigin).path, isEmpty);
+    });
+
+    // 常規 flutter test（未帶 dart-define）此測試為 no-op；
+    // 帶 --dart-define=TRIPLINE_API_ORIGIN=<x> 時才真正驗證覆寫生效。
+    test('帶 --dart-define 時 origin 被覆寫', () {
+      if (!const bool.hasEnvironment('TRIPLINE_API_ORIGIN')) return;
+      const injected = String.fromEnvironment('TRIPLINE_API_ORIGIN');
+      expect(kTriplineOrigin, injected);
+      expect(kTriplineOrigin, isNot('https://trip-planner-dby.pages.dev'));
+    });
+  });
 }
