@@ -1,5 +1,8 @@
 # 模組契約（跨 agent 實作介面，嚴格遵守）
 
+> **狀態：P0 已實作完成，本檔為歷史契約。** 個別欄位以 `lib/` 程式碼與 [reference-models.md](reference-models.md)／[reference-api.md](reference-api.md) 為準。
+> 已知與實作的偏差：`UserInfo` 多 `createdAt` 欄位、`AccountStats` 實際為 `tripCount`/`totalDays`/`collaboratorCount`、`sortOrder`/`version` 缺漏時預設 `0`。
+
 > 所有平行實作的 agent 必須照此檔的檔案路徑、class 名、方法簽章實作。
 > 若實作中發現契約有誤（如 API 欄位不符），以 `docs/discovery/*.md` 與 web repo 原始碼為準，並在最終回報中註明偏差。
 

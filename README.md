@@ -20,7 +20,7 @@
 
 ```bash
 flutter pub get
-flutter test       # 144 tests
+flutter test       # 全部測試
 flutter analyze
 flutter run        # 連 prod API（注意：請用測試帳號）
 ```
@@ -40,7 +40,23 @@ docs/
   discovery/        # 來源 SPA 的畫面/API/模型/設計系統調查報告
 ```
 
-技術棧：Flutter 3.41 / Dart 3.11、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
+## 文件
+
+| 想做什麼 | 看哪份 |
+|---|---|
+| 從零跑起來、走一輪 TDD | [新手教學](docs/tutorial-getting-started.md) |
+| 懂整體設計與取捨 | [架構說明](docs/explanation-architecture.md) |
+| 新增 API endpoint | [How to 新增 API endpoint](docs/howto-add-endpoint.md) |
+| 新增畫面 | [How to 新增畫面](docs/howto-add-screen.md) |
+| 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
+| 查 API 層介面 | [reference-api](docs/reference-api.md) |
+| 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
+| 查 design token / 三色 tone | [reference-theme](docs/reference-theme.md) |
+| 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
+| 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
+| 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
+
+技術棧：Flutter 3.41 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 
