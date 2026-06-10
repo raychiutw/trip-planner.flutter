@@ -271,4 +271,16 @@ void main() {
       expect(kTriplineOrigin, isNot('https://trip-planner-dby.pages.dev'));
     });
   });
+
+  group('CancelToken', () {
+    test('傳入已取消的 CancelToken → 拋 DioException(cancel)', () async {
+      dioAdapter.onGet('/slow', (server) => server.reply(200, []));
+      final cancelToken = CancelToken()..cancel('test-cancel');
+
+      await expectLater(
+        apiClient.get('/slow', cancelToken: cancelToken),
+        throwsA(isA<DioException>()),
+      );
+    });
+  });
 }
