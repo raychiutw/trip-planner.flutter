@@ -4,7 +4,6 @@
 
 ## P1(第二波)
 
-- [ ] 加入行程（add-to-trip favorite/direct mode、409 conflict;**探索已於 2026-06-11 完成**）
 - [ ] Entry CRUD 表單群(新增/編輯/刪除停留點;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
 - [ ] 建立/編輯行程(行程基本資料表單)
 - [ ] AI 聊天(chat tab 轉正;request queue)
@@ -27,6 +26,7 @@
 
 ## Completed
 
+- [x] 收藏 + 探索:收藏清單 + 探索（poi-search/find-or-create）+ 加入行程（favorite/direct mode、409 conflict）(**Completed:** 2026-06-11)
 - [x] P0:登入/行程清單/時間軸/地圖/筆記/帳號 + 5-tab shell(**Completed:** v0.1.0, 2026-06-10)
 - [x] 基礎層:tokens/theme、models、API client、providers(**Completed:** v0.1.0, 2026-06-10)
 - [x] Diataxis 文件 9 篇 + CLAUDE.md + 標準專案文件(**Completed:** v0.1.0, 2026-06-10)
