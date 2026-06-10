@@ -125,6 +125,19 @@ class TripRepository {
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 
+## FavoritesRepository(`favorites_repository.dart`)
+
+對應 `/api/poi-favorites`(跨 trip 收藏池)。
+
+```dart
+class FavoritesRepository {
+  FavoritesRepository({required ApiClient client});
+
+  Future<List<PoiFavorite>> fetchFavorites();       // GET /poi-favorites
+  Future<void>              deleteFavorite(int id);  // DELETE /poi-favorites/:id
+}
+```
+
 回傳的 model 結構見 [Models 參考](reference-models.md)。
 
 ## Riverpod providers(`providers.dart`)
