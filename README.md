@@ -53,6 +53,8 @@ docs/
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
 | 查 design token / 三色 tone | [reference-theme](docs/reference-theme.md) |
 | 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
+| 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
+| 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 
 技術棧：Flutter 3.41 / Dart 3.11、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
 
