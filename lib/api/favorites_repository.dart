@@ -21,4 +21,8 @@ class FavoritesRepository {
 
   /// DELETE /poi-favorites/:id（mutation，ApiClient 自動帶 CSRF Origin）。
   Future<void> deleteFavorite(int id) => _client.delete('/poi-favorites/$id');
+
+  /// POST /poi-favorites（camelCase body）。重複收藏後端回 409。
+  Future<void> addFavorite(int poiId) =>
+      _client.post('/poi-favorites', body: {'poiId': poiId});
 }

@@ -51,4 +51,15 @@ void main() {
 
     await expectLater(favoritesRepository.deleteFavorite(7), completes);
   });
+
+  test('addFavorite：POST /poi-favorites camelCase {poiId}', () async {
+    dioAdapter.onPost(
+      '/poi-favorites',
+      (server) => server.reply(201, {'id': 9, 'userId': 'u-1', 'poiId': 501,
+          'favoritedAt': '2026-06-11T00:00:00Z'}),
+      data: {'poiId': 501},
+    );
+
+    await expectLater(favoritesRepository.addFavorite(501), completes);
+  });
 }
