@@ -1,0 +1,111 @@
+import 'package:flutter/material.dart';
+
+import '../../models/poi_favorite.dart';
+import '../../theme/app_theme.dart';
+import '../../theme/poi_tone.dart';
+import '../../theme/tokens.dart';
+
+/// 收藏 POI 卡片：poiType tone 色階 + rating/note/usages + 取消收藏 heart（永遠粉）。
+class PoiFavoriteCard extends StatelessWidget {
+  const PoiFavoriteCard({
+    super.key,
+    required this.favorite,
+    required this.onRemove,
+  });
+
+  final PoiFavorite favorite;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    final tone = resolvePoiTone(tones, favorite.poiType);
+    final mutedColor = theme.colorScheme.onSurfaceVariant;
+
+    return Container(
+      key: ValueKey('favorite-card-${favorite.id}'),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: tone.subtle,
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        border: Border.all(color: tone.bg),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: tone.bg,
+              borderRadius: BorderRadius.circular(TpRadius.md),
+            ),
+            child: Icon(Icons.place_outlined, size: 20, color: tone.deep),
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  favorite.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                if (favorite.poiRating != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star_rounded, size: 14, color: tones.accent),
+                        const SizedBox(width: 2),
+                        Text(
+                          favorite.poiRating!.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: mutedColor,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (favorite.note != null && favorite.note!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
+                    child: Text(
+                      favorite.note!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: mutedColor),
+                    ),
+                  ),
+                if (favorite.usages.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
+                    child: Text(
+                      '用於 ${favorite.usages.length} 個行程',
+                      style: TextStyle(fontSize: 12, color: tone.deep),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: ValueKey('favorite-remove-${favorite.id}'),
+            tooltip: '取消收藏',
+            icon: Icon(Icons.favorite, color: tones.pink),
+            onPressed: onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+}

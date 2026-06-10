@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripline/features/trip_detail/widgets/entry_tone.dart';
+import 'package:tripline/theme/poi_tone.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 void main() {
   const tones = TpTones.light;
 
   void expectTone(
-    EntryToneColors actual, {
+    PoiToneColors actual, {
     required Color base,
     required Color deep,
     required Color subtle,
@@ -19,11 +19,11 @@ void main() {
     expect(actual.bg, bg);
   }
 
-  group('resolveEntryTone', () {
+  group('resolvePoiTone', () {
     test('hotel / transport / parking → sage', () {
       for (final poiType in ['hotel', 'transport', 'parking']) {
         expectTone(
-          resolveEntryTone(tones, poiType),
+          resolvePoiTone(tones, poiType),
           base: tones.sage,
           deep: tones.sageDeep,
           subtle: tones.sageSubtle,
@@ -34,7 +34,7 @@ void main() {
 
     test('restaurant → pink', () {
       expectTone(
-        resolveEntryTone(tones, 'restaurant'),
+        resolvePoiTone(tones, 'restaurant'),
         base: tones.pink,
         deep: tones.pinkDeep,
         subtle: tones.pinkSubtle,
@@ -45,7 +45,7 @@ void main() {
     test('其他類型與 null → accent', () {
       for (final poiType in [null, 'attraction', 'shopping', 'activity']) {
         expectTone(
-          resolveEntryTone(tones, poiType),
+          resolvePoiTone(tones, poiType),
           base: tones.accent,
           deep: tones.accentDeep,
           subtle: tones.accentSubtle,

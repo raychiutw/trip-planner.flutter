@@ -4,7 +4,7 @@
 
 ## P1(第二波)
 
-- [ ] 收藏 + 探索(favorites tab 由 placeholder 轉正,對應 web Explore)
+- [ ] 探索 + 加入行程(ExplorePage poi-search/find-or-create、add-to-trip;**收藏清單已於 2026-06-10 完成**)
 - [ ] Entry CRUD 表單群(新增/編輯/刪除停留點;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
 - [ ] 建立/編輯行程(行程基本資料表單)
 - [ ] AI 聊天(chat tab 轉正;request queue)
@@ -21,7 +21,7 @@
 
 ## 技術債
 
-- [ ] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push — CHANGELOG 的 compare/release 連結目前指向尚不存在的 tag
+- [x] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push(**Completed:** 2026-06-10)
 - [x] `--dart-define=TRIPLINE_API_ORIGIN` base URL 覆寫(**Completed:** 2026-06-10)
 - [ ] 地圖介面抽象化(PORTING_PLAN 決策:保留之後換 google_maps_flutter 的空間;目前 flutter_map 直接用在 TripMapScreen)
 
