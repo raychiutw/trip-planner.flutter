@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/entry.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
-import 'entry_tone.dart';
+import '../../../theme/poi_tone.dart';
 
 /// 時間欄寬度（timeline rail 對齊用，travel row 共用）。
 const double kTimelineTimeColumnWidth = 48;
@@ -33,7 +33,7 @@ class TimelineEntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    final tone = resolveEntryTone(tones, entry.master?.type);
+    final tone = resolvePoiTone(tones, entry.master?.type);
     final railLineColor = theme.colorScheme.outlineVariant;
     final displayTime = entry.startTime ?? entry.time ?? '';
 
@@ -101,7 +101,7 @@ class _EntryCard extends StatelessWidget {
   const _EntryCard({required this.entry, required this.tone});
 
   final TimelineEntry entry;
-  final EntryToneColors tone;
+  final PoiToneColors tone;
 
   @override
   Widget build(BuildContext context) {
