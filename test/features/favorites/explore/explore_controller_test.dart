@@ -5,7 +5,6 @@ import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
-import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 
 class _MockPoiRepository extends Mock implements PoiRepository {}
@@ -32,7 +31,7 @@ void main() {
   test('search：成功更新 results + searching=false', () async {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
-    when(() => fav.listFavorites()).thenAnswer((_) async => const []);
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
     when(() => poi.searchPois(
             q: any(named: 'q'),
             limit: any(named: 'limit'),
@@ -52,7 +51,7 @@ void main() {
   test('search：q < 2 字 → 不呼叫 repo,設 error 訊息', () async {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
-    when(() => fav.listFavorites()).thenAnswer((_) async => const []);
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
     final container = _container(poi, fav);
     final controller = container.read(exploreControllerProvider.notifier);
 
@@ -68,7 +67,7 @@ void main() {
   test('filteredResults：分類 client-side filter（美食）', () async {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
-    when(() => fav.listFavorites()).thenAnswer((_) async => const []);
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
     when(() => poi.searchPois(
             q: any(named: 'q'),
             limit: any(named: 'limit'),
@@ -94,7 +93,7 @@ void main() {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
     var listCalls = 0;
-    when(() => fav.listFavorites()).thenAnswer((_) async {
+    when(() => fav.fetchFavorites()).thenAnswer((_) async {
       listCalls++;
       return const [];
     });

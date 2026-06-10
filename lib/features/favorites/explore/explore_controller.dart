@@ -102,7 +102,7 @@ class ExploreController extends Notifier<ExploreState> {
   /// 載入已收藏 map（進頁呼叫一次）。
   Future<void> ensureSavedLoaded() async {
     try {
-      final favorites = await _fav.listFavorites();
+      final favorites = await _fav.fetchFavorites();
       state = state.copyWith(savedMap: _buildSavedMap(favorites));
     } on Exception {
       // 收藏 map 載入失敗不阻擋搜尋
@@ -167,8 +167,9 @@ class ExploreController extends Notifier<ExploreState> {
         );
         await _fav.addFavorite(poiId);
       }
-      final favorites = await _fav.listFavorites();
+      final favorites = await _fav.fetchFavorites();
       state = state.copyWith(savedMap: _buildSavedMap(favorites));
+      ref.invalidate(favoritesProvider);
     } on Exception {
       state = state.copyWith(errorMessage: '收藏操作失敗,請稍後再試');
     } finally {
