@@ -149,8 +149,8 @@ class FavoritesRepository {
 class PoiRepository {
   PoiRepository({required ApiClient client});
 
-  Future<List<PoiSearchResult>> searchPois({required String q, int limit = 10, String? region, CancelToken? cancelToken}); // GET /poi-search
-  Future<int>                   findOrCreatePoi({required String name, required String type, required double lat, required double lng, String? address, String? category, String? source, String? placeId}); // POST /pois/find-or-create
+  Future<List<PoiSearchResult>> searchPois({required String q, int limit = 20, String? region, CancelToken? cancelToken}); // GET /poi-search
+  Future<int>                   findOrCreatePoi({required String name, required String type, double? lat, double? lng, String? address, String? category, String? source, String? placeId}); // POST /pois/find-or-create
 }
 ```
 

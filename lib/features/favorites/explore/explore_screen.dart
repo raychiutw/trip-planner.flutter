@@ -56,36 +56,40 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
   Future<void> _openCustomRegion() async {
     final textController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('自訂地區'),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '地區名稱',
-            hintText: '例如:大阪、曼谷、巴黎',
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('自訂地區'),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '地區名稱',
+              hintText: '例如:大阪、曼谷、巴黎',
+            ),
+            onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
           ),
-          onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(textController.text),
+              child: const Text('切換'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(textController.text),
-            child: const Text('切換'),
-          ),
-        ],
-      ),
-    );
-    if (result != null) {
-      ref
-          .read(exploreControllerProvider.notifier)
-          .setRegion(result.trim().isEmpty ? '全部地區' : result.trim());
+      );
+      if (result != null) {
+        ref
+            .read(exploreControllerProvider.notifier)
+            .setRegion(result.trim().isEmpty ? '全部地區' : result.trim());
+      }
+    } finally {
+      textController.dispose();
     }
   }
 
