@@ -135,10 +135,24 @@ class FavoritesRepository {
 
   Future<List<PoiFavorite>> fetchFavorites();       // GET /poi-favorites
   Future<void>              deleteFavorite(int id);  // DELETE /poi-favorites/:id
+  Future<void>              addFavorite(int poiId);  // POST /poi-favorites
 }
 ```
 
 回傳的 model 結構見 [Models 參考](reference-models.md)。
+
+## PoiRepository(`poi_repository.dart`)
+
+對應 `/api/poi-search`、`/api/pois/find-or-create`。
+
+```dart
+class PoiRepository {
+  PoiRepository({required ApiClient client});
+
+  Future<List<PoiSearchResult>> searchPois({required String q, int limit = 10, String? region, CancelToken? cancelToken}); // GET /poi-search
+  Future<int>                   findOrCreatePoi({required String name, required String type, required double lat, required double lng, String? address, String? category, String? source, String? placeId}); // POST /pois/find-or-create
+}
+```
 
 ## Riverpod providers(`providers.dart`)
 

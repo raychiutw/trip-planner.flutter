@@ -46,7 +46,9 @@
 | `/api/trips/:id/notes/{flights\|lodgings\|reservations\|pretrip\|emergency}` | GET / POST | GET → `{ items: [...] }`；POST body 為各表白名單 snake_case 欄位（見 `notes/_shared.ts ALLOWED_FIELDS`）→ 201 row |
 | `/api/trips/:id/notes/{section}/:rowId` | PATCH / DELETE | PATCH 支援 OCC `{ ...fields, expectedVersion? }`，版本不符 409 `STALE_ENTRY`；DELETE → `{ok:true}` |
 | `/api/trips/:id/notes/{section}/reorder` | POST | `{ items: [{ id, sortOrder }] }` |
-| `/api/poi-favorites` | GET / POST | GET → `[{ id, userId, poiId, favoritedAt, note, poiName, poiAddress, poiLat, poiLng, poiType, poiRating, usages:[{tripId,tripName,dayNum,dayDate,entryId}] }]`；POST `{ poiId, note? }` → 201 row（重複 409、POI 不存在 404）；`DELETE /api/poi-favorites/:id`；`POST /:id/add-to-trip` |
+| `/api/poi-favorites` | GET / POST | GET → `[{ id, userId, poiId, favoritedAt, note, poiName, poiAddress, poiLat, poiLng, poiType, poiRating, usages:[{tripId,tripName,dayNum,dayDate,entryId}] }]`；POST `{ poiId, note? }` → 201 row（重複 409、POI 不存在 404）；`DELETE /api/poi-favorites/:id`；`POST /:id/add-to-trip`（PR-B 加入行程）|
+| `/api/poi-search` | GET | 查詢參數：`q`（必填，2–200 字）、`limit`（1–20，預設 10）、`region`（中文城市名，選填）；回 `{ results: PoiSearchResult[] }`，item 欄位 snake_case：`place_id, name, address, lat, lng, type, category, rating?, photos?[]` |
+| `/api/pois/find-or-create` | POST | body snake_case：`name, type, lat, lng, address?, category?, source?, place_id?`；`type` 須通過 `mapGooglePrimaryTypeToPoiType` 映射；回 `{ id }`（POI 的整數主鍵） |
 | `/api/account/profile` | PATCH | `{ displayName: string\|null }` → 200 userinfo shape `{ id, email, emailVerified, displayName, avatarUrl, createdAt }` |
 | `/api/oauth/userinfo` | GET（**僅 cookie**） | `{ id, email, emailVerified, displayName, avatarUrl, createdAt }` |
 
