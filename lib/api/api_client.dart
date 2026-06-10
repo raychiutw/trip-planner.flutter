@@ -8,8 +8,13 @@ import 'package:dio/dio.dart';
 import 'api_error.dart';
 import 'session_store.dart';
 
-/// CSRF Origin allowlist 要求的正式站 origin。
-const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
+/// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
+/// 覆寫（本機開發指向本機後端）。一個 origin 同時決定 base URL（`origin/api`）
+/// 與 mutating request 的 CSRF Origin header。
+const String kTriplineOrigin = String.fromEnvironment(
+  'TRIPLINE_API_ORIGIN',
+  defaultValue: 'https://trip-planner-dby.pages.dev',
+);
 
 /// Tripline API client，base = `<origin>/api`。
 class ApiClient {
