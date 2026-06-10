@@ -102,7 +102,7 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 
 ## 測試策略
 
-TDD,144 tests,分三層(對應 `test/` 鏡像結構):
+TDD,測試分三層(對應 `test/` 鏡像結構;數量以 `flutter test` 輸出為準):
 
 | 層 | 工具 | 驗什麼 |
 |---|---|---|

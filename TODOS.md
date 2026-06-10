@@ -21,6 +21,7 @@
 
 ## 技術債
 
+- [ ] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push — CHANGELOG 的 compare/release 連結目前指向尚不存在的 tag
 - [ ] `--dart-define=TRIPLINE_API_URL` base URL 覆寫(PORTING_PLAN 規劃項,尚未實作;目前僅能以 `ApiClient(origin:)` 建構參數覆寫)
 - [ ] 地圖介面抽象化(PORTING_PLAN 決策:保留之後換 google_maps_flutter 的空間;目前 flutter_map 直接用在 TripMapScreen)
 

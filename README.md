@@ -20,7 +20,7 @@
 
 ```bash
 flutter pub get
-flutter test       # 144 tests
+flutter test       # 全部測試
 flutter analyze
 flutter run        # 連 prod API（注意：請用測試帳號）
 ```

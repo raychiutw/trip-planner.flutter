@@ -1,6 +1,6 @@
 # 新手教學:從 clone 到改出第一個畫面變更
 
-跟著做完,你會有一個在模擬器上跑起來的 Tripline app、全綠的 144 個測試,並且親手改一行 UI、用測試驗證它 — 走完一輪本專案的 TDD 開發循環。
+跟著做完,你會有一個在模擬器上跑起來的 Tripline app、全綠的完整測試套件,並且親手改一行 UI、用測試驗證它 — 走完一輪本專案的 TDD 開發循環。
 
 ## 你需要
 
@@ -24,13 +24,13 @@ flutter pub get
 flutter test
 ```
 
-預期輸出結尾:
+預期輸出結尾(`+N` 為當前測試總數,會隨開發增加):
 
 ```
-00:0x +144: All tests passed!
+00:0x +N: All tests passed!
 ```
 
-這 144 個測試覆蓋三層:models 的 JSON 解析、API client 的行為規則、每個畫面的 widget test。**全程不打網路** — 假資料怎麼注入的,之後可看 [How to 用 provider override 寫測試](howto-test-with-providers.md)。
+這些測試覆蓋三層:models 的 JSON 解析、API client 的行為規則、每個畫面的 widget test。**全程不打網路** — 假資料怎麼注入的,之後可看 [How to 用 provider override 寫測試](howto-test-with-providers.md)。
 
 ## Step 3:在模擬器跑起來
 
@@ -74,7 +74,7 @@ flutter test      # 全綠
 
 ## 你完成了什麼
 
-- 跑起 Tripline 的開發環境與 144 個測試
+- 跑起 Tripline 的開發環境與完整測試套件
 - 在模擬器上體驗了 P0 全部畫面
 - 走完一次紅 → 綠的 TDD 循環,知道「先改測試、再改實作」是這裡的規矩
 
