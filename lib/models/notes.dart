@@ -1,0 +1,258 @@
+/// 行程筆記 models（`GET /trips/:id/notes` 5 區聚合）。
+/// 5 個 row class 共通欄位：id / sortOrder / version；文字欄位 DB 為
+/// `NOT NULL DEFAULT ''`，缺漏時預設空字串。
+library;
+
+/// 航班（trip_flights）。
+class TripFlight {
+  const TripFlight({
+    required this.id,
+    required this.sortOrder,
+    required this.version,
+    this.airline = '',
+    this.flightNo = '',
+    this.cabinClass = '',
+    this.departAirport = '',
+    this.arriveAirport = '',
+    this.departAt = '',
+    this.arriveAt = '',
+    this.note = '',
+  });
+
+  final int id;
+  final int sortOrder;
+  final int version;
+  final String airline;
+  final String flightNo;
+  final String cabinClass;
+  final String departAirport;
+  final String arriveAirport;
+
+  /// ISO8601 local datetime 字串。
+  final String departAt;
+  final String arriveAt;
+  final String note;
+
+  factory TripFlight.fromJson(Map<String, dynamic> json) {
+    return TripFlight(
+      id: (json['id'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      airline: json['airline'] as String? ?? '',
+      flightNo: json['flightNo'] as String? ?? '',
+      cabinClass: json['cabinClass'] as String? ?? '',
+      departAirport: json['departAirport'] as String? ?? '',
+      arriveAirport: json['arriveAirport'] as String? ?? '',
+      departAt: json['departAt'] as String? ?? '',
+      arriveAt: json['arriveAt'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+    );
+  }
+}
+
+/// 住宿（trip_lodgings）；dayId 在 link day 被刪後 SET NULL。
+class TripLodging {
+  const TripLodging({
+    required this.id,
+    required this.sortOrder,
+    required this.version,
+    this.dayId,
+    this.name = '',
+    this.address = '',
+    this.checkInAt = '',
+    this.checkOutAt = '',
+    this.bookingNo = '',
+    this.phone = '',
+    this.note = '',
+  });
+
+  final int id;
+  final int sortOrder;
+  final int version;
+  final int? dayId;
+  final String name;
+  final String address;
+  final String checkInAt;
+  final String checkOutAt;
+  final String bookingNo;
+  final String phone;
+  final String note;
+
+  factory TripLodging.fromJson(Map<String, dynamic> json) {
+    return TripLodging(
+      id: (json['id'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      dayId: (json['dayId'] as num?)?.toInt(),
+      name: json['name'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      checkInAt: json['checkInAt'] as String? ?? '',
+      checkOutAt: json['checkOutAt'] as String? ?? '',
+      bookingNo: json['bookingNo'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+    );
+  }
+}
+
+/// 預約（trip_reservations）；kind enum 預設 restaurant。
+class TripReservation {
+  const TripReservation({
+    required this.id,
+    required this.sortOrder,
+    required this.version,
+    this.kind = 'restaurant',
+    this.title = '',
+    this.reservedAt = '',
+    this.partySize = 0,
+    this.reservationNo = '',
+    this.phone = '',
+    this.note = '',
+  });
+
+  final int id;
+  final int sortOrder;
+  final int version;
+
+  /// enum：restaurant | experience | ticket | transport | other。
+  final String kind;
+  final String title;
+  final String reservedAt;
+  final int partySize;
+  final String reservationNo;
+  final String phone;
+  final String note;
+
+  factory TripReservation.fromJson(Map<String, dynamic> json) {
+    return TripReservation(
+      id: (json['id'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      kind: json['kind'] as String? ?? 'restaurant',
+      title: json['title'] as String? ?? '',
+      reservedAt: json['reservedAt'] as String? ?? '',
+      partySize: (json['partySize'] as num?)?.toInt() ?? 0,
+      reservationNo: json['reservationNo'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+    );
+  }
+}
+
+/// 行前筆記（trip_pretrip_notes，AI 可生成）。
+class TripPretripNote {
+  const TripPretripNote({
+    required this.id,
+    required this.sortOrder,
+    required this.version,
+    this.section = '',
+    this.title = '',
+    this.content = '',
+    this.aiGenerated = false,
+  });
+
+  final int id;
+  final int sortOrder;
+  final int version;
+  final String section;
+  final String title;
+
+  /// markdown 內容。
+  final String content;
+  final bool aiGenerated;
+
+  factory TripPretripNote.fromJson(Map<String, dynamic> json) {
+    return TripPretripNote(
+      id: (json['id'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      section: json['section'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
+    );
+  }
+}
+
+/// 緊急聯絡人（trip_emergency_contacts，AI 可生成）；kind enum 預設 other。
+class TripEmergencyContact {
+  const TripEmergencyContact({
+    required this.id,
+    required this.sortOrder,
+    required this.version,
+    this.name = '',
+    this.relationship = '',
+    this.phone = '',
+    this.email = '',
+    this.kind = 'other',
+    this.aiGenerated = false,
+  });
+
+  final int id;
+  final int sortOrder;
+  final int version;
+  final String name;
+  final String relationship;
+  final String phone;
+  final String email;
+
+  /// enum：personal | embassy | police | medical | insurance | hotel | other。
+  final String kind;
+  final bool aiGenerated;
+
+  factory TripEmergencyContact.fromJson(Map<String, dynamic> json) {
+    return TripEmergencyContact(
+      id: (json['id'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      name: json['name'] as String? ?? '',
+      relationship: json['relationship'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'other',
+      aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
+    );
+  }
+}
+
+/// `GET /trips/:id/notes` 回應的 5 區聚合。
+class TripNotes {
+  const TripNotes({
+    this.flights = const [],
+    this.lodgings = const [],
+    this.reservations = const [],
+    this.pretripNotes = const [],
+    this.emergencyContacts = const [],
+  });
+
+  final List<TripFlight> flights;
+  final List<TripLodging> lodgings;
+  final List<TripReservation> reservations;
+  final List<TripPretripNote> pretripNotes;
+  final List<TripEmergencyContact> emergencyContacts;
+
+  factory TripNotes.fromJson(Map<String, dynamic> json) {
+    return TripNotes(
+      flights: (json['flights'] as List<dynamic>? ?? [])
+          .map((flightJson) =>
+              TripFlight.fromJson(flightJson as Map<String, dynamic>))
+          .toList(),
+      lodgings: (json['lodgings'] as List<dynamic>? ?? [])
+          .map((lodgingJson) =>
+              TripLodging.fromJson(lodgingJson as Map<String, dynamic>))
+          .toList(),
+      reservations: (json['reservations'] as List<dynamic>? ?? [])
+          .map((reservationJson) =>
+              TripReservation.fromJson(reservationJson as Map<String, dynamic>))
+          .toList(),
+      pretripNotes: (json['pretripNotes'] as List<dynamic>? ?? [])
+          .map((pretripNoteJson) =>
+              TripPretripNote.fromJson(pretripNoteJson as Map<String, dynamic>))
+          .toList(),
+      emergencyContacts: (json['emergencyContacts'] as List<dynamic>? ?? [])
+          .map((contactJson) => TripEmergencyContact.fromJson(
+              contactJson as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

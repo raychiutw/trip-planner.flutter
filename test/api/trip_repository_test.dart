@@ -1,0 +1,252 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http_mock_adapter/http_mock_adapter.dart';
+import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/session_store.dart';
+import 'package:tripline/api/trip_repository.dart';
+
+void main() {
+  late Dio dio;
+  late DioAdapter dioAdapter;
+  late TripRepository tripRepository;
+
+  setUp(() {
+    dio = Dio();
+    dioAdapter = DioAdapter(dio: dio);
+    final apiClient =
+        ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    tripRepository = TripRepository(client: apiClient);
+  });
+
+  test('fetchMyTrips：GET /my-trips 解析 TripSummary list', () async {
+    dioAdapter.onGet(
+      '/my-trips',
+      (server) => server.reply(200, [
+        {
+          'tripId': 'okinawa-trip-2026-Ray',
+          'name': 'Okinawa',
+          'title': '沖繩自駕',
+          'totalDays': 5,
+        },
+      ]),
+    );
+
+    final myTrips = await tripRepository.fetchMyTrips();
+
+    expect(myTrips, hasLength(1));
+    expect(myTrips.single.tripId, 'okinawa-trip-2026-Ray');
+    expect(myTrips.single.totalDays, 5);
+  });
+
+  test('fetchTrips：GET /trips 解析 Trip list', () async {
+    dioAdapter.onGet(
+      '/trips',
+      (server) => server.reply(200, [
+        {
+          'tripId': 'okinawa-trip-2026-Ray',
+          'name': 'Okinawa',
+          'owner': 'Ray',
+          'published': 1,
+          'dayCount': 5,
+        },
+      ]),
+    );
+
+    final publishedTrips = await tripRepository.fetchTrips();
+
+    expect(publishedTrips.single.id, 'okinawa-trip-2026-Ray');
+    expect(publishedTrips.single.published, isTrue);
+  });
+
+  test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）',
+      () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray',
+      (server) => server.reply(200, {
+        'id': 'okinawa-trip-2026-Ray',
+        'name': 'Okinawa',
+        'published': 0,
+        'destinations': [
+          {'destOrder': 1, 'name': '那霸', 'lat': 26.21, 'lng': 127.68},
+        ],
+      }),
+    );
+
+    final tripDetail = await tripRepository.fetchTrip('okinawa-trip-2026-Ray');
+
+    expect(tripDetail.id, 'okinawa-trip-2026-Ray');
+    expect(tripDetail.destinations.single.name, '那霸');
+  });
+
+  test('fetchDays：GET /trips/:id/days?all=1 解析巢狀 timeline', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(200, [
+        {
+          'id': 11,
+          'dayNum': 1,
+          'date': '2026-04-23',
+          'dayOfWeek': '四',
+          'label': 'Day 1',
+          'title': '抵達那霸',
+          'version': 2,
+          'hotel': {
+            'id': 99,
+            'name': '那霸海濱飯店',
+            'checkout': '11:00',
+            'note': null,
+            'location': {'name': '那霸', 'lat': 26.21, 'lng': 127.68},
+          },
+          'timeline': [
+            {
+              'id': 101,
+              'dayId': 11,
+              'sortOrder': 0,
+              'time': '10:00',
+              'startTime': '10:00',
+              'endTime': '11:30',
+              'title': '首里城',
+              'description': '世界遺產',
+              'note': null,
+              'version': 1,
+              'travel': {
+                'type': 'drive',
+                'desc': '開車 20 分',
+                'min': 20,
+                'distanceM': 8000,
+                'source': 'google',
+              },
+              'master': {
+                'poiId': 501,
+                'name': '首里城公園',
+                'lat': 26.217,
+                'lng': 127.719,
+                'type': 'attraction',
+                'category': '歷史',
+                'hours': '08:30-18:00',
+                'rating': 4.4,
+                'price': null,
+                'note': null,
+                'sortOrder': 0,
+              },
+              'alternates': [
+                {
+                  'poiId': 502,
+                  'name': '玉陵',
+                  'lat': 26.218,
+                  'lng': 127.717,
+                  'type': 'attraction',
+                  'rating': 4.2,
+                },
+              ],
+            },
+            {
+              'id': 102,
+              'dayId': 11,
+              'sortOrder': 1,
+              'title': '國際通',
+              'version': 1,
+              'travel': null,
+              'master': null,
+              'alternates': [],
+            },
+          ],
+        },
+      ]),
+      queryParameters: {'all': '1'},
+    );
+
+    final tripDays = await tripRepository.fetchDays('okinawa-trip-2026-Ray');
+
+    expect(tripDays, hasLength(1));
+    final firstDay = tripDays.single;
+    expect(firstDay.dayNum, 1);
+    expect(firstDay.displayTitle, '抵達那霸');
+    expect(firstDay.hotel!.name, '那霸海濱飯店');
+    expect(firstDay.hotel!.location!.lat, 26.21);
+    expect(firstDay.timeline, hasLength(2));
+
+    final shuriCastleEntry = firstDay.timeline.first;
+    expect(shuriCastleEntry.title, '首里城');
+    expect(shuriCastleEntry.travel!.min, 20);
+    expect(shuriCastleEntry.master!.poiId, 501);
+    expect(shuriCastleEntry.master!.rating, 4.4);
+    expect(shuriCastleEntry.alternates.single.poiId, 502);
+
+    final kokusaiStreetEntry = firstDay.timeline.last;
+    expect(kokusaiStreetEntry.master, isNull);
+    expect(kokusaiStreetEntry.alternates, isEmpty);
+  });
+
+  test('fetchNotes：GET /trips/:id/notes 解析 5 區聚合', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/notes',
+      (server) => server.reply(200, {
+        'flights': [
+          {
+            'id': 1,
+            'sortOrder': 0,
+            'version': 1,
+            'airline': '台灣虎航',
+            'flightNo': 'IT232',
+          },
+        ],
+        'lodgings': [],
+        'reservations': [],
+        'pretripNotes': [],
+        'emergencyContacts': [],
+      }),
+    );
+
+    final tripNotes =
+        await tripRepository.fetchNotes('okinawa-trip-2026-Ray');
+
+    expect(tripNotes.flights.single.flightNo, 'IT232');
+    expect(tripNotes.lodgings, isEmpty);
+  });
+
+  test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
+    dioAdapter.onDelete(
+      '/trips/old-trip',
+      (server) => server.reply(204, null),
+    );
+
+    await expectLater(tripRepository.deleteTrip('old-trip'), completes);
+  });
+
+  test('fetchStats：GET /account/stats', () async {
+    dioAdapter.onGet(
+      '/account/stats',
+      (server) => server.reply(200, {
+        'tripCount': 2,
+        'totalDays': 10,
+        'collaboratorCount': 1,
+      }),
+    );
+
+    final accountStats = await tripRepository.fetchStats();
+
+    expect(accountStats.tripCount, 2);
+    expect(accountStats.totalDays, 10);
+  });
+
+  test('updateProfile：PATCH /account/profile 回 UserInfo', () async {
+    dioAdapter.onPatch(
+      '/account/profile',
+      (server) => server.reply(200, {
+        'id': 'u1hex',
+        'email': 'ray@example.com',
+        'emailVerified': 1,
+        'displayName': '新名字',
+        'avatarUrl': null,
+        'createdAt': '2026-01-01T00:00:00Z',
+      }),
+      data: {'displayName': '新名字'},
+    );
+
+    final updatedUser =
+        await tripRepository.updateProfile(displayName: '新名字');
+
+    expect(updatedUser.displayName, '新名字');
+  });
+}
