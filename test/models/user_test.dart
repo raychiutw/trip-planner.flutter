@@ -6,7 +6,7 @@ void main() {
     test('解析完整欄位', () {
       final userInfo = UserInfo.fromJson({
         'id': 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
-        'email': 'lean.lean@gmail.com',
+        'email': 'traveler@example.com',
         'emailVerified': true,
         'displayName': 'Ray',
         'avatarUrl': 'https://example.com/avatar.png',
@@ -14,7 +14,7 @@ void main() {
       });
 
       expect(userInfo.id, 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4');
-      expect(userInfo.email, 'lean.lean@gmail.com');
+      expect(userInfo.email, 'traveler@example.com');
       expect(userInfo.emailVerified, isTrue);
       expect(userInfo.displayName, 'Ray');
       expect(userInfo.avatarUrl, 'https://example.com/avatar.png');

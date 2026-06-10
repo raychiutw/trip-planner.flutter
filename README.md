@@ -1,17 +1,53 @@
-# tripline
+# Tripline Flutter
 
-A new Flutter project.
+[trip-planner](https://github.com/raychiutw/trip-planner) React SPA 的 **iOS / Android 移植版**。後端共用同一套 Cloudflare Pages Functions API（`https://trip-planner-dby.pages.dev/api`），本 repo 只是另一個 client。
 
-## Getting Started
+## 功能狀態
 
-This project is a starting point for a Flutter application.
+**P0（已完成）**
+- 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
+- 5-tab shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
+- 行程清單（三色 tone 卡片、pull-to-refresh、長按刪除）
+- 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
+- 行程地圖（flutter_map + OSM、逐日 pin、day tabs、entry cards 同步）
+- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
+- 帳號（profile、統計、登出）
 
-A few resources to get you started if this is your first Flutter project:
+**P1（待辦）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
+**P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## 開發
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter test       # 144 tests
+flutter analyze
+flutter run        # 連 prod API（注意：請用測試帳號）
+```
+
+## 架構
+
+```
+lib/
+  theme/        # design tokens（對應 web css/tokens.css）+ ThemeData + TpTones 三色 ThemeExtension
+  models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
+  api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
+  app/          # go_router（5-tab StatefulShellRoute + auth redirect）
+  features/     # auth / trips / trip_detail（timeline·map·notes）/ account / shell
+docs/
+  PORTING_PLAN.md   # 移植藍圖與架構決策
+  CONTRACTS.md      # 模組介面契約（多 agent 平行開發用）
+  discovery/        # 來源 SPA 的畫面/API/模型/設計系統調查報告
+```
+
+技術棧：Flutter 3.41 / Dart 3.11、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
+
+## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
+
+- mutating request 一律帶 `Origin: https://trip-planner-dby.pages.dev`（後端 CSRF Origin allowlist，缺少 → 403）
+- 429 讀 `Retry-After`（cap 30s）只 retry GET 一次；mutation 不 retry
+- 錯誤 shape `{error:{code,message,detail}}`；204 → null
+
+## 設計
+
+視覺規範以 web repo 的 `DESIGN.md` + `css/tokens.css` 為 SoT：柔褐 `#A97A4A` 主色、三色系統（玩/看/買=柔褐、住/移動=sage、吃=玫瑰粉）、hairline 卡片（elevation 0）、HIG 字級、light/dark 雙主題。
