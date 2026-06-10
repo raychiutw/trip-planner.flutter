@@ -1,7 +1,6 @@
 /// device smoke:app 啟動(未登入、完全不打 prod API)→ 停在登入頁。
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

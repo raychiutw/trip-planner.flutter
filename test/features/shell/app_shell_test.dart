@@ -6,7 +6,7 @@ import 'package:tripline/theme/app_theme.dart';
 
 GoRouter buildShellRouter() {
   StatefulShellBranch probe(String path, String marker) => StatefulShellBranch(
-        routes: [GoRoute(path: path, builder: (_, __) => Text(marker))],
+        routes: [GoRoute(path: path, builder: (_, _) => Text(marker))],
       );
   return GoRouter(
     initialLocation: '/chat',
