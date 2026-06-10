@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/poi_favorite.dart';
 import '../../theme/tokens.dart';
@@ -15,7 +16,17 @@ class FavoritesScreen extends ConsumerWidget {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('收藏')),
+      appBar: AppBar(
+        title: const Text('收藏'),
+        actions: [
+          IconButton(
+            key: const ValueKey('favorites-explore-action'),
+            tooltip: '探索',
+            icon: const Icon(Icons.search),
+            onPressed: () => context.go('/favorites/explore'),
+          ),
+        ],
+      ),
       body: favoritesAsync.when(
         data: (favorites) => RefreshIndicator(
           onRefresh: () => ref.refresh(favoritesProvider.future),

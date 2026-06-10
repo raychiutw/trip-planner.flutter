@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
@@ -138,6 +139,38 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
       verifyNever(() => mockRepo.deleteFavorite(any()));
+    });
+
+    testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.fetchFavorites).thenAnswer((_) async => const []);
+
+      final router = GoRouter(
+        initialLocation: '/favorites',
+        routes: [
+          GoRoute(
+            path: '/favorites',
+            builder: (context, state) => const FavoritesScreen(),
+            routes: [
+              GoRoute(
+                path: 'explore',
+                builder: (context, state) =>
+                    const Scaffold(body: Text('EXPLORE-PROBE')),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+        child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorites-explore-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('EXPLORE-PROBE'), findsOneWidget);
     });
   });
 }
