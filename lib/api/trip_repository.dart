@@ -59,6 +59,32 @@ class TripRepository {
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
 
+  /// POST /trips/:id/days/:num/entries（direct add,body snake_case;後端自動 find-or-create POI）。
+  Future<void> addEntryToDay({
+    required String tripId,
+    required int dayNum,
+    required String title,
+    String? poiType,
+    double? lat,
+    double? lng,
+    String? startTime,
+    String? endTime,
+    String source = 'user-explore',
+  }) {
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
+      body: {
+        'title': title,
+        'poi_type': poiType,
+        'lat': lat,
+        'lng': lng,
+        'start_time': startTime,
+        'end_time': endTime,
+        'source': source,
+      },
+    );
+  }
+
   /// GET /account/stats。
   Future<AccountStats> fetchStats() async {
     final responseBody = await _client.get('/account/stats');

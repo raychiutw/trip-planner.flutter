@@ -120,6 +120,7 @@ class TripRepository {
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
+  Future<void>              addEntryToDay({required String tripId, required int dayNum, required String title, String? poiType, double? lat, double? lng, String? startTime, String? endTime, String source}); // POST /trips/:id/days/:num/entries（探索 direct add）
 }
 ```
 
@@ -136,6 +137,7 @@ class FavoritesRepository {
   Future<List<PoiFavorite>> fetchFavorites();       // GET /poi-favorites
   Future<void>              deleteFavorite(int id);  // DELETE /poi-favorites/:id
   Future<void>              addFavorite(int poiId);  // POST /poi-favorites
+  Future<AddToTripResult>   addFavoriteToTrip({required int favoriteId, required String tripId, required int dayNum, required String startTime, required String endTime}); // POST /poi-favorites/:id/add-to-trip（409 → ApiError.payload['conflictWith']）
 }
 ```
 

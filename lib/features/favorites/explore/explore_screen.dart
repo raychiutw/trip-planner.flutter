@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
 import 'poi_search_card.dart';
@@ -250,6 +252,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           isSaving: state.savingPlaceIds.contains(poi.placeId),
           onToggleFavorite: () =>
               ref.read(exploreControllerProvider.notifier).toggleFavorite(poi),
+          onAddToTrip: () => context.go(
+            '/favorites/add-to-trip',
+            extra: AddToTripDirect(poi: poi),
+          ),
         );
       },
     );

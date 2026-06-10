@@ -14,12 +14,14 @@ class PoiSearchCard extends StatelessWidget {
     required this.isSaved,
     required this.isSaving,
     required this.onToggleFavorite,
+    this.onAddToTrip,
   });
 
   final PoiSearchResult poi;
   final bool isSaved;
   final bool isSaving;
   final VoidCallback onToggleFavorite;
+  final VoidCallback? onAddToTrip;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +58,17 @@ class PoiSearchCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onAddToTrip != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: IconButton(
+                    key: ValueKey('poi-add-to-trip-${poi.placeId}'),
+                    tooltip: '加入行程',
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    onPressed: onAddToTrip,
+                  ),
+                ),
             ],
           ),
           Expanded(

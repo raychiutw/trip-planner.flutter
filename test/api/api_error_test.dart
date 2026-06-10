@@ -72,4 +72,27 @@ void main() {
       expect(apiError.toString(), contains('AUTH_REQUIRED'));
     });
   });
+
+  group('payload（保留原始 body 供 409 conflictWith）', () {
+    test('Map body → payload 保留整個原始 body', () {
+      final error = ApiError.fromResponse(409, {
+        'error': 'CONFLICT',
+        'conflictWith': {
+          'entryId': 5,
+          'time': '10:00-11:00',
+          'title': '午餐',
+          'dayNum': 1,
+        },
+      });
+      expect(error.status, 409);
+      expect(error.code, 'CONFLICT');
+      expect(error.payload?['conflictWith'], isA<Map>());
+      expect((error.payload!['conflictWith'] as Map)['entryId'], 5);
+    });
+
+    test('非 Map body → payload null', () {
+      final error = ApiError.fromResponse(500, 'oops');
+      expect(error.payload, isNull);
+    });
+  });
 }

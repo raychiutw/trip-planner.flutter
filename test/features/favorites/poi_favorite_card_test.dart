@@ -8,11 +8,16 @@ Future<void> pumpCard(
   WidgetTester tester,
   PoiFavorite favorite, {
   VoidCallback? onRemove,
+  VoidCallback? onAddToTrip,
 }) {
   return tester.pumpWidget(MaterialApp(
     theme: AppTheme.light(),
     home: Scaffold(
-      body: PoiFavoriteCard(favorite: favorite, onRemove: onRemove ?? () {}),
+      body: PoiFavoriteCard(
+        favorite: favorite,
+        onRemove: onRemove ?? () {},
+        onAddToTrip: onAddToTrip,
+      ),
     ),
   ));
 }
@@ -63,6 +68,13 @@ void main() {
       await pumpCard(tester, _favorite, onRemove: () => removed++);
       await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
       expect(removed, 1);
+    });
+
+    testWidgets('有 onAddToTrip → 點加入行程鈕觸發', (tester) async {
+      var added = 0;
+      await pumpCard(tester, _favorite, onAddToTrip: () => added++);
+      await tester.tap(find.byKey(const ValueKey('favorite-add-to-trip-7')));
+      expect(added, 1);
     });
   });
 }
