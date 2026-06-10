@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -15,6 +16,7 @@ import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
 import '../features/trips/trips_list_screen.dart';
+import '../models/add_to_trip.dart';
 
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -106,6 +108,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'explore',
                     builder: (context, state) => const ExploreScreen(),
+                  ),
+                  GoRoute(
+                    path: 'add-to-trip',
+                    builder: (context, state) =>
+                        AddToTripScreen(args: state.extra! as AddToTripArgs),
                   ),
                 ],
               ),

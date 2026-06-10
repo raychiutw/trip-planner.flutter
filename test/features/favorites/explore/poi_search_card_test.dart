@@ -8,6 +8,7 @@ Future<void> pumpCard(
   WidgetTester tester, {
   required bool isSaved,
   VoidCallback? onToggle,
+  VoidCallback? onAddToTrip,
 }) {
   return tester.pumpWidget(MaterialApp(
     theme: AppTheme.light(),
@@ -20,6 +21,7 @@ Future<void> pumpCard(
         isSaved: isSaved,
         isSaving: false,
         onToggleFavorite: onToggle ?? () {},
+        onAddToTrip: onAddToTrip,
       ),
     ),
   ));
@@ -45,5 +47,12 @@ void main() {
     await pumpCard(tester, isSaved: false, onToggle: () => toggled++);
     await tester.tap(find.byKey(const ValueKey('poi-heart-p1')));
     expect(toggled, 1);
+  });
+
+  testWidgets('有 onAddToTrip → 點加入行程鈕觸發', (tester) async {
+    var added = 0;
+    await pumpCard(tester, isSaved: false, onAddToTrip: () => added++);
+    await tester.tap(find.byKey(const ValueKey('poi-add-to-trip-p1')));
+    expect(added, 1);
   });
 }

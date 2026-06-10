@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../theme/tokens.dart';
 import 'favorites_providers.dart';
@@ -58,6 +59,13 @@ class FavoritesScreen extends ConsumerWidget {
         return PoiFavoriteCard(
           favorite: favorite,
           onRemove: () => _confirmRemove(context, ref, favorite),
+          onAddToTrip: () => context.go(
+            '/favorites/add-to-trip',
+            extra: AddToTripFavorite(
+              favoriteId: favorite.id,
+              displayName: favorite.displayName,
+            ),
+          ),
         );
       },
     );

@@ -11,10 +11,12 @@ class PoiFavoriteCard extends StatelessWidget {
     super.key,
     required this.favorite,
     required this.onRemove,
+    this.onAddToTrip,
   });
 
   final PoiFavorite favorite;
   final VoidCallback onRemove;
+  final VoidCallback? onAddToTrip;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +100,13 @@ class PoiFavoriteCard extends StatelessWidget {
               ],
             ),
           ),
+          if (onAddToTrip != null)
+            IconButton(
+              key: ValueKey('favorite-add-to-trip-${favorite.id}'),
+              tooltip: '加入行程',
+              icon: const Icon(Icons.add_location_alt_outlined),
+              onPressed: onAddToTrip,
+            ),
           IconButton(
             key: ValueKey('favorite-remove-${favorite.id}'),
             tooltip: '取消收藏',
