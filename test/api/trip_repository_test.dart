@@ -249,4 +249,24 @@ void main() {
 
     expect(updatedUser.displayName, '新名字');
   });
+
+  test('addEntryToDay：POST /trips/:id/days/:num/entries snake_case body', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/days/1/entries',
+      (server) => server.reply(201, {'id': 99}),
+      data: {
+        'title': '美麗海水族館', 'poi_type': 'attraction',
+        'lat': 26.69, 'lng': 127.87,
+        'start_time': '10:00', 'end_time': '11:00', 'source': 'user-explore',
+      },
+    );
+
+    await expectLater(
+      tripRepository.addEntryToDay(
+        tripId: 'okinawa', dayNum: 1, title: '美麗海水族館',
+        poiType: 'attraction', lat: 26.69, lng: 127.87,
+        startTime: '10:00', endTime: '11:00'),
+      completes,
+    );
+  });
 }
