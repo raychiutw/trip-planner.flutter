@@ -19,6 +19,9 @@ class FavoritesRepository {
         .toList();
   }
 
+  /// GET /poi-favorites（探索畫面用；與 fetchFavorites 相同）。
+  Future<List<PoiFavorite>> listFavorites() => fetchFavorites();
+
   /// DELETE /poi-favorites/:id（mutation，ApiClient 自動帶 CSRF Origin）。
   Future<void> deleteFavorite(int id) => _client.delete('/poi-favorites/$id');
 
