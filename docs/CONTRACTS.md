@@ -1,0 +1,175 @@
+# 模組契約（跨 agent 實作介面，嚴格遵守）
+
+> 所有平行實作的 agent 必須照此檔的檔案路徑、class 名、方法簽章實作。
+> 若實作中發現契約有誤（如 API 欄位不符），以 `docs/discovery/*.md` 與 web repo 原始碼為準，並在最終回報中註明偏差。
+
+## 通用解析規則
+
+- wire format 是 **camelCase**（server `deepCamel()`）；`fromJson` 直接讀 camelCase key
+- 數字一律 `(json['x'] as num?)?.toDouble()` / `?.toInt()`（server 可能回 int 或 double）
+- bool flag（如 `published`）server 回 0/1：`json['published'] == 1 || json['published'] == true`
+- 日期時間全是字串，不轉 DateTime 存放（顯示層再 parse）；entry `startTime`/`endTime` = `"HH:MM"`
+- 所有 model：`const` 建構子 + named 參數 + `factory X.fromJson(Map<String, dynamic> json)`；list 欄位預設 `[]`
+
+## lib/theme/
+
+```dart
+// tokens.dart — design token 常數（值來自 docs/discovery/design.md 的 tokens 表）
+abstract final class TpColorsLight { static const background = Color(0xFFFFFBF5); /* accent, accentDeep, accentSubtle, accentBg, sage 4 階, pink 4 階, secondary, tertiary, hover, foreground, muted, accentForeground, border, lineStrong, destructive, destructiveBg, success, warning, disabled, overlay … */ }
+abstract final class TpColorsDark { /* 同名 dark 值 */ }
+abstract final class TpRadius { static const xs = 4.0; sm = 6.0; md = 8.0; lg = 12.0; xl = 16.0; }
+abstract final class TpSpacing { /* 4px grid: s1=4 … s10=40; tapMin=44.0; navHeight=88.0 */ }
+abstract final class TpMotion { static const fast = Duration(milliseconds: 150); normal = 250ms; slow = 350ms; static const appleEase = Cubic(0.2, 0.8, 0.2, 1); }
+
+// app_theme.dart
+class TpTones extends ThemeExtension<TpTones> { /* accent/sage/pink 各 4 階（base deep subtle bg）+ success warning */ }
+abstract final class AppTheme {
+  static ThemeData light();
+  static ThemeData dark();
+}
+```
+
+## lib/models/（檔案：trip.dart, day.dart, entry.dart, notes.dart, user.dart）
+
+```dart
+// trip.dart
+class TripSummary { final String tripId; final String name; final String? title; final int? totalDays; }       // GET /my-trips
+class TripDestination { final int? destOrder; final String name; final double? lat; final double? lng; }
+class Trip {            // GET /trips (list item) 與 GET /trips/:id（detail）共用，寬鬆 nullable
+  final String id;      // 來源 json['tripId'] ?? json['id']
+  final String name; final String? owner; final String? ownerDisplayName; final String? title;
+  final String? description; final String? countries; final bool published; final String? lang;
+  final int? dayCount; final String? startDate; final String? endDate; final int? memberCount;
+  final List<TripDestination> destinations;
+}
+
+// day.dart
+class TripLocation { final String? name; final double? lat; final double? lng; }
+class DayHotel { final int id; final String name; final String? checkout; final String? note; final TripLocation? location; }
+class TripDay {         // GET /trips/:id/days?all=1 item
+  final int id; final int dayNum; final String? date; final String? dayOfWeek; final String? label;
+  final String? title; final int version; final DayHotel? hotel; final List<TimelineEntry> timeline;
+  String get displayTitle; // title ?? label ?? 'Day $dayNum'
+}
+
+// entry.dart
+class Travel { final String type; final String? desc; final int? min; final int? distanceM; final String? source; }
+class EntryPoiInfo {
+  final int poiId; final String? name; final double? lat; final double? lng; final String? type; // poi_type enum 字串
+  final String? category; final String? hours; final double? rating; final String? price; final String? note; final int? sortOrder;
+}
+class TimelineEntry {
+  final int id; final int? dayId; final int sortOrder; final String? time; final String? startTime; final String? endTime;
+  final String title; final String? description; final String? note; final int version;
+  final Travel? travel; final EntryPoiInfo? master; final List<EntryPoiInfo> alternates;
+}
+
+// notes.dart — 5 個 row class 共通欄位：int id, int sortOrder, int version；文字欄位非 null 預設 ''
+class TripFlight { airline, flightNo, cabinClass, departAirport, arriveAirport, departAt, arriveAt, note — 全 String }
+class TripLodging { name, address, checkInAt, checkOutAt, bookingNo, phone, note — String; final int? dayId; }
+class TripReservation { final String kind; title, reservedAt, reservationNo, phone, note — String; final int partySize; }
+class TripPretripNote { section, title, content — String; final bool aiGenerated; }
+class TripEmergencyContact { name, relationship, phone, email — String; final String kind; final bool aiGenerated; }
+class TripNotes { final List<TripFlight> flights; final List<TripLodging> lodgings; final List<TripReservation> reservations; final List<TripPretripNote> pretripNotes; final List<TripEmergencyContact> emergencyContacts; }
+
+// user.dart
+class UserInfo { final String id; final String email; final bool emailVerified; final String? displayName; final String? avatarUrl; }
+class AccountStats { /* 欄位以 web repo functions/api/account/stats.ts 實際輸出（camelCase 化）為準，實作前先讀該檔 */ }
+```
+
+## lib/api/
+
+```dart
+// api_error.dart
+class ApiError implements Exception {
+  final int status; final String code; final String message; final String? detail;
+  // 解析優先序：{error:{code,message,detail}} → {error:"string"} → status fallback；OAuth 端點 {error, error_description}
+  factory ApiError.fromResponse(int status, dynamic body);
+}
+
+// session_store.dart — 可注入測試替身
+abstract class SessionStore { Future<String?> read(); Future<void> write(String token); Future<void> clear(); }
+class SecureSessionStore implements SessionStore { /* flutter_secure_storage, key: 'tripline_session' */ }
+class InMemorySessionStore implements SessionStore { /* 測試用 */ }
+
+// api_client.dart
+const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
+class ApiClient {
+  ApiClient({required SessionStore sessionStore, Dio? dio, String origin = kTriplineOrigin});
+  // base = '$origin/api'。行為規則（必含對應測試）：
+  // 1. 每個 request 帶 Cookie: tripline_session=<token>（store 有值時）
+  // 2. POST/PUT/PATCH/DELETE 帶 Origin: $origin header
+  // 3. 非 2xx → throw ApiError；429 且 GET → 讀 Retry-After（cap 30s）retry 一次；mutation 不 retry
+  // 4. 204 / 空 body → 回 null
+  Future<dynamic> get(String path, {Map<String, dynamic>? query});
+  Future<dynamic> post(String path, {Object? body});
+  Future<dynamic> put(String path, {Object? body});
+  Future<dynamic> patch(String path, {Object? body});
+  Future<dynamic> delete(String path);
+  Dio get dio; // 供 auth repository 讀 set-cookie 用
+}
+
+// auth_repository.dart
+class AuthRepository {
+  AuthRepository({required ApiClient client, required SessionStore sessionStore});
+  Future<UserInfo> login({required String email, required String password});
+  // POST /oauth/login {email,password} → 解析 response set-cookie 中 tripline_session=<value>，寫入 store，再 GET /oauth/userinfo
+  Future<void> logout();          // POST /oauth/logout（忽略失敗）+ store.clear()
+  Future<UserInfo?> currentUser(); // GET /oauth/userinfo；401 → null（不 throw）
+}
+
+// trip_repository.dart
+class TripRepository {
+  TripRepository({required ApiClient client});
+  Future<List<TripSummary>> fetchMyTrips();          // GET /my-trips
+  Future<List<Trip>> fetchTrips();                   // GET /trips
+  Future<Trip> fetchTrip(String id);                 // GET /trips/:id
+  Future<List<TripDay>> fetchDays(String id);        // GET /trips/:id/days?all=1
+  Future<TripNotes> fetchNotes(String id);           // GET /trips/:id/notes
+  Future<void> deleteTrip(String id);
+  Future<AccountStats> fetchStats();                 // GET /account/stats
+  Future<UserInfo> updateProfile({String? displayName}); // PATCH /account/profile
+}
+
+// providers.dart（riverpod 3.x 語法）
+final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSessionStore
+final apiClientProvider = Provider<ApiClient>(...);
+final authRepositoryProvider = Provider<AuthRepository>(...);
+final tripRepositoryProvider = Provider<TripRepository>(...);
+class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<void> logout(); }
+final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new); // build() = currentUser()
+```
+
+## lib/app/ 與 features/
+
+```dart
+// app/router.dart
+GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
+// /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesPlaceholderScreen) /account(AccountScreen)
+// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）
+// /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
+
+// features/shell/app_shell.dart
+class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // NavigationBar 5 tabs：聊天/行程/地圖/收藏/帳號
+class PlaceholderScreen extends StatelessWidget { const PlaceholderScreen({required this.title}); } // 「即將推出」
+
+// features/trip_detail/trip_providers.dart（由 timeline agent 實作，map/notes agent 只 import）
+final tripDetailProvider = FutureProvider.family<Trip, String>(...);
+final tripDaysProvider = FutureProvider.family<List<TripDay>, String>(...);
+final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
+
+// 各 screen class 名
+class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
+class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
+class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
+class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
+class TripNotesScreen extends ConsumerWidget;          // features/trip_detail/trip_notes_screen.dart
+class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
+```
+
+## 測試要求（TDD）
+
+- models：每個 model 至少 1 個 fromJson 測試（fixture 對齊 discovery/models.md 欄位表，含 nullable/0-1 bool/num 轉型 edge case）
+- api：ApiClient 4 條行為規則各 1 測試（http_mock_adapter）；AuthRepository login 解析 set-cookie 測試
+- screens：每個 screen 至少 1 個 widget test（ProviderScope override 假 repository）
+- 全部 `flutter analyze` 零 error/warning、`flutter test` 綠
