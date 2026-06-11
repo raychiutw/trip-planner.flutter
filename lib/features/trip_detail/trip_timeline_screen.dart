@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
+import 'widgets/entry_edit_sheet.dart';
 import 'widgets/hotel_card.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_pill.dart';
@@ -48,8 +50,9 @@ class TripTimelineScreen extends ConsumerWidget {
         ],
       ),
       body: daysAsync.when(
-        data: (days) =>
-            days.isEmpty ? const _EmptyTimeline() : _TimelineBody(days: days),
+        data: (days) => days.isEmpty
+            ? const _EmptyTimeline()
+            : _TimelineBody(days: days, tripId: tripId),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -64,9 +67,10 @@ class TripTimelineScreen extends ConsumerWidget {
 
 /// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
 class _TimelineBody extends StatefulWidget {
-  const _TimelineBody({required this.days});
+  const _TimelineBody({required this.days, required this.tripId});
 
   final List<TripDay> days;
+  final String tripId;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
@@ -128,7 +132,10 @@ class _TimelineBodyState extends State<_TimelineBody> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final day in widget.days)
-                  _DaySection(key: _daySectionKeys[day.dayNum], day: day),
+                  _DaySection(
+                      key: _daySectionKeys[day.dayNum],
+                      day: day,
+                      tripId: widget.tripId),
               ],
             ),
           ),
@@ -138,14 +145,49 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 }
 
-/// 單日 section：day header → hotel 卡 → entries（entry 之間插 travel pill）。
-class _DaySection extends StatelessWidget {
-  const _DaySection({super.key, required this.day});
+/// 單日 section：day header → hotel 卡 → entries（entry 之間插 travel pill）→ 新增鈕。
+/// entry 可點（編輯）、左滑（刪除）。
+class _DaySection extends ConsumerWidget {
+  const _DaySection({super.key, required this.tripId, required this.day});
 
+  final String tripId;
   final TripDay day;
 
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, TimelineEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('刪除停留點'),
+        content: Text('確定要刪除「${entry.title}」嗎？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('刪除')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .deleteEntry(tripId: tripId, entryId: entry.id);
+      ref.invalidate(tripDaysProvider(tripId));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已刪除')));
+    } on Exception {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
 
     return Column(
@@ -157,17 +199,59 @@ class _DaySection extends StatelessWidget {
           HotelCard(hotel: day.hotel!),
           const SizedBox(height: TpSpacing.s3),
         ],
-        for (var entryIndex = 0; entryIndex < timeline.length; entryIndex++) ...[
-          if (entryIndex > 0 && timeline[entryIndex].travel != null)
-            _TravelRow(travel: timeline[entryIndex].travel!),
-          TimelineEntryTile(
-            entry: timeline[entryIndex],
-            isFirst: entryIndex == 0,
-            isLast: entryIndex == timeline.length - 1,
+        for (var i = 0; i < timeline.length; i++) ...[
+          if (i > 0 && timeline[i].travel != null)
+            _TravelRow(travel: timeline[i].travel!),
+          Dismissible(
+            key: ValueKey('entry-dismiss-${timeline[i].id}'),
+            direction: DismissDirection.endToStart,
+            background: const _DeleteBackground(),
+            confirmDismiss: (_) async {
+              await _confirmDelete(context, ref, timeline[i]);
+              return false; // 靠 invalidate 重抓移除,避免與 provider 資料雙重移除
+            },
+            child: TimelineEntryTile(
+              entry: timeline[i],
+              isFirst: i == 0,
+              isLast: i == timeline.length - 1,
+              onTap: () => showEntryEditSheet(context,
+                  tripId: tripId, args: EntryEditExisting(timeline[i])),
+            ),
           ),
         ],
+        const SizedBox(height: TpSpacing.s2),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('add-entry-${day.dayNum}'),
+            onPressed: () => showEntryEditSheet(context,
+                tripId: tripId, args: EntryEditNew(day.dayNum)),
+            icon: const Icon(Icons.add),
+            label: const Text('新增停留點'),
+          ),
+        ),
         const SizedBox(height: TpSpacing.s6),
       ],
+    );
+  }
+}
+
+/// 左滑刪除背景。
+class _DeleteBackground extends StatelessWidget {
+  const _DeleteBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      alignment: Alignment.centerRight,
+      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(TpRadius.md),
+      ),
+      child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
     );
   }
 }
