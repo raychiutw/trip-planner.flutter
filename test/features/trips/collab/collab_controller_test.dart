@@ -55,8 +55,12 @@ void main() {
 
   test('非 owner（成員列表 403）→ canManage false', () async {
     when(() => repo.fetchMembers(any())).thenAnswer(
-        (_) async => throw const ApiError(
-            status: 403, code: 'PERM_ADMIN_ONLY', message: 'no'));
+      (_) async => throw const ApiError(
+        status: 403,
+        code: 'PERM_ADMIN_ONLY',
+        message: 'no',
+      ),
+    );
     final c = makeC();
     await loaded(c);
     final s = c.read(collabControllerProvider('okinawa'));
@@ -65,26 +69,32 @@ void main() {
   });
 
   test('invite → 呼叫 repo.invite + reload', () async {
-    when(() => repo.invite(
-          tripId: any(named: 'tripId'),
-          email: any(named: 'email'),
-          role: any(named: 'role'),
-        )).thenAnswer((_) async {});
+    when(
+      () => repo.invite(
+        tripId: any(named: 'tripId'),
+        email: any(named: 'email'),
+        role: any(named: 'role'),
+      ),
+    ).thenAnswer((_) async {});
     final c = makeC();
     final ctrl = await loaded(c);
     await ctrl.invite('b@x.com', 'viewer');
-    verify(() => repo.invite(tripId: 'okinawa', email: 'b@x.com', role: 'viewer'))
-        .called(1);
+    verify(
+      () => repo.invite(tripId: 'okinawa', email: 'b@x.com', role: 'viewer'),
+    ).called(1);
     verify(() => repo.fetchMembers('okinawa')).called(2); // load + reload
   });
 
   test('invite 409 → actionError', () async {
-    when(() => repo.invite(
-          tripId: any(named: 'tripId'),
-          email: any(named: 'email'),
-          role: any(named: 'role'),
-        )).thenThrow(
-        const ApiError(status: 409, code: 'DATA_CONFLICT', message: 'dup'));
+    when(
+      () => repo.invite(
+        tripId: any(named: 'tripId'),
+        email: any(named: 'email'),
+        role: any(named: 'role'),
+      ),
+    ).thenThrow(
+      const ApiError(status: 409, code: 'DATA_CONFLICT', message: 'dup'),
+    );
     final c = makeC();
     final ctrl = await loaded(c);
     await ctrl.invite('b@x.com', 'member');
@@ -99,6 +109,7 @@ void main() {
     final ctrl = await loaded(c);
     await ctrl.changeRole(2, 'member');
     verify(() => repo.changeRole(2, 'member')).called(1);
+    verify(() => repo.fetchMembers('okinawa')).called(2); // load + reload
   });
 
   test('removeMember → 呼叫 repo.removeMember', () async {
@@ -107,5 +118,6 @@ void main() {
     final ctrl = await loaded(c);
     await ctrl.removeMember(2);
     verify(() => repo.removeMember(2)).called(1);
+    verify(() => repo.fetchMembers('okinawa')).called(2); // load + reload
   });
 }

@@ -130,6 +130,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 PopupMenuButton<String>(
                   key: ValueKey('member-role-${m.id}'),
                   initialValue: m.role,
+                  enabled: state.changingId == null,
                   onSelected: (r) => _ctrl.changeRole(m.id, r),
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'member', child: Text('共編成員')),

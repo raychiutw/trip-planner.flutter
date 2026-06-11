@@ -58,13 +58,18 @@ class CollabState {
       invites: invites ?? this.invites,
       error: error == _sentinel ? this.error : error as String?,
       adding: adding ?? this.adding,
-      changingId: changingId == _sentinel ? this.changingId : changingId as int?,
-      removingId: removingId == _sentinel ? this.removingId : removingId as int?,
+      changingId: changingId == _sentinel
+          ? this.changingId
+          : changingId as int?,
+      removingId: removingId == _sentinel
+          ? this.removingId
+          : removingId as int?,
       revokingEmail: revokingEmail == _sentinel
           ? this.revokingEmail
           : revokingEmail as String?,
-      actionError:
-          actionError == _sentinel ? this.actionError : actionError as String?,
+      actionError: actionError == _sentinel
+          ? this.actionError
+          : actionError as String?,
     );
   }
 
@@ -156,6 +161,7 @@ class CollabController extends Notifier<CollabState> {
   }
 
   Future<void> changeRole(int permissionId, String role) async {
+    if (state.changingId != null) return;
     state = state.copyWith(changingId: permissionId, actionError: null);
     try {
       await _repo.changeRole(permissionId, role);
@@ -169,6 +175,7 @@ class CollabController extends Notifier<CollabState> {
   }
 
   Future<void> removeMember(int permissionId) async {
+    if (state.removingId != null) return;
     state = state.copyWith(removingId: permissionId, actionError: null);
     try {
       await _repo.removeMember(permissionId);
@@ -182,6 +189,7 @@ class CollabController extends Notifier<CollabState> {
   }
 
   Future<void> revokeInvite(String email) async {
+    if (state.revokingEmail != null) return;
     state = state.copyWith(revokingEmail: email, actionError: null);
     try {
       await _repo.revokeInvite(tripId: tripId, email: email);
@@ -195,7 +203,5 @@ class CollabController extends Notifier<CollabState> {
   }
 }
 
-final collabControllerProvider =
-    NotifierProvider.autoDispose.family<CollabController, CollabState, String>(
-  CollabController.new,
-);
+final collabControllerProvider = NotifierProvider.autoDispose
+    .family<CollabController, CollabState, String>(CollabController.new);

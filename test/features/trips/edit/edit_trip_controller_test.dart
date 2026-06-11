@@ -62,7 +62,9 @@ void main() {
   });
 
   test('改 title → save 送 diff(只 title)', () async {
-    when(() => repo.updateTrip(any(),
+    when(
+      () => repo.updateTrip(
+        any(),
         name: any(named: 'name'),
         title: any(named: 'title'),
         description: any(named: 'description'),
@@ -70,7 +72,9 @@ void main() {
         published: any(named: 'published'),
         dataSource: any(named: 'dataSource'),
         lang: any(named: 'lang'),
-        destinations: any(named: 'destinations'))).thenAnswer((_) async {});
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((_) async {});
 
     final c = makeC();
     final ctrl = await loaded(c);
@@ -78,16 +82,28 @@ void main() {
     await ctrl.save();
 
     expect(c.read(editTripControllerProvider('okinawa')).saved, isTrue);
-    verify(() => repo.updateTrip('okinawa',
+    verify(
+      () => repo.updateTrip(
+        'okinawa',
         title: '新標題',
-        description: any(named: 'description'),
-        lang: any(named: 'lang'),
-        published: any(named: 'published'),
-        destinations: any(named: 'destinations'))).called(1);
+        description: null, // 未改 → 不送(diff-only)
+        lang: null,
+        published: null,
+        destinations: null,
+      ),
+    ).called(1);
   });
 
-  test('destinations 改 → save 送 destinations', () async {
-    when(() => repo.updateTrip(any(),
+  test('改回原值 → hasChanges false、save 不打 API', () async {
+    final c = makeC();
+    final ctrl = await loaded(c);
+    ctrl.setTitle('改了');
+    ctrl.setTitle('原標題'); // 改回原值
+    await ctrl.save();
+    expect(c.read(editTripControllerProvider('okinawa')).saved, isTrue);
+    verifyNever(
+      () => repo.updateTrip(
+        any(),
         name: any(named: 'name'),
         title: any(named: 'title'),
         description: any(named: 'description'),
@@ -95,19 +111,41 @@ void main() {
         published: any(named: 'published'),
         dataSource: any(named: 'dataSource'),
         lang: any(named: 'lang'),
-        destinations: any(named: 'destinations'))).thenAnswer((_) async {});
+        destinations: any(named: 'destinations'),
+      ),
+    );
+  });
+
+  test('destinations 改 → save 送 destinations', () async {
+    when(
+      () => repo.updateTrip(
+        any(),
+        name: any(named: 'name'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        published: any(named: 'published'),
+        dataSource: any(named: 'dataSource'),
+        lang: any(named: 'lang'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((_) async {});
 
     final c = makeC();
     final ctrl = await loaded(c);
     ctrl.addDestination(const DestinationInput(name: '石垣島'));
     await ctrl.save();
 
-    verify(() => repo.updateTrip('okinawa',
+    verify(
+      () => repo.updateTrip(
+        'okinawa',
         title: any(named: 'title'),
         description: any(named: 'description'),
         lang: any(named: 'lang'),
         published: any(named: 'published'),
-        destinations: any(named: 'destinations'))).called(1);
+        destinations: any(named: 'destinations'),
+      ),
+    ).called(1);
   });
 
   test('無變更 → save 不打 API,直接 saved', () async {
@@ -116,7 +154,9 @@ void main() {
     await ctrl.save();
 
     expect(c.read(editTripControllerProvider('okinawa')).saved, isTrue);
-    verifyNever(() => repo.updateTrip(any(),
+    verifyNever(
+      () => repo.updateTrip(
+        any(),
         name: any(named: 'name'),
         title: any(named: 'title'),
         description: any(named: 'description'),
@@ -124,6 +164,8 @@ void main() {
         published: any(named: 'published'),
         dataSource: any(named: 'dataSource'),
         lang: any(named: 'lang'),
-        destinations: any(named: 'destinations')));
+        destinations: any(named: 'destinations'),
+      ),
+    );
   });
 }

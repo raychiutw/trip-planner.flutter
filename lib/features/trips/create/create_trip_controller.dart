@@ -89,8 +89,11 @@ class CreateTripState {
 }
 
 class CreateTripController extends Notifier<CreateTripState> {
+  bool _disposed = false;
+
   @override
   CreateTripState build() {
+    ref.onDispose(() => _disposed = true);
     final now = DateTime.now();
     return CreateTripState(flexYear: now.year, flexMonth: now.month);
   }
@@ -100,8 +103,9 @@ class CreateTripController extends Notifier<CreateTripState> {
   void addDestination(DestinationInput d) =>
       state = state.copyWith(destinations: [...state.destinations, d]);
 
-  void removeDestination(int index) =>
-      state = state.copyWith(destinations: [...state.destinations]..removeAt(index));
+  void removeDestination(int index) => state = state.copyWith(
+    destinations: [...state.destinations]..removeAt(index),
+  );
 
   void reorderDestination(int oldIndex, int newIndex) {
     final list = [...state.destinations];
@@ -144,12 +148,14 @@ class CreateTripController extends Notifier<CreateTripState> {
       );
       return r.tripId;
     } on ApiError catch (e) {
+      if (_disposed) return null;
       state = state.copyWith(
         submitting: false,
         error: e.status == 409 ? '行程建立衝突,請再試一次' : '建立失敗,請稍後再試',
       );
       return null;
     } on Exception {
+      if (_disposed) return null;
       state = state.copyWith(submitting: false, error: '建立失敗,請稍後再試');
       return null;
     }
@@ -157,6 +163,6 @@ class CreateTripController extends Notifier<CreateTripState> {
 }
 
 final createTripControllerProvider =
-    NotifierProvider<CreateTripController, CreateTripState>(
-  CreateTripController.new,
-);
+    NotifierProvider.autoDispose<CreateTripController, CreateTripState>(
+      CreateTripController.new,
+    );
