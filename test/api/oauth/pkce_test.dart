@@ -16,4 +16,9 @@ void main() {
   test('每次 verifier 不同(隨機)', () {
     expect(generateCodeVerifier(), isNot(generateCodeVerifier()));
   });
+
+  test('generateState：CSPRNG、43 字、每次不同', () {
+    expect(generateState(), matches(RegExp(r'^[A-Za-z0-9\-._~]{43}$')));
+    expect(generateState(), isNot(generateState()));
+  });
 }

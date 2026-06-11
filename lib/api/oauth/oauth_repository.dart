@@ -14,6 +14,9 @@ class OAuthRepository {
       _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     _dio.options.validateStatus = (_) => true;
+    // 避免 token 交換/刷新無限期 hang(連帶卡住所有等 refresh 的 request)。
+    _dio.options.connectTimeout = const Duration(seconds: 15);
+    _dio.options.receiveTimeout = const Duration(seconds: 15);
   }
 
   final String _origin;
