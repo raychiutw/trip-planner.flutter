@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 
@@ -255,7 +256,7 @@ void main() {
       '/trips/okinawa/days/1/entries',
       (server) => server.reply(201, {'id': 99}),
       data: {
-        'title': '美麗海水族館', 'poi_type': 'attraction',
+        'title': '美麗海水族館', 'description': '海景第一排', 'poi_type': 'attraction',
         'lat': 26.69, 'lng': 127.87,
         'start_time': '10:00', 'end_time': '11:00', 'source': 'user-explore',
       },
@@ -264,8 +265,64 @@ void main() {
     await expectLater(
       tripRepository.addEntryToDay(
         tripId: 'okinawa', dayNum: 1, title: '美麗海水族館',
-        poiType: 'attraction', lat: 26.69, lng: 127.87,
+        description: '海景第一排', poiType: 'attraction', lat: 26.69, lng: 127.87,
         startTime: '10:00', endTime: '11:00'),
+      completes,
+    );
+  });
+
+  test('updateEntry：PATCH /trips/:id/entries/:eid snake_case + expectedVersion',
+      () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11',
+      (server) => server.reply(200, {'id': 11, 'version': 3, 'title': '新標題'}),
+      data: {
+        'title': '新標題', 'description': '改描述',
+        'start_time': '09:30', 'end_time': '10:30', 'expectedVersion': 2,
+      },
+    );
+
+    await expectLater(
+      tripRepository.updateEntry(
+        tripId: 'okinawa', entryId: 11, expectedVersion: 2,
+        title: '新標題', description: '改描述',
+        startTime: '09:30', endTime: '10:30'),
+      completes,
+    );
+  });
+
+  test('updateEntry：409 STALE_ENTRY → 拋 ApiError(409)', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11',
+      (server) => server.reply(409, {
+        'error': {
+          'code': 'STALE_ENTRY',
+          'message': 'expected version 2, current 3',
+        },
+      }),
+      data: {
+        'title': '標題', 'description': null,
+        'start_time': null, 'end_time': null, 'expectedVersion': 2,
+      },
+    );
+
+    await expectLater(
+      tripRepository.updateEntry(
+        tripId: 'okinawa', entryId: 11, expectedVersion: 2, title: '標題'),
+      throwsA(isA<ApiError>()
+          .having((e) => e.status, 'status', 409)
+          .having((e) => e.code, 'code', 'STALE_ENTRY')),
+    );
+  });
+
+  test('deleteEntry：DELETE /trips/:id/entries/:eid（200 {ok:true}）', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa/entries/11',
+      (server) => server.reply(200, {'ok': true}),
+    );
+
+    await expectLater(
+      tripRepository.deleteEntry(tripId: 'okinawa', entryId: 11),
       completes,
     );
   });
