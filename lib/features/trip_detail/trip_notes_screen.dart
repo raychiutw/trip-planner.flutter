@@ -7,6 +7,7 @@ import '../../models/notes.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'notes/note_edit_sheet.dart';
+import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 
 /// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡），MVP 唯讀。
@@ -135,16 +136,6 @@ class _NoteRowData {
   final Widget display;
 }
 
-/// 計算 reorder 後的 (id, sortOrder) 清單（onReorderItem 已調整索引,不 -1）。
-List<({int id, int sortOrder})> _noteReorder(
-    List<int> ids, int oldIndex, int newIndex) {
-  final list = [...ids];
-  final moved = list.removeAt(oldIndex);
-  list.insert(newIndex, moved);
-  return [
-    for (var i = 0; i < list.length; i++) (id: list[i], sortOrder: i),
-  ];
-}
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
@@ -201,7 +192,8 @@ class _NotesSection extends ConsumerWidget {
 
   Future<void> _reorder(
       BuildContext context, WidgetRef ref, int oldIndex, int newIndex) async {
-    final items = _noteReorder([for (final r in rows) r.id], oldIndex, newIndex);
+    final items =
+        reorderedSortOrders([for (final r in rows) r.id], oldIndex, newIndex);
     try {
       await ref
           .read(tripRepositoryProvider)

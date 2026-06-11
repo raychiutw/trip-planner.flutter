@@ -81,9 +81,24 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         case NoteFieldType.text:
         case NoteFieldType.multiline:
         case NoteFieldType.integer:
-          _ctrls[spec.key] = TextEditingController(text: initial);
+          final controller = TextEditingController(text: initial);
+          if (spec.required) controller.addListener(_onRequiredChanged);
+          _ctrls[spec.key] = controller;
       }
     }
+  }
+
+  void _onRequiredChanged() => setState(() {});
+
+  /// 各區主要識別欄位（required）需非空才可送出,避免建立全空 row。
+  bool get _canSubmit {
+    if (_submitting) return false;
+    for (final spec in _specs) {
+      if (spec.required && (_ctrls[spec.key]?.text.trim().isEmpty ?? true)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override
@@ -126,9 +141,9 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         case NoteFieldType.multiline:
           out[spec.key] = _ctrls[spec.key]!.text.trim();
         case NoteFieldType.enumChoice:
-          out[spec.key] = _enums[spec.key];
+          out[spec.key] = _enums[spec.key]!;
         case NoteFieldType.datetime:
-          out[spec.key] = _dts[spec.key] ?? '';
+          out[spec.key] = _dts[spec.key]!;
       }
     }
     return out;
@@ -195,7 +210,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               const SizedBox(height: TpSpacing.s2),
               FilledButton(
                 key: const ValueKey('note-edit-submit'),
-                onPressed: _submitting ? null : _submit,
+                onPressed: _canSubmit ? _submit : null,
                 child: Text(_submitting
                     ? '處理中…'
                     : (widget.isEdit ? '儲存' : '新增')),
@@ -213,7 +228,8 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         return TextField(
           key: ValueKey('note-field-${spec.key}'),
           controller: _ctrls[spec.key],
-          decoration: InputDecoration(labelText: spec.label),
+          decoration: InputDecoration(
+              labelText: spec.required ? '${spec.label} *' : spec.label),
         );
       case NoteFieldType.multiline:
         return TextField(

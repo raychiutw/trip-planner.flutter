@@ -7,6 +7,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
 import '../../theme/tokens.dart';
+import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
@@ -148,16 +149,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 }
 
-/// 計算單日 reorder 後的 batch updates。newIndex 為 onReorderItem 已調整後的
-/// 目標索引（item 移除後的位置）,重編連續 sort_order。抽頂層純函式以利測試。
+/// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
 List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
     List<int> entryIds, int oldIndex, int newIndex) {
-  final ids = [...entryIds];
-  final moved = ids.removeAt(oldIndex);
-  ids.insert(newIndex, moved);
   return [
-    for (var i = 0; i < ids.length; i++)
-      (id: ids[i], sortOrder: i, dayId: null),
+    for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
+      (id: u.id, sortOrder: u.sortOrder, dayId: null),
   ];
 }
 

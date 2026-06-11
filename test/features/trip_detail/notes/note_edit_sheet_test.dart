@@ -87,6 +87,8 @@ void main() {
             fields: any(named: 'fields'))).thenAnswer((_) async {});
     await _open(tester, repo, section: NoteSection.reservations);
 
+    await tester.enterText(find.byKey(const ValueKey('note-field-title')), '午餐');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
     await tester.pumpAndSettle();
 
@@ -105,6 +107,7 @@ void main() {
             fields: any(named: 'fields'))).thenAnswer((_) async {});
     await _open(tester, repo, section: NoteSection.reservations);
 
+    await tester.enterText(find.byKey(const ValueKey('note-field-title')), '午餐');
     await tester.enterText(
         find.byKey(const ValueKey('note-field-party_size')), '4');
     await tester.pump();
@@ -118,6 +121,14 @@ void main() {
         .single as Map<String, dynamic>;
     expect(fields['party_size'], 4);
     expect(fields['party_size'], isA<int>());
+  });
+
+  testWidgets('必填（reservations title）空 → 送出鈕 disabled', (tester) async {
+    await _open(tester, _MockTripRepository(),
+        section: NoteSection.reservations);
+    final button = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('note-edit-submit')));
+    expect(button.onPressed, isNull);
   });
 
   testWidgets('edit reservations：預填 + 改 title → updateNote(rowId, expectedVersion)',

@@ -13,6 +13,7 @@ class NoteFieldSpec {
     this.type, {
     this.options = const [],
     this.defaultValue = '',
+    this.required = false,
   });
 
   final String key;
@@ -24,6 +25,9 @@ class NoteFieldSpec {
 
   /// create 預設值（enum 用）。
   final String defaultValue;
+
+  /// 必填（送出前需非空）。各區標一個主要識別欄位,避免建立全空 row。
+  final bool required;
 }
 
 const Map<NoteSection, String> noteSectionTitles = {
@@ -54,7 +58,7 @@ const List<(String, String)> _emergencyKinds = [
 
 const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
   NoteSection.flights: [
-    NoteFieldSpec('airline', '航空公司', NoteFieldType.text),
+    NoteFieldSpec('airline', '航空公司', NoteFieldType.text, required: true),
     NoteFieldSpec('flight_no', '航班編號', NoteFieldType.text),
     NoteFieldSpec('cabin_class', '艙等', NoteFieldType.text),
     NoteFieldSpec('depart_airport', '出發機場', NoteFieldType.text),
@@ -64,7 +68,7 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
     NoteFieldSpec('note', '備註', NoteFieldType.multiline),
   ],
   NoteSection.lodgings: [
-    NoteFieldSpec('name', '名稱', NoteFieldType.text),
+    NoteFieldSpec('name', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('address', '地址', NoteFieldType.text),
     NoteFieldSpec('check_in_at', '入住', NoteFieldType.datetime),
     NoteFieldSpec('check_out_at', '退房', NoteFieldType.datetime),
@@ -75,7 +79,7 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
   NoteSection.reservations: [
     NoteFieldSpec('kind', '類型', NoteFieldType.enumChoice,
         options: _reservationKinds, defaultValue: 'restaurant'),
-    NoteFieldSpec('title', '名稱', NoteFieldType.text),
+    NoteFieldSpec('title', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('reserved_at', '預約時間', NoteFieldType.datetime),
     NoteFieldSpec('party_size', '人數', NoteFieldType.integer),
     NoteFieldSpec('reservation_no', '預約編號', NoteFieldType.text),
@@ -84,11 +88,11 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
   ],
   NoteSection.pretrip: [
     NoteFieldSpec('section', '分類', NoteFieldType.text),
-    NoteFieldSpec('title', '標題', NoteFieldType.text),
+    NoteFieldSpec('title', '標題', NoteFieldType.text, required: true),
     NoteFieldSpec('content', '內容', NoteFieldType.multiline),
   ],
   NoteSection.emergency: [
-    NoteFieldSpec('name', '名稱', NoteFieldType.text),
+    NoteFieldSpec('name', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('relationship', '關係', NoteFieldType.text),
     NoteFieldSpec('phone', '電話', NoteFieldType.text),
     NoteFieldSpec('email', 'Email', NoteFieldType.text),
