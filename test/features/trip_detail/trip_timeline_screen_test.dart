@@ -11,6 +11,7 @@ import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
@@ -117,6 +118,7 @@ Future<void> _pumpTimeline(
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
   _MockTripRepository? repo,
+  List<TripSegment> segments = const [],
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
@@ -148,6 +150,7 @@ Future<void> _pumpTimeline(
             .overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
         tripDaysProvider(_tripId)
             .overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
+        tripSegmentsProvider(_tripId).overrideWith((ref) async => segments),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -163,7 +166,10 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(<String, dynamic>{}));
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+    registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
+  });
 
   testWidgets('AppBar 顯示行程標題與地圖/筆記 actions', (tester) async {
     await _pumpTimeline(tester);
@@ -295,5 +301,81 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
+  });
+
+  group('computeReorderUpdates', () {
+    test('移到末位（onReorderItem 已調整索引）+ 重編連續 sort_order', () {
+      final updates = computeReorderUpdates([11, 12, 13], 0, 2);
+      expect(updates.map((u) => u.id).toList(), [12, 13, 11]);
+      expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
+      expect(updates.every((u) => u.dayId == null), isTrue);
+    });
+    test('末位移到首位', () {
+      final updates = computeReorderUpdates([11, 12, 13], 2, 0);
+      expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
+    });
+  });
+
+  testWidgets('每個 entry 有拖曳 handle', (tester) async {
+    await _pumpTimeline(tester);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
+  });
+
+  testWidgets('點搬移鈕 → 選其他天 → reorderEntries 帶 day_id', (tester) async {
+    final repo = _MockTripRepository();
+    when(() => repo.reorderEntries(
+          tripId: any(named: 'tripId'),
+          updates: any(named: 'updates'),
+        )).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(
+          tripId: any(named: 'tripId'),
+          day: any(named: 'day'),
+        )).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-day-2')));
+    await tester.pumpAndSettle();
+
+    final captured = verify(() => repo.reorderEntries(
+            tripId: _tripId, updates: captureAny(named: 'updates')))
+        .captured
+        .single as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured.single.id, 11);
+    expect(captured.single.dayId, 2);
+  });
+
+  testWidgets('點 travel pill → 大眾運輸填分鐘 → updateSegment', (tester) async {
+    final repo = _MockTripRepository();
+    when(() => repo.updateSegment(
+          tripId: any(named: 'tripId'),
+          segmentId: any(named: 'segmentId'),
+          mode: any(named: 'mode'),
+          min: any(named: 'min'),
+          expectedVersion: any(named: 'expectedVersion'),
+        )).thenAnswer(
+        (_) async => const TripSegment(id: 50, mode: 'transit', version: 2));
+    await _pumpTimeline(tester, repo: repo, segments: const [
+      TripSegment(
+          id: 50, fromEntryId: 11, toEntryId: 12, mode: 'driving', version: 1),
+    ]);
+
+    await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-mode-transit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('travel-min')), '25');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.updateSegment(
+        tripId: _tripId,
+        segmentId: 50,
+        mode: 'transit',
+        min: 25,
+        expectedVersion: 1)).called(1);
   });
 }

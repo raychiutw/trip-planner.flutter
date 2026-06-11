@@ -53,6 +53,9 @@ void main() {
         'rating': 4.5,
         'price': r'$',
         'note': '排隊名店',
+        'reservation': '已訂位 18:00',
+        'reservationUrl': 'https://book.example/abc',
+        'description': '招牌豚骨',
         'sortOrder': 2,
       });
 
@@ -66,6 +69,9 @@ void main() {
       expect(poiInfo.rating, 4.5);
       expect(poiInfo.price, r'$');
       expect(poiInfo.note, '排隊名店');
+      expect(poiInfo.reservation, '已訂位 18:00');
+      expect(poiInfo.reservationUrl, 'https://book.example/abc');
+      expect(poiInfo.description, '招牌豚骨');
       expect(poiInfo.sortOrder, 2);
     });
 
@@ -98,6 +104,7 @@ void main() {
         'description': '人氣排隊店',
         'note': '備案在隔壁',
         'version': 2,
+        'entryPoisVersion': 7,
         'travel': {'type': 'driving', 'min': 15, 'distanceM': 8000},
         'master': {'poiId': 555, 'name': '暖暮拉麵', 'rating': 4},
         'alternates': [
@@ -116,6 +123,7 @@ void main() {
       expect(entry.description, '人氣排隊店');
       expect(entry.note, '備案在隔壁');
       expect(entry.version, 2);
+      expect(entry.entryPoisVersion, '7'); // int wire → string
       expect(entry.travel?.type, 'driving');
       expect(entry.travel?.min, 15);
       expect(entry.master?.poiId, 555);

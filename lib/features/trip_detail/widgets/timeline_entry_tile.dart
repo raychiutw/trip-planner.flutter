@@ -20,6 +20,7 @@ class TimelineEntryTile extends StatelessWidget {
     this.isFirst = false,
     this.isLast = false,
     this.onTap,
+    this.trailing,
   });
 
   final TimelineEntry entry;
@@ -32,6 +33,9 @@ class TimelineEntryTile extends StatelessWidget {
 
   /// 點內容卡的回呼（null 則不可點）。
   final VoidCallback? onTap;
+
+  /// tile 尾端附加元件（拖曳 handle、搬移鈕）。
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +102,7 @@ class TimelineEntryTile extends StatelessWidget {
               ),
             ),
           ),
+          ?trailing,
         ],
       ),
     );
