@@ -173,36 +173,16 @@ class _DaySection extends ConsumerWidget {
   final List<TripDay> allDays;
 
   Future<void> _confirmDelete(
-      BuildContext context, WidgetRef ref, TimelineEntry entry) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('刪除停留點'),
-        content: Text('確定要刪除「${entry.title}」嗎？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('刪除')),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await ref
+      BuildContext context, WidgetRef ref, TimelineEntry entry) {
+    return confirmAndDelete(
+      context,
+      title: '刪除停留點',
+      message: '確定要刪除「${entry.title}」嗎？',
+      delete: () => ref
           .read(tripRepositoryProvider)
-          .deleteEntry(tripId: tripId, entryId: entry.id);
-      ref.invalidate(tripDaysProvider(tripId));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已刪除')));
-    } on Exception {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
-    }
+          .deleteEntry(tripId: tripId, entryId: entry.id),
+      onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
+    );
   }
 
   Future<void> _reorder(
