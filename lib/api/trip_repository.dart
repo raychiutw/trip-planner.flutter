@@ -3,6 +3,7 @@ library;
 
 import '../models/day.dart';
 import '../models/notes.dart';
+import '../models/segment.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -115,6 +116,64 @@ class TripRepository {
     return _client.delete(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
     );
+  }
+
+  /// PATCH /trips/:id/entries/batch（批次 reorder/搬移,snake_case,無 OCC）。
+  /// 同天 reorder 只帶 sortOrder;跨天搬移帶 dayId。
+  Future<void> reorderEntries({
+    required String tripId,
+    required List<({int id, int sortOrder, int? dayId})> updates,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/batch',
+      body: {
+        'updates': [
+          for (final u in updates)
+            {
+              'id': u.id,
+              'sort_order': u.sortOrder,
+              if (u.dayId != null) 'day_id': u.dayId,
+            },
+        ],
+      },
+    );
+  }
+
+  /// POST /trips/:id/recompute-travel?day=（reorder/換 POI 後重算交通,fire-and-forget）。
+  Future<void> recomputeTravel({required String tripId, String day = 'all'}) {
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/recompute-travel',
+      query: {'day': day},
+    );
+  }
+
+  /// GET /trips/:id/segments（交通段;含 id/version 供編輯）。
+  Future<List<TripSegment>> fetchSegments({required String tripId}) async {
+    final body =
+        await _client.get('/trips/${Uri.encodeComponent(tripId)}/segments');
+    return (body as List<dynamic>)
+        .map((e) => TripSegment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// PATCH /trips/:id/segments/:sid（mode driving/walking/transit;OCC expectedVersion）。
+  /// transit 必帶 min;driving/walking 後端打 Google 重算(忽略 min)。
+  Future<TripSegment> updateSegment({
+    required String tripId,
+    required int segmentId,
+    required String mode,
+    int? min,
+    int? expectedVersion,
+  }) async {
+    final body = await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/segments/$segmentId',
+      body: {
+        'mode': mode,
+        if (min != null) 'min': min,
+        if (expectedVersion != null) 'expectedVersion': expectedVersion,
+      },
+    );
+    return TripSegment.fromJson(body as Map<String, dynamic>);
   }
 
   /// GET /account/stats。

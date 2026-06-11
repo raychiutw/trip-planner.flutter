@@ -44,8 +44,8 @@ class ApiClient {
   }) =>
       _send('GET', path, query: query, cancelToken: cancelToken);
 
-  Future<dynamic> post(String path, {Object? body}) =>
-      _send('POST', path, body: body);
+  Future<dynamic> post(String path, {Object? body, Map<String, dynamic>? query}) =>
+      _send('POST', path, body: body, query: query);
 
   Future<dynamic> put(String path, {Object? body}) =>
       _send('PUT', path, body: body);
@@ -53,7 +53,8 @@ class ApiClient {
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
 
-  Future<dynamic> delete(String path) => _send('DELETE', path);
+  Future<dynamic> delete(String path, {Map<String, dynamic>? query}) =>
+      _send('DELETE', path, query: query);
 
   /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
   static int parseRetryAfterSeconds(String? headerValue) {
