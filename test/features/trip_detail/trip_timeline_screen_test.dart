@@ -163,7 +163,10 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
 }
 
 void main() {
-  setUpAll(() => registerFallbackValue(<String, dynamic>{}));
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+    registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
+  });
 
   testWidgets('AppBar 顯示行程標題與地圖/筆記 actions', (tester) async {
     await _pumpTimeline(tester);
@@ -295,5 +298,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
+  });
+
+  group('computeReorderUpdates', () {
+    test('移到末位（onReorderItem 已調整索引）+ 重編連續 sort_order', () {
+      final updates = computeReorderUpdates([11, 12, 13], 0, 2);
+      expect(updates.map((u) => u.id).toList(), [12, 13, 11]);
+      expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
+      expect(updates.every((u) => u.dayId == null), isTrue);
+    });
+    test('末位移到首位', () {
+      final updates = computeReorderUpdates([11, 12, 13], 2, 0);
+      expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
+    });
+  });
+
+  testWidgets('每個 entry 有拖曳 handle', (tester) async {
+    await _pumpTimeline(tester);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
+  });
+
+  testWidgets('點搬移鈕 → 選其他天 → reorderEntries 帶 day_id', (tester) async {
+    final repo = _MockTripRepository();
+    when(() => repo.reorderEntries(
+          tripId: any(named: 'tripId'),
+          updates: any(named: 'updates'),
+        )).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(
+          tripId: any(named: 'tripId'),
+          day: any(named: 'day'),
+        )).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('move-day-2')));
+    await tester.pumpAndSettle();
+
+    final captured = verify(() => repo.reorderEntries(
+            tripId: _tripId, updates: captureAny(named: 'updates')))
+        .captured
+        .single as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured.single.id, 11);
+    expect(captured.single.dayId, 2);
   });
 }

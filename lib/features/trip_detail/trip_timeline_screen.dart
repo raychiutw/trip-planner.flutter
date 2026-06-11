@@ -135,6 +135,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                   _DaySection(
                       key: _daySectionKeys[day.dayNum],
                       day: day,
+                      allDays: widget.days,
                       tripId: widget.tripId),
               ],
             ),
@@ -145,13 +146,31 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 }
 
-/// 單日 section：day header → hotel 卡 → entries（entry 之間插 travel pill）→ 新增鈕。
-/// entry 可點（編輯）、左滑（刪除）。
+/// 計算單日 reorder 後的 batch updates。newIndex 為 onReorderItem 已調整後的
+/// 目標索引（item 移除後的位置）,重編連續 sort_order。抽頂層純函式以利測試。
+List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
+    List<int> entryIds, int oldIndex, int newIndex) {
+  final ids = [...entryIds];
+  final moved = ids.removeAt(oldIndex);
+  ids.insert(newIndex, moved);
+  return [
+    for (var i = 0; i < ids.length; i++)
+      (id: ids[i], sortOrder: i, dayId: null),
+  ];
+}
+
+/// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
-  const _DaySection({super.key, required this.tripId, required this.day});
+  const _DaySection({
+    super.key,
+    required this.tripId,
+    required this.day,
+    required this.allDays,
+  });
 
   final String tripId;
   final TripDay day;
+  final List<TripDay> allDays;
 
   Future<void> _confirmDelete(
       BuildContext context, WidgetRef ref, TimelineEntry entry) async {
@@ -186,6 +205,79 @@ class _DaySection extends ConsumerWidget {
     }
   }
 
+  Future<void> _reorder(
+      BuildContext context, WidgetRef ref, int oldIndex, int newIndex) async {
+    final updates = computeReorderUpdates(
+        [for (final e in day.timeline) e.id], oldIndex, newIndex);
+    final repo = ref.read(tripRepositoryProvider);
+    try {
+      await repo.reorderEntries(tripId: tripId, updates: updates);
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+      }
+      ref.invalidate(tripDaysProvider(tripId));
+      return;
+    }
+    ref.invalidate(tripDaysProvider(tripId));
+    await _recomputeAndRefresh(ref);
+  }
+
+  Future<void> _moveToDay(
+      BuildContext context, WidgetRef ref, TimelineEntry entry) async {
+    final targets = allDays.where((d) => d.dayNum != day.dayNum).toList();
+    if (targets.isEmpty) return;
+    final targetDayId = await showModalBottomSheet<int>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('移到其他天')),
+            for (final d in targets)
+              ListTile(
+                key: ValueKey('move-day-${d.id}'),
+                title: Text('DAY ${d.dayNum} · ${d.displayTitle}'),
+                onTap: () => Navigator.of(sheetContext).pop(d.id),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (targetDayId == null) return;
+    final target = allDays.firstWhere((d) => d.id == targetDayId);
+    final repo = ref.read(tripRepositoryProvider);
+    try {
+      await repo.reorderEntries(tripId: tripId, updates: [
+        (id: entry.id, sortOrder: target.timeline.length, dayId: targetDayId),
+      ]);
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
+      }
+      ref.invalidate(tripDaysProvider(tripId));
+      return;
+    }
+    ref.invalidate(tripDaysProvider(tripId));
+    await _recomputeAndRefresh(ref);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
+    }
+  }
+
+  /// reorder/move 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
+  Future<void> _recomputeAndRefresh(WidgetRef ref) async {
+    try {
+      await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
+      ref.invalidate(tripDaysProvider(tripId));
+    } on Exception {
+      // 交通重算失敗忽略
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
@@ -199,26 +291,46 @@ class _DaySection extends ConsumerWidget {
           HotelCard(hotel: day.hotel!),
           const SizedBox(height: TpSpacing.s3),
         ],
-        for (var i = 0; i < timeline.length; i++) ...[
-          if (i > 0 && timeline[i].travel != null)
-            _TravelRow(travel: timeline[i].travel!),
-          Dismissible(
-            key: ValueKey('entry-dismiss-${timeline[i].id}'),
-            direction: DismissDirection.endToStart,
-            background: const _DeleteBackground(),
-            confirmDismiss: (_) async {
-              await _confirmDelete(context, ref, timeline[i]);
-              return false; // 靠 invalidate 重抓移除,避免與 provider 資料雙重移除
-            },
-            child: TimelineEntryTile(
-              entry: timeline[i],
-              isFirst: i == 0,
-              isLast: i == timeline.length - 1,
-              onTap: () => showEntryEditSheet(context,
-                  tripId: tripId, args: EntryEditExisting(timeline[i])),
-            ),
-          ),
-        ],
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: timeline.length,
+          onReorderItem: (oldIndex, newIndex) =>
+              _reorder(context, ref, oldIndex, newIndex),
+          itemBuilder: (context, i) {
+            final entry = timeline[i];
+            return Column(
+              key: ValueKey('entry-${entry.id}'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (i > 0 && entry.travel != null)
+                  _TravelRow(travel: entry.travel!),
+                Dismissible(
+                  key: ValueKey('entry-dismiss-${entry.id}'),
+                  direction: DismissDirection.endToStart,
+                  background: const _DeleteBackground(),
+                  confirmDismiss: (_) async {
+                    await _confirmDelete(context, ref, entry);
+                    return false; // 靠 invalidate 重抓移除
+                  },
+                  child: TimelineEntryTile(
+                    entry: entry,
+                    isFirst: i == 0,
+                    isLast: i == timeline.length - 1,
+                    onTap: () => showEntryEditSheet(context,
+                        tripId: tripId, args: EntryEditExisting(entry)),
+                    trailing: _EntryTrailing(
+                      entryId: entry.id,
+                      index: i,
+                      onMove: () => _moveToDay(context, ref, entry),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         const SizedBox(height: TpSpacing.s2),
         Align(
           alignment: Alignment.centerLeft,
@@ -231,6 +343,41 @@ class _DaySection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: TpSpacing.s6),
+      ],
+    );
+  }
+}
+
+/// tile 尾端：搬移到其他天 + 拖曳 handle（長按拖動排序）。
+class _EntryTrailing extends StatelessWidget {
+  const _EntryTrailing(
+      {required this.entryId, required this.index, required this.onMove});
+
+  final int entryId;
+  final int index;
+  final VoidCallback onMove;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          key: ValueKey('entry-menu-$entryId'),
+          icon: const Icon(Icons.drive_file_move_outline),
+          tooltip: '移到其他天',
+          visualDensity: VisualDensity.compact,
+          onPressed: onMove,
+        ),
+        ReorderableDragStartListener(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(Icons.drag_handle,
+                key: ValueKey('entry-drag-$entryId'), color: color),
+          ),
+        ),
       ],
     );
   }
