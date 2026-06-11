@@ -10,7 +10,7 @@ P1 全數完成 🎉(見 Completed)。
 
 - [ ] 分享/列印/匯入
 - [ ] 設定子頁
-- [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
+- [~] OAuth PKCE + Bearer 認證:**client 端已完成 + 單測**(pkce/token/refresh/Bearer ApiClient/loopback 編排),預設關閉(`--dart-define` 啟用)。**e2e 待 backend owner provision active public client + loopback redirect**(見 `docs/howto-oauth-pkce.md`)。登入頁 OAuth 按鈕待接。
 - [ ] 離線快取
 
 ## 技術債
