@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
@@ -210,6 +211,20 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                         color: Theme.of(context).colorScheme.error,
                         fontSize: 12)),
               ),
+            if (_isEdit) ...[
+              const SizedBox(height: TpSpacing.s3),
+              OutlinedButton.icon(
+                key: const ValueKey('entry-edit-manage-pois'),
+                onPressed: () {
+                  final entry = (widget.args as EntryEditExisting).entry;
+                  Navigator.of(context).pop();
+                  context.push(
+                      '/trips/${widget.tripId}/entries/${entry.id}/pois');
+                },
+                icon: const Icon(Icons.place_outlined),
+                label: const Text('管理地點'),
+              ),
+            ],
             const SizedBox(height: TpSpacing.s6),
             FilledButton(
               key: const ValueKey('entry-edit-submit'),

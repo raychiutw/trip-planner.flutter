@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
 import '../../models/day.dart';
+import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../models/trip.dart';
 
@@ -17,4 +18,13 @@ final tripDaysProvider = FutureProvider.family<List<TripDay>, String>((ref, trip
 
 final tripNotesProvider = FutureProvider.family<TripNotes, String>((ref, tripId) {
   return ref.watch(tripRepositoryProvider).fetchNotes(tripId);
+});
+
+/// 單筆 entry 詳情（地點管理用;含 master/alternates/entryPoisVersion,無 travel）。
+final entryDetailProvider =
+    FutureProvider.family<TimelineEntry, ({String tripId, int entryId})>(
+        (ref, key) {
+  return ref
+      .watch(tripRepositoryProvider)
+      .fetchEntry(tripId: key.tripId, entryId: key.entryId);
 });
