@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
+import '../../models/segment.dart';
 import '../../theme/tokens.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
@@ -12,6 +13,7 @@ import 'widgets/day_pills.dart';
 import 'widgets/entry_edit_sheet.dart';
 import 'widgets/hotel_card.dart';
 import 'widgets/timeline_entry_tile.dart';
+import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
@@ -281,6 +283,10 @@ class _DaySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
+    final segments = switch (ref.watch(tripSegmentsProvider(tripId))) {
+      AsyncData(:final value) => value,
+      _ => const <TripSegment>[],
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -305,7 +311,12 @@ class _DaySection extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (i > 0 && entry.travel != null)
-                  _TravelRow(travel: entry.travel!),
+                  _TravelRow(
+                    travel: entry.travel!,
+                    segment:
+                        _findSegment(segments, timeline[i - 1].id, entry.id),
+                    tripId: tripId,
+                  ),
                 Dismissible(
                   key: ValueKey('entry-dismiss-${entry.id}'),
                   direction: DismissDirection.endToStart,
@@ -403,15 +414,36 @@ class _DeleteBackground extends StatelessWidget {
   }
 }
 
-/// travel pill 列：沿用 tile 的時間欄 + rail 縮排，rail 連線視覺連續。
+/// 依相鄰兩端 entry id 比對 travel pill 對應的 segment（找不到回 null,pill 不可點）。
+TripSegment? _findSegment(List<TripSegment> segments, int fromId, int toId) {
+  for (final s in segments) {
+    if (s.fromEntryId == fromId && s.toEntryId == toId) return s;
+  }
+  return null;
+}
+
+/// travel pill 列：沿用 tile 的時間欄 + rail 縮排。有對應 segment 時可點擊編輯交通。
 class _TravelRow extends StatelessWidget {
-  const _TravelRow({required this.travel});
+  const _TravelRow({required this.travel, this.segment, this.tripId});
 
   final Travel travel;
+  final TripSegment? segment;
+  final String? tripId;
 
   @override
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
+    final seg = segment;
+    Widget pill = TravelPill(travel: travel);
+    if (seg != null && tripId != null) {
+      pill = InkWell(
+        key: ValueKey('travel-edit-${seg.id}'),
+        onTap: () =>
+            showTravelEditSheet(context, tripId: tripId!, segment: seg),
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        child: pill,
+      );
+    }
 
     return IntrinsicHeight(
       child: Row(
@@ -429,10 +461,7 @@ class _TravelRow extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TravelPill(travel: travel),
-              ),
+              child: Align(alignment: Alignment.centerLeft, child: pill),
             ),
           ),
         ],
