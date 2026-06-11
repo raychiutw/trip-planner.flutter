@@ -34,7 +34,7 @@ class ExploreState {
   final String region;
   final String category;
   final List<PoiSearchResult> results;
-  final Map<String, int> savedMap; // "poiType::name" → favoriteId
+  final Map<String, int> savedMap; // poiName(trim) → favoriteId
   final bool searching;
   final Set<String> savingPlaceIds;
   final String? errorMessage;
@@ -86,8 +86,10 @@ class ExploreState {
   static const _sentinel = Object();
 }
 
-String _savedKey(PoiSearchResult poi) =>
-    '${mapGooglePrimaryTypeToPoiType(poi.category)}::${poi.name}';
+// 收藏比對只用「名稱」作 key:search result 帶 Google category、favorite 帶
+// server 正規化後的 poiType,兩者經 mapGooglePrimaryTypeToPoiType 後可能不一致
+//（find-or-create 命中既有 POI 時 type 不重算）→ 用名稱單一來源避免取消收藏失效。
+String _savedKey(PoiSearchResult poi) => poi.name.trim();
 
 class ExploreController extends Notifier<ExploreState> {
   int _requestSeq = 0;
@@ -181,8 +183,7 @@ class ExploreController extends Notifier<ExploreState> {
   static Map<String, int> _buildSavedMap(List<PoiFavorite> favorites) {
     return {
       for (final f in favorites)
-        if (f.poiName != null)
-          '${mapGooglePrimaryTypeToPoiType(f.poiType)}::${f.poiName}': f.id,
+        if (f.poiName != null) f.poiName!.trim(): f.id,
     };
   }
 }

@@ -111,6 +111,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'add-to-trip',
+                    // 深連結／重整後 extra 遺失時不 crash：導回收藏頁。
+                    redirect: (context, state) =>
+                        state.extra is AddToTripArgs ? null : '/favorites',
                     builder: (context, state) =>
                         AddToTripScreen(args: state.extra! as AddToTripArgs),
                   ),

@@ -5,6 +5,7 @@ import '../../../models/poi_type.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
+import '../poi_rating_label.dart';
 
 /// 探索 POI 卡片：cover tone 漸層 + 類型 label + name/address/rating + heart toggle。
 class PoiSearchCard extends StatelessWidget {
@@ -104,22 +105,7 @@ class PoiSearchCard extends StatelessWidget {
                       ),
                     ),
                   const Spacer(),
-                  if (poi.rating != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star_rounded, size: 14, color: tones.accent),
-                        const SizedBox(width: 2),
-                        Text(
-                          poi.rating!.toStringAsFixed(1),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: mutedColor,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
+                  if (poi.rating != null) PoiRatingLabel(rating: poi.rating!),
                 ],
               ),
             ),

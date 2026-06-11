@@ -32,6 +32,27 @@ void main() {
     when(() => tripRepo.fetchDays('okinawa')).thenAnswer((_) async => _days);
   });
 
+  group('isAddToTripTimeValid', () {
+    test('end > start → true', () {
+      expect(
+          isAddToTripTimeValid(const TimeOfDay(hour: 10, minute: 0),
+              const TimeOfDay(hour: 11, minute: 0)),
+          isTrue);
+    });
+    test('end == start → false', () {
+      expect(
+          isAddToTripTimeValid(const TimeOfDay(hour: 10, minute: 0),
+              const TimeOfDay(hour: 10, minute: 0)),
+          isFalse);
+    });
+    test('end < start → false', () {
+      expect(
+          isAddToTripTimeValid(const TimeOfDay(hour: 12, minute: 0),
+              const TimeOfDay(hour: 11, minute: 30)),
+          isFalse);
+    });
+  });
+
   // 統一 override tripRepositoryProvider（myTripsProvider/tripDaysProvider 皆走它,
   // 避免 family instance override 語法不確定）。
   Widget buildApp(AddToTripArgs args) {
@@ -55,9 +76,7 @@ void main() {
           dayNum: any(named: 'dayNum'),
           startTime: any(named: 'startTime'),
           endTime: any(named: 'endTime'),
-        )).thenAnswer((_) async => const AddToTripResult(
-        ok: true, entryId: 11, dayId: 1, sortOrder: 0,
-        startTime: '10:00', endTime: '11:00'));
+        )).thenAnswer((_) async {});
 
     await tester.pumpWidget(
         buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')));
@@ -126,5 +145,17 @@ void main() {
 
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
+  });
+
+  testWidgets('trips 為空 → 送出鈕 disabled（不靜默 return）', (tester) async {
+    when(tripRepo.fetchMyTrips).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(
+        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')));
+    await tester.pumpAndSettle();
+
+    final button = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('add-to-trip-submit')));
+    expect(button.onPressed, isNull);
   });
 }

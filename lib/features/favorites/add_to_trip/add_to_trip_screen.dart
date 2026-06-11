@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../models/add_to_trip.dart';
+import '../../../models/day.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
@@ -11,6 +12,10 @@ import '../../trip_detail/trip_providers.dart';
 import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
 import '../favorites_providers.dart';
+
+/// 時間區間有效性：結束須晚於開始。抽為頂層純函式以利單元測試。
+bool isAddToTripTimeValid(TimeOfDay start, TimeOfDay end) =>
+    end.hour * 60 + end.minute > start.hour * 60 + start.minute;
 
 /// 加入行程（fullpage）：選 trip/day/時間 → 送出（favorite / direct mode）。
 class AddToTripScreen extends ConsumerStatefulWidget {
@@ -37,6 +42,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   String _fmt(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+  /// 結束須晚於開始（避免零長度或負區間 entry）。
+  bool get _timeValid => isAddToTripTimeValid(_start, _end);
+
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
         context: context, initialTime: isStart ? _start : _end);
@@ -45,10 +53,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     }
   }
 
-  Future<void> _submit() async {
-    final tripId = _tripId;
-    final dayNum = _dayNum;
-    if (tripId == null || dayNum == null) return;
+  Future<void> _submit(String tripId, int dayNum) async {
     setState(() => _submitting = true);
     try {
       switch (widget.args) {
@@ -76,10 +81,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已加入行程')));
       Navigator.of(context).pop();
-    } on ApiError catch (error) {
+    } on Exception catch (error) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      if (error.status == 409) {
+      if (error is ApiError && error.status == 409) {
         final raw = error.payload?['conflictWith'];
         if (raw is Map) {
           await _showConflict(
@@ -87,11 +92,6 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           return;
         }
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('加入行程失敗,請稍後再試')));
-    } on Exception {
-      if (!mounted) return;
-      setState(() => _submitting = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('加入行程失敗,請稍後再試')));
     }
@@ -135,9 +135,16 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   }
 
   Widget _form(BuildContext context, List<TripSummary> trips) {
-    final tripId = _tripId ??= trips.isEmpty ? null : trips.first.tripId;
+    // 純讀 fallback：不在 build() 內寫入 state（_tripId/_dayNum 仍為 null 直到使用者選），
+    // 以衍生「有效值」驅動 dropdown initialValue 與送出鈕啟用條件。
+    final tripId = _tripId ?? (trips.isEmpty ? null : trips.first.tripId);
     final daysAsync =
         tripId == null ? null : ref.watch(tripDaysProvider(tripId));
+    final days = switch (daysAsync) {
+      AsyncData<List<TripDay>>(:final value) => value,
+      _ => const <TripDay>[],
+    };
+    final dayNum = _dayNum ?? (days.isEmpty ? null : days.first.dayNum);
 
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -160,21 +167,18 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           daysAsync.when(
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text('無法載入日程:$e'),
-            data: (days) {
-              final dayNum = _dayNum ??= days.isEmpty ? null : days.first.dayNum;
-              return DropdownButtonFormField<int>(
-                key: const ValueKey('add-to-trip-day'),
-                initialValue: dayNum,
-                decoration: const InputDecoration(labelText: '日期'),
-                items: [
-                  for (final d in days)
-                    DropdownMenuItem(
-                        value: d.dayNum,
-                        child: Text('DAY ${d.dayNum} · ${d.displayTitle}')),
-                ],
-                onChanged: (v) => setState(() => _dayNum = v),
-              );
-            },
+            data: (_) => DropdownButtonFormField<int>(
+              key: const ValueKey('add-to-trip-day'),
+              initialValue: dayNum,
+              decoration: const InputDecoration(labelText: '日期'),
+              items: [
+                for (final d in days)
+                  DropdownMenuItem(
+                      value: d.dayNum,
+                      child: Text('DAY ${d.dayNum} · ${d.displayTitle}')),
+              ],
+              onChanged: (v) => setState(() => _dayNum = v),
+            ),
           ),
         const SizedBox(height: TpSpacing.s4),
         Row(
@@ -196,10 +200,24 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             ),
           ],
         ),
+        if (!_timeValid)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s2),
+            child: Text(
+              '結束時間需晚於開始時間',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.error, fontSize: 12),
+            ),
+          ),
         const SizedBox(height: TpSpacing.s6),
         FilledButton(
           key: const ValueKey('add-to-trip-submit'),
-          onPressed: _submitting ? null : _submit,
+          onPressed: (!_submitting &&
+                  _timeValid &&
+                  tripId != null &&
+                  dayNum != null)
+              ? () => _submit(tripId, dayNum)
+              : null,
           child: Text(_submitting ? '加入中…' : '加入行程'),
         ),
       ],

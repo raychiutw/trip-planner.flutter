@@ -3,24 +3,6 @@ import 'package:tripline/models/add_to_trip.dart';
 import 'package:tripline/models/poi_search_result.dart';
 
 void main() {
-  group('AddToTripResult.fromJson', () {
-    test('camelCase 201 body', () {
-      final r = AddToTripResult.fromJson({
-        'ok': true,
-        'entryId': 11,
-        'dayId': 2,
-        'sortOrder': 0,
-        'startTime': '10:00',
-        'endTime': '11:00',
-        'note': '...',
-      });
-      expect(r.ok, isTrue);
-      expect(r.entryId, 11);
-      expect(r.dayId, 2);
-      expect(r.startTime, '10:00');
-    });
-  });
-
   group('TripEntryConflict.fromJson', () {
     test('解析 conflictWith', () {
       final c = TripEntryConflict.fromJson({

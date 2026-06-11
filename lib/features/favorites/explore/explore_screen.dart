@@ -17,9 +17,8 @@ const List<(String, String)> _categoryChips = [
   ('all', '為你推薦'), ('attraction', '景點'), ('food', '美食'),
   ('hotel', '住宿'), ('shopping', '購物'),
 ];
-const Map<String, String> _categoryLabels = {
-  'all': '為你推薦', 'attraction': '景點', 'food': '美食',
-  'hotel': '住宿', 'shopping': '購物',
+final Map<String, String> _categoryLabels = {
+  for (final (key, label) in _categoryChips) key: label,
 };
 const String _kCustomRegion = '__custom__';
 
