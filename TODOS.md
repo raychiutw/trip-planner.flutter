@@ -4,9 +4,7 @@
 
 ## P1(第二波)
 
-- [ ] 建立/編輯行程(行程基本資料表單)
-- [ ] 全域地圖(map tab 轉正,跨行程 POI)
-- [ ] 共編邀請(成員管理)
+P1 全數完成 🎉(見 Completed)。
 
 ## P2
 
@@ -23,6 +21,9 @@
 
 ## Completed
 
+- [x] 建立/編輯行程:目的地優先 POI 建立(固定/彈性日期 + 每地天數)+ 編輯(PUT 欄位,明確儲存)(**Completed:** 2026-06-12)
+- [x] 全域地圖(map tab 轉正):收藏 POI 跨行程 flutter_map(依 poi_type 上色 + 點選資訊卡)(**Completed:** 2026-06-12)
+- [x] 共編邀請(成員管理):成員/角色/移除 + 待接受邀請撤銷 + email 邀請(`/permissions` + `/invitations`)(**Completed:** 2026-06-12)
 - [x] AI 聊天(chat tab 轉正):工單佇列(`POST /api/requests` + polling)+ markdown 回覆 + deep-link 映射 + 行程下拉(預設最近)+ 三方氣泡;completed 後 invalidate 行程 providers(**Completed:** 2026-06-11)
 - [x] 行程筆記 CRUD:5 區（航班/住宿/預訂/行前須知/緊急聯絡）新增/編輯/刪除 + 每區拖曳排序(spec-driven 表單 + 泛型 repository,OCC `expectedVersion`)(**Completed:** 2026-06-11)
 - [x] Entry CRUD 表單群:編輯/刪除/新增停留點 + 拖曳排序/跨天搬移 + 地點管理（master/alternates/per-POI）+ 交通編輯;三套 OCC、409 `STALE_ENTRY` 重抓(**Completed:** 2026-06-11)
