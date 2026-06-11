@@ -42,10 +42,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(title: const Text('AI 助手')),
       body: tripsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const _CenteredHint(
-          title: '載入失敗',
-          body: '無法取得行程清單,請稍後再試。',
-        ),
+        error: (e, _) =>
+            const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
         data: (trips) {
           if (trips.isEmpty) {
             return const _CenteredHint(
@@ -62,7 +60,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                    TpSpacing.s4, TpSpacing.s3, TpSpacing.s4, TpSpacing.s2),
+                  TpSpacing.s4,
+                  TpSpacing.s3,
+                  TpSpacing.s4,
+                  TpSpacing.s2,
+                ),
                 child: DropdownButtonFormField<String>(
                   key: const ValueKey('chat-trip-dropdown'),
                   initialValue: tripId,
@@ -75,7 +77,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     for (final t in trips)
                       DropdownMenuItem(
                         value: t.tripId,
-                        child: Text(_tripLabel(t), overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          _tripLabel(t),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                   ],
                   onChanged: (v) {
@@ -83,7 +88,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   },
                 ),
               ),
-              Expanded(child: _ChatBody(key: ValueKey(tripId), tripId: tripId)),
+              Expanded(
+                child: _ChatBody(key: ValueKey(tripId), tripId: tripId),
+              ),
             ],
           );
         },
@@ -123,7 +130,8 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   void _onScroll() {
     if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 240) {
       unawaited(
-          ref.read(chatControllerProvider(widget.tripId).notifier).loadOlder());
+        ref.read(chatControllerProvider(widget.tripId).notifier).loadOlder(),
+      );
     }
   }
 
@@ -132,7 +140,8 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     if (text.trim().isEmpty) return;
     _input.clear();
     unawaited(
-        ref.read(chatControllerProvider(widget.tripId).notifier).send(text));
+      ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
+    );
     // 捲到底(reverse list 底部 = offset 0)。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -148,33 +157,42 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     };
     final msgs = state.messages;
 
+    final controller = ref.read(chatControllerProvider(widget.tripId).notifier);
+
     return Column(
       children: [
         if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
-        if (state.error != null) _Banner(text: state.error!),
+        // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
+        if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
         Expanded(
           child: state.initialLoading
               ? const Center(child: CircularProgressIndicator())
+              : (state.error != null && msgs.isEmpty)
+              ? _CenteredHint(
+                  title: '載入失敗',
+                  body: '無法取得對話,請稍後再試。',
+                  onRetry: () => unawaited(controller.reload()),
+                )
               : msgs.isEmpty
-                  ? const _CenteredHint(
-                      title: '開始跟 AI 對話',
-                      body: '例如:「幫我把第二天下午改成室內行程」。',
-                    )
-                  : ListView.builder(
-                      key: const ValueKey('chat-list'),
-                      controller: _scroll,
-                      reverse: true,
-                      padding: const EdgeInsets.all(TpSpacing.s4),
-                      itemCount: msgs.length,
-                      itemBuilder: (context, i) {
-                        final m = msgs[msgs.length - 1 - i];
-                        return _MessageBubble(
-                          message: m,
-                          tripId: widget.tripId,
-                          myEmail: myEmail,
-                        );
-                      },
-                    ),
+              ? const _CenteredHint(
+                  title: '開始跟 AI 對話',
+                  body: '例如:「幫我把第二天下午改成室內行程」。',
+                )
+              : ListView.builder(
+                  key: const ValueKey('chat-list'),
+                  controller: _scroll,
+                  reverse: true,
+                  padding: const EdgeInsets.all(TpSpacing.s4),
+                  itemCount: msgs.length,
+                  itemBuilder: (context, i) {
+                    final m = msgs[msgs.length - 1 - i];
+                    return _MessageBubble(
+                      message: m,
+                      tripId: widget.tripId,
+                      myEmail: myEmail,
+                    );
+                  },
+                ),
         ),
         _Composer(input: _input, sending: state.sending, onSend: _send),
       ],
@@ -202,7 +220,8 @@ class _MessageBubble extends StatelessWidget {
 
     final isAssistant = message.role == ChatRole.assistant;
     // submittedBy 為空(樂觀 temp / 認證未解析)視為自己。
-    final isSelf = !isAssistant &&
+    final isSelf =
+        !isAssistant &&
         (message.submittedBy == null || message.submittedBy == myEmail);
 
     final Color bg;
@@ -215,8 +234,9 @@ class _MessageBubble extends StatelessWidget {
     } else {
       bg = tones.pinkSubtle;
     }
-    final textColor =
-        message.isFailed ? scheme.onErrorContainer : scheme.onSurface;
+    final textColor = message.isFailed
+        ? scheme.onErrorContainer
+        : scheme.onSurface;
 
     String? label;
     Color? labelColor;
@@ -257,25 +277,34 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TpSpacing.s1),
       child: Column(
-        crossAxisAlignment:
-            isSelf ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isSelf
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (label != null)
             Padding(
               padding: const EdgeInsets.only(
-                  left: TpSpacing.s1, right: TpSpacing.s1, bottom: 2),
+                left: TpSpacing.s1,
+                right: TpSpacing.s1,
+                bottom: 2,
+              ),
               child: Text(
                 label,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: labelColor, fontWeight: FontWeight.w600),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ConstrainedBox(
             constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.78),
+              maxWidth: MediaQuery.of(context).size.width * 0.78,
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: TpSpacing.s3, vertical: TpSpacing.s2),
+                horizontal: TpSpacing.s3,
+                vertical: TpSpacing.s2,
+              ),
               decoration: BoxDecoration(
                 color: bg,
                 borderRadius: BorderRadius.circular(TpRadius.lg),
@@ -310,7 +339,11 @@ class _Composer extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-            TpSpacing.s3, TpSpacing.s2, TpSpacing.s3, TpSpacing.s2),
+          TpSpacing.s3,
+          TpSpacing.s2,
+          TpSpacing.s3,
+          TpSpacing.s2,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -350,10 +383,11 @@ class _Composer extends StatelessWidget {
 
 /// 置中提示(空清單 / 空對話 / 錯誤)。
 class _CenteredHint extends StatelessWidget {
-  const _CenteredHint({required this.title, required this.body});
+  const _CenteredHint({required this.title, required this.body, this.onRetry});
 
   final String title;
   final String body;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -369,9 +403,18 @@ class _CenteredHint extends StatelessWidget {
             Text(
               body,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(
+                key: const ValueKey('chat-retry'),
+                onPressed: onRetry,
+                child: const Text('重試'),
+              ),
+            ],
           ],
         ),
       ),
@@ -397,8 +440,10 @@ class _Banner extends StatelessWidget {
             Icon(Icons.error_outline, color: scheme.onErrorContainer, size: 18),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
-              child: Text(text,
-                  style: TextStyle(color: scheme.onErrorContainer)),
+              child: Text(
+                text,
+                style: TextStyle(color: scheme.onErrorContainer),
+              ),
             ),
           ],
         ),

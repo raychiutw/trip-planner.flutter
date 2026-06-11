@@ -44,8 +44,9 @@ class ChatState {
   final bool authExpired;
 
   /// 投影成氣泡(1 row → 1~2 個);畫面直接 render 這個。
-  List<ChatMessage> get messages =>
-      [for (final r in requests) ...rowToMessages(r)];
+  List<ChatMessage> get messages => [
+    for (final r in requests) ...rowToMessages(r),
+  ];
 
   ChatState copyWith({
     List<TripRequest>? requests,
@@ -98,9 +99,9 @@ class ChatController extends Notifier<ChatState> {
   RequestsRepository get _repo => ref.read(requestsRepositoryProvider);
 
   UserInfo? get _me => switch (ref.read(authStateProvider)) {
-        AsyncData(:final value) => value,
-        _ => null,
-      };
+    AsyncData(:final value) => value,
+    _ => null,
+  };
 
   /// 首次載入最新一頁(desc 抓 → 反轉成 asc);idempotent。
   Future<void> loadInitial() async {
@@ -108,7 +109,11 @@ class ChatController extends Notifier<ChatState> {
     _initStarted = true;
     try {
       final page = await _repo.fetchRequests(
-          tripId: tripId, sort: 'desc', limit: _pageSize);
+        tripId: tripId,
+        sort: 'desc',
+        limit: _pageSize,
+      );
+      if (_disposed) return; // 抓取期間若已 dispose(切換行程)→ 不寫已死的 state
       final rows = page.items.reversed.toList(); // asc
       state = state.copyWith(
         requests: rows,
@@ -123,10 +128,18 @@ class ChatController extends Notifier<ChatState> {
         if (!r.status.isTerminal) _startPoll(r.id);
       }
     } on Exception catch (e) {
+      if (_disposed) return;
       state = (e is ApiError && e.status == 401)
           ? state.copyWith(initialLoading: false, authExpired: true)
           : state.copyWith(initialLoading: false, error: '載入失敗,請稍後再試');
     }
+  }
+
+  /// 重新載入(初次載入失敗後重試):清 idempotent 旗標 + 進入載入態 + 重抓。
+  Future<void> reload() async {
+    _initStarted = false;
+    state = state.copyWith(initialLoading: true, error: null);
+    return loadInitial();
   }
 
   /// 往更舊翻頁(prepend);用最舊一筆當 cursor。
@@ -142,6 +155,7 @@ class ChatController extends Notifier<ChatState> {
         before: cursor.createdAt,
         beforeId: cursor.id,
       );
+      if (_disposed) return;
       final older = page.items.reversed.toList(); // asc
       state = state.copyWith(
         requests: [...older, ...state.requests],
@@ -155,6 +169,7 @@ class ChatController extends Notifier<ChatState> {
         if (!r.status.isTerminal) _startPoll(r.id);
       }
     } on Exception {
+      if (_disposed) return;
       state = state.copyWith(loadingOlder: false);
     }
   }
@@ -178,6 +193,7 @@ class ChatController extends Notifier<ChatState> {
     );
     try {
       final row = await _repo.sendRequest(tripId: tripId, message: t);
+      if (_disposed) return;
       state = state.copyWith(
         requests: [
           for (final r in state.requests)
@@ -192,14 +208,14 @@ class ChatController extends Notifier<ChatState> {
         _startPoll(row.id);
       }
     } on Exception catch (e) {
+      if (_disposed) return;
       state = state.copyWith(
         requests: [
           for (final r in state.requests)
             if (r.id != temp.id) r,
         ],
         sending: false,
-        error:
-            (e is ApiError && e.status == 403) ? '沒有權限傳訊息' : '送出失敗,請稍後再試',
+        error: (e is ApiError && e.status == 403) ? '沒有權限傳訊息' : '送出失敗,請稍後再試',
       );
     }
   }
@@ -247,9 +263,7 @@ class ChatController extends Notifier<ChatState> {
 
   void _replace(TripRequest row) {
     state = state.copyWith(
-      requests: [
-        for (final r in state.requests) r.id == row.id ? row : r,
-      ],
+      requests: [for (final r in state.requests) r.id == row.id ? row : r],
     );
   }
 
@@ -263,7 +277,5 @@ class ChatController extends Notifier<ChatState> {
   }
 }
 
-final chatControllerProvider =
-    NotifierProvider.autoDispose.family<ChatController, ChatState, String>(
-  ChatController.new,
-);
+final chatControllerProvider = NotifierProvider.autoDispose
+    .family<ChatController, ChatState, String>(ChatController.new);

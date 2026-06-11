@@ -67,43 +67,54 @@ List<ChatMessage> rowToMessages(TripRequest r) {
   final out = <ChatMessage>[];
   if (r.message.isNotEmpty) {
     final t = _displayUserText(r.message);
-    out.add(ChatMessage(
-      key: '${r.id}-u',
-      role: ChatRole.user,
-      text: isGarbledText(t) ? kGarbledPlaceholder : t,
-      submittedBy: r.submittedBy,
-      senderName: r.submittedByDisplayName,
-      createdAt: r.createdAt,
-    ));
+    out.add(
+      ChatMessage(
+        key: '${r.id}-u',
+        role: ChatRole.user,
+        text: isGarbledText(t) ? kGarbledPlaceholder : t,
+        submittedBy: r.submittedBy,
+        senderName: r.submittedByDisplayName,
+        createdAt: r.createdAt,
+      ),
+    );
   }
   switch (r.status) {
     case RequestStatus.completed:
       final reply = r.reply ?? '';
       final bad = isGarbledText(reply);
-      out.add(ChatMessage(
-        key: '${r.id}-a',
-        role: ChatRole.assistant,
-        text: bad ? kGarbledPlaceholder : reply,
-        isMarkdown: !bad,
-        createdAt: r.updatedAt ?? r.createdAt,
-      ));
+      out.add(
+        ChatMessage(
+          key: '${r.id}-a',
+          role: ChatRole.assistant,
+          text: bad ? kGarbledPlaceholder : reply,
+          isMarkdown: !bad,
+          createdAt: r.updatedAt ?? r.createdAt,
+        ),
+      );
     case RequestStatus.failed:
-      out.add(ChatMessage(
-        key: '${r.id}-a',
-        role: ChatRole.assistant,
-        text: (r.reply == null || r.reply!.isEmpty) ? 'AI 處理失敗。' : r.reply!,
-        isFailed: true,
-        createdAt: r.updatedAt ?? r.createdAt,
-      ));
+      final reply = r.reply;
+      out.add(
+        ChatMessage(
+          key: '${r.id}-a',
+          role: ChatRole.assistant,
+          text: (reply == null || reply.isEmpty)
+              ? 'AI 處理失敗。'
+              : (isGarbledText(reply) ? kGarbledPlaceholder : reply),
+          isFailed: true,
+          createdAt: r.updatedAt ?? r.createdAt,
+        ),
+      );
     case RequestStatus.open:
     case RequestStatus.processing:
-      out.add(ChatMessage(
-        key: '${r.id}-a',
-        role: ChatRole.assistant,
-        text: '思考中…',
-        pendingRequestId: r.id,
-        createdAt: r.createdAt,
-      ));
+      out.add(
+        ChatMessage(
+          key: '${r.id}-a',
+          role: ChatRole.assistant,
+          text: '思考中…',
+          pendingRequestId: r.id,
+          createdAt: r.createdAt,
+        ),
+      );
   }
   return out;
 }

@@ -31,9 +31,13 @@ TripRequest _req({
   String message = 'hi',
   String? reply,
   required RequestStatus status,
-}) =>
-    TripRequest(
-        id: id, tripId: 'okinawa', message: message, reply: reply, status: status);
+}) => TripRequest(
+  id: id,
+  tripId: 'okinawa',
+  message: message,
+  reply: reply,
+  status: status,
+);
 
 void main() {
   late _MockRequestsRepo reqRepo;
@@ -44,13 +48,15 @@ void main() {
     tripRepo = _MockTripRepo();
     when(tripRepo.fetchMyTrips).thenAnswer((_) async => _trips);
     // 預設聊天串為空(各測試可覆寫)。
-    when(() => reqRepo.fetchRequests(
-          tripId: any(named: 'tripId'),
-          limit: any(named: 'limit'),
-          sort: any(named: 'sort'),
-          before: any(named: 'before'),
-          beforeId: any(named: 'beforeId'),
-        )).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
   });
 
   Widget buildApp() {
@@ -60,10 +66,7 @@ void main() {
         tripRepositoryProvider.overrideWithValue(tripRepo),
         authStateProvider.overrideWith(_StubAuth.new),
       ],
-      child: MaterialApp(
-        theme: AppTheme.light(),
-        home: const ChatScreen(),
-      ),
+      child: MaterialApp(theme: AppTheme.light(), home: const ChatScreen()),
     );
   }
 
@@ -76,14 +79,23 @@ void main() {
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {
-    when(() => reqRepo.sendRequest(
-              tripId: any(named: 'tripId'),
-              message: any(named: 'message'),
-            ))
-        .thenAnswer(
-            (_) async => _req(id: 7, message: '改午餐', status: RequestStatus.processing));
-    when(() => reqRepo.fetchRequest(7)).thenAnswer((_) async =>
-        _req(id: 7, message: '改午餐', status: RequestStatus.completed, reply: '改好了'));
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 7, message: '改午餐', status: RequestStatus.processing),
+    );
+    when(() => reqRepo.fetchRequest(7)).thenAnswer(
+      (_) async => _req(
+        id: 7,
+        message: '改午餐',
+        status: RequestStatus.completed,
+        reply: '改好了',
+      ),
+    );
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -93,28 +105,34 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pumpAndSettle();
 
-    verify(() => reqRepo.sendRequest(tripId: 'okinawa', message: '改午餐'))
-        .called(1);
+    verify(
+      () => reqRepo.sendRequest(tripId: 'okinawa', message: '改午餐'),
+    ).called(1);
     expect(find.text('改午餐'), findsWidgets); // user 氣泡樂觀顯示
   });
 
   testWidgets('completed reply → markdown 渲染', (tester) async {
-    when(() => reqRepo.fetchRequests(
-          tripId: any(named: 'tripId'),
-          limit: any(named: 'limit'),
-          sort: any(named: 'sort'),
-          before: any(named: 'before'),
-          beforeId: any(named: 'beforeId'),
-        )).thenAnswer((_) async => (
-          items: [
-            _req(
-                id: 1,
-                message: 'q',
-                status: RequestStatus.completed,
-                reply: '**已完成** [看筆記](/trip/okinawa/notes)'),
-          ],
-          hasMore: false,
-        ));
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 1,
+            message: 'q',
+            status: RequestStatus.completed,
+            reply: '**已完成** [看筆記](/trip/okinawa/notes)',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -126,10 +144,12 @@ void main() {
   testWidgets('思考中態顯示', (tester) async {
     // sendRequest 永不回 → 樂觀 temp(open)維持「思考中…」。
     final pending = Completer<TripRequest>();
-    when(() => reqRepo.sendRequest(
-          tripId: any(named: 'tripId'),
-          message: any(named: 'message'),
-        )).thenAnswer((_) => pending.future);
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer((_) => pending.future);
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -153,10 +173,12 @@ void main() {
   });
 
   testWidgets('下拉切換行程 → 新行程的工單被載入', (tester) async {
-    when(tripRepo.fetchMyTrips).thenAnswer((_) async => const [
-          TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
-          TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
-        ]);
+    when(tripRepo.fetchMyTrips).thenAnswer(
+      (_) async => const [
+        TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+        TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+      ],
+    );
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -166,12 +188,46 @@ void main() {
     await tester.tap(find.text('京都').last); // 選單項
     await tester.pumpAndSettle();
 
-    verify(() => reqRepo.fetchRequests(
-          tripId: 'kyoto',
-          limit: any(named: 'limit'),
-          sort: any(named: 'sort'),
-          before: any(named: 'before'),
-          beforeId: any(named: 'beforeId'),
-        )).called(1);
+    verify(
+      () => reqRepo.fetchRequests(
+        tripId: 'kyoto',
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {
+    var calls = 0;
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw Exception('boom');
+      return (
+        items: [
+          _req(id: 1, message: 'q', status: RequestStatus.completed, reply: '好了'),
+        ],
+        hasMore: false,
+      );
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    expect(find.text('載入失敗'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('chat-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('載入失敗'), findsNothing);
+    expect(find.byType(MarkdownBody), findsWidgets); // reply 顯示
   });
 }
