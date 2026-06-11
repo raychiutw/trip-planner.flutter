@@ -16,7 +16,7 @@ abstract class OAuthTokenStore {
 /// 正式環境:flutter_secure_storage,key `tripline_oauth_tokens`(存 JSON)。
 class SecureOAuthTokenStore implements OAuthTokenStore {
   SecureOAuthTokenStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   static const _key = 'tripline_oauth_tokens';
 

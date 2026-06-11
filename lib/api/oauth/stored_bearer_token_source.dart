@@ -11,9 +11,9 @@ class StoredBearerTokenSource implements BearerTokenSource {
     required OAuthTokenStore store,
     required OAuthRepository repository,
     required String clientId,
-  })  : _store = store,
-        _repo = repository,
-        _clientId = clientId;
+  }) : _store = store,
+       _repo = repository,
+       _clientId = clientId;
 
   final OAuthTokenStore _store;
   final OAuthRepository _repo;

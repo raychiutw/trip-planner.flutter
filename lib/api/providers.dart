@@ -7,6 +7,8 @@ import '../models/user.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'collab_repository.dart';
+import 'oauth/oauth_config.dart';
+import 'oauth/oauth_providers.dart';
 import 'requests_repository.dart';
 import 'session_store.dart';
 import 'trip_repository.dart';
@@ -16,7 +18,14 @@ final sessionStoreProvider = Provider<SessionStore>(
 );
 
 final apiClientProvider = Provider<ApiClient>(
-  (ref) => ApiClient(sessionStore: ref.watch(sessionStoreProvider)),
+  (ref) => ApiClient(
+    sessionStore: ref.watch(sessionStoreProvider),
+    // 有設定 OAuth client 才走 Bearer(無 token 時 source 回 null → 仍 cookie);
+    // 未設定則完全不接 → 維持 cookie 登入,零破壞。
+    bearerSource: OAuthConfig.isConfigured
+        ? ref.watch(bearerTokenSourceProvider)
+        : null,
+  ),
 );
 
 final authRepositoryProvider = Provider<AuthRepository>(
@@ -41,8 +50,7 @@ final collabRepositoryProvider = Provider<CollabRepository>(
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   @override
-  Future<UserInfo?> build() =>
-      ref.watch(authRepositoryProvider).currentUser();
+  Future<UserInfo?> build() => ref.watch(authRepositoryProvider).currentUser();
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
@@ -59,5 +67,6 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   }
 }
 
-final authStateProvider =
-    AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new);
+final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(
+  AuthNotifier.new,
+);

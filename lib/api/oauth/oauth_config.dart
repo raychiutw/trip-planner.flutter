@@ -7,8 +7,10 @@ abstract final class OAuthConfig {
   static const clientId = String.fromEnvironment('TRIPLINE_OAUTH_CLIENT_ID');
 
   /// loopback 固定埠(RFC 8252);須與註冊的 redirect_uri 完全一致。
-  static const redirectPort =
-      int.fromEnvironment('TRIPLINE_OAUTH_REDIRECT_PORT', defaultValue: 8765);
+  static const redirectPort = int.fromEnvironment(
+    'TRIPLINE_OAUTH_REDIRECT_PORT',
+    defaultValue: 8765,
+  );
 
   static String get redirectUri => 'http://127.0.0.1:$redirectPort';
 

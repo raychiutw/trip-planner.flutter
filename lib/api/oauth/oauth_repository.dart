@@ -10,8 +10,8 @@ import '../api_error.dart';
 
 class OAuthRepository {
   OAuthRepository({Dio? dio, String origin = kTriplineOrigin})
-      : _origin = origin,
-        _dio = dio ?? Dio() {
+    : _origin = origin,
+      _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     _dio.options.validateStatus = (_) => true;
   }
@@ -46,25 +46,23 @@ class OAuthRepository {
     required String codeVerifier,
     required String clientId,
     required String redirectUri,
-  }) =>
-      _token({
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': redirectUri,
-        'client_id': clientId,
-        'code_verifier': codeVerifier,
-      });
+  }) => _token({
+    'grant_type': 'authorization_code',
+    'code': code,
+    'redirect_uri': redirectUri,
+    'client_id': clientId,
+    'code_verifier': codeVerifier,
+  });
 
   /// refresh_token 換新 token pair(public client 不帶 secret)。
   Future<OAuthTokens> refresh({
     required String refreshToken,
     required String clientId,
-  }) =>
-      _token({
-        'grant_type': 'refresh_token',
-        'refresh_token': refreshToken,
-        'client_id': clientId,
-      });
+  }) => _token({
+    'grant_type': 'refresh_token',
+    'refresh_token': refreshToken,
+    'client_id': clientId,
+  });
 
   Future<OAuthTokens> _token(Map<String, dynamic> form) async {
     final res = await _dio.post<dynamic>(
