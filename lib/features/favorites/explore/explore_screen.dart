@@ -10,9 +10,6 @@ import 'poi_search_card.dart';
 const List<String> _popularRegions = [
   '全部地區', '沖繩', '東京', '京都', '首爾', '台北',
 ];
-const List<String> _suggestedQueries = [
-  '沖繩美麗海水族館', '首里城', '國際通', '古宇利大橋', '美國村',
-];
 const List<(String, String)> _categoryChips = [
   ('all', '為你推薦'), ('attraction', '景點'), ('food', '美食'),
   ('hotel', '住宿'), ('shopping', '購物'),
@@ -205,9 +202,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         );
       }
-      if (state.hasSearched) {
-        return _landingEmpty(context);
-      }
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -260,47 +254,4 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     );
   }
 
-  Widget _landingEmpty(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '沒拿到結果',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: TpSpacing.s1),
-            Text('試試這些', style: theme.textTheme.titleLarge),
-            const SizedBox(height: TpSpacing.s1),
-            Text(
-              '看起來這個地區暫時沒結果,點下方建議或自行搜尋。',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            Wrap(
-              spacing: TpSpacing.s2,
-              runSpacing: TpSpacing.s2,
-              alignment: WrapAlignment.center,
-              children: [
-                for (final q in _suggestedQueries)
-                  ActionChip(
-                    label: Text(q),
-                    onPressed: () {
-                      _searchController.text = q;
-                      ref.read(exploreControllerProvider.notifier).search(q);
-                    },
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
