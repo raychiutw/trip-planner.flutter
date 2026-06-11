@@ -19,6 +19,7 @@ class TimelineEntryTile extends StatelessWidget {
     required this.entry,
     this.isFirst = false,
     this.isLast = false,
+    this.onTap,
   });
 
   final TimelineEntry entry;
@@ -28,6 +29,9 @@ class TimelineEntryTile extends StatelessWidget {
 
   /// 當日最後一個 entry：rail 不畫圓點下方連線。
   final bool isLast;
+
+  /// 點內容卡的回呼（null 則不可點）。
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +91,11 @@ class TimelineEntryTile extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: _EntryCard(entry: entry, tone: tone),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(TpRadius.md),
+                child: _EntryCard(entry: entry, tone: tone),
+              ),
             ),
           ),
         ],
