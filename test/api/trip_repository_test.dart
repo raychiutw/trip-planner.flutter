@@ -5,6 +5,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
 
@@ -507,6 +508,81 @@ void main() {
       tripRepository.updateEntryPoi(
           tripId: 'okinawa', entryId: 11, poiId: 501,
           note: '記得訂位', poiType: 'restaurant'),
+      completes,
+    );
+  });
+
+  test('createNote：POST /notes/{section} snake_case body', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/notes/flights',
+      (server) => server.reply(201, {'id': 1, 'version': 0}),
+      data: {'airline': 'IT', 'flight_no': 'IT232'},
+    );
+    await expectLater(
+      tripRepository.createNote(NoteSection.flights,
+          tripId: 'okinawa', fields: {'airline': 'IT', 'flight_no': 'IT232'}),
+      completes,
+    );
+  });
+
+  test('updateNote：PATCH /notes/{section}/:id + expectedVersion', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/notes/reservations/5',
+      (server) => server.reply(200, {'id': 5, 'version': 3}),
+      data: {'title': '晚餐', 'expectedVersion': 2},
+    );
+    await expectLater(
+      tripRepository.updateNote(NoteSection.reservations,
+          tripId: 'okinawa', rowId: 5, fields: {'title': '晚餐'},
+          expectedVersion: 2),
+      completes,
+    );
+  });
+
+  test('updateNote：409 STALE_ENTRY → ApiError(409)', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/notes/reservations/5',
+      (server) => server.reply(409, {
+        'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+      }),
+      data: {'title': '晚餐', 'expectedVersion': 2},
+    );
+    await expectLater(
+      tripRepository.updateNote(NoteSection.reservations,
+          tripId: 'okinawa', rowId: 5, fields: {'title': '晚餐'},
+          expectedVersion: 2),
+      throwsA(isA<ApiError>()
+          .having((e) => e.status, 'status', 409)
+          .having((e) => e.code, 'code', 'STALE_ENTRY')),
+    );
+  });
+
+  test('deleteNote：DELETE /notes/{section}/:id（200 {ok:true}）', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa/notes/emergency/7',
+      (server) => server.reply(200, {'ok': true}),
+    );
+    await expectLater(
+      tripRepository.deleteNote(NoteSection.emergency,
+          tripId: 'okinawa', rowId: 7),
+      completes,
+    );
+  });
+
+  test('reorderNotes：PATCH /notes/{section}/reorder items camelCase', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/notes/flights/reorder',
+      (server) => server.reply(200, {'ok': true, 'updated': 2}),
+      data: {
+        'items': [
+          {'id': 11, 'sortOrder': 0},
+          {'id': 12, 'sortOrder': 1},
+        ],
+      },
+    );
+    await expectLater(
+      tripRepository.reorderNotes(NoteSection.flights, tripId: 'okinawa',
+          items: [(id: 11, sortOrder: 0), (id: 12, sortOrder: 1)]),
       completes,
     );
   });

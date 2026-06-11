@@ -3,6 +3,7 @@ library;
 
 import '../models/day.dart';
 import '../models/entry.dart';
+import '../models/note_section.dart';
 import '../models/notes.dart';
 import '../models/poi_search_result.dart';
 import '../models/poi_type.dart';
@@ -57,6 +58,59 @@ class TripRepository {
     final responseBody =
         await _client.get('/trips/${Uri.encodeComponent(id)}/notes');
     return TripNotes.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /trips/:id/notes/{section}（建立筆記;body snake_case 欄位,5 區共用）。
+  Future<void> createNote(
+    NoteSection section, {
+    required String tripId,
+    required Map<String, dynamic> fields,
+  }) {
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}',
+      body: fields,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/{section}/:rowId（OCC expectedVersion;409 STALE_ENTRY）。
+  Future<void> updateNote(
+    NoteSection section, {
+    required String tripId,
+    required int rowId,
+    required Map<String, dynamic> fields,
+    int? expectedVersion,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
+      body: {...fields, 'expectedVersion': ?expectedVersion},
+    );
+  }
+
+  /// DELETE /trips/:id/notes/{section}/:rowId（回 200 {ok:true},忽略 body）。
+  Future<void> deleteNote(
+    NoteSection section, {
+    required String tripId,
+    required int rowId,
+  }) {
+    return _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
+    );
+  }
+
+  /// PATCH /trips/:id/notes/{section}/reorder（items camelCase）。
+  Future<void> reorderNotes(
+    NoteSection section, {
+    required String tripId,
+    required List<({int id, int sortOrder})> items,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/reorder',
+      body: {
+        'items': [
+          for (final it in items) {'id': it.id, 'sortOrder': it.sortOrder},
+        ],
+      },
+    );
   }
 
   /// DELETE /trips/:id（限 owner/admin）。
