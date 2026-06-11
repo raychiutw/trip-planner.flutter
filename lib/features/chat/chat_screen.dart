@@ -53,8 +53,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               body: '建立行程後,就能在這裡用 AI 助手調整行程。',
             );
           }
-          // 預設最近(清單第一筆);使用者可下拉切換。
-          final tripId = _tripId ?? trips.first.tripId;
+          // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
+          // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
+          final tripId = trips.any((t) => t.tripId == _tripId)
+              ? _tripId!
+              : trips.first.tripId;
           return Column(
             children: [
               Padding(

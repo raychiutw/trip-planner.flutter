@@ -151,4 +151,27 @@ void main() {
     expect(find.text('先建立行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-trip-dropdown')), findsNothing);
   });
+
+  testWidgets('下拉切換行程 → 新行程的工單被載入', (tester) async {
+    when(tripRepo.fetchMyTrips).thenAnswer((_) async => const [
+          TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+          TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+        ]);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('京都').last); // 選單項
+    await tester.pumpAndSettle();
+
+    verify(() => reqRepo.fetchRequests(
+          tripId: 'kyoto',
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        )).called(1);
+  });
 }

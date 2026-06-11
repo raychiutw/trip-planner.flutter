@@ -11,6 +11,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../api/requests_repository.dart';
 import '../../models/trip_request.dart';
+import '../../models/user.dart';
 import '../favorites/favorites_providers.dart';
 import '../trip_detail/trip_providers.dart';
 import 'chat_message.dart';
@@ -96,12 +97,8 @@ class ChatController extends Notifier<ChatState> {
 
   RequestsRepository get _repo => ref.read(requestsRepositoryProvider);
 
-  String? get _myEmail => switch (ref.read(authStateProvider)) {
-        AsyncData(:final value) => value?.email,
-        _ => null,
-      };
-  String? get _myName => switch (ref.read(authStateProvider)) {
-        AsyncData(:final value) => value?.displayName,
+  UserInfo? get _me => switch (ref.read(authStateProvider)) {
+        AsyncData(:final value) => value,
         _ => null,
       };
 
@@ -125,12 +122,10 @@ class ChatController extends Notifier<ChatState> {
       for (final r in rows) {
         if (!r.status.isTerminal) _startPoll(r.id);
       }
-    } on ApiError catch (e) {
-      state = e.status == 401
+    } on Exception catch (e) {
+      state = (e is ApiError && e.status == 401)
           ? state.copyWith(initialLoading: false, authExpired: true)
           : state.copyWith(initialLoading: false, error: '載入失敗,請稍後再試');
-    } on Exception {
-      state = state.copyWith(initialLoading: false, error: '載入失敗,請稍後再試');
     }
   }
 
@@ -173,8 +168,8 @@ class ChatController extends Notifier<ChatState> {
       tripId: tripId,
       message: t,
       status: RequestStatus.open,
-      submittedBy: _myEmail,
-      submittedByDisplayName: _myName,
+      submittedBy: _me?.email,
+      submittedByDisplayName: _me?.displayName,
     );
     state = state.copyWith(
       requests: [...state.requests, temp],
@@ -196,23 +191,15 @@ class ChatController extends Notifier<ChatState> {
       } else {
         _startPoll(row.id);
       }
-    } on ApiError catch (e) {
+    } on Exception catch (e) {
       state = state.copyWith(
         requests: [
           for (final r in state.requests)
             if (r.id != temp.id) r,
         ],
         sending: false,
-        error: e.status == 403 ? '沒有權限傳訊息' : '送出失敗,請稍後再試',
-      );
-    } on Exception {
-      state = state.copyWith(
-        requests: [
-          for (final r in state.requests)
-            if (r.id != temp.id) r,
-        ],
-        sending: false,
-        error: '送出失敗,請稍後再試',
+        error:
+            (e is ApiError && e.status == 403) ? '沒有權限傳訊息' : '送出失敗,請稍後再試',
       );
     }
   }
