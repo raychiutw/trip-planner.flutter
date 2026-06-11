@@ -23,6 +23,11 @@ class TripsListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('我的行程')),
+      floatingActionButton: FloatingActionButton(
+        key: const ValueKey('trips-create-fab'),
+        onPressed: () => context.push('/new-trip'),
+        child: const Icon(Icons.add),
+      ),
       body: myTripsAsync.when(
         data: (trips) => RefreshIndicator(
           onRefresh: () => ref.refresh(myTripsProvider.future),

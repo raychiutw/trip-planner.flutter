@@ -17,6 +17,7 @@ import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
+import '../features/trips/create/create_trip_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 
@@ -48,6 +49,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      // 建立行程:shell 外全螢幕表單(避開 /trips/:tripId 衝突)
+      GoRoute(
+        path: '/new-trip',
+        builder: (context, state) => const CreateTripScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
