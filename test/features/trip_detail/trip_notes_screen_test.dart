@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/theme/app_theme.dart';
+
+class _MockTripRepository extends Mock implements TripRepository {}
 
 TripNotes _sampleNotes() {
   return const TripNotes(
@@ -64,7 +70,7 @@ TripNotes _sampleNotes() {
   );
 }
 
-Widget _buildScreen(TripNotes notes) {
+Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -76,12 +82,18 @@ Widget _buildScreen(TripNotes notes) {
   return ProviderScope(
     overrides: [
       tripNotesProvider.overrideWith((ref, tripId) async => notes),
+      if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(NoteSection.flights);
+    registerFallbackValue(<String, dynamic>{});
+  });
+
   testWidgets('渲染 AppBar 標題、5 個 section header 與 count badge', (tester) async {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
@@ -185,5 +197,55 @@ void main() {
       );
     }
     expect(find.text('尚無資料'), findsOneWidget);
+  });
+
+  testWidgets('點 flight row → 開編輯 sheet（預填）', (tester) async {
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('長榮航空 BR112'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('note-edit-submit')), findsOneWidget);
+    expect(find.widgetWithText(TextField, '長榮航空'), findsOneWidget);
+  });
+
+  testWidgets('左滑 flight row → 確認 → deleteNote', (tester) async {
+    final repo = _MockTripRepository();
+    when(() => repo.deleteNote(any(),
+            tripId: any(named: 'tripId'),
+            rowId: any(named: 'rowId'))).thenAnswer((_) async {});
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+        find.byKey(const ValueKey('note-dismiss-flights-1')),
+        const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.deleteNote(NoteSection.flights, tripId: 'trip-1', rowId: 1))
+        .called(1);
+  });
+
+  testWidgets('點「新增航班」→ 開 create sheet', (tester) async {
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+
+    final addBtn = find.byKey(const ValueKey('note-add-flights'));
+    await tester.ensureVisible(addBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(addBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('note-edit-submit')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
+  });
+
+  testWidgets('flight row 有 drag handle', (tester) async {
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('note-drag-flights-1')), findsOneWidget);
   });
 }
