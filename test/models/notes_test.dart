@@ -217,4 +217,37 @@ void main() {
       expect(notes.emergencyContacts, isEmpty);
     });
   });
+
+  group('toEditFields（edit 預填用,snake_case key）', () {
+    test('TripFlight', () {
+      const flight = TripFlight(
+          id: 1,
+          sortOrder: 0,
+          version: 1,
+          airline: 'IT',
+          flightNo: 'IT232',
+          departAt: '2026-04-23T08:30');
+      final fields = flight.toEditFields();
+      expect(fields['airline'], 'IT');
+      expect(fields['flight_no'], 'IT232');
+      expect(fields['depart_at'], '2026-04-23T08:30');
+      expect(fields.containsKey('note'), isTrue);
+    });
+
+    test('TripReservation（含 enum kind + int party_size）', () {
+      const reservation = TripReservation(
+          id: 5,
+          sortOrder: 0,
+          version: 2,
+          kind: 'experience',
+          title: '潛水',
+          partySize: 4,
+          reservationNo: 'R-1');
+      final fields = reservation.toEditFields();
+      expect(fields['kind'], 'experience');
+      expect(fields['title'], '潛水');
+      expect(fields['party_size'], 4);
+      expect(fields['reservation_no'], 'R-1');
+    });
+  });
 }

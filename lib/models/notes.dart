@@ -48,6 +48,17 @@ class TripFlight {
       note: json['note'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toEditFields() => {
+        'airline': airline,
+        'flight_no': flightNo,
+        'cabin_class': cabinClass,
+        'depart_airport': departAirport,
+        'arrive_airport': arriveAirport,
+        'depart_at': departAt,
+        'arrive_at': arriveAt,
+        'note': note,
+      };
 }
 
 /// 住宿（trip_lodgings）；dayId 在 link day 被刪後 SET NULL。
@@ -93,6 +104,16 @@ class TripLodging {
       note: json['note'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toEditFields() => {
+        'name': name,
+        'address': address,
+        'check_in_at': checkInAt,
+        'check_out_at': checkOutAt,
+        'booking_no': bookingNo,
+        'phone': phone,
+        'note': note,
+      };
 }
 
 /// 預約（trip_reservations）；kind enum 預設 restaurant。
@@ -137,6 +158,16 @@ class TripReservation {
       note: json['note'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toEditFields() => {
+        'kind': kind,
+        'title': title,
+        'reserved_at': reservedAt,
+        'party_size': partySize,
+        'reservation_no': reservationNo,
+        'phone': phone,
+        'note': note,
+      };
 }
 
 /// 行前筆記（trip_pretrip_notes，AI 可生成）。
@@ -172,6 +203,9 @@ class TripPretripNote {
       aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
     );
   }
+
+  Map<String, dynamic> toEditFields() =>
+      {'section': section, 'title': title, 'content': content};
 }
 
 /// 緊急聯絡人（trip_emergency_contacts，AI 可生成）；kind enum 預設 other。
@@ -213,6 +247,14 @@ class TripEmergencyContact {
       aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
     );
   }
+
+  Map<String, dynamic> toEditFields() => {
+        'name': name,
+        'relationship': relationship,
+        'phone': phone,
+        'email': email,
+        'kind': kind,
+      };
 }
 
 /// `GET /trips/:id/notes` 回應的 5 區聚合。
