@@ -42,6 +42,11 @@ class TripTimelineScreen extends ConsumerWidget {
         title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
+            tooltip: '編輯行程',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => context.push('/edit-trip/$tripId'),
+          ),
+          IconButton(
             tooltip: '地圖',
             icon: const Icon(Icons.map_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/map'),

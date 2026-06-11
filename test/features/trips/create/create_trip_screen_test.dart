@@ -34,16 +34,19 @@ void main() {
   setUp(() {
     tripRepo = _MockTripRepo();
     poiRepo = _MockPoiRepo();
-    when(() => poiRepo.searchPois(q: any(named: 'q'), region: any(named: 'region')))
-        .thenAnswer((_) async => const [_tokyo]);
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        region: any(named: 'region'),
+      ),
+    ).thenAnswer((_) async => const [_tokyo]);
   });
 
   Widget buildApp() {
     final router = GoRouter(
       initialLocation: '/new-trip',
       routes: [
-        GoRoute(
-            path: '/new-trip', builder: (_, _) => const CreateTripScreen()),
+        GoRoute(path: '/new-trip', builder: (_, _) => const CreateTripScreen()),
         GoRoute(
           path: '/trips/:id',
           builder: (_, s) =>
@@ -63,8 +66,9 @@ void main() {
   testWidgets('目的地空 → 送出鈕 disabled', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
-    final btn =
-        tester.widget<FilledButton>(find.byKey(const ValueKey('create-submit')));
+    final btn = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('create-submit')),
+    );
     expect(btn.onPressed, isNull);
   });
 
@@ -72,8 +76,8 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const ValueKey('create-poi-search')), '東京');
-    await tester.tap(find.byKey(const ValueKey('create-poi-search-btn')));
+    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
+    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('poi-result-p1')));
     await tester.pumpAndSettle();
@@ -92,27 +96,30 @@ void main() {
   });
 
   testWidgets('加目的地 + 彈性日期 → 送出呼叫 createTrip + 導頁', (tester) async {
-    when(() => tripRepo.createTrip(
-          id: any(named: 'id'),
-          name: any(named: 'name'),
-          startDate: any(named: 'startDate'),
-          endDate: any(named: 'endDate'),
-          title: any(named: 'title'),
-          description: any(named: 'description'),
-          countries: any(named: 'countries'),
-          published: any(named: 'published'),
-          dataSource: any(named: 'dataSource'),
-          lang: any(named: 'lang'),
-          destinations: any(named: 'destinations'),
-        )).thenAnswer(
-        (_) async => (tripId: 'tokyo-x', daysCreated: 5, destinationsCreated: 1));
+    when(
+      () => tripRepo.createTrip(
+        id: any(named: 'id'),
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        published: any(named: 'published'),
+        dataSource: any(named: 'dataSource'),
+        lang: any(named: 'lang'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer(
+      (_) async => (tripId: 'tokyo-x', daysCreated: 5, destinationsCreated: 1),
+    );
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     // 加目的地
-    await tester.enterText(find.byKey(const ValueKey('create-poi-search')), '東京');
-    await tester.tap(find.byKey(const ValueKey('create-poi-search-btn')));
+    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
+    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('poi-result-p1')));
     await tester.pumpAndSettle();
@@ -127,14 +134,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('create-submit')));
     await tester.pumpAndSettle();
 
-    verify(() => tripRepo.createTrip(
-          id: any(named: 'id'),
-          name: '東京',
-          startDate: any(named: 'startDate'),
-          endDate: any(named: 'endDate'),
-          countries: 'JP',
-          destinations: any(named: 'destinations'),
-        )).called(1);
+    verify(
+      () => tripRepo.createTrip(
+        id: any(named: 'id'),
+        name: '東京',
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        countries: 'JP',
+        destinations: any(named: 'destinations'),
+      ),
+    ).called(1);
     expect(find.text('TRIP tokyo-x'), findsOneWidget); // 已導去新行程
   });
 }

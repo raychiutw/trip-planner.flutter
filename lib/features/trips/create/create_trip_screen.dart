@@ -6,15 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../models/destination_input.dart';
-import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
-import '../../favorites/explore/explore_controller.dart'
-    show poiRepositoryProvider;
 import '../trips_list_screen.dart';
+import '../widgets/destination_picker.dart';
 import 'create_trip_controller.dart';
-
-const _hotDestinations = ['沖繩', '東京', '京都', '首爾', '曼谷', '台北'];
 
 class CreateTripScreen extends ConsumerStatefulWidget {
   const CreateTripScreen({super.key});
@@ -24,42 +19,16 @@ class CreateTripScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
-  final _search = TextEditingController();
   final _desc = TextEditingController();
-  List<PoiSearchResult> _results = const [];
-  bool _searching = false;
 
   @override
   void dispose() {
-    _search.dispose();
     _desc.dispose();
     super.dispose();
   }
 
   CreateTripController get _ctrl =>
       ref.read(createTripControllerProvider.notifier);
-
-  Future<void> _runSearch() async {
-    final q = _search.text.trim();
-    if (q.length < 2) return;
-    setState(() => _searching = true);
-    try {
-      final r = await ref
-          .read(poiRepositoryProvider)
-          .searchPois(q: q, region: '全部地區');
-      if (mounted) setState(() => _results = r);
-    } on Exception {
-      if (mounted) setState(() => _results = const []);
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  void _addPoi(PoiSearchResult p) {
-    _ctrl.addDestination(DestinationInput.fromPoi(p));
-    _search.clear();
-    setState(() => _results = const []);
-  }
 
   Future<void> _submit() async {
     final id = await _ctrl.submit();
@@ -82,15 +51,9 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
               padding: const EdgeInsets.all(TpSpacing.s4),
               children: [
                 _sectionTitle(context, '目的地'),
-                _DestinationPicker(
-                  search: _search,
-                  results: _results,
-                  searching: _searching,
+                DestinationPicker(
                   destinations: state.destinations,
-                  onSearch: _runSearch,
-                  onPickPoi: _addPoi,
-                  onPickHot: (name) =>
-                      _ctrl.addDestination(DestinationInput(name: name)),
+                  onAdd: _ctrl.addDestination,
                   onRemove: _ctrl.removeDestination,
                   onReorder: _ctrl.reorderDestination,
                 ),
@@ -134,123 +97,6 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     padding: const EdgeInsets.only(bottom: TpSpacing.s2),
     child: Text(t, style: Theme.of(context).textTheme.titleMedium),
   );
-}
-
-class _DestinationPicker extends StatelessWidget {
-  const _DestinationPicker({
-    required this.search,
-    required this.results,
-    required this.searching,
-    required this.destinations,
-    required this.onSearch,
-    required this.onPickPoi,
-    required this.onPickHot,
-    required this.onRemove,
-    required this.onReorder,
-  });
-
-  final TextEditingController search;
-  final List<PoiSearchResult> results;
-  final bool searching;
-  final List<DestinationInput> destinations;
-  final VoidCallback onSearch;
-  final void Function(PoiSearchResult) onPickPoi;
-  final void Function(String) onPickHot;
-  final void Function(int) onRemove;
-  final void Function(int oldIndex, int newIndex) onReorder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('create-poi-search'),
-                controller: search,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => onSearch(),
-                decoration: const InputDecoration(
-                  hintText: '搜尋地點（城市、景點）',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            IconButton.filled(
-              key: const ValueKey('create-poi-search-btn'),
-              onPressed: onSearch,
-              icon: searching
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.search),
-            ),
-          ],
-        ),
-        // 熱門目的地 chips
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
-          child: Wrap(
-            spacing: TpSpacing.s2,
-            children: [
-              for (final h in _hotDestinations)
-                ActionChip(label: Text(h), onPressed: () => onPickHot(h)),
-            ],
-          ),
-        ),
-        // 搜尋結果
-        if (results.isNotEmpty)
-          ...results
-              .take(8)
-              .map(
-                (r) => ListTile(
-                  dense: true,
-                  key: ValueKey('poi-result-${r.placeId}'),
-                  title: Text(r.name),
-                  subtitle: r.address == null ? null : Text(r.address!),
-                  trailing: const Icon(Icons.add),
-                  onTap: () => onPickPoi(r),
-                ),
-              ),
-        // 已選目的地(可拖曳排序 + 移除)
-        if (destinations.isNotEmpty)
-          ReorderableListView(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            onReorderItem: onReorder, // newIndex 已調整(無需 -1)
-            children: [
-              for (var i = 0; i < destinations.length; i++)
-                ListTile(
-                  key: ValueKey('dest-$i-${destinations[i].name}'),
-                  leading: const Icon(Icons.place_outlined),
-                  title: Text(destinations[i].name),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => onRemove(i),
-                  ),
-                ),
-            ],
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
-            child: Text(
-              '至少選 1 個目的地',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 }
 
 class _DateModeSection extends StatelessWidget {
