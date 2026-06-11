@@ -5,6 +5,44 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/tokens.dart';
 
+/// 確認對話框 → 執行 [delete] → [onSuccess]（通常是 invalidate provider）→ 成功/失敗 snackbar。
+/// timeline 與 notes 的左滑刪除共用,收斂重複的 dialog + try/catch 樣板。
+Future<void> confirmAndDelete(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required Future<void> Function() delete,
+  required void Function() onSuccess,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消')),
+        FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('刪除')),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    await delete();
+    onSuccess();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('已刪除')));
+  } on Exception {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+  }
+}
+
 /// 左滑刪除的紅底背景（errorContainer + 刪除 icon）。
 class ReorderDeleteBackground extends StatelessWidget {
   const ReorderDeleteBackground({super.key});

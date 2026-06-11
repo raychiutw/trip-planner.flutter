@@ -159,36 +159,16 @@ class _NotesSection extends ConsumerWidget {
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
 
-  Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('刪除筆記'),
-        content: const Text('確定要刪除這筆嗎？'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('刪除')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await ref
+  Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
+    return confirmAndDelete(
+      context,
+      title: '刪除筆記',
+      message: '確定要刪除這筆嗎？',
+      delete: () => ref
           .read(tripRepositoryProvider)
-          .deleteNote(section, tripId: tripId, rowId: rowId);
-      ref.invalidate(tripNotesProvider(tripId));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已刪除')));
-    } on Exception {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
-    }
+          .deleteNote(section, tripId: tripId, rowId: rowId),
+      onSuccess: () => ref.invalidate(tripNotesProvider(tripId)),
+    );
   }
 
   Future<void> _reorder(

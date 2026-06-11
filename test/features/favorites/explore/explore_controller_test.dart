@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
@@ -163,5 +165,70 @@ void main() {
           category: any(named: 'category'),
           placeId: any(named: 'placeId'),
         ));
+  });
+
+  test('search race:後發搜尋勝出,過期結果被丟棄（sequence guard）', () async {
+    final poi = _MockPoiRepository();
+    final fav = _MockFavoritesRepository();
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
+    final slow = Completer<List<PoiSearchResult>>();
+    when(() => poi.searchPois(
+          q: 'AAAA',
+          limit: any(named: 'limit'),
+          region: any(named: 'region'),
+          cancelToken: any(named: 'cancelToken'),
+        )).thenAnswer((_) => slow.future);
+    when(() => poi.searchPois(
+          q: 'BBBB',
+          limit: any(named: 'limit'),
+          region: any(named: 'region'),
+          cancelToken: any(named: 'cancelToken'),
+        )).thenAnswer((_) async => [_poi('pb', 'B結果', 'x')]);
+
+    final container = _container(poi, fav);
+    final controller = container.read(exploreControllerProvider.notifier);
+
+    final firstSearch = controller.search('AAAA'); // seq=1,卡在 slow.future
+    await controller.search('BBBB'); // seq=2,先回 B
+    expect(
+        container.read(exploreControllerProvider).results.single.name, 'B結果');
+
+    slow.complete([_poi('pa', 'A結果', 'x')]); // A 回來但 seq 過期 → 丟棄
+    await firstSearch;
+    expect(
+        container.read(exploreControllerProvider).results.single.name, 'B結果');
+  });
+
+  test('toggleFavorite 後 invalidate favoritesProvider（收藏 tab 會刷新）', () async {
+    final poi = _MockPoiRepository();
+    final fav = _MockFavoritesRepository();
+    var listCalls = 0;
+    when(() => fav.fetchFavorites()).thenAnswer((_) async {
+      listCalls++;
+      return const [];
+    });
+    when(() => poi.findOrCreatePoi(
+          name: any(named: 'name'),
+          type: any(named: 'type'),
+          lat: any(named: 'lat'),
+          lng: any(named: 'lng'),
+          address: any(named: 'address'),
+          category: any(named: 'category'),
+          placeId: any(named: 'placeId'),
+        )).thenAnswer((_) async => 501);
+    when(() => fav.addFavorite(any())).thenAnswer((_) async {});
+
+    final container = _container(poi, fav);
+    container.listen(favoritesProvider, (_, _) {}); // 模擬收藏 tab 正在顯示
+    await container.read(favoritesProvider.future); // favoritesProvider 首抓
+    final beforeToggle = listCalls;
+
+    await container
+        .read(exploreControllerProvider.notifier)
+        .toggleFavorite(_poi('p1', '店', 'ramen_restaurant'));
+    await container.read(favoritesProvider.future); // 若有 invalidate → 重抓
+
+    // +1 toggle 自身 refetch,+1 favoritesProvider 因 invalidate 重抓（收藏 tab 刷新）
+    expect(listCalls, greaterThan(beforeToggle + 1));
   });
 }
