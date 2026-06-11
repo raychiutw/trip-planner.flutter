@@ -35,9 +35,8 @@ class TripsListScreen extends ConsumerWidget {
               ? const _EmptyHero()
               : _buildTripList(context, ref, trips),
         ),
-        error: (error, stackTrace) => _ErrorState(
-          onRetry: () => ref.invalidate(myTripsProvider),
-        ),
+        error: (error, stackTrace) =>
+            _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
@@ -84,6 +83,14 @@ class TripsListScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: TpSpacing.s2),
+              ListTile(
+                leading: const Icon(Icons.group_outlined),
+                title: const Text('共編設定'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  context.push('/collab/${trip.tripId}');
+                },
+              ),
               ListTile(
                 leading: Icon(Icons.delete_outline, color: destructiveColor),
                 title: Text(
@@ -147,9 +154,9 @@ class TripsListScreen extends ConsumerWidget {
       ref.invalidate(myTripsProvider);
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('刪除失敗，請稍後再試')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
     }
   }
 }
