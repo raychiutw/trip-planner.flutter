@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -13,6 +16,8 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
 const _tripId = 'okinawa-2026';
+
+class _MockTripRepository extends Mock implements TripRepository {}
 
 const _fakeTrip = Trip(id: _tripId, name: '沖繩自駕 2026', title: '沖繩自駕五日');
 
@@ -111,6 +116,7 @@ Future<void> _pumpTimeline(
   WidgetTester tester, {
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
+  _MockTripRepository? repo,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
@@ -142,6 +148,7 @@ Future<void> _pumpTimeline(
             .overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
         tripDaysProvider(_tripId)
             .overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
+        if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -156,6 +163,8 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
 }
 
 void main() {
+  setUpAll(() => registerFallbackValue(<String, dynamic>{}));
+
   testWidgets('AppBar 顯示行程標題與地圖/筆記 actions', (tester) async {
     await _pumpTimeline(tester);
 
@@ -250,5 +259,41 @@ void main() {
 
     expect(find.text('北部海岸線'), findsOneWidget);
     expect(fetchDaysAttempts, 2);
+  });
+
+  testWidgets('點 entry tile 開啟編輯 sheet（預填標題）', (tester) async {
+    await _pumpTimeline(tester);
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
+    expect(find.widgetWithText(TextField, '美麗海水族館'), findsOneWidget);
+  });
+
+  testWidgets('左滑 entry → 確認 → 呼叫 deleteEntry', (tester) async {
+    final repo = _MockTripRepository();
+    when(() => repo.deleteEntry(
+          tripId: any(named: 'tripId'),
+          entryId: any(named: 'entryId'),
+        )).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.drag(
+        find.byKey(const ValueKey('entry-dismiss-11')), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+  });
+
+  testWidgets('點「新增停留點」開啟新增 sheet', (tester) async {
+    await _pumpTimeline(tester);
+    final addBtn = find.byKey(const ValueKey('add-entry-1'));
+    await tester.ensureVisible(addBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(addBtn);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
   });
 }

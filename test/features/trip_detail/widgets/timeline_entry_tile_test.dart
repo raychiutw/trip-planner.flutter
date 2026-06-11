@@ -84,5 +84,21 @@ void main() {
       expect(dotColor(tester, 3), tones.accentDeep);
       expect(find.text('14:00'), findsOneWidget);
     });
+
+    testWidgets('有 onTap：點內容卡觸發 callback', (tester) async {
+      var tapped = 0;
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: TimelineEntryTile(
+            entry: const TimelineEntry(
+                id: 11, sortOrder: 0, version: 1, title: '首里城'),
+            onTap: () => tapped++,
+          ),
+        ),
+      ));
+      await tester.tap(find.text('首里城'));
+      expect(tapped, 1);
+    });
   });
 }

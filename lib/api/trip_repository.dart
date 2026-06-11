@@ -64,6 +64,7 @@ class TripRepository {
     required String tripId,
     required int dayNum,
     required String title,
+    String? description,
     String? poiType,
     double? lat,
     double? lng,
@@ -75,6 +76,7 @@ class TripRepository {
       '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
       body: {
         'title': title,
+        'description': description,
         'poi_type': poiType,
         'lat': lat,
         'lng': lng,
@@ -82,6 +84,36 @@ class TripRepository {
         'end_time': endTime,
         'source': source,
       },
+    );
+  }
+
+  /// PATCH /trips/:id/entries/:eid（meta 編輯;欄位 snake_case + OCC camelCase expectedVersion）。
+  /// 409 STALE_ENTRY 時 ApiClient 丟 ApiError(status 409)。
+  Future<void> updateEntry({
+    required String tripId,
+    required int entryId,
+    required int expectedVersion,
+    required String title,
+    String? description,
+    String? startTime,
+    String? endTime,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
+      body: {
+        'title': title,
+        'description': description,
+        'start_time': startTime,
+        'end_time': endTime,
+        'expectedVersion': expectedVersion,
+      },
+    );
+  }
+
+  /// DELETE /trips/:id/entries/:eid（後端回 200 {ok:true},忽略 body）。
+  Future<void> deleteEntry({required String tripId, required int entryId}) {
+    return _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
     );
   }
 
