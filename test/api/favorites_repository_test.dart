@@ -64,7 +64,7 @@ void main() {
     await expectLater(favoritesRepository.addFavorite(501), completes);
   });
 
-  test('addFavoriteToTrip：POST /poi-favorites/:id/add-to-trip camelCase → 201 result',
+  test('addFavoriteToTrip：POST /poi-favorites/:id/add-to-trip camelCase（201 成功）',
       () async {
     dioAdapter.onPost(
       '/poi-favorites/7/add-to-trip',
@@ -75,13 +75,12 @@ void main() {
       data: {'tripId': 'okinawa', 'dayNum': 1, 'startTime': '10:00', 'endTime': '11:00'},
     );
 
-    final result = await favoritesRepository.addFavoriteToTrip(
-      favoriteId: 7, tripId: 'okinawa', dayNum: 1,
-      startTime: '10:00', endTime: '11:00',
+    await expectLater(
+      favoritesRepository.addFavoriteToTrip(
+        favoriteId: 7, tripId: 'okinawa', dayNum: 1,
+        startTime: '10:00', endTime: '11:00'),
+      completes,
     );
-
-    expect(result.entryId, 11);
-    expect(result.ok, isTrue);
   });
 
   test('addFavoriteToTrip：409 → 拋 ApiError 帶 conflictWith payload', () async {

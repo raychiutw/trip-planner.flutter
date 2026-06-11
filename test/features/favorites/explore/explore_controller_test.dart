@@ -5,6 +5,7 @@ import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
+import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 
 class _MockPoiRepository extends Mock implements PoiRepository {}
@@ -124,5 +125,43 @@ void main() {
         placeId: 'p1')).called(1);
     verify(() => fav.addFavorite(501)).called(1);
     expect(listCalls, greaterThanOrEqualTo(2)); // 初載 + toggle 後重抓
+  });
+
+  test('toggleFavorite：名稱相同但 poiType 不一致仍視為已收藏 → 取消(delete)而非重建', () async {
+    final poi = _MockPoiRepository();
+    final fav = _MockFavoritesRepository();
+    // favorite 以 server poiType 'attraction' 儲存；search 結果 category 'aquarium'
+    // 經 mapGooglePrimaryTypeToPoiType 會映射成 'activity' → 舊版 key 不一致會誤判未收藏。
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const [
+          PoiFavorite(
+            id: 7,
+            userId: 'u-1',
+            poiId: 501,
+            favoritedAt: '2026-06-01T00:00:00Z',
+            poiName: '美麗海水族館',
+            poiType: 'attraction',
+          ),
+        ]);
+    when(() => fav.deleteFavorite(any())).thenAnswer((_) async {});
+
+    final container = _container(poi, fav);
+    final controller = container.read(exploreControllerProvider.notifier);
+    await controller.ensureSavedLoaded();
+
+    final result = _poi('p9', '美麗海水族館', 'aquarium');
+    expect(container.read(exploreControllerProvider).isSaved(result), isTrue);
+
+    await controller.toggleFavorite(result);
+
+    verify(() => fav.deleteFavorite(7)).called(1);
+    verifyNever(() => poi.findOrCreatePoi(
+          name: any(named: 'name'),
+          type: any(named: 'type'),
+          lat: any(named: 'lat'),
+          lng: any(named: 'lng'),
+          address: any(named: 'address'),
+          category: any(named: 'category'),
+          placeId: any(named: 'placeId'),
+        ));
   });
 }

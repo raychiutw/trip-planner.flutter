@@ -3,36 +3,6 @@ library;
 
 import 'poi_search_result.dart';
 
-/// `POST /poi-favorites/:id/add-to-trip` 成功 201 回應（camelCase）。
-class AddToTripResult {
-  const AddToTripResult({
-    required this.ok,
-    required this.entryId,
-    required this.dayId,
-    required this.sortOrder,
-    required this.startTime,
-    required this.endTime,
-  });
-
-  final bool ok;
-  final int entryId;
-  final int dayId;
-  final int sortOrder;
-  final String startTime;
-  final String endTime;
-
-  factory AddToTripResult.fromJson(Map<String, dynamic> json) {
-    return AddToTripResult(
-      ok: json['ok'] == true,
-      entryId: (json['entryId'] as num).toInt(),
-      dayId: (json['dayId'] as num).toInt(),
-      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
-      startTime: json['startTime'] as String? ?? '',
-      endTime: json['endTime'] as String? ?? '',
-    );
-  }
-}
-
 /// 409 `conflictWith`：時段與既有 entry 重疊。
 class TripEntryConflict {
   const TripEntryConflict({

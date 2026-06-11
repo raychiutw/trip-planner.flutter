@@ -1,7 +1,6 @@
 /// 收藏 repository：跨 trip 收藏池（`/api/poi-favorites`）。
 library;
 
-import '../models/add_to_trip.dart';
 import '../models/poi_favorite.dart';
 import 'api_client.dart';
 
@@ -28,23 +27,22 @@ class FavoritesRepository {
       _client.post('/poi-favorites', body: {'poiId': poiId});
 
   /// POST /poi-favorites/:id/add-to-trip（body camelCase,startTime/endTime 必填 HH:MM）。
-  /// 409 時 ApiClient 丟 ApiError（status 409,payload 含 conflictWith）。
-  Future<AddToTripResult> addFavoriteToTrip({
+  /// 成功回應不被消費（fire-and-forget）；409 時 ApiClient 丟 ApiError
+  /// （status 409,payload 含 conflictWith）。
+  Future<void> addFavoriteToTrip({
     required int favoriteId,
     required String tripId,
     required int dayNum,
     required String startTime,
     required String endTime,
-  }) async {
-    final body = await _client.post(
-      '/poi-favorites/$favoriteId/add-to-trip',
-      body: {
-        'tripId': tripId,
-        'dayNum': dayNum,
-        'startTime': startTime,
-        'endTime': endTime,
-      },
-    );
-    return AddToTripResult.fromJson(body as Map<String, dynamic>);
-  }
+  }) =>
+      _client.post(
+        '/poi-favorites/$favoriteId/add-to-trip',
+        body: {
+          'tripId': tripId,
+          'dayNum': dayNum,
+          'startTime': startTime,
+          'endTime': endTime,
+        },
+      );
 }

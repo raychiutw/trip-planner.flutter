@@ -4,6 +4,7 @@ import '../../models/poi_favorite.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/poi_tone.dart';
 import '../../theme/tokens.dart';
+import 'poi_rating_label.dart';
 
 /// 收藏 POI 卡片：poiType tone 色階 + rating/note/usages + 取消收藏 heart（永遠粉）。
 class PoiFavoriteCard extends StatelessWidget {
@@ -62,21 +63,7 @@ class PoiFavoriteCard extends StatelessWidget {
                 if (favorite.poiRating != null)
                   Padding(
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star_rounded, size: 14, color: tones.accent),
-                        const SizedBox(width: 2),
-                        Text(
-                          favorite.poiRating!.toStringAsFixed(1),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: mutedColor,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: PoiRatingLabel(rating: favorite.poiRating!),
                   ),
                 if (favorite.note != null && favorite.note!.isNotEmpty)
                   Padding(
