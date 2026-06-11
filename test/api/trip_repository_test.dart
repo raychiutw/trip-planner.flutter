@@ -5,6 +5,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
 
 void main() {
@@ -405,6 +406,108 @@ void main() {
       tripRepository.updateSegment(
           tripId: 'okinawa', segmentId: 5, mode: 'driving', expectedVersion: 1),
       throwsA(isA<ApiError>().having((e) => e.status, 'status', 409)),
+    );
+  });
+
+  test('fetchEntry：GET /entries/:eid 解析 master/alternates/entryPoisVersion',
+      () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/entries/11',
+      (server) => server.reply(200, {
+        'id': 11, 'sortOrder': 0, 'title': '首里城', 'version': 2,
+        'entryPoisVersion': '4',
+        'master': {'poiId': 501, 'name': '首里城公園'},
+        'alternates': [
+          {'poiId': 502, 'name': '玉陵', 'sortOrder': 2},
+        ],
+      }),
+    );
+
+    final entry = await tripRepository.fetchEntry(tripId: 'okinawa', entryId: 11);
+    expect(entry.master?.poiId, 501);
+    expect(entry.entryPoisVersion, '4');
+    expect(entry.alternates.single.poiId, 502);
+  });
+
+  test('setEntryMaster：PATCH /entries/:eid/master camelCase + entryPoisVersion',
+      () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11/master',
+      (server) => server.reply(200, {'entryId': 11, 'masterPoiId': 502}),
+      data: {'poiId': 502, 'entryPoisVersion': '4'},
+    );
+
+    await expectLater(
+      tripRepository.setEntryMaster(
+          tripId: 'okinawa', entryId: 11, poiId: 502, entryPoisVersion: '4'),
+      completes,
+    );
+  });
+
+  test('addEntryAlternate：POST /alternates find-or-create（type 映射）', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/entries/11/alternates',
+      (server) => server.reply(201, {'entryId': 11, 'poiId': 999}),
+      data: {
+        'name': '通堂拉麵', 'lat': 26.2, 'lng': 127.6,
+        'type': 'restaurant', 'category': 'ramen_restaurant',
+        'address': '那霸市', 'rating': 4.1, 'source': 'search',
+        'entryPoisVersion': '4',
+      },
+    );
+
+    await expectLater(
+      tripRepository.addEntryAlternate(
+        tripId: 'okinawa', entryId: 11,
+        poi: const PoiSearchResult(
+            placeId: 'p1', name: '通堂拉麵', address: '那霸市',
+            category: 'ramen_restaurant', lat: 26.2, lng: 127.6, rating: 4.1),
+        entryPoisVersion: '4'),
+      completes,
+    );
+  });
+
+  test('removeEntryAlternate：DELETE /alternates/:poiId?entryPoisVersion', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa/entries/11/alternates/502',
+      (server) => server.reply(200, {'entryId': 11, 'poiId': 502}),
+      queryParameters: {'entryPoisVersion': '4'},
+    );
+
+    await expectLater(
+      tripRepository.removeEntryAlternate(
+          tripId: 'okinawa', entryId: 11, poiId: 502, entryPoisVersion: '4'),
+      completes,
+    );
+  });
+
+  test('reorderEntryAlternates：PATCH /alternates/reorder order=poiId[]', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11/alternates/reorder',
+      (server) => server.reply(200, {'entryId': 11, 'order': [503, 502]}),
+      data: {'order': [503, 502], 'entryPoisVersion': '4'},
+    );
+
+    await expectLater(
+      tripRepository.reorderEntryAlternates(
+          tripId: 'okinawa', entryId: 11, order: [503, 502],
+          entryPoisVersion: '4'),
+      completes,
+    );
+  });
+
+  test('updateEntryPoi：PATCH /pois/:poiId 只送有值欄位（無 OCC）', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11/pois/501',
+      (server) => server.reply(200, {'entryId': 11, 'poiId': 501}),
+      data: {'note': '記得訂位', 'poi_type': 'restaurant'},
+    );
+
+    await expectLater(
+      tripRepository.updateEntryPoi(
+          tripId: 'okinawa', entryId: 11, poiId: 501,
+          note: '記得訂位', poiType: 'restaurant'),
+      completes,
     );
   });
 }

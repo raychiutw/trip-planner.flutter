@@ -2,7 +2,10 @@
 library;
 
 import '../models/day.dart';
+import '../models/entry.dart';
 import '../models/notes.dart';
+import '../models/poi_search_result.dart';
+import '../models/poi_type.dart';
 import '../models/segment.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
@@ -132,7 +135,7 @@ class TripRepository {
             {
               'id': u.id,
               'sort_order': u.sortOrder,
-              if (u.dayId != null) 'day_id': u.dayId,
+              'day_id': ?u.dayId,
             },
         ],
       },
@@ -169,11 +172,110 @@ class TripRepository {
       '/trips/${Uri.encodeComponent(tripId)}/segments/$segmentId',
       body: {
         'mode': mode,
-        if (min != null) 'min': min,
-        if (expectedVersion != null) 'expectedVersion': expectedVersion,
+        'min': ?min,
+        'expectedVersion': ?expectedVersion,
       },
     );
     return TripSegment.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// GET /trips/:id/entries/:eid（單筆;含 master/alternates/entryPoisVersion,無 travel）。
+  Future<TimelineEntry> fetchEntry({
+    required String tripId,
+    required int entryId,
+  }) async {
+    final body = await _client
+        .get('/trips/${Uri.encodeComponent(tripId)}/entries/$entryId');
+    return TimelineEntry.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// PATCH /trips/:id/entries/:eid/master（設正選;OCC entryPoisVersion）。
+  Future<void> setEntryMaster({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    String? entryPoisVersion,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/master',
+      body: {
+        'poiId': poiId,
+        'entryPoisVersion': ?entryPoisVersion,
+      },
+    );
+  }
+
+  /// POST /trips/:id/entries/:eid/alternates（find-or-create 變體;POI 分類欄用 `type`）。
+  Future<void> addEntryAlternate({
+    required String tripId,
+    required int entryId,
+    required PoiSearchResult poi,
+    String? entryPoisVersion,
+  }) {
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates',
+      body: {
+        'name': poi.name,
+        'lat': poi.lat,
+        'lng': poi.lng,
+        'type': mapGooglePrimaryTypeToPoiType(poi.category),
+        'category': poi.category,
+        'address': poi.address,
+        'rating': poi.rating,
+        'source': 'search',
+        'entryPoisVersion': ?entryPoisVersion,
+      },
+    );
+  }
+
+  /// DELETE /trips/:id/entries/:eid/alternates/:poiId（OCC token 走 query）。
+  Future<void> removeEntryAlternate({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    String? entryPoisVersion,
+  }) {
+    return _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates/$poiId',
+      query: {
+        'entryPoisVersion': ?entryPoisVersion,
+      },
+    );
+  }
+
+  /// PATCH /trips/:id/entries/:eid/alternates/reorder（order 為 poiId 陣列,不含 master）。
+  Future<void> reorderEntryAlternates({
+    required String tripId,
+    required int entryId,
+    required List<int> order,
+    String? entryPoisVersion,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates/reorder',
+      body: {
+        'order': order,
+        'entryPoisVersion': ?entryPoisVersion,
+      },
+    );
+  }
+
+  /// PATCH /trips/:id/entries/:eid/pois/:poiId（per-POI 備註/分類/訂位;LWW 無 OCC）。
+  Future<void> updateEntryPoi({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    String? note,
+    String? poiType,
+    String? reservation,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/pois/$poiId',
+      body: {
+        'note': ?note,
+        'poi_type': ?poiType,
+        'reservation': ?reservation,
+      },
+    );
   }
 
   /// GET /account/stats。
