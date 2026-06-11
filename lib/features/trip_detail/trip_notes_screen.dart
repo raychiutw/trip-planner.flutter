@@ -9,6 +9,7 @@ import '../../theme/tokens.dart';
 import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
+import 'widgets/reorderable_row.dart';
 
 /// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡），MVP 唯讀。
 class TripNotesScreen extends ConsumerWidget {
@@ -328,24 +329,9 @@ class _NoteRowTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Dismissible(
-      key: ValueKey('note-dismiss-${section.name}-${row.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        margin: const EdgeInsets.only(bottom: TpSpacing.s2),
-        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-        decoration: BoxDecoration(
-          color: scheme.errorContainer,
-          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-        ),
-        child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
-      ),
-      confirmDismiss: (_) async {
-        await onDelete();
-        return false; // 靠 invalidate 重抓移除
-      },
+    return SwipeToDelete(
+      dismissKey: ValueKey('note-dismiss-${section.name}-${row.id}'),
+      onDelete: onDelete,
       child: Row(
         children: [
           Expanded(
@@ -360,14 +346,9 @@ class _NoteRowTile extends StatelessWidget {
               child: row.display,
             ),
           ),
-          ReorderableDragStartListener(
+          ReorderDragHandle(
             index: index,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.drag_handle,
-                  key: ValueKey('note-drag-${section.name}-${row.id}'),
-                  color: scheme.onSurfaceVariant),
-            ),
+            iconKey: ValueKey('note-drag-${section.name}-${row.id}'),
           ),
         ],
       ),
