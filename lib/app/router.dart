@@ -12,11 +12,15 @@ import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
+import '../features/map/global_map_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
+import '../features/trips/collab/collab_screen.dart';
+import '../features/trips/create/create_trip_screen.dart';
+import '../features/trips/edit/edit_trip_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 
@@ -45,9 +49,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // 登入頁在 shell 外（無底部導航）
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // 建立/編輯行程:shell 外全螢幕表單(避開 /trips/:tripId 衝突)
       GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        path: '/new-trip',
+        builder: (context, state) => const CreateTripScreen(),
+      ),
+      GoRoute(
+        path: '/edit-trip/:tripId',
+        builder: (context, state) =>
+            EditTripScreen(tripId: state.pathParameters['tripId']!),
+      ),
+      GoRoute(
+        path: '/collab/:tripId',
+        builder: (context, state) =>
+            CollabScreen(tripId: state.pathParameters['tripId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -102,8 +118,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/map',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: '全域地圖'),
+                builder: (context, state) => const GlobalMapScreen(),
               ),
             ],
           ),
