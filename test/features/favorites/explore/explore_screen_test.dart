@@ -101,4 +101,19 @@ void main() {
 
     verify(() => fav.addFavorite(501)).called(1);
   });
+
+  testWidgets('搜尋無結果（query ≥2）→ 顯示「沒有找到」空狀態', (tester) async {
+    when(() => poi.searchPois(
+          q: any(named: 'q'),
+          limit: any(named: 'limit'),
+          region: any(named: 'region'),
+          cancelToken: any(named: 'cancelToken'),
+        )).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PoiSearchCard), findsNothing);
+    expect(find.textContaining('沒有找到'), findsOneWidget);
+  });
 }
