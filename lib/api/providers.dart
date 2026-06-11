@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
+import 'requests_repository.dart';
 import 'session_store.dart';
 import 'trip_repository.dart';
 
@@ -26,6 +27,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final tripRepositoryProvider = Provider<TripRepository>(
   (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+);
+
+final requestsRepositoryProvider = Provider<RequestsRepository>(
+  (ref) => RequestsRepository(client: ref.watch(apiClientProvider)),
 );
 
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
