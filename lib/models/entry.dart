@@ -41,6 +41,9 @@ class EntryPoiInfo {
     this.rating,
     this.price,
     this.note,
+    this.reservation,
+    this.reservationUrl,
+    this.description,
     this.sortOrder,
   });
 
@@ -56,6 +59,9 @@ class EntryPoiInfo {
   final double? rating;
   final String? price;
   final String? note;
+  final String? reservation;
+  final String? reservationUrl;
+  final String? description;
   final int? sortOrder;
 
   factory EntryPoiInfo.fromJson(Map<String, dynamic> json) {
@@ -70,6 +76,9 @@ class EntryPoiInfo {
       rating: (json['rating'] as num?)?.toDouble(),
       price: json['price'] as String?,
       note: json['note'] as String?,
+      reservation: json['reservation'] as String?,
+      reservationUrl: json['reservationUrl'] as String?,
+      description: json['description'] as String?,
       sortOrder: (json['sortOrder'] as num?)?.toInt(),
     );
   }
@@ -88,6 +97,7 @@ class TimelineEntry {
     this.description,
     this.note,
     required this.version,
+    this.entryPoisVersion,
     this.travel,
     this.master,
     this.alternates = const [],
@@ -105,6 +115,9 @@ class TimelineEntry {
   final String? description;
   final String? note;
   final int version;
+
+  /// POI 結構 OCC token（master/alternates 操作用;server 一律 string 化）。
+  final String? entryPoisVersion;
   final Travel? travel;
   final EntryPoiInfo? master;
   final List<EntryPoiInfo> alternates;
@@ -121,6 +134,7 @@ class TimelineEntry {
       description: json['description'] as String?,
       note: json['note'] as String?,
       version: (json['version'] as num?)?.toInt() ?? 0,
+      entryPoisVersion: json['entryPoisVersion']?.toString(),
       travel: json['travel'] == null
           ? null
           : Travel.fromJson(json['travel'] as Map<String, dynamic>),
