@@ -5,6 +5,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
@@ -583,6 +584,75 @@ void main() {
     await expectLater(
       tripRepository.reorderNotes(NoteSection.flights, tripId: 'okinawa',
           items: [(id: 11, sortOrder: 0), (id: 12, sortOrder: 1)]),
+      completes,
+    );
+  });
+
+  test('createTrip：POST /trips 衍生欄位 + snake_case destinations', () async {
+    dioAdapter.onPost(
+      '/trips',
+      (server) => server.reply(201, {
+        'ok': true,
+        'tripId': 'tokyo-abcd',
+        'daysCreated': 5,
+        'destinationsCreated': 1,
+      }),
+      data: {
+        'id': 'tokyo-abcd',
+        'name': '東京',
+        'startDate': '2026-07-01',
+        'endDate': '2026-07-05',
+        'countries': 'JP',
+        'published': 1,
+        'data_source': 'manual',
+        'lang': 'zh-TW',
+        'destinations': [
+          {'name': '東京', 'lat': 35.68, 'lng': 139.76},
+        ],
+      },
+    );
+
+    final r = await tripRepository.createTrip(
+      id: 'tokyo-abcd',
+      name: '東京',
+      startDate: '2026-07-01',
+      endDate: '2026-07-05',
+      destinations: const [
+        DestinationInput(name: '東京', lat: 35.68, lng: 139.76, country: 'JP'),
+      ],
+    );
+    expect(r.tripId, 'tokyo-abcd');
+    expect(r.daysCreated, 5);
+    expect(r.destinationsCreated, 1);
+  });
+
+  test('updateTrip：diff-only PUT（只送 title,無 expectedVersion）', () async {
+    dioAdapter.onPut(
+      '/trips/tokyo',
+      (server) => server.reply(200, {'ok': true}),
+      data: {'title': '新標題'},
+    );
+    await expectLater(tripRepository.updateTrip('tokyo', title: '新標題'), completes);
+  });
+
+  test('updateTrip：destinations 全量替換 + countries', () async {
+    dioAdapter.onPut(
+      '/trips/tokyo',
+      (server) => server.reply(200, {'ok': true}),
+      data: {
+        'countries': 'JP,KR',
+        'destinations': [
+          {'name': 'A'},
+          {'name': 'B'},
+        ],
+      },
+    );
+    await expectLater(
+      tripRepository.updateTrip(
+        'tokyo',
+        countries: 'JP,KR',
+        destinations: const [DestinationInput(name: 'A'), DestinationInput(name: 'B')],
+      ),
       completes,
     );
   });

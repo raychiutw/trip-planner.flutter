@@ -2,6 +2,7 @@
 library;
 
 import '../models/day.dart';
+import '../models/destination_input.dart';
 import '../models/entry.dart';
 import '../models/note_section.dart';
 import '../models/notes.dart';
@@ -25,6 +26,68 @@ class TripRepository {
         .map((tripJson) =>
             TripSummary.fromJson(tripJson as Map<String, dynamic>))
         .toList();
+  }
+
+  /// POST /trips（建立;body 混 camel + snake_case destinations）→ {tripId,...}。
+  /// 後端自動建好每日 days + owner 權限;不回整列。
+  Future<({String tripId, int daysCreated, int destinationsCreated})> createTrip({
+    required String id,
+    required String name,
+    required String startDate,
+    required String endDate,
+    String? title,
+    String? description,
+    String countries = 'JP',
+    int published = 1,
+    String dataSource = 'manual',
+    String lang = 'zh-TW',
+    List<DestinationInput> destinations = const [],
+  }) async {
+    final body = await _client.post('/trips', body: {
+      'id': id,
+      'name': name,
+      'startDate': startDate,
+      'endDate': endDate,
+      'title': ?title,
+      'description': ?description,
+      'countries': countries,
+      'published': published,
+      'data_source': dataSource,
+      'lang': lang,
+      'destinations': [for (final d in destinations) d.toJson()],
+    });
+    final map = body as Map<String, dynamic>;
+    return (
+      tripId: map['tripId'] as String? ?? id,
+      daysCreated: (map['daysCreated'] as num?)?.toInt() ?? 0,
+      destinationsCreated: (map['destinationsCreated'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// PUT /trips/:id（編輯;diff-only,只送非 null;無 OCC,不要送 expectedVersion）。
+  /// destinations 給了才全量替換(給 `[]` 清空、不給不動)。
+  Future<void> updateTrip(
+    String id, {
+    String? name,
+    String? title,
+    String? description,
+    String? countries,
+    int? published,
+    String? dataSource,
+    String? lang,
+    List<DestinationInput>? destinations,
+  }) async {
+    await _client.put('/trips/${Uri.encodeComponent(id)}', body: {
+      'name': ?name,
+      'title': ?title,
+      'description': ?description,
+      'countries': ?countries,
+      'published': ?published,
+      'data_source': ?dataSource,
+      'lang': ?lang,
+      if (destinations != null)
+        'destinations': [for (final d in destinations) d.toJson()],
+    });
   }
 
   /// GET /trips（published 行程清單）。
