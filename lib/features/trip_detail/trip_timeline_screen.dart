@@ -13,6 +13,7 @@ import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
 import 'widgets/entry_edit_sheet.dart';
 import 'widgets/hotel_card.dart';
+import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
@@ -314,14 +315,9 @@ class _DaySection extends ConsumerWidget {
                         _findSegment(segments, timeline[i - 1].id, entry.id),
                     tripId: tripId,
                   ),
-                Dismissible(
-                  key: ValueKey('entry-dismiss-${entry.id}'),
-                  direction: DismissDirection.endToStart,
-                  background: const _DeleteBackground(),
-                  confirmDismiss: (_) async {
-                    await _confirmDelete(context, ref, entry);
-                    return false; // 靠 invalidate 重抓移除
-                  },
+                SwipeToDelete(
+                  dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                  onDelete: () => _confirmDelete(context, ref, entry),
                   child: TimelineEntryTile(
                     entry: entry,
                     isFirst: i == 0,
@@ -367,7 +363,6 @@ class _EntryTrailing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurfaceVariant;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -378,35 +373,11 @@ class _EntryTrailing extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           onPressed: onMove,
         ),
-        ReorderableDragStartListener(
+        ReorderDragHandle(
           index: index,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Icon(Icons.drag_handle,
-                key: ValueKey('entry-drag-$entryId'), color: color),
-          ),
+          iconKey: ValueKey('entry-drag-$entryId'),
         ),
       ],
-    );
-  }
-}
-
-/// 左滑刪除背景。
-class _DeleteBackground extends StatelessWidget {
-  const _DeleteBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      alignment: Alignment.centerRight,
-      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-      ),
-      child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
     );
   }
 }
