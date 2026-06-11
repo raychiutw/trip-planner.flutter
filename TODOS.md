@@ -4,12 +4,10 @@
 
 ## P1(第二波)
 
-- [ ] Entry CRUD 表單群(新增/編輯/刪除停留點;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
 - [ ] 建立/編輯行程(行程基本資料表單)
 - [ ] AI 聊天(chat tab 轉正;request queue)
 - [ ] 全域地圖(map tab 轉正,跨行程 POI)
 - [ ] 共編邀請(成員管理)
-- [ ] 行程筆記 CRUD(5 區由唯讀轉可編輯)
 
 ## P2
 
@@ -26,6 +24,8 @@
 
 ## Completed
 
+- [x] 行程筆記 CRUD:5 區（航班/住宿/預訂/行前須知/緊急聯絡）新增/編輯/刪除 + 每區拖曳排序(spec-driven 表單 + 泛型 repository,OCC `expectedVersion`)(**Completed:** 2026-06-11)
+- [x] Entry CRUD 表單群:編輯/刪除/新增停留點 + 拖曳排序/跨天搬移 + 地點管理（master/alternates/per-POI）+ 交通編輯;三套 OCC、409 `STALE_ENTRY` 重抓(**Completed:** 2026-06-11)
 - [x] 收藏 + 探索:收藏清單 + 探索（poi-search/find-or-create）+ 加入行程（favorite/direct mode、409 conflict）(**Completed:** 2026-06-11)
 - [x] P0:登入/行程清單/時間軸/地圖/筆記/帳號 + 5-tab shell(**Completed:** v0.1.0, 2026-06-10)
 - [x] 基礎層:tokens/theme、models、API client、providers(**Completed:** v0.1.0, 2026-06-10)

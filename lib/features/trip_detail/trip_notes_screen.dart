@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/providers.dart';
+import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import 'notes/note_edit_sheet.dart';
+import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 
 /// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡），MVP 唯讀。
@@ -25,65 +29,91 @@ class TripNotesScreen extends ConsumerWidget {
             child: Text('載入失敗：$error', textAlign: TextAlign.center),
           ),
         ),
-        data: (notes) => _buildSections(context, notes),
+        data: (notes) => _buildSections(context, ref, notes),
       ),
     );
   }
 
-  Widget _buildSections(BuildContext context, TripNotes notes) {
+  Widget _buildSections(BuildContext context, WidgetRef ref, TripNotes notes) {
     final tones = Theme.of(context).extension<TpTones>()!;
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
         _NotesSection(
-          countKeySuffix: 'flights',
+          tripId: tripId,
+          section: NoteSection.flights,
           icon: Icons.flight_takeoff,
           iconColor: tones.sageDeep,
           title: '航班',
-          count: notes.flights.length,
           // mobile 預設展開航班（對齊 web TripNotesPage 行為）
           initiallyExpanded: true,
-          rows: [for (final flight in notes.flights) _FlightRow(flight)],
+          rows: [
+            for (final f in notes.flights)
+              _NoteRowData(
+                  id: f.id,
+                  version: f.version,
+                  editFields: f.toEditFields(),
+                  display: _FlightRow(f)),
+          ],
         ),
         _NotesSection(
-          countKeySuffix: 'lodgings',
+          tripId: tripId,
+          section: NoteSection.lodgings,
           icon: Icons.hotel_outlined,
           iconColor: tones.sageDeep,
           title: '住宿',
-          count: notes.lodgings.length,
-          rows: [for (final lodging in notes.lodgings) _LodgingRow(lodging)],
+          rows: [
+            for (final l in notes.lodgings)
+              _NoteRowData(
+                  id: l.id,
+                  version: l.version,
+                  editFields: l.toEditFields(),
+                  display: _LodgingRow(l)),
+          ],
         ),
         _NotesSection(
-          countKeySuffix: 'reservations',
+          tripId: tripId,
+          section: NoteSection.reservations,
           icon: Icons.confirmation_number_outlined,
           iconColor: tones.pinkDeep,
           title: '預訂',
-          count: notes.reservations.length,
           rows: [
-            for (final reservation in notes.reservations)
-              _ReservationRow(reservation),
+            for (final r in notes.reservations)
+              _NoteRowData(
+                  id: r.id,
+                  version: r.version,
+                  editFields: r.toEditFields(),
+                  display: _ReservationRow(r)),
           ],
         ),
         _NotesSection(
-          countKeySuffix: 'pretrip',
+          tripId: tripId,
+          section: NoteSection.pretrip,
           icon: Icons.checklist_outlined,
           iconColor: tones.accentDeep,
           title: '行前須知',
-          count: notes.pretripNotes.length,
           rows: [
-            for (final pretripNote in notes.pretripNotes)
-              _PretripNoteRow(pretripNote),
+            for (final p in notes.pretripNotes)
+              _NoteRowData(
+                  id: p.id,
+                  version: p.version,
+                  editFields: p.toEditFields(),
+                  display: _PretripNoteRow(p)),
           ],
         ),
         _NotesSection(
-          countKeySuffix: 'emergency',
+          tripId: tripId,
+          section: NoteSection.emergency,
           icon: Icons.support_agent_outlined,
           iconColor: tones.accentDeep,
           title: '緊急聯絡',
-          count: notes.emergencyContacts.length,
           rows: [
-            for (final contact in notes.emergencyContacts)
-              _EmergencyContactRow(contact),
+            for (final c in notes.emergencyContacts)
+              _NoteRowData(
+                  id: c.id,
+                  version: c.version,
+                  editFields: c.toEditFields(),
+                  display: _EmergencyContactRow(c)),
           ],
         ),
       ],
@@ -91,28 +121,95 @@ class TripNotesScreen extends ConsumerWidget {
   }
 }
 
+/// 單一筆記 row 的資料：id/version（OCC）、editFields（編輯預填）、display（唯讀卡片）。
+class _NoteRowData {
+  const _NoteRowData({
+    required this.id,
+    required this.version,
+    required this.editFields,
+    required this.display,
+  });
+
+  final int id;
+  final int version;
+  final Map<String, dynamic> editFields;
+  final Widget display;
+}
+
+
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
-class _NotesSection extends StatelessWidget {
+/// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
+class _NotesSection extends ConsumerWidget {
   const _NotesSection({
-    required this.countKeySuffix,
+    required this.tripId,
+    required this.section,
     required this.icon,
     required this.iconColor,
     required this.title,
-    required this.count,
     required this.rows,
     this.initiallyExpanded = false,
   });
 
-  final String countKeySuffix;
+  final String tripId;
+  final NoteSection section;
   final IconData icon;
   final Color iconColor;
   final String title;
-  final int count;
-  final List<Widget> rows;
+  final List<_NoteRowData> rows;
   final bool initiallyExpanded;
 
+  Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('刪除筆記'),
+        content: const Text('確定要刪除這筆嗎？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('刪除')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .deleteNote(section, tripId: tripId, rowId: rowId);
+      ref.invalidate(tripNotesProvider(tripId));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已刪除')));
+    } on Exception {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+    }
+  }
+
+  Future<void> _reorder(
+      BuildContext context, WidgetRef ref, int oldIndex, int newIndex) async {
+    final items =
+        reorderedSortOrders([for (final r in rows) r.id], oldIndex, newIndex);
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .reorderNotes(section, tripId: tripId, items: items);
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+      }
+    } finally {
+      ref.invalidate(tripNotesProvider(tripId));
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
     return Container(
@@ -146,7 +243,7 @@ class _NotesSection extends StatelessWidget {
             ),
             const SizedBox(width: TpSpacing.s2),
             Container(
-              key: ValueKey('notes-count-$countKeySuffix'),
+              key: ValueKey('notes-count-${section.name}'),
               padding: const EdgeInsets.symmetric(
                 horizontal: TpSpacing.s2,
                 vertical: 2,
@@ -156,7 +253,7 @@ class _NotesSection extends StatelessWidget {
                 borderRadius: const BorderRadius.all(Radius.circular(999)),
               ),
               child: Text(
-                '$count',
+                '${rows.length}',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: tones.accentDeep,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -165,22 +262,114 @@ class _NotesSection extends StatelessWidget {
             ),
           ],
         ),
-        children: rows.isEmpty
-            ? [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '尚無資料',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+        children: [
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '尚無資料',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ]
-            : rows,
+              ),
+            )
+          else
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: rows.length,
+              onReorderItem: (oldIndex, newIndex) =>
+                  _reorder(context, ref, oldIndex, newIndex),
+              itemBuilder: (context, i) => _NoteRowTile(
+                key: ValueKey('note-row-${section.name}-${rows[i].id}'),
+                section: section,
+                tripId: tripId,
+                row: rows[i],
+                index: i,
+                onDelete: () => _delete(context, ref, rows[i].id),
+              ),
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: ValueKey('note-add-${section.name}'),
+              onPressed: () =>
+                  showNoteEditSheet(context, tripId: tripId, section: section),
+              icon: const Icon(Icons.add),
+              label: Text('新增$title'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 可拖曳/點擊/左滑的筆記 row：唯讀 display 卡 + drag handle + 左滑刪除。
+class _NoteRowTile extends StatelessWidget {
+  const _NoteRowTile({
+    super.key,
+    required this.section,
+    required this.tripId,
+    required this.row,
+    required this.index,
+    required this.onDelete,
+  });
+
+  final NoteSection section;
+  final String tripId;
+  final _NoteRowData row;
+  final int index;
+  final Future<void> Function() onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Dismissible(
+      key: ValueKey('note-dismiss-${section.name}-${row.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        margin: const EdgeInsets.only(bottom: TpSpacing.s2),
+        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        ),
+        child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+      ),
+      confirmDismiss: (_) async {
+        await onDelete();
+        return false; // 靠 invalidate 重抓移除
+      },
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => showNoteEditSheet(context,
+                  tripId: tripId,
+                  section: section,
+                  initialFields: row.editFields,
+                  rowId: row.id,
+                  version: row.version),
+              borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+              child: row.display,
+            ),
+          ),
+          ReorderableDragStartListener(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(Icons.drag_handle,
+                  key: ValueKey('note-drag-${section.name}-${row.id}'),
+                  color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }
