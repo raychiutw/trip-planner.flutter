@@ -47,25 +47,3 @@ class AppShell extends StatelessWidget {
     );
   }
 }
-
-/// 尚未實作功能的占位畫面（聊天／全域地圖／收藏）。
-class PlaceholderScreen extends StatelessWidget {
-  const PlaceholderScreen({super.key, required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          '即將推出',
-          style: theme.textTheme.bodyLarge
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-      ),
-    );
-  }
-}

@@ -27,16 +27,6 @@ GoRouter buildShellRouter() {
 }
 
 void main() {
-  group('PlaceholderScreen', () {
-    testWidgets('顯示 title 與「即將推出」', (tester) async {
-      await tester.pumpWidget(const MaterialApp(
-        home: PlaceholderScreen(title: '收藏'),
-      ));
-      expect(find.text('收藏'), findsOneWidget);
-      expect(find.text('即將推出'), findsOneWidget);
-    });
-  });
-
   group('AppShell 5-tab 導航', () {
     testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(MaterialApp.router(

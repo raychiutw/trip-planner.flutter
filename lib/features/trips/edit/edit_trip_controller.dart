@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/providers.dart';
@@ -118,8 +119,9 @@ class EditTripController extends Notifier<EditTripState> {
 
   void addDestination(DestinationInput d) =>
       state = state.copyWith(destinations: [...state.destinations, d]);
-  void removeDestination(int index) =>
-      state = state.copyWith(destinations: [...state.destinations]..removeAt(index));
+  void removeDestination(int index) => state = state.copyWith(
+    destinations: [...state.destinations]..removeAt(index),
+  );
   void reorderDestination(int oldIndex, int newIndex) {
     final list = [...state.destinations];
     final item = list.removeAt(oldIndex);
@@ -127,8 +129,10 @@ class EditTripController extends Notifier<EditTripState> {
     state = state.copyWith(destinations: list);
   }
 
-  bool get _destChanged =>
-      !_listEq([for (final d in state.destinations) d.name], _origDestNames);
+  bool get _destChanged => !listEquals(
+        [for (final d in state.destinations) d.name],
+        _origDestNames,
+      );
 
   /// 有任何欄位變更。
   bool get hasChanges =>
@@ -150,8 +154,9 @@ class EditTripController extends Notifier<EditTripState> {
       await _repo.updateTrip(
         tripId,
         title: state.title != _origTitle ? state.title : null,
-        description:
-            state.description != _origDescription ? state.description : null,
+        description: state.description != _origDescription
+            ? state.description
+            : null,
         lang: state.lang != _origLang ? state.lang : null,
         published: state.published != _origPublished
             ? (state.published ? 1 : 0)
@@ -167,17 +172,7 @@ class EditTripController extends Notifier<EditTripState> {
       state = state.copyWith(saving: false, error: '儲存失敗,請稍後再試');
     }
   }
-
-  static bool _listEq(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
 }
 
-final editTripControllerProvider =
-    NotifierProvider.autoDispose.family<EditTripController, EditTripState, String>(
-  EditTripController.new,
-);
+final editTripControllerProvider = NotifierProvider.autoDispose
+    .family<EditTripController, EditTripState, String>(EditTripController.new);
