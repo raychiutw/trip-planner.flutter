@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/account/settings/appearance_screen.dart';
+import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
@@ -75,6 +76,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/appearance',
         builder: (context, state) => const AppearanceScreen(),
+      ),
+      GoRoute(
+        path: '/settings/profile',
+        builder: (context, state) => const ProfileEditScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

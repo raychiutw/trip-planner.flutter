@@ -289,6 +289,18 @@ class _SettingsGroup extends StatelessWidget {
           child: Column(
             children: [
               ListTile(
+                key: const ValueKey('settings-profile'),
+                leading: const Icon(Icons.person_outline),
+                title: const Text('個人資料'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/profile'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
                 key: const ValueKey('settings-appearance'),
                 leading: const Icon(Icons.palette_outlined),
                 title: const Text('外觀'),

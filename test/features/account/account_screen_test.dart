@@ -103,18 +103,18 @@ void main() {
     expect(find.text('Email 未驗證'), findsNothing);
   });
 
-  testWidgets('外觀與通知 rows 顯示「即將推出」且為 disabled', (tester) async {
+  testWidgets('個人資料/外觀 可點;通知 仍「即將推出」', (tester) async {
     await pumpAccountScreen(tester);
 
-    expect(find.text('外觀'), findsOneWidget);
+    // 個人資料 + 外觀 轉成可導航設定列
+    expect(find.byKey(const ValueKey('settings-profile')), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-appearance')), findsOneWidget);
+    // 通知 仍為即將推出(唯一一個)
     expect(find.text('通知'), findsOneWidget);
-    expect(find.text('即將推出'), findsNWidgets(2));
+    expect(find.text('即將推出'), findsOneWidget);
 
-    final appearanceTile =
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '外觀'));
     final notificationsTile =
         tester.widget<ListTile>(find.widgetWithText(ListTile, '通知'));
-    expect(appearanceTile.enabled, isFalse);
     expect(notificationsTile.enabled, isFalse);
   });
 
