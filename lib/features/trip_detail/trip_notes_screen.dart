@@ -51,10 +51,11 @@ class TripNotesScreen extends ConsumerWidget {
           rows: [
             for (final f in notes.flights)
               _NoteRowData(
-                  id: f.id,
-                  version: f.version,
-                  editFields: f.toEditFields(),
-                  display: _FlightRow(f)),
+                id: f.id,
+                version: f.version,
+                editFields: f.toEditFields(),
+                display: _FlightRow(f),
+              ),
           ],
         ),
         _NotesSection(
@@ -66,10 +67,11 @@ class TripNotesScreen extends ConsumerWidget {
           rows: [
             for (final l in notes.lodgings)
               _NoteRowData(
-                  id: l.id,
-                  version: l.version,
-                  editFields: l.toEditFields(),
-                  display: _LodgingRow(l)),
+                id: l.id,
+                version: l.version,
+                editFields: l.toEditFields(),
+                display: _LodgingRow(l),
+              ),
           ],
         ),
         _NotesSection(
@@ -81,10 +83,11 @@ class TripNotesScreen extends ConsumerWidget {
           rows: [
             for (final r in notes.reservations)
               _NoteRowData(
-                  id: r.id,
-                  version: r.version,
-                  editFields: r.toEditFields(),
-                  display: _ReservationRow(r)),
+                id: r.id,
+                version: r.version,
+                editFields: r.toEditFields(),
+                display: _ReservationRow(r),
+              ),
           ],
         ),
         _NotesSection(
@@ -96,10 +99,11 @@ class TripNotesScreen extends ConsumerWidget {
           rows: [
             for (final p in notes.pretripNotes)
               _NoteRowData(
-                  id: p.id,
-                  version: p.version,
-                  editFields: p.toEditFields(),
-                  display: _PretripNoteRow(p)),
+                id: p.id,
+                version: p.version,
+                editFields: p.toEditFields(),
+                display: _PretripNoteRow(p),
+              ),
           ],
         ),
         _NotesSection(
@@ -111,10 +115,11 @@ class TripNotesScreen extends ConsumerWidget {
           rows: [
             for (final c in notes.emergencyContacts)
               _NoteRowData(
-                  id: c.id,
-                  version: c.version,
-                  editFields: c.toEditFields(),
-                  display: _EmergencyContactRow(c)),
+                id: c.id,
+                version: c.version,
+                editFields: c.toEditFields(),
+                display: _EmergencyContactRow(c),
+              ),
           ],
         ),
       ],
@@ -136,7 +141,6 @@ class _NoteRowData {
   final Map<String, dynamic> editFields;
   final Widget display;
 }
-
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
@@ -172,17 +176,25 @@ class _NotesSection extends ConsumerWidget {
   }
 
   Future<void> _reorder(
-      BuildContext context, WidgetRef ref, int oldIndex, int newIndex) async {
-    final items =
-        reorderedSortOrders([for (final r in rows) r.id], oldIndex, newIndex);
+    BuildContext context,
+    WidgetRef ref,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    final items = reorderedSortOrders(
+      [for (final r in rows) r.id],
+      oldIndex,
+      newIndex,
+    );
     try {
       await ref
           .read(tripRepositoryProvider)
           .reorderNotes(section, tripId: tripId, items: items);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
       }
     } finally {
       ref.invalidate(tripNotesProvider(tripId));
@@ -316,13 +328,17 @@ class _NoteRowTile extends StatelessWidget {
         children: [
           Expanded(
             child: InkWell(
-              onTap: () => showNoteEditSheet(context,
-                  tripId: tripId,
-                  section: section,
-                  initialFields: row.editFields,
-                  rowId: row.id,
-                  version: row.version),
-              borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+              onTap: () => showNoteEditSheet(
+                context,
+                tripId: tripId,
+                section: section,
+                initialFields: row.editFields,
+                rowId: row.id,
+                version: row.version,
+              ),
+              borderRadius: const BorderRadius.all(
+                Radius.circular(TpRadius.md),
+              ),
               child: row.display,
             ),
           ),
@@ -392,7 +408,10 @@ class _KindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s2,
+        vertical: 2,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: const BorderRadius.all(Radius.circular(999)),

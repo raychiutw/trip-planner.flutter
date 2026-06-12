@@ -31,18 +31,17 @@ class TripShare {
   bool get isActive => !isRevoked && !isExpired;
 
   factory TripShare.fromJson(Map<String, dynamic> json) => TripShare(
-        id: (json['id'] as num).toInt(),
-        label: json['label'] as String? ?? '',
-        visibleSections:
-            (json['visibleSections'] as List<dynamic>? ?? const [])
-                .map((e) => e.toString())
-                .toList(),
-        expiresAt: (json['expiresAt'] as num?)?.toInt(),
-        viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
-        anonymous: json['anonymous'] == 1 || json['anonymous'] == true,
-        createdAt: json['createdAt'] as String?,
-        revokedAt: json['revokedAt'] as String?,
-      );
+    id: (json['id'] as num).toInt(),
+    label: json['label'] as String? ?? '',
+    visibleSections: (json['visibleSections'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString())
+        .toList(),
+    expiresAt: (json['expiresAt'] as num?)?.toInt(),
+    viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
+    anonymous: json['anonymous'] == 1 || json['anonymous'] == true,
+    createdAt: json['createdAt'] as String?,
+    revokedAt: json['revokedAt'] as String?,
+  );
 }
 
 /// 建立分享連結的回應(raw token 只回一次)。
@@ -65,9 +64,9 @@ class ShareLink {
   String fullUrl(String origin) => '$origin$url';
 
   factory ShareLink.fromJson(Map<String, dynamic> json) => ShareLink(
-        id: (json['id'] as num).toInt(),
-        token: json['token'] as String? ?? '',
-        url: json['url'] as String? ?? '',
-        label: json['label'] as String? ?? '',
-      );
+    id: (json['id'] as num).toInt(),
+    token: json['token'] as String? ?? '',
+    url: json['url'] as String? ?? '',
+    label: json['label'] as String? ?? '',
+  );
 }

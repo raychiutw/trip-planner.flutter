@@ -10,16 +10,18 @@ Future<void> pumpCard(
   VoidCallback? onRemove,
   VoidCallback? onAddToTrip,
 }) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(
-      body: PoiFavoriteCard(
-        favorite: favorite,
-        onRemove: onRemove ?? () {},
-        onAddToTrip: onAddToTrip,
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: PoiFavoriteCard(
+          favorite: favorite,
+          onRemove: onRemove ?? () {},
+          onAddToTrip: onAddToTrip,
+        ),
       ),
     ),
-  ));
+  );
 }
 
 const _favorite = PoiFavorite(

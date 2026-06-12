@@ -77,8 +77,13 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
     NoteFieldSpec('note', '備註', NoteFieldType.multiline),
   ],
   NoteSection.reservations: [
-    NoteFieldSpec('kind', '類型', NoteFieldType.enumChoice,
-        options: _reservationKinds, defaultValue: 'restaurant'),
+    NoteFieldSpec(
+      'kind',
+      '類型',
+      NoteFieldType.enumChoice,
+      options: _reservationKinds,
+      defaultValue: 'restaurant',
+    ),
     NoteFieldSpec('title', '名稱', NoteFieldType.text, required: true),
     NoteFieldSpec('reserved_at', '預約時間', NoteFieldType.datetime),
     NoteFieldSpec('party_size', '人數', NoteFieldType.integer),
@@ -96,7 +101,12 @@ const Map<NoteSection, List<NoteFieldSpec>> noteSectionSpecs = {
     NoteFieldSpec('relationship', '關係', NoteFieldType.text),
     NoteFieldSpec('phone', '電話', NoteFieldType.text),
     NoteFieldSpec('email', 'Email', NoteFieldType.text),
-    NoteFieldSpec('kind', '類型', NoteFieldType.enumChoice,
-        options: _emergencyKinds, defaultValue: 'other'),
+    NoteFieldSpec(
+      'kind',
+      '類型',
+      NoteFieldType.enumChoice,
+      options: _emergencyKinds,
+      defaultValue: 'other',
+    ),
   ],
 };

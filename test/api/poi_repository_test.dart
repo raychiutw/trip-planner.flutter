@@ -15,12 +15,17 @@ void main() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
     recordedRequests = [];
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
-      recordedRequests.add(options);
-      handler.next(options);
-    }));
-    poiRepository =
-        PoiRepository(client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          recordedRequests.add(options);
+          handler.next(options);
+        },
+      ),
+    );
+    poiRepository = PoiRepository(
+      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
+    );
   });
 
   test('searchPois：組 query（q/limit/region）+ 解析 results', () async {
@@ -28,7 +33,12 @@ void main() {
       '/poi-search',
       (server) => server.reply(200, {
         'results': [
-          {'place_id': 'p1', 'name': '首里城', 'category': 'tourist_attraction', 'rating': 4.4},
+          {
+            'place_id': 'p1',
+            'name': '首里城',
+            'category': 'tourist_attraction',
+            'rating': 4.4,
+          },
         ],
       }),
       queryParameters: {'q': '首里城', 'limit': '20', 'region': '沖繩'},

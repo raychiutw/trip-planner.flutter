@@ -127,38 +127,41 @@ class _EntryCard extends StatelessWidget {
     if (master != null) {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
-        metaItems.add(Text(
-          masterName,
-          style: TextStyle(fontSize: 13, color: mutedColor),
-        ));
+        metaItems.add(
+          Text(masterName, style: TextStyle(fontSize: 13, color: mutedColor)),
+        );
       }
       if (master.category != null) {
-        metaItems.add(Text(
-          master.category!,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: tone.deep,
+        metaItems.add(
+          Text(
+            master.category!,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: tone.deep,
+            ),
           ),
-        ));
+        );
       }
       if (master.rating != null) {
         // rating 一律 accent（設計系統：rating 屬 accent 職責）
-        metaItems.add(Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.star_rounded, size: 14, color: tones.accent),
-            const SizedBox(width: 2),
-            Text(
-              master.rating!.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 12,
-                color: mutedColor,
-                fontFeatures: const [FontFeature.tabularFigures()],
+        metaItems.add(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.star_rounded, size: 14, color: tones.accent),
+              const SizedBox(width: 2),
+              Text(
+                master.rating!.toStringAsFixed(1),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: mutedColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
-          ],
-        ));
+            ],
+          ),
+        );
       }
     }
 

@@ -28,12 +28,11 @@ OAuthTokens _tok({
   String access = 'AT',
   String? refresh = 'RT',
   required Duration ttl,
-}) =>
-    OAuthTokens(
-      accessToken: access,
-      refreshToken: refresh,
-      expiresAt: DateTime.now().add(ttl),
-    );
+}) => OAuthTokens(
+  accessToken: access,
+  refreshToken: refresh,
+  expiresAt: DateTime.now().add(ttl),
+);
 
 void main() {
   late OAuthTokenStore store;
@@ -43,46 +42,60 @@ void main() {
   setUp(() {
     store = InMemoryOAuthTokenStore();
     repo = _MockRepo();
-    source =
-        StoredBearerTokenSource(store: store, repository: repo, clientId: 'cid');
+    source = StoredBearerTokenSource(
+      store: store,
+      repository: repo,
+      clientId: 'cid',
+    );
   });
 
   test('未過期 → 直接回 access(不 refresh)', () async {
     await store.write(_tok(ttl: const Duration(hours: 1)));
     expect(await source.accessToken(), 'AT');
-    verifyNever(() => repo.refresh(
+    verifyNever(
+      () => repo.refresh(
         refreshToken: any(named: 'refreshToken'),
-        clientId: any(named: 'clientId')));
+        clientId: any(named: 'clientId'),
+      ),
+    );
   });
 
   test('過期 → refresh 成功 → 新 access 寫回', () async {
     await store.write(_tok(access: 'OLD', ttl: const Duration(seconds: -1)));
-    when(() => repo.refresh(
-              refreshToken: any(named: 'refreshToken'),
-              clientId: any(named: 'clientId'),
-            ))
-        .thenAnswer((_) async =>
-            _tok(access: 'NEW', refresh: 'RT2', ttl: const Duration(hours: 1)));
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _tok(access: 'NEW', refresh: 'RT2', ttl: const Duration(hours: 1)),
+    );
     expect(await source.accessToken(), 'NEW');
     expect((await store.read())!.accessToken, 'NEW');
   });
 
   test('refresh 回應無 id_token → 沿用舊 idToken(身分不丟)', () async {
-    await store.write(OAuthTokens(
-      accessToken: 'OLD',
-      refreshToken: 'RT',
-      idToken: 'OLD_ID',
-      expiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
-    ));
-    when(() => repo.refresh(
-              refreshToken: any(named: 'refreshToken'),
-              clientId: any(named: 'clientId'),
-            ))
-        .thenAnswer((_) async => OAuthTokens(
-              accessToken: 'NEW',
-              refreshToken: 'RT2',
-              expiresAt: DateTime.now().add(const Duration(hours: 1)),
-            )); // 無 id_token
+    await store.write(
+      OAuthTokens(
+        accessToken: 'OLD',
+        refreshToken: 'RT',
+        idToken: 'OLD_ID',
+        expiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
+      ),
+    );
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenAnswer(
+      (_) async => OAuthTokens(
+        accessToken: 'NEW',
+        refreshToken: 'RT2',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      ),
+    ); // 無 id_token
     expect(await source.refresh(), isTrue);
     expect((await store.read())!.idToken, 'OLD_ID');
   });
@@ -94,35 +107,47 @@ void main() {
 
   test('refresh 端 401 → clear（真的失效）', () async {
     await store.write(_tok(ttl: const Duration(seconds: -1)));
-    when(() => repo.refresh(
-          refreshToken: any(named: 'refreshToken'),
-          clientId: any(named: 'clientId'),
-        )).thenThrow(
-        const ApiError(status: 401, code: 'invalid_grant', message: 'x'));
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenThrow(
+      const ApiError(status: 401, code: 'invalid_grant', message: 'x'),
+    );
     expect(await source.refresh(), isFalse);
     expect(await store.read(), isNull);
   });
 
   test('refresh 暫時性錯誤(網路)→ 保留 token,不清空', () async {
     await store.write(_tok(ttl: const Duration(seconds: -1)));
-    when(() => repo.refresh(
-          refreshToken: any(named: 'refreshToken'),
-          clientId: any(named: 'clientId'),
-        )).thenThrow(Exception('network'));
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenThrow(Exception('network'));
     expect(await source.refresh(), isFalse);
     expect(await store.read(), isNotNull); // 未清空
   });
 
   test('write 失敗 → 不清空,本輪仍回新 access', () async {
     final failStore = _WriteFailStore(
-        _tok(access: 'OLD', ttl: const Duration(seconds: -1)));
+      _tok(access: 'OLD', ttl: const Duration(seconds: -1)),
+    );
     final src = StoredBearerTokenSource(
-        store: failStore, repository: repo, clientId: 'cid');
-    when(() => repo.refresh(
-              refreshToken: any(named: 'refreshToken'),
-              clientId: any(named: 'clientId'),
-            ))
-        .thenAnswer((_) async => _tok(access: 'NEW', ttl: const Duration(hours: 1)));
+      store: failStore,
+      repository: repo,
+      clientId: 'cid',
+    );
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenAnswer(
+      (_) async => _tok(access: 'NEW', ttl: const Duration(hours: 1)),
+    );
     expect(await src.accessToken(), 'NEW');
     expect(failStore.cleared, isFalse);
   });
@@ -130,10 +155,12 @@ void main() {
   test('並發過期 → single-flight(repo.refresh 僅 1 次)', () async {
     await store.write(_tok(ttl: const Duration(seconds: -1)));
     var calls = 0;
-    when(() => repo.refresh(
-          refreshToken: any(named: 'refreshToken'),
-          clientId: any(named: 'clientId'),
-        )).thenAnswer((_) async {
+    when(
+      () => repo.refresh(
+        refreshToken: any(named: 'refreshToken'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenAnswer((_) async {
       calls++;
       await Future<void>.delayed(const Duration(milliseconds: 10));
       return _tok(access: 'NEW', ttl: const Duration(hours: 1));

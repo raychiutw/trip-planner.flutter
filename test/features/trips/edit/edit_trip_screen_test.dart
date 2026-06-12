@@ -8,7 +8,6 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
-import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trips/edit/edit_trip_screen.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/trip.dart';
@@ -37,6 +36,7 @@ void main() {
   setUp(() {
     tripRepo = _MockTripRepo();
     poiRepo = _MockPoiRepo();
+    when(() => tripRepo.fetchTrip(any())).thenAnswer((_) async => _trip);
     when(
       () => tripRepo.updateTrip(
         any(),
@@ -67,7 +67,6 @@ void main() {
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
         poiRepositoryProvider.overrideWithValue(poiRepo),
-        tripDetailProvider.overrideWith((ref, id) async => _trip),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     );

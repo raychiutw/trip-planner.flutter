@@ -27,12 +27,14 @@ void main() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
     sessionStore = InMemorySessionStore();
-    container = ProviderContainer(overrides: [
-      sessionStoreProvider.overrideWithValue(sessionStore),
-      apiClientProvider.overrideWithValue(
-        ApiClient(sessionStore: sessionStore, dio: dio),
-      ),
-    ]);
+    container = ProviderContainer(
+      overrides: [
+        sessionStoreProvider.overrideWithValue(sessionStore),
+        apiClientProvider.overrideWithValue(
+          ApiClient(sessionStore: sessionStore, dio: dio),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
   });
 

@@ -13,7 +13,7 @@ abstract class SessionStore {
 /// 正式環境實作：flutter_secure_storage，key `tripline_session`。
 class SecureSessionStore implements SessionStore {
   SecureSessionStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   static const _sessionKey = 'tripline_session';
 

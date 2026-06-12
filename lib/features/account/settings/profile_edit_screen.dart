@@ -70,8 +70,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-            child: Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         FilledButton(
           key: const ValueKey('profile-save'),
@@ -80,7 +82,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('儲存'),
         ),
       ],

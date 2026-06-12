@@ -49,8 +49,10 @@ void main() {
   });
 
   test('403 → canManage false', () async {
-    when(() => repo.fetchShares(any())).thenAnswer((_) async =>
-        throw const ApiError(status: 403, code: 'PERM', message: 'no'));
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async =>
+          throw const ApiError(status: 403, code: 'PERM', message: 'no'),
+    );
     final c = makeC();
     await loaded(c);
     expect(c.read(shareControllerProvider('t')).canManage, isFalse);
@@ -58,8 +60,9 @@ void main() {
 
   test('create → 呼叫 + reload + lastCreated', () async {
     when(() => repo.createShare(any(), label: any(named: 'label'))).thenAnswer(
-        (_) async =>
-            const ShareLink(id: 7, token: 'tok', url: '/s/tok', label: 'A'));
+      (_) async =>
+          const ShareLink(id: 7, token: 'tok', url: '/s/tok', label: 'A'),
+    );
     final c = makeC();
     final ctrl = await loaded(c);
     await ctrl.create('A');

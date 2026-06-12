@@ -43,8 +43,9 @@ class TravelPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = Theme.of(context).extension<TpTones>()!;
-    final label =
-        travel.min != null ? '${travel.min} 分鐘' : (travel.desc ?? '移動');
+    final label = travel.min != null
+        ? '${travel.min} 分鐘'
+        : (travel.desc ?? '移動');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

@@ -21,7 +21,12 @@ void main() {
 
   test('toJson：snake_case + null 省略', () {
     expect(
-      const DestinationInput(name: 'A', lat: 1.0, lng: 2.0, dayQuota: 3).toJson(),
+      const DestinationInput(
+        name: 'A',
+        lat: 1.0,
+        lng: 2.0,
+        dayQuota: 3,
+      ).toJson(),
       {'name': 'A', 'lat': 1.0, 'lng': 2.0, 'day_quota': 3},
     );
     expect(const DestinationInput(name: 'B').toJson(), {'name': 'B'});

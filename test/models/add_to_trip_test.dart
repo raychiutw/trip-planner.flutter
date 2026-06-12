@@ -17,8 +17,11 @@ void main() {
       expect(c.dayNum, 1);
     });
     test('time 可為 null', () {
-      final c = TripEntryConflict.fromJson(
-          {'entryId': 6, 'title': '景點', 'dayNum': 2});
+      final c = TripEntryConflict.fromJson({
+        'entryId': 6,
+        'title': '景點',
+        'dayNum': 2,
+      });
       expect(c.time, isNull);
     });
   });
@@ -27,7 +30,8 @@ void main() {
     test('favorite / direct 兩型', () {
       final fav = AddToTripFavorite(favoriteId: 7, displayName: '首里城');
       final direct = AddToTripDirect(
-          poi: const PoiSearchResult(placeId: 'p1', name: '拉麵'));
+        poi: const PoiSearchResult(placeId: 'p1', name: '拉麵'),
+      );
       expect(fav.favoriteId, 7);
       expect(direct.poi.name, '拉麵');
       expect(fav, isA<AddToTripArgs>());

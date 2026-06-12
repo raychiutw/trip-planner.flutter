@@ -40,7 +40,8 @@ Future<void> showEntryEditSheet(
     isScrollControlled: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+      ),
       child: EntryEditSheet(tripId: tripId, args: args),
     ),
   );
@@ -151,25 +152,29 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_isEdit ? '已儲存' : '已新增')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_isEdit ? '已儲存' : '已新增')));
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripDaysProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('此停留點已更新，已重新載入，請再編輯一次')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('此停留點已更新，已重新載入，請再編輯一次')));
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     }
   }
 
@@ -183,8 +188,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_isEdit ? '編輯停留點' : '新增停留點',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              _isEdit ? '編輯停留點' : '新增停留點',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: TpSpacing.s4),
             TextField(
               key: const ValueKey('entry-edit-title'),
@@ -206,10 +213,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             if (!timeValid)
               Padding(
                 padding: const EdgeInsets.only(top: TpSpacing.s2),
-                child: Text('結束時間需晚於開始時間',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontSize: 12)),
+                child: Text(
+                  '結束時間需晚於開始時間',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             if (_isEdit) ...[
               const SizedBox(height: TpSpacing.s3),
@@ -219,7 +229,8 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                   final entry = (widget.args as EntryEditExisting).entry;
                   Navigator.of(context).pop();
                   context.push(
-                      '/trips/${widget.tripId}/entries/${entry.id}/pois');
+                    '/trips/${widget.tripId}/entries/${entry.id}/pois',
+                  );
                 },
                 icon: const Icon(Icons.place_outlined),
                 label: const Text('管理地點'),
@@ -254,7 +265,8 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
         if (t != null)
           IconButton(
             key: ValueKey(
-                isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear'),
+              isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
+            ),
             tooltip: '清除',
             icon: const Icon(Icons.close, size: 18),
             onPressed: () =>

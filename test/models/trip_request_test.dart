@@ -38,8 +38,12 @@ void main() {
     });
 
     test('reply 可 null（未完成）', () {
-      final r = TripRequest.fromJson(
-          {'id': 6, 'tripId': 't', 'message': 'hi', 'status': 'open'});
+      final r = TripRequest.fromJson({
+        'id': 6,
+        'tripId': 't',
+        'message': 'hi',
+        'status': 'open',
+      });
       expect(r.reply, isNull);
       expect(r.status, RequestStatus.open);
       expect(r.status.isTerminal, isFalse);

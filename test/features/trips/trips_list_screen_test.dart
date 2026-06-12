@@ -47,9 +47,8 @@ void main() {
         ),
         GoRoute(
           path: '/trips/:tripId',
-          builder: (context, state) => Scaffold(
-            body: Text('detail:${state.pathParameters['tripId']}'),
-          ),
+          builder: (context, state) =>
+              Scaffold(body: Text('detail:${state.pathParameters['tripId']}')),
         ),
       ],
     );
@@ -61,12 +60,14 @@ void main() {
 
   group('TripsListScreen 清單渲染', () {
     testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          myTripsProvider.overrideWith((ref) async => fakeTrips),
-        ],
-        child: buildRouterApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
       await tester.pump();
 
       expect(find.text('我的行程'), findsOneWidget);
@@ -82,21 +83,27 @@ void main() {
       expect(find.text('4 天'), findsOneWidget);
 
       // tone 依 index 輪替 accent → sage → pink
-      final renderedCards =
-          tester.widgetList<TripCard>(find.byType(TripCard)).toList();
-      expect(
-        renderedCards.map((card) => card.tone).toList(),
-        [TripCardTone.accent, TripCardTone.sage, TripCardTone.pink],
-      );
+      final renderedCards = tester
+          .widgetList<TripCard>(find.byType(TripCard))
+          .toList();
+      expect(renderedCards.map((card) => card.tone).toList(), [
+        TripCardTone.accent,
+        TripCardTone.sage,
+        TripCardTone.pink,
+      ]);
     });
 
     testWidgets('empty state：顯示「還沒有行程」hero 文案', (tester) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          myTripsProvider.overrideWith((ref) async => const <TripSummary>[]),
-        ],
-        child: buildRouterApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(const <TripSummary>[]),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
       await tester.pump();
 
       expect(find.byType(TripCard), findsNothing);
@@ -105,20 +112,22 @@ void main() {
 
     testWidgets('error state：顯示重試按鈕，點擊後重新載入成功', (tester) async {
       var fetchAttempts = 0;
-      await tester.pumpWidget(ProviderScope(
-        // 關閉 riverpod 3.x 自動 retry，讓 error state 可被穩定斷言
-        retry: (retryCount, error) => null,
-        overrides: [
-          myTripsProvider.overrideWith((ref) async {
-            fetchAttempts++;
-            if (fetchAttempts == 1) {
-              throw Exception('network down');
-            }
-            return fakeTrips;
-          }),
-        ],
-        child: buildRouterApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          // 關閉 riverpod 3.x 自動 retry，讓 error state 可被穩定斷言
+          retry: (retryCount, error) => null,
+          overrides: [
+            myTripsProvider.overrideWith((ref) {
+              fetchAttempts++;
+              if (fetchAttempts == 1) {
+                return Stream.error(Exception('network down'));
+              }
+              return Stream.value(fakeTrips);
+            }),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
       await tester.pump();
       await tester.pump();
 
@@ -135,12 +144,14 @@ void main() {
 
   group('TripsListScreen 互動', () {
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          myTripsProvider.overrideWith((ref) async => fakeTrips),
-        ],
-        child: buildRouterApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
       await tester.pump();
 
       await tester.tap(find.text('沖繩家族之旅'));
@@ -149,54 +160,64 @@ void main() {
       expect(find.text('detail:okinawa-trip-2026'), findsOneWidget);
     });
 
-    testWidgets('長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
-        (tester) async {
-      final mockTripRepository = MockTripRepository();
-      when(() => mockTripRepository.fetchMyTrips())
-          .thenAnswer((_) async => fakeTrips);
-      when(() => mockTripRepository.deleteTrip(any()))
-          .thenAnswer((_) async {});
+    testWidgets(
+      '長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
+      (tester) async {
+        final mockTripRepository = MockTripRepository();
+        when(
+          () => mockTripRepository.watchMyTrips(),
+        ).thenAnswer((_) => Stream.value(fakeTrips));
+        when(
+          () => mockTripRepository.deleteTrip(any()),
+        ).thenAnswer((_) async {});
 
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
-        ],
-        child: buildRouterApp(),
-      ));
-      await tester.pump();
-      expect(find.byType(TripCard), findsNWidgets(3));
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            ],
+            child: buildRouterApp(),
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(TripCard), findsNWidgets(3));
 
-      // 長按第一張卡 → bottom sheet
-      await tester.longPress(find.text('沖繩家族之旅'));
-      await tester.pumpAndSettle();
-      expect(find.text('刪除行程'), findsOneWidget);
+        // 長按第一張卡 → bottom sheet
+        await tester.longPress(find.text('沖繩家族之旅'));
+        await tester.pumpAndSettle();
+        expect(find.text('刪除行程'), findsOneWidget);
 
-      // 點「刪除行程」→ AlertDialog 確認
-      await tester.tap(find.text('刪除行程'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+        // 點「刪除行程」→ AlertDialog 確認
+        await tester.tap(find.text('刪除行程'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
 
-      // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
-      await tester.tap(find.text('刪除'));
-      await tester.pumpAndSettle();
+        // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
+        await tester.tap(find.text('刪除'));
+        await tester.pumpAndSettle();
 
-      verify(() => mockTripRepository.deleteTrip('okinawa-trip-2026'))
-          .called(1);
-      // 初載 + 刪除後 invalidate refresh = 2 次
-      verify(() => mockTripRepository.fetchMyTrips()).called(2);
-    });
+        verify(
+          () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+        ).called(1);
+        // 初載 + 刪除後 invalidate refresh = 2 次
+        verify(() => mockTripRepository.watchMyTrips()).called(2);
+      },
+    );
 
     testWidgets('刪除確認對話框按「取消」→ 不呼叫 deleteTrip', (tester) async {
       final mockTripRepository = MockTripRepository();
-      when(() => mockTripRepository.fetchMyTrips())
-          .thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
 
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
-        ],
-        child: buildRouterApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
       await tester.pump();
 
       await tester.longPress(find.text('沖繩家族之旅'));

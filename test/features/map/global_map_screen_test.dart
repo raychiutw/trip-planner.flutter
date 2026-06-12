@@ -36,7 +36,7 @@ const _noCoords = PoiFavorite(
 void main() {
   Widget buildApp(List<PoiFavorite> favs) {
     return ProviderScope(
-      overrides: [favoritesProvider.overrideWith((ref) async => favs)],
+      overrides: [favoritesProvider.overrideWith((ref) => Stream.value(favs))],
       child: MaterialApp(
         theme: AppTheme.light(),
         home: GlobalMapScreen(tileProvider: _TransparentTileProvider()),

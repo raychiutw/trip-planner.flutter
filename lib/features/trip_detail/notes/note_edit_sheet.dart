@@ -24,7 +24,8 @@ Future<void> showNoteEditSheet(
     isScrollControlled: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+      ),
       child: NoteEditSheet(
         tripId: tripId,
         section: section,
@@ -127,8 +128,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
           : TimeOfDay(hour: current.hour, minute: current.minute),
     );
     if (time == null) return;
-    setState(() => _dts[key] =
-        '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}T${_pad2(time.hour)}:${_pad2(time.minute)}');
+    setState(
+      () => _dts[key] =
+          '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}T${_pad2(time.hour)}:${_pad2(time.minute)}',
+    );
   }
 
   Map<String, dynamic> _collect() {
@@ -155,37 +158,46 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
     final repo = ref.read(tripRepositoryProvider);
     try {
       if (widget.isEdit) {
-        await repo.updateNote(widget.section,
-            tripId: widget.tripId,
-            rowId: widget.rowId!,
-            fields: fields,
-            expectedVersion: widget.version);
+        await repo.updateNote(
+          widget.section,
+          tripId: widget.tripId,
+          rowId: widget.rowId!,
+          fields: fields,
+          expectedVersion: widget.version,
+        );
       } else {
-        await repo.createNote(widget.section,
-            tripId: widget.tripId, fields: fields);
+        await repo.createNote(
+          widget.section,
+          tripId: widget.tripId,
+          fields: fields,
+        );
       }
       ref.invalidate(tripNotesProvider(widget.tripId));
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(widget.isEdit ? '已儲存' : '已新增')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(widget.isEdit ? '已儲存' : '已新增')));
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripNotesProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('此筆記已更新，請重新編輯')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('此筆記已更新，請重新編輯')));
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     }
   }
 
@@ -200,8 +212,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(widget.isEdit ? '編輯$title' : '新增$title',
-                  style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                widget.isEdit ? '編輯$title' : '新增$title',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: TpSpacing.s4),
               for (final spec in _specs) ...[
                 _field(spec),
@@ -211,9 +225,9 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               FilledButton(
                 key: const ValueKey('note-edit-submit'),
                 onPressed: _canSubmit ? _submit : null,
-                child: Text(_submitting
-                    ? '處理中…'
-                    : (widget.isEdit ? '儲存' : '新增')),
+                child: Text(
+                  _submitting ? '處理中…' : (widget.isEdit ? '儲存' : '新增'),
+                ),
               ),
             ],
           ),
@@ -229,7 +243,8 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
           key: ValueKey('note-field-${spec.key}'),
           controller: _ctrls[spec.key],
           decoration: InputDecoration(
-              labelText: spec.required ? '${spec.label} *' : spec.label),
+            labelText: spec.required ? '${spec.label} *' : spec.label,
+          ),
         );
       case NoteFieldType.multiline:
         return TextField(
@@ -250,8 +265,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(spec.label,
-                style: Theme.of(context).textTheme.labelMedium),
+            Text(spec.label, style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: TpSpacing.s1),
             Wrap(
               spacing: TpSpacing.s2,
@@ -277,8 +291,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                 onPressed: () => _pickDateTime(spec.key),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                      '${spec.label}　${value.isEmpty ? '未設定' : value}'),
+                  child: Text('${spec.label}　${value.isEmpty ? '未設定' : value}'),
                 ),
               ),
             ),

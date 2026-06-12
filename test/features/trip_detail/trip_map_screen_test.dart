@@ -78,15 +78,16 @@ Widget _buildScreen(List<TripDay> days) {
   );
   return ProviderScope(
     overrides: [
-      tripDaysProvider.overrideWith((ref, tripId) async => days),
+      tripDaysProvider.overrideWith((ref, tripId) => Stream.value(days)),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
 }
 
 void main() {
-  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution',
-      (tester) async {
+  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
+    tester,
+  ) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 

@@ -1,4 +1,4 @@
-/// 編輯行程狀態機:讀 tripDetailProvider 帶入初值 → 使用者改 → diff-only PUT。
+/// 編輯行程狀態機:一次性 fetchTrip 帶入初值 → 使用者改 → diff-only PUT。
 /// 不動日期/name;destinations 載入自 GET(無 country)→ 不重算 countries(避免誤判)。
 library;
 
@@ -87,7 +87,10 @@ class EditTripController extends Notifier<EditTripState> {
 
   Future<void> _load() async {
     try {
-      final trip = await ref.read(tripDetailProvider(tripId).future);
+      // 表單種子用一次性 fetch(非 SWR stream),避免依賴會 autoDispose 的
+      // tripDetailProvider.future(無 listener 時 stream 未 emit 即被回收)。
+      // 仍享 ApiClient 透明快取/離線回退。
+      final trip = await _repo.fetchTrip(tripId);
       if (_disposed) return;
       _origTitle = trip.title ?? '';
       _origDescription = trip.description ?? '';
@@ -129,10 +132,8 @@ class EditTripController extends Notifier<EditTripState> {
     state = state.copyWith(destinations: list);
   }
 
-  bool get _destChanged => !listEquals(
-        [for (final d in state.destinations) d.name],
-        _origDestNames,
-      );
+  bool get _destChanged =>
+      !listEquals([for (final d in state.destinations) d.name], _origDestNames);
 
   /// 有任何欄位變更。
   bool get hasChanges =>

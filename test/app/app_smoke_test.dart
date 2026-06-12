@@ -14,11 +14,11 @@ import 'package:tripline/models/user.dart';
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   Future<UserInfo?> build() async => const UserInfo(
-        id: 'user-1',
-        email: 'traveler@example.com',
-        emailVerified: true,
-        displayName: 'Ray',
-      );
+    id: 'user-1',
+    email: 'traveler@example.com',
+    emailVerified: true,
+    displayName: 'Ray',
+  );
 }
 
 class _MockTripRepository extends Mock implements TripRepository {}
@@ -26,7 +26,7 @@ class _MockTripRepository extends Mock implements TripRepository {}
 void main() {
   testWidgets('已登入時顯示 5-tab NavigationBar', (tester) async {
     final mockTripRepository = _MockTripRepository();
-    when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
+    when(mockTripRepository.watchMyTrips).thenAnswer((_) => Stream.value([]));
 
     await tester.pumpWidget(
       ProviderScope(

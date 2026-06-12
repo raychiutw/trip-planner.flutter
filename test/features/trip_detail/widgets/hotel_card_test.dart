@@ -5,10 +5,12 @@ import 'package:tripline/features/trip_detail/widgets/hotel_card.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 Future<void> pumpHotel(WidgetTester tester, DayHotel hotel) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(body: HotelCard(hotel: hotel)),
-  ));
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: HotelCard(hotel: hotel)),
+    ),
+  );
 }
 
 void main() {

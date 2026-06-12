@@ -35,9 +35,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   bool _submitting = false;
 
   String get _title => switch (widget.args) {
-        AddToTripFavorite(:final displayName) => displayName,
-        AddToTripDirect(:final poi) => poi.name,
-      };
+    AddToTripFavorite(:final displayName) => displayName,
+    AddToTripDirect(:final poi) => poi.name,
+  };
 
   String _fmt(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -47,7 +47,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
 
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
-        context: context, initialTime: isStart ? _start : _end);
+      context: context,
+      initialTime: isStart ? _start : _end,
+    );
     if (picked != null) {
       setState(() => isStart ? _start = picked : _end = picked);
     }
@@ -58,7 +60,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     try {
       switch (widget.args) {
         case AddToTripFavorite(:final favoriteId):
-          await ref.read(favoritesRepositoryProvider).addFavoriteToTrip(
+          await ref
+              .read(favoritesRepositoryProvider)
+              .addFavoriteToTrip(
                 favoriteId: favoriteId,
                 tripId: tripId,
                 dayNum: dayNum,
@@ -66,7 +70,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                 endTime: _fmt(_end),
               );
         case AddToTripDirect(:final poi):
-          await ref.read(tripRepositoryProvider).addEntryToDay(
+          await ref
+              .read(tripRepositoryProvider)
+              .addEntryToDay(
                 tripId: tripId,
                 dayNum: dayNum,
                 title: poi.name,
@@ -78,8 +84,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
               );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已加入行程')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已加入行程')));
       Navigator.of(context).pop();
     } on Exception catch (error) {
       if (!mounted) return;
@@ -88,12 +95,14 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
         final raw = error.payload?['conflictWith'];
         if (raw is Map) {
           await _showConflict(
-              TripEntryConflict.fromJson(Map<String, dynamic>.from(raw)));
+            TripEntryConflict.fromJson(Map<String, dynamic>.from(raw)),
+          );
           return;
         }
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('加入行程失敗,請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('加入行程失敗,請稍後再試')));
     }
   }
 
@@ -103,8 +112,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('時段衝突'),
-        content:
-            Text('該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。'),
+        content: Text('該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。'),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -138,8 +146,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     // 純讀 fallback：不在 build() 內寫入 state（_tripId/_dayNum 仍為 null 直到使用者選），
     // 以衍生「有效值」驅動 dropdown initialValue 與送出鈕啟用條件。
     final tripId = _tripId ?? (trips.isEmpty ? null : trips.first.tripId);
-    final daysAsync =
-        tripId == null ? null : ref.watch(tripDaysProvider(tripId));
+    final daysAsync = tripId == null
+        ? null
+        : ref.watch(tripDaysProvider(tripId));
     final days = switch (daysAsync) {
       AsyncData<List<TripDay>>(:final value) => value,
       _ => const <TripDay>[],
@@ -174,8 +183,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
               items: [
                 for (final d in days)
                   DropdownMenuItem(
-                      value: d.dayNum,
-                      child: Text('DAY ${d.dayNum} · ${d.displayTitle}')),
+                    value: d.dayNum,
+                    child: Text('DAY ${d.dayNum} · ${d.displayTitle}'),
+                  ),
               ],
               onChanged: (v) => setState(() => _dayNum = v),
             ),
@@ -206,16 +216,16 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             child: Text(
               '結束時間需晚於開始時間',
               style: TextStyle(
-                  color: Theme.of(context).colorScheme.error, fontSize: 12),
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+              ),
             ),
           ),
         const SizedBox(height: TpSpacing.s6),
         FilledButton(
           key: const ValueKey('add-to-trip-submit'),
-          onPressed: (!_submitting &&
-                  _timeValid &&
-                  tripId != null &&
-                  dayNum != null)
+          onPressed:
+              (!_submitting && _timeValid && tripId != null && dayNum != null)
               ? () => _submit(tripId, dayNum)
               : null,
           child: Text(_submitting ? '加入中…' : '加入行程'),

@@ -46,7 +46,8 @@ class DayPills extends StatelessWidget {
           vertical: TpSpacing.s2,
         ),
         itemCount: days.length,
-        separatorBuilder: (context, index) => const SizedBox(width: TpSpacing.s2),
+        separatorBuilder: (context, index) =>
+            const SizedBox(width: TpSpacing.s2),
         itemBuilder: (context, index) => _DayPill(
           day: days[index],
           isActive: days[index].dayNum == activeDayNum,

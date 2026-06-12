@@ -11,10 +11,11 @@ class ShareRepository {
 
   /// GET /trips/:id/shares → {shares:[...]}。
   Future<List<TripShare>> fetchShares(String tripId) async {
-    final body =
-        await _client.get('/trips/${Uri.encodeComponent(tripId)}/shares');
-    final list = (body as Map<String, dynamic>)['shares'] as List<dynamic>? ??
-        const [];
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/shares',
+    );
+    final list =
+        (body as Map<String, dynamic>)['shares'] as List<dynamic>? ?? const [];
     return list
         .map((e) => TripShare.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -31,7 +32,7 @@ class ShareRepository {
 
   /// PATCH /trips/:id/shares/:shareId {action:'revoke'}。
   Future<void> revokeShare(String tripId, int shareId) => _client.patch(
-        '/trips/${Uri.encodeComponent(tripId)}/shares/$shareId',
-        body: {'action': 'revoke'},
-      );
+    '/trips/${Uri.encodeComponent(tripId)}/shares/$shareId',
+    body: {'action': 'revoke'},
+  );
 }

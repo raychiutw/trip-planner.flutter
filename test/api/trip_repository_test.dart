@@ -18,8 +18,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    final apiClient =
-        ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
     tripRepository = TripRepository(client: apiClient);
   });
 
@@ -63,8 +62,7 @@ void main() {
     expect(publishedTrips.single.published, isTrue);
   });
 
-  test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）',
-      () async {
+  test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray',
       (server) => server.reply(200, {
@@ -203,18 +201,14 @@ void main() {
       }),
     );
 
-    final tripNotes =
-        await tripRepository.fetchNotes('okinawa-trip-2026-Ray');
+    final tripNotes = await tripRepository.fetchNotes('okinawa-trip-2026-Ray');
 
     expect(tripNotes.flights.single.flightNo, 'IT232');
     expect(tripNotes.lodgings, isEmpty);
   });
 
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
-    dioAdapter.onDelete(
-      '/trips/old-trip',
-      (server) => server.reply(204, null),
-    );
+    dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 
     await expectLater(tripRepository.deleteTrip('old-trip'), completes);
   });
@@ -249,51 +243,75 @@ void main() {
       data: {'displayName': '新名字'},
     );
 
-    final updatedUser =
-        await tripRepository.updateProfile(displayName: '新名字');
+    final updatedUser = await tripRepository.updateProfile(displayName: '新名字');
 
     expect(updatedUser.displayName, '新名字');
   });
 
-  test('addEntryToDay：POST /trips/:id/days/:num/entries snake_case body', () async {
-    dioAdapter.onPost(
-      '/trips/okinawa/days/1/entries',
-      (server) => server.reply(201, {'id': 99}),
-      data: {
-        'title': '美麗海水族館', 'description': '海景第一排', 'poi_type': 'attraction',
-        'lat': 26.69, 'lng': 127.87,
-        'start_time': '10:00', 'end_time': '11:00', 'source': 'user-explore',
-      },
-    );
+  test(
+    'addEntryToDay：POST /trips/:id/days/:num/entries snake_case body',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa/days/1/entries',
+        (server) => server.reply(201, {'id': 99}),
+        data: {
+          'title': '美麗海水族館',
+          'description': '海景第一排',
+          'poi_type': 'attraction',
+          'lat': 26.69,
+          'lng': 127.87,
+          'start_time': '10:00',
+          'end_time': '11:00',
+          'source': 'user-explore',
+        },
+      );
 
-    await expectLater(
-      tripRepository.addEntryToDay(
-        tripId: 'okinawa', dayNum: 1, title: '美麗海水族館',
-        description: '海景第一排', poiType: 'attraction', lat: 26.69, lng: 127.87,
-        startTime: '10:00', endTime: '11:00'),
-      completes,
-    );
-  });
+      await expectLater(
+        tripRepository.addEntryToDay(
+          tripId: 'okinawa',
+          dayNum: 1,
+          title: '美麗海水族館',
+          description: '海景第一排',
+          poiType: 'attraction',
+          lat: 26.69,
+          lng: 127.87,
+          startTime: '10:00',
+          endTime: '11:00',
+        ),
+        completes,
+      );
+    },
+  );
 
-  test('updateEntry：PATCH /trips/:id/entries/:eid snake_case + expectedVersion',
-      () async {
-    dioAdapter.onPatch(
-      '/trips/okinawa/entries/11',
-      (server) => server.reply(200, {'id': 11, 'version': 3, 'title': '新標題'}),
-      data: {
-        'title': '新標題', 'description': '改描述',
-        'start_time': '09:30', 'end_time': '10:30', 'expectedVersion': 2,
-      },
-    );
+  test(
+    'updateEntry：PATCH /trips/:id/entries/:eid snake_case + expectedVersion',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa/entries/11',
+        (server) => server.reply(200, {'id': 11, 'version': 3, 'title': '新標題'}),
+        data: {
+          'title': '新標題',
+          'description': '改描述',
+          'start_time': '09:30',
+          'end_time': '10:30',
+          'expectedVersion': 2,
+        },
+      );
 
-    await expectLater(
-      tripRepository.updateEntry(
-        tripId: 'okinawa', entryId: 11, expectedVersion: 2,
-        title: '新標題', description: '改描述',
-        startTime: '09:30', endTime: '10:30'),
-      completes,
-    );
-  });
+      await expectLater(
+        tripRepository.updateEntry(
+          tripId: 'okinawa',
+          entryId: 11,
+          expectedVersion: 2,
+          title: '新標題',
+          description: '改描述',
+          startTime: '09:30',
+          endTime: '10:30',
+        ),
+        completes,
+      );
+    },
+  );
 
   test('updateEntry：409 STALE_ENTRY → 拋 ApiError(409)', () async {
     dioAdapter.onPatch(
@@ -305,17 +323,26 @@ void main() {
         },
       }),
       data: {
-        'title': '標題', 'description': null,
-        'start_time': null, 'end_time': null, 'expectedVersion': 2,
+        'title': '標題',
+        'description': null,
+        'start_time': null,
+        'end_time': null,
+        'expectedVersion': 2,
       },
     );
 
     await expectLater(
       tripRepository.updateEntry(
-        tripId: 'okinawa', entryId: 11, expectedVersion: 2, title: '標題'),
-      throwsA(isA<ApiError>()
-          .having((e) => e.status, 'status', 409)
-          .having((e) => e.code, 'code', 'STALE_ENTRY')),
+        tripId: 'okinawa',
+        entryId: 11,
+        expectedVersion: 2,
+        title: '標題',
+      ),
+      throwsA(
+        isA<ApiError>()
+            .having((e) => e.status, 'status', 409)
+            .having((e) => e.code, 'code', 'STALE_ENTRY'),
+      ),
     );
   });
 
@@ -344,10 +371,13 @@ void main() {
     );
 
     await expectLater(
-      tripRepository.reorderEntries(tripId: 'okinawa', updates: [
-        (id: 11, sortOrder: 0, dayId: null),
-        (id: 12, sortOrder: 1, dayId: 2),
-      ]),
+      tripRepository.reorderEntries(
+        tripId: 'okinawa',
+        updates: [
+          (id: 11, sortOrder: 0, dayId: null),
+          (id: 12, sortOrder: 1, dayId: 2),
+        ],
+      ),
       completes,
     );
   });
@@ -370,8 +400,12 @@ void main() {
       '/trips/okinawa/segments',
       (server) => server.reply(200, [
         {
-          'id': 5, 'fromEntryId': 11, 'toEntryId': 12,
-          'mode': 'transit', 'min': 20, 'version': 3,
+          'id': 5,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'transit',
+          'min': 20,
+          'version': 3,
         },
       ]),
     );
@@ -390,8 +424,12 @@ void main() {
     );
 
     final seg = await tripRepository.updateSegment(
-        tripId: 'okinawa', segmentId: 5, mode: 'transit', min: 20,
-        expectedVersion: 1);
+      tripId: 'okinawa',
+      segmentId: 5,
+      mode: 'transit',
+      min: 20,
+      expectedVersion: 1,
+    );
     expect(seg.version, 4);
   });
 
@@ -406,97 +444,147 @@ void main() {
 
     await expectLater(
       tripRepository.updateSegment(
-          tripId: 'okinawa', segmentId: 5, mode: 'driving', expectedVersion: 1),
+        tripId: 'okinawa',
+        segmentId: 5,
+        mode: 'driving',
+        expectedVersion: 1,
+      ),
       throwsA(isA<ApiError>().having((e) => e.status, 'status', 409)),
     );
   });
 
-  test('fetchEntry：GET /entries/:eid 解析 master/alternates/entryPoisVersion',
-      () async {
-    dioAdapter.onGet(
-      '/trips/okinawa/entries/11',
-      (server) => server.reply(200, {
-        'id': 11, 'sortOrder': 0, 'title': '首里城', 'version': 2,
-        'entryPoisVersion': '4',
-        'master': {'poiId': 501, 'name': '首里城公園'},
-        'alternates': [
-          {'poiId': 502, 'name': '玉陵', 'sortOrder': 2},
-        ],
-      }),
-    );
+  test(
+    'fetchEntry：GET /entries/:eid 解析 master/alternates/entryPoisVersion',
+    () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/entries/11',
+        (server) => server.reply(200, {
+          'id': 11,
+          'sortOrder': 0,
+          'title': '首里城',
+          'version': 2,
+          'entryPoisVersion': '4',
+          'master': {'poiId': 501, 'name': '首里城公園'},
+          'alternates': [
+            {'poiId': 502, 'name': '玉陵', 'sortOrder': 2},
+          ],
+        }),
+      );
 
-    final entry = await tripRepository.fetchEntry(tripId: 'okinawa', entryId: 11);
-    expect(entry.master?.poiId, 501);
-    expect(entry.entryPoisVersion, '4');
-    expect(entry.alternates.single.poiId, 502);
-  });
+      final entry = await tripRepository.fetchEntry(
+        tripId: 'okinawa',
+        entryId: 11,
+      );
+      expect(entry.master?.poiId, 501);
+      expect(entry.entryPoisVersion, '4');
+      expect(entry.alternates.single.poiId, 502);
+    },
+  );
 
-  test('setEntryMaster：PATCH /entries/:eid/master camelCase + entryPoisVersion',
-      () async {
-    dioAdapter.onPatch(
-      '/trips/okinawa/entries/11/master',
-      (server) => server.reply(200, {'entryId': 11, 'masterPoiId': 502}),
-      data: {'poiId': 502, 'entryPoisVersion': '4'},
-    );
+  test(
+    'setEntryMaster：PATCH /entries/:eid/master camelCase + entryPoisVersion',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa/entries/11/master',
+        (server) => server.reply(200, {'entryId': 11, 'masterPoiId': 502}),
+        data: {'poiId': 502, 'entryPoisVersion': '4'},
+      );
 
-    await expectLater(
-      tripRepository.setEntryMaster(
-          tripId: 'okinawa', entryId: 11, poiId: 502, entryPoisVersion: '4'),
-      completes,
-    );
-  });
+      await expectLater(
+        tripRepository.setEntryMaster(
+          tripId: 'okinawa',
+          entryId: 11,
+          poiId: 502,
+          entryPoisVersion: '4',
+        ),
+        completes,
+      );
+    },
+  );
 
   test('addEntryAlternate：POST /alternates find-or-create（type 映射）', () async {
     dioAdapter.onPost(
       '/trips/okinawa/entries/11/alternates',
       (server) => server.reply(201, {'entryId': 11, 'poiId': 999}),
       data: {
-        'name': '通堂拉麵', 'lat': 26.2, 'lng': 127.6,
-        'type': 'restaurant', 'category': 'ramen_restaurant',
-        'address': '那霸市', 'rating': 4.1, 'source': 'search',
+        'name': '通堂拉麵',
+        'lat': 26.2,
+        'lng': 127.6,
+        'type': 'restaurant',
+        'category': 'ramen_restaurant',
+        'address': '那霸市',
+        'rating': 4.1,
+        'source': 'search',
         'entryPoisVersion': '4',
       },
     );
 
     await expectLater(
       tripRepository.addEntryAlternate(
-        tripId: 'okinawa', entryId: 11,
+        tripId: 'okinawa',
+        entryId: 11,
         poi: const PoiSearchResult(
-            placeId: 'p1', name: '通堂拉麵', address: '那霸市',
-            category: 'ramen_restaurant', lat: 26.2, lng: 127.6, rating: 4.1),
-        entryPoisVersion: '4'),
+          placeId: 'p1',
+          name: '通堂拉麵',
+          address: '那霸市',
+          category: 'ramen_restaurant',
+          lat: 26.2,
+          lng: 127.6,
+          rating: 4.1,
+        ),
+        entryPoisVersion: '4',
+      ),
       completes,
     );
   });
 
-  test('removeEntryAlternate：DELETE /alternates/:poiId?entryPoisVersion', () async {
-    dioAdapter.onDelete(
-      '/trips/okinawa/entries/11/alternates/502',
-      (server) => server.reply(200, {'entryId': 11, 'poiId': 502}),
-      queryParameters: {'entryPoisVersion': '4'},
-    );
+  test(
+    'removeEntryAlternate：DELETE /alternates/:poiId?entryPoisVersion',
+    () async {
+      dioAdapter.onDelete(
+        '/trips/okinawa/entries/11/alternates/502',
+        (server) => server.reply(200, {'entryId': 11, 'poiId': 502}),
+        queryParameters: {'entryPoisVersion': '4'},
+      );
 
-    await expectLater(
-      tripRepository.removeEntryAlternate(
-          tripId: 'okinawa', entryId: 11, poiId: 502, entryPoisVersion: '4'),
-      completes,
-    );
-  });
+      await expectLater(
+        tripRepository.removeEntryAlternate(
+          tripId: 'okinawa',
+          entryId: 11,
+          poiId: 502,
+          entryPoisVersion: '4',
+        ),
+        completes,
+      );
+    },
+  );
 
-  test('reorderEntryAlternates：PATCH /alternates/reorder order=poiId[]', () async {
-    dioAdapter.onPatch(
-      '/trips/okinawa/entries/11/alternates/reorder',
-      (server) => server.reply(200, {'entryId': 11, 'order': [503, 502]}),
-      data: {'order': [503, 502], 'entryPoisVersion': '4'},
-    );
+  test(
+    'reorderEntryAlternates：PATCH /alternates/reorder order=poiId[]',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa/entries/11/alternates/reorder',
+        (server) => server.reply(200, {
+          'entryId': 11,
+          'order': [503, 502],
+        }),
+        data: {
+          'order': [503, 502],
+          'entryPoisVersion': '4',
+        },
+      );
 
-    await expectLater(
-      tripRepository.reorderEntryAlternates(
-          tripId: 'okinawa', entryId: 11, order: [503, 502],
-          entryPoisVersion: '4'),
-      completes,
-    );
-  });
+      await expectLater(
+        tripRepository.reorderEntryAlternates(
+          tripId: 'okinawa',
+          entryId: 11,
+          order: [503, 502],
+          entryPoisVersion: '4',
+        ),
+        completes,
+      );
+    },
+  );
 
   test('updateEntryPoi：PATCH /pois/:poiId 只送有值欄位（無 OCC）', () async {
     dioAdapter.onPatch(
@@ -507,8 +595,12 @@ void main() {
 
     await expectLater(
       tripRepository.updateEntryPoi(
-          tripId: 'okinawa', entryId: 11, poiId: 501,
-          note: '記得訂位', poiType: 'restaurant'),
+        tripId: 'okinawa',
+        entryId: 11,
+        poiId: 501,
+        note: '記得訂位',
+        poiType: 'restaurant',
+      ),
       completes,
     );
   });
@@ -520,8 +612,11 @@ void main() {
       data: {'airline': 'IT', 'flight_no': 'IT232'},
     );
     await expectLater(
-      tripRepository.createNote(NoteSection.flights,
-          tripId: 'okinawa', fields: {'airline': 'IT', 'flight_no': 'IT232'}),
+      tripRepository.createNote(
+        NoteSection.flights,
+        tripId: 'okinawa',
+        fields: {'airline': 'IT', 'flight_no': 'IT232'},
+      ),
       completes,
     );
   });
@@ -533,9 +628,13 @@ void main() {
       data: {'title': '晚餐', 'expectedVersion': 2},
     );
     await expectLater(
-      tripRepository.updateNote(NoteSection.reservations,
-          tripId: 'okinawa', rowId: 5, fields: {'title': '晚餐'},
-          expectedVersion: 2),
+      tripRepository.updateNote(
+        NoteSection.reservations,
+        tripId: 'okinawa',
+        rowId: 5,
+        fields: {'title': '晚餐'},
+        expectedVersion: 2,
+      ),
       completes,
     );
   });
@@ -549,12 +648,18 @@ void main() {
       data: {'title': '晚餐', 'expectedVersion': 2},
     );
     await expectLater(
-      tripRepository.updateNote(NoteSection.reservations,
-          tripId: 'okinawa', rowId: 5, fields: {'title': '晚餐'},
-          expectedVersion: 2),
-      throwsA(isA<ApiError>()
-          .having((e) => e.status, 'status', 409)
-          .having((e) => e.code, 'code', 'STALE_ENTRY')),
+      tripRepository.updateNote(
+        NoteSection.reservations,
+        tripId: 'okinawa',
+        rowId: 5,
+        fields: {'title': '晚餐'},
+        expectedVersion: 2,
+      ),
+      throwsA(
+        isA<ApiError>()
+            .having((e) => e.status, 'status', 409)
+            .having((e) => e.code, 'code', 'STALE_ENTRY'),
+      ),
     );
   });
 
@@ -564,8 +669,11 @@ void main() {
       (server) => server.reply(200, {'ok': true}),
     );
     await expectLater(
-      tripRepository.deleteNote(NoteSection.emergency,
-          tripId: 'okinawa', rowId: 7),
+      tripRepository.deleteNote(
+        NoteSection.emergency,
+        tripId: 'okinawa',
+        rowId: 7,
+      ),
       completes,
     );
   });
@@ -582,8 +690,11 @@ void main() {
       },
     );
     await expectLater(
-      tripRepository.reorderNotes(NoteSection.flights, tripId: 'okinawa',
-          items: [(id: 11, sortOrder: 0), (id: 12, sortOrder: 1)]),
+      tripRepository.reorderNotes(
+        NoteSection.flights,
+        tripId: 'okinawa',
+        items: [(id: 11, sortOrder: 0), (id: 12, sortOrder: 1)],
+      ),
       completes,
     );
   });
@@ -632,7 +743,10 @@ void main() {
       (server) => server.reply(200, {'ok': true}),
       data: {'title': '新標題'},
     );
-    await expectLater(tripRepository.updateTrip('tokyo', title: '新標題'), completes);
+    await expectLater(
+      tripRepository.updateTrip('tokyo', title: '新標題'),
+      completes,
+    );
   });
 
   test('updateTrip：destinations 全量替換 + countries', () async {
@@ -651,7 +765,10 @@ void main() {
       tripRepository.updateTrip(
         'tokyo',
         countries: 'JP,KR',
-        destinations: const [DestinationInput(name: 'A'), DestinationInput(name: 'B')],
+        destinations: const [
+          DestinationInput(name: 'A'),
+          DestinationInput(name: 'B'),
+        ],
       ),
       completes,
     );

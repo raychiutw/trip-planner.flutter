@@ -7,19 +7,23 @@ import '../../models/entry.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
-import '../favorites/explore/explore_controller.dart' show poiRepositoryProvider;
+import '../favorites/explore/explore_controller.dart'
+    show poiRepositoryProvider;
 import 'trip_providers.dart';
 
 /// 地點管理全頁：正選切換、備選增刪、per-POI 備註/分類/訂位。
 /// OCC = entryPoisVersion（string）;每次操作後重抓 entryDetail 取最新 token。
 class EntryPoiScreen extends ConsumerWidget {
-  const EntryPoiScreen({super.key, required this.tripId, required this.entryId});
+  const EntryPoiScreen({
+    super.key,
+    required this.tripId,
+    required this.entryId,
+  });
 
   final String tripId;
   final int entryId;
 
-  ({String tripId, int entryId}) get _key =>
-      (tripId: tripId, entryId: entryId);
+  ({String tripId, int entryId}) get _key => (tripId: tripId, entryId: entryId);
 
   /// 跑一個 POI 操作 → 成功重抓 entryDetail + tripDays;409 重抓 + 提示。
   Future<void> _run(
@@ -33,19 +37,22 @@ class EntryPoiScreen extends ConsumerWidget {
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(success)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(success)));
     } on ApiError catch (error) {
       ref.invalidate(entryDetailProvider(_key));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(error.status == 409
-              ? '地點已更新，已重新載入'
-              : '操作失敗，請稍後再試')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試'),
+        ),
+      );
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('操作失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('操作失敗，請稍後再試')));
     }
   }
 
@@ -88,9 +95,12 @@ class EntryPoiScreen extends ConsumerWidget {
             ),
           )
         else
-          Text('尚無正選地點',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            '尚無正選地點',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         const SizedBox(height: TpSpacing.s5),
         Row(
           children: [
@@ -106,9 +116,12 @@ class EntryPoiScreen extends ConsumerWidget {
         ),
         const SizedBox(height: TpSpacing.s2),
         if (entry.alternates.isEmpty)
-          Text('尚無備選地點',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+          Text(
+            '尚無備選地點',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
         else
           for (final alt in entry.alternates)
             _PoiCard(
@@ -123,10 +136,11 @@ class EntryPoiScreen extends ConsumerWidget {
                       context,
                       ref,
                       () => repo.setEntryMaster(
-                          tripId: tripId,
-                          entryId: entryId,
-                          poiId: alt.poiId,
-                          entryPoisVersion: version),
+                        tripId: tripId,
+                        entryId: entryId,
+                        poiId: alt.poiId,
+                        entryPoisVersion: version,
+                      ),
                       success: '已設為正選',
                     ),
                     child: const Text('設為正選'),
@@ -139,10 +153,11 @@ class EntryPoiScreen extends ConsumerWidget {
                       context,
                       ref,
                       () => repo.removeEntryAlternate(
-                          tripId: tripId,
-                          entryId: entryId,
-                          poiId: alt.poiId,
-                          entryPoisVersion: version),
+                        tripId: tripId,
+                        entryId: entryId,
+                        poiId: alt.poiId,
+                        entryPoisVersion: version,
+                      ),
                       success: '已移除備選',
                     ),
                   ),
@@ -154,17 +169,22 @@ class EntryPoiScreen extends ConsumerWidget {
   }
 
   Future<void> _editPoiInfo(
-      BuildContext context, WidgetRef ref, EntryPoiInfo poi) async {
+    BuildContext context,
+    WidgetRef ref,
+    EntryPoiInfo poi,
+  ) async {
     final result =
         await showDialog<({String? note, String type, String? reservation})>(
-      context: context,
-      builder: (_) => _PoiInfoDialog(poi: poi),
-    );
+          context: context,
+          builder: (_) => _PoiInfoDialog(poi: poi),
+        );
     if (result == null || !context.mounted) return;
     await _run(
       context,
       ref,
-      () => ref.read(tripRepositoryProvider).updateEntryPoi(
+      () => ref
+          .read(tripRepositoryProvider)
+          .updateEntryPoi(
             tripId: tripId,
             entryId: entryId,
             poiId: poi.poiId,
@@ -177,13 +197,17 @@ class EntryPoiScreen extends ConsumerWidget {
   }
 
   Future<void> _addAlternate(
-      BuildContext context, WidgetRef ref, TimelineEntry entry) async {
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+  ) async {
     final selected = await showModalBottomSheet<PoiSearchResult>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
         child: const _AlternateSearchSheet(),
       ),
     );
@@ -191,11 +215,14 @@ class EntryPoiScreen extends ConsumerWidget {
     await _run(
       context,
       ref,
-      () => ref.read(tripRepositoryProvider).addEntryAlternate(
-          tripId: tripId,
-          entryId: entryId,
-          poi: selected,
-          entryPoisVersion: entry.entryPoisVersion),
+      () => ref
+          .read(tripRepositoryProvider)
+          .addEntryAlternate(
+            tripId: tripId,
+            entryId: entryId,
+            poi: selected,
+            entryPoisVersion: entry.entryPoisVersion,
+          ),
       success: '已加入備選',
     );
   }
@@ -203,8 +230,11 @@ class EntryPoiScreen extends ConsumerWidget {
 
 /// 正選/備選共用卡：名稱 + 分類 label + 評分 + 備註/訂位 + 尾端操作。
 class _PoiCard extends StatelessWidget {
-  const _PoiCard(
-      {required this.poi, required this.isMaster, required this.trailing});
+  const _PoiCard({
+    required this.poi,
+    required this.isMaster,
+    required this.trailing,
+  });
 
   final EntryPoiInfo poi;
   final bool isMaster;
@@ -230,29 +260,35 @@ class _PoiCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(poi.name ?? '未命名地點',
-                    style: theme.textTheme.bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  poi.name ?? '未命名地點',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 Text(
                   [
                     kPoiTypeLabels[poi.type] ?? 'POI',
-                    if (poi.rating != null) '★ ${poi.rating!.toStringAsFixed(1)}',
+                    if (poi.rating != null)
+                      '★ ${poi.rating!.toStringAsFixed(1)}',
                   ].join('  ·  '),
                   style: theme.textTheme.bodySmall?.copyWith(color: muted),
                 ),
                 if (poi.note != null && poi.note!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(poi.note!,
-                        style:
-                            theme.textTheme.bodyMedium?.copyWith(color: muted)),
+                    child: Text(
+                      poi.note!,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                    ),
                   ),
                 if (poi.reservation != null && poi.reservation!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text('訂位:${poi.reservation!}',
-                        style:
-                            theme.textTheme.bodySmall?.copyWith(color: muted)),
+                    child: Text(
+                      '訂位:${poi.reservation!}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    ),
                   ),
               ],
             ),
@@ -336,8 +372,9 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消')),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
         FilledButton(
           key: const ValueKey('poi-save'),
           onPressed: () {

@@ -81,7 +81,7 @@ Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
   );
   return ProviderScope(
     overrides: [
-      tripNotesProvider.overrideWith((ref, tripId) async => notes),
+      tripNotesProvider.overrideWith((ref, tripId) => Stream.value(notes)),
       if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -212,21 +212,27 @@ void main() {
 
   testWidgets('左滑 flight row → 確認 → deleteNote', (tester) async {
     final repo = _MockTripRepository();
-    when(() => repo.deleteNote(any(),
-            tripId: any(named: 'tripId'),
-            rowId: any(named: 'rowId'))).thenAnswer((_) async {});
+    when(
+      () => repo.deleteNote(
+        any(),
+        tripId: any(named: 'tripId'),
+        rowId: any(named: 'rowId'),
+      ),
+    ).thenAnswer((_) async {});
     await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
     await tester.pumpAndSettle();
 
     await tester.drag(
-        find.byKey(const ValueKey('note-dismiss-flights-1')),
-        const Offset(-500, 0));
+      find.byKey(const ValueKey('note-dismiss-flights-1')),
+      const Offset(-500, 0),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('刪除'));
     await tester.pumpAndSettle();
 
-    verify(() => repo.deleteNote(NoteSection.flights, tripId: 'trip-1', rowId: 1))
-        .called(1);
+    verify(
+      () => repo.deleteNote(NoteSection.flights, tripId: 'trip-1', rowId: 1),
+    ).called(1);
   });
 
   testWidgets('點「新增航班」→ 開 create sheet', (tester) async {

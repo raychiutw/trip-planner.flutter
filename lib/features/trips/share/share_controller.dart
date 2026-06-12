@@ -47,9 +47,12 @@ class ShareState {
       shares: shares ?? this.shares,
       error: error == _sentinel ? this.error : error as String?,
       creating: creating ?? this.creating,
-      revokingId: revokingId == _sentinel ? this.revokingId : revokingId as int?,
-      lastCreated:
-          lastCreated == _sentinel ? this.lastCreated : lastCreated as ShareLink?,
+      revokingId: revokingId == _sentinel
+          ? this.revokingId
+          : revokingId as int?,
+      lastCreated: lastCreated == _sentinel
+          ? this.lastCreated
+          : lastCreated as ShareLink?,
     );
   }
 
@@ -76,7 +79,11 @@ class ShareController extends Notifier<ShareState> {
       final shares = await _repo.fetchShares(tripId);
       if (_disposed) return;
       state = state.copyWith(
-          loading: false, canManage: true, shares: shares, error: null);
+        loading: false,
+        canManage: true,
+        shares: shares,
+        error: null,
+      );
     } on ApiError catch (e) {
       if (_disposed) return;
       state = e.status == 403
@@ -134,7 +141,5 @@ class ShareController extends Notifier<ShareState> {
   }
 }
 
-final shareControllerProvider =
-    NotifierProvider.autoDispose.family<ShareController, ShareState, String>(
-  ShareController.new,
-);
+final shareControllerProvider = NotifierProvider.autoDispose
+    .family<ShareController, ShareState, String>(ShareController.new);

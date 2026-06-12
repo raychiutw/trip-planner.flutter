@@ -72,8 +72,9 @@ class PoiFavoriteCard extends StatelessWidget {
                       favorite.note!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: mutedColor),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: mutedColor,
+                      ),
                     ),
                   ),
                 if (favorite.usages.isNotEmpty)

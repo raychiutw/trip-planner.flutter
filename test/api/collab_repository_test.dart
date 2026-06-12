@@ -14,7 +14,8 @@ void main() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
     repo = CollabRepository(
-        client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio));
+      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
+    );
   });
 
   test('fetchMembers：GET /permissions 裸陣列 → TripMember', () async {

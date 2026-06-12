@@ -35,9 +35,8 @@ class FavoritesScreen extends ConsumerWidget {
               ? const _EmptyHero()
               : _buildList(context, ref, favorites),
         ),
-        error: (error, stackTrace) => _ErrorState(
-          onRetry: () => ref.invalidate(favoritesProvider),
-        ),
+        error: (error, stackTrace) =>
+            _ErrorState(onRetry: () => ref.invalidate(favoritesProvider)),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
@@ -100,9 +99,9 @@ class FavoritesScreen extends ConsumerWidget {
       ref.invalidate(favoritesProvider);
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('取消收藏失敗，請稍後再試')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('取消收藏失敗，請稍後再試')));
     }
   }
 }

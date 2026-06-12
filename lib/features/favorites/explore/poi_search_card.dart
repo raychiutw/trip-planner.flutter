@@ -100,8 +100,9 @@ class PoiSearchCard extends StatelessWidget {
                         poi.address!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: mutedColor),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: mutedColor,
+                        ),
                       ),
                     ),
                   const Spacer(),

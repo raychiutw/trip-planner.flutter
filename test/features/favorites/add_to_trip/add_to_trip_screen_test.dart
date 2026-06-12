@@ -28,28 +28,39 @@ void main() {
   setUp(() {
     favRepo = _MockFavoritesRepository();
     tripRepo = _MockTripRepository();
-    when(tripRepo.fetchMyTrips).thenAnswer((_) async => _trips);
-    when(() => tripRepo.fetchDays('okinawa')).thenAnswer((_) async => _days);
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(_trips));
+    when(
+      () => tripRepo.watchDays('okinawa'),
+    ).thenAnswer((_) => Stream.value(_days));
   });
 
   group('isAddToTripTimeValid', () {
     test('end > start → true', () {
       expect(
-          isAddToTripTimeValid(const TimeOfDay(hour: 10, minute: 0),
-              const TimeOfDay(hour: 11, minute: 0)),
-          isTrue);
+        isAddToTripTimeValid(
+          const TimeOfDay(hour: 10, minute: 0),
+          const TimeOfDay(hour: 11, minute: 0),
+        ),
+        isTrue,
+      );
     });
     test('end == start → false', () {
       expect(
-          isAddToTripTimeValid(const TimeOfDay(hour: 10, minute: 0),
-              const TimeOfDay(hour: 10, minute: 0)),
-          isFalse);
+        isAddToTripTimeValid(
+          const TimeOfDay(hour: 10, minute: 0),
+          const TimeOfDay(hour: 10, minute: 0),
+        ),
+        isFalse,
+      );
     });
     test('end < start → false', () {
       expect(
-          isAddToTripTimeValid(const TimeOfDay(hour: 12, minute: 0),
-              const TimeOfDay(hour: 11, minute: 30)),
-          isFalse);
+        isAddToTripTimeValid(
+          const TimeOfDay(hour: 12, minute: 0),
+          const TimeOfDay(hour: 11, minute: 30),
+        ),
+        isFalse,
+      );
     });
   });
 
@@ -68,77 +79,111 @@ void main() {
     );
   }
 
-  testWidgets('favorite mode：選 trip/day(預設)→ 送出呼叫 addFavoriteToTrip',
-      (tester) async {
-    when(() => favRepo.addFavoriteToTrip(
-          favoriteId: any(named: 'favoriteId'),
-          tripId: any(named: 'tripId'),
-          dayNum: any(named: 'dayNum'),
-          startTime: any(named: 'startTime'),
-          endTime: any(named: 'endTime'),
-        )).thenAnswer((_) async {});
+  testWidgets('favorite mode：選 trip/day(預設)→ 送出呼叫 addFavoriteToTrip', (
+    tester,
+  ) async {
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
 
     await tester.pumpWidget(
-        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')));
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
 
-    verify(() => favRepo.addFavoriteToTrip(
+    verify(
+      () => favRepo.addFavoriteToTrip(
         favoriteId: 7,
         tripId: 'okinawa',
         dayNum: 1,
         startTime: any(named: 'startTime'),
-        endTime: any(named: 'endTime'))).called(1);
+        endTime: any(named: 'endTime'),
+      ),
+    ).called(1);
   });
 
   testWidgets('direct mode：送出呼叫 addEntryToDay(poiType 經映射)', (tester) async {
-    when(() => tripRepo.addEntryToDay(
-          tripId: any(named: 'tripId'),
-          dayNum: any(named: 'dayNum'),
-          title: any(named: 'title'),
-          poiType: any(named: 'poiType'),
-          lat: any(named: 'lat'),
-          lng: any(named: 'lng'),
-          startTime: any(named: 'startTime'),
-          endTime: any(named: 'endTime'),
-        )).thenAnswer((_) async {});
+    when(
+      () => tripRepo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
 
-    await tester.pumpWidget(buildApp(const AddToTripDirect(
-        poi: PoiSearchResult(
-            placeId: 'p1', name: '美麗海水族館',
-            category: 'aquarium', lat: 26.69, lng: 127.87))));
+    await tester.pumpWidget(
+      buildApp(
+        const AddToTripDirect(
+          poi: PoiSearchResult(
+            placeId: 'p1',
+            name: '美麗海水族館',
+            category: 'aquarium',
+            lat: 26.69,
+            lng: 127.87,
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
 
-    verify(() => tripRepo.addEntryToDay(
+    verify(
+      () => tripRepo.addEntryToDay(
         tripId: 'okinawa',
         dayNum: 1,
         title: '美麗海水族館',
-        poiType: 'activity', // aquarium → activity（mapGooglePrimaryTypeToPoiType）
+        poiType:
+            'activity', // aquarium → activity（mapGooglePrimaryTypeToPoiType）
         lat: 26.69,
         lng: 127.87,
         startTime: any(named: 'startTime'),
-        endTime: any(named: 'endTime'))).called(1);
+        endTime: any(named: 'endTime'),
+      ),
+    ).called(1);
   });
 
   testWidgets('favorite mode：409 → 顯示 ConflictDialog', (tester) async {
-    when(() => favRepo.addFavoriteToTrip(
-          favoriteId: any(named: 'favoriteId'),
-          tripId: any(named: 'tripId'),
-          dayNum: any(named: 'dayNum'),
-          startTime: any(named: 'startTime'),
-          endTime: any(named: 'endTime'),
-        )).thenThrow(const ApiError(
-      status: 409, code: 'CONFLICT', message: 'CONFLICT',
-      payload: {
-        'conflictWith': {'entryId': 5, 'time': '10:00-11:00', 'title': '午餐', 'dayNum': 1}
-      },
-    ));
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'CONFLICT',
+        message: 'CONFLICT',
+        payload: {
+          'conflictWith': {
+            'entryId': 5,
+            'time': '10:00-11:00',
+            'title': '午餐',
+            'dayNum': 1,
+          },
+        },
+      ),
+    );
 
     await tester.pumpWidget(
-        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')));
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
@@ -148,14 +193,16 @@ void main() {
   });
 
   testWidgets('trips 為空 → 送出鈕 disabled（不靜默 return）', (tester) async {
-    when(tripRepo.fetchMyTrips).thenAnswer((_) async => const []);
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(const []));
 
     await tester.pumpWidget(
-        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')));
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
     await tester.pumpAndSettle();
 
     final button = tester.widget<FilledButton>(
-        find.byKey(const ValueKey('add-to-trip-submit')));
+      find.byKey(const ValueKey('add-to-trip-submit')),
+    );
     expect(button.onPressed, isNull);
   });
 }

@@ -24,7 +24,8 @@ Future<void> showTravelEditSheet(
     isScrollControlled: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+      ),
       child: TravelEditSheet(tripId: tripId, segment: segment),
     ),
   );
@@ -33,7 +34,11 @@ Future<void> showTravelEditSheet(
 /// 交通方式編輯：開車/步行（後端打 Google 重算）、大眾運輸（手動填分鐘）。
 /// OCC = segment.version（expectedVersion）。
 class TravelEditSheet extends ConsumerStatefulWidget {
-  const TravelEditSheet({super.key, required this.tripId, required this.segment});
+  const TravelEditSheet({
+    super.key,
+    required this.tripId,
+    required this.segment,
+  });
 
   final String tripId;
   final TripSegment segment;
@@ -50,7 +55,8 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   @override
   void initState() {
     super.initState();
-    _mode = const {'driving', 'walking', 'transit'}.contains(widget.segment.mode)
+    _mode =
+        const {'driving', 'walking', 'transit'}.contains(widget.segment.mode)
         ? widget.segment.mode
         : 'driving';
     _min = TextEditingController(text: widget.segment.min?.toString() ?? '');
@@ -88,25 +94,29 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       ref.invalidate(tripSegmentsProvider(widget.tripId));
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已更新交通')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已更新交通')));
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripSegmentsProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('交通已更新，已重新載入')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('交通已更新，已重新載入')));
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
     }
   }
 
@@ -141,12 +151,17 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
                 controller: _min,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: '分鐘數', helperText: '大眾運輸需手動填寫'),
+                  labelText: '分鐘數',
+                  helperText: '大眾運輸需手動填寫',
+                ),
               )
             else
-              Text('開車／步行會自動重算時間與距離',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              Text(
+                '開車／步行會自動重算時間與距離',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             const SizedBox(height: TpSpacing.s5),
             FilledButton(
               key: const ValueKey('travel-submit'),

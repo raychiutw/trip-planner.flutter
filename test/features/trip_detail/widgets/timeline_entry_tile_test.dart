@@ -10,12 +10,14 @@ Future<void> pumpTile(
   bool isFirst = false,
   bool isLast = false,
 }) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(
-      body: TimelineEntryTile(entry: entry, isFirst: isFirst, isLast: isLast),
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: TimelineEntryTile(entry: entry, isFirst: isFirst, isLast: isLast),
+      ),
     ),
-  ));
+  );
 }
 
 Color dotColor(WidgetTester tester, int entryId) {
@@ -70,7 +72,9 @@ void main() {
       expect(dotColor(tester, 2), tones.pinkDeep);
     });
 
-    testWidgets('master 為 null → accentDeep;startTime 缺則用 time', (tester) async {
+    testWidgets('master 為 null → accentDeep;startTime 缺則用 time', (
+      tester,
+    ) async {
       await pumpTile(
         tester,
         const TimelineEntry(
@@ -87,16 +91,22 @@ void main() {
 
     testWidgets('有 onTap：點內容卡觸發 callback', (tester) async {
       var tapped = 0;
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: TimelineEntryTile(
-            entry: const TimelineEntry(
-                id: 11, sortOrder: 0, version: 1, title: '首里城'),
-            onTap: () => tapped++,
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: TimelineEntryTile(
+              entry: const TimelineEntry(
+                id: 11,
+                sortOrder: 0,
+                version: 1,
+                title: '首里城',
+              ),
+              onTap: () => tapped++,
+            ),
           ),
         ),
-      ));
+      );
       await tester.tap(find.text('首里城'));
       expect(tapped, 1);
     });

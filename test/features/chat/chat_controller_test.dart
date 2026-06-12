@@ -59,9 +59,9 @@ void main() {
           ),
         ),
         if (onDays != null)
-          tripDaysProvider.overrideWith((ref, tripId) async {
+          tripDaysProvider.overrideWith((ref, tripId) {
             onDays();
-            return <TripDay>[];
+            return Stream.value(<TripDay>[]);
           }),
       ],
     );

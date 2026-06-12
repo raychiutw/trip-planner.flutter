@@ -14,7 +14,8 @@ void main() {
     dio = Dio();
     adapter = DioAdapter(dio: dio);
     repo = ShareRepository(
-        client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio));
+      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
+    );
   });
 
   test('fetchShares：GET /trips/:id/shares → {shares}', () async {

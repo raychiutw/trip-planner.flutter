@@ -293,8 +293,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationThemeData(
         filled: true,
         fillColor: colorScheme.surfaceContainerLow,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
           borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1.5),
@@ -317,7 +319,9 @@ abstract final class AppTheme {
           final isSelected = states.contains(WidgetState.selected);
           return IconThemeData(
             size: 20,
-            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -326,7 +330,9 @@ abstract final class AppTheme {
             fontSize: 11,
             letterSpacing: 0,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
           );
         }),
       ),
@@ -339,9 +345,7 @@ abstract final class AppTheme {
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: colorScheme.onSurface,
         ),
-        shape: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant),
-        ),
+        shape: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
       ),
     );
   }

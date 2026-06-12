@@ -38,7 +38,9 @@ void main() {
       'url': '/s/tok123',
       'label': 'x',
     });
-    expect(l.fullUrl('https://trip-planner-dby.pages.dev'),
-        'https://trip-planner-dby.pages.dev/s/tok123');
+    expect(
+      l.fullUrl('https://trip-planner-dby.pages.dev'),
+      'https://trip-planner-dby.pages.dev/s/tok123',
+    );
   });
 }

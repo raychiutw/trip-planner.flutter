@@ -14,10 +14,24 @@ class FavoritesRepository {
   Future<List<PoiFavorite>> fetchFavorites() async {
     final responseBody = await _client.get('/poi-favorites');
     return (responseBody as List<dynamic>)
-        .map((favoriteJson) =>
-            PoiFavorite.fromJson(favoriteJson as Map<String, dynamic>))
+        .map(
+          (favoriteJson) =>
+              PoiFavorite.fromJson(favoriteJson as Map<String, dynamic>),
+        )
         .toList();
   }
+
+  /// GET /poi-favorites（SWR stream:stale→fresh）。
+  Stream<List<PoiFavorite>> watchFavorites() => _client
+      .getStream('/poi-favorites')
+      .map(
+        (body) => (body as List<dynamic>)
+            .map(
+              (favoriteJson) =>
+                  PoiFavorite.fromJson(favoriteJson as Map<String, dynamic>),
+            )
+            .toList(),
+      );
 
   /// DELETE /poi-favorites/:id（mutation，ApiClient 自動帶 CSRF Origin）。
   Future<void> deleteFavorite(int id) => _client.delete('/poi-favorites/$id');
@@ -35,14 +49,13 @@ class FavoritesRepository {
     required int dayNum,
     required String startTime,
     required String endTime,
-  }) =>
-      _client.post(
-        '/poi-favorites/$favoriteId/add-to-trip',
-        body: {
-          'tripId': tripId,
-          'dayNum': dayNum,
-          'startTime': startTime,
-          'endTime': endTime,
-        },
-      );
+  }) => _client.post(
+    '/poi-favorites/$favoriteId/add-to-trip',
+    body: {
+      'tripId': tripId,
+      'dayNum': dayNum,
+      'startTime': startTime,
+      'endTime': endTime,
+    },
+  );
 }

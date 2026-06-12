@@ -75,6 +75,18 @@ class ApiClient {
   Future<dynamic> delete(String path, {Map<String, dynamic>? query}) =>
       _send('DELETE', path, query: query);
 
+  /// SWR 讀取:先 emit 本機快取(stale,若有),再 emit `get()`(fresh / 離線回退 / 或 throw)。
+  /// 重用 get() 的 auth / 429 retry / write-through / 離線回退邏輯,故無需額外 try/catch:
+  /// 線上 HTTP 錯誤與「無快取離線」都會讓 stream 自然 emit error。
+  Stream<dynamic> getStream(String path, {Map<String, dynamic>? query}) async* {
+    final store = _cacheStore;
+    if (store != null) {
+      final cached = await store.readResponse(cacheKeyFor('GET', path, query));
+      if (cached != null) yield cached.data;
+    }
+    yield await get(path, query: query);
+  }
+
   /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
   static int parseRetryAfterSeconds(String? headerValue) {
     const maxWaitSeconds = 30;

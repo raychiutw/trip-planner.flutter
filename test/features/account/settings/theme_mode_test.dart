@@ -23,7 +23,8 @@ void main() {
   test('setMode：更新 state + 寫入 store', () async {
     final store = InMemorySettingsStore();
     final c = ProviderContainer(
-        overrides: [settingsStoreProvider.overrideWithValue(store)]);
+      overrides: [settingsStoreProvider.overrideWithValue(store)],
+    );
     addTearDown(c.dispose);
     c.listen(themeModeProvider, (_, _) {});
     await c.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
@@ -35,7 +36,8 @@ void main() {
     final store = InMemorySettingsStore();
     await store.write('theme_mode', 'dark');
     final c = ProviderContainer(
-        overrides: [settingsStoreProvider.overrideWithValue(store)]);
+      overrides: [settingsStoreProvider.overrideWithValue(store)],
+    );
     addTearDown(c.dispose);
     c.listen(themeModeProvider, (_, _) {});
     c.read(themeModeProvider); // 觸發 build + _load
