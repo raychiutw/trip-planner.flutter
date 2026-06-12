@@ -900,4 +900,78 @@ void main() {
       expect(emissions.last.single.displayTitle, 'fresh');
     });
   });
+
+  // entry 離線寫:證明 repo 建出正確 OfflineOp(type + daysKey),防 cache key mismatch。
+  group('離線 entry 寫入(樂觀入佇列 + patch days 快取)', () {
+    late InMemoryCacheStore cache;
+    late TripRepository repo;
+    setUp(() {
+      cache = InMemoryCacheStore();
+      repo = TripRepository(
+        client: ApiClient(
+          sessionStore: InMemorySessionStore(),
+          dio: dio,
+          cacheStore: cache,
+        ),
+      );
+    });
+    final daysKey = cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'});
+
+    test('addEntryToDay 離線 → 入佇列(entry.add)+ days 快取末端插入', () async {
+      await cache.writeResponse(daysKey, [
+        {'dayNum': 1, 'timeline': <dynamic>[]},
+      ]);
+      dioAdapter.onPost(
+        '/trips/okinawa/days/1/entries',
+        (server) => server.throws(
+          503,
+          DioException(
+            requestOptions: RequestOptions(
+              path: '/trips/okinawa/days/1/entries',
+            ),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+        data: Matchers.any,
+      );
+
+      await repo.addEntryToDay(tripId: 'okinawa', dayNum: 1, title: '新景點');
+
+      final q = await cache.readQueue();
+      expect(q.single.type, 'entry.add');
+      expect(q.single.cacheKey, daysKey);
+      final days = (await cache.readResponse(daysKey))!.data as List;
+      final timeline = (days.first as Map)['timeline'] as List;
+      expect(timeline, hasLength(1));
+      expect((timeline.first as Map)['title'], '新景點');
+    });
+
+    test('deleteEntry 離線 → 入佇列(entry.delete)+ days 快取移除', () async {
+      await cache.writeResponse(daysKey, [
+        {
+          'dayNum': 1,
+          'timeline': [
+            {'id': 77, 'title': '要刪的'},
+          ],
+        },
+      ]);
+      dioAdapter.onDelete(
+        '/trips/okinawa/entries/77',
+        (server) => server.throws(
+          503,
+          DioException(
+            requestOptions: RequestOptions(path: '/trips/okinawa/entries/77'),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+      );
+
+      await repo.deleteEntry(tripId: 'okinawa', entryId: 77);
+
+      final q = await cache.readQueue();
+      expect(q.single.type, 'entry.delete');
+      final days = (await cache.readResponse(daysKey))!.data as List;
+      expect((days.first as Map)['timeline'] as List, isEmpty);
+    });
+  });
 }
