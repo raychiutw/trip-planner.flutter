@@ -32,6 +32,27 @@ Object? applyOptimisticPatch(
 
 Map<String, dynamic> _asMap(Object? o) => Map<String, dynamic>.from(o as Map);
 
+/// 臨時負 id:正常路徑由 sendMutation 入佇列時注入 args(冪等、不碰撞);
+/// fallback 僅供直接呼叫 patcher。
+int _tempIdFrom(Map<String, dynamic> args) =>
+    (args['tempId'] as int?) ?? -DateTime.now().microsecondsSinceEpoch;
+
+/// 在 list 內找 id 相符的 Map row 並 merge [fields],其餘原樣;回新 list。
+List<dynamic> _replaceById(
+  List<dynamic> source,
+  Object? id,
+  Map<String, dynamic> fields,
+) => [
+  for (final r in source)
+    if (r is Map && r['id'] == id) {..._asMap(r), ...fields} else r,
+];
+
+/// 從 list 移除 id 相符的 Map row;回新 list。
+List<dynamic> _removeById(List<dynamic> source, Object? id) => [
+  for (final r in source)
+    if (!(r is Map && r['id'] == id)) r,
+];
+
 /// 在指定 dayNum 的 timeline 末端插入一筆樂觀 entry(臨時負 id)。
 Object? _entryAdd(Object? cached, Map<String, dynamic> args) {
   if (cached is! List) return cached;
@@ -59,13 +80,7 @@ Object? _entryUpdate(Object? cached, Map<String, dynamic> args) {
       if (day is Map && day['timeline'] is List)
         {
           ..._asMap(day),
-          'timeline': [
-            for (final e in (day['timeline'] as List))
-              if (e is Map && e['id'] == entryId)
-                {..._asMap(e), ...fields}
-              else
-                e,
-          ],
+          'timeline': _replaceById(day['timeline'] as List, entryId, fields),
         }
       else
         day,
@@ -81,10 +96,7 @@ Object? _entryDelete(Object? cached, Map<String, dynamic> args) {
       if (day is Map && day['timeline'] is List)
         {
           ..._asMap(day),
-          'timeline': [
-            for (final e in (day['timeline'] as List))
-              if (!(e is Map && e['id'] == entryId)) e,
-          ],
+          'timeline': _removeById(day['timeline'] as List, entryId),
         }
       else
         day,
@@ -92,10 +104,7 @@ Object? _entryDelete(Object? cached, Map<String, dynamic> args) {
 }
 
 Map<String, dynamic> _buildOptimisticEntry(Map<String, dynamic> args) {
-  // 臨時負 id:正常路徑由 sendMutation 在入佇列時產生並存進 args(冪等、不碰撞);
-  // 此處 fallback 僅供直接呼叫 patcher 的情況。PR-4 flush 成功後 evict+refetch 換 server id。
-  final tempId =
-      (args['tempId'] as int?) ?? -DateTime.now().microsecondsSinceEpoch;
+  final tempId = _tempIdFrom(args);
   final lat = args['lat'];
   final lng = args['lng'];
   return {
@@ -141,8 +150,7 @@ Map<String, dynamic> _entryUpdateFields(Map<String, dynamic> args) => {
 Object? _noteCreate(Object? cached, Map<String, dynamic> args) {
   if (cached is! Map) return cached;
   final sectionKey = args['sectionKey'] as String;
-  final tempId =
-      (args['tempId'] as int?) ?? -DateTime.now().microsecondsSinceEpoch;
+  final tempId = _tempIdFrom(args);
   final row = {
     'id': tempId,
     'sortOrder': _kOptimisticSortOrder,
@@ -160,16 +168,15 @@ Object? _noteCreate(Object? cached, Map<String, dynamic> args) {
 Object? _noteUpdate(Object? cached, Map<String, dynamic> args) {
   if (cached is! Map) return cached;
   final sectionKey = args['sectionKey'] as String;
-  final rowId = args['rowId'];
   final section = cached[sectionKey];
   if (section is! List) return cached;
-  final fields = _camelKeys(args['fields'] as Map);
   return {
     ..._asMap(cached),
-    sectionKey: [
-      for (final r in section)
-        if (r is Map && r['id'] == rowId) {..._asMap(r), ...fields} else r,
-    ],
+    sectionKey: _replaceById(
+      section,
+      args['rowId'],
+      _camelKeys(args['fields'] as Map),
+    ),
   };
 }
 
@@ -177,16 +184,9 @@ Object? _noteUpdate(Object? cached, Map<String, dynamic> args) {
 Object? _noteDelete(Object? cached, Map<String, dynamic> args) {
   if (cached is! Map) return cached;
   final sectionKey = args['sectionKey'] as String;
-  final rowId = args['rowId'];
   final section = cached[sectionKey];
   if (section is! List) return cached;
-  return {
-    ..._asMap(cached),
-    sectionKey: [
-      for (final r in section)
-        if (!(r is Map && r['id'] == rowId)) r,
-    ],
-  };
+  return {..._asMap(cached), sectionKey: _removeById(section, args['rowId'])};
 }
 
 Map<String, dynamic> _camelKeys(Map<dynamic, dynamic> src) => {

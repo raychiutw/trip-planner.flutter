@@ -286,20 +286,22 @@ class ApiClient {
     }
 
     final statusCode = response.statusCode ?? 0;
+    // 429 GET / 401 Bearer-refresh 共用的「同參數重送一次」。
+    Future<dynamic> retry() => _send(
+      method,
+      path,
+      query: query,
+      body: body,
+      cancelToken: cancelToken,
+      isRetryAttempt: true,
+      fallbackToCache: fallbackToCache,
+    );
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
       final waitSeconds = parseRetryAfterSeconds(
         response.headers.value('retry-after'),
       );
       await Future<void>.delayed(Duration(seconds: waitSeconds));
-      return _send(
-        method,
-        path,
-        query: query,
-        body: body,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-        fallbackToCache: fallbackToCache,
-      );
+      return retry();
     }
     // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
     if (statusCode == 401 &&
@@ -307,15 +309,7 @@ class ApiClient {
         !isRetryAttempt &&
         _bearerSource != null &&
         await _bearerSource.refresh()) {
-      return _send(
-        method,
-        path,
-        query: query,
-        body: body,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-        fallbackToCache: fallbackToCache,
-      );
+      return retry();
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);

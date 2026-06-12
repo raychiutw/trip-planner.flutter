@@ -39,27 +39,23 @@ class TripRepository {
     _ => s.name,
   };
 
+  // 一次性 fetch 與 SWR watch 共用的解析器(消成對重複)。
+  static T _one<T>(Object? body, T Function(Map<String, dynamic>) fromJson) =>
+      fromJson(body as Map<String, dynamic>);
+  static List<T> _list<T>(
+    Object? body,
+    T Function(Map<String, dynamic>) fromJson,
+  ) => (body as List<dynamic>)
+      .map((e) => fromJson(e as Map<String, dynamic>))
+      .toList();
+
   /// GET /my-trips。
-  Future<List<TripSummary>> fetchMyTrips() async {
-    final responseBody = await _client.get('/my-trips');
-    return (responseBody as List<dynamic>)
-        .map(
-          (tripJson) => TripSummary.fromJson(tripJson as Map<String, dynamic>),
-        )
-        .toList();
-  }
+  Future<List<TripSummary>> fetchMyTrips() async =>
+      _list(await _client.get('/my-trips'), TripSummary.fromJson);
 
   /// GET /my-trips（SWR stream:stale→fresh）。
-  Stream<List<TripSummary>> watchMyTrips() => _client
-      .getStream('/my-trips')
-      .map(
-        (body) => (body as List<dynamic>)
-            .map(
-              (tripJson) =>
-                  TripSummary.fromJson(tripJson as Map<String, dynamic>),
-            )
-            .toList(),
-      );
+  Stream<List<TripSummary>> watchMyTrips() =>
+      _client.getStream('/my-trips').map((b) => _list(b, TripSummary.fromJson));
 
   /// POST /trips（建立;body 混 camel + snake_case destinations）→ {tripId,...}。
   /// 後端自動建好每日 days + owner 權限;不回整列。
@@ -131,56 +127,44 @@ class TripRepository {
   }
 
   /// GET /trips（published 行程清單）。
-  Future<List<Trip>> fetchTrips() async {
-    final responseBody = await _client.get('/trips');
-    return (responseBody as List<dynamic>)
-        .map((tripJson) => Trip.fromJson(tripJson as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<Trip>> fetchTrips() async =>
+      _list(await _client.get('/trips'), Trip.fromJson);
 
   /// GET /trips/:id。
-  Future<Trip> fetchTrip(String id) async {
-    final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
-    return Trip.fromJson(responseBody as Map<String, dynamic>);
-  }
+  Future<Trip> fetchTrip(String id) async => _one(
+    await _client.get('/trips/${Uri.encodeComponent(id)}'),
+    Trip.fromJson,
+  );
 
   /// GET /trips/:id（SWR stream）。
   Stream<Trip> watchTrip(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}')
-      .map((body) => Trip.fromJson(body as Map<String, dynamic>));
+      .map((b) => _one(b, Trip.fromJson));
 
   /// GET /trips/:id/days?all=1（完整 timeline）。
-  Future<List<TripDay>> fetchDays(String id) async {
-    final responseBody = await _client.get(
+  Future<List<TripDay>> fetchDays(String id) async => _list(
+    await _client.get(
       '/trips/${Uri.encodeComponent(id)}/days',
       query: {'all': '1'},
-    );
-    return (responseBody as List<dynamic>)
-        .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
-        .toList();
-  }
+    ),
+    TripDay.fromJson,
+  );
 
   /// GET /trips/:id/days?all=1（SWR stream）。
   Stream<List<TripDay>> watchDays(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}/days', query: {'all': '1'})
-      .map(
-        (body) => (body as List<dynamic>)
-            .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
-            .toList(),
-      );
+      .map((b) => _list(b, TripDay.fromJson));
 
   /// GET /trips/:id/notes（5 區聚合）。
-  Future<TripNotes> fetchNotes(String id) async {
-    final responseBody = await _client.get(
-      '/trips/${Uri.encodeComponent(id)}/notes',
-    );
-    return TripNotes.fromJson(responseBody as Map<String, dynamic>);
-  }
+  Future<TripNotes> fetchNotes(String id) async => _one(
+    await _client.get('/trips/${Uri.encodeComponent(id)}/notes'),
+    TripNotes.fromJson,
+  );
 
   /// GET /trips/:id/notes（SWR stream）。
   Stream<TripNotes> watchNotes(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}/notes')
-      .map((body) => TripNotes.fromJson(body as Map<String, dynamic>));
+      .map((b) => _one(b, TripNotes.fromJson));
 
   /// POST /trips/:id/notes/{section}（建立筆記;body snake_case 欄位,5 區共用）。
   Future<void> createNote(
@@ -362,23 +346,16 @@ class TripRepository {
   }
 
   /// GET /trips/:id/segments（交通段;含 id/version 供編輯）。
-  Future<List<TripSegment>> fetchSegments({required String tripId}) async {
-    final body = await _client.get(
-      '/trips/${Uri.encodeComponent(tripId)}/segments',
-    );
-    return (body as List<dynamic>)
-        .map((e) => TripSegment.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<TripSegment>> fetchSegments({required String tripId}) async =>
+      _list(
+        await _client.get('/trips/${Uri.encodeComponent(tripId)}/segments'),
+        TripSegment.fromJson,
+      );
 
   /// GET /trips/:id/segments（SWR stream）。
   Stream<List<TripSegment>> watchSegments({required String tripId}) => _client
       .getStream('/trips/${Uri.encodeComponent(tripId)}/segments')
-      .map(
-        (body) => (body as List<dynamic>)
-            .map((e) => TripSegment.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+      .map((b) => _list(b, TripSegment.fromJson));
 
   /// PATCH /trips/:id/segments/:sid（mode driving/walking/transit;OCC expectedVersion）。
   /// transit 必帶 min;driving/walking 後端打 Google 重算(忽略 min)。
@@ -400,12 +377,10 @@ class TripRepository {
   Future<TimelineEntry> fetchEntry({
     required String tripId,
     required int entryId,
-  }) async {
-    final body = await _client.get(
-      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
-    );
-    return TimelineEntry.fromJson(body as Map<String, dynamic>);
-  }
+  }) async => _one(
+    await _client.get('/trips/${Uri.encodeComponent(tripId)}/entries/$entryId'),
+    TimelineEntry.fromJson,
+  );
 
   /// GET /trips/:id/entries/:eid（SWR stream）。
   Stream<TimelineEntry> watchEntry({
@@ -413,7 +388,7 @@ class TripRepository {
     required int entryId,
   }) => _client
       .getStream('/trips/${Uri.encodeComponent(tripId)}/entries/$entryId')
-      .map((body) => TimelineEntry.fromJson(body as Map<String, dynamic>));
+      .map((b) => _one(b, TimelineEntry.fromJson));
 
   /// PATCH /trips/:id/entries/:eid/master（設正選;OCC entryPoisVersion）。
   Future<void> setEntryMaster({
