@@ -1,6 +1,8 @@
 /// 離線快取持久化抽象與記憶體實作（沿用 SessionStore 慣例）。
 library;
 
+import 'dart:async';
+
 import 'cache_keys.dart';
 
 /// 一筆回應快取:原始 wire JSON + 寫入時間。
@@ -72,7 +74,10 @@ abstract class CacheStore {
   Future<void> appendMutation(QueuedMutation mutation);
   Future<void> removeMutation(String id);
 
-  /// 清回應快取 + 佇列(登出用)。
+  /// 佇列變動(append/remove/clear)事件流,供待同步筆數等 UI 反應式刷新。
+  Stream<void> get changes;
+
+  /// 清回應快取 + 佇列(登出 / 換帳號用)。
   Future<void> clear();
 }
 
@@ -80,6 +85,10 @@ abstract class CacheStore {
 class InMemoryCacheStore implements CacheStore {
   final Map<String, CacheEntry> _entries = {};
   final List<QueuedMutation> _queue = [];
+  final StreamController<void> _changes = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get changes => _changes.stream;
 
   @override
   Future<CacheEntry?> readResponse(String key) async => _entries[key];
@@ -105,16 +114,21 @@ class InMemoryCacheStore implements CacheStore {
   Future<List<QueuedMutation>> readQueue() async => List.unmodifiable(_queue);
 
   @override
-  Future<void> appendMutation(QueuedMutation mutation) async =>
-      _queue.add(mutation);
+  Future<void> appendMutation(QueuedMutation mutation) async {
+    _queue.add(mutation);
+    _changes.add(null);
+  }
 
   @override
-  Future<void> removeMutation(String id) async =>
-      _queue.removeWhere((m) => m.id == id);
+  Future<void> removeMutation(String id) async {
+    _queue.removeWhere((m) => m.id == id);
+    _changes.add(null);
+  }
 
   @override
   Future<void> clear() async {
     _entries.clear();
     _queue.clear();
+    _changes.add(null);
   }
 }

@@ -45,6 +45,16 @@ void main() {
     addTearDown(container.dispose);
   });
 
+  // offlinePendingCountProvider 是 StreamProvider(反應式),bare container 需有 listener
+  // 才會跑 generator;listen + pump microtask 後讀當前值。
+  Future<int> currentCount() async {
+    container.listen(offlinePendingCountProvider, (_, _) {});
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    return container.read(offlinePendingCountProvider).value ?? -1;
+  }
+
   test('sync 成功 → 佇列清空、count 歸零、無衝突', () async {
     await cache.appendMutation(mut('1'));
     adapter.onPost(
@@ -53,7 +63,7 @@ void main() {
       data: Matchers.any,
     );
     await container.read(offlineSyncControllerProvider.notifier).sync();
-    expect(await container.read(offlinePendingCountProvider.future), 0);
+    expect(await currentCount(), 0);
     expect(container.read(syncConflictsProvider), isEmpty);
   });
 
@@ -68,12 +78,22 @@ void main() {
     );
     await container.read(offlineSyncControllerProvider.notifier).sync();
     expect(container.read(syncConflictsProvider).map((m) => m.id), ['1']);
-    expect(await container.read(offlinePendingCountProvider.future), 0);
+    expect(await currentCount(), 0);
   });
 
   test('offlinePendingCountProvider 反映佇列筆數', () async {
     await cache.appendMutation(mut('1'));
     await cache.appendMutation(mut('2'));
-    expect(await container.read(offlinePendingCountProvider.future), 2);
+    expect(await currentCount(), 2);
+  });
+
+  test('入隊後 count 反應式更新(無需手動 invalidate)', () async {
+    container.listen(offlinePendingCountProvider, (_, _) {});
+    expect(await currentCount(), 0);
+    await cache.appendMutation(mut('x')); // 模擬離線寫入入隊
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(container.read(offlinePendingCountProvider).value, 1);
   });
 }

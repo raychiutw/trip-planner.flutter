@@ -196,9 +196,10 @@ class ApiClient {
           await store.removeMutation(m.id);
           synced++;
         } on ApiError catch (e) {
-          // 5xx 視為暫時失敗 → 中止保留佇列、下次再試(避免永久遺失離線編輯);
-          // 4xx(含 409 衝突)→ 上報並移除。
-          if (e.status >= 500) break;
+          // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
+          // → 中止保留佇列、待重試,避免永久遺失離線編輯;
+          // 其他 4xx(409 衝突 / 400 / 404 等永久無效)→ 上報並移除。
+          if (e.status >= 500 || e.status == 401 || e.status == 403) break;
           conflicts.add(m);
           await store.removeMutation(m.id);
         } on DioException catch (e) {
@@ -286,20 +287,22 @@ class ApiClient {
     }
 
     final statusCode = response.statusCode ?? 0;
+    // 429 GET / 401 Bearer-refresh 共用的「同參數重送一次」。
+    Future<dynamic> retry() => _send(
+      method,
+      path,
+      query: query,
+      body: body,
+      cancelToken: cancelToken,
+      isRetryAttempt: true,
+      fallbackToCache: fallbackToCache,
+    );
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
       final waitSeconds = parseRetryAfterSeconds(
         response.headers.value('retry-after'),
       );
       await Future<void>.delayed(Duration(seconds: waitSeconds));
-      return _send(
-        method,
-        path,
-        query: query,
-        body: body,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-        fallbackToCache: fallbackToCache,
-      );
+      return retry();
     }
     // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
     if (statusCode == 401 &&
@@ -307,15 +310,7 @@ class ApiClient {
         !isRetryAttempt &&
         _bearerSource != null &&
         await _bearerSource.refresh()) {
-      return _send(
-        method,
-        path,
-        query: query,
-        body: body,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-        fallbackToCache: fallbackToCache,
-      );
+      return retry();
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);
