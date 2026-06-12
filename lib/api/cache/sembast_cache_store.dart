@@ -1,6 +1,8 @@
 /// sembast-backed 永續快取（app 用;測試走 InMemoryCacheStore）。
 library;
 
+import 'dart:async';
+
 import 'package:sembast/sembast_io.dart';
 
 import 'cache_keys.dart';
@@ -18,6 +20,10 @@ class SembastCacheStore implements CacheStore {
       .store('response_cache');
   final StoreRef<int, Map<String, Object?>> _queueStore = intMapStoreFactory
       .store('mutation_queue');
+  final StreamController<void> _changes = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get changes => _changes.stream;
 
   @override
   Future<CacheEntry?> readResponse(String key) async {
@@ -66,6 +72,7 @@ class SembastCacheStore implements CacheStore {
   @override
   Future<void> appendMutation(QueuedMutation mutation) async {
     await _queueStore.add(_db, mutation.toMap());
+    _changes.add(null);
   }
 
   @override
@@ -74,11 +81,13 @@ class SembastCacheStore implements CacheStore {
       _db,
       finder: Finder(filter: Filter.equals('id', id)),
     );
+    _changes.add(null);
   }
 
   @override
   Future<void> clear() async {
     await _store.delete(_db);
     await _queueStore.delete(_db);
+    _changes.add(null);
   }
 }

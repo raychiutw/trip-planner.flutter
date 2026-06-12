@@ -65,8 +65,17 @@ final shareRepositoryProvider = Provider<ShareRepository>(
 
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
+  // 上次快取擁有者標記(存 cacheStore;隨 clear 一起清、登入後重建)。
+  static const _cacheOwnerKey = '__cache_owner__';
+
   @override
   Future<UserInfo?> build() async {
+    final user = await _resolveUser();
+    await _enforceCacheOwner(user);
+    return user;
+  }
+
+  Future<UserInfo?> _resolveUser() async {
     // OAuth 模式:有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。
     if (OAuthConfig.isConfigured) {
       final idToken =
@@ -85,6 +94,19 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       }
     }
     return ref.watch(authRepositoryProvider).currentUser();
+  }
+
+  /// 身分與上次快取擁有者不同(同裝置換帳號)→ 清離線快取 + 佇列,避免跨帳號外洩。
+  /// 同一帳號(含重新登入)則保留快取與待同步佇列。登出的清除由 logout() 負責。
+  Future<void> _enforceCacheOwner(UserInfo? user) async {
+    if (user == null) return;
+    final cache = ref.read(cacheStoreProvider);
+    final ownerId = '${user.id}|${user.email}';
+    final prev = (await cache.readResponse(_cacheOwnerKey))?.data;
+    if (prev != null && prev != ownerId) {
+      await cache.clear();
+    }
+    await cache.writeResponse(_cacheOwnerKey, ownerId);
   }
 
   Future<void> login(String email, String password) async {

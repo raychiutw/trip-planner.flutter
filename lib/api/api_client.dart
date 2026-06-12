@@ -196,9 +196,10 @@ class ApiClient {
           await store.removeMutation(m.id);
           synced++;
         } on ApiError catch (e) {
-          // 5xx 視為暫時失敗 → 中止保留佇列、下次再試(避免永久遺失離線編輯);
-          // 4xx(含 409 衝突)→ 上報並移除。
-          if (e.status >= 500) break;
+          // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
+          // → 中止保留佇列、待重試,避免永久遺失離線編輯;
+          // 其他 4xx(409 衝突 / 400 / 404 等永久無效)→ 上報並移除。
+          if (e.status >= 500 || e.status == 401 || e.status == 403) break;
           conflicts.add(m);
           await store.removeMutation(m.id);
         } on DioException catch (e) {

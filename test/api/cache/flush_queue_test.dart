@@ -145,6 +145,21 @@ void main() {
     expect(await cache.readQueue(), hasLength(1)); // 保留待重試
   });
 
+  test('401(認證未就緒,如 session 過期)→ 中止保留佇列、不當衝突 drop', () async {
+    await cache.appendMutation(addMut('1'));
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (s) => s.reply(401, {
+        'error': {'code': 'AUTH_NO_SESSION'},
+      }),
+      data: Matchers.any,
+    );
+    final r = await client.flushQueue();
+    expect(r.synced, 0);
+    expect(r.conflicts, isEmpty);
+    expect(await cache.readQueue(), hasLength(1)); // 保留,重新登入後可再送
+  });
+
   test('空佇列 → synced 0', () async {
     final r = await client.flushQueue();
     expect(r.synced, 0);
