@@ -84,6 +84,14 @@ class TripsListScreen extends ConsumerWidget {
             children: [
               const SizedBox(height: TpSpacing.s2),
               ListTile(
+                leading: const Icon(Icons.ios_share),
+                title: const Text('分享'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  context.push('/share-trip/${trip.tripId}');
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.group_outlined),
                 title: const Text('共編設定'),
                 onTap: () {
