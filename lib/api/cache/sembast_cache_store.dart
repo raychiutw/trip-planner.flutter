@@ -16,6 +16,8 @@ class SembastCacheStore implements CacheStore {
   final Database _db;
   final StoreRef<String, Map<String, Object?>> _store = stringMapStoreFactory
       .store('response_cache');
+  final StoreRef<int, Map<String, Object?>> _queueStore = intMapStoreFactory
+      .store('mutation_queue');
 
   @override
   Future<CacheEntry?> readResponse(String key) async {
@@ -50,5 +52,31 @@ class SembastCacheStore implements CacheStore {
   }
 
   @override
-  Future<void> clear() async => _store.delete(_db);
+  Future<List<QueuedMutation>> readQueue() async {
+    // key 為自增 int → 依 key 排序即插入序(= 重播序)。
+    final records = await _queueStore.find(
+      _db,
+      finder: Finder(sortOrders: [SortOrder(Field.key)]),
+    );
+    return records.map((r) => QueuedMutation.fromMap(r.value)).toList();
+  }
+
+  @override
+  Future<void> appendMutation(QueuedMutation mutation) async {
+    await _queueStore.add(_db, mutation.toMap());
+  }
+
+  @override
+  Future<void> removeMutation(String id) async {
+    await _queueStore.delete(
+      _db,
+      finder: Finder(filter: Filter.equals('id', id)),
+    );
+  }
+
+  @override
+  Future<void> clear() async {
+    await _store.delete(_db);
+    await _queueStore.delete(_db);
+  }
 }

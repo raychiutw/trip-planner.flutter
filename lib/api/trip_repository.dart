@@ -12,12 +12,21 @@ import '../models/segment.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
+import 'cache/cache_keys.dart';
+import 'cache/offline_op.dart';
 
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
   TripRepository({required ApiClient client}) : _client = client;
 
   final ApiClient _client;
+
+  /// days 快取 key(離線 entry 樂觀 patch 的目標)。
+  String _daysKey(String tripId) => cacheKeyFor(
+    'GET',
+    '/trips/${Uri.encodeComponent(tripId)}/days',
+    const {'all': '1'},
+  );
 
   /// GET /my-trips。
   Future<List<TripSummary>> fetchMyTrips() async {
@@ -232,7 +241,8 @@ class TripRepository {
     String? endTime,
     String source = 'user-explore',
   }) {
-    return _client.post(
+    return _client.sendMutation(
+      'POST',
       '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
       body: {
         'title': title,
@@ -244,6 +254,16 @@ class TripRepository {
         'end_time': endTime,
         'source': source,
       },
+      optimistic: OfflineOp('entry.add', _daysKey(tripId), {
+        'dayNum': dayNum,
+        'title': title,
+        'description': description,
+        'startTime': startTime,
+        'endTime': endTime,
+        'poiType': poiType,
+        'lat': lat,
+        'lng': lng,
+      }),
     );
   }
 
@@ -258,7 +278,8 @@ class TripRepository {
     String? startTime,
     String? endTime,
   }) {
-    return _client.patch(
+    return _client.sendMutation(
+      'PATCH',
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
       body: {
         'title': title,
@@ -267,13 +288,24 @@ class TripRepository {
         'end_time': endTime,
         'expectedVersion': expectedVersion,
       },
+      optimistic: OfflineOp('entry.update', _daysKey(tripId), {
+        'entryId': entryId,
+        'title': title,
+        'description': description,
+        'startTime': startTime,
+        'endTime': endTime,
+      }),
     );
   }
 
   /// DELETE /trips/:id/entries/:eid（後端回 200 {ok:true},忽略 body）。
   Future<void> deleteEntry({required String tripId, required int entryId}) {
-    return _client.delete(
+    return _client.sendMutation(
+      'DELETE',
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
+      optimistic: OfflineOp('entry.delete', _daysKey(tripId), {
+        'entryId': entryId,
+      }),
     );
   }
 
