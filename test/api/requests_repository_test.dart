@@ -16,43 +16,55 @@ void main() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
     repo = RequestsRepository(
-        client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio));
-  });
-
-  test('fetchRequests：GET /requests 解析 {items,hasMore} + query 帶 limit/sort',
-      () async {
-    dioAdapter.onGet(
-      '/requests',
-      (server) => server.reply(200, {
-        'items': [
-          {
-            'id': 1, 'tripId': 'okinawa', 'message': 'hi',
-            'status': 'completed', 'reply': '哈囉',
-          },
-        ],
-        'hasMore': true,
-      }),
-      queryParameters: {'tripId': 'okinawa', 'limit': '20', 'sort': 'desc'},
+      client: ApiClient(sessionStore: InMemorySessionStore(), dio: dio),
     );
-
-    final page = await repo.fetchRequests(tripId: 'okinawa');
-    expect(page.items.single.id, 1);
-    expect(page.items.single.reply, '哈囉');
-    expect(page.hasMore, isTrue);
   });
+
+  test(
+    'fetchRequests：GET /requests 解析 {items,hasMore} + query 帶 limit/sort',
+    () async {
+      dioAdapter.onGet(
+        '/requests',
+        (server) => server.reply(200, {
+          'items': [
+            {
+              'id': 1,
+              'tripId': 'okinawa',
+              'message': 'hi',
+              'status': 'completed',
+              'reply': '哈囉',
+            },
+          ],
+          'hasMore': true,
+        }),
+        queryParameters: {'tripId': 'okinawa', 'limit': '20', 'sort': 'desc'},
+      );
+
+      final page = await repo.fetchRequests(tripId: 'okinawa');
+      expect(page.items.single.id, 1);
+      expect(page.items.single.reply, '哈囉');
+      expect(page.hasMore, isTrue);
+    },
+  );
 
   test('fetchRequests：cursor 帶 before/beforeId', () async {
     dioAdapter.onGet(
       '/requests',
       (server) => server.reply(200, {'items': [], 'hasMore': false}),
       queryParameters: {
-        'tripId': 'okinawa', 'limit': '20', 'sort': 'desc',
-        'before': '2026-06-01', 'beforeId': '9',
+        'tripId': 'okinawa',
+        'limit': '20',
+        'sort': 'desc',
+        'before': '2026-06-01',
+        'beforeId': '9',
       },
     );
 
-    final page =
-        await repo.fetchRequests(tripId: 'okinawa', before: '2026-06-01', beforeId: 9);
+    final page = await repo.fetchRequests(
+      tripId: 'okinawa',
+      before: '2026-06-01',
+      beforeId: 9,
+    );
     expect(page.items, isEmpty);
     expect(page.hasMore, isFalse);
   });
@@ -61,7 +73,10 @@ void main() {
     dioAdapter.onPost(
       '/requests',
       (server) => server.reply(201, {
-        'id': 7, 'tripId': 'okinawa', 'message': '改午餐', 'status': 'open',
+        'id': 7,
+        'tripId': 'okinawa',
+        'message': '改午餐',
+        'status': 'open',
       }),
       data: {'tripId': 'okinawa', 'message': '改午餐'},
     );
@@ -75,8 +90,11 @@ void main() {
     dioAdapter.onGet(
       '/requests/7',
       (server) => server.reply(200, {
-        'id': 7, 'tripId': 'okinawa', 'message': '改午餐',
-        'status': 'completed', 'reply': '改好了',
+        'id': 7,
+        'tripId': 'okinawa',
+        'message': '改午餐',
+        'status': 'completed',
+        'reply': '改好了',
       }),
     );
 

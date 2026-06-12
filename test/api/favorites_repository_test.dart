@@ -56,50 +56,90 @@ void main() {
   test('addFavorite：POST /poi-favorites camelCase {poiId}', () async {
     dioAdapter.onPost(
       '/poi-favorites',
-      (server) => server.reply(201, {'id': 9, 'userId': 'u-1', 'poiId': 501,
-          'favoritedAt': '2026-06-11T00:00:00Z'}),
+      (server) => server.reply(201, {
+        'id': 9,
+        'userId': 'u-1',
+        'poiId': 501,
+        'favoritedAt': '2026-06-11T00:00:00Z',
+      }),
       data: {'poiId': 501},
     );
 
     await expectLater(favoritesRepository.addFavorite(501), completes);
   });
 
-  test('addFavoriteToTrip：POST /poi-favorites/:id/add-to-trip camelCase（201 成功）',
-      () async {
-    dioAdapter.onPost(
-      '/poi-favorites/7/add-to-trip',
-      (server) => server.reply(201, {
-        'ok': true, 'entryId': 11, 'dayId': 2, 'sortOrder': 0,
-        'startTime': '10:00', 'endTime': '11:00', 'note': '...',
-      }),
-      data: {'tripId': 'okinawa', 'dayNum': 1, 'startTime': '10:00', 'endTime': '11:00'},
-    );
+  test(
+    'addFavoriteToTrip：POST /poi-favorites/:id/add-to-trip camelCase（201 成功）',
+    () async {
+      dioAdapter.onPost(
+        '/poi-favorites/7/add-to-trip',
+        (server) => server.reply(201, {
+          'ok': true,
+          'entryId': 11,
+          'dayId': 2,
+          'sortOrder': 0,
+          'startTime': '10:00',
+          'endTime': '11:00',
+          'note': '...',
+        }),
+        data: {
+          'tripId': 'okinawa',
+          'dayNum': 1,
+          'startTime': '10:00',
+          'endTime': '11:00',
+        },
+      );
 
-    await expectLater(
-      favoritesRepository.addFavoriteToTrip(
-        favoriteId: 7, tripId: 'okinawa', dayNum: 1,
-        startTime: '10:00', endTime: '11:00'),
-      completes,
-    );
-  });
+      await expectLater(
+        favoritesRepository.addFavoriteToTrip(
+          favoriteId: 7,
+          tripId: 'okinawa',
+          dayNum: 1,
+          startTime: '10:00',
+          endTime: '11:00',
+        ),
+        completes,
+      );
+    },
+  );
 
   test('addFavoriteToTrip：409 → 拋 ApiError 帶 conflictWith payload', () async {
     dioAdapter.onPost(
       '/poi-favorites/7/add-to-trip',
       (server) => server.reply(409, {
         'error': 'CONFLICT',
-        'conflictWith': {'entryId': 5, 'time': '10:00-11:00', 'title': '午餐', 'dayNum': 1},
+        'conflictWith': {
+          'entryId': 5,
+          'time': '10:00-11:00',
+          'title': '午餐',
+          'dayNum': 1,
+        },
       }),
-      data: {'tripId': 'okinawa', 'dayNum': 1, 'startTime': '10:00', 'endTime': '11:00'},
+      data: {
+        'tripId': 'okinawa',
+        'dayNum': 1,
+        'startTime': '10:00',
+        'endTime': '11:00',
+      },
     );
 
     await expectLater(
       favoritesRepository.addFavoriteToTrip(
-        favoriteId: 7, tripId: 'okinawa', dayNum: 1,
-        startTime: '10:00', endTime: '11:00'),
-      throwsA(isA<ApiError>()
-          .having((e) => e.status, 'status', 409)
-          .having((e) => e.payload?['conflictWith'], 'conflictWith', isA<Map>())),
+        favoriteId: 7,
+        tripId: 'okinawa',
+        dayNum: 1,
+        startTime: '10:00',
+        endTime: '11:00',
+      ),
+      throwsA(
+        isA<ApiError>()
+            .having((e) => e.status, 'status', 409)
+            .having(
+              (e) => e.payload?['conflictWith'],
+              'conflictWith',
+              isA<Map>(),
+            ),
+      ),
     );
   });
 }

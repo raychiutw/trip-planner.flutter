@@ -5,12 +5,12 @@ library;
 enum RequestStatus { open, processing, completed, failed }
 
 RequestStatus parseRequestStatus(String? s) => switch (s) {
-      'completed' => RequestStatus.completed,
-      'failed' => RequestStatus.failed,
-      'open' => RequestStatus.open,
-      'processing' => RequestStatus.processing,
-      _ => RequestStatus.processing, // unknown 續 poll,不誤判終止
-    };
+  'completed' => RequestStatus.completed,
+  'failed' => RequestStatus.failed,
+  'open' => RequestStatus.open,
+  'processing' => RequestStatus.processing,
+  _ => RequestStatus.processing, // unknown 續 poll,不誤判終止
+};
 
 extension RequestStatusX on RequestStatus {
   bool get isTerminal =>
@@ -47,15 +47,15 @@ class TripRequest {
   final String? updatedAt;
 
   factory TripRequest.fromJson(Map<String, dynamic> json) => TripRequest(
-        id: (json['id'] as num).toInt(),
-        tripId: json['tripId'] as String? ?? '',
-        message: json['message'] as String? ?? '',
-        reply: json['reply'] as String?,
-        status: parseRequestStatus(json['status'] as String?),
-        submittedBy: json['submittedBy'] as String?,
-        submittedByDisplayName: json['submittedByDisplayName'] as String?,
-        processedBy: json['processedBy'] as String?,
-        createdAt: json['createdAt'] as String?,
-        updatedAt: json['updatedAt'] as String?,
-      );
+    id: (json['id'] as num).toInt(),
+    tripId: json['tripId'] as String? ?? '',
+    message: json['message'] as String? ?? '',
+    reply: json['reply'] as String?,
+    status: parseRequestStatus(json['status'] as String?),
+    submittedBy: json['submittedBy'] as String?,
+    submittedByDisplayName: json['submittedByDisplayName'] as String?,
+    processedBy: json['processedBy'] as String?,
+    createdAt: json['createdAt'] as String?,
+    updatedAt: json['updatedAt'] as String?,
+  );
 }

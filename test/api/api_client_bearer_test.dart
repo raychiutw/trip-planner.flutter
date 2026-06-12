@@ -28,10 +28,16 @@ void main() {
   test('Bearer 模式：送 Authorization,不送 Cookie/Origin', () async {
     final dio = Dio();
     late Map<String, dynamic> captured;
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      captured = o.headers;
-      h.resolve(Response(requestOptions: o, statusCode: 200, data: {'ok': true}));
-    }));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          captured = o.headers;
+          h.resolve(
+            Response(requestOptions: o, statusCode: 200, data: {'ok': true}),
+          );
+        },
+      ),
+    );
     final client = ApiClient(
       sessionStore: InMemorySessionStore(),
       dio: dio,
@@ -47,18 +53,24 @@ void main() {
   test('Bearer 401 → refresh 成功 → 帶新 token 重試一次 → 200', () async {
     final dio = Dio();
     var calls = 0;
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      calls++;
-      h.resolve(Response(
-        requestOptions: o,
-        statusCode: calls == 1 ? 401 : 200,
-        data: calls == 1
-            ? {
-                'error': {'code': 'AUTH', 'message': 'x'}
-              }
-            : {'ok': true},
-      ));
-    }));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          calls++;
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: calls == 1 ? 401 : 200,
+              data: calls == 1
+                  ? {
+                      'error': {'code': 'AUTH', 'message': 'x'},
+                    }
+                  : {'ok': true},
+            ),
+          );
+        },
+      ),
+    );
     final source = _FakeSource('old', refreshResult: true);
     final client = ApiClient(
       sessionStore: InMemorySessionStore(),
@@ -75,16 +87,22 @@ void main() {
   test('Bearer 401 → refresh 失敗 → 丟 ApiError(401),不重試', () async {
     final dio = Dio();
     var calls = 0;
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      calls++;
-      h.resolve(Response(
-        requestOptions: o,
-        statusCode: 401,
-        data: {
-          'error': {'code': 'AUTH', 'message': 'x'}
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          calls++;
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: 401,
+              data: {
+                'error': {'code': 'AUTH', 'message': 'x'},
+              },
+            ),
+          );
         },
-      ));
-    }));
+      ),
+    );
     final source = _FakeSource('old', refreshResult: false);
     final client = ApiClient(
       sessionStore: InMemorySessionStore(),
@@ -100,21 +118,29 @@ void main() {
     expect(calls, 1); // refresh 失敗 → 不重試
   });
 
-  test('無 bearerSource → cookie 模式（mutation 帶 Origin,不帶 Authorization）',
-      () async {
-    final dio = Dio();
-    late Map<String, dynamic> captured;
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      captured = o.headers;
-      h.resolve(Response(requestOptions: o, statusCode: 200, data: {'ok': true}));
-    }));
-    final store = InMemorySessionStore();
-    await store.write('sess');
-    final client = ApiClient(sessionStore: store, dio: dio);
+  test(
+    '無 bearerSource → cookie 模式（mutation 帶 Origin,不帶 Authorization）',
+    () async {
+      final dio = Dio();
+      late Map<String, dynamic> captured;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (o, h) {
+            captured = o.headers;
+            h.resolve(
+              Response(requestOptions: o, statusCode: 200, data: {'ok': true}),
+            );
+          },
+        ),
+      );
+      final store = InMemorySessionStore();
+      await store.write('sess');
+      final client = ApiClient(sessionStore: store, dio: dio);
 
-    await client.post('/x', body: const {});
-    expect(captured['Cookie'], 'tripline_session=sess');
-    expect(captured['Origin'], isNotNull);
-    expect(captured.containsKey('Authorization'), isFalse);
-  });
+      await client.post('/x', body: const {});
+      expect(captured['Cookie'], 'tripline_session=sess');
+      expect(captured['Origin'], isNotNull);
+      expect(captured.containsKey('Authorization'), isFalse);
+    },
+  );
 }

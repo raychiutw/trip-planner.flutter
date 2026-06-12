@@ -23,14 +23,28 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips() async {
     final responseBody = await _client.get('/my-trips');
     return (responseBody as List<dynamic>)
-        .map((tripJson) =>
-            TripSummary.fromJson(tripJson as Map<String, dynamic>))
+        .map(
+          (tripJson) => TripSummary.fromJson(tripJson as Map<String, dynamic>),
+        )
         .toList();
   }
 
+  /// GET /my-trips（SWR stream:stale→fresh）。
+  Stream<List<TripSummary>> watchMyTrips() => _client
+      .getStream('/my-trips')
+      .map(
+        (body) => (body as List<dynamic>)
+            .map(
+              (tripJson) =>
+                  TripSummary.fromJson(tripJson as Map<String, dynamic>),
+            )
+            .toList(),
+      );
+
   /// POST /trips（建立;body 混 camel + snake_case destinations）→ {tripId,...}。
   /// 後端自動建好每日 days + owner 權限;不回整列。
-  Future<({String tripId, int daysCreated, int destinationsCreated})> createTrip({
+  Future<({String tripId, int daysCreated, int destinationsCreated})>
+  createTrip({
     required String id,
     required String name,
     required String startDate,
@@ -43,19 +57,22 @@ class TripRepository {
     String lang = 'zh-TW',
     List<DestinationInput> destinations = const [],
   }) async {
-    final body = await _client.post('/trips', body: {
-      'id': id,
-      'name': name,
-      'startDate': startDate,
-      'endDate': endDate,
-      'title': ?title,
-      'description': ?description,
-      'countries': countries,
-      'published': published,
-      'data_source': dataSource,
-      'lang': lang,
-      'destinations': [for (final d in destinations) d.toJson()],
-    });
+    final body = await _client.post(
+      '/trips',
+      body: {
+        'id': id,
+        'name': name,
+        'startDate': startDate,
+        'endDate': endDate,
+        'title': ?title,
+        'description': ?description,
+        'countries': countries,
+        'published': published,
+        'data_source': dataSource,
+        'lang': lang,
+        'destinations': [for (final d in destinations) d.toJson()],
+      },
+    );
     final map = body as Map<String, dynamic>;
     return (
       tripId: map['tripId'] as String? ?? id,
@@ -77,17 +94,20 @@ class TripRepository {
     String? lang,
     List<DestinationInput>? destinations,
   }) async {
-    await _client.put('/trips/${Uri.encodeComponent(id)}', body: {
-      'name': ?name,
-      'title': ?title,
-      'description': ?description,
-      'countries': ?countries,
-      'published': ?published,
-      'data_source': ?dataSource,
-      'lang': ?lang,
-      if (destinations != null)
-        'destinations': [for (final d in destinations) d.toJson()],
-    });
+    await _client.put(
+      '/trips/${Uri.encodeComponent(id)}',
+      body: {
+        'name': ?name,
+        'title': ?title,
+        'description': ?description,
+        'countries': ?countries,
+        'published': ?published,
+        'data_source': ?dataSource,
+        'lang': ?lang,
+        if (destinations != null)
+          'destinations': [for (final d in destinations) d.toJson()],
+      },
+    );
   }
 
   /// GET /trips（published 行程清單）。
@@ -100,10 +120,14 @@ class TripRepository {
 
   /// GET /trips/:id。
   Future<Trip> fetchTrip(String id) async {
-    final responseBody =
-        await _client.get('/trips/${Uri.encodeComponent(id)}');
+    final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
     return Trip.fromJson(responseBody as Map<String, dynamic>);
   }
+
+  /// GET /trips/:id（SWR stream）。
+  Stream<Trip> watchTrip(String id) => _client
+      .getStream('/trips/${Uri.encodeComponent(id)}')
+      .map((body) => Trip.fromJson(body as Map<String, dynamic>));
 
   /// GET /trips/:id/days?all=1（完整 timeline）。
   Future<List<TripDay>> fetchDays(String id) async {
@@ -116,12 +140,27 @@ class TripRepository {
         .toList();
   }
 
+  /// GET /trips/:id/days?all=1（SWR stream）。
+  Stream<List<TripDay>> watchDays(String id) => _client
+      .getStream('/trips/${Uri.encodeComponent(id)}/days', query: {'all': '1'})
+      .map(
+        (body) => (body as List<dynamic>)
+            .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
+            .toList(),
+      );
+
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async {
-    final responseBody =
-        await _client.get('/trips/${Uri.encodeComponent(id)}/notes');
+    final responseBody = await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/notes',
+    );
     return TripNotes.fromJson(responseBody as Map<String, dynamic>);
   }
+
+  /// GET /trips/:id/notes（SWR stream）。
+  Stream<TripNotes> watchNotes(String id) => _client
+      .getStream('/trips/${Uri.encodeComponent(id)}/notes')
+      .map((body) => TripNotes.fromJson(body as Map<String, dynamic>));
 
   /// POST /trips/:id/notes/{section}（建立筆記;body snake_case 欄位,5 區共用）。
   Future<void> createNote(
@@ -249,11 +288,7 @@ class TripRepository {
       body: {
         'updates': [
           for (final u in updates)
-            {
-              'id': u.id,
-              'sort_order': u.sortOrder,
-              'day_id': ?u.dayId,
-            },
+            {'id': u.id, 'sort_order': u.sortOrder, 'day_id': ?u.dayId},
         ],
       },
     );
@@ -269,12 +304,22 @@ class TripRepository {
 
   /// GET /trips/:id/segments（交通段;含 id/version 供編輯）。
   Future<List<TripSegment>> fetchSegments({required String tripId}) async {
-    final body =
-        await _client.get('/trips/${Uri.encodeComponent(tripId)}/segments');
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/segments',
+    );
     return (body as List<dynamic>)
         .map((e) => TripSegment.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  /// GET /trips/:id/segments（SWR stream）。
+  Stream<List<TripSegment>> watchSegments({required String tripId}) => _client
+      .getStream('/trips/${Uri.encodeComponent(tripId)}/segments')
+      .map(
+        (body) => (body as List<dynamic>)
+            .map((e) => TripSegment.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 
   /// PATCH /trips/:id/segments/:sid（mode driving/walking/transit;OCC expectedVersion）。
   /// transit 必帶 min;driving/walking 後端打 Google 重算(忽略 min)。
@@ -287,11 +332,7 @@ class TripRepository {
   }) async {
     final body = await _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/segments/$segmentId',
-      body: {
-        'mode': mode,
-        'min': ?min,
-        'expectedVersion': ?expectedVersion,
-      },
+      body: {'mode': mode, 'min': ?min, 'expectedVersion': ?expectedVersion},
     );
     return TripSegment.fromJson(body as Map<String, dynamic>);
   }
@@ -301,10 +342,19 @@ class TripRepository {
     required String tripId,
     required int entryId,
   }) async {
-    final body = await _client
-        .get('/trips/${Uri.encodeComponent(tripId)}/entries/$entryId');
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
+    );
     return TimelineEntry.fromJson(body as Map<String, dynamic>);
   }
+
+  /// GET /trips/:id/entries/:eid（SWR stream）。
+  Stream<TimelineEntry> watchEntry({
+    required String tripId,
+    required int entryId,
+  }) => _client
+      .getStream('/trips/${Uri.encodeComponent(tripId)}/entries/$entryId')
+      .map((body) => TimelineEntry.fromJson(body as Map<String, dynamic>));
 
   /// PATCH /trips/:id/entries/:eid/master（設正選;OCC entryPoisVersion）。
   Future<void> setEntryMaster({
@@ -315,10 +365,7 @@ class TripRepository {
   }) {
     return _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/master',
-      body: {
-        'poiId': poiId,
-        'entryPoisVersion': ?entryPoisVersion,
-      },
+      body: {'poiId': poiId, 'entryPoisVersion': ?entryPoisVersion},
     );
   }
 
@@ -354,9 +401,7 @@ class TripRepository {
   }) {
     return _client.delete(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates/$poiId',
-      query: {
-        'entryPoisVersion': ?entryPoisVersion,
-      },
+      query: {'entryPoisVersion': ?entryPoisVersion},
     );
   }
 
@@ -369,10 +414,7 @@ class TripRepository {
   }) {
     return _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates/reorder',
-      body: {
-        'order': order,
-        'entryPoisVersion': ?entryPoisVersion,
-      },
+      body: {'order': order, 'entryPoisVersion': ?entryPoisVersion},
     );
   }
 
@@ -387,11 +429,7 @@ class TripRepository {
   }) {
     return _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/pois/$poiId',
-      body: {
-        'note': ?note,
-        'poi_type': ?poiType,
-        'reservation': ?reservation,
-      },
+      body: {'note': ?note, 'poi_type': ?poiType, 'reservation': ?reservation},
     );
   }
 

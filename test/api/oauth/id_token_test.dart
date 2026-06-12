@@ -8,7 +8,8 @@ String _seg(Map<String, dynamic> m) =>
 
 void main() {
   test('decodeIdTokenClaims：解出 payload claims', () {
-    final jwt = '${_seg({'alg': 'RS256'})}.'
+    final jwt =
+        '${_seg({'alg': 'RS256'})}.'
         '${_seg({'sub': 'u1', 'email': 'a@x.com', 'name': 'Amy', 'email_verified': true})}.sig';
     final claims = decodeIdTokenClaims(jwt);
     expect(claims['sub'], 'u1');

@@ -6,8 +6,8 @@ import 'package:tripline/theme/app_theme.dart';
 
 GoRouter buildShellRouter() {
   StatefulShellBranch probe(String path, String marker) => StatefulShellBranch(
-        routes: [GoRoute(path: path, builder: (_, _) => Text(marker))],
-      );
+    routes: [GoRoute(path: path, builder: (_, _) => Text(marker))],
+  );
   return GoRouter(
     initialLocation: '/chat',
     routes: [
@@ -29,10 +29,12 @@ GoRouter buildShellRouter() {
 void main() {
   group('AppShell 5-tab 導航', () {
     testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
-      await tester.pumpWidget(MaterialApp.router(
-        theme: AppTheme.light(),
-        routerConfig: buildShellRouter(),
-      ));
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: buildShellRouter(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // 初始 branch 0

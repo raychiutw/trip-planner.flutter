@@ -25,14 +25,19 @@ class PoiRepository {
         trimmedRegion != '全部地區') {
       query['region'] = trimmedRegion;
     }
-    final responseBody =
-        await _client.get('/poi-search', query: query, cancelToken: cancelToken);
-    final results = (responseBody as Map<String, dynamic>)['results']
-            as List<dynamic>? ??
+    final responseBody = await _client.get(
+      '/poi-search',
+      query: query,
+      cancelToken: cancelToken,
+    );
+    final results =
+        (responseBody as Map<String, dynamic>)['results'] as List<dynamic>? ??
         const [];
     return results
-        .map((poiJson) =>
-            PoiSearchResult.fromJson(poiJson as Map<String, dynamic>))
+        .map(
+          (poiJson) =>
+              PoiSearchResult.fromJson(poiJson as Map<String, dynamic>),
+        )
         .toList();
   }
 
@@ -48,16 +53,19 @@ class PoiRepository {
     String source = 'user-explore',
     String? placeId,
   }) async {
-    final responseBody = await _client.post('/pois/find-or-create', body: {
-      'name': name,
-      'type': type,
-      'lat': lat,
-      'lng': lng,
-      'address': address,
-      'category': category,
-      'source': source,
-      'place_id': placeId,
-    });
+    final responseBody = await _client.post(
+      '/pois/find-or-create',
+      body: {
+        'name': name,
+        'type': type,
+        'lat': lat,
+        'lng': lng,
+        'address': address,
+        'category': category,
+        'source': source,
+        'place_id': placeId,
+      },
+    );
     return ((responseBody as Map<String, dynamic>)['id'] as num).toInt();
   }
 }

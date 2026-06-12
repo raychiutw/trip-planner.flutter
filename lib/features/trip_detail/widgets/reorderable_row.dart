@@ -21,11 +21,13 @@ Future<void> confirmAndDelete(
       content: Text(message),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消')),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('取消'),
+        ),
         FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('刪除')),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('刪除'),
+        ),
       ],
     ),
   );
@@ -34,12 +36,14 @@ Future<void> confirmAndDelete(
     await delete();
     onSuccess();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('已刪除')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已刪除')));
   } on Exception {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
   }
 }
 
@@ -82,9 +86,11 @@ class ReorderDragHandle extends StatelessWidget {
       index: index,
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: Icon(Icons.drag_handle,
-            key: iconKey,
-            color: Theme.of(context).colorScheme.onSurfaceVariant),
+        child: Icon(
+          Icons.drag_handle,
+          key: iconKey,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }

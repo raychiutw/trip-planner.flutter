@@ -51,20 +51,27 @@ void main() {
     final mockAuth = _MockAuthRepository();
     final mockTrips = _MockTripRepository();
     when(() => mockAuth.currentUser()).thenAnswer((_) async => null);
-    when(() => mockAuth.login(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-        )).thenAnswer((_) async =>
-        const UserInfo(id: 'u1', email: 'ray@example.com'));
-    when(mockTrips.fetchMyTrips).thenAnswer((_) async => const <TripSummary>[]);
+    when(
+      () => mockAuth.login(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer(
+      (_) async => const UserInfo(id: 'u1', email: 'ray@example.com'),
+    );
+    when(
+      mockTrips.watchMyTrips,
+    ).thenAnswer((_) => Stream.value(const <TripSummary>[]));
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        authRepositoryProvider.overrideWithValue(mockAuth),
-        tripRepositoryProvider.overrideWithValue(mockTrips),
-      ],
-      child: const TriplineApp(),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(mockAuth),
+          tripRepositoryProvider.overrideWithValue(mockTrips),
+        ],
+        child: const TriplineApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -81,32 +88,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
-    verify(() => mockAuth.login(email: 'ray@example.com', password: 'secret'))
-        .called(1);
+    verify(
+      () => mockAuth.login(email: 'ray@example.com', password: 'secret'),
+    ).called(1);
   });
 
   testWidgets('B:已登入 清單→點卡片→時間軸→點筆記→筆記頁', (tester) async {
     final mockTrips = _MockTripRepository();
-    when(mockTrips.fetchMyTrips).thenAnswer((_) async => const [
-          TripSummary(
-            tripId: 'okinawa',
-            name: 'okinawa',
-            title: '沖繩家族之旅',
-            totalDays: 1,
-          ),
-        ]);
-    when(() => mockTrips.fetchTrip('okinawa')).thenAnswer((_) async => _trip);
-    when(() => mockTrips.fetchDays('okinawa')).thenAnswer((_) async => _days);
-    when(() => mockTrips.fetchNotes('okinawa'))
-        .thenAnswer((_) async => const TripNotes());
+    when(mockTrips.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
+        TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 1,
+        ),
+      ]),
+    );
+    when(
+      () => mockTrips.watchTrip('okinawa'),
+    ).thenAnswer((_) => Stream.value(_trip));
+    when(
+      () => mockTrips.watchDays('okinawa'),
+    ).thenAnswer((_) => Stream.value(_days));
+    when(
+      () => mockTrips.watchNotes('okinawa'),
+    ).thenAnswer((_) => Stream.value(const TripNotes()));
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        authStateProvider.overrideWith(_LoggedInAuthNotifier.new),
-        tripRepositoryProvider.overrideWithValue(mockTrips),
-      ],
-      child: const TriplineApp(),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(_LoggedInAuthNotifier.new),
+          tripRepositoryProvider.overrideWithValue(mockTrips),
+        ],
+        child: const TriplineApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // 清單

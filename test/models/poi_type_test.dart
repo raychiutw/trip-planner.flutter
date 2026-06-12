@@ -5,8 +5,14 @@ void main() {
   group('mapGooglePrimaryTypeToPoiType', () {
     test('whitelist 值原樣 passthrough', () {
       for (final t in [
-        'hotel', 'restaurant', 'shopping', 'parking',
-        'attraction', 'transport', 'activity', 'other',
+        'hotel',
+        'restaurant',
+        'shopping',
+        'parking',
+        'attraction',
+        'transport',
+        'activity',
+        'other',
       ]) {
         expect(mapGooglePrimaryTypeToPoiType(t), t);
       }

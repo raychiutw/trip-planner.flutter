@@ -92,12 +92,14 @@ void main() {
       final lightTheme = AppTheme.light();
       final navigationBarTheme = lightTheme.navigationBarTheme;
       expect(navigationBarTheme.indicatorColor, TpColorsLight.accentSubtle);
-      final selectedLabelStyle = navigationBarTheme.labelTextStyle!
-          .resolve({WidgetState.selected});
+      final selectedLabelStyle = navigationBarTheme.labelTextStyle!.resolve({
+        WidgetState.selected,
+      });
       expect(selectedLabelStyle!.fontSize, 11);
       expect(selectedLabelStyle.color, TpColorsLight.accent);
-      final selectedIconTheme =
-          navigationBarTheme.iconTheme!.resolve({WidgetState.selected});
+      final selectedIconTheme = navigationBarTheme.iconTheme!.resolve({
+        WidgetState.selected,
+      });
       expect(selectedIconTheme!.color, TpColorsLight.accent);
     });
 

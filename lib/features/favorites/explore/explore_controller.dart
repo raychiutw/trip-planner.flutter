@@ -49,7 +49,9 @@ class ExploreState {
         'food' => RegExp(r'restaurant|cafe|food|bar|bakery|餐|食').hasMatch(cat),
         'hotel' => RegExp(r'hotel|hostel|guest|inn|住宿|飯店').hasMatch(cat),
         'shopping' => RegExp(r'shop|mall|market|購物').hasMatch(cat),
-        'attraction' => RegExp(r'attract|museum|park|temple|景點|公園').hasMatch(cat),
+        'attraction' => RegExp(
+          r'attract|museum|park|temple|景點|公園',
+        ).hasMatch(cat),
         _ => false,
       };
     }).toList();
@@ -135,15 +137,24 @@ class ExploreController extends Notifier<ExploreState> {
       );
       if (seq != _requestSeq) return; // 過期結果丟棄
       state = state.copyWith(
-          results: results, searching: false, hasSearched: true);
+        results: results,
+        searching: false,
+        hasSearched: true,
+      );
     } on DioException catch (e) {
       if (CancelToken.isCancel(e) || seq != _requestSeq) return;
       state = state.copyWith(
-          searching: false, hasSearched: true, errorMessage: '搜尋失敗,請稍後再試');
+        searching: false,
+        hasSearched: true,
+        errorMessage: '搜尋失敗,請稍後再試',
+      );
     } on Exception {
       if (seq != _requestSeq) return;
       state = state.copyWith(
-          searching: false, hasSearched: true, errorMessage: '搜尋失敗,請稍後再試');
+        searching: false,
+        hasSearched: true,
+        errorMessage: '搜尋失敗,請稍後再試',
+      );
     }
   }
 
@@ -151,7 +162,8 @@ class ExploreController extends Notifier<ExploreState> {
   Future<void> toggleFavorite(PoiSearchResult poi) async {
     if (state.savingPlaceIds.contains(poi.placeId)) return;
     state = state.copyWith(
-        savingPlaceIds: {...state.savingPlaceIds, poi.placeId});
+      savingPlaceIds: {...state.savingPlaceIds, poi.placeId},
+    );
     try {
       final key = _savedKey(poi);
       final existingId = state.savedMap[key];
@@ -176,7 +188,8 @@ class ExploreController extends Notifier<ExploreState> {
       state = state.copyWith(errorMessage: '收藏操作失敗,請稍後再試');
     } finally {
       state = state.copyWith(
-          savingPlaceIds: {...state.savingPlaceIds}..remove(poi.placeId));
+        savingPlaceIds: {...state.savingPlaceIds}..remove(poi.placeId),
+      );
     }
   }
 

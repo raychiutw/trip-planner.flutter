@@ -113,8 +113,9 @@ void main() {
     expect(find.text('通知'), findsOneWidget);
     expect(find.text('即將推出'), findsOneWidget);
 
-    final notificationsTile =
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '通知'));
+    final notificationsTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '通知'),
+    );
     expect(notificationsTile.enabled, isFalse);
   });
 

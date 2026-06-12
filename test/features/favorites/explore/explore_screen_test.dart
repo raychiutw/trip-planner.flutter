@@ -26,24 +26,28 @@ void main() {
     poi = _MockPoiRepository();
     fav = _MockFavoritesRepository();
     when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
-    when(() => poi.searchPois(
-          q: any(named: 'q'),
-          limit: any(named: 'limit'),
-          region: any(named: 'region'),
-          cancelToken: any(named: 'cancelToken'),
-        )).thenAnswer((_) async => [
-          _poi('p1', '拉麵店', 'ramen_restaurant'),
-          _poi('p2', '首里城', 'tourist_attraction'),
-        ]);
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        _poi('p1', '拉麵店', 'ramen_restaurant'),
+        _poi('p2', '首里城', 'tourist_attraction'),
+      ],
+    );
   });
 
   Widget buildApp() => ProviderScope(
-        overrides: [
-          poiRepositoryProvider.overrideWithValue(poi),
-          favoritesRepositoryProvider.overrideWithValue(fav),
-        ],
-        child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
-      );
+    overrides: [
+      poiRepositoryProvider.overrideWithValue(poi),
+      favoritesRepositoryProvider.overrideWithValue(fav),
+    ],
+    child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
+  );
 
   testWidgets('進頁 auto-search seed → 顯示結果卡', (tester) async {
     await tester.pumpWidget(buildApp());
@@ -51,11 +55,14 @@ void main() {
 
     expect(find.text('探索'), findsOneWidget); // AppBar
     expect(find.byType(PoiSearchCard), findsNWidgets(2));
-    verify(() => poi.searchPois(
+    verify(
+      () => poi.searchPois(
         q: '東京',
         limit: any(named: 'limit'),
         region: any(named: 'region'),
-        cancelToken: any(named: 'cancelToken'))).called(1);
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   testWidgets('分類 chip「美食」→ 只剩拉麵店', (tester) async {
@@ -74,7 +81,10 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const ValueKey('explore-search-field')), 'a');
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      'a',
+    );
     await tester.tap(find.byKey(const ValueKey('explore-search-button')));
     await tester.pump();
 
@@ -82,15 +92,17 @@ void main() {
   });
 
   testWidgets('點 heart → 觸發 find-or-create + addFavorite', (tester) async {
-    when(() => poi.findOrCreatePoi(
-          name: any(named: 'name'),
-          type: any(named: 'type'),
-          lat: any(named: 'lat'),
-          lng: any(named: 'lng'),
-          address: any(named: 'address'),
-          category: any(named: 'category'),
-          placeId: any(named: 'placeId'),
-        )).thenAnswer((_) async => 501);
+    when(
+      () => poi.findOrCreatePoi(
+        name: any(named: 'name'),
+        type: any(named: 'type'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        address: any(named: 'address'),
+        category: any(named: 'category'),
+        placeId: any(named: 'placeId'),
+      ),
+    ).thenAnswer((_) async => 501);
     when(() => fav.addFavorite(any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(buildApp());
@@ -103,12 +115,14 @@ void main() {
   });
 
   testWidgets('搜尋無結果（query ≥2）→ 顯示「沒有找到」空狀態', (tester) async {
-    when(() => poi.searchPois(
-          q: any(named: 'q'),
-          limit: any(named: 'limit'),
-          region: any(named: 'region'),
-          cancelToken: any(named: 'cancelToken'),
-        )).thenAnswer((_) async => const []);
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => const []);
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

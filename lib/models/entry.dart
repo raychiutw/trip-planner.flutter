@@ -142,8 +142,10 @@ class TimelineEntry {
           ? null
           : EntryPoiInfo.fromJson(json['master'] as Map<String, dynamic>),
       alternates: (json['alternates'] as List<dynamic>? ?? [])
-          .map((alternateJson) =>
-              EntryPoiInfo.fromJson(alternateJson as Map<String, dynamic>))
+          .map(
+            (alternateJson) =>
+                EntryPoiInfo.fromJson(alternateJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

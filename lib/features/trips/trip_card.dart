@@ -57,8 +57,9 @@ class TripCard extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 trip.displayTitle.characters.first,
-                style: theme.textTheme.displaySmall
-                    ?.copyWith(color: coverForeground),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: coverForeground,
+                ),
               ),
             ),
             Padding(

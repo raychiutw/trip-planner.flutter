@@ -11,25 +11,30 @@ Future<void> pumpCard(
   VoidCallback? onTap,
   VoidCallback? onLongPress,
 }) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(
-      body: TripCard(
-        trip: trip,
-        tone: tone,
-        onTap: onTap,
-        onLongPress: onLongPress,
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: TripCard(
+          trip: trip,
+          tone: tone,
+          onTap: onTap,
+          onLongPress: onLongPress,
+        ),
       ),
     ),
-  ));
+  );
 }
 
 void main() {
   group('TripSummary.displayTitle', () {
     test('title 有值 → title(trim)', () {
       expect(
-        const TripSummary(tripId: 't', name: 'okinawa', title: '  沖繩  ')
-            .displayTitle,
+        const TripSummary(
+          tripId: 't',
+          name: 'okinawa',
+          title: '  沖繩  ',
+        ).displayTitle,
         '沖繩',
       );
     });
@@ -39,8 +44,11 @@ void main() {
         'okinawa',
       );
       expect(
-        const TripSummary(tripId: 't', name: 'okinawa', title: '   ')
-            .displayTitle,
+        const TripSummary(
+          tripId: 't',
+          name: 'okinawa',
+          title: '   ',
+        ).displayTitle,
         'okinawa',
       );
     });

@@ -26,13 +26,14 @@ void main() {
     dioAdapter = DioAdapter(dio: dio);
     sessionStore = InMemorySessionStore();
     final apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
-    authRepository =
-        AuthRepository(client: apiClient, sessionStore: sessionStore);
+    authRepository = AuthRepository(
+      client: apiClient,
+      sessionStore: sessionStore,
+    );
   });
 
   group('login', () {
-    test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo',
-        () async {
+    test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo', () async {
       dioAdapter.onPost(
         '/oauth/login',
         (server) => server.reply(
@@ -76,9 +77,11 @@ void main() {
 
       await expectLater(
         authRepository.login(email: 'ray@example.com', password: 'wrong'),
-        throwsA(isA<ApiError>()
-            .having((error) => error.status, 'status', 401)
-            .having((error) => error.code, 'code', 'LOGIN_INVALID')),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 401)
+              .having((error) => error.code, 'code', 'LOGIN_INVALID'),
+        ),
       );
       expect(await sessionStore.read(), isNull);
     });
@@ -86,10 +89,11 @@ void main() {
     test('200 但無 tripline_session cookie → 丟 ApiError', () async {
       dioAdapter.onPost(
         '/oauth/login',
-        (server) => server.reply(
-          200,
-          {'ok': true, 'userId': 'u1hex', 'email': 'ray@example.com'},
-        ),
+        (server) => server.reply(200, {
+          'ok': true,
+          'userId': 'u1hex',
+          'email': 'ray@example.com',
+        }),
         data: {'email': 'ray@example.com', 'password': 'secret'},
       );
 

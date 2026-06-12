@@ -115,8 +115,9 @@ class _ProfileHero extends StatelessWidget {
           backgroundColor: tones.accentBg,
           child: Text(
             resolvedName.characters.first.toUpperCase(),
-            style: theme.textTheme.headlineMedium
-                ?.copyWith(color: tones.accentDeep),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: tones.accentDeep,
+            ),
           ),
         ),
         const SizedBox(height: TpSpacing.s3),
@@ -124,8 +125,9 @@ class _ProfileHero extends StatelessWidget {
         const SizedBox(height: TpSpacing.s1),
         Text(
           user.email,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         if (!user.emailVerified) ...[
           const SizedBox(height: TpSpacing.s2),
@@ -160,10 +162,9 @@ class _UnverifiedChip extends StatelessWidget {
           const SizedBox(width: TpSpacing.s1),
           Text(
             'Email 未驗證',
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: warningColor),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: warningColor),
           ),
         ],
       ),
@@ -254,8 +255,9 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: TpSpacing.s1),
           Text(
             label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -280,8 +282,9 @@ class _SettingsGroup extends StatelessWidget {
           ),
           child: Text(
             '設定',
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         Card(
@@ -340,8 +343,9 @@ class _ComingSoonRow extends StatelessWidget {
       title: Text(title),
       trailing: Text(
         '即將推出',
-        style: theme.textTheme.labelMedium
-            ?.copyWith(color: theme.disabledColor),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.disabledColor,
+        ),
       ),
     );
   }

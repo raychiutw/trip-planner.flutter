@@ -19,7 +19,10 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(theme: AppTheme.light(), home: const AppearanceScreen()),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const AppearanceScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -29,7 +32,9 @@ void main() {
 
     expect(container.read(themeModeProvider), ThemeMode.dark);
     // 深色列出現打勾
-    final darkTile = tester.widget<ListTile>(find.byKey(const ValueKey('theme-dark')));
+    final darkTile = tester.widget<ListTile>(
+      find.byKey(const ValueKey('theme-dark')),
+    );
     expect(darkTile.trailing, isA<Icon>());
   });
 }

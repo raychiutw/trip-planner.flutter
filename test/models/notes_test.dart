@@ -32,7 +32,11 @@ void main() {
     });
 
     test('文字欄位缺漏時預設空字串', () {
-      final flight = TripFlight.fromJson({'id': 2, 'sortOrder': 1, 'version': 1});
+      final flight = TripFlight.fromJson({
+        'id': 2,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(flight.airline, '');
       expect(flight.flightNo, '');
@@ -73,7 +77,11 @@ void main() {
     });
 
     test('dayId nullable、文字欄位缺漏預設空字串', () {
-      final lodging = TripLodging.fromJson({'id': 12, 'sortOrder': 2, 'version': 1});
+      final lodging = TripLodging.fromJson({
+        'id': 12,
+        'sortOrder': 2,
+        'version': 1,
+      });
 
       expect(lodging.dayId, isNull);
       expect(lodging.name, '');
@@ -107,8 +115,11 @@ void main() {
     });
 
     test('partySize 缺漏預設 0、kind 缺漏預設 restaurant', () {
-      final reservation =
-          TripReservation.fromJson({'id': 22, 'sortOrder': 1, 'version': 1});
+      final reservation = TripReservation.fromJson({
+        'id': 22,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(reservation.partySize, 0);
       expect(reservation.kind, 'restaurant');
@@ -166,8 +177,11 @@ void main() {
     });
 
     test('kind 缺漏預設 other、aiGenerated 缺漏預設 false', () {
-      final contact =
-          TripEmergencyContact.fromJson({'id': 42, 'sortOrder': 1, 'version': 1});
+      final contact = TripEmergencyContact.fromJson({
+        'id': 42,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(contact.kind, 'other');
       expect(contact.aiGenerated, isFalse);
@@ -221,12 +235,13 @@ void main() {
   group('toEditFields（edit 預填用,snake_case key）', () {
     test('TripFlight', () {
       const flight = TripFlight(
-          id: 1,
-          sortOrder: 0,
-          version: 1,
-          airline: 'IT',
-          flightNo: 'IT232',
-          departAt: '2026-04-23T08:30');
+        id: 1,
+        sortOrder: 0,
+        version: 1,
+        airline: 'IT',
+        flightNo: 'IT232',
+        departAt: '2026-04-23T08:30',
+      );
       final fields = flight.toEditFields();
       expect(fields['airline'], 'IT');
       expect(fields['flight_no'], 'IT232');
@@ -236,13 +251,14 @@ void main() {
 
     test('TripReservation（含 enum kind + int party_size）', () {
       const reservation = TripReservation(
-          id: 5,
-          sortOrder: 0,
-          version: 2,
-          kind: 'experience',
-          title: '潛水',
-          partySize: 4,
-          reservationNo: 'R-1');
+        id: 5,
+        sortOrder: 0,
+        version: 2,
+        kind: 'experience',
+        title: '潛水',
+        partySize: 4,
+        reservationNo: 'R-1',
+      );
       final fields = reservation.toEditFields();
       expect(fields['kind'], 'experience');
       expect(fields['title'], '潛水');

@@ -7,12 +7,13 @@ import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
 import 'poi_search_card.dart';
 
-const List<String> _popularRegions = [
-  '全部地區', '沖繩', '東京', '京都', '首爾', '台北',
-];
+const List<String> _popularRegions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
 const List<(String, String)> _categoryChips = [
-  ('all', '為你推薦'), ('attraction', '景點'), ('food', '美食'),
-  ('hotel', '住宿'), ('shopping', '購物'),
+  ('all', '為你推薦'),
+  ('attraction', '景點'),
+  ('food', '美食'),
+  ('hotel', '住宿'),
+  ('shopping', '購物'),
 ];
 final Map<String, String> _categoryLabels = {
   for (final (key, label) in _categoryChips) key: label,
@@ -95,11 +96,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(exploreControllerProvider);
 
-    ref.listen(exploreControllerProvider.select((s) => s.errorMessage),
-        (prev, next) {
+    ref.listen(exploreControllerProvider.select((s) => s.errorMessage), (
+      prev,
+      next,
+    ) {
       if (next != null && next != prev) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(next)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next)));
       }
     });
 
@@ -109,7 +113,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
-                TpSpacing.s4, TpSpacing.s2, TpSpacing.s4, 0),
+              TpSpacing.s4,
+              TpSpacing.s2,
+              TpSpacing.s4,
+              0,
+            ),
             child: Align(
               alignment: Alignment.centerLeft,
               child: _regionPill(state.region),
@@ -253,5 +261,4 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       },
     );
   }
-
 }

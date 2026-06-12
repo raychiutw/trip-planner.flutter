@@ -110,13 +110,15 @@ class _TripMapViewState extends State<_TripMapView> {
       final lat = entry.master?.lat;
       final lng = entry.master?.lng;
       if (lat == null || lng == null) continue;
-      dayPins.add(_DayPin(
-        dayIndex: dayIndex,
-        dayNum: day.dayNum,
-        pinNumber: dayPins.length + 1,
-        entry: entry,
-        point: LatLng(lat, lng),
-      ));
+      dayPins.add(
+        _DayPin(
+          dayIndex: dayIndex,
+          dayNum: day.dayNum,
+          pinNumber: dayPins.length + 1,
+          entry: entry,
+          point: LatLng(lat, lng),
+        ),
+      );
     }
     return dayPins;
   }
@@ -158,8 +160,8 @@ class _TripMapViewState extends State<_TripMapView> {
         child: Text(
           '此行程尚無地點座標',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -252,9 +254,9 @@ class _TripMapViewState extends State<_TripMapView> {
       mapController: _mapController,
       options: MapOptions(
         initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(
-            [for (final pin in allPins) pin.point],
-          ),
+          bounds: LatLngBounds.fromPoints([
+            for (final pin in allPins) pin.point,
+          ]),
           padding: const EdgeInsets.all(TpSpacing.s10),
           maxZoom: 16,
         ),
@@ -270,9 +272,7 @@ class _TripMapViewState extends State<_TripMapView> {
           markers: [for (final pin in visiblePins) _buildMarker(pin)],
         ),
         RichAttributionWidget(
-          attributions: [
-            TextSourceAttribution('OpenStreetMap contributors'),
-          ],
+          attributions: [TextSourceAttribution('OpenStreetMap contributors')],
         ),
       ],
     );
@@ -333,8 +333,9 @@ class _TripMapViewState extends State<_TripMapView> {
     final theme = Theme.of(context);
     final timeText = pin.entry.startTime ?? pin.entry.time ?? '--:--';
     // 總覽模式加 D{N} 前綴標示所屬日。
-    final timeLabel =
-        _selectedTabIndex == 0 ? 'D${pin.dayNum} · $timeText' : timeText;
+    final timeLabel = _selectedTabIndex == 0
+        ? 'D${pin.dayNum} · $timeText'
+        : timeText;
 
     return SizedBox(
       width: 220,

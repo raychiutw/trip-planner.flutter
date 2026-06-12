@@ -21,8 +21,10 @@ void main() {
   setUp(() {
     authRepo = _MockAuthRepo();
     tripRepo = _MockTripRepo();
-    when(() => authRepo.currentUser()).thenAnswer((_) async =>
-        const UserInfo(id: '1', email: 'me@x.com', displayName: '舊名字'));
+    when(() => authRepo.currentUser()).thenAnswer(
+      (_) async =>
+          const UserInfo(id: '1', email: 'me@x.com', displayName: '舊名字'),
+    );
   });
 
   Widget buildApp() {
@@ -30,8 +32,9 @@ void main() {
       initialLocation: '/settings/profile',
       routes: [
         GoRoute(
-            path: '/settings/profile',
-            builder: (_, _) => const ProfileEditScreen()),
+          path: '/settings/profile',
+          builder: (_, _) => const ProfileEditScreen(),
+        ),
       ],
     );
     return ProviderScope(
@@ -44,16 +47,21 @@ void main() {
   }
 
   testWidgets('帶入目前名稱 + 改名儲存 → updateProfile', (tester) async {
-    when(() => tripRepo.updateProfile(displayName: any(named: 'displayName')))
-        .thenAnswer((_) async =>
-            const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'));
+    when(
+      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+    ).thenAnswer(
+      (_) async =>
+          const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'),
+    );
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.text('舊名字'), findsOneWidget); // 帶入初值
 
     await tester.enterText(
-        find.byKey(const ValueKey('profile-display-name')), '新名字');
+      find.byKey(const ValueKey('profile-display-name')),
+      '新名字',
+    );
     await tester.tap(find.byKey(const ValueKey('profile-save')));
     await tester.pumpAndSettle();
 

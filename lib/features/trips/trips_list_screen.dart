@@ -7,9 +7,9 @@ import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
 
-/// `GET /my-trips` 清單（本畫面專屬 scope；刪除後 invalidate refresh）。
-final myTripsProvider = FutureProvider<List<TripSummary>>((ref) {
-  return ref.watch(tripRepositoryProvider).fetchMyTrips();
+/// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
+final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
+  return ref.watch(tripRepositoryProvider).watchMyTrips();
 });
 
 /// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 下拉更新 + 單欄卡片清單。

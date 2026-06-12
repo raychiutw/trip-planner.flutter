@@ -46,7 +46,7 @@ void main() {
   setUp(() {
     reqRepo = _MockRequestsRepo();
     tripRepo = _MockTripRepo();
-    when(tripRepo.fetchMyTrips).thenAnswer((_) async => _trips);
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(_trips));
     // 預設聊天串為空(各測試可覆寫)。
     when(
       () => reqRepo.fetchRequests(
@@ -163,7 +163,7 @@ void main() {
   });
 
   testWidgets('my-trips 空 → 「先建立行程」提示', (tester) async {
-    when(tripRepo.fetchMyTrips).thenAnswer((_) async => const []);
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(const []));
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -173,11 +173,11 @@ void main() {
   });
 
   testWidgets('下拉切換行程 → 新行程的工單被載入', (tester) async {
-    when(tripRepo.fetchMyTrips).thenAnswer(
-      (_) async => const [
+    when(tripRepo.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
         TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
         TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
-      ],
+      ]),
     );
 
     await tester.pumpWidget(buildApp());
@@ -214,7 +214,12 @@ void main() {
       if (calls == 1) throw Exception('boom');
       return (
         items: [
-          _req(id: 1, message: 'q', status: RequestStatus.completed, reply: '好了'),
+          _req(
+            id: 1,
+            message: 'q',
+            status: RequestStatus.completed,
+            reply: '好了',
+          ),
         ],
         hasMore: false,
       );

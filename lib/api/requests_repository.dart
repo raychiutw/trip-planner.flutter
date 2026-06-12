@@ -18,13 +18,16 @@ class RequestsRepository {
     String? before,
     int? beforeId,
   }) async {
-    final body = await _client.get('/requests', query: {
-      'tripId': tripId,
-      'limit': '$limit',
-      'sort': sort,
-      'before': ?before,
-      'beforeId': ?beforeId?.toString(),
-    });
+    final body = await _client.get(
+      '/requests',
+      query: {
+        'tripId': tripId,
+        'limit': '$limit',
+        'sort': sort,
+        'before': ?before,
+        'beforeId': ?beforeId?.toString(),
+      },
+    );
     final map = body as Map<String, dynamic>;
     final items = (map['items'] as List<dynamic>? ?? [])
         .map((e) => TripRequest.fromJson(e as Map<String, dynamic>))

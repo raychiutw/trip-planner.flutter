@@ -23,8 +23,10 @@ class SequencedResponseAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     recordedRequests.add(options);
-    final responseIndex =
-        (recordedRequests.length - 1).clamp(0, scriptedResponses.length - 1);
+    final responseIndex = (recordedRequests.length - 1).clamp(
+      0,
+      scriptedResponses.length - 1,
+    );
     return scriptedResponses[responseIndex];
   }
 
@@ -32,8 +34,11 @@ class SequencedResponseAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-ResponseBody jsonResponseBody(int statusCode, Object? body,
-    {Map<String, List<String>>? extraHeaders}) {
+ResponseBody jsonResponseBody(
+  int statusCode,
+  Object? body, {
+  Map<String, List<String>>? extraHeaders,
+}) {
   return ResponseBody.fromString(
     jsonEncode(body),
     statusCode,
@@ -56,28 +61,32 @@ void main() {
     dioAdapter = DioAdapter(dio: dio);
     sessionStore = InMemorySessionStore();
     recordedRequests = [];
-    dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        recordedRequests.add(options);
-        handler.next(options);
-      },
-    ));
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          recordedRequests.add(options);
+          handler.next(options);
+        },
+      ),
+    );
     apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
   });
 
   group('規則 1：Cookie header', () {
-    test('store 有 token 時每個 request 帶 Cookie: tripline_session=<token>',
-        () async {
-      await sessionStore.write('token123');
-      dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
+    test(
+      'store 有 token 時每個 request 帶 Cookie: tripline_session=<token>',
+      () async {
+        await sessionStore.write('token123');
+        dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
 
-      await apiClient.get('/my-trips');
+        await apiClient.get('/my-trips');
 
-      expect(
-        recordedRequests.single.headers['Cookie'],
-        'tripline_session=token123',
-      );
-    });
+        expect(
+          recordedRequests.single.headers['Cookie'],
+          'tripline_session=token123',
+        );
+      },
+    );
 
     test('store 無 token 時不帶 Cookie header', () async {
       dioAdapter.onGet('/my-trips', (server) => server.reply(200, []));
@@ -120,9 +129,11 @@ void main() {
 
       await expectLater(
         apiClient.get('/trips/missing'),
-        throwsA(isA<ApiError>()
-            .having((error) => error.status, 'status', 404)
-            .having((error) => error.code, 'code', 'DATA_NOT_FOUND')),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 404)
+              .having((error) => error.code, 'code', 'DATA_NOT_FOUND'),
+        ),
       );
     });
 
@@ -142,8 +153,10 @@ void main() {
         ]),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final retryingClient =
-          ApiClient(sessionStore: sessionStore, dio: sequencedDio);
+      final retryingClient = ApiClient(
+        sessionStore: sessionStore,
+        dio: sequencedDio,
+      );
 
       final responseBody = await retryingClient.get('/my-trips');
 
@@ -174,8 +187,10 @@ void main() {
         ),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final retryingClient =
-          ApiClient(sessionStore: sessionStore, dio: sequencedDio);
+      final retryingClient = ApiClient(
+        sessionStore: sessionStore,
+        dio: sequencedDio,
+      );
 
       await expectLater(
         retryingClient.get('/my-trips'),
@@ -198,8 +213,10 @@ void main() {
         jsonResponseBody(200, {'ok': true}),
       ]);
       final sequencedDio = Dio()..httpClientAdapter = sequencedAdapter;
-      final nonRetryingClient =
-          ApiClient(sessionStore: sessionStore, dio: sequencedDio);
+      final nonRetryingClient = ApiClient(
+        sessionStore: sessionStore,
+        dio: sequencedDio,
+      );
 
       await expectLater(
         nonRetryingClient.post('/trips', body: {'id': 't1'}),
@@ -208,8 +225,7 @@ void main() {
       expect(sequencedAdapter.recordedRequests, hasLength(1));
     });
 
-    test('parseRetryAfterSeconds：delta-seconds、cap 30s、HTTP-date、無效值',
-        () {
+    test('parseRetryAfterSeconds：delta-seconds、cap 30s、HTTP-date、無效值', () {
       expect(ApiClient.parseRetryAfterSeconds('5'), 5);
       expect(ApiClient.parseRetryAfterSeconds('0'), 0);
       expect(ApiClient.parseRetryAfterSeconds('120'), 30);

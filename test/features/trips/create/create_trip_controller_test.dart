@@ -24,7 +24,10 @@ void main() {
   }
 
   CreateTripController ctrl(ProviderContainer c) {
-    c.listen(createTripControllerProvider, (_, _) {}); // keep alive (autoDispose)
+    c.listen(
+      createTripControllerProvider,
+      (_, _) {},
+    ); // keep alive (autoDispose)
     return c.read(createTripControllerProvider.notifier);
   }
 

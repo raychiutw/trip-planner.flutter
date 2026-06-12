@@ -34,7 +34,10 @@ sealed class AddToTripArgs {
 
 /// 從收藏進：已有 favorite id。
 class AddToTripFavorite extends AddToTripArgs {
-  const AddToTripFavorite({required this.favoriteId, required this.displayName});
+  const AddToTripFavorite({
+    required this.favoriteId,
+    required this.displayName,
+  });
   final int favoriteId;
   final String displayName;
 }

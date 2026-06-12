@@ -4,10 +4,12 @@ import 'package:tripline/features/favorites/poi_rating_label.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 Future<void> _pump(WidgetTester tester, double rating) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(body: PoiRatingLabel(rating: rating)),
-  ));
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: PoiRatingLabel(rating: rating)),
+    ),
+  );
 }
 
 void main() {

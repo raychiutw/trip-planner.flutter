@@ -34,9 +34,10 @@ class CollabRepository {
     required String tripId,
     required String email,
     String role = 'member',
-  }) =>
-      _client.post('/permissions',
-          body: {'email': email, 'tripId': tripId, 'role': role});
+  }) => _client.post(
+    '/permissions',
+    body: {'email': email, 'tripId': tripId, 'role': role},
+  );
 
   /// PATCH /permissions/:id(只接受 member|viewer)。
   Future<void> changeRole(int permissionId, String role) =>
@@ -48,6 +49,8 @@ class CollabRepository {
 
   /// POST /invitations/revoke(撤銷待接受邀請)。
   Future<void> revokeInvite({required String tripId, required String email}) =>
-      _client.post('/invitations/revoke',
-          body: {'tripId': tripId, 'email': email});
+      _client.post(
+        '/invitations/revoke',
+        body: {'tripId': tripId, 'email': email},
+      );
 }

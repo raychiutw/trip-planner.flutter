@@ -59,10 +59,7 @@ void main() {
         'id': 'should-not-use',
         'name': '沖繩',
       });
-      final tripWithIdOnly = Trip.fromJson({
-        'id': 'kyoto-trip',
-        'name': '京都',
-      });
+      final tripWithIdOnly = Trip.fromJson({'id': 'kyoto-trip', 'name': '京都'});
 
       expect(tripWithTripId.id, 'okinawa-trip-2026-Ray');
       expect(tripWithIdOnly.id, 'kyoto-trip');

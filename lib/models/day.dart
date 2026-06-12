@@ -91,8 +91,10 @@ class TripDay {
           ? null
           : DayHotel.fromJson(json['hotel'] as Map<String, dynamic>),
       timeline: (json['timeline'] as List<dynamic>? ?? [])
-          .map((entryJson) =>
-              TimelineEntry.fromJson(entryJson as Map<String, dynamic>))
+          .map(
+            (entryJson) =>
+                TimelineEntry.fromJson(entryJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

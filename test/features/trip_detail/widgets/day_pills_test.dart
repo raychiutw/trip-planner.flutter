@@ -26,16 +26,18 @@ void main() {
   group('DayPills 渲染與互動', () {
     testWidgets('渲染 N 個 pill,點擊回呼該 dayNum', (tester) async {
       int? selectedDayNum;
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: DayPills(
-            days: _days,
-            activeDayNum: 1,
-            onDaySelected: (dayNum) => selectedDayNum = dayNum,
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: DayPills(
+              days: _days,
+              activeDayNum: 1,
+              onDaySelected: (dayNum) => selectedDayNum = dayNum,
+            ),
           ),
         ),
-      ));
+      );
 
       expect(find.text('DAY 01'), findsOneWidget);
       expect(find.text('DAY 02'), findsOneWidget);

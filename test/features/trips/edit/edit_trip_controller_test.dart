@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
-import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trips/edit/edit_trip_controller.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/trip.dart';
@@ -33,17 +32,17 @@ void main() {
   setUp(() => repo = _MockTripRepo());
 
   ProviderContainer makeC([Trip trip = _trip]) {
+    // 表單種子走一次性 fetchTrip(非 SWR stream)。
+    when(() => repo.fetchTrip(any())).thenAnswer((_) async => trip);
     final c = ProviderContainer(
-      overrides: [
-        tripRepositoryProvider.overrideWithValue(repo),
-        tripDetailProvider.overrideWith((ref, id) async => trip),
-      ],
+      overrides: [tripRepositoryProvider.overrideWithValue(repo)],
     );
     addTearDown(c.dispose);
     return c;
   }
 
   Future<EditTripController> loaded(ProviderContainer c) async {
+    // 持續 listener 讓 autoDispose controller 撐過 async _load。
     c.listen(editTripControllerProvider('okinawa'), (_, _) {});
     final ctrl = c.read(editTripControllerProvider('okinawa').notifier);
     await _flush();

@@ -142,10 +142,11 @@ class _TimelineBodyState extends State<_TimelineBody> {
               children: [
                 for (final day in widget.days)
                   _DaySection(
-                      key: _daySectionKeys[day.dayNum],
-                      day: day,
-                      allDays: widget.days,
-                      tripId: widget.tripId),
+                    key: _daySectionKeys[day.dayNum],
+                    day: day,
+                    allDays: widget.days,
+                    tripId: widget.tripId,
+                  ),
               ],
             ),
           ),
@@ -157,7 +158,10 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
 /// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
 List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
-    List<int> entryIds, int oldIndex, int newIndex) {
+  List<int> entryIds,
+  int oldIndex,
+  int newIndex,
+) {
   return [
     for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
       (id: u.id, sortOrder: u.sortOrder, dayId: null),
@@ -178,7 +182,10 @@ class _DaySection extends ConsumerWidget {
   final List<TripDay> allDays;
 
   Future<void> _confirmDelete(
-      BuildContext context, WidgetRef ref, TimelineEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+  ) {
     return confirmAndDelete(
       context,
       title: '刪除停留點',
@@ -191,16 +198,24 @@ class _DaySection extends ConsumerWidget {
   }
 
   Future<void> _reorder(
-      BuildContext context, WidgetRef ref, int oldIndex, int newIndex) async {
+    BuildContext context,
+    WidgetRef ref,
+    int oldIndex,
+    int newIndex,
+  ) async {
     final updates = computeReorderUpdates(
-        [for (final e in day.timeline) e.id], oldIndex, newIndex);
+      [for (final e in day.timeline) e.id],
+      oldIndex,
+      newIndex,
+    );
     final repo = ref.read(tripRepositoryProvider);
     try {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -210,7 +225,10 @@ class _DaySection extends ConsumerWidget {
   }
 
   Future<void> _moveToDay(
-      BuildContext context, WidgetRef ref, TimelineEntry entry) async {
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+  ) async {
     final targets = allDays.where((d) => d.dayNum != day.dayNum).toList();
     if (targets.isEmpty) return;
     final targetDayId = await showModalBottomSheet<int>(
@@ -234,13 +252,17 @@ class _DaySection extends ConsumerWidget {
     final target = allDays.firstWhere((d) => d.id == targetDayId);
     final repo = ref.read(tripRepositoryProvider);
     try {
-      await repo.reorderEntries(tripId: tripId, updates: [
-        (id: entry.id, sortOrder: target.timeline.length, dayId: targetDayId),
-      ]);
+      await repo.reorderEntries(
+        tripId: tripId,
+        updates: [
+          (id: entry.id, sortOrder: target.timeline.length, dayId: targetDayId),
+        ],
+      );
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -248,8 +270,9 @@ class _DaySection extends ConsumerWidget {
     ref.invalidate(tripDaysProvider(tripId));
     await _recomputeAndRefresh(ref);
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
     }
   }
 
@@ -296,8 +319,11 @@ class _DaySection extends ConsumerWidget {
                 if (i > 0 && entry.travel != null)
                   _TravelRow(
                     travel: entry.travel!,
-                    segment:
-                        _findSegment(segments, timeline[i - 1].id, entry.id),
+                    segment: _findSegment(
+                      segments,
+                      timeline[i - 1].id,
+                      entry.id,
+                    ),
                     tripId: tripId,
                   ),
                 SwipeToDelete(
@@ -307,8 +333,11 @@ class _DaySection extends ConsumerWidget {
                     entry: entry,
                     isFirst: i == 0,
                     isLast: i == timeline.length - 1,
-                    onTap: () => showEntryEditSheet(context,
-                        tripId: tripId, args: EntryEditExisting(entry)),
+                    onTap: () => showEntryEditSheet(
+                      context,
+                      tripId: tripId,
+                      args: EntryEditExisting(entry),
+                    ),
                     trailing: _EntryTrailing(
                       entryId: entry.id,
                       index: i,
@@ -325,8 +354,11 @@ class _DaySection extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             key: ValueKey('add-entry-${day.dayNum}'),
-            onPressed: () => showEntryEditSheet(context,
-                tripId: tripId, args: EntryEditNew(day.dayNum)),
+            onPressed: () => showEntryEditSheet(
+              context,
+              tripId: tripId,
+              args: EntryEditNew(day.dayNum),
+            ),
             icon: const Icon(Icons.add),
             label: const Text('新增停留點'),
           ),
@@ -339,8 +371,11 @@ class _DaySection extends ConsumerWidget {
 
 /// tile 尾端：搬移到其他天 + 拖曳 handle（長按拖動排序）。
 class _EntryTrailing extends StatelessWidget {
-  const _EntryTrailing(
-      {required this.entryId, required this.index, required this.onMove});
+  const _EntryTrailing({
+    required this.entryId,
+    required this.index,
+    required this.onMove,
+  });
 
   final int entryId;
   final int index;

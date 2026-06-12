@@ -11,7 +11,7 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>(
   (ref) => FavoritesRepository(client: ref.watch(apiClientProvider)),
 );
 
-/// 收藏清單（本畫面專屬 scope；取消收藏後 invalidate refresh）。
-final favoritesProvider = FutureProvider<List<PoiFavorite>>(
-  (ref) => ref.watch(favoritesRepositoryProvider).fetchFavorites(),
+/// 收藏清單（SWR:stale→fresh;取消收藏後 invalidate refresh）。
+final favoritesProvider = StreamProvider<List<PoiFavorite>>(
+  (ref) => ref.watch(favoritesRepositoryProvider).watchFavorites(),
 );

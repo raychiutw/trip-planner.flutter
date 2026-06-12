@@ -19,14 +19,20 @@ void main() {
 
   test('isExpired：未過期 false / 已過期 true（含 skew）', () {
     final fresh = OAuthTokens(
-        accessToken: 'a', expiresAt: DateTime.now().add(const Duration(hours: 1)));
+      accessToken: 'a',
+      expiresAt: DateTime.now().add(const Duration(hours: 1)),
+    );
     expect(fresh.isExpired(), isFalse);
     final old = OAuthTokens(
-        accessToken: 'a', expiresAt: DateTime.now().subtract(const Duration(minutes: 1)));
+      accessToken: 'a',
+      expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+    );
     expect(old.isExpired(), isTrue);
     // skew:30 秒後到期,skew 60s → 視為已過期
     final soon = OAuthTokens(
-        accessToken: 'a', expiresAt: DateTime.now().add(const Duration(seconds: 30)));
+      accessToken: 'a',
+      expiresAt: DateTime.now().add(const Duration(seconds: 30)),
+    );
     expect(soon.isExpired(skew: const Duration(seconds: 60)), isTrue);
   });
 

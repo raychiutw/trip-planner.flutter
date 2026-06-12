@@ -26,22 +26,13 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.chat_bubble_outline),
             label: '聊天',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: '行程',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            label: '地圖',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: '行程'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), label: '地圖'),
           NavigationDestination(
             icon: Icon(Icons.favorite_outline),
             label: '收藏',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: '帳號',
-          ),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: '帳號'),
         ],
       ),
     );

@@ -100,8 +100,11 @@ class Trip {
       endDate: json['endDate'] as String?,
       memberCount: (json['memberCount'] as num?)?.toInt(),
       destinations: (json['destinations'] as List<dynamic>? ?? [])
-          .map((destinationJson) =>
-              TripDestination.fromJson(destinationJson as Map<String, dynamic>))
+          .map(
+            (destinationJson) => TripDestination.fromJson(
+              destinationJson as Map<String, dynamic>,
+            ),
+          )
           .toList(),
     );
   }

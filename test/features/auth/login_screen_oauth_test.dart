@@ -36,7 +36,10 @@ void main() {
           oauthEnabledProvider.overrideWithValue(oauthEnabled),
           oauthLoginServiceProvider.overrideWithValue(oauthLogin),
         ],
-        child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -48,10 +51,12 @@ void main() {
   });
 
   testWidgets('啟用 OAuth → 顯示按鈕,點擊呼叫 login()', (tester) async {
-    when(() => oauthLogin.login()).thenAnswer((_) async => OAuthTokens(
-          accessToken: 'AT',
-          expiresAt: DateTime.now().add(const Duration(hours: 1)),
-        ));
+    when(() => oauthLogin.login()).thenAnswer(
+      (_) async => OAuthTokens(
+        accessToken: 'AT',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      ),
+    );
 
     await pump(tester, oauthEnabled: true);
     expect(find.byKey(const ValueKey('login-oauth-button')), findsOneWidget);

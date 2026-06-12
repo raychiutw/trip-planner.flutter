@@ -75,8 +75,10 @@ class PoiFavorite {
       poiLng: (json['poiLng'] as num?)?.toDouble(),
       poiRating: (json['poiRating'] as num?)?.toDouble(),
       usages: (json['usages'] as List<dynamic>? ?? [])
-          .map((usageJson) =>
-              PoiFavoriteUsage.fromJson(usageJson as Map<String, dynamic>))
+          .map(
+            (usageJson) =>
+                PoiFavoriteUsage.fromJson(usageJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

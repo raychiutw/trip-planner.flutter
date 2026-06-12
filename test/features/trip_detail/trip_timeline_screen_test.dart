@@ -69,7 +69,12 @@ const _fakeDays = [
         title: '美國村購物',
         version: 1,
         travel: Travel(type: 'walk', min: 10),
-        master: EntryPoiInfo(poiId: 103, name: '美國村', type: 'shopping', category: '購物'),
+        master: EntryPoiInfo(
+          poiId: 103,
+          name: '美國村',
+          type: 'shopping',
+          category: '購物',
+        ),
       ),
       TimelineEntry(
         id: 14,
@@ -105,7 +110,12 @@ const _fakeDays = [
         title: '首里城公園',
         version: 1,
         travel: Travel(type: 'monorail', min: 20),
-        master: EntryPoiInfo(poiId: 202, name: '首里城', type: 'attraction', rating: 4.4),
+        master: EntryPoiInfo(
+          poiId: 202,
+          name: '首里城',
+          type: 'attraction',
+          rating: 4.4,
+        ),
       ),
     ],
   ),
@@ -134,7 +144,8 @@ Future<void> _pumpTimeline(
           ),
           GoRoute(
             path: 'notes',
-            builder: (context, state) => const Scaffold(body: Text('notes-page')),
+            builder: (context, state) =>
+                const Scaffold(body: Text('notes-page')),
           ),
         ],
       ),
@@ -146,11 +157,21 @@ Future<void> _pumpTimeline(
       // 關閉 riverpod 3 預設自動 retry：error 測試需要 provider 停在 AsyncError
       retry: (retryCount, error) => null,
       overrides: [
-        tripDetailProvider(_tripId)
-            .overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
-        tripDaysProvider(_tripId)
-            .overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
-        tripSegmentsProvider(_tripId).overrideWith((ref) async => segments),
+        // StreamProvider override 需回 Stream；以 Stream.fromFuture(Future.sync(...))
+        // 包裝 helper 的 FutureOr callback，同時保留同步 throw / 永不完成的語意。
+        tripDetailProvider(_tripId).overrideWith(
+          (ref) => Stream.fromFuture(
+            Future.sync(() => (fetchTrip ?? () => _fakeTrip)()),
+          ),
+        ),
+        tripDaysProvider(_tripId).overrideWith(
+          (ref) => Stream.fromFuture(
+            Future.sync(() => (fetchDays ?? () => _fakeDays)()),
+          ),
+        ),
+        tripSegmentsProvider(
+          _tripId,
+        ).overrideWith((ref) => Stream.value(segments)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -160,8 +181,9 @@ Future<void> _pumpTimeline(
 }
 
 Color _entryDotColor(WidgetTester tester, int entryId) {
-  final dotContainer =
-      tester.widget<Container>(find.byKey(ValueKey('entry-dot-$entryId')));
+  final dotContainer = tester.widget<Container>(
+    find.byKey(ValueKey('entry-dot-$entryId')),
+  );
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
@@ -188,7 +210,9 @@ void main() {
     expect(find.text('map-page'), findsOneWidget);
   });
 
-  testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (tester) async {
+  testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (
+    tester,
+  ) async {
     await _pumpTimeline(tester);
 
     // 'DAY 01' 同時出現在頂部 pill 與 day header eyebrow
@@ -222,8 +246,9 @@ void main() {
     expect(find.text('美國村海濱飯店'), findsOneWidget);
     expect(find.byIcon(Icons.bed_outlined), findsOneWidget);
 
-    final hotelCardContainer =
-        tester.widget<Container>(find.byKey(const ValueKey('hotel-card-9')));
+    final hotelCardContainer = tester.widget<Container>(
+      find.byKey(const ValueKey('hotel-card-9')),
+    );
     final hotelCardDecoration = hotelCardContainer.decoration! as BoxDecoration;
     expect(hotelCardDecoration.color, TpColorsLight.sageSubtle);
   });
@@ -250,13 +275,16 @@ void main() {
 
   testWidgets('error 顯示重試按鈕，點擊後重新載入', (tester) async {
     var fetchDaysAttempts = 0;
-    await _pumpTimeline(tester, fetchDays: () {
-      fetchDaysAttempts++;
-      if (fetchDaysAttempts == 1) {
-        throw Exception('network down');
-      }
-      return _fakeDays;
-    });
+    await _pumpTimeline(
+      tester,
+      fetchDays: () {
+        fetchDaysAttempts++;
+        if (fetchDaysAttempts == 1) {
+          throw Exception('network down');
+        }
+        return _fakeDays;
+      },
+    );
 
     expect(find.text('重試'), findsOneWidget);
 
@@ -277,14 +305,18 @@ void main() {
 
   testWidgets('左滑 entry → 確認 → 呼叫 deleteEntry', (tester) async {
     final repo = _MockTripRepository();
-    when(() => repo.deleteEntry(
-          tripId: any(named: 'tripId'),
-          entryId: any(named: 'entryId'),
-        )).thenAnswer((_) async {});
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
 
     await tester.drag(
-        find.byKey(const ValueKey('entry-dismiss-11')), const Offset(-500, 0));
+      find.byKey(const ValueKey('entry-dismiss-11')),
+      const Offset(-500, 0),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('刪除'));
     await tester.pumpAndSettle();
@@ -324,14 +356,18 @@ void main() {
 
   testWidgets('點搬移鈕 → 選其他天 → reorderEntries 帶 day_id', (tester) async {
     final repo = _MockTripRepository();
-    when(() => repo.reorderEntries(
-          tripId: any(named: 'tripId'),
-          updates: any(named: 'updates'),
-        )).thenAnswer((_) async {});
-    when(() => repo.recomputeTravel(
-          tripId: any(named: 'tripId'),
-          day: any(named: 'day'),
-        )).thenAnswer((_) async {});
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
 
     await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
@@ -339,28 +375,47 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('move-day-2')));
     await tester.pumpAndSettle();
 
-    final captured = verify(() => repo.reorderEntries(
-            tripId: _tripId, updates: captureAny(named: 'updates')))
-        .captured
-        .single as List<({int id, int sortOrder, int? dayId})>;
+    final captured =
+        verify(
+              () => repo.reorderEntries(
+                tripId: _tripId,
+                updates: captureAny(named: 'updates'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder, int? dayId})>;
     expect(captured.single.id, 11);
     expect(captured.single.dayId, 2);
   });
 
   testWidgets('點 travel pill → 大眾運輸填分鐘 → updateSegment', (tester) async {
     final repo = _MockTripRepository();
-    when(() => repo.updateSegment(
-          tripId: any(named: 'tripId'),
-          segmentId: any(named: 'segmentId'),
-          mode: any(named: 'mode'),
-          min: any(named: 'min'),
-          expectedVersion: any(named: 'expectedVersion'),
-        )).thenAnswer(
-        (_) async => const TripSegment(id: 50, mode: 'transit', version: 2));
-    await _pumpTimeline(tester, repo: repo, segments: const [
-      TripSegment(
-          id: 50, fromEntryId: 11, toEntryId: 12, mode: 'driving', version: 1),
-    ]);
+    when(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        min: any(named: 'min'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(id: 50, mode: 'transit', version: 2),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          version: 1,
+        ),
+      ],
+    );
+    // segments 改 StreamProvider 後，day section 內的 tripSegmentsProvider 訂閱在
+    // days 渲染後才建立，需再 settle 一輪讓 stream 值傳達、travel pill 才會出現。
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
     await tester.pumpAndSettle();
@@ -371,11 +426,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('travel-submit')));
     await tester.pumpAndSettle();
 
-    verify(() => repo.updateSegment(
+    verify(
+      () => repo.updateSegment(
         tripId: _tripId,
         segmentId: 50,
         mode: 'transit',
         min: 25,
-        expectedVersion: 1)).called(1);
+        expectedVersion: 1,
+      ),
+    ).called(1);
   });
 }

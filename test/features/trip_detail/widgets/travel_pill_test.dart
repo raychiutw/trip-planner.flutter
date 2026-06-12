@@ -5,10 +5,14 @@ import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 Future<void> pumpPill(WidgetTester tester, Travel travel) {
-  return tester.pumpWidget(MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(body: Center(child: TravelPill(travel: travel))),
-  ));
+  return tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: Center(child: TravelPill(travel: travel)),
+      ),
+    ),
+  );
 }
 
 void main() {

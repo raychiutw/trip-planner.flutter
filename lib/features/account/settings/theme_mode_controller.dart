@@ -11,16 +11,16 @@ import '../../../api/providers.dart';
 const _themeKey = 'theme_mode';
 
 String themeModeToString(ThemeMode m) => switch (m) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      ThemeMode.system => 'system',
-    };
+  ThemeMode.light => 'light',
+  ThemeMode.dark => 'dark',
+  ThemeMode.system => 'system',
+};
 
 ThemeMode parseThemeMode(String? s) => switch (s) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+  'light' => ThemeMode.light,
+  'dark' => ThemeMode.dark,
+  _ => ThemeMode.system,
+};
 
 class ThemeModeController extends Notifier<ThemeMode> {
   bool _userOverrode = false;
@@ -47,5 +47,6 @@ class ThemeModeController extends Notifier<ThemeMode> {
   }
 }
 
-final themeModeProvider =
-    NotifierProvider<ThemeModeController, ThemeMode>(ThemeModeController.new);
+final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
+  ThemeModeController.new,
+);

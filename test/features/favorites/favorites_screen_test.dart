@@ -32,20 +32,20 @@ const _favorites = [
   ),
 ];
 
-Widget buildApp() => MaterialApp(
-      theme: AppTheme.light(),
-      home: const FavoritesScreen(),
-    );
+Widget buildApp() =>
+    MaterialApp(theme: AppTheme.light(), home: const FavoritesScreen());
 
 void main() {
   group('FavoritesScreen', () {
     testWidgets('渲染收藏清單 N 卡', (tester) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          favoritesProvider.overrideWith((ref) async => _favorites),
-        ],
-        child: buildApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
       await tester.pump();
 
       expect(find.text('收藏'), findsOneWidget); // AppBar
@@ -55,12 +55,16 @@ void main() {
     });
 
     testWidgets('empty → 還沒有收藏 hero', (tester) async {
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          favoritesProvider.overrideWith((ref) async => const <PoiFavorite>[]),
-        ],
-        child: buildApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith(
+              (ref) => Stream.value(const <PoiFavorite>[]),
+            ),
+          ],
+          child: buildApp(),
+        ),
+      );
       await tester.pump();
 
       expect(find.byType(PoiFavoriteCard), findsNothing);
@@ -69,17 +73,19 @@ void main() {
 
     testWidgets('error → 重試後成功', (tester) async {
       var attempts = 0;
-      await tester.pumpWidget(ProviderScope(
-        retry: (retryCount, error) => null,
-        overrides: [
-          favoritesProvider.overrideWith((ref) async {
-            attempts++;
-            if (attempts == 1) throw Exception('network');
-            return _favorites;
-          }),
-        ],
-        child: buildApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          retry: (retryCount, error) => null,
+          overrides: [
+            favoritesProvider.overrideWith((ref) {
+              attempts++;
+              if (attempts == 1) return Stream.error(Exception('network'));
+              return Stream.value(_favorites);
+            }),
+          ],
+          child: buildApp(),
+        ),
+      );
       await tester.pump();
       await tester.pump();
 
@@ -94,18 +100,18 @@ void main() {
     testWidgets('heart → 確認對話框 → deleteFavorite + refresh', (tester) async {
       final mockRepo = MockFavoritesRepository();
       var fetchCount = 0;
-      when(mockRepo.fetchFavorites).thenAnswer((_) async {
+      when(mockRepo.watchFavorites).thenAnswer((_) {
         fetchCount++;
-        return _favorites;
+        return Stream.value(_favorites);
       });
       when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
 
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          favoritesRepositoryProvider.overrideWithValue(mockRepo),
-        ],
-        child: buildApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: buildApp(),
+        ),
+      );
       await tester.pump();
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
 
@@ -122,14 +128,14 @@ void main() {
 
     testWidgets('heart → 對話框「保留」→ 不刪除', (tester) async {
       final mockRepo = MockFavoritesRepository();
-      when(mockRepo.fetchFavorites).thenAnswer((_) async => _favorites);
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
 
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          favoritesRepositoryProvider.overrideWithValue(mockRepo),
-        ],
-        child: buildApp(),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: buildApp(),
+        ),
+      );
       await tester.pump();
 
       await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
@@ -143,7 +149,7 @@ void main() {
 
     testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
       final mockRepo = MockFavoritesRepository();
-      when(mockRepo.fetchFavorites).thenAnswer((_) async => const []);
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(const []));
 
       final router = GoRouter(
         initialLocation: '/favorites',
@@ -162,10 +168,15 @@ void main() {
         ],
       );
 
-      await tester.pumpWidget(ProviderScope(
-        overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
-        child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
-      ));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
       await tester.pump();
 
       await tester.tap(find.byKey(const ValueKey('favorites-explore-action')));
