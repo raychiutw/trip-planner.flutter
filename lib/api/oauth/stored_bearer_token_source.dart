@@ -42,7 +42,8 @@ class StoredBearerTokenSource implements BearerTokenSource {
       _inFlight ??= _doRefresh().whenComplete(() => _inFlight = null);
 
   Future<OAuthTokens?> _doRefresh() async {
-    final rt = (await _store.read())?.refreshToken;
+    final old = await _store.read();
+    final rt = old?.refreshToken;
     if (rt == null || rt.isEmpty) return null;
 
     final OAuthTokens fresh;
@@ -57,11 +58,15 @@ class StoredBearerTokenSource implements BearerTokenSource {
       return null;
     }
 
+    // refresh 回應常不含新 id_token → 沿用舊的,身分不丟。
+    final merged = fresh.idToken == null
+        ? fresh.copyWith(idToken: old?.idToken)
+        : fresh;
     try {
-      await _store.write(fresh);
+      await _store.write(merged);
     } on Exception {
-      // 寫入失敗:仍回傳 fresh(本輪可用),不清空(下次再試寫)。
+      // 寫入失敗:仍回傳 merged(本輪可用),不清空(下次再試寫)。
     }
-    return fresh;
+    return merged;
   }
 }

@@ -67,6 +67,26 @@ void main() {
     expect((await store.read())!.accessToken, 'NEW');
   });
 
+  test('refresh 回應無 id_token → 沿用舊 idToken(身分不丟)', () async {
+    await store.write(OAuthTokens(
+      accessToken: 'OLD',
+      refreshToken: 'RT',
+      idToken: 'OLD_ID',
+      expiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
+    ));
+    when(() => repo.refresh(
+              refreshToken: any(named: 'refreshToken'),
+              clientId: any(named: 'clientId'),
+            ))
+        .thenAnswer((_) async => OAuthTokens(
+              accessToken: 'NEW',
+              refreshToken: 'RT2',
+              expiresAt: DateTime.now().add(const Duration(hours: 1)),
+            )); // 無 id_token
+    expect(await source.refresh(), isTrue);
+    expect((await store.read())!.idToken, 'OLD_ID');
+  });
+
   test('無 refresh token → false', () async {
     await store.write(_tok(refresh: null, ttl: const Duration(hours: 1)));
     expect(await source.refresh(), isFalse);

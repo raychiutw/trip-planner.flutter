@@ -11,6 +11,9 @@ import 'oauth_repository.dart';
 import 'oauth_token_store.dart';
 import 'stored_bearer_token_source.dart';
 
+/// OAuth 登入是否啟用(預設依 dart-define 的 client_id;測試可 override)。
+final oauthEnabledProvider = Provider<bool>((ref) => OAuthConfig.isConfigured);
+
 final oauthTokenStoreProvider = Provider<OAuthTokenStore>(
   (ref) => SecureOAuthTokenStore(),
 );

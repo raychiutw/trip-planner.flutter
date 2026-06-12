@@ -46,5 +46,29 @@ flutter run \
 - **mobile loopback UX**:iOS 上 loopback redirect 後使用者會看到「可關閉此頁」再手動切回 App(不像
   custom scheme 自動返回)。若要更順,需後端放寬 redirect 政策(custom scheme)或設 https App Link
   關聯檔 — 兩者皆後端網域層級,超出本 repo。
-- `/oauth/userinfo` 不收 Bearer(後端僅 cookie),身分請改讀 `id_token` claims 或一般 API 端點。
-- 登入頁尚未加「用 OAuth 登入」按鈕(就緒待接);預設登入流程不變。
+- `/oauth/userinfo` 不收 Bearer(後端僅 cookie)→ 已改成**讀 `id_token` claims** 當身分(`AuthNotifier.build` 在 `isConfigured` 且有 token 時走此路;refresh 沿用舊 id_token)。
+- 登入頁的「用 OAuth 登入」按鈕**已接好**(`login-oauth-button`,gated by `oauthEnabledProvider`/`OAuthConfig.isConfigured`);成功後 invalidate authState → router 跳轉。
+
+## 本機 e2e（後端在 ~/Projects/trip-planner)
+
+已在**本機 D1** provision 一個可用的 public client(免你再建):
+- `client_id = tripline-mobile`、`client_type = public`、`redirect_uris = ["http://127.0.0.1:8765"]`、scopes `openid profile email offline_access`、`status = active`。
+- 重建本機 DB(`npm run dev:reset`)會清掉它 → 重跑這段 SQL 即可:
+  ```bash
+  cd ~/Projects/trip-planner
+  node_modules/.bin/wrangler d1 execute trip-planner-db --local --env production --command \
+    "INSERT INTO client_apps (client_id,client_type,app_name,redirect_uris,allowed_scopes,status) \
+     VALUES ('tripline-mobile','public','Tripline Mobile','[\"http://127.0.0.1:8765\"]','[\"openid\",\"profile\",\"email\",\"offline_access\"]','active')"
+  ```
+
+跑 e2e:
+1. 起**真**後端(functions,非 mock):`cd ~/Projects/trip-planner && npm run dev`(:8788)。
+2. 跑 app 指向本機 + 帶 client:
+   ```bash
+   flutter run \
+     --dart-define=TRIPLINE_API_ORIGIN=http://localhost:8788 \
+     --dart-define=TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile \
+     --dart-define=TRIPLINE_OAUTH_REDIRECT_PORT=8765
+   ```
+   (Android emulator 用 `http://10.0.2.2:8788`。)
+3. 登入頁點「用 OAuth 登入」→ 系統瀏覽器開 authorize → 用本機帳號登入(seed user 如 `lean.lean@gmail.com`;若卡 email 未驗證,於本機 DB 補 `email_verified_at`)→ consent → 自動回 `127.0.0.1:8765` → 換 token → 進 app。之後所有 API 走 Bearer(不再偽造 Origin)。

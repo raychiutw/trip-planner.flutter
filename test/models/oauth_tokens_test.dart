@@ -34,13 +34,27 @@ void main() {
     final t = OAuthTokens(
       accessToken: 'at',
       refreshToken: 'rt',
+      idToken: 'idt',
       scope: 'openid',
       expiresAt: DateTime.utc(2026, 6, 12, 10, 30),
     );
     final back = OAuthTokens.fromJson(t.toJson());
     expect(back.accessToken, 'at');
     expect(back.refreshToken, 'rt');
+    expect(back.idToken, 'idt');
     expect(back.scope, 'openid');
     expect(back.expiresAt, t.expiresAt);
+  });
+
+  test('copyWith(idToken) 保留其餘欄位', () {
+    final t = OAuthTokens(
+      accessToken: 'at',
+      refreshToken: 'rt',
+      expiresAt: DateTime.utc(2026, 6, 12),
+    );
+    final withId = t.copyWith(idToken: 'idt');
+    expect(withId.idToken, 'idt');
+    expect(withId.accessToken, 'at');
+    expect(withId.refreshToken, 'rt');
   });
 }
