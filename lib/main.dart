@@ -10,6 +10,7 @@ import 'api/cache/sembast_cache_store.dart';
 import 'api/providers.dart';
 import 'app/router.dart';
 import 'features/account/settings/theme_mode_controller.dart';
+import 'features/offline/offline_sync.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -35,11 +36,36 @@ Future<void> main() async {
 }
 
 /// 根 widget：套用 Tripline theme 與 go_router 路由。
-class TriplineApp extends ConsumerWidget {
+/// 啟動與每次回前景時嘗試把離線佇列同步回後端(線上才會真正排空)。
+class TriplineApp extends ConsumerStatefulWidget {
   const TriplineApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TriplineApp> createState() => _TriplineAppState();
+}
+
+class _TriplineAppState extends ConsumerState<TriplineApp> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _syncOffline);
+    // 冷啟動時也排空上次離線殘留的佇列。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncOffline());
+  }
+
+  void _syncOffline() =>
+      ref.read(offlineSyncControllerProvider.notifier).sync();
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Tripline',
       theme: AppTheme.light(),

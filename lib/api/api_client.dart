@@ -29,6 +29,14 @@ abstract class BearerTokenSource {
   Future<bool> refresh();
 }
 
+/// flushQueue 的結果:成功同步筆數 + 上報的衝突(已從佇列移除)。
+class FlushResult {
+  const FlushResult({required this.synced, required this.conflicts});
+  final int synced;
+  final List<QueuedMutation> conflicts;
+  static const empty = FlushResult(synced: 0, conflicts: <QueuedMutation>[]);
+}
+
 /// Tripline API client，base = `<origin>/api`。
 class ApiClient {
   ApiClient({
@@ -53,6 +61,7 @@ class ApiClient {
   final CacheStore? _cacheStore;
   final Dio _dio;
   int _mutationCounter = 0;
+  bool _flushing = false;
 
   /// 供 AuthRepository 直接讀 response headers（set-cookie）用。
   Dio get dio => _dio;
@@ -168,6 +177,35 @@ class ApiClient {
         return null;
       }
       rethrow;
+    }
+  }
+
+  /// 重連後依序重播離線佇列。成功 → 移除(_send 已 evict 受影響快取);
+  /// HTTP 錯誤(含 409 衝突)→ 上報並移除(v1 不 rebase,列 PR-4b);
+  /// 連線錯誤 → 中止並保留剩餘佇列(下次再試)。重入時直接回 empty。
+  Future<FlushResult> flushQueue() async {
+    final store = _cacheStore;
+    if (store == null || _flushing) return FlushResult.empty;
+    _flushing = true;
+    try {
+      final conflicts = <QueuedMutation>[];
+      var synced = 0;
+      for (final m in await store.readQueue()) {
+        try {
+          await _send(m.method, m.path, body: m.body, query: m.query);
+          await store.removeMutation(m.id);
+          synced++;
+        } on ApiError {
+          conflicts.add(m);
+          await store.removeMutation(m.id);
+        } on DioException catch (e) {
+          if (_isOfflineError(e)) break;
+          rethrow;
+        }
+      }
+      return FlushResult(synced: synced, conflicts: conflicts);
+    } finally {
+      _flushing = false;
     }
   }
 
