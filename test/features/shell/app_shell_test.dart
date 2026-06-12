@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tripline/features/shell/app_shell.dart';
@@ -30,9 +31,11 @@ void main() {
   group('AppShell 5-tab 導航', () {
     testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.light(),
-          routerConfig: buildShellRouter(),
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
         ),
       );
       await tester.pumpAndSettle();

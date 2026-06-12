@@ -4,6 +4,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../offline/offline_status_banner.dart';
+
 /// 5-tab 底部導航外殼：聊天／行程／地圖／收藏／帳號。
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -13,7 +15,13 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
+      body: Column(
+        children: [
+          Expanded(child: navigationShell),
+          const OfflineStatusBanner(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (selectedIndex) => navigationShell.goBranch(
