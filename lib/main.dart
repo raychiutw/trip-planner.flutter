@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/router.dart';
+import 'features/account/settings/theme_mode_controller.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -22,7 +23,7 @@ class TriplineApp extends ConsumerWidget {
       title: 'Tripline',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: const [
         Locale('zh', 'TW'),

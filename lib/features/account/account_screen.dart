@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../models/user.dart';
@@ -287,7 +288,25 @@ class _SettingsGroup extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
-              const _ComingSoonRow(icon: Icons.palette_outlined, title: '外觀'),
+              ListTile(
+                key: const ValueKey('settings-profile'),
+                leading: const Icon(Icons.person_outline),
+                title: const Text('個人資料'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/profile'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-appearance'),
+                leading: const Icon(Icons.palette_outlined),
+                title: const Text('外觀'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/appearance'),
+              ),
               Divider(
                 height: 1,
                 thickness: 1,
