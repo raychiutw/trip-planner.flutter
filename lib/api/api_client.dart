@@ -6,6 +6,8 @@ import 'dart:io' show HttpDate;
 import 'package:dio/dio.dart';
 
 import 'api_error.dart';
+import 'cache/cache_keys.dart';
+import 'cache/cache_store.dart';
 import 'session_store.dart';
 
 /// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
@@ -32,10 +34,12 @@ class ApiClient {
     Dio? dio,
     String origin = kTriplineOrigin,
     BearerTokenSource? bearerSource,
-  })  : _sessionStore = sessionStore,
-        _origin = origin,
-        _bearerSource = bearerSource,
-        _dio = dio ?? Dio() {
+    CacheStore? cacheStore,
+  }) : _sessionStore = sessionStore,
+       _origin = origin,
+       _bearerSource = bearerSource,
+       _cacheStore = cacheStore,
+       _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     // 全收所有 status code，由 _send 自行判斷丟 ApiError
     _dio.options.validateStatus = (_) => true;
@@ -44,6 +48,7 @@ class ApiClient {
   final SessionStore _sessionStore;
   final String _origin;
   final BearerTokenSource? _bearerSource;
+  final CacheStore? _cacheStore;
   final Dio _dio;
 
   /// 供 AuthRepository 直接讀 response headers（set-cookie）用。
@@ -53,11 +58,13 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     CancelToken? cancelToken,
-  }) =>
-      _send('GET', path, query: query, cancelToken: cancelToken);
+  }) => _send('GET', path, query: query, cancelToken: cancelToken);
 
-  Future<dynamic> post(String path, {Object? body, Map<String, dynamic>? query}) =>
-      _send('POST', path, body: body, query: query);
+  Future<dynamic> post(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) => _send('POST', path, body: body, query: query);
 
   Future<dynamic> put(String path, {Object? body}) =>
       _send('PUT', path, body: body);
@@ -116,24 +123,41 @@ class ApiClient {
       }
     }
 
-    final response = await _dio.request<dynamic>(
-      path,
-      queryParameters: query,
-      data: body,
-      options: Options(method: method, headers: requestHeaders),
-      cancelToken: cancelToken,
-    );
+    final Response<dynamic> response;
+    try {
+      response = await _dio.request<dynamic>(
+        path,
+        queryParameters: query,
+        data: body,
+        options: Options(method: method, headers: requestHeaders),
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      // 連線層失敗(離線/逾時):GET 嘗試回退本機快取
+      final store = _cacheStore;
+      if (method == 'GET' && store != null && _isOfflineError(e)) {
+        final cached = await store.readResponse(
+          cacheKeyFor('GET', path, query),
+        );
+        if (cached != null) return cached.data;
+      }
+      rethrow;
+    }
 
     final statusCode = response.statusCode ?? 0;
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
-      final waitSeconds =
-          parseRetryAfterSeconds(response.headers.value('retry-after'));
+      final waitSeconds = parseRetryAfterSeconds(
+        response.headers.value('retry-after'),
+      );
       await Future<void>.delayed(Duration(seconds: waitSeconds));
-      return _send(method, path,
-          query: query,
-          body: body,
-          cancelToken: cancelToken,
-          isRetryAttempt: true);
+      return _send(
+        method,
+        path,
+        query: query,
+        body: body,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+      );
     }
     // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
     if (statusCode == 401 &&
@@ -141,21 +165,65 @@ class ApiClient {
         !isRetryAttempt &&
         _bearerSource != null &&
         await _bearerSource.refresh()) {
-      return _send(method, path,
-          query: query,
-          body: body,
-          cancelToken: cancelToken,
-          isRetryAttempt: true);
+      return _send(
+        method,
+        path,
+        query: query,
+        body: body,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+      );
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);
     }
-    if (statusCode == 204) return null;
-    final responseData = response.data;
-    if (responseData == null ||
-        (responseData is String && responseData.isEmpty)) {
+    if (statusCode == 204) {
+      await _evictForMutation(method, path, body);
       return null;
     }
-    return responseData;
+    final responseData = response.data;
+    final isEmpty =
+        responseData == null ||
+        (responseData is String && responseData.isEmpty);
+    if (method == 'GET') {
+      if (!isEmpty && _isCacheableGet(path)) {
+        await _cacheStore?.writeResponse(
+          cacheKeyFor('GET', path, query),
+          responseData,
+        );
+      }
+    } else {
+      await _evictForMutation(method, path, body);
+    }
+    return isEmpty ? null : responseData;
+  }
+
+  /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
+  bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
+
+  /// 連線層錯誤(離線/逾時/無回應)→ 可回退快取;HTTP 4xx/5xx 不算(server 有回)。
+  bool _isOfflineError(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return true;
+      default:
+        return e.type == DioExceptionType.unknown && e.response == null;
+    }
+  }
+
+  /// mutation 成功後,依失效表移除受影響的 GET 快取(body 供 add-to-trip 取 tripId)。
+  Future<void> _evictForMutation(
+    String method,
+    String path,
+    Object? body,
+  ) async {
+    final store = _cacheStore;
+    if (store == null) return;
+    for (final prefix in evictionPrefixesFor(method, path, body)) {
+      await store.evictByPrefix(prefix);
+    }
   }
 }

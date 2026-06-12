@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
+import 'cache/cache_store.dart';
 import 'collab_repository.dart';
 import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
@@ -24,9 +25,13 @@ final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => SecureSettingsStore(),
 );
 
+/// 離線快取 store。預設記憶體版;app 於 main() override 成 SembastCacheStore。
+final cacheStoreProvider = Provider<CacheStore>((ref) => InMemoryCacheStore());
+
 final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(
     sessionStore: ref.watch(sessionStoreProvider),
+    cacheStore: ref.watch(cacheStoreProvider),
     // 有設定 OAuth client 才走 Bearer(無 token 時 source 回 null → 仍 cookie);
     // 未設定則完全不接 → 維持 cookie 登入,零破壞。
     bearerSource: OAuthConfig.isConfigured
@@ -96,6 +101,8 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     if (OAuthConfig.isConfigured) {
       await ref.read(oauthTokenStoreProvider).clear();
     }
+    // 清離線快取,避免帳號間資料外洩。
+    await ref.read(cacheStoreProvider).clear();
     state = const AsyncData(null);
   }
 }
