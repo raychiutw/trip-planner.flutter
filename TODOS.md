@@ -8,7 +8,7 @@ P1 全數完成 🎉(見 Completed)。
 
 ## P2
 
-- [ ] 分享/列印/匯入
+- [~] 分享/列印/匯入:**分享(公開連結)已完成**(建立/清單/撤銷 + 複製 URL);列印/匯入未做。
 - [ ] 設定子頁
 - [~] OAuth PKCE + Bearer 認證:**client 端已完成 + 單測**(pkce/token/refresh/Bearer ApiClient/loopback 編排),預設關閉(`--dart-define` 啟用)。**e2e 待 backend owner provision active public client + loopback redirect**(見 `docs/howto-oauth-pkce.md`)。登入頁 OAuth 按鈕待接。
 - [ ] 離線快取
