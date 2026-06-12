@@ -21,6 +21,7 @@ import '../features/trip_detail/trip_timeline_screen.dart';
 import '../features/trips/collab/collab_screen.dart';
 import '../features/trips/create/create_trip_screen.dart';
 import '../features/trips/edit/edit_trip_screen.dart';
+import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 
@@ -64,6 +65,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/collab/:tripId',
         builder: (context, state) =>
             CollabScreen(tripId: state.pathParameters['tripId']!),
+      ),
+      GoRoute(
+        path: '/share-trip/:tripId',
+        builder: (context, state) =>
+            ShareScreen(tripId: state.pathParameters['tripId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
