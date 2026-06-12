@@ -8,15 +8,18 @@ import 'session_store.dart';
 
 /// 對應 `/api/oauth/*` 認證 endpoints。
 class AuthRepository {
-  AuthRepository({required ApiClient client, required SessionStore sessionStore})
-      : _client = client,
-        _sessionStore = sessionStore;
+  AuthRepository({
+    required ApiClient client,
+    required SessionStore sessionStore,
+  }) : _client = client,
+       _sessionStore = sessionStore;
 
   final ApiClient _client;
   final SessionStore _sessionStore;
 
-  static final _sessionCookiePattern =
-      RegExp(r'(?:^|;\s*)tripline_session=([^;]+)');
+  static final _sessionCookiePattern = RegExp(
+    r'(?:^|;\s*)tripline_session=([^;]+)',
+  );
 
   /// POST /oauth/login → 解析 set-cookie 的 tripline_session 寫入 store →
   /// GET /oauth/userinfo 回 UserInfo。
@@ -39,8 +42,7 @@ class AuthRepository {
         loginResponse.headers['set-cookie'] ?? const <String>[];
     String? sessionToken;
     for (final cookieHeader in setCookieHeaders) {
-      final sessionCookieMatch =
-          _sessionCookiePattern.firstMatch(cookieHeader);
+      final sessionCookieMatch = _sessionCookiePattern.firstMatch(cookieHeader);
       if (sessionCookieMatch != null) {
         sessionToken = sessionCookieMatch.group(1);
         break;
@@ -71,6 +73,10 @@ class AuthRepository {
   }
 
   /// GET /oauth/userinfo；401（未登入/過期）回 null，不 throw。
+  ///
+  /// 離線快取(刻意行為):userinfo 走 ApiClient 透明快取,離線開機時 GET 連線失敗
+  /// 會回退最後一次成功的身分,讓 cookie 模式使用者離線仍保持登入、能讀已快取行程。
+  /// 登出會清快取(避免跨帳號外洩);無快取時離線仍 throw(等同本快取功能前的行為)。
   Future<UserInfo?> currentUser() async {
     try {
       final userInfoJson = await _client.get('/oauth/userinfo');

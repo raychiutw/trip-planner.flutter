@@ -15,8 +15,19 @@ bool cacheKeyMatchesPrefix(String key, String prefix) =>
     key == prefix || key.startsWith('$prefix/') || key.startsWith('$prefix?');
 
 /// mutation(非 GET/HEAD)成功後應失效的 GET 快取鍵前綴。
-List<String> evictionPrefixesFor(String method, String path) {
+/// [body] 供「目標資源在 body 而非 path」的情況(如 add-to-trip 的 tripId)使用。
+List<String> evictionPrefixesFor(String method, String path, [Object? body]) {
   if (method == 'GET' || method == 'HEAD') return const [];
+
+  // add-to-trip:目標 tripId 在 body,需失效該 trip 的 days(tripId encode 對齊快取 key)。
+  if (path.startsWith('/poi-favorites') && path.endsWith('/add-to-trip')) {
+    final prefixes = <String>['GET /poi-favorites'];
+    if (body is Map && body['tripId'] is String) {
+      final tripId = Uri.encodeComponent(body['tripId'] as String);
+      prefixes.add('GET /trips/$tripId/days');
+    }
+    return prefixes;
+  }
 
   final tripMatch = RegExp(r'^/trips/([^/]+)').firstMatch(path);
   if (tripMatch != null) {

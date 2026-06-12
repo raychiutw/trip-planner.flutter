@@ -15,11 +15,20 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
-  final docsDir = await getApplicationDocumentsDirectory();
-  final cacheStore = SembastCacheStore(await openCacheDatabase(docsDir.path));
+  // 開啟失敗(磁碟/權限/檔案損毀)時退回預設 InMemory,不阻擋 app 啟動。
+  SembastCacheStore? cacheStore;
+  try {
+    final docsDir = await getApplicationDocumentsDirectory();
+    cacheStore = SembastCacheStore(await openCacheDatabase(docsDir.path));
+  } catch (_) {
+    cacheStore = null;
+  }
   runApp(
     ProviderScope(
-      overrides: [cacheStoreProvider.overrideWithValue(cacheStore)],
+      overrides: [
+        if (cacheStore != null)
+          cacheStoreProvider.overrideWithValue(cacheStore),
+      ],
       child: const TriplineApp(),
     ),
   );

@@ -88,5 +88,14 @@ void main() {
         contains('GET /poi-favorites'),
       );
     });
+    test('add-to-trip(body 帶 tripId)→ poi-favorites + 目標 trip days', () {
+      final p = evictionPrefixesFor('POST', '/poi-favorites/42/add-to-trip', {
+        'tripId': 't',
+      });
+      expect(
+        p,
+        containsAll(<String>['GET /poi-favorites', 'GET /trips/t/days']),
+      );
+    });
   });
 }

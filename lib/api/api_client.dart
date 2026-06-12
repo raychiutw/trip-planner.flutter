@@ -178,7 +178,7 @@ class ApiClient {
       throw ApiError.fromResponse(statusCode, response.data);
     }
     if (statusCode == 204) {
-      await _evictForMutation(method, path);
+      await _evictForMutation(method, path, body);
       return null;
     }
     final responseData = response.data;
@@ -186,17 +186,20 @@ class ApiClient {
         responseData == null ||
         (responseData is String && responseData.isEmpty);
     if (method == 'GET') {
-      if (!isEmpty) {
+      if (!isEmpty && _isCacheableGet(path)) {
         await _cacheStore?.writeResponse(
           cacheKeyFor('GET', path, query),
           responseData,
         );
       }
     } else {
-      await _evictForMutation(method, path);
+      await _evictForMutation(method, path, body);
     }
     return isEmpty ? null : responseData;
   }
+
+  /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
+  bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
 
   /// 連線層錯誤(離線/逾時/無回應)→ 可回退快取;HTTP 4xx/5xx 不算(server 有回)。
   bool _isOfflineError(DioException e) {
@@ -211,11 +214,15 @@ class ApiClient {
     }
   }
 
-  /// mutation 成功後,依失效表移除受影響的 GET 快取。
-  Future<void> _evictForMutation(String method, String path) async {
+  /// mutation 成功後,依失效表移除受影響的 GET 快取(body 供 add-to-trip 取 tripId)。
+  Future<void> _evictForMutation(
+    String method,
+    String path,
+    Object? body,
+  ) async {
     final store = _cacheStore;
     if (store == null) return;
-    for (final prefix in evictionPrefixesFor(method, path)) {
+    for (final prefix in evictionPrefixesFor(method, path, body)) {
       await store.evictByPrefix(prefix);
     }
   }
