@@ -15,6 +15,9 @@ const Map<String, OptimisticPatcher> _patchers = {
   'entry.add': _entryAdd,
   'entry.update': _entryUpdate,
   'entry.delete': _entryDelete,
+  'note.create': _noteCreate,
+  'note.update': _noteUpdate,
+  'note.delete': _noteDelete,
 };
 
 /// 套用樂觀 patch;查無 type 或 base 無法處理 → 回原 cached。
@@ -128,3 +131,74 @@ Map<String, dynamic> _entryUpdateFields(Map<String, dynamic> args) => {
   },
   if (args.containsKey('endTime')) 'endTime': args['endTime'],
 };
+
+// ── notes ──────────────────────────────────────────────────────────────────
+// 操作 `GET /trips/:id/notes` 的 Map(key 為 response 段名:flights/lodgings/
+// reservations/pretripNotes/emergencyContacts)。fields 是 request 的 snake_case,
+// 樂觀 row 需轉 camelCase 對齊 wire(轉換對已是 camelCase 的 key 為 no-op)。
+
+/// 在指定段末端插入一筆樂觀 note(臨時負 id)。
+Object? _noteCreate(Object? cached, Map<String, dynamic> args) {
+  if (cached is! Map) return cached;
+  final sectionKey = args['sectionKey'] as String;
+  final tempId =
+      (args['tempId'] as int?) ?? -DateTime.now().microsecondsSinceEpoch;
+  final row = {
+    'id': tempId,
+    'sortOrder': _kOptimisticSortOrder,
+    'version': 0,
+    ..._camelKeys(args['fields'] as Map),
+  };
+  final section = (cached[sectionKey] as List?) ?? const [];
+  return {
+    ..._asMap(cached),
+    sectionKey: [...section, row],
+  };
+}
+
+/// 在指定段找 rowId,merge 欄位。
+Object? _noteUpdate(Object? cached, Map<String, dynamic> args) {
+  if (cached is! Map) return cached;
+  final sectionKey = args['sectionKey'] as String;
+  final rowId = args['rowId'];
+  final section = cached[sectionKey];
+  if (section is! List) return cached;
+  final fields = _camelKeys(args['fields'] as Map);
+  return {
+    ..._asMap(cached),
+    sectionKey: [
+      for (final r in section)
+        if (r is Map && r['id'] == rowId) {..._asMap(r), ...fields} else r,
+    ],
+  };
+}
+
+/// 在指定段移除 rowId。
+Object? _noteDelete(Object? cached, Map<String, dynamic> args) {
+  if (cached is! Map) return cached;
+  final sectionKey = args['sectionKey'] as String;
+  final rowId = args['rowId'];
+  final section = cached[sectionKey];
+  if (section is! List) return cached;
+  return {
+    ..._asMap(cached),
+    sectionKey: [
+      for (final r in section)
+        if (!(r is Map && r['id'] == rowId)) r,
+    ],
+  };
+}
+
+Map<String, dynamic> _camelKeys(Map<dynamic, dynamic> src) => {
+  for (final e in src.entries) _snakeToCamel(e.key as String): e.value,
+};
+
+String _snakeToCamel(String s) {
+  final parts = s.split('_');
+  if (parts.length == 1) return s;
+  return parts.first +
+      parts
+          .skip(1)
+          .map((p) => p.isEmpty ? '' : p[0].toUpperCase() + p.substring(1))
+          .join();
+}
