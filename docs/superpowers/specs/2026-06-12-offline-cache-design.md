@@ -90,8 +90,10 @@ abstract class CacheStore {
 ```
 
 實作:
-- `SembastCacheStore`(`lib/api/cache/sembast_cache_store.dart`)— 兩個 store:`response_cache`(key→{data,cachedAt})、`mutation_queue`(自增 seq→envelope)。DB 檔放 app documents dir(透過 sembast 的 `databaseFactoryIo`)。
-- `InMemoryCacheStore`(同檔或 `_inmemory.dart`)— 測試用 Map,亦可直接用 `sembast/sembast_memory.dart` 的 in-memory factory。
+- `SembastCacheStore`(`lib/api/cache/sembast_cache_store.dart`)— 兩個 store:`response_cache`(key→{data,cachedAt})、`mutation_queue`(自增 seq→envelope)。DB 檔放 app documents dir,目錄由 `path_provider` 的 `getApplicationDocumentsDirectory()` 取得(在 `main()` 開好 DB 後注入,override `cacheStoreProvider`)。
+- `InMemoryCacheStore`(同檔或 `_inmemory.dart`)— 測試用純 `Map`(沿用 `InMemorySessionStore` 慣例),不碰 sembast/IO/path_provider。
+
+新增依賴:`sembast`(純 Dart 持久化)+ `path_provider`(取 app 可寫目錄;官方 plugin,測試走 InMemory 不觸及)。
 
 > 登出時 `CacheStore.clear()`,避免帳號間資料外洩。
 
@@ -188,12 +190,15 @@ PendingMutation {
 
 ## 7. PR 拆解
 
-1. **PR-1 讀取地基(SWR + 離線讀)**:`CacheStore`+sembast+InMemory、cache key、`ApiClient.getStream` 與網路失敗回退、失效表 + mutation 成功 evict、讀取 providers/repositories 改 Stream。**驗收**:離線可讀已快取資料;線上 SWR 先 stale 後 fresh;`flutter analyze` 0、測試全綠。
-2. **PR-2 寫入佇列(離線寫可見)**:`MutationQueue` envelope + sembast 持久化、`ApiClient.sendMutation` 離線入隊、樂觀 patcher 集合(entries/notes/segments)、`applyPendingPatches` 接入 getStream。**驗收**:離線編輯立即反映且重啟後仍在。
-3. **PR-3 同步與衝突**:`SyncEngine.flush`、OCC 409 rebase 重試、衝突上報 provider、app-resume/opportunistic/手動觸發。**驗收**:重連後自動同步;模擬 409 走 rebase 路徑;衝突進清單。
-4. **PR-4 離線 UI affordance**:離線橫幅、stale/pending 標示、待同步筆數、衝突提示與「立即重試」。**驗收**:UI 正確反映連線/同步狀態。
+> 細化原則:離線「讀」可在 `ApiClient.get()` 做透明 write-through + 失敗回退,**不需動 providers**;SWR(emit stale→fresh)需把 provider 改 StreamProvider,波及測試,獨立成一個 PR 較易 review。故將原 PR-1 拆為「透明讀(PR-1)」與「SWR(PR-2)」。
 
-每個 PR 各自 spec(細節)→ plan → TDD 實作 → review → PR,沿用既有流程。本 spec 為總綱。
+1. **PR-1 透明離線讀**:`CacheStore`(response 方法 + clear)+`SembastCacheStore`+`InMemoryCacheStore`、cache key 正規化、失效前綴對照(純函式)、`ApiClient` 注入 `CacheStore`、GET write-through + 網路失敗回退快取、mutation 成功後 evict、登出清快取、`main()` 開 sembast DB 並 override。**零 provider/screen 改動**。**驗收**:離線可讀已快取資料;既有測試全綠;`flutter analyze` 0。
+2. **PR-2 SWR(stale→fresh)**:`ApiClient.getStream`、repository 新增 `watchX()` Stream 方法、讀取 providers(tripDetail/tripDays/tripNotes/tripSegments/entryDetail/myTrips/favorites)由 `FutureProvider` 改 `StreamProvider`、更新對應 widget test overrides、pull-to-refresh 配合。**驗收**:線上先 stale 後 fresh;畫面消費 `AsyncValue` 行為一致。
+3. **PR-3 寫入佇列(離線寫可見)**:`MutationQueue` envelope + sembast 持久化、`ApiClient.sendMutation` 離線入隊、樂觀 patcher 集合(entries/notes/segments)、`applyPendingPatches` 接入 getStream、核心不變式。**驗收**:離線編輯立即反映且重啟後仍在。
+4. **PR-4 同步與衝突**:`SyncEngine.flush`、OCC 409 rebase 重試、衝突上報 provider、app-resume/opportunistic/手動觸發。**驗收**:重連後自動同步;模擬 409 走 rebase 路徑;衝突進清單。
+5. **PR-5 離線 UI affordance**:離線橫幅、stale/pending 標示、待同步筆數、衝突提示與「立即重試」。**驗收**:UI 正確反映連線/同步狀態。
+
+每個 PR 各自 plan → TDD 實作 → review → PR,沿用既有流程。本 spec 為總綱。
 
 ## 8. 風險與緩解
 
