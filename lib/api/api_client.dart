@@ -195,7 +195,10 @@ class ApiClient {
           await _send(m.method, m.path, body: m.body, query: m.query);
           await store.removeMutation(m.id);
           synced++;
-        } on ApiError {
+        } on ApiError catch (e) {
+          // 5xx 視為暫時失敗 → 中止保留佇列、下次再試(避免永久遺失離線編輯);
+          // 4xx(含 409 衝突)→ 上報並移除。
+          if (e.status >= 500) break;
           conflicts.add(m);
           await store.removeMutation(m.id);
         } on DioException catch (e) {

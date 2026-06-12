@@ -9,7 +9,7 @@ import '../favorites/favorites_providers.dart';
 import '../trip_detail/trip_providers.dart';
 import '../trips/trips_list_screen.dart';
 
-/// 待同步(離線佇列)筆數;flush/入隊後 invalidate 以刷新(供 UI badge,PR-5)。
+/// 待同步(離線佇列)筆數;flush 後 invalidate 以刷新(入隊端的刷新待 PR-5 UI 接上)。
 final offlinePendingCountProvider = FutureProvider<int>(
   (ref) async => (await ref.watch(cacheStoreProvider).readQueue()).length,
 );

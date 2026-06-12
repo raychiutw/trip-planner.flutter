@@ -112,6 +112,39 @@ void main() {
     expect(await cache.readQueue(), hasLength(2));
   });
 
+  test('前筆成功移除、後筆離線 break → 只保留未處理(部分同步)', () async {
+    await cache.appendMutation(addMut('1'));
+    await cache.appendMutation(addMut('2', path: '/trips/t/days/2/entries'));
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (s) => s.reply(200, {'ok': true}),
+      data: Matchers.any,
+    );
+    adapter.onPost(
+      '/trips/t/days/2/entries',
+      (s) => s.throws(503, offline('/trips/t/days/2/entries')),
+      data: Matchers.any,
+    );
+    final r = await client.flushQueue();
+    expect(r.synced, 1);
+    expect((await cache.readQueue()).map((m) => m.id), ['2']);
+  });
+
+  test('5xx(暫時失敗)→ 中止保留佇列、不當衝突 drop', () async {
+    await cache.appendMutation(addMut('1'));
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (s) => s.reply(503, {
+        'error': {'code': 'SYS_UNAVAILABLE'},
+      }),
+      data: Matchers.any,
+    );
+    final r = await client.flushQueue();
+    expect(r.synced, 0);
+    expect(r.conflicts, isEmpty);
+    expect(await cache.readQueue(), hasLength(1)); // 保留待重試
+  });
+
   test('空佇列 → synced 0', () async {
     final r = await client.flushQueue();
     expect(r.synced, 0);
