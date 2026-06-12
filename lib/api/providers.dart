@@ -12,11 +12,16 @@ import 'oauth/oauth_config.dart';
 import 'oauth/oauth_providers.dart';
 import 'requests_repository.dart';
 import 'session_store.dart';
+import 'settings_store.dart';
 import 'share_repository.dart';
 import 'trip_repository.dart';
 
 final sessionStoreProvider = Provider<SessionStore>(
   (ref) => SecureSessionStore(),
+);
+
+final settingsStoreProvider = Provider<SettingsStore>(
+  (ref) => SecureSettingsStore(),
 );
 
 final apiClientProvider = Provider<ApiClient>(
