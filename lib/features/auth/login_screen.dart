@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
+import '../../api/oauth/oauth_login_service.dart';
+import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../theme/tokens.dart';
 
@@ -22,6 +24,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _oauthLoading = false;
+  String? _oauthError;
 
   /// 已知錯誤碼的繁中人話 fallback（server message 非繁中時使用）。
   static const _fallbackMessageByCode = <String, String>{
@@ -43,10 +47,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
-    await ref.read(authStateProvider.notifier).login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+    await ref
+        .read(authStateProvider.notifier)
+        .login(_emailController.text.trim(), _passwordController.text);
+  }
+
+  /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
+  Future<void> _oauthLogin() async {
+    setState(() {
+      _oauthLoading = true;
+      _oauthError = null;
+    });
+    try {
+      await ref.read(oauthLoginServiceProvider).login();
+      if (mounted) ref.invalidate(authStateProvider);
+    } on OAuthLoginException catch (e) {
+      if (mounted) setState(() => _oauthError = e.message);
+    } on Exception {
+      if (mounted) setState(() => _oauthError = 'OAuth 登入失敗,請稍後再試');
+    } finally {
+      if (mounted) setState(() => _oauthLoading = false);
+    }
   }
 
   /// 錯誤訊息：server 回繁中直接用；否則查 code 對照表；再不然通用訊息。
@@ -85,15 +106,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       'Tripline',
                       textAlign: TextAlign.center,
-                      style: textTheme.displaySmall
-                          ?.copyWith(color: colorScheme.primary),
+                      style: textTheme.displaySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: TpSpacing.s2),
                     Text(
                       '把每段旅程，安排得剛剛好',
                       textAlign: TextAlign.center,
-                      style: textTheme.bodyLarge
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: TpSpacing.s8),
                     if (authState.hasError) ...[
@@ -109,8 +132,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         child: Text(
                           _loginErrorMessage(authState.error!),
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: colorScheme.error),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.error,
+                          ),
                         ),
                       ),
                       const SizedBox(height: TpSpacing.s4),
@@ -125,8 +149,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: const InputDecoration(labelText: 'Email'),
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
-                              ? '請輸入 Email'
-                              : null,
+                          ? '請輸入 Email'
+                          : null,
                     ),
                     const SizedBox(height: TpSpacing.s4),
                     TextFormField(
@@ -168,6 +192,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             )
                           : const Text('登入'),
                     ),
+                    if (ref.watch(oauthEnabledProvider)) ...[
+                      const SizedBox(height: TpSpacing.s4),
+                      if (_oauthError != null) ...[
+                        Text(
+                          _oauthError!,
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(height: TpSpacing.s2),
+                      ],
+                      OutlinedButton(
+                        key: const ValueKey('login-oauth-button'),
+                        onPressed: _oauthLoading ? null : _oauthLogin,
+                        child: _oauthLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('用 OAuth 登入'),
+                      ),
+                    ],
                   ],
                 ),
               ),
