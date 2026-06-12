@@ -130,8 +130,18 @@ class ApiClient {
     } on DioException catch (e) {
       final store = _cacheStore;
       if (optimistic != null && store != null && _isOfflineError(e)) {
-        final id =
-            '${DateTime.now().microsecondsSinceEpoch}-${_mutationCounter++}';
+        final now = DateTime.now();
+        final seq = _mutationCounter++;
+        final id = '${now.microsecondsSinceEpoch}-$seq';
+        // 穩定臨時 id:由「微秒×1000 + seq」導出唯一負值,存進 args 一次 →
+        // 入佇列當下與日後 getStream 重播讀同一值(冪等);連續離線新增不碰撞、
+        // 跨重啟單調遞減。已帶 tempId(測試)則尊重之。
+        final args = optimistic.args.containsKey('tempId')
+            ? optimistic.args
+            : {
+                ...optimistic.args,
+                'tempId': -(now.microsecondsSinceEpoch * 1000 + (seq % 1000)),
+              };
         await store.appendMutation(
           QueuedMutation(
             id: id,
@@ -141,15 +151,15 @@ class ApiClient {
             body: body,
             type: optimistic.type,
             cacheKey: optimistic.cacheKey,
-            args: optimistic.args,
-            createdAt: DateTime.now().toIso8601String(),
+            args: args,
+            createdAt: now.toIso8601String(),
           ),
         );
         final current = await store.readResponse(optimistic.cacheKey);
         final patched = applyOptimisticPatch(
           optimistic.type,
           current?.data,
-          optimistic.args,
+          args,
         );
         // null 代表無 base 可 patch(該資源未快取)→ 不寫,僅留佇列待 flush。
         if (patched != null) {

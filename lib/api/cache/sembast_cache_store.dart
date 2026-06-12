@@ -58,7 +58,9 @@ class SembastCacheStore implements CacheStore {
       _db,
       finder: Finder(sortOrders: [SortOrder(Field.key)]),
     );
-    return records.map((r) => QueuedMutation.fromMap(r.value)).toList();
+    return List.unmodifiable(
+      records.map((r) => QueuedMutation.fromMap(r.value)),
+    );
   }
 
   @override

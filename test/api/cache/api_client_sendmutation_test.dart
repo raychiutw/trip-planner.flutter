@@ -141,4 +141,54 @@ void main() {
     final last = emissions.last as List;
     expect((last.first as Map)['timeline'] as List, hasLength(1));
   });
+
+  test('離線新增臨時 id:冪等(重播=入佇列)且連續新增不碰撞', () async {
+    await cache.writeResponse(daysKey, [
+      {'dayNum': 1, 'timeline': <dynamic>[]},
+    ]);
+    // production 路徑:OfflineOp 不帶 tempId,由 sendMutation 入佇列時產生並存進 args。
+    OfflineOp prodAdd(String title) =>
+        OfflineOp('entry.add', daysKey, {'dayNum': 1, 'title': title});
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (s) => s.throws(503, _offline('/trips/t/days/1/entries')),
+      data: Matchers.any,
+    );
+
+    await client.sendMutation(
+      'POST',
+      '/trips/t/days/1/entries',
+      body: {'title': 'One'},
+      optimistic: prodAdd('One'),
+    );
+    await client.sendMutation(
+      'POST',
+      '/trips/t/days/1/entries',
+      body: {'title': 'Two'},
+      optimistic: prodAdd('Two'),
+    );
+
+    final queue = await cache.readQueue();
+    expect(queue, hasLength(2));
+    final id1 = queue[0].args['tempId'];
+    final id2 = queue[1].args['tempId'];
+    expect(id1, isNotNull);
+    expect(id1, isNot(id2)); // 不碰撞
+
+    // getStream 重播:fresh(空)→ 套兩筆 pending → entry id 與 queued tempId 相同、順序穩定
+    adapter.onGet(
+      '/trips/t/days',
+      (s) => s.reply(200, [
+        {'dayNum': 1, 'timeline': <dynamic>[]},
+      ]),
+      queryParameters: {'all': '1'},
+    );
+    final emissions = await client
+        .getStream('/trips/t/days', query: {'all': '1'})
+        .toList();
+    final timeline =
+        ((emissions.last as List).first as Map)['timeline'] as List;
+    final replayIds = timeline.map((e) => (e as Map)['id']).toList();
+    expect(replayIds, [id1, id2]); // 冪等
+  });
 }

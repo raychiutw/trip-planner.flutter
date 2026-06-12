@@ -8,6 +8,9 @@ library;
 typedef OptimisticPatcher =
     Object? Function(Object? cached, Map<String, dynamic> args);
 
+/// 樂觀 entry 的 sortOrder:遠大於任何真實 sortOrder,確保 UI 排在當天末端。
+const int _kOptimisticSortOrder = 1 << 30;
+
 const Map<String, OptimisticPatcher> _patchers = {
   'entry.add': _entryAdd,
   'entry.update': _entryUpdate,
@@ -86,14 +89,15 @@ Object? _entryDelete(Object? cached, Map<String, dynamic> args) {
 }
 
 Map<String, dynamic> _buildOptimisticEntry(Map<String, dynamic> args) {
-  // 臨時負 id(測試可由 args 指定以便斷言);PR-4 flush 成功後 evict+refetch 換成 server id。
+  // 臨時負 id:正常路徑由 sendMutation 在入佇列時產生並存進 args(冪等、不碰撞);
+  // 此處 fallback 僅供直接呼叫 patcher 的情況。PR-4 flush 成功後 evict+refetch 換 server id。
   final tempId =
       (args['tempId'] as int?) ?? -DateTime.now().microsecondsSinceEpoch;
   final lat = args['lat'];
   final lng = args['lng'];
   return {
     'id': tempId,
-    'sortOrder': 1 << 30, // 末端
+    'sortOrder': _kOptimisticSortOrder,
     'title': args['title'],
     'description': args['description'],
     'startTime': args['startTime'],
