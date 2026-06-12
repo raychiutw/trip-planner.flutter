@@ -100,4 +100,76 @@ void main() {
     expect((out[0] as Map)['timeline'] as List, hasLength(1));
     expect((out[1] as Map)['timeline'] as List, hasLength(1));
   });
+
+  group('note patchers', () {
+    Map<String, Object?> makeNotes() => {
+      'flights': [
+        {'id': 1, 'airline': 'A'},
+      ],
+      'lodgings': <dynamic>[],
+      'pretripNotes': [
+        {'id': 9, 'content': 'old'},
+      ],
+    };
+
+    test('note.create 在指定段末端插入 + snake→camel', () {
+      final out =
+          applyOptimisticPatch('note.create', makeNotes(), {
+                'sectionKey': 'flights',
+                'fields': {'airline': 'B', 'flight_no': 'IT5'},
+                'tempId': -1,
+              })
+              as Map;
+      final flights = out['flights'] as List;
+      expect(flights, hasLength(2));
+      expect((flights.last as Map)['flightNo'], 'IT5'); // snake→camel
+      expect((flights.last as Map)['id'], -1);
+    });
+
+    test('note.update merge 欄位', () {
+      final out =
+          applyOptimisticPatch('note.update', makeNotes(), {
+                'sectionKey': 'pretripNotes',
+                'rowId': 9,
+                'fields': {'content': 'new'},
+              })
+              as Map;
+      expect(((out['pretripNotes'] as List).first as Map)['content'], 'new');
+    });
+
+    test('note.delete 移除指定 row', () {
+      final out =
+          applyOptimisticPatch('note.delete', makeNotes(), {
+                'sectionKey': 'flights',
+                'rowId': 1,
+              })
+              as Map;
+      expect(out['flights'] as List, isEmpty);
+    });
+
+    test('note.create 段不存在 → 建新段', () {
+      final out =
+          applyOptimisticPatch(
+                'note.create',
+                {'flights': <dynamic>[]},
+                {
+                  'sectionKey': 'emergencyContacts',
+                  'fields': {'name': 'X'},
+                  'tempId': -2,
+                },
+              )
+              as Map;
+      expect(out['emergencyContacts'] as List, hasLength(1));
+    });
+
+    test('note.create 不就地改原 cached', () {
+      final original = makeNotes();
+      applyOptimisticPatch('note.create', original, {
+        'sectionKey': 'flights',
+        'fields': {'airline': 'Z'},
+        'tempId': -1,
+      });
+      expect(original['flights'] as List, hasLength(1));
+    });
+  });
 }

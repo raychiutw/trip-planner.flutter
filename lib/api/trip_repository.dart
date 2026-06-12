@@ -28,6 +28,17 @@ class TripRepository {
     const {'all': '1'},
   );
 
+  /// notes 快取 key(離線 note 樂觀 patch 的目標)。
+  String _notesKey(String tripId) =>
+      cacheKeyFor('GET', '/trips/${Uri.encodeComponent(tripId)}/notes');
+
+  /// 聚合 GET /notes 的 response 段名(pretrip/emergency 與 URL 段名不同)。
+  String _notesSectionKey(NoteSection s) => switch (s) {
+    NoteSection.pretrip => 'pretripNotes',
+    NoteSection.emergency => 'emergencyContacts',
+    _ => s.name,
+  };
+
   /// GET /my-trips。
   Future<List<TripSummary>> fetchMyTrips() async {
     final responseBody = await _client.get('/my-trips');
@@ -177,9 +188,14 @@ class TripRepository {
     required String tripId,
     required Map<String, dynamic> fields,
   }) {
-    return _client.post(
+    return _client.sendMutation(
+      'POST',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}',
       body: fields,
+      optimistic: OfflineOp('note.create', _notesKey(tripId), {
+        'sectionKey': _notesSectionKey(section),
+        'fields': fields,
+      }),
     );
   }
 
@@ -191,9 +207,15 @@ class TripRepository {
     required Map<String, dynamic> fields,
     int? expectedVersion,
   }) {
-    return _client.patch(
+    return _client.sendMutation(
+      'PATCH',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
       body: {...fields, 'expectedVersion': ?expectedVersion},
+      optimistic: OfflineOp('note.update', _notesKey(tripId), {
+        'sectionKey': _notesSectionKey(section),
+        'rowId': rowId,
+        'fields': fields,
+      }),
     );
   }
 
@@ -203,8 +225,13 @@ class TripRepository {
     required String tripId,
     required int rowId,
   }) {
-    return _client.delete(
+    return _client.sendMutation(
+      'DELETE',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
+      optimistic: OfflineOp('note.delete', _notesKey(tripId), {
+        'sectionKey': _notesSectionKey(section),
+        'rowId': rowId,
+      }),
     );
   }
 

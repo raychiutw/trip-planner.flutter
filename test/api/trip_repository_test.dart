@@ -973,5 +973,38 @@ void main() {
       final days = (await cache.readResponse(daysKey))!.data as List;
       expect((days.first as Map)['timeline'] as List, isEmpty);
     });
+
+    test('createNote(pretrip)離線 → 入佇列 + patch 對到 pretripNotes 段', () async {
+      final notesKey = cacheKeyFor('GET', '/trips/okinawa/notes');
+      await cache.writeResponse(notesKey, {
+        'flights': <dynamic>[],
+        'pretripNotes': <dynamic>[],
+      });
+      dioAdapter.onPost(
+        '/trips/okinawa/notes/pretrip',
+        (server) => server.throws(
+          503,
+          DioException(
+            requestOptions: RequestOptions(
+              path: '/trips/okinawa/notes/pretrip',
+            ),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+        data: Matchers.any,
+      );
+
+      await repo.createNote(
+        NoteSection.pretrip,
+        tripId: 'okinawa',
+        fields: {'content': '記得帶護照'},
+      );
+
+      final q = await cache.readQueue();
+      expect(q.single.type, 'note.create');
+      final notes = (await cache.readResponse(notesKey))!.data as Map;
+      // section 段名 gotcha:pretrip → pretripNotes(非 'pretrip')
+      expect(notes['pretripNotes'] as List, hasLength(1));
+    });
   });
 }
