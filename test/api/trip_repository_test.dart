@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/cache/cache_keys.dart';
+import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/destination_input.dart';
@@ -772,5 +774,130 @@ void main() {
       ),
       completes,
     );
+  });
+
+  // watchX(SWR stream)— 上線讀取實際走這些;直接測解析路徑(尤其 watchEntry/watchSegments)。
+  group('watchX SWR streams', () {
+    test('watchMyTrips:無快取 → 單一 emission 解析 TripSummary list', () async {
+      dioAdapter.onGet(
+        '/my-trips',
+        (server) => server.reply(200, [
+          {'tripId': 't1', 'name': 'N', 'totalDays': 3},
+        ]),
+      );
+      final emissions = await tripRepository.watchMyTrips().toList();
+      expect(emissions, hasLength(1));
+      expect(emissions.single.single.tripId, 't1');
+    });
+
+    test('watchTrip:無快取 → 解析 Trip', () async {
+      dioAdapter.onGet(
+        '/trips/okinawa',
+        (server) => server.reply(200, {'id': 'okinawa', 'name': 'Okinawa'}),
+      );
+      final trip = await tripRepository.watchTrip('okinawa').first;
+      expect(trip.id, 'okinawa');
+    });
+
+    test('watchDays:無快取 → 解析巢狀 timeline', () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/days',
+        (server) => server.reply(200, [
+          {
+            'id': 11,
+            'dayNum': 1,
+            'title': '抵達那霸',
+            'timeline': [
+              {'id': 101, 'sortOrder': 0, 'title': '首里城', 'alternates': []},
+            ],
+          },
+        ]),
+        queryParameters: {'all': '1'},
+      );
+      final days = await tripRepository.watchDays('okinawa').first;
+      expect(days.single.timeline.single.title, '首里城');
+    });
+
+    test('watchNotes:無快取 → 解析 5 區', () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/notes',
+        (server) => server.reply(200, {
+          'flights': [
+            {'id': 1, 'sortOrder': 0, 'version': 1, 'flightNo': 'IT232'},
+          ],
+          'lodgings': [],
+          'reservations': [],
+          'pretripNotes': [],
+          'emergencyContacts': [],
+        }),
+      );
+      final notes = await tripRepository.watchNotes('okinawa').first;
+      expect(notes.flights.single.flightNo, 'IT232');
+    });
+
+    test('watchSegments:無快取 → 解析 TripSegment list', () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/segments',
+        (server) => server.reply(200, [
+          {'id': 5, 'mode': 'transit', 'min': 20, 'version': 3},
+        ]),
+      );
+      final segs = await tripRepository.watchSegments(tripId: 'okinawa').first;
+      expect(segs.single.id, 5);
+      expect(segs.single.version, 3);
+    });
+
+    test('watchEntry:無快取 → 解析 master/alternates/entryPoisVersion', () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/entries/11',
+        (server) => server.reply(200, {
+          'id': 11,
+          'sortOrder': 0,
+          'title': '首里城',
+          'version': 2,
+          'entryPoisVersion': '4',
+          'master': {'poiId': 501, 'name': '首里城公園'},
+          'alternates': [
+            {'poiId': 502, 'name': '玉陵', 'sortOrder': 2},
+          ],
+        }),
+      );
+      final entry = await tripRepository
+          .watchEntry(tripId: 'okinawa', entryId: 11)
+          .first;
+      expect(entry.master?.poiId, 501);
+      expect(entry.entryPoisVersion, '4');
+      expect(entry.alternates.single.poiId, 502);
+    });
+
+    test('watchDays:有快取 → 先 stale 後 fresh(SWR 兩次 emission)', () async {
+      final cache = InMemoryCacheStore();
+      final swrDio = Dio();
+      final swrAdapter = DioAdapter(dio: swrDio);
+      final swrRepo = TripRepository(
+        client: ApiClient(
+          sessionStore: InMemorySessionStore(),
+          dio: swrDio,
+          cacheStore: cache,
+        ),
+      );
+      await cache.writeResponse(
+        cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'}),
+        [
+          {'id': 11, 'dayNum': 1, 'title': 'stale', 'timeline': []},
+        ],
+      );
+      swrAdapter.onGet(
+        '/trips/okinawa/days',
+        (server) => server.reply(200, [
+          {'id': 11, 'dayNum': 1, 'title': 'fresh', 'timeline': []},
+        ]),
+        queryParameters: {'all': '1'},
+      );
+      final emissions = await swrRepo.watchDays('okinawa').toList();
+      expect(emissions, hasLength(2));
+      expect(emissions.first.single.displayTitle, 'stale');
+      expect(emissions.last.single.displayTitle, 'fresh');
+    });
   });
 }
