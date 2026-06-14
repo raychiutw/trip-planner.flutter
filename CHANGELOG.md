@@ -26,6 +26,7 @@
 - `kTriplineOrigin` 由固定常數改為 `String.fromEnvironment`(預設值不變,既有測試零破壞)。
 - `docs/PORTING_PLAN.md`:dart-define 覆寫由 `TRIPLINE_API_URL` 更正為 `TRIPLINE_API_ORIGIN`(origin 語意)。
 - **favorites review cleanup**:收藏比對改「名稱」單一 key（消除 server poiType 與 client category 映射不一致致取消收藏失效）、AddToTripScreen 改純讀 fallback + 「結束晚於開始」驗證 + 送出守門、router add-to-trip 對遺失 extra 改 redirect 防 crash;移除 dead code `AddToTripResult`、`poi_type` RegExp 提升檔案層級、抽共用 `PoiRatingLabel` 與 `reorderedSortOrders`。
+- **過時文案清理**:收藏空狀態移除「(即將推出)」(探索功能早已上線),改為「去探索」按鈕直達 `/favorites/explore`;校正 `AccountScreen` 設定群組過時註解(外觀/個人資料已可用,僅通知為即將推出)。
 
 ## [0.1.0] - 2026-06-10
 
