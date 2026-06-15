@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-15
+
+離線寫衝突解決 + web 對齊:離線 OCC rebase(三方 merge)、時間軸資訊密度補齊、行程清單搜尋、聊天建議引導。
+
+### 新增
+
+- **離線寫 OCC 409 三方 merge rebase**:離線編輯重連 flush 遇 `STALE_ENTRY` 時自動 **dirty-aware 三方 merge**(只比對/重送使用者改過的欄位)→ 無真衝突靜默 rebase、真衝突進持久化 conflict store + banner 點開 bottom sheet 整筆二選一(保留你的 / 用對方的)。不丟資料:重抓/重送離線保留、`newVersion` 缺失當衝突、row 被刪上報;換帳號/登出一併清 conflict store。範圍 `entry.update` + `note.update`。新增 `rebase_merge.dart`(rebaseMerge / dirtyFields / entry|note 欄位擷取)、`ConflictRecord` + conflict store(Sembast)、`_send` writeCache 參數。
+- **時間軸資訊補齊(對齊 web 手機版)**:交通段顯示距離 km(`travel.distanceM`)、當日總覽「N 個停留點 · 總距離 km」、景點停留時長、**注意事項卡**(POI 營業時間早於提醒,移植 web `validateDay`)、entry 編號 + 當日時間範圍。
+- **行程清單搜尋**:本地 filter(名稱 / 標題)。
+- **聊天空對話引導**:「從一個指令開始」+ 4 個建議 prompt 快捷鈕。
+
+### 變更
+
+- `AuthNotifier` 換帳號 / 登出清快取一併清 conflict store(沿用 `__cache_owner__` owner-check)。
+
 ## [0.2.0] - 2026-06-15
 
 P1 + P2 收斂發版:收藏/探索、Entry CRUD、筆記 CRUD、AI 聊天、建立/編輯行程、全域地圖、共編邀請、設定子頁、分享連結、OAuth PKCE(就緒待啟用)、離線快取(讀寫同步)。
