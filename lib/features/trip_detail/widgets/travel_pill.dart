@@ -40,12 +40,32 @@ class TravelPill extends StatelessWidget {
     }
   }
 
+  /// 距離公尺 → 顯示字串：>=1000m 整數 km；<1000m 顯示 M m。
+  static String _formatDistance(int distanceM) {
+    if (distanceM >= 1000) {
+      return '${distanceM ~/ 1000} km';
+    }
+    return '$distanceM m';
+  }
+
   @override
   Widget build(BuildContext context) {
     final tones = Theme.of(context).extension<TpTones>()!;
-    final label = travel.min != null
-        ? '${travel.min} 分鐘'
-        : (travel.desc ?? '移動');
+
+    final String label;
+    final hasMin = travel.min != null;
+    final hasDist = travel.distanceM != null;
+
+    if (hasMin && hasDist) {
+      label =
+          '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
+    } else if (hasMin) {
+      label = '${travel.min} 分鐘';
+    } else if (hasDist) {
+      label = _formatDistance(travel.distanceM!);
+    } else {
+      label = travel.desc ?? '移動';
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
