@@ -9,7 +9,6 @@ import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_status_banner.dart';
-import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 QueuedMutation _mut(String id) => QueuedMutation(
@@ -20,6 +19,20 @@ QueuedMutation _mut(String id) => QueuedMutation(
   type: 'entry.add',
   cacheKey: cacheKeyFor('GET', '/trips/t/days', {'all': '1'}),
   args: const {'dayNum': 1},
+  createdAt: 't',
+);
+
+ConflictRecord _conflict(String id) => ConflictRecord(
+  id: id,
+  type: 'entry.update',
+  path: '/trips/t/entries/7',
+  body: const {'title': '我的標題'},
+  args: const {'entryId': 7, 'title': '我的標題'},
+  cacheKey: cacheKeyFor('GET', '/trips/t/days', {'all': '1'}),
+  ours: const {'title': '我的標題'},
+  theirs: const {'title': '對方標題'},
+  newVersion: 5,
+  conflictFields: const ['title'],
   createdAt: 't',
 );
 
@@ -101,19 +114,42 @@ void main() {
     expect(await cache.readQueue(), isEmpty);
   });
 
-  testWidgets('有衝突 → 顯示衝突 + 知道了清除', (tester) async {
+  testWidgets('banner 顯示 conflict store 衝突數', (tester) async {
+    await cache.appendConflict(_conflict('c1'));
     await pump(tester);
-    container.read(syncConflictsProvider.notifier).set([_mut('c1')]);
-    await tester.pumpAndSettle();
 
     expect(
       find.byKey(const ValueKey('offline-conflict-banner')),
       findsOneWidget,
     );
-    expect(find.text('1 筆變更同步失敗(衝突)'), findsOneWidget);
+    expect(find.text('1 筆同步衝突'), findsOneWidget);
+    expect(find.text('檢視'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('知道了'));
+  testWidgets('點檢視 → 開 bottom sheet,逐筆二選一(用對方的)', (tester) async {
+    await cache.appendConflict(_conflict('c1'));
+    await pump(tester);
+
+    await tester.tap(find.text('檢視'));
     await tester.pumpAndSettle();
+
+    // sheet 出現:衝突卡 + 兩顆鈕 + theirs 並排值。
+    expect(find.byKey(const ValueKey('conflict-card-c1')), findsOneWidget);
+    expect(find.text('對方標題'), findsOneWidget); // theirs 並排值(唯一)
+    expect(find.text('標題'), findsOneWidget); // 欄位人話標籤
+    expect(find.byKey(const ValueKey('conflict-keep-ours-c1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('conflict-keep-theirs-c1')),
+      findsOneWidget,
+    );
+
+    // 用對方的 → 純本機 removeConflict;store 變空。
+    await tester.tap(find.byKey(const ValueKey('conflict-keep-theirs-c1')));
+    await tester.pumpAndSettle();
+
+    expect(await cache.readConflicts(), isEmpty);
+    // 清單空 → sheet 自動關閉,banner 也消失。
+    expect(find.byKey(const ValueKey('conflict-card-c1')), findsNothing);
     expect(find.byKey(const ValueKey('offline-conflict-banner')), findsNothing);
   });
 }

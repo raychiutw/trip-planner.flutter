@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/tokens.dart';
+import 'conflict_resolve_sheet.dart';
 import 'offline_sync.dart';
 
 class OfflineStatusBanner extends ConsumerWidget {
@@ -14,20 +15,21 @@ class OfflineStatusBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final conflicts = ref.watch(syncConflictsProvider);
+    final conflictCount =
+        ref.watch(syncConflictRecordsProvider).value?.length ?? 0;
     final pending = ref.watch(offlinePendingCountProvider).value ?? 0;
     final syncing = ref.watch(offlineSyncControllerProvider).isLoading;
 
-    // 衝突優先:同步失敗(含 OCC 衝突)需使用者知悉。
-    if (conflicts.isNotEmpty) {
+    // 衝突優先:同步衝突(OCC 真衝突)需使用者逐筆解決。
+    if (conflictCount > 0) {
       return _Bar(
         key: const ValueKey('offline-conflict-banner'),
         background: colorScheme.errorContainer,
         foreground: colorScheme.onErrorContainer,
         icon: Icons.error_outline,
-        text: '${conflicts.length} 筆變更同步失敗(衝突)',
-        actionLabel: '知道了',
-        onAction: () => ref.read(syncConflictsProvider.notifier).clear(),
+        text: '$conflictCount 筆同步衝突',
+        actionLabel: '檢視',
+        onAction: () => showConflictResolveSheet(context, ref),
       );
     }
 

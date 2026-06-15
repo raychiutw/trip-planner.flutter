@@ -18,19 +18,17 @@ final offlinePendingCountProvider = StreamProvider<int>((ref) async* {
   }
 });
 
-/// 最後一次 flush 的衝突清單(供 UI 上報;PR-5 顯示)。
-final syncConflictsProvider =
-    NotifierProvider<SyncConflictsController, List<QueuedMutation>>(
-      SyncConflictsController.new,
-    );
-
-class SyncConflictsController extends Notifier<List<QueuedMutation>> {
-  @override
-  List<QueuedMutation> build() => const [];
-
-  void set(List<QueuedMutation> conflicts) => state = conflicts;
-  void clear() => state = const [];
-}
+/// 待解決衝突(持久化 conflict store);store 變動反應式刷新。
+/// 真相源是 conflict store(flushQueue / resolveConflict 寫入),非記憶體。
+final syncConflictRecordsProvider = StreamProvider<List<ConflictRecord>>((
+  ref,
+) async* {
+  final store = ref.watch(cacheStoreProvider);
+  yield await store.readConflicts();
+  await for (final _ in store.changes) {
+    yield await store.readConflicts();
+  }
+});
 
 /// 同步控制器:sync() 觸發 flush、更新衝突/筆數、invalidate 讀取以套 server 真相。
 final offlineSyncControllerProvider =
@@ -48,7 +46,8 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
     state = const AsyncLoading();
     try {
       final result = await ref.read(apiClientProvider).flushQueue();
-      ref.read(syncConflictsProvider.notifier).set(result.conflicts);
+      // 衝突已由 flushQueue 寫進 conflict store,syncConflictRecordsProvider
+      // 透過 store.changes 反應式刷新,這裡不需手動 set。
       // offlinePendingCountProvider 由 cacheStore.changes 反應式更新,flush 的
       // removeMutation 會自動讓 badge 歸零,不需在此手動 invalidate。
       if (result.synced > 0 || result.conflicts.isNotEmpty) {
