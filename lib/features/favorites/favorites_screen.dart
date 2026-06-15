@@ -125,10 +125,17 @@ class _EmptyHero extends StatelessWidget {
                 Text('還沒有收藏的地點', style: theme.textTheme.titleLarge),
                 const SizedBox(height: TpSpacing.s2),
                 Text(
-                  '探索並收藏喜歡的地點（即將推出）。',
+                  '探索並收藏喜歡的地點。',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: TpSpacing.s4),
+                FilledButton.tonalIcon(
+                  key: const ValueKey('favorites-empty-explore'),
+                  onPressed: () => context.go('/favorites/explore'),
+                  icon: const Icon(Icons.search),
+                  label: const Text('去探索'),
                 ),
               ],
             ),

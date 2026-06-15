@@ -69,6 +69,8 @@ void main() {
 
       expect(find.byType(PoiFavoriteCard), findsNothing);
       expect(find.text('還沒有收藏的地點'), findsOneWidget);
+      expect(find.text('去探索'), findsOneWidget); // 引導去已上線的探索
+      expect(find.textContaining('即將推出'), findsNothing); // 過時文案已移除
     });
 
     testWidgets('error → 重試後成功', (tester) async {
@@ -180,6 +182,43 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.byKey(const ValueKey('favorites-explore-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('EXPLORE-PROBE'), findsOneWidget);
+    });
+
+    testWidgets('empty「去探索」→ 導到 /favorites/explore', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(const []));
+
+      final router = GoRouter(
+        initialLocation: '/favorites',
+        routes: [
+          GoRoute(
+            path: '/favorites',
+            builder: (context, state) => const FavoritesScreen(),
+            routes: [
+              GoRoute(
+                path: 'explore',
+                builder: (context, state) =>
+                    const Scaffold(body: Text('EXPLORE-PROBE')),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorites-empty-explore')));
       await tester.pumpAndSettle();
       expect(find.text('EXPLORE-PROBE'), findsOneWidget);
     });

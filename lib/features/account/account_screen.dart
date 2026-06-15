@@ -265,7 +265,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「外觀」「通知」皆為即將推出（disabled）。
+/// 設定群組：「個人資料」「外觀」可進子頁;「通知」即將推出（disabled）。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
