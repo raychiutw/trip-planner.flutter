@@ -25,6 +25,7 @@ class QueuedMutation {
     required this.cacheKey,
     required this.args,
     required this.createdAt,
+    this.base,
   });
 
   final String id;
@@ -36,6 +37,8 @@ class QueuedMutation {
   final String cacheKey; // 受影響的 GET 快取 key
   final Map<String, dynamic> args; // patcher 參數
   final String createdAt;
+  /// rebase 三方比對用:離線寫入當下受影響欄位的原始值,缺漏舊資料降級為 null。
+  final Map<String, dynamic>? base;
 
   Map<String, Object?> toMap() => {
     'id': id,
@@ -47,6 +50,7 @@ class QueuedMutation {
     'cacheKey': cacheKey,
     'args': args,
     'createdAt': createdAt,
+    'base': base,
   };
 
   factory QueuedMutation.fromMap(Map<String, Object?> m) => QueuedMutation(
@@ -59,6 +63,7 @@ class QueuedMutation {
     cacheKey: m['cacheKey'] as String,
     args: (m['args'] as Map).cast<String, dynamic>(),
     createdAt: m['createdAt'] as String,
+    base: (m['base'] as Map?)?.cast<String, dynamic>(),
   );
 }
 
