@@ -51,5 +51,45 @@ void main() {
       await pumpPill(tester, const Travel(type: 'bus'));
       expect(find.text('移動'), findsOneWidget);
     });
+
+    // 距離顯示（對齊 web「20 分鐘 · 11 km」）
+    testWidgets('min 與 distanceM 皆有 → 「N 分鐘 · K km」', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'car', min: 20, distanceM: 11000),
+      );
+      expect(find.text('20 分鐘 · 11 km'), findsOneWidget);
+    });
+
+    testWidgets('僅 distanceM(>=1000m) → 整數 km', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'walk', distanceM: 5500),
+      );
+      expect(find.text('5 km'), findsOneWidget);
+    });
+
+    testWidgets('僅 distanceM(<1000m) → 「M m」', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'walk', distanceM: 350),
+      );
+      expect(find.text('350 m'), findsOneWidget);
+    });
+
+    testWidgets('min 與 distanceM 皆無、有 desc → desc（fallback 不變）',
+        (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'train', desc: '接駁車'),
+      );
+      expect(find.text('接駁車'), findsOneWidget);
+    });
+
+    testWidgets('min 與 distanceM 與 desc 皆無 → 「移動」（fallback 不變）',
+        (tester) async {
+      await pumpPill(tester, const Travel(type: 'ferry'));
+      expect(find.text('移動'), findsOneWidget);
+    });
   });
 }

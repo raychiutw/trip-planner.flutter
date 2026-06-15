@@ -6,7 +6,9 @@ import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import 'day_warnings.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
@@ -289,6 +291,7 @@ class _DaySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
+    final warnings = validateDay(timeline);
     final segments = switch (ref.watch(tripSegmentsProvider(tripId))) {
       AsyncData(:final value) => value,
       _ => const <TripSegment>[],
@@ -299,6 +302,10 @@ class _DaySection extends ConsumerWidget {
       children: [
         DayHeader(day: day),
         const SizedBox(height: TpSpacing.s3),
+        if (warnings.isNotEmpty) ...[
+          _DayWarningsCard(warnings: warnings),
+          const SizedBox(height: TpSpacing.s3),
+        ],
         if (day.hotel != null) ...[
           HotelCard(hotel: day.hotel!),
           const SizedBox(height: TpSpacing.s3),
@@ -331,6 +338,7 @@ class _DaySection extends ConsumerWidget {
                   onDelete: () => _confirmDelete(context, ref, entry),
                   child: TimelineEntryTile(
                     entry: entry,
+                    number: i + 1,
                     isFirst: i == 0,
                     isLast: i == timeline.length - 1,
                     onTap: () => showEntryEditSheet(
@@ -365,6 +373,56 @@ class _DaySection extends ConsumerWidget {
         ),
         const SizedBox(height: TpSpacing.s6),
       ],
+    );
+  }
+}
+
+/// 注意事項卡：早於營業時間等提醒,以 warning tone 呈現（淡底 + 警示圖示）。
+class _DayWarningsCard extends StatelessWidget {
+  const _DayWarningsCard({required this.warnings});
+
+  final List<String> warnings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final warningColor = theme.extension<TpTones>()!.warning;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: warningColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        border: Border.all(color: warningColor.withValues(alpha: 0.24)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 18, color: warningColor),
+              const SizedBox(width: TpSpacing.s2),
+              Text(
+                '注意事項',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          for (final warning in warnings)
+            Padding(
+              padding: const EdgeInsets.only(top: TpSpacing.s1),
+              child: Text(
+                warning,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -12,14 +12,51 @@ final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
 });
 
-/// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 下拉更新 + 單欄卡片清單。
+/// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 搜尋框 + 下拉更新 + 單欄卡片清單。
 /// 點卡片進詳情；長按開 bottom sheet 刪除（AlertDialog 二次確認）。
-class TripsListScreen extends ConsumerWidget {
+class TripsListScreen extends ConsumerStatefulWidget {
   const TripsListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TripsListScreen> createState() => _TripsListScreenState();
+}
+
+class _TripsListScreenState extends ConsumerState<TripsListScreen> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _query = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<TripSummary> _filter(List<TripSummary> trips) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return trips;
+    return trips
+        .where(
+          (t) =>
+              t.displayTitle.toLowerCase().contains(q) ||
+              t.name.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final myTripsAsync = ref.watch(myTripsProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('我的行程')),
@@ -28,25 +65,74 @@ class TripsListScreen extends ConsumerWidget {
         onPressed: () => context.push('/new-trip'),
         child: const Icon(Icons.add),
       ),
-      body: myTripsAsync.when(
-        data: (trips) => RefreshIndicator(
-          onRefresh: () => ref.refresh(myTripsProvider.future),
-          child: trips.isEmpty
-              ? const _EmptyHero()
-              : _buildTripList(context, ref, trips),
-        ),
-        error: (error, stackTrace) =>
-            _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
-        loading: () => const Center(child: CircularProgressIndicator()),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              TpSpacing.s4,
+              TpSpacing.s2,
+              TpSpacing.s4,
+              TpSpacing.s2,
+            ),
+            child: TextField(
+              key: const ValueKey('trips-search-field'),
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: '搜尋行程',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: myTripsAsync.when(
+              data: (trips) {
+                final filtered = _filter(trips);
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(myTripsProvider.future),
+                  child: trips.isEmpty
+                      ? const _EmptyHero()
+                      : filtered.isEmpty
+                          ? _buildNoResults(theme)
+                          : _buildTripList(context, filtered),
+                );
+              },
+              error: (error, stackTrace) =>
+                  _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
+              loading: () => const Center(child: CircularProgressIndicator()),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTripList(
-    BuildContext context,
-    WidgetRef ref,
-    List<TripSummary> trips,
-  ) {
+  Widget _buildNoResults(ThemeData theme) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Text(
+              '找不到符合的行程',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTripList(BuildContext context, List<TripSummary> trips) {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -59,18 +145,14 @@ class TripsListScreen extends ConsumerWidget {
           trip: trip,
           tone: TripCardTone.values[index % TripCardTone.values.length],
           onTap: () => context.go('/trips/${trip.tripId}'),
-          onLongPress: () => _showTripActions(context, ref, trip),
+          onLongPress: () => _showTripActions(context, trip),
         );
       },
     );
   }
 
   /// 長按卡片 → bottom sheet（刪除行程）。
-  Future<void> _showTripActions(
-    BuildContext context,
-    WidgetRef ref,
-    TripSummary trip,
-  ) async {
+  Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
     final selectedDelete = await showModalBottomSheet<bool>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -117,13 +199,12 @@ class TripsListScreen extends ConsumerWidget {
       },
     );
     if (selectedDelete != true || !context.mounted) return;
-    await _confirmAndDeleteTrip(context, ref, trip);
+    await _confirmAndDeleteTrip(context, trip);
   }
 
   /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。
   Future<void> _confirmAndDeleteTrip(
     BuildContext context,
-    WidgetRef ref,
     TripSummary trip,
   ) async {
     final confirmedDelete = await showDialog<bool>(

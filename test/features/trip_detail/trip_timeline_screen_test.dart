@@ -387,6 +387,47 @@ void main() {
     expect(captured.single.dayId, 2);
   });
 
+  testWidgets('entry 早於營業時間 → 顯示「注意事項」卡', (tester) async {
+    await _pumpTimeline(
+      tester,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '早起測試',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '08:00',
+              title: '美麗海水族館',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                type: 'attraction',
+                hours: '09:00-18:00',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('注意事項'), findsOneWidget);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+    expect(
+      find.text('美麗海水族館（08:00)可能早於 沖繩美麗海水族館 營業時間（09:00-18:00)'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('無早於營業時間問題 → 不顯示「注意事項」卡', (tester) async {
+    await _pumpTimeline(tester);
+    expect(find.text('注意事項'), findsNothing);
+  });
+
   testWidgets('點 travel pill → 大眾運輸填分鐘 → updateSegment', (tester) async {
     final repo = _MockTripRepository();
     when(

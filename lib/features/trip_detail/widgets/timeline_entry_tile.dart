@@ -4,6 +4,7 @@ import '../../../models/entry.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/poi_tone.dart';
+import 'entry_duration.dart';
 
 /// 時間欄寬度（timeline rail 對齊用，travel row 共用）。
 const double kTimelineTimeColumnWidth = 48;
@@ -17,6 +18,7 @@ class TimelineEntryTile extends StatelessWidget {
   const TimelineEntryTile({
     super.key,
     required this.entry,
+    required this.number,
     this.isFirst = false,
     this.isLast = false,
     this.onTap,
@@ -24,6 +26,9 @@ class TimelineEntryTile extends StatelessWidget {
   });
 
   final TimelineEntry entry;
+
+  /// 當日序號（1-based),渲染於 rail badge。
+  final int number;
 
   /// 當日第一個 entry：rail 不畫圓點上方連線。
   final bool isFirst;
@@ -75,11 +80,22 @@ class TimelineEntryTile extends StatelessWidget {
                 ),
                 Container(
                   key: ValueKey('entry-dot-${entry.id}'),
-                  width: 10,
-                  height: 10,
+                  width: 18,
+                  height: 18,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: tone.deep,
                     shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$number',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onPrimary,
+                      height: 1,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -124,6 +140,26 @@ class _EntryCard extends StatelessWidget {
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
     final metaItems = <Widget>[];
+    final duration = formatEntryDuration(entry.startTime, entry.endTime);
+    if (duration != null) {
+      metaItems.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.schedule, size: 14, color: mutedColor),
+            const SizedBox(width: 2),
+            Text(
+              duration,
+              style: TextStyle(
+                fontSize: 12,
+                color: mutedColor,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (master != null) {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
