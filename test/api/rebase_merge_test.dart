@@ -27,4 +27,38 @@ void main() {
       expect(rebaseMerge({'min': 5}, {'min': 7}, {'min': 5.0}), isEmpty);
     });
   });
+
+  group('extractEntryFields', () {
+    final days = [
+      {'dayNum': 1, 'timeline': [
+        {'id': 7, 'title': '舊標題', 'description': 'd', 'startTime': '09:00',
+         'endTime': '10:00', 'version': 3},
+      ]},
+    ];
+    test('找到 entry → 取指定欄位 + version(camelCase)', () {
+      final r = extractEntryFields(days, 7, ['title', 'startTime']);
+      expect(r, {'title': '舊標題', 'startTime': '09:00', 'version': 3});
+    });
+    test('找不到 entry → null', () {
+      expect(extractEntryFields(days, 999, ['title']), isNull);
+    });
+    test('cached 非 List → null', () {
+      expect(extractEntryFields(null, 7, ['title']), isNull);
+    });
+  });
+
+  group('extractNoteFields', () {
+    final notes = {
+      'pretripNotes': [
+        {'id': 5, 'content': '舊內容', 'version': 2},
+      ],
+    };
+    test('找到 note row → 取欄位 + version', () {
+      final r = extractNoteFields(notes, 'pretripNotes', 5, ['content']);
+      expect(r, {'content': '舊內容', 'version': 2});
+    });
+    test('段不存在 → null', () {
+      expect(extractNoteFields(notes, 'flights', 5, ['content']), isNull);
+    });
+  });
 }
