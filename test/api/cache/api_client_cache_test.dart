@@ -265,4 +265,24 @@ void main() {
     adapter.onGet('/trips', (s) => s.reply(200, []));
     expect(await plain.get('/trips'), []);
   });
+
+  group('writeCache 開關', () {
+    test('writeCache:false → GET 成功後快取不被寫入(仍為 null)', () async {
+      final key = cacheKeyFor('GET', '/trips/t1');
+      adapter.onGet('/trips/t1', (s) => s.reply(200, {'id': 't1'}));
+
+      await client.get('/trips/t1', writeCache: false);
+
+      expect(await cache.readResponse(key), isNull);
+    });
+
+    test('預設 writeCache:true → GET 成功後快取有新值(回歸保護)', () async {
+      final key = cacheKeyFor('GET', '/trips/t1');
+      adapter.onGet('/trips/t1', (s) => s.reply(200, {'id': 't1'}));
+
+      await client.get('/trips/t1');
+
+      expect((await cache.readResponse(key))!.data, {'id': 't1'});
+    });
+  });
 }

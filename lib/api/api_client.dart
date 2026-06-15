@@ -70,7 +70,8 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     CancelToken? cancelToken,
-  }) => _send('GET', path, query: query, cancelToken: cancelToken);
+    bool writeCache = true,
+  }) => _send('GET', path, query: query, cancelToken: cancelToken, writeCache: writeCache);
 
   Future<dynamic> post(
     String path, {
@@ -242,6 +243,7 @@ class ApiClient {
     CancelToken? cancelToken,
     bool isRetryAttempt = false,
     bool fallbackToCache = true,
+    bool writeCache = true,
   }) async {
     final requestHeaders = <String, dynamic>{};
     final bearer = await _bearerSource?.accessToken();
@@ -296,6 +298,7 @@ class ApiClient {
       cancelToken: cancelToken,
       isRetryAttempt: true,
       fallbackToCache: fallbackToCache,
+      writeCache: writeCache,
     );
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
       final waitSeconds = parseRetryAfterSeconds(
@@ -324,7 +327,7 @@ class ApiClient {
         responseData == null ||
         (responseData is String && responseData.isEmpty);
     if (method == 'GET') {
-      if (!isEmpty && _isCacheableGet(path)) {
+      if (writeCache && !isEmpty && _isCacheableGet(path)) {
         await _cacheStore?.writeResponse(
           cacheKeyFor('GET', path, query),
           responseData,
