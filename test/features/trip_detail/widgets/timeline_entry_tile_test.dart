@@ -89,6 +89,35 @@ void main() {
       expect(find.text('14:00'), findsOneWidget);
     });
 
+    testWidgets('start + end 皆有 → 顯示時長', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 4,
+          sortOrder: 0,
+          version: 0,
+          startTime: '09:00',
+          endTime: '11:00',
+          title: '美麗海水族館',
+        ),
+      );
+      expect(find.text('2 hr'), findsOneWidget);
+    });
+
+    testWidgets('缺 endTime → 不顯示時長', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 5,
+          sortOrder: 0,
+          version: 0,
+          startTime: '09:00',
+          title: '美麗海水族館',
+        ),
+      );
+      expect(find.textContaining('hr'), findsNothing);
+    });
+
     testWidgets('有 onTap：點內容卡觸發 callback', (tester) async {
       var tapped = 0;
       await tester.pumpWidget(

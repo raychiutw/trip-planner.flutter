@@ -4,6 +4,7 @@ import '../../../models/entry.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/poi_tone.dart';
+import 'entry_duration.dart';
 
 /// 時間欄寬度（timeline rail 對齊用，travel row 共用）。
 const double kTimelineTimeColumnWidth = 48;
@@ -124,6 +125,26 @@ class _EntryCard extends StatelessWidget {
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
     final metaItems = <Widget>[];
+    final duration = formatEntryDuration(entry.startTime, entry.endTime);
+    if (duration != null) {
+      metaItems.add(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.schedule, size: 14, color: mutedColor),
+            const SizedBox(width: 2),
+            Text(
+              duration,
+              style: TextStyle(
+                fontSize: 12,
+                color: mutedColor,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (master != null) {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
