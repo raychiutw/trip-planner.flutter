@@ -84,6 +84,19 @@ class SembastCacheStore implements CacheStore {
     _changes.add(null);
   }
 
+  // T5 實作
+  @override
+  Future<List<ConflictRecord>> readConflicts() => throw UnimplementedError();
+
+  // T5 實作
+  @override
+  Future<void> appendConflict(ConflictRecord conflict) =>
+      throw UnimplementedError();
+
+  // T5 實作
+  @override
+  Future<void> removeConflict(String id) => throw UnimplementedError();
+
   @override
   Future<void> clear() async {
     await _store.delete(_db);
