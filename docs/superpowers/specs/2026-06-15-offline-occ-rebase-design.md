@@ -71,6 +71,8 @@ List<String> rebaseMerge(
 
 回傳 `conflictFields`(空 = 可自動 rebase)。純函式、可獨立測,對齊 `optimistic_patchers` 慣例。
 
+**[C1] 型別正規化比對**:wire 數字可能 int 或 double(CLAUDE.md model 規則),直接 `==` 會把同值不同型(`5` vs `5.0`)誤判為衝突。比對前正規化:`num` 統一轉 `double` 再比,其餘型別(String/bool/null)原樣 `==`。entry 可編輯欄位全字串(安全),note `fields` 可能含數字欄位,故正規化必要。
+
 **欄位命名統一在 camelCase**:
 - `entry.update` 的 args 已是 camelCase(`title`/`description`/`startTime`/`endTime`),wire 同名,直接比對。
 - `note.update` 的 args.fields 是 snake_case(request),比對前用 `_snakeToCamel` 轉成 camelCase,對齊 wire 的 theirs/base。
@@ -96,7 +98,13 @@ List<String> rebaseMerge(
 - `createdAt`
 
 ### `FlushResult`
-`conflicts` 既有欄位語意不變(仍回上報筆數);衝突明細改由 conflict store 持有,UI 讀 store。
+`conflicts` 語意改為「本次 flush 新增的衝突」(供 `sync()` 判斷是否 invalidate);**衝突 UI 真相源改為持久化 conflict store**,不再靠記憶體。
+
+### [A1] 取代 `syncConflictsProvider`
+現有 `syncConflictsProvider`(offline_sync.dart:22,記憶體 `Notifier<List<QueuedMutation>>`,PR-5「知道了」dismiss)與 conflict store 重疊 → **取代,不並存**:
+- 改為 `syncConflictRecordsProvider`(StreamProvider,讀 conflict store + `changes` 反應式刷新),成為唯一衝突真相源(持久化、跨重啟、reactive)。
+- `OfflineSyncController.sync()` 移除 `syncConflictsProvider.notifier.set(...)`(衝突已由 `flushQueue` 寫進 store)。
+- 移除舊 `SyncConflictsController` 與「知道了」dismiss(改由解決 UI 移除衝突)。
 
 ## flush 整合(`flushQueue` 改動)
 
@@ -121,6 +129,10 @@ if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
 - entry:`get('/trips/:tripId/days', query:{all:1})` → 依 `args.entryId` 跨 day 找 timeline row → 取 `title/description/startTime/endTime` + `version`
 - note :`get('/trips/:tripId/notes')` → 依 `args.sectionKey`(已映射的 response 段名)+ `args.rowId` 找 row → 取對應欄位 + `version`
 
+**[A2] 重抓不污染快取**:重抓只為取 theirs,不可蓋掉同 key 其他 pending patch 的樂觀效果。`_send` 的 GET 預設 `writeResponse`;為此 `_send` 加參數 `writeCache: true`(預設),`_tryRebase` 重抓傳 `writeCache: false`(取值不寫)。快取刷新交給 flush 結尾 `OfflineSyncController` 的 invalidate(重算 server 真相 + pending)。
+
+**[P1] 重抓去重**:單次 `flushQueue` 內以 `Map<重抓資源, 結果>` 暫存,同 trip 多筆衝突只打一次整包 GET(衝突罕見但佇列可能累積數筆同 trip update);flush 結束丟棄暫存。
+
 ## 衝突解決 UI(決策 2B — Banner 點開 bottom sheet)
 
 - 新 provider `syncConflictRecordsProvider`(StreamProvider,讀 conflict store + `CacheStore.changes` 反應式刷新),沿用 `lib/features/offline/offline_sync.dart` 既有 provider 風格。
@@ -143,6 +155,7 @@ if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
 - 多欄位混合(部分衝突)→ 只回衝突欄位
 - base==null → 無衝突(降級)
 - note snake↔camel 對齊
+- **[C1]** int vs double 同值正規化 → 不誤判衝突
 
 **`test/api/api_client_test.dart` / `trip_repository_test.dart`**
 - flush STALE_ENTRY 無衝突 → 重抓 + 重送(verify 帶新 expectedVersion)+ removeMutation + synced
@@ -153,10 +166,13 @@ if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
 - `resolveConflictKeepOurs` → 重送帶 newVersion + removeConflict
 - `resolveConflictKeepTheirs` → 僅 removeConflict
 - 入佇列時擷取 base(entry/note)
+- **[A2]** 重抓(writeCache:false)不覆蓋同 key 其他 pending patch 的快取
+- **[P1]** 同 trip 多筆衝突 → 整包 GET 只打一次
 
 **widget**
 - banner 顯示衝突數 + 點開 bottom sheet
 - 二選一 → 正確呼叫 resolve、清單更新
+- **[A1]** banner 從 `syncConflictRecordsProvider`(store)讀衝突數,store 變動反應式刷新
 
 ## 邊界 / gotcha
 
