@@ -19,6 +19,15 @@ class DayHeader extends StatelessWidget {
       if (day.dayOfWeek != null) '（${day.dayOfWeek}）',
     ].join();
 
+    final stopCount = day.timeline.length;
+    final totalM = day.timeline.fold<int>(
+      0,
+      (sum, e) => sum + (e.travel?.distanceM ?? 0),
+    );
+    final summary = totalM == 0
+        ? '$stopCount 個停留點'
+        : '$stopCount 個停留點 · ${(totalM / 1000).round()} km';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -49,6 +58,14 @@ class DayHeader extends StatelessWidget {
         ),
         const SizedBox(height: TpSpacing.s1),
         Text(day.displayTitle, style: theme.textTheme.titleLarge),
+        Text(
+          summary,
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.colorScheme.onSurfaceVariant,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       ],
     );
   }
