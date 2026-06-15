@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-16
+
+行程清單名稱排序 + 聊天語音指令(本 repo 可做的 web parity 後續)。
+
+### 新增
+
+- **行程清單排序**:預設順序 / 名稱 A→Z,與搜尋並存。(web 的「最新編輯/出發日」需後端 `/my-trips` 回 `updatedAt`/`startDate`,暫不支援。)
+- **聊天語音指令**:聊天輸入加麥克風語音轉文字(`speech_to_text`),對齊 web「輸入訊息或語音指令」。**lazy 權限**(點麥克風才請求),辨識文字回填輸入框沿用送出。新增 iOS `NSMicrophoneUsageDescription`/`NSSpeechRecognitionUsageDescription`、Android `RECORD_AUDIO`。
+
 ## [0.3.0] - 2026-06-15
 
 離線寫衝突解決 + web 對齊:離線 OCC rebase(三方 merge)、時間軸資訊密度補齊、行程清單搜尋、聊天建議引導。
