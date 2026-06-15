@@ -20,6 +20,8 @@ class SembastCacheStore implements CacheStore {
       .store('response_cache');
   final StoreRef<int, Map<String, Object?>> _queueStore = intMapStoreFactory
       .store('mutation_queue');
+  final StoreRef<int, Map<String, Object?>> _conflictStore =
+      intMapStoreFactory.store('conflict_store');
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   @override
@@ -84,23 +86,37 @@ class SembastCacheStore implements CacheStore {
     _changes.add(null);
   }
 
-  // T5 實作
   @override
-  Future<List<ConflictRecord>> readConflicts() => throw UnimplementedError();
+  Future<List<ConflictRecord>> readConflicts() async {
+    final records = await _conflictStore.find(
+      _db,
+      finder: Finder(sortOrders: [SortOrder(Field.key)]),
+    );
+    return List.unmodifiable(
+      records.map((r) => ConflictRecord.fromMap(r.value)),
+    );
+  }
 
-  // T5 實作
   @override
-  Future<void> appendConflict(ConflictRecord conflict) =>
-      throw UnimplementedError();
+  Future<void> appendConflict(ConflictRecord conflict) async {
+    await _conflictStore.add(_db, conflict.toMap());
+    _changes.add(null);
+  }
 
-  // T5 實作
   @override
-  Future<void> removeConflict(String id) => throw UnimplementedError();
+  Future<void> removeConflict(String id) async {
+    await _conflictStore.delete(
+      _db,
+      finder: Finder(filter: Filter.equals('id', id)),
+    );
+    _changes.add(null);
+  }
 
   @override
   Future<void> clear() async {
     await _store.delete(_db);
     await _queueStore.delete(_db);
+    await _conflictStore.delete(_db);
     _changes.add(null);
   }
 }
