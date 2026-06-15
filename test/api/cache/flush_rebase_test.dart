@@ -497,4 +497,97 @@ void main() {
     expect(bodyOf(patches[1])['note'], '我改的備註');
     expect(bodyOf(patches[1])['flight_no'], 'JL123');
   });
+
+  test(
+    '8. 重抓 row 無 version → 進 conflict store(不 livelock、不重送)',
+    () async {
+      await cache.appendMutation(
+        entryUpdateMut(
+          id: '1',
+          entryId: 5,
+          oursTitle: '我改的新標題',
+          baseTitle: '舊標題',
+          expectedVersion: 3,
+        ),
+      );
+      adapter.on('PATCH', '/trips/t/entries/5', [
+        const Scripted.json(409, {
+          'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+        }),
+        // 若誤重送(送舊 expectedVersion)會再 409;放這筆凸顯「不該被呼叫」。
+        const Scripted.json(409, {
+          'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+        }),
+      ]);
+      // 重抓:row 存在但「無 version 欄位」(異常 server row)。title 沒被他人動
+      // → 無欄位衝突,舊邏輯會走無衝突重送 → 送回舊 expectedVersion → livelock。
+      adapter.on('GET', '/trips/t/days', [
+        Scripted.json(200, [
+          {
+            'dayNum': 1,
+            'timeline': [
+              {
+                'id': 5,
+                'title': '舊標題',
+                'description': null,
+                'startTime': null,
+                'endTime': null,
+              },
+            ],
+          },
+        ]),
+      ]);
+
+      final r = await client.flushQueue();
+
+      // 當衝突上報:不重送、不卡死,移出主佇列、入 conflict store。
+      expect(r.synced, 0);
+      expect(r.conflicts.map((m) => m.id), ['1']);
+      expect(await cache.readQueue(), isEmpty);
+      final conflicts = await cache.readConflicts();
+      expect(conflicts, hasLength(1));
+      // newVersion 缺失降級為 0(ConflictRecord.newVersion 非空)。
+      expect(conflicts.single.newVersion, 0);
+      // 只打過一次 PATCH(沒有重送 → 沒 livelock)。
+      expect(adapter.countOf('PATCH', '/trips/t/entries/5'), 1);
+    },
+  );
+
+  test(
+    '9. theirs==null(row 被協作者刪)→ drop+report(不進 conflict store)',
+    () async {
+      await cache.appendMutation(
+        entryUpdateMut(
+          id: '1',
+          entryId: 5,
+          oursTitle: '我改的標題',
+          baseTitle: '舊標題',
+          expectedVersion: 3,
+        ),
+      );
+      adapter.on('PATCH', '/trips/t/entries/5', [
+        const Scripted.json(409, {
+          'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+        }),
+        // 若誤重送讓它成功,凸顯「不該被呼叫」。
+        const Scripted.json(200, {'ok': true}),
+      ]);
+      // 重抓:days 內找不到 entryId 5(row 已被協作者刪)→ theirs==null。
+      adapter.on('GET', '/trips/t/days', [
+        Scripted.json(200, [
+          {'dayNum': 1, 'timeline': <Object>[]},
+        ]),
+      ]);
+
+      final r = await client.flushQueue();
+
+      // drop+report:上報、移出主佇列,但「不」進 conflict store。
+      expect(r.synced, 0);
+      expect(r.conflicts.map((m) => m.id), ['1']);
+      expect(await cache.readQueue(), isEmpty);
+      expect(await cache.readConflicts(), isEmpty);
+      // 只打過一次 PATCH(沒有重送)。
+      expect(adapter.countOf('PATCH', '/trips/t/entries/5'), 1);
+    },
+  );
 }

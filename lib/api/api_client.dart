@@ -262,6 +262,21 @@ class ApiClient {
     final newVersion = (theirs.remove('version') as num?)?.toInt();
     final ours = _oursFrom(m);
     final conflictFields = rebaseMerge(m.base, ours, theirs);
+    // newVersion 缺失(server row 無 version,異常)→ 無法安全重送(會送回舊
+    // expectedVersion 造成永久 STALE livelock)→ 當衝突上報,交使用者處理。
+    // conflictFields 可能為空(僅 version 異常),此時退而標記所有 ours 欄位。
+    if (newVersion == null) {
+      await store.appendConflict(
+        _conflictFor(
+          m,
+          ours,
+          theirs,
+          0,
+          conflictFields.isEmpty ? ours.keys.toList() : conflictFields,
+        ),
+      );
+      return _RebaseOutcome.conflict;
+    }
     if (conflictFields.isEmpty) {
       try {
         await _send(
@@ -280,22 +295,31 @@ class ApiClient {
       }
     }
     await store.appendConflict(
-      ConflictRecord(
-        id: m.id,
-        type: m.type,
-        path: m.path,
-        body: m.body,
-        args: m.args,
-        cacheKey: m.cacheKey,
-        ours: ours,
-        theirs: theirs,
-        newVersion: newVersion ?? 0,
-        conflictFields: conflictFields,
-        createdAt: m.createdAt,
-      ),
+      _conflictFor(m, ours, theirs, newVersion, conflictFields),
     );
     return _RebaseOutcome.conflict;
   }
+
+  /// 由單筆 mutation + 三方 merge 結果組 ConflictRecord(真衝突與 version 缺失共用)。
+  ConflictRecord _conflictFor(
+    QueuedMutation m,
+    Map<String, dynamic> ours,
+    Map<String, dynamic> theirs,
+    int newVersion,
+    List<String> conflictFields,
+  ) => ConflictRecord(
+    id: m.id,
+    type: m.type,
+    path: m.path,
+    body: m.body,
+    args: m.args,
+    cacheKey: m.cacheKey,
+    ours: ours,
+    theirs: theirs,
+    newVersion: newVersion,
+    conflictFields: conflictFields,
+    createdAt: m.createdAt,
+  );
 
   static final _tripIdRe = RegExp(r'/trips/([^/]+)/');
   String? _tripIdFromPath(String path) => _tripIdRe.firstMatch(path)?.group(1);
