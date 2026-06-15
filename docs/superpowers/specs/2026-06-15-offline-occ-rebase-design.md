@@ -146,6 +146,8 @@ if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
   - 解一筆移除一筆;清空關閉 sheet。
 - 解決後 invalidate trip 家族(畫面更新),沿用 `OfflineSyncController` 既有 invalidate。
 
+**[A3] resolve 錯誤處理(避免二次遺失)**:`resolveConflictKeepOurs` 重送 PATCH 時 —— 只有 2xx 成功才 `removeConflict`;離線 → **不**移除、提示「仍離線,稍後重試」、衝突留存;再 409(server 又變)→ 重新 `_tryRebase`(重抓比對),自動解或更新 `theirs` 留在 store。`resolveConflictKeepTheirs` 純本機移除,不會失敗。
+
 ## 測試(TDD)
 
 **`test/api/rebase_merge_test.dart`(純函式)**
@@ -168,6 +170,7 @@ if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
 - 入佇列時擷取 base(entry/note)
 - **[A2]** 重抓(writeCache:false)不覆蓋同 key 其他 pending patch 的快取
 - **[P1]** 同 trip 多筆衝突 → 整包 GET 只打一次
+- **[A3]** resolveKeepOurs 重送離線 → 不 removeConflict(留存);重送再 409 → 重新 rebase
 
 **widget**
 - banner 顯示衝突數 + 點開 bottom sheet
