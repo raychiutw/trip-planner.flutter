@@ -142,6 +142,125 @@ void main() {
     });
   });
 
+  group('TripsListScreen 搜尋', () {
+    testWidgets('輸入關鍵字 → 只顯示符合的卡片', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+      // 初始：3 張卡全部顯示
+      expect(find.byType(TripCard), findsNWidgets(3));
+
+      // 在搜尋框輸入「沖繩」
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        '沖繩',
+      );
+      await tester.pump();
+
+      // 只剩符合的卡片
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+      expect(find.text('kyoto-trip-2025'), findsNothing);
+      expect(find.text('釜山美食團'), findsNothing);
+    });
+
+    testWidgets('清空搜尋框 → 全部卡片還原', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      final searchField = find.byKey(const ValueKey('trips-search-field'));
+      await tester.enterText(searchField, '釜山');
+      await tester.pump();
+      expect(find.byType(TripCard), findsOneWidget);
+
+      // 清空搜尋框
+      await tester.enterText(searchField, '');
+      await tester.pump();
+
+      // 全部卡片還原
+      expect(find.byType(TripCard), findsNWidgets(3));
+    });
+
+    testWidgets('無相符結果 → 顯示空狀態文字', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        '找不到我',
+      );
+      await tester.pump();
+
+      expect(find.byType(TripCard), findsNothing);
+      expect(find.text('找不到符合的行程'), findsOneWidget);
+    });
+
+    testWidgets('搜尋匹配 name 欄位（無 title 的行程）', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // kyoto-trip-2025 的 title 為 null，顯示 name；搜尋 name 應能命中
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        'kyoto',
+      );
+      await tester.pump();
+
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('kyoto-trip-2025'), findsOneWidget);
+    });
+
+    testWidgets('filtered 後 tone 輪替依新 index 計算', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // 搜尋「busan」→ 只剩第三張（原 index=2），但 filtered index=0 → accent tone
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        'busan',
+      );
+      await tester.pump();
+
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 1);
+      expect(cards.first.tone, TripCardTone.accent); // filtered index 0 → accent
+    });
+  });
+
   group('TripsListScreen 互動', () {
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
       await tester.pumpWidget(
