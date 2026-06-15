@@ -331,8 +331,9 @@ class _MessageBubble extends StatelessWidget {
 }
 
 /// 輸入列:多行 TextField + 語音鈕 + 送出鈕(送出中顯示 spinner)。
-/// 語音鈕點擊 → init SpeechService → listen,辨識文字回填輸入框;
-/// 聆聽中切換 icon/配色;不支援(init 失敗)時鈕 disabled。
+/// 語音鈕 lazy:進頁不請求權限;點擊時才 init SpeechService(請求麥克風/語音
+/// 辨識權限)→ 成功則 listen,辨識文字回填輸入框;init 失敗(權限拒絕/不支援)
+/// → SnackBar 提示且不 listen。聆聽中切換 icon/配色,再點則 stop。
 class _Composer extends ConsumerStatefulWidget {
   const _Composer({
     required this.input,
@@ -349,33 +350,34 @@ class _Composer extends ConsumerStatefulWidget {
 }
 
 class _ComposerState extends ConsumerState<_Composer> {
-  /// null = 尚未初始化;true/false = init 結果(支援與否)。
+  /// null = 尚未初始化過;true/false = 最近一次 init 結果(快取,避免重複請求)。
   bool? _speechAvailable;
   bool _listening = false;
 
-  @override
-  void initState() {
-    super.initState();
-    // 進頁先試 init 一次:成功則啟用語音鈕,失敗/不支援則 disabled。
-    unawaited(_ensureInit());
-  }
-
+  /// lazy init:第一次成功後快取結果,後續沿用不再請求權限。
   Future<bool> _ensureInit() async {
+    if (_speechAvailable == true) return true;
     final ok = await ref.read(speechServiceProvider).init();
-    if (!mounted) return ok;
-    setState(() => _speechAvailable = ok);
+    if (mounted) setState(() => _speechAvailable = ok);
     return ok;
   }
 
-  Future<void> _toggleListen() async {
+  /// 點麥克風鈕:聆聽中 → stop;否則 lazy init,成功才 listen,失敗則提示。
+  Future<void> _onMic() async {
     final speech = ref.read(speechServiceProvider);
     if (_listening) {
       await speech.stop();
       if (mounted) setState(() => _listening = false);
       return;
     }
-    final ok = _speechAvailable ?? await _ensureInit();
-    if (!ok || !mounted) return;
+    final ok = await _ensureInit();
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('需要麥克風與語音辨識權限才能語音輸入')),
+      );
+      return;
+    }
     setState(() => _listening = true);
     await speech.listen((text) {
       if (!mounted) return;
@@ -387,7 +389,8 @@ class _ComposerState extends ConsumerState<_Composer> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final micEnabled = _speechAvailable == true && !widget.sending;
+    // lazy:預設 enabled,僅送出中 disable;權限在點擊時才檢查。
+    final micEnabled = !widget.sending;
 
     return SafeArea(
       top: false,
@@ -420,7 +423,7 @@ class _ComposerState extends ConsumerState<_Composer> {
             IconButton(
               key: const ValueKey('chat-mic-button'),
               tooltip: _listening ? '停止語音輸入' : '語音輸入',
-              onPressed: micEnabled ? () => unawaited(_toggleListen()) : null,
+              onPressed: micEnabled ? () => unawaited(_onMic()) : null,
               color: _listening ? scheme.primary : null,
               icon: Icon(_listening ? Icons.mic : Icons.mic_none),
             ),

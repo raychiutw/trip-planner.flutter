@@ -282,7 +282,25 @@ void main() {
   });
 
   group('語音輸入', () {
-    testWidgets('isAvailable=true → 點麥克風 → init + listen 被呼叫', (tester) async {
+    testWidgets('進聊天頁不呼叫 init()(lazy,不預先請求權限)', (tester) async {
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(false);
+      when(speech.init).thenAnswer((_) async => true);
+      when(() => speech.listen(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      // 核心回歸:進頁不得觸發 init()(避免一進頁就跳權限對話框)。
+      verifyNever(speech.init);
+      // 麥克風鈕預設 enabled(不再依賴進頁預檢)。
+      final mic = tester.widget<IconButton>(
+        find.byKey(const ValueKey('chat-mic-button')),
+      );
+      expect(mic.onPressed, isNotNull);
+    });
+
+    testWidgets('點麥克風 → 才 init + listen 被呼叫', (tester) async {
       final speech = _MockSpeechService();
       when(() => speech.isAvailable).thenReturn(true);
       when(speech.init).thenAnswer((_) async => true);
@@ -290,6 +308,9 @@ void main() {
 
       await tester.pumpWidget(buildApp(speech: speech));
       await tester.pumpAndSettle();
+
+      // 點之前未 init。
+      verifyNever(speech.init);
 
       await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
       await tester.pumpAndSettle();
@@ -321,7 +342,7 @@ void main() {
       expect(field.controller!.text, '幫我規劃晚餐');
     });
 
-    testWidgets('isAvailable=false 時麥克風 disabled', (tester) async {
+    testWidgets('init() 回 false(權限拒絕)→ SnackBar 提示且不 listen', (tester) async {
       final speech = _MockSpeechService();
       when(() => speech.isAvailable).thenReturn(false);
       when(speech.init).thenAnswer((_) async => false);
@@ -330,8 +351,36 @@ void main() {
       await tester.pumpWidget(buildApp(speech: speech));
       await tester.pumpAndSettle();
 
-      // init 在 build 時嘗試一次,回 false → isAvailable=false → 鈕 disabled。
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
       await tester.pumpAndSettle();
+
+      verify(speech.init).called(1);
+      verifyNever(() => speech.listen(any()));
+      expect(find.text('需要麥克風與語音辨識權限才能語音輸入'), findsOneWidget);
+    });
+
+    testWidgets('sending 中麥克風 disabled', (tester) async {
+      // sendRequest 永不回 → sending=true 維持。
+      final pending = Completer<TripRequest>();
+      when(
+        () => reqRepo.sendRequest(
+          tripId: any(named: 'tripId'),
+          message: any(named: 'message'),
+        ),
+      ).thenAnswer((_) => pending.future);
+
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(true);
+      when(speech.init).thenAnswer((_) async => true);
+      when(() => speech.listen(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const ValueKey('chat-input')), 'hi');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('chat-send')));
+      await tester.pump(); // 不 settle:維持 sending 態
 
       final mic = tester.widget<IconButton>(
         find.byKey(const ValueKey('chat-mic-button')),
