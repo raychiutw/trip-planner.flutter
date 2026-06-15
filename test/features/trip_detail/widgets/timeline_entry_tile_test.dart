@@ -7,6 +7,7 @@ import 'package:tripline/theme/app_theme.dart';
 Future<void> pumpTile(
   WidgetTester tester,
   TimelineEntry entry, {
+  int number = 1,
   bool isFirst = false,
   bool isLast = false,
 }) {
@@ -14,7 +15,12 @@ Future<void> pumpTile(
     MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(
-        body: TimelineEntryTile(entry: entry, isFirst: isFirst, isLast: isLast),
+        body: TimelineEntryTile(
+          entry: entry,
+          number: number,
+          isFirst: isFirst,
+          isLast: isLast,
+        ),
       ),
     ),
   );
@@ -89,6 +95,25 @@ void main() {
       expect(find.text('14:00'), findsOneWidget);
     });
 
+    testWidgets('rail badge 顯示停留點編號', (tester) async {
+      await pumpTile(
+        tester,
+        number: 3,
+        const TimelineEntry(
+          id: 7,
+          sortOrder: 0,
+          version: 0,
+          title: '首里城',
+        ),
+      );
+      final badge = find.byKey(const ValueKey('entry-dot-7'));
+      expect(badge, findsOneWidget);
+      expect(
+        find.descendant(of: badge, matching: find.text('3')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('start + end 皆有 → 顯示時長', (tester) async {
       await pumpTile(
         tester,
@@ -131,6 +156,7 @@ void main() {
                 version: 1,
                 title: '首里城',
               ),
+              number: 1,
               onTap: () => tapped++,
             ),
           ),

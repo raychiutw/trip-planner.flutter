@@ -338,6 +338,7 @@ class _DaySection extends ConsumerWidget {
                   onDelete: () => _confirmDelete(context, ref, entry),
                   child: TimelineEntryTile(
                     entry: entry,
+                    number: i + 1,
                     isFirst: i == 0,
                     isLast: i == timeline.length - 1,
                     onTap: () => showEntryEditSheet(

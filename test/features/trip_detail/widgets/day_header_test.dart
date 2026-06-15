@@ -73,6 +73,52 @@ void main() {
       expect(find.text('3 個停留點 · 4 km'), findsOneWidget);
     });
 
+    testWidgets('當日時間範圍：取 timeline min–max（en dash）', (tester) async {
+      await pumpHeader(
+        tester,
+        const TripDay(
+          id: 1,
+          dayNum: 1,
+          version: 0,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              version: 0,
+              startTime: '09:00',
+              endTime: '10:30',
+              title: 'A',
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              version: 0,
+              startTime: '13:00',
+              endTime: '17:00',
+              title: 'B',
+            ),
+          ],
+        ),
+      );
+      // U+2013 en dash
+      expect(find.text('09:00–17:00'), findsOneWidget);
+    });
+
+    testWidgets('timeline 無任何時間 → 不顯示時間範圍', (tester) async {
+      await pumpHeader(
+        tester,
+        const TripDay(
+          id: 1,
+          dayNum: 1,
+          version: 0,
+          timeline: [
+            TimelineEntry(id: 11, sortOrder: 0, version: 0, title: 'A'),
+          ],
+        ),
+      );
+      expect(find.textContaining('–'), findsNothing);
+    });
+
     testWidgets('總距離為 0 → 只顯示停留點數,隱藏「· K km」', (tester) async {
       await pumpHeader(
         tester,
