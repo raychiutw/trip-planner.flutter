@@ -1007,4 +1007,120 @@ void main() {
       expect(notes['pretripNotes'] as List, hasLength(1));
     });
   });
+
+  // T7:入佇列時擷取 base(rebase 三方比對的「離線當下值」)。
+  group('離線 updateEntry/updateNote → 佇列項帶 base', () {
+    late InMemoryCacheStore cache;
+    late TripRepository repo;
+    final daysKey = cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'});
+    final notesKey = cacheKeyFor('GET', '/trips/okinawa/notes');
+
+    setUp(() {
+      cache = InMemoryCacheStore();
+      repo = TripRepository(
+        client: ApiClient(
+          sessionStore: InMemorySessionStore(),
+          dio: dio,
+          cacheStore: cache,
+        ),
+      );
+    });
+
+    test('離線 updateEntry → 佇列項帶 base(快取當下值)', () async {
+      // 預先寫入含 entry id=7 的 days 快取
+      await cache.writeResponse(daysKey, [
+        {
+          'dayNum': 1,
+          'timeline': [
+            {
+              'id': 7,
+              'title': '舊標題',
+              'description': '舊描述',
+              'startTime': '09:00',
+              'endTime': '10:00',
+              'version': 3,
+            },
+          ],
+        },
+      ]);
+      dioAdapter.onPatch(
+        '/trips/okinawa/entries/7',
+        (server) => server.throws(
+          503,
+          DioException(
+            requestOptions: RequestOptions(
+              path: '/trips/okinawa/entries/7',
+            ),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+        data: Matchers.any,
+      );
+
+      await repo.updateEntry(
+        tripId: 'okinawa',
+        entryId: 7,
+        expectedVersion: 3,
+        title: '新標題',
+        description: '新描述',
+        startTime: '10:00',
+        endTime: '11:00',
+      );
+
+      final q = await cache.readQueue();
+      expect(q.single.type, 'entry.update');
+      final base = q.single.base;
+      expect(base, isNotNull);
+      // base 應含快取中 entry 的原始值(camelCase)+ version
+      expect(base!['title'], '舊標題');
+      expect(base['description'], '舊描述');
+      expect(base['startTime'], '09:00');
+      expect(base['endTime'], '10:00');
+      expect(base['version'], 3);
+    });
+
+    test('離線 updateNote → 佇列項帶 base(快取當下值)', () async {
+      // 預先寫入含 reservations row id=5 的 notes 快取
+      await cache.writeResponse(notesKey, {
+        'reservations': [
+          {
+            'id': 5,
+            'title': '舊餐廳',
+            'date': '2026-05-01',
+            'version': 2,
+          },
+        ],
+        'flights': <dynamic>[],
+      });
+      dioAdapter.onPatch(
+        '/trips/okinawa/notes/reservations/5',
+        (server) => server.throws(
+          503,
+          DioException(
+            requestOptions: RequestOptions(
+              path: '/trips/okinawa/notes/reservations/5',
+            ),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+        data: Matchers.any,
+      );
+
+      await repo.updateNote(
+        NoteSection.reservations,
+        tripId: 'okinawa',
+        rowId: 5,
+        fields: {'title': '新餐廳'},
+        expectedVersion: 2,
+      );
+
+      final q = await cache.readQueue();
+      expect(q.single.type, 'note.update');
+      final base = q.single.base;
+      expect(base, isNotNull);
+      // base 應含 note row 對應 camelCase 欄位 + version
+      expect(base!['title'], '舊餐廳');
+      expect(base['version'], 2);
+    });
+  });
 }

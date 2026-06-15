@@ -45,6 +45,20 @@ void main() {
     addTearDown(container.dispose);
   });
 
+  ConflictRecord conflict(String id) => ConflictRecord(
+    id: id,
+    type: 'entry.update',
+    path: '/trips/t/entries/7',
+    body: const {'title': 'B'},
+    args: const {'entryId': 7},
+    cacheKey: cacheKeyFor('GET', '/trips/t/days', {'all': '1'}),
+    ours: const {'title': 'B'},
+    theirs: const {'title': 'C'},
+    newVersion: 5,
+    conflictFields: const ['title'],
+    createdAt: 't',
+  );
+
   // offlinePendingCountProvider 是 StreamProvider(反應式),bare container 需有 listener
   // 才會跑 generator;listen + pump microtask 後讀當前值。
   Future<int> currentCount() async {
@@ -55,7 +69,16 @@ void main() {
     return container.read(offlinePendingCountProvider).value ?? -1;
   }
 
-  test('sync 成功 → 佇列清空、count 歸零、無衝突', () async {
+  // syncConflictRecordsProvider 同為反應式 StreamProvider:需 listener 驅動 generator。
+  Future<List<ConflictRecord>> currentConflicts() async {
+    container.listen(syncConflictRecordsProvider, (_, _) {});
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    return container.read(syncConflictRecordsProvider).value ?? const [];
+  }
+
+  test('sync 成功 → 佇列清空、count 歸零', () async {
     await cache.appendMutation(mut('1'));
     adapter.onPost(
       '/trips/t/days/1/entries',
@@ -64,21 +87,18 @@ void main() {
     );
     await container.read(offlineSyncControllerProvider.notifier).sync();
     expect(await currentCount(), 0);
-    expect(container.read(syncConflictsProvider), isEmpty);
   });
 
-  test('sync 遇 409 → 衝突進 syncConflictsProvider', () async {
-    await cache.appendMutation(mut('1'));
-    adapter.onPost(
-      '/trips/t/days/1/entries',
-      (s) => s.reply(409, {
-        'error': {'code': 'STALE_ENTRY'},
-      }),
-      data: Matchers.any,
-    );
-    await container.read(offlineSyncControllerProvider.notifier).sync();
-    expect(container.read(syncConflictsProvider).map((m) => m.id), ['1']);
-    expect(await currentCount(), 0);
+  // 衝突真相源改為持久化 conflict store(flushQueue/_tryRebase 寫入,api 層測試覆蓋);
+  // 此處驗證 syncConflictRecordsProvider 反應式反映 store 內容與變動。
+  test('syncConflictRecordsProvider 反映 conflict store 並反應式更新', () async {
+    expect(await currentConflicts(), isEmpty);
+
+    await cache.appendConflict(conflict('1'));
+    expect((await currentConflicts()).map((c) => c.id), ['1']);
+
+    await cache.removeConflict('1');
+    expect(await currentConflicts(), isEmpty);
   });
 
   test('offlinePendingCountProvider 反映佇列筆數', () async {
