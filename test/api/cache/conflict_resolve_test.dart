@@ -290,6 +290,70 @@ void main() {
     },
   );
 
+  test(
+    '[Issue1] resolveKeepOurs 重送 body 只含 dirty 欄位(不覆蓋使用者沒改的欄)',
+    () async {
+      // ConflictRecord 帶 base:ours 為 full-form(title 與 description 都在),
+      // 但只 title 與 base 不同(使用者只改 title)。description 與 base 相同。
+      // 「保留你的」重送應只送 dirty 的 title + 新 expectedVersion,不送 description。
+      final c = ConflictRecord(
+        id: 'c1',
+        type: 'entry.update',
+        path: '/trips/t/entries/5',
+        body: const {
+          'title': '我改的標題',
+          'description': '舊備註',
+          'start_time': null,
+          'end_time': null,
+          'expectedVersion': 6,
+        },
+        args: const {
+          'entryId': 5,
+          'title': '我改的標題',
+          'description': '舊備註',
+          'startTime': null,
+          'endTime': null,
+        },
+        cacheKey: daysKey,
+        ours: const {
+          'title': '我改的標題',
+          'description': '舊備註',
+          'startTime': null,
+          'endTime': null,
+        },
+        theirs: const {
+          'title': '他人改的標題',
+          'description': '舊備註',
+          'startTime': null,
+          'endTime': null,
+        },
+        newVersion: 7,
+        conflictFields: const ['title'],
+        createdAt: 't',
+        base: const {
+          'title': '舊標題',
+          'description': '舊備註',
+          'startTime': null,
+          'endTime': null,
+        },
+      );
+      await cache.appendConflict(c);
+
+      adapter.on('PATCH', '/trips/t/entries/5', [
+        const Scripted.json(200, {'ok': true}),
+      ]);
+
+      await client.resolveConflictKeepOurs(c);
+
+      expect(await cache.readConflicts(), isEmpty);
+      final body = bodyOf(adapter.recorded.single);
+      expect(body['title'], '我改的標題');
+      expect(body['expectedVersion'], 7);
+      // 不含 description(使用者沒改 → 保留 server theirs,不覆蓋)。
+      expect(body.containsKey('description'), isFalse);
+    },
+  );
+
   // ─────────────────────────────────────────────
   // resolveConflictKeepTheirs
   // ─────────────────────────────────────────────

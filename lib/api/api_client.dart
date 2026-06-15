@@ -282,7 +282,7 @@ class ApiClient {
         await _send(
           m.method,
           m.path,
-          body: _withExpectedVersion(m.body, newVersion),
+          body: _rebasedBody(m.base, ours, m.body, newVersion),
           query: m.query,
         );
         return _RebaseOutcome.synced;
@@ -319,6 +319,7 @@ class ApiClient {
     newVersion: newVersion,
     conflictFields: conflictFields,
     createdAt: m.createdAt,
+    base: m.base, // 「保留你的」重送時據此只送 dirty 欄位
   );
 
   static final _tripIdRe = RegExp(r'/trips/([^/]+)/');
@@ -372,10 +373,28 @@ class ApiClient {
       if (m.args.containsKey(k)) k,
   ];
 
-  /// 把 body(Map)的 expectedVersion 換成新值(body 非 Map 或無新值則原樣)。
-  Object? _withExpectedVersion(Object? body, int? v) {
-    if (body is! Map || v == null) return body;
-    return {...body, 'expectedVersion': v};
+  /// rebase 重送 body:真實 caller 送整包(full-form),只保留使用者改過的
+  /// (ours≠base)欄位 + 換新 expectedVersion;使用者沒改的欄位不送 → 保留 server
+  /// theirs,避免用離線舊值覆蓋協作者的變更。base==null(降級)→ 原 body 全送
+  /// (last-write-wins)。body 非 Map → 原樣。
+  ///
+  /// body 欄位是 snake_case(entry: `start_time`、note: `flight_no`),dirty 集合
+  /// 是 camelCase,故以 [snakeToCamel] 對齊比對;`expectedVersion` 永遠保留並換新值。
+  Object? _rebasedBody(
+    Map<String, dynamic>? base,
+    Map<String, dynamic> ours,
+    Object? body,
+    int? newVersion,
+  ) {
+    if (body is! Map) return body;
+    final dirty = dirtyFields(base, ours);
+    return {
+      for (final e in body.entries)
+        if (e.key == 'expectedVersion')
+          e.key: newVersion ?? e.value
+        else if (base == null || dirty.contains(snakeToCamel(e.key as String)))
+          e.key: e.value,
+    };
   }
 
   /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
@@ -517,7 +536,7 @@ class ApiClient {
     final store = _cacheStore!;
     try {
       await _send('PATCH', c.path,
-          body: _withExpectedVersion(c.body, c.newVersion));
+          body: _rebasedBody(c.base, c.ours, c.body, c.newVersion));
       await store.removeConflict(c.id);
     } on ApiError catch (e) {
       if (e.status == 409 && e.code == 'STALE_ENTRY') {
@@ -542,7 +561,8 @@ class ApiClient {
       _cacheStore!.removeConflict(c.id);
 
   /// ConflictRecord → QueuedMutation(重新 rebase / 入佇列用)。
-  /// base 以 ours 為基準:使用者已確認要保留這版本作為新起點。
+  /// base 沿用原始離線 base,讓重新 rebase 的 dirty 判斷正確(只比對/重送使用者
+  /// 真正改過的欄位);c.base 為 null(降級)→ 全送 last-write-wins,可接受。
   QueuedMutation _asQueued(ConflictRecord c) => QueuedMutation(
     id: c.id,
     method: 'PATCH',
@@ -552,7 +572,7 @@ class ApiClient {
     cacheKey: c.cacheKey,
     args: c.args,
     createdAt: c.createdAt,
-    base: c.ours, // 以「上次離線值」為新 base 供三方 merge
+    base: c.base, // 原始離線 base 供 dirty-aware 三方 merge
   );
 
   /// 連線層錯誤(離線/逾時/無回應)→ 可回退快取;HTTP 4xx/5xx 不算(server 有回)。

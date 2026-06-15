@@ -492,10 +492,12 @@ void main() {
         .where((o) => o.method == 'PATCH')
         .toList();
     expect(patches, hasLength(2));
-    // 重送帶新 version,且保留 ours 的 snake_case body 欄位。
+    // 重送帶新 version,且保留 ours 改過的 snake_case 欄位(note)。
     expect(bodyOf(patches[1])['expectedVersion'], 4);
     expect(bodyOf(patches[1])['note'], '我改的備註');
-    expect(bodyOf(patches[1])['flight_no'], 'JL123');
+    // dirty-aware:flight_no 在 ours 與 base 相同(JL123,使用者沒改)→ 不重送,
+    // 保留 server 值;同時驗 snake(flight_no)→camel(flightNo)的 dirty 比對正確。
+    expect(bodyOf(patches[1]).containsKey('flight_no'), isFalse);
   });
 
   test(
@@ -588,6 +590,137 @@ void main() {
       expect(await cache.readConflicts(), isEmpty);
       // 只打過一次 PATCH(沒有重送)。
       expect(adapter.countOf('PATCH', '/trips/t/entries/5'), 1);
+    },
+  );
+
+  test(
+    '10. full-form:使用者只改 title、server 改 description → 無假衝突、重送不覆蓋 description',
+    () async {
+      // 真實 caller 送整包(全欄位),只有 title 與 base 不同(使用者只改 title)。
+      // base/ours 的 description 相同(='舊備註');server 把 description 改成
+      // '協作者改的備註'、title 沒動。dirty-aware:title 非衝突(server 沒動)、
+      // description 非衝突(使用者沒改)→ 自動 synced,且重送 body 不含 description。
+      await cache.appendMutation(
+        QueuedMutation(
+          id: '1',
+          method: 'PATCH',
+          path: '/trips/t/entries/5',
+          body: const {
+            'title': '我改的新標題',
+            'description': '舊備註',
+            'start_time': null,
+            'end_time': null,
+            'expectedVersion': 3,
+          },
+          type: 'entry.update',
+          cacheKey: daysKey,
+          args: const {
+            'entryId': 5,
+            'title': '我改的新標題',
+            'description': '舊備註',
+            'startTime': null,
+            'endTime': null,
+          },
+          createdAt: 't',
+          base: const {
+            'title': '舊標題',
+            'description': '舊備註',
+            'startTime': null,
+            'endTime': null,
+          },
+        ),
+      );
+      adapter.on('PATCH', '/trips/t/entries/5', [
+        const Scripted.json(409, {
+          'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+        }),
+        const Scripted.json(200, {'ok': true}),
+      ]);
+      // 重抓:title 仍是舊標題(沒人動),description 被協作者改、version 進到 7。
+      adapter.on('GET', '/trips/t/days', [
+        Scripted.json(200, [
+          {
+            'dayNum': 1,
+            'timeline': [
+              {
+                'id': 5,
+                'title': '舊標題',
+                'description': '協作者改的備註',
+                'startTime': null,
+                'endTime': null,
+                'version': 7,
+              },
+            ],
+          },
+        ]),
+      ]);
+
+      final r = await client.flushQueue();
+
+      // 無假衝突、自動 synced。
+      expect(r.synced, 1);
+      expect(r.conflicts, isEmpty);
+      expect(await cache.readQueue(), isEmpty);
+      expect(await cache.readConflicts(), isEmpty);
+      // 重送 body:只含 dirty 的 title + 新 expectedVersion;不含 description
+      //(否則會用舊備註覆蓋協作者的變更)。
+      final patches = adapter.recorded
+          .where((o) => o.method == 'PATCH')
+          .toList();
+      expect(patches, hasLength(2));
+      final resendBody = bodyOf(patches[1]);
+      expect(resendBody['title'], '我改的新標題');
+      expect(resendBody['expectedVersion'], 7);
+      expect(resendBody.containsKey('description'), isFalse);
+    },
+  );
+
+  test(
+    '11. full-form note:使用者只改 note、server 改 flightNo → 無假衝突、重送不含 flight_no',
+    () async {
+      // note.update full-form:body 為 snake,只 note 與 base 不同。
+      // server 改了 flightNo,note 沒動。dirty-aware:皆非衝突,重送不含 flight_no。
+      await cache.appendMutation(
+        noteUpdateMut(
+          id: '1',
+          rowId: 9,
+          sectionKey: 'flights',
+          oursFields: const {'note': '我改的備註', 'flight_no': 'JL123'},
+          baseFields: const {'note': '舊備註', 'flightNo': 'JL123'},
+          expectedVersion: 2,
+        ),
+      );
+      adapter.on('PATCH', '/trips/t/notes/flights/9', [
+        const Scripted.json(409, {
+          'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+        }),
+        const Scripted.json(200, {'ok': true}),
+      ]);
+      // 重抓:note 沒被動(='舊備註'),flightNo 被協作者改成 'NH456',version 進到 4。
+      adapter.on('GET', '/trips/t/notes', [
+        const Scripted.json(200, {
+          'flights': [
+            {'id': 9, 'note': '舊備註', 'flightNo': 'NH456', 'version': 4},
+          ],
+          'lodgings': [],
+        }),
+      ]);
+
+      final r = await client.flushQueue();
+
+      expect(r.synced, 1);
+      expect(r.conflicts, isEmpty);
+      expect(await cache.readQueue(), isEmpty);
+      expect(await cache.readConflicts(), isEmpty);
+      final patches = adapter.recorded
+          .where((o) => o.method == 'PATCH')
+          .toList();
+      expect(patches, hasLength(2));
+      final resendBody = bodyOf(patches[1]);
+      expect(resendBody['note'], '我改的備註');
+      expect(resendBody['expectedVersion'], 4);
+      // 不含 flight_no(使用者沒改 → 保留 server 的 flightNo)。
+      expect(resendBody.containsKey('flight_no'), isFalse);
     },
   );
 }

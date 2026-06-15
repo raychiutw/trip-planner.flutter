@@ -26,6 +26,47 @@ void main() {
     test('[C1] int vs double 同值 → 不誤判衝突', () {
       expect(rebaseMerge({'min': 5}, {'min': 7}, {'min': 5.0}), isEmpty);
     });
+    test('使用者沒改的欄位(ours==base)即使 server 改了也不算衝突', () {
+      // ours full-form 重送整包,但只 title 真的改;desc 與 base 相同(使用者沒碰)。
+      // server 改了 desc(A→Y);title server 沒動。預期:皆非衝突。
+      final r = rebaseMerge(
+        {'title': 'A', 'desc': 'X'},
+        {'title': 'A2', 'desc': 'X'},
+        {'title': 'A', 'desc': 'Y'},
+      );
+      expect(r, isEmpty);
+    });
+    test('使用者沒改該欄(ours==base)但三方值都不同 → 仍非衝突(以使用者意圖為準)', () {
+      // ours==base(沒改)→ 短路非衝突,不論 theirs 為何。
+      final r = rebaseMerge(
+        {'title': 'A', 'desc': 'X'},
+        {'title': 'A2', 'desc': 'X'},
+        {'title': 'A', 'desc': 'Y'},
+      );
+      // desc:ours==base==X(沒改)→ 不衝突;title:theirs==base==A(server 沒動)→ 不衝突。
+      expect(r, isEmpty);
+    });
+  });
+
+  group('dirtyFields', () {
+    test('只回 ours 與 base 不同的欄位', () {
+      expect(
+        dirtyFields({'title': 'A', 'desc': 'X'}, {'title': 'A2', 'desc': 'X'}),
+        {'title'},
+      );
+    });
+    test('base==null → 全部欄位視為 dirty(降級)', () {
+      expect(
+        dirtyFields(null, {'title': 'A', 'desc': 'X'}),
+        {'title', 'desc'},
+      );
+    });
+    test('[C1] int vs double 同值 → 不算 dirty', () {
+      expect(dirtyFields({'min': 5}, {'min': 5.0}), isEmpty);
+    });
+    test('全相同 → 空集合', () {
+      expect(dirtyFields({'title': 'A'}, {'title': 'A'}), isEmpty);
+    });
   });
 
   group('extractEntryFields', () {
