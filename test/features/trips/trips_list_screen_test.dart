@@ -261,6 +261,196 @@ void main() {
     });
   });
 
+  group('TripsListScreen 排序', () {
+    // 名稱亂序：busan < kyoto < okinawa（ASCII/locale 順），但原始順序是 okinawa, kyoto, busan
+    const unsortedTrips = [
+      TripSummary(
+        tripId: 'okinawa-trip-2026',
+        name: 'okinawa-trip-2026',
+        title: '沖繩家族之旅',
+        totalDays: 5,
+      ),
+      TripSummary(
+        tripId: 'kyoto-trip-2025',
+        name: 'kyoto-trip-2025',
+        totalDays: 4,
+      ),
+      TripSummary(
+        tripId: 'busan-trip-2024',
+        name: 'busan-trip-2024',
+        title: '釜山美食團',
+      ),
+    ];
+
+    testWidgets('初始有排序按鈕，預設顯示原始順序', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(unsortedTrips),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // 排序按鈕應存在
+      expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
+
+      // 預設順序：okinawa → kyoto → busan（沖繩 → kyoto → 釜山）
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 3);
+      expect(cards[0].trip.tripId, 'okinawa-trip-2026');
+      expect(cards[1].trip.tripId, 'kyoto-trip-2025');
+      expect(cards[2].trip.tripId, 'busan-trip-2024');
+    });
+
+    testWidgets('選「名稱 A→Z」後依 displayTitle 排序', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(unsortedTrips),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // 點排序按鈕開 PopupMenu
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+
+      // 點「名稱 A→Z」
+      await tester.tap(find.text('名稱 A→Z'));
+      await tester.pumpAndSettle();
+
+      // displayTitle: '沖繩家族之旅' (U+51D6≈27990) / 'kyoto-trip-2025' (U+6B) / '釜山美食團' (U+91DC≈37340)
+      // compareTo 順序：'kyoto-trip-2025' < '沖繩家族之旅' < '釜山美食團'（ASCII < 沖 < 釜）
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 3);
+      expect(cards[0].trip.tripId, 'kyoto-trip-2025');
+      expect(cards[1].trip.tripId, 'okinawa-trip-2026');
+      expect(cards[2].trip.tripId, 'busan-trip-2024');
+    });
+
+    testWidgets('選「預設順序」可切回原始順序', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(unsortedTrips),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // 先切到 nameAsc
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('名稱 A→Z'));
+      await tester.pumpAndSettle();
+
+      // 再切回「預設順序」
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('預設順序'));
+      await tester.pumpAndSettle();
+
+      // 還原原始順序
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 3);
+      expect(cards[0].trip.tripId, 'okinawa-trip-2026');
+      expect(cards[1].trip.tripId, 'kyoto-trip-2025');
+      expect(cards[2].trip.tripId, 'busan-trip-2024');
+    });
+
+    testWidgets('搜尋 + 排序並存：filter 之後再 sort', (tester) async {
+      // 加入第四筆，讓搜尋後仍有多筆可以驗證排序
+      const moreTrips = [
+        TripSummary(
+          tripId: 'okinawa-trip-2026',
+          name: 'okinawa-trip-2026',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+        ),
+        TripSummary(
+          tripId: 'okinawa-food-2025',
+          name: 'okinawa-food-2025',
+          title: 'Okinawa Food Tour',
+          totalDays: 3,
+        ),
+        TripSummary(
+          tripId: 'kyoto-trip-2025',
+          name: 'kyoto-trip-2025',
+          totalDays: 4,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(moreTrips),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      // 搜尋「okinawa」→ filter 到 2 筆（okinawa-trip + okinawa-food）
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        'okinawa',
+      );
+      await tester.pump();
+      expect(find.byType(TripCard), findsNWidgets(2));
+
+      // 切「名稱 A→Z」
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('名稱 A→Z'));
+      await tester.pumpAndSettle();
+
+      // 'Okinawa Food Tour'(O=79) < '沖繩家族之旅'(沖=27798)（ASCII < CJK）
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 2);
+      expect(cards[0].trip.tripId, 'okinawa-food-2025');
+      expect(cards[1].trip.tripId, 'okinawa-trip-2026');
+    });
+
+    testWidgets('nameAsc 排序後 tone 輪替依最終 index 計算', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.value(unsortedTrips),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('名稱 A→Z'));
+      await tester.pumpAndSettle();
+
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.length, 3);
+      // 排序後 index 0,1,2 → accent, sage, pink
+      expect(cards[0].tone, TripCardTone.accent);
+      expect(cards[1].tone, TripCardTone.sage);
+      expect(cards[2].tone, TripCardTone.pink);
+    });
+  });
+
   group('TripsListScreen 互動', () {
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
       await tester.pumpWidget(

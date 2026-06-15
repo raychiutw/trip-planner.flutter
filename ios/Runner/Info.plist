@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用於語音輸入行程指令,將你說的話轉成文字傳給 AI 助手。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用於把你的語音辨識成文字,作為調整行程的指令。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
