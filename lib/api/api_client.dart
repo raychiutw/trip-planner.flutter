@@ -506,6 +506,55 @@ class ApiClient {
   /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
   bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // 衝突解決 API(供 T10 衝突 UI 呼叫)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// 衝突解決:保留離線版本 → 重送原 body(換上 newVersion)。
+  /// 成功才 removeConflict;離線 → 往上拋保留衝突記錄;
+  /// 再 409 STALE → 重新 rebase(同 flushQueue 邏輯)。
+  Future<void> resolveConflictKeepOurs(ConflictRecord c) async {
+    final store = _cacheStore!;
+    try {
+      await _send('PATCH', c.path,
+          body: _withExpectedVersion(c.body, c.newVersion));
+      await store.removeConflict(c.id);
+    } on ApiError catch (e) {
+      if (e.status == 409 && e.code == 'STALE_ENTRY') {
+        await store.removeConflict(c.id);
+        final outcome =
+            await _tryRebase(_asQueued(c), <String, Future<Object?>>{});
+        // synced → 已解;conflict → _tryRebase 內已重新 appendConflict;
+        // offline/retryLater → 重新入主佇列待下次 flush。
+        if (outcome == _RebaseOutcome.offline ||
+            outcome == _RebaseOutcome.retryLater) {
+          await store.appendMutation(_asQueued(c));
+        }
+        return;
+      }
+      rethrow; // 其他 4xx → 往上報給呼叫端
+    }
+    // DioException(離線)不 catch → 往上拋,衝突留存,UI 提示「仍離線」
+  }
+
+  /// 衝突解決:採用 server 版本 → 丟棄離線改動(純本機,不會失敗)。
+  Future<void> resolveConflictKeepTheirs(ConflictRecord c) =>
+      _cacheStore!.removeConflict(c.id);
+
+  /// ConflictRecord → QueuedMutation(重新 rebase / 入佇列用)。
+  /// base 以 ours 為基準:使用者已確認要保留這版本作為新起點。
+  QueuedMutation _asQueued(ConflictRecord c) => QueuedMutation(
+    id: c.id,
+    method: 'PATCH',
+    path: c.path,
+    body: c.body,
+    type: c.type,
+    cacheKey: c.cacheKey,
+    args: c.args,
+    createdAt: c.createdAt,
+    base: c.ours, // 以「上次離線值」為新 base 供三方 merge
+  );
+
   /// 連線層錯誤(離線/逾時/無回應)→ 可回退快取;HTTP 4xx/5xx 不算(server 有回)。
   bool _isOfflineError(DioException e) {
     switch (e.type) {
