@@ -190,10 +190,10 @@ Object? _noteDelete(Object? cached, Map<String, dynamic> args) {
 }
 
 Map<String, dynamic> _camelKeys(Map<dynamic, dynamic> src) => {
-  for (final e in src.entries) _snakeToCamel(e.key as String): e.value,
+  for (final e in src.entries) snakeToCamel(e.key as String): e.value,
 };
 
-String _snakeToCamel(String s) {
+String snakeToCamel(String s) {
   final parts = s.split('_');
   if (parts.length == 1) return s;
   return parts.first +

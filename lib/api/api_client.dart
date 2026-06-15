@@ -10,6 +10,7 @@ import 'cache/cache_keys.dart';
 import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
 import 'cache/optimistic_patchers.dart';
+import 'cache/rebase_merge.dart';
 import 'session_store.dart';
 
 /// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
@@ -152,6 +153,7 @@ class ApiClient {
                 ...optimistic.args,
                 'tempId': -(now.microsecondsSinceEpoch * 1000 + (seq % 1000)),
               };
+        final base = await _extractBase(store, optimistic);
         await store.appendMutation(
           QueuedMutation(
             id: id,
@@ -163,6 +165,7 @@ class ApiClient {
             cacheKey: optimistic.cacheKey,
             args: args,
             createdAt: now.toIso8601String(),
+            base: base,
           ),
         );
         final current = await store.readResponse(optimistic.cacheKey);
@@ -370,6 +373,39 @@ class ApiClient {
     }
     return result;
   }
+
+  /// 入佇列時從快取擷取「離線改過欄位」的當下值,供 flush rebase 三方比對。
+  /// 只對 entry.update / note.update;其餘回 null。
+  Future<Map<String, dynamic>?> _extractBase(
+    CacheStore store,
+    OfflineOp op,
+  ) async {
+    final cached = (await store.readResponse(op.cacheKey))?.data;
+    if (op.type == 'entry.update') {
+      return extractEntryFields(
+        cached,
+        op.args['entryId'] as int,
+        _entryFieldKeys(op.args),
+      );
+    }
+    if (op.type == 'note.update') {
+      final fields = (op.args['fields'] as Map).cast<String, dynamic>();
+      final camelKeys = fields.keys.map(snakeToCamel).toList();
+      return extractNoteFields(
+        cached,
+        op.args['sectionKey'] as String,
+        op.args['rowId'] as int,
+        camelKeys,
+      );
+    }
+    return null;
+  }
+
+  /// entry.update args 內實際帶的可編輯欄位(camelCase)。
+  List<String> _entryFieldKeys(Map<String, dynamic> args) => [
+    for (final k in const ['title', 'description', 'startTime', 'endTime'])
+      if (args.containsKey(k)) k,
+  ];
 
   /// mutation 成功後,依失效表移除受影響的 GET 快取(body 供 add-to-trip 取 tripId)。
   Future<void> _evictForMutation(
