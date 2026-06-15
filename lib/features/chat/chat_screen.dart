@@ -17,6 +17,7 @@ import '../trips/trips_list_screen.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
+import 'speech_service.dart';
 
 /// 空對話時顯示的 4 個示範建議 prompt。
 const List<String> _suggestedPrompts = [
@@ -329,8 +330,10 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-/// 輸入列:多行 TextField + 送出鈕(送出中顯示 spinner)。
-class _Composer extends StatelessWidget {
+/// 輸入列:多行 TextField + 語音鈕 + 送出鈕(送出中顯示 spinner)。
+/// 語音鈕點擊 → init SpeechService → listen,辨識文字回填輸入框;
+/// 聆聽中切換 icon/配色;不支援(init 失敗)時鈕 disabled。
+class _Composer extends ConsumerStatefulWidget {
   const _Composer({
     required this.input,
     required this.sending,
@@ -342,7 +345,50 @@ class _Composer extends StatelessWidget {
   final VoidCallback onSend;
 
   @override
+  ConsumerState<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends ConsumerState<_Composer> {
+  /// null = 尚未初始化;true/false = init 結果(支援與否)。
+  bool? _speechAvailable;
+  bool _listening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 進頁先試 init 一次:成功則啟用語音鈕,失敗/不支援則 disabled。
+    unawaited(_ensureInit());
+  }
+
+  Future<bool> _ensureInit() async {
+    final ok = await ref.read(speechServiceProvider).init();
+    if (!mounted) return ok;
+    setState(() => _speechAvailable = ok);
+    return ok;
+  }
+
+  Future<void> _toggleListen() async {
+    final speech = ref.read(speechServiceProvider);
+    if (_listening) {
+      await speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final ok = _speechAvailable ?? await _ensureInit();
+    if (!ok || !mounted) return;
+    setState(() => _listening = true);
+    await speech.listen((text) {
+      if (!mounted) return;
+      widget.input.text = text;
+      widget.input.selection = TextSelection.collapsed(offset: text.length);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final micEnabled = _speechAvailable == true && !widget.sending;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -358,23 +404,31 @@ class _Composer extends StatelessWidget {
             Expanded(
               child: TextField(
                 key: const ValueKey('chat-input'),
-                controller: input,
+                controller: widget.input,
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
+                onSubmitted: (_) => widget.onSend(),
                 decoration: const InputDecoration(
-                  hintText: '輸入訊息…',
+                  hintText: '輸入訊息或語音指令',
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
             ),
             const SizedBox(width: TpSpacing.s2),
+            IconButton(
+              key: const ValueKey('chat-mic-button'),
+              tooltip: _listening ? '停止語音輸入' : '語音輸入',
+              onPressed: micEnabled ? () => unawaited(_toggleListen()) : null,
+              color: _listening ? scheme.primary : null,
+              icon: Icon(_listening ? Icons.mic : Icons.mic_none),
+            ),
+            const SizedBox(width: TpSpacing.s1),
             IconButton.filled(
               key: const ValueKey('chat-send'),
-              onPressed: sending ? null : onSend,
-              icon: sending
+              onPressed: widget.sending ? null : widget.onSend,
+              icon: widget.sending
                   ? const SizedBox(
                       width: 18,
                       height: 18,

@@ -9,6 +9,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
+import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
@@ -17,6 +18,8 @@ import 'package:tripline/theme/app_theme.dart';
 class _MockRequestsRepo extends Mock implements RequestsRepository {}
 
 class _MockTripRepo extends Mock implements TripRepository {}
+
+class _MockSpeechService extends Mock implements SpeechService {}
 
 class _StubAuth extends AuthNotifier {
   @override
@@ -59,12 +62,13 @@ void main() {
     ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
   });
 
-  Widget buildApp() {
+  Widget buildApp({SpeechService? speech}) {
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
         authStateProvider.overrideWith(_StubAuth.new),
+        if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
       child: MaterialApp(theme: AppTheme.light(), home: const ChatScreen()),
     );
@@ -275,5 +279,71 @@ void main() {
         message: any(named: 'message'),
       ),
     ).called(1);
+  });
+
+  group('語音輸入', () {
+    testWidgets('isAvailable=true → 點麥克風 → init + listen 被呼叫', (tester) async {
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(true);
+      when(speech.init).thenAnswer((_) async => true);
+      when(() => speech.listen(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+
+      verify(speech.init).called(1);
+      verify(() => speech.listen(any())).called(1);
+    });
+
+    testWidgets('onResult 回傳文字 → 輸入框出現該文字', (tester) async {
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(true);
+      when(speech.init).thenAnswer((_) async => true);
+      // 攔截 onResult callback,稍後手動觸發。
+      when(() => speech.listen(any())).thenAnswer((invocation) async {
+        final onResult =
+            invocation.positionalArguments.first as void Function(String);
+        onResult('幫我規劃晚餐');
+      });
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(
+        find.byKey(const ValueKey('chat-input')),
+      );
+      expect(field.controller!.text, '幫我規劃晚餐');
+    });
+
+    testWidgets('isAvailable=false 時麥克風 disabled', (tester) async {
+      final speech = _MockSpeechService();
+      when(() => speech.isAvailable).thenReturn(false);
+      when(speech.init).thenAnswer((_) async => false);
+      when(() => speech.listen(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(buildApp(speech: speech));
+      await tester.pumpAndSettle();
+
+      // init 在 build 時嘗試一次,回 false → isAvailable=false → 鈕 disabled。
+      await tester.pumpAndSettle();
+
+      final mic = tester.widget<IconButton>(
+        find.byKey(const ValueKey('chat-mic-button')),
+      );
+      expect(mic.onPressed, isNull);
+    });
+
+    testWidgets('hintText 為「輸入訊息或語音指令」', (tester) async {
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('輸入訊息或語音指令'), findsOneWidget);
+    });
   });
 }
