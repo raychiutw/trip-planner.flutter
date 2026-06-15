@@ -185,12 +185,16 @@ class ApiClient {
   }
 
   /// 重連後依序重播離線佇列。成功 → 移除(_send 已 evict 受影響快取);
-  /// HTTP 錯誤(含 409 衝突)→ 上報並移除(v1 不 rebase,列 PR-4b);
-  /// 連線錯誤 → 中止並保留剩餘佇列(下次再試)。重入時直接回 empty。
+  /// 409 STALE_ENTRY 且可 rebase(entry.update / note.update)→ 重抓 server 真相
+  /// 三方 merge:無衝突重送(帶新 version)、有衝突入 conflict store 並上報;
+  /// 其他 HTTP 錯誤(409 非 STALE / 400 / 404 等永久無效)→ 上報並移除;
+  /// 5xx / 401 / 403 / 連線錯誤 → 中止並保留剩餘佇列(下次再試)。重入時直接回 empty。
   Future<FlushResult> flushQueue() async {
     final store = _cacheStore;
     if (store == null || _flushing) return FlushResult.empty;
     _flushing = true;
+    // [P1] 同一輪 flush 內,同 cacheKey 的整包重抓只打一次(同 trip 多筆 STALE 共用)。
+    final refetchCache = <String, Future<Object?>>{};
     try {
       final conflicts = <QueuedMutation>[];
       var synced = 0;
@@ -200,12 +204,26 @@ class ApiClient {
           await store.removeMutation(m.id);
           synced++;
         } on ApiError catch (e) {
-          // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
-          // → 中止保留佇列、待重試,避免永久遺失離線編輯;
-          // 其他 4xx(409 衝突 / 400 / 404 等永久無效)→ 上報並移除。
-          if (e.status >= 500 || e.status == 401 || e.status == 403) break;
-          conflicts.add(m);
-          await store.removeMutation(m.id);
+          if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
+            final outcome = await _tryRebase(m, refetchCache);
+            if (outcome == _RebaseOutcome.synced) {
+              await store.removeMutation(m.id);
+              synced++;
+            } else if (outcome == _RebaseOutcome.conflict) {
+              await store.removeMutation(m.id);
+              conflicts.add(m);
+            } else {
+              break; // offline / retryLater → 保留佇列待下次
+            }
+          } else if (e.status >= 500 || e.status == 401 || e.status == 403) {
+            // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
+            // → 中止保留佇列、待重試,避免永久遺失離線編輯。
+            break;
+          } else {
+            // 其他 4xx(409 非 STALE / 400 / 404 等永久無效)→ 上報並移除。
+            conflicts.add(m);
+            await store.removeMutation(m.id);
+          }
         } on DioException catch (e) {
           if (_isOfflineError(e)) break;
           rethrow;
@@ -215,6 +233,125 @@ class ApiClient {
     } finally {
       _flushing = false;
     }
+  }
+
+  static const _rebasableTypes = {'entry.update', 'note.update'};
+  bool _rebasable(String type) => _rebasableTypes.contains(type);
+
+  /// STALE 重抓 server 真相 → 三方 merge → 無衝突重送 / 有衝突入 conflict store。
+  Future<_RebaseOutcome> _tryRebase(
+    QueuedMutation m,
+    Map<String, Future<Object?>> refetchCache,
+  ) async {
+    final store = _cacheStore!;
+    final tripId = _tripIdFromPath(m.path);
+    if (tripId == null) return _RebaseOutcome.conflict;
+    final Object? fresh;
+    try {
+      fresh = await refetchCache.putIfAbsent(
+        m.cacheKey,
+        () => _refetchFor(m, tripId),
+      );
+    } on DioException catch (e) {
+      return _isOfflineError(e)
+          ? _RebaseOutcome.offline
+          : _RebaseOutcome.conflict;
+    }
+    final theirs = _theirsFrom(m, fresh);
+    if (theirs == null) return _RebaseOutcome.conflict; // row 可能已被刪
+    final newVersion = (theirs.remove('version') as num?)?.toInt();
+    final ours = _oursFrom(m);
+    final conflictFields = rebaseMerge(m.base, ours, theirs);
+    if (conflictFields.isEmpty) {
+      try {
+        await _send(
+          m.method,
+          m.path,
+          body: _withExpectedVersion(m.body, newVersion),
+          query: m.query,
+        );
+        return _RebaseOutcome.synced;
+      } on ApiError {
+        return _RebaseOutcome.retryLater;
+      } on DioException catch (e) {
+        return _isOfflineError(e)
+            ? _RebaseOutcome.offline
+            : _RebaseOutcome.retryLater;
+      }
+    }
+    await store.appendConflict(
+      ConflictRecord(
+        id: m.id,
+        type: m.type,
+        path: m.path,
+        body: m.body,
+        args: m.args,
+        cacheKey: m.cacheKey,
+        ours: ours,
+        theirs: theirs,
+        newVersion: newVersion ?? 0,
+        conflictFields: conflictFields,
+        createdAt: m.createdAt,
+      ),
+    );
+    return _RebaseOutcome.conflict;
+  }
+
+  static final _tripIdRe = RegExp(r'/trips/([^/]+)/');
+  String? _tripIdFromPath(String path) => _tripIdRe.firstMatch(path)?.group(1);
+
+  /// 依 type 重抓對應整包(entry→days?all=1;note→notes),writeCache:false
+  /// (重抓是「拿 server 真相做 merge」,不可覆寫已含 pending patch 的快取)。
+  Future<Object?> _refetchFor(QueuedMutation m, String tripId) {
+    if (m.type == 'entry.update') {
+      return _send(
+        'GET',
+        '/trips/$tripId/days',
+        query: {'all': 1},
+        writeCache: false,
+        fallbackToCache: false,
+      );
+    }
+    return _send(
+      'GET',
+      '/trips/$tripId/notes',
+      writeCache: false,
+      fallbackToCache: false,
+    );
+  }
+
+  /// 從重抓結果抽 theirs(含 version);找不到 row → null。
+  Map<String, dynamic>? _theirsFrom(QueuedMutation m, Object? fresh) {
+    if (m.type == 'entry.update') {
+      return extractEntryFields(fresh, m.args['entryId'] as int, _ourKeys(m));
+    }
+    final fields = (m.args['fields'] as Map).cast<String, dynamic>();
+    return extractNoteFields(
+      fresh,
+      m.args['sectionKey'] as String,
+      m.args['rowId'] as int,
+      fields.keys.map(snakeToCamel).toList(),
+    );
+  }
+
+  /// ours = 離線改成的值(camelCase),與 base/theirs 同鍵集合。
+  Map<String, dynamic> _oursFrom(QueuedMutation m) {
+    if (m.type == 'entry.update') {
+      return {for (final k in _ourKeys(m)) k: m.args[k]};
+    }
+    final fields = (m.args['fields'] as Map).cast<String, dynamic>();
+    return {for (final e in fields.entries) snakeToCamel(e.key): e.value};
+  }
+
+  List<String> _ourKeys(QueuedMutation m) => [
+    for (final k in const ['title', 'description', 'startTime', 'endTime'])
+      if (m.args.containsKey(k)) k,
+  ];
+
+  /// 把 body(Map)的 expectedVersion 換成新值(body 非 Map 或無新值則原樣)。
+  Object? _withExpectedVersion(Object? body, int? v) {
+    if (body is! Map || v == null) return body;
+    return {...body, 'expectedVersion': v};
   }
 
   /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
@@ -420,3 +557,6 @@ class ApiClient {
     }
   }
 }
+
+/// rebase 單筆結果:成功重送 / 真衝突已入庫 / 離線中止 / 重送暫時失敗待下次。
+enum _RebaseOutcome { synced, conflict, offline, retryLater }
