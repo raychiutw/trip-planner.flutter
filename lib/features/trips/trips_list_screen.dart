@@ -7,6 +7,15 @@ import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
 
+/// 行程清單排序方式。
+enum TripSortOrder {
+  /// 預設：保留伺服器回傳順序。
+  defaultOrder,
+
+  /// 名稱 A→Z：依 displayTitle 升冪排列。
+  nameAsc,
+}
+
 /// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
 final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
@@ -24,6 +33,7 @@ class TripsListScreen extends ConsumerStatefulWidget {
 class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   final _searchController = TextEditingController();
   String _query = '';
+  TripSortOrder _sortOrder = TripSortOrder.defaultOrder;
 
   @override
   void initState() {
@@ -53,13 +63,46 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         .toList();
   }
 
+  /// 在 filter 之後套用排序。
+  List<TripSummary> _sort(List<TripSummary> trips) {
+    if (_sortOrder == TripSortOrder.defaultOrder) return trips;
+    final sorted = List<TripSummary>.from(trips);
+    sorted.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
+    return sorted;
+  }
+
   @override
   Widget build(BuildContext context) {
     final myTripsAsync = ref.watch(myTripsProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('我的行程')),
+      appBar: AppBar(
+        title: const Text('我的行程'),
+        actions: [
+          PopupMenuButton<TripSortOrder>(
+            key: const ValueKey('trips-sort-button'),
+            icon: const Icon(Icons.sort),
+            tooltip: '排序',
+            initialValue: _sortOrder,
+            onSelected: (order) {
+              setState(() {
+                _sortOrder = order;
+              });
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: TripSortOrder.defaultOrder,
+                child: const Text('預設順序'),
+              ),
+              PopupMenuItem(
+                value: TripSortOrder.nameAsc,
+                child: const Text('名稱 A→Z'),
+              ),
+            ],
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         key: const ValueKey('trips-create-fab'),
         onPressed: () => context.push('/new-trip'),
@@ -93,7 +136,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
           Expanded(
             child: myTripsAsync.when(
               data: (trips) {
-                final filtered = _filter(trips);
+                final filtered = _sort(_filter(trips));
                 return RefreshIndicator(
                   onRefresh: () => ref.refresh(myTripsProvider.future),
                   child: trips.isEmpty
