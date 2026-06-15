@@ -235,4 +235,45 @@ void main() {
     expect(find.text('載入失敗'), findsNothing);
     expect(find.byType(MarkdownBody), findsWidgets); // reply 顯示
   });
+
+  testWidgets('空對話顯示標題「從一個指令開始」與 4 個建議鈕', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('從一個指令開始'), findsOneWidget);
+    // 4 個建議鈕皆可見
+    for (var i = 0; i < 4; i++) {
+      expect(find.byKey(ValueKey('chat-suggestion-$i')), findsOneWidget);
+    }
+  });
+
+  testWidgets('點建議鈕呼叫 sendRequest(message 為該 prompt)', (tester) async {
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 99, message: 'x', status: RequestStatus.processing),
+    );
+    when(() => reqRepo.fetchRequest(99)).thenAnswer(
+      (_) async =>
+          _req(id: 99, message: 'x', status: RequestStatus.completed),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    // 點第一個建議鈕
+    await tester.tap(find.byKey(const ValueKey('chat-suggestion-0')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => reqRepo.sendRequest(
+        tripId: 'okinawa',
+        message: any(named: 'message'),
+      ),
+    ).called(1);
+  });
 }

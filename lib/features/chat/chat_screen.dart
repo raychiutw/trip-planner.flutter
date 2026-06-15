@@ -18,6 +18,14 @@ import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
 
+/// 空對話時顯示的 4 個示範建議 prompt。
+const List<String> _suggestedPrompts = [
+  '幫我規劃 Day 1 的早午餐',
+  '推薦附近 30 分鐘車程內的景點',
+  '把第二天的午餐改成沖繩麵',
+  '加入適合親子的水族館行程',
+];
+
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
@@ -174,9 +182,9 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                   onRetry: () => unawaited(controller.reload()),
                 )
               : msgs.isEmpty
-              ? const _CenteredHint(
-                  title: '開始跟 AI 對話',
-                  body: '例如:「幫我把第二天下午改成室內行程」。',
+              ? _EmptyStatePrompts(
+                  sending: state.sending,
+                  onSelect: (prompt) => unawaited(controller.send(prompt)),
                 )
               : ListView.builder(
                   key: const ValueKey('chat-list'),
@@ -373,6 +381,55 @@ class _Composer extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.send),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 空對話引導:標題 + 說明 + 4 個建議 prompt 快捷鈕。
+class _EmptyStatePrompts extends StatelessWidget {
+  const _EmptyStatePrompts({
+    required this.sending,
+    required this.onSelect,
+  });
+
+  final bool sending;
+  final void Function(String prompt) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('從一個指令開始', style: theme.textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s2),
+            Text(
+              '選一個建議,或直接在下方輸入你想調整的行程。',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s4),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s2,
+              alignment: WrapAlignment.center,
+              children: [
+                for (var i = 0; i < _suggestedPrompts.length; i++)
+                  ActionChip(
+                    key: ValueKey('chat-suggestion-$i'),
+                    label: Text(_suggestedPrompts[i]),
+                    onPressed: sending ? null : () => onSelect(_suggestedPrompts[i]),
+                  ),
+              ],
             ),
           ],
         ),
