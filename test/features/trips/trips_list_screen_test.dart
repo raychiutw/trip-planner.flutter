@@ -8,9 +8,23 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/trip_card.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+/// 固定回傳指定使用者的假 AuthNotifier（不打 API），供卡片判斷「由你建立」。
+class _FakeAuthNotifier extends AuthNotifier {
+  _FakeAuthNotifier(this._fixedUser);
+
+  final UserInfo? _fixedUser;
+
+  @override
+  Future<UserInfo?> build() async => _fixedUser;
+}
+
+UserInfo _userWithId(String id) =>
+    UserInfo(id: id, email: '$id@example.com');
 
 void main() {
   const fakeTrips = [
@@ -539,6 +553,221 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
       verifyNever(() => mockTripRepository.deleteTrip(any()));
+    });
+  });
+
+  group('TripsListScreen 建立者標示串接', () {
+    const ownedAndShared = [
+      TripSummary(
+        tripId: 'mine',
+        name: 'mine',
+        title: '我的行程',
+        totalDays: 3,
+        ownerUserId: 'me',
+        ownerDisplayName: 'Me Owner',
+      ),
+      TripSummary(
+        tripId: 'shared',
+        name: 'shared',
+        title: '共編行程',
+        totalDays: 2,
+        ownerUserId: 'someone-else',
+        ownerDisplayName: 'Amy Wang',
+      ),
+    ];
+
+    testWidgets('card 收到 authState 的 currentUserId → 自己的卡顯示「由你建立」', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(ownedAndShared)),
+            authStateProvider.overrideWith(
+              () => _FakeAuthNotifier(_userWithId('me')),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.map((c) => c.currentUserId).toSet(), {'me'});
+      expect(find.text('由你建立'), findsOneWidget);
+      expect(find.text('Amy Wang'), findsOneWidget);
+    });
+  });
+
+  group('TripsListScreen 篩選分頁（全部 / 我的 / 共編）', () {
+    const mixedTrips = [
+      TripSummary(
+        tripId: 'mine-1',
+        name: 'mine-1',
+        title: '我的沖繩',
+        ownerUserId: 'me',
+      ),
+      TripSummary(
+        tripId: 'shared-1',
+        name: 'shared-1',
+        title: '共編京都',
+        ownerUserId: 'other',
+      ),
+      TripSummary(
+        tripId: 'mine-2',
+        name: 'mine-2',
+        title: '我的釜山',
+        ownerUserId: 'me',
+      ),
+    ];
+
+    Future<void> pumpMixed(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(mixedTrips)),
+            authStateProvider.overrideWith(
+              () => _FakeAuthNotifier(_userWithId('me')),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('預設「全部」顯示所有行程', (tester) async {
+      await pumpMixed(tester);
+      expect(find.byType(TripCard), findsNWidgets(3));
+    });
+
+    testWidgets('切「我的」→ 只剩 ownerUserId == 當前 user', (tester) async {
+      await pumpMixed(tester);
+
+      await tester.tap(find.text('我的'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TripCard), findsNWidgets(2));
+      expect(find.text('我的沖繩'), findsOneWidget);
+      expect(find.text('我的釜山'), findsOneWidget);
+      expect(find.text('共編京都'), findsNothing);
+    });
+
+    testWidgets('切「共編」→ 只剩 ownerUserId != 當前 user', (tester) async {
+      await pumpMixed(tester);
+
+      await tester.tap(find.text('共編'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('共編京都'), findsOneWidget);
+    });
+
+    testWidgets('篩選 + 搜尋並存：filter → search', (tester) async {
+      await pumpMixed(tester);
+
+      await tester.tap(find.text('我的'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TripCard), findsNWidgets(2));
+
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-search-field')),
+        '沖繩',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('我的沖繩'), findsOneWidget);
+    });
+  });
+
+  group('TripsListScreen 擴充排序（最新編輯 / 出發日）', () {
+    const datedTrips = [
+      TripSummary(
+        tripId: 'a',
+        name: 'a',
+        title: 'A 行程',
+        startDate: '2026-05-10',
+        updatedAt: '2026-01-01T00:00:00Z',
+      ),
+      TripSummary(
+        tripId: 'b',
+        name: 'b',
+        title: 'B 行程',
+        startDate: '2026-03-01',
+        updatedAt: '2026-03-15T00:00:00Z',
+      ),
+      TripSummary(
+        tripId: 'c',
+        name: 'c',
+        title: 'C 行程',
+        startDate: '2026-04-20',
+        updatedAt: '2026-02-01T00:00:00Z',
+      ),
+    ];
+
+    Future<void> pumpDated(WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(datedTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('選「最新編輯」→ updatedAt 由新到舊', (tester) async {
+      await pumpDated(tester);
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('最新編輯'));
+      await tester.pumpAndSettle();
+
+      // updatedAt: b(03-15) > c(02-01) > a(01-01)
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.map((c) => c.trip.tripId).toList(), ['b', 'c', 'a']);
+    });
+
+    testWidgets('選「出發日」→ startDate 由近到遠', (tester) async {
+      await pumpDated(tester);
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('出發日'));
+      await tester.pumpAndSettle();
+
+      // startDate: b(03-01) < c(04-20) < a(05-10)
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.map((c) => c.trip.tripId).toList(), ['b', 'c', 'a']);
+    });
+
+    testWidgets('缺 startDate 的行程排到最後（出發日排序）', (tester) async {
+      const withMissing = [
+        TripSummary(tripId: 'x', name: 'x', title: 'X', startDate: '2026-06-01'),
+        TripSummary(tripId: 'y', name: 'y', title: 'Y'),
+        TripSummary(tripId: 'z', name: 'z', title: 'Z', startDate: '2026-02-01'),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(withMissing)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('出發日'));
+      await tester.pumpAndSettle();
+
+      // z(02-01) < x(06-01) < y(null → 最後)
+      final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
+      expect(cards.map((c) => c.trip.tripId).toList(), ['z', 'x', 'y']);
     });
   });
 }

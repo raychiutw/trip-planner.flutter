@@ -8,6 +8,7 @@ Future<void> pumpCard(
   WidgetTester tester,
   TripSummary trip, {
   TripCardTone tone = TripCardTone.accent,
+  String? currentUserId,
   VoidCallback? onTap,
   VoidCallback? onLongPress,
 }) {
@@ -18,6 +19,7 @@ Future<void> pumpCard(
         body: TripCard(
           trip: trip,
           tone: tone,
+          currentUserId: currentUserId,
           onTap: onTap,
           onLongPress: onLongPress,
         ),
@@ -87,6 +89,152 @@ void main() {
       );
       expect(find.text('釜山美食團'), findsOneWidget);
       expect(find.textContaining('天'), findsNothing);
+    });
+  });
+
+  group('TripCard eyebrow（countries · N 天）', () {
+    testWidgets('countries 有值 → 「{countries} · {N} 天」', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+          countries: 'JP',
+        ),
+      );
+      expect(find.text('JP · 5 天'), findsOneWidget);
+    });
+
+    testWidgets('countries 為 null → 只顯示「{N} 天」', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+        ),
+      );
+      expect(find.text('5 天'), findsOneWidget);
+    });
+
+    testWidgets('countries 有值但 totalDays 為 null → 只顯示 countries', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          countries: 'JP',
+        ),
+      );
+      expect(find.text('JP'), findsOneWidget);
+    });
+  });
+
+  group('TripCard 建立者標示', () {
+    testWidgets('ownerUserId == currentUserId → 顯示「由你建立」', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+          ownerUserId: 'u-ray',
+          ownerDisplayName: 'Ray Chiu',
+        ),
+        currentUserId: 'u-ray',
+      );
+      expect(find.text('由你建立'), findsOneWidget);
+      expect(find.text('Ray Chiu'), findsNothing);
+    });
+
+    testWidgets('ownerUserId != currentUserId → 顯示 ownerDisplayName + 首字 avatar', (
+      tester,
+    ) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+          ownerUserId: 'u-amy',
+          ownerDisplayName: 'Amy Wang',
+        ),
+        currentUserId: 'u-ray',
+      );
+      expect(find.text('由你建立'), findsNothing);
+      expect(find.text('Amy Wang'), findsOneWidget);
+      // 首字 avatar（非抓圖）
+      expect(find.byType(CircleAvatar), findsOneWidget);
+      expect(find.text('A'), findsOneWidget);
+    });
+
+    testWidgets('ownerUserId / ownerDisplayName 皆缺 → 不顯示建立者列', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+        ),
+        currentUserId: 'u-ray',
+      );
+      expect(find.text('由你建立'), findsNothing);
+      expect(find.byType(CircleAvatar), findsNothing);
+    });
+
+    testWidgets('非自己但 ownerDisplayName 缺 → 不顯示建立者列', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+          ownerUserId: 'u-amy',
+        ),
+        currentUserId: 'u-ray',
+      );
+      expect(find.text('由你建立'), findsNothing);
+      expect(find.byType(CircleAvatar), findsNothing);
+    });
+  });
+
+  group('TripCard 日期範圍', () {
+    testWidgets('startDate + endDate 都有 → 「startDate – endDate」', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+          startDate: '2026-04-23',
+          endDate: '2026-04-27',
+        ),
+      );
+      expect(find.text('2026-04-23 – 2026-04-27'), findsOneWidget);
+    });
+
+    testWidgets('startDate / endDate 缺 → 不顯示日期範圍', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 5,
+        ),
+      );
+      expect(find.textContaining('–'), findsNothing);
     });
   });
 }

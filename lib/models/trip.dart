@@ -8,6 +8,14 @@ class TripSummary {
     required this.name,
     this.title,
     this.totalDays,
+    this.ownerUserId,
+    this.ownerDisplayName,
+    this.role,
+    this.countries,
+    this.startDate,
+    this.endDate,
+    this.updatedAt,
+    this.memberCount,
   });
 
   final String tripId;
@@ -15,12 +23,44 @@ class TripSummary {
   final String? title;
   final int? totalDays;
 
+  /// canonical owner id（後端 NOT NULL，但容許舊資料缺漏）。
+  final String? ownerUserId;
+
+  /// owner 顯示名（avatar initial / 顯示用）。
+  final String? ownerDisplayName;
+
+  /// 當前 user 在此 trip 的權限：owner | admin | member | viewer。
+  final String? role;
+
+  /// 目的地國家（逗號分隔字串，filter / 顯示用）。
+  final String? countries;
+
+  /// 行程起日（日期字串，不轉 DateTime；無日期則 null）。
+  final String? startDate;
+
+  /// 行程迄日（日期字串，不轉 DateTime；無日期則 null）。
+  final String? endDate;
+
+  /// 最後更新時間（datetime 字串，排序 / 同步用）。
+  final String? updatedAt;
+
+  /// 協作人數（後端回 int）。
+  final int? memberCount;
+
   factory TripSummary.fromJson(Map<String, dynamic> json) {
     return TripSummary(
       tripId: json['tripId'] as String,
       name: json['name'] as String,
       title: json['title'] as String?,
       totalDays: (json['totalDays'] as num?)?.toInt(),
+      ownerUserId: json['ownerUserId'] as String?,
+      ownerDisplayName: json['ownerDisplayName'] as String?,
+      role: json['role'] as String?,
+      countries: json['countries'] as String?,
+      startDate: json['startDate'] as String?,
+      endDate: json['endDate'] as String?,
+      updatedAt: json['updatedAt'] as String?,
+      memberCount: (json['memberCount'] as num?)?.toInt(),
     );
   }
 }

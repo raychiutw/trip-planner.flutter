@@ -14,6 +14,24 @@ enum TripSortOrder {
 
   /// 名稱 A→Z：依 displayTitle 升冪排列。
   nameAsc,
+
+  /// 最新編輯：updatedAt 由新到舊（缺漏排最後）。
+  updatedDesc,
+
+  /// 出發日：startDate 由近到遠（缺漏排最後）。
+  startDateAsc,
+}
+
+/// 行程清單篩選分頁。
+enum TripFilter {
+  /// 全部行程。
+  all,
+
+  /// 我的：ownerUserId == 當前 user。
+  mine,
+
+  /// 共編：ownerUserId != 當前 user。
+  shared,
 }
 
 /// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
@@ -34,6 +52,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   TripSortOrder _sortOrder = TripSortOrder.defaultOrder;
+  TripFilter _filterTab = TripFilter.all;
 
   @override
   void initState() {
@@ -51,7 +70,28 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     super.dispose();
   }
 
-  List<TripSummary> _filter(List<TripSummary> trips) {
+  /// 篩選分頁:全部 / 我的(ownerUserId == 當前 user)/ 共編(ownerUserId != 當前 user)。
+  /// currentUserId 為 null(未登入/載入中)時「我的/共編」皆回空,避免誤判。
+  List<TripSummary> _filterByTab(
+    List<TripSummary> trips,
+    String? currentUserId,
+  ) {
+    switch (_filterTab) {
+      case TripFilter.all:
+        return trips;
+      case TripFilter.mine:
+        return trips
+            .where((t) => t.ownerUserId != null && t.ownerUserId == currentUserId)
+            .toList();
+      case TripFilter.shared:
+        return trips
+            .where((t) => t.ownerUserId != null && t.ownerUserId != currentUserId)
+            .toList();
+    }
+  }
+
+  /// 關鍵字搜尋(displayTitle / name)。
+  List<TripSummary> _search(List<TripSummary> trips) {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return trips;
     return trips
@@ -63,17 +103,53 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         .toList();
   }
 
-  /// 在 filter 之後套用排序。
+  /// 在 filter + search 之後套用排序。
   List<TripSummary> _sort(List<TripSummary> trips) {
     if (_sortOrder == TripSortOrder.defaultOrder) return trips;
     final sorted = List<TripSummary>.from(trips);
-    sorted.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
+    switch (_sortOrder) {
+      case TripSortOrder.defaultOrder:
+        break;
+      case TripSortOrder.nameAsc:
+        sorted.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
+      case TripSortOrder.updatedDesc:
+        // updatedAt 由新到舊;缺漏(null/空)排最後。
+        sorted.sort(
+          (a, b) => _compareNullableDesc(a.updatedAt, b.updatedAt),
+        );
+      case TripSortOrder.startDateAsc:
+        // startDate 由近到遠;缺漏(null/空)排最後。
+        sorted.sort(
+          (a, b) => _compareNullableAsc(a.startDate, b.startDate),
+        );
+    }
     return sorted;
+  }
+
+  /// 字串升冪比較,null/空值一律排到最後。
+  int _compareNullableAsc(String? a, String? b) {
+    final aEmpty = a == null || a.isEmpty;
+    final bEmpty = b == null || b.isEmpty;
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    return a.compareTo(b);
+  }
+
+  /// 字串降冪比較,null/空值一律排到最後。
+  int _compareNullableDesc(String? a, String? b) {
+    final aEmpty = a == null || a.isEmpty;
+    final bEmpty = b == null || b.isEmpty;
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    return b.compareTo(a);
   }
 
   @override
   Widget build(BuildContext context) {
     final myTripsAsync = ref.watch(myTripsProvider);
+    final currentUserId = ref.watch(authStateProvider).value?.id;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -98,6 +174,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               PopupMenuItem(
                 value: TripSortOrder.nameAsc,
                 child: const Text('名稱 A→Z'),
+              ),
+              PopupMenuItem(
+                value: TripSortOrder.updatedDesc,
+                child: const Text('最新編輯'),
+              ),
+              PopupMenuItem(
+                value: TripSortOrder.startDateAsc,
+                child: const Text('出發日'),
               ),
             ],
           ),
@@ -133,17 +217,51 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              TpSpacing.s4,
+              0,
+              TpSpacing.s4,
+              TpSpacing.s2,
+            ),
+            child: SegmentedButton<TripFilter>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: TripFilter.all,
+                  label: Text('全部'),
+                ),
+                ButtonSegment(
+                  value: TripFilter.mine,
+                  label: Text('我的'),
+                ),
+                ButtonSegment(
+                  value: TripFilter.shared,
+                  label: Text('共編'),
+                ),
+              ],
+              selected: {_filterTab},
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _filterTab = selection.first;
+                });
+              },
+            ),
+          ),
           Expanded(
             child: myTripsAsync.when(
               data: (trips) {
-                final filtered = _sort(_filter(trips));
+                // 串接:filter(分頁) → search(關鍵字) → sort(排序)。
+                final filtered = _sort(
+                  _search(_filterByTab(trips, currentUserId)),
+                );
                 return RefreshIndicator(
                   onRefresh: () => ref.refresh(myTripsProvider.future),
                   child: trips.isEmpty
                       ? const _EmptyHero()
                       : filtered.isEmpty
                           ? _buildNoResults(theme)
-                          : _buildTripList(context, filtered),
+                          : _buildTripList(context, filtered, currentUserId),
                 );
               },
               error: (error, stackTrace) =>
@@ -175,7 +293,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  Widget _buildTripList(BuildContext context, List<TripSummary> trips) {
+  Widget _buildTripList(
+    BuildContext context,
+    List<TripSummary> trips,
+    String? currentUserId,
+  ) {
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -187,6 +309,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         return TripCard(
           trip: trip,
           tone: TripCardTone.values[index % TripCardTone.values.length],
+          currentUserId: currentUserId,
           onTap: () => context.go('/trips/${trip.tripId}'),
           onLongPress: () => _showTripActions(context, trip),
         );
