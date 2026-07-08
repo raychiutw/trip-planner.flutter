@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
@@ -118,6 +120,82 @@ void main() {
 
     expect(tripId, 'cloned-trip');
   });
+
+  test('importTripJson：POST /trips/import raw JSON 回傳新 tripId', () async {
+    const jsonText = '{"schemaVersion":1,"meta":{"name":"A"}}';
+    dioAdapter.onPost(
+      '/trips/import',
+      (server) => server.reply(200, {'tripId': 'imported-trip'}),
+      data: jsonText,
+    );
+
+    final tripId = await tripRepository.importTripJson(jsonText);
+
+    expect(tripId, 'imported-trip');
+  });
+
+  test(
+    'exportTripJson：輸出 schemaVersion 1 JSON 與 entry segment index',
+    () async {
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray',
+        (server) => server.reply(200, {
+          'id': 'okinawa-trip-2026-Ray',
+          'name': 'Okinawa',
+          'title': '沖繩',
+        }),
+      );
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray/days',
+        (server) => server.reply(200, [
+          {
+            'id': 1,
+            'dayNum': 1,
+            'timeline': [
+              {'id': 11, 'title': 'A'},
+              {'id': 12, 'title': 'B'},
+            ],
+          },
+        ]),
+        queryParameters: {'all': '1'},
+      );
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray/segments',
+        (server) => server.reply(200, [
+          {
+            'fromEntryId': 11,
+            'toEntryId': 12,
+            'mode': 'drive',
+            'min': 20,
+            'distanceM': 1200,
+            'source': 'manual',
+          },
+        ]),
+      );
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray/notes',
+        (server) =>
+            server.reply(200, {'flights': const [], 'lodgings': const []}),
+      );
+
+      final export = await tripRepository.exportTripJson(
+        'okinawa-trip-2026-Ray',
+        now: DateTime(2026, 7, 8),
+      );
+      final decoded = jsonDecode(export.content) as Map<String, dynamic>;
+      final days = decoded['days'] as List<dynamic>;
+      final timeline =
+          (days.single as Map<String, dynamic>)['timeline'] as List;
+      final segments = decoded['segments'] as List<dynamic>;
+
+      expect(export.fileName, 'Okinawa-2026-07-08.json');
+      expect(decoded['schemaVersion'], 1);
+      expect((timeline.first as Map<String, dynamic>)['entryPosition'], 0);
+      expect((timeline.last as Map<String, dynamic>)['entryPosition'], 1);
+      expect((segments.single as Map<String, dynamic>)['fromEntryIdx'], 0);
+      expect((segments.single as Map<String, dynamic>)['toEntryIdx'], 1);
+    },
+  );
 
   test('fetchDays：GET /trips/:id/days?all=1 解析巢狀 timeline', () async {
     dioAdapter.onGet(
