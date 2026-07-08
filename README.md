@@ -53,6 +53,7 @@ docs/
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
 | 查 design token / 三色 tone | [reference-theme](docs/reference-theme.md) |
 | 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
+| 查 web→Flutter 尚未翻寫功能 | [移植缺口盤點](docs/porting-gap-audit-2026-07-08.md) |
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 

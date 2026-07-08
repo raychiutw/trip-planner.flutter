@@ -4,18 +4,27 @@
 
 ## P1(第二波)
 
-- [ ] 收藏 + 探索(favorites tab 由 placeholder 轉正,對應 web Explore)
-- [ ] Entry CRUD 表單群(新增/編輯/刪除停留點;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
-- [ ] 建立/編輯行程(行程基本資料表單)
-- [ ] AI 聊天(chat tab 轉正;request queue)
-- [ ] 全域地圖(map tab 轉正,跨行程 POI)
-- [ ] 共編邀請(成員管理)
-- [ ] 行程筆記 CRUD(5 區由唯讀轉可編輯)
+- [ ] 收藏 + 探索 + 加入行程 fast-path(`/favorites`,`/explore`,`/favorites/:id/add-to-trip`,`/add-to-trip`;favorites tab 由 placeholder 轉正)
+- [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
+- [ ] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料表單)
+- [ ] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)
+- [ ] 全域地圖(`/map`;map tab 轉正,跨行程 POI)
+- [ ] 共編邀請(`/trips/:id/collab`,`/invite`;成員管理 + invitation accept/revoke)
+- [ ] 行程筆記 CRUD + AI generate(`/trips/:id/notes`;5 區由唯讀轉可編輯)
+- [ ] AI 健檢報告(`/trips/:id/health`;reports polling)
+- [ ] Auth 補齊(`/signup`,`/login/forgot`,`/auth/password/reset`,`/auth/verify-email`)
+
+## P0 parity debt
+
+- [ ] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/匯入/新增行程入口/TripCardMenu/分享/filtered empty
+- [ ] TripTimelineScreen 補 web parity:scroll-spy active day/今日自動定位/focus deep link/offline banner/segment 即時 refetch/overflow actions
+- [ ] TripMapScreen 補 web parity:`stop/:entryId/map` focus route/pin-card 雙向同步/overview 點 pin 切 day/polyline/定位 FAB
+- [ ] AccountScreen 補 web parity:displayName inline edit/外觀與通知 row 實際導航
 
 ## P2
 
-- [ ] 分享/列印/匯入
-- [ ] 設定子頁
+- [ ] 分享/列印/匯入(`/s/:token`,`/trips/:id/print`,ShareLink,PDF/JSON)
+- [ ] 設定子頁(`/account/*`,`/settings/*`,`/developer/apps*`,`/oauth/consent`)
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
 - [ ] 離線快取
 
