@@ -117,6 +117,48 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
+  testWidgets('已登入導向 /login?redirect_after 會回到安全站內路徑', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go('/login?redirect_after=%2Fs%2Fpublic-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicShareScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入導向 /login 會忽略外部 redirect_after', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go('/login?redirect_after=https%3A%2F%2Fevil.example');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
   testWidgets('未登入可進入公開分享頁 /s/:token', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);

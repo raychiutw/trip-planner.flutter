@@ -54,8 +54,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
       final isPublicRoute = _isPublicShellOutsideRoute(state);
-      if (!isLoggedIn && !isOnLogin && !isPublicRoute) return '/login';
-      if (isLoggedIn && isOnLogin) return '/trips';
+      if (!isLoggedIn && !isOnLogin && !isPublicRoute) {
+        return _loginLocationWithRedirect(state);
+      }
+      if (isLoggedIn && isOnLogin) return _redirectAfterLogin(state);
       return null;
     },
     routes: [
@@ -229,6 +231,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 const _publicShellOutsideRoutes = {'/login', '/oauth/consent'};
+
+String _loginLocationWithRedirect(GoRouterState state) {
+  final requestedLocation = state.uri.toString();
+  if (requestedLocation == '/trips') return '/login';
+  return '/login?redirect_after=${Uri.encodeComponent(requestedLocation)}';
+}
+
+String _redirectAfterLogin(GoRouterState state) {
+  final rawRedirect = state.uri.queryParameters['redirect_after'];
+  if (rawRedirect == null) return '/trips';
+
+  final redirectUri = Uri.tryParse(rawRedirect);
+  if (redirectUri == null ||
+      redirectUri.hasScheme ||
+      redirectUri.hasAuthority ||
+      !rawRedirect.startsWith('/') ||
+      rawRedirect.startsWith('//') ||
+      redirectUri.path == '/login') {
+    return '/trips';
+  }
+  return redirectUri.toString();
+}
 
 bool _isPublicShellOutsideRoute(GoRouterState state) {
   if (_publicShellOutsideRoutes.contains(state.matchedLocation)) return true;
