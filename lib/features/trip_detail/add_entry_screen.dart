@@ -4,10 +4,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../api/providers.dart';
 import '../../api/trip_repository.dart';
@@ -17,6 +15,7 @@ import '../../models/poi.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../favorites/favorites_screen.dart';
+import '../map/map_adapter.dart';
 import 'trip_providers.dart';
 
 class AddEntryScreen extends ConsumerStatefulWidget {
@@ -527,11 +526,11 @@ class _AddEntryScreenState extends ConsumerState<AddEntryScreen> {
     };
   }
 
-  LatLng? _customPointFromFields() {
+  TripMapPoint? _customPointFromFields() {
     final lat = double.tryParse(_customLatController.text.trim());
     final lng = double.tryParse(_customLngController.text.trim());
     if (!_isValidCustomCoord(lat, lng)) return null;
-    return LatLng(lat!, lng!);
+    return TripMapPoint(lat!, lng!);
   }
 
   bool _isValidCustomCoord(double? lat, double? lng) {
@@ -539,13 +538,17 @@ class _AddEntryScreenState extends ConsumerState<AddEntryScreen> {
     return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   }
 
-  void _setCustomPoint(LatLng point) {
+  void _setCustomPoint(TripMapPoint point) {
     _customLatController.text = point.latitude.toStringAsFixed(6);
     _customLngController.text = point.longitude.toStringAsFixed(6);
     setState(() => _submitError = null);
   }
 
-  LatLng _initialCustomMapCenter(List<TripDay> days, int dayNum, Trip? trip) {
+  TripMapPoint _initialCustomMapCenter(
+    List<TripDay> days,
+    int dayNum,
+    Trip? trip,
+  ) {
     TripDay? selectedDay;
     for (final day in days) {
       if (day.dayNum == dayNum) {
@@ -557,18 +560,18 @@ class _AddEntryScreenState extends ConsumerState<AddEntryScreen> {
     for (final entry in timeline.reversed) {
       final lat = entry.master?.lat;
       final lng = entry.master?.lng;
-      if (lat != null && lng != null) return LatLng(lat, lng);
+      if (lat != null && lng != null) return TripMapPoint(lat, lng);
     }
     final hotelLocation = selectedDay?.hotel?.location;
     if (hotelLocation?.lat != null && hotelLocation?.lng != null) {
-      return LatLng(hotelLocation!.lat!, hotelLocation.lng!);
+      return TripMapPoint(hotelLocation!.lat!, hotelLocation.lng!);
     }
     for (final destination in trip?.destinations ?? const <TripDestination>[]) {
       final lat = destination.lat;
       final lng = destination.lng;
-      if (lat != null && lng != null) return LatLng(lat, lng);
+      if (lat != null && lng != null) return TripMapPoint(lat, lng);
     }
-    return const LatLng(35.681236, 139.767125);
+    return const TripMapPoint(35.681236, 139.767125);
   }
 
   String? _tripTitle(Trip? trip) {
@@ -650,7 +653,7 @@ class _DayAndTimeFields extends StatelessWidget {
   String _dayTitle(TripDay day) => 'Day ${day.dayNum} · ${day.displayTitle}';
 }
 
-class _CustomLocationPicker extends StatelessWidget {
+class _CustomLocationPicker extends StatefulWidget {
   const _CustomLocationPicker({
     required this.center,
     required this.pickedPoint,
@@ -658,15 +661,28 @@ class _CustomLocationPicker extends StatelessWidget {
     required this.onPicked,
   });
 
-  final LatLng center;
-  final LatLng? pickedPoint;
+  final TripMapPoint center;
+  final TripMapPoint? pickedPoint;
   final bool enabled;
-  final ValueChanged<LatLng> onPicked;
+  final ValueChanged<TripMapPoint> onPicked;
+
+  @override
+  State<_CustomLocationPicker> createState() => _CustomLocationPickerState();
+}
+
+class _CustomLocationPickerState extends State<_CustomLocationPicker> {
+  final FlutterTripMapController _mapController = FlutterTripMapController();
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pickedPoint = this.pickedPoint;
+    final pickedPoint = widget.pickedPoint;
     return SizedBox(
       key: const ValueKey('add-entry-custom-map'),
       height: 240,
@@ -674,37 +690,25 @@ class _CustomLocationPicker extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
         child: Stack(
           children: [
-            FlutterMap(
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: 14,
-                onTap: enabled ? (tapPosition, point) => onPicked(point) : null,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.raychiu.tripline',
-                ),
+            FlutterMapCanvas(
+              controller: _mapController,
+              tilePreset: kTripMapTilePresets.first,
+              initialFitPoints: const [],
+              initialCenter: widget.center,
+              initialZoom: 14,
+              onTap: widget.enabled ? widget.onPicked : null,
+              markers: [
                 if (pickedPoint != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: pickedPoint,
-                        width: 40,
-                        height: 40,
-                        child: Icon(
-                          Icons.location_pin,
-                          color: colorScheme.primary,
-                          size: 40,
-                        ),
-                      ),
-                    ],
+                  TripMapMarker(
+                    point: pickedPoint,
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.location_pin,
+                      color: colorScheme.primary,
+                      size: 40,
+                    ),
                   ),
-                RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution('OpenStreetMap contributors'),
-                  ],
-                ),
               ],
             ),
             Positioned(

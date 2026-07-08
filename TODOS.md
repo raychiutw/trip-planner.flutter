@@ -34,7 +34,7 @@
 
 - [ ] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push — CHANGELOG 的 compare/release 連結目前指向尚不存在的 tag
 - [x] `--dart-define=TRIPLINE_API_URL` base URL 覆寫（可傳 origin 或完整 `/api` URL；Origin header 取 scheme/host/port）(**Completed:** feature/favorites-explore)
-- [ ] 地圖介面抽象化(PORTING_PLAN 決策:保留之後換 google_maps_flutter 的空間;目前 flutter_map 直接用在 TripMapScreen)
+- [x] 地圖介面抽象化（`features/map/map_adapter.dart` 集中 `flutter_map` adapter；TripMap / AddEntry 畫面改用 `TripMapPoint`、`TripMapRoute`、`TripMapMarker`）(**Completed:** feature/favorites-explore)
 
 ## Completed
 

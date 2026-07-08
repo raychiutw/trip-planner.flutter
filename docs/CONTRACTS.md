@@ -451,7 +451,7 @@ class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/a
 class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/edit_entry_screen.dart（接受 tripId, entryId）
 class ChangePoiScreen extends ConsumerStatefulWidget;  // features/trip_detail/change_poi_screen.dart（接受 tripId, entryId, mode）
 class EntryActionScreen extends ConsumerStatefulWidget; // features/trip_detail/entry_action_screen.dart（接受 tripId, entryId, action）
-class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM；接受 tripId, focusEntryId?）
+class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（走 features/map/map_adapter.dart；接受 tripId, focusEntryId?）
 class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
@@ -465,6 +465,24 @@ class DeveloperAppsScreen extends ConsumerWidget;      // features/account/devel
 class DeveloperAppNewScreen extends ConsumerStatefulWidget; // features/account/developer_apps_screen.dart
 class AppearanceSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 class NotificationSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
+```
+
+### 地圖 adapter contract
+
+```dart
+// features/map/map_adapter.dart
+class TripMapPoint { const TripMapPoint(double latitude, double longitude); }
+enum TripMapTileStyle { roadmap, terrain, satellite }
+class TripMapTilePreset { /* style,label,urlTemplate,attribution */ }
+class TripMapRoute { /* points,color,strokeWidth,border... */ }
+class TripMapMarker { /* point,width,height,child */ }
+class FlutterTripMapController { /* fitPoints / move / dispose */ }
+class FlutterMapCanvas extends StatelessWidget;        // 唯一持有 flutter_map widget/layer 轉接
+
+// 規則：
+// - feature screen 不直接保存 raw LatLng / MapController / Marker / Polyline
+// - TripMapScreen、GlobalMapScreen、AddEntryScreen 透過 TripMapPoint/Route/Marker 與 canvas 互動
+// - 若日後替換 google_maps_flutter,優先替換 adapter,保留畫面層 domain 型別
 ```
 
 ## 測試要求（TDD）

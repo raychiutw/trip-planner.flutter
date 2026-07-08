@@ -94,7 +94,7 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 
 ## 為什麼 flutter_map(OSM)而不是 google_maps_flutter
 
-免 API key、零帳務設定,個人專案的維運成本最低。已知取捨:OSM tile 風格較陽春、無 Google POI 資料。介面上地圖只在 `TripMapScreen` 一處,之後要換 google_maps_flutter 影響面有限。
+免 API key、零帳務設定,個人專案的維運成本最低。已知取捨:OSM tile 風格較陽春、無 Google POI 資料。地圖套件轉接集中在 `features/map/map_adapter.dart`;畫面層使用 `TripMapPoint`、`TripMapRoute`、`TripMapMarker` 與 `FlutterMapCanvas`,避免在 TripMap / AddEntry 表單散落 raw `LatLng`、`MapController` 或 layer 型別。之後要換 google_maps_flutter 時,優先替換 adapter。
 
 ## OCC(樂觀並行控制)
 

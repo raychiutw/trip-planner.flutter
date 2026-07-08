@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
@@ -68,7 +68,7 @@ final _dayTwo = TripDay(
 Widget _buildScreen(
   List<TripDay> days, {
   String initialLocation = '/trips/trip-1/map',
-  Future<LatLng?> Function()? locationProvider,
+  Future<TripMapPoint?> Function()? locationProvider,
 }) {
   final router = GoRouter(
     initialLocation: initialLocation,
@@ -185,7 +185,7 @@ void main() {
       _buildScreen([
         _dayOne,
         _dayTwo,
-      ], locationProvider: () async => const LatLng(26.22, 127.70)),
+      ], locationProvider: () async => const TripMapPoint(26.22, 127.70)),
     );
     await tester.pumpAndSettle();
 

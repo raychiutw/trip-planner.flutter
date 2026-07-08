@@ -9,7 +9,7 @@
 - 5-tab shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
 - 行程清單（三色 tone 卡片、pull-to-refresh、分類/搜尋/排序、action menu、filtered empty、尾端新增卡、JSON 匯入、分享連結管理）
 - 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
-- 行程地圖（flutter_map + OSM、逐日 pin、day tabs、entry cards 同步）
+- 行程地圖（map adapter + flutter_map/OSM、逐日 pin、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，新增/編輯/刪除與 AI 生成第一波）
 - AI 健檢（行程層級報告、severity 分組、pending polling）
 - Auth 補齊（註冊、查看信箱/重寄驗證信、忘記/重設密碼、Email 驗證）
@@ -59,7 +59,7 @@ docs/
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 
-技術棧：Flutter 3.41 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
+技術棧：Flutter 3.41 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（透過 `features/map/map_adapter.dart` 提供 OSM tiles，免 API key）。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 

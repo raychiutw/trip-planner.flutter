@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import 'map_adapter.dart';
 import '../trip_detail/trip_map_screen.dart';
 
 /// 全域地圖 tab 第一波：以目前使用者的行程清單作為入口，預設顯示第一趟行程地圖。
@@ -15,7 +15,7 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
   const GlobalMapScreen({super.key, this.tileProvider});
 
   /// 測試注入點：避免 widget test 對 OSM 發網路請求。
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
 
   @override
   ConsumerState<GlobalMapScreen> createState() => _GlobalMapScreenState();

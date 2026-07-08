@@ -57,6 +57,10 @@ wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.t
 
 語意色走 `colorScheme`;三色 tone(accent=玩/看/買、sage=住/移動、pink=吃,各 4 階)走 `Theme.of(context).extension<TpTones>()!` — 不要直接引用 `TpColorsLight/Dark` 常數(會壞 dark mode)。poi_type → tone 對照在 `lib/features/trip_detail/widgets/entry_tone.dart`。設計禁忌:無 gradient 裝飾、無 emoji icon、無 rainbow 色(地圖 pin palette 是唯一例外)。
 
+### 地圖 adapter
+
+`flutter_map` / `latlong2` 轉接集中在 `lib/features/map/map_adapter.dart`。Feature screen 使用 `TripMapPoint`、`TripMapRoute`、`TripMapMarker` 與 `FlutterMapCanvas`;不要在 TripMap / AddEntry / GlobalMap 之類畫面直接保存 raw `LatLng`、`MapController`、`Marker`、`Polyline` 或 layer widget。
+
 ### OCC
 
 models 帶 `version` 欄位;後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用。Entry edit/move 與 POI mutation 目前已在畫面層重抓 entry,用最新 `version` / `entryPoisVersion` retry 同一個操作一次。

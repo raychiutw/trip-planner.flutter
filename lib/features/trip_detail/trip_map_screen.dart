@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
+import '../map/map_adapter.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -23,47 +22,9 @@ const List<Color> kDayPinPalette = [
   Color(0xFFF43F5E), // rose
 ];
 
-typedef TripMapLocationProvider = Future<LatLng?> Function();
+typedef TripMapLocationProvider = Future<TripMapPoint?> Function();
 
-enum _MapTileStyle { roadmap, terrain, satellite }
-
-class _MapTilePreset {
-  const _MapTilePreset({
-    required this.style,
-    required this.label,
-    required this.urlTemplate,
-    required this.attribution,
-  });
-
-  final _MapTileStyle style;
-  final String label;
-  final String urlTemplate;
-  final String attribution;
-}
-
-const List<_MapTilePreset> _mapTilePresets = [
-  _MapTilePreset(
-    style: _MapTileStyle.roadmap,
-    label: '路線圖',
-    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: 'OpenStreetMap contributors',
-  ),
-  _MapTilePreset(
-    style: _MapTileStyle.terrain,
-    label: '地形',
-    urlTemplate: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: 'OpenTopoMap, OpenStreetMap contributors',
-  ),
-  _MapTilePreset(
-    style: _MapTileStyle.satellite,
-    label: '衛星',
-    urlTemplate:
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Esri, OpenStreetMap contributors',
-  ),
-];
-
-/// 行程地圖：day tabs（總覽 + DAY NN）＋ flutter_map OSM ＋ 底部 entry cards。
+/// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
   const TripMapScreen({
     super.key,
@@ -79,7 +40,7 @@ class TripMapScreen extends ConsumerWidget {
   final int? focusEntryId;
 
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
 
   /// 測試注入點：production 使用裝置定位，widget test 可傳固定座標。
   final TripMapLocationProvider? locationProvider;
@@ -114,7 +75,7 @@ class TripMapContent extends ConsumerWidget {
   /// Optional entry id used to initialize the selected day and map camera.
   final int? focusEntryId;
 
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
   final TripMapLocationProvider? locationProvider;
   final String emptyMessage;
 
@@ -156,7 +117,7 @@ class _DayPin {
   /// 該日內 1-based 序號（圓形 marker 上的數字）。
   final int pinNumber;
   final TimelineEntry entry;
-  final LatLng point;
+  final TripMapPoint point;
 
   Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
 }
@@ -173,7 +134,7 @@ class _TripMapView extends StatefulWidget {
   final List<TripDay> days;
   final int? focusEntryId;
   final String emptyMessage;
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
   final TripMapLocationProvider? locationProvider;
 
   @override
@@ -181,7 +142,7 @@ class _TripMapView extends StatefulWidget {
 }
 
 class _TripMapViewState extends State<_TripMapView> {
-  final MapController _mapController = MapController();
+  final FlutterTripMapController _mapController = FlutterTripMapController();
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   late int _selectedTabIndex;
@@ -192,13 +153,13 @@ class _TripMapViewState extends State<_TripMapView> {
   bool _isLayerMenuOpen = false;
   bool _isLocating = false;
   int? _selectedEntryId;
-  LatLng? _userLocation;
-  _MapTileStyle _tileStyle = _MapTileStyle.roadmap;
+  TripMapPoint? _userLocation;
+  TripMapTileStyle _tileStyle = TripMapTileStyle.roadmap;
 
-  _MapTilePreset get _activeTilePreset {
-    return _mapTilePresets.firstWhere(
+  TripMapTilePreset get _activeTilePreset {
+    return kTripMapTilePresets.firstWhere(
       (preset) => preset.style == _tileStyle,
-      orElse: () => _mapTilePresets.first,
+      orElse: () => kTripMapTilePresets.first,
     );
   }
 
@@ -247,7 +208,7 @@ class _TripMapViewState extends State<_TripMapView> {
           dayNum: day.dayNum,
           pinNumber: dayPins.length + 1,
           entry: entry,
-          point: LatLng(lat, lng),
+          point: TripMapPoint(lat, lng),
         ),
       );
     }
@@ -262,7 +223,7 @@ class _TripMapViewState extends State<_TripMapView> {
     return pinsByDay[tabIndex - 1];
   }
 
-  List<Polyline<Object>> _polylinesForTab(int tabIndex) {
+  List<TripMapRoute> _routesForTab(int tabIndex) {
     final pinsByDay = _pinsByDay;
     final dayPinGroups = tabIndex == 0
         ? pinsByDay
@@ -270,7 +231,7 @@ class _TripMapViewState extends State<_TripMapView> {
     return [
       for (final dayPins in dayPinGroups)
         if (dayPins.length >= 2)
-          Polyline<Object>(
+          TripMapRoute(
             points: [for (final pin in dayPins) pin.point],
             color: dayPins.first.color,
             strokeWidth: 4,
@@ -309,14 +270,12 @@ class _TripMapViewState extends State<_TripMapView> {
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
   }
 
-  void _fitToPoints(List<LatLng> points) {
+  void _fitToPoints(List<TripMapPoint> points) {
     if (!_mapIsReady || points.isEmpty) return;
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints(points),
-        padding: const EdgeInsets.all(TpSpacing.s10),
-        maxZoom: 16,
-      ),
+    _mapController.fitPoints(
+      points,
+      padding: const EdgeInsets.all(TpSpacing.s10),
+      maxZoom: 16,
     );
   }
 
@@ -343,7 +302,7 @@ class _TripMapViewState extends State<_TripMapView> {
     _focusPin(pin);
   }
 
-  void _selectTileStyle(_MapTileStyle style) {
+  void _selectTileStyle(TripMapTileStyle style) {
     setState(() {
       _tileStyle = style;
       _isLayerMenuOpen = false;
@@ -356,7 +315,7 @@ class _TripMapViewState extends State<_TripMapView> {
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<LatLng?> _resolveDeviceLocation() async {
+  Future<TripMapPoint?> _resolveDeviceLocation() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -379,7 +338,7 @@ class _TripMapViewState extends State<_TripMapView> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      return LatLng(position.latitude, position.longitude);
+      return TripMapPoint(position.latitude, position.longitude);
     } catch (error) {
       _showMapMessage('無法取得位置：$error');
       return null;
@@ -521,55 +480,36 @@ class _TripMapViewState extends State<_TripMapView> {
 
   Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
     final tilePreset = _activeTilePreset;
-    final visiblePolylines = _polylinesForTab(_selectedTabIndex);
+    final visibleRoutes = _routesForTab(_selectedTabIndex);
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints([
-                for (final pin in allPins) pin.point,
-              ]),
-              padding: const EdgeInsets.all(TpSpacing.s10),
-              maxZoom: 16,
-            ),
-            onMapReady: () {
-              _mapIsReady = true;
-              _applyInitialFocus();
-            },
-          ),
-          children: [
-            TileLayer(
-              key: const ValueKey('trip-map-tile-layer'),
-              urlTemplate: tilePreset.urlTemplate,
-              userAgentPackageName: 'com.raychiu.tripline',
-              tileProvider: widget.tileProvider,
-            ),
-            if (visiblePolylines.isNotEmpty)
-              PolylineLayer<Object>(
-                key: const ValueKey('trip-map-polylines'),
-                polylines: visiblePolylines,
-              ),
-            MarkerLayer(
-              markers: [
-                for (final pin in visiblePins) _buildMarker(pin),
-                if (_userLocation != null) _buildUserLocationMarker(),
-              ],
-            ),
-            RichAttributionWidget(
-              attributions: [TextSourceAttribution(tilePreset.attribution)],
-            ),
+        FlutterMapCanvas(
+          controller: _mapController,
+          tilePreset: tilePreset,
+          initialFitPoints: [for (final pin in allPins) pin.point],
+          initialPadding: const EdgeInsets.all(TpSpacing.s10),
+          initialMaxZoom: 16,
+          tileProvider: widget.tileProvider,
+          routes: visibleRoutes,
+          markers: [
+            for (final pin in visiblePins) _buildMarker(pin),
+            if (_userLocation != null) _buildUserLocationMarker(),
           ],
+          onMapReady: () {
+            _mapIsReady = true;
+            _applyInitialFocus();
+          },
+          tileLayerKey: const ValueKey('trip-map-tile-layer'),
+          routeLayerKey: const ValueKey('trip-map-polylines'),
         ),
         _buildMapFabs(context),
       ],
     );
   }
 
-  Marker _buildMarker(_DayPin pin) {
+  TripMapMarker _buildMarker(_DayPin pin) {
     final isSelected = pin.entry.id == _selectedEntryId;
-    return Marker(
+    return TripMapMarker(
       point: pin.point,
       width: 32,
       height: 32,
@@ -603,8 +543,8 @@ class _TripMapViewState extends State<_TripMapView> {
     );
   }
 
-  Marker _buildUserLocationMarker() {
-    return Marker(
+  TripMapMarker _buildUserLocationMarker() {
+    return TripMapMarker(
       point: _userLocation!,
       width: 28,
       height: 28,
@@ -681,7 +621,7 @@ class _TripMapViewState extends State<_TripMapView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final preset in _mapTilePresets)
+              for (final preset in kTripMapTilePresets)
                 _LayerOption(
                   key: ValueKey('trip-map-layer-${preset.style.name}'),
                   label: preset.label,

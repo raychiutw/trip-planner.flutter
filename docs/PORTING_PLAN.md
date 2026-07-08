@@ -12,7 +12,7 @@
 | Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
 | HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry；`--dart-define=TRIPLINE_API_URL` 可覆寫 API base |
 | 認證 | 密碼登入拿 session cookie | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE+Bearer 留待後續（需註冊 public client） |
-| 地圖 | flutter_map + OSM tiles | 免 API key、零帳務設定；介面抽象化，之後可換 google_maps_flutter |
+| 地圖 | map adapter + flutter_map / OSM tiles | 免 API key、零帳務設定；`features/map/map_adapter.dart` 集中套件轉接，之後可替換 google_maps_flutter |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
 | 測試 | flutter_test + mocktail + http_mock_adapter | TDD：models 解析測試、api client 行為測試、widget 測試 |
 
@@ -74,7 +74,7 @@ lib/
   features/collab/          # CollabScreen
   features/invite/          # InviteScreen
   features/share/           # PublicShareScreen
-  features/map/             # GlobalMapScreen
+  features/map/             # GlobalMapScreen + map_adapter.dart（地圖套件轉接層）
   features/trips/           # TripsListScreen + TripFormScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen / TripHealthScreen + trip scope providers
   features/favorites/       # FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen
