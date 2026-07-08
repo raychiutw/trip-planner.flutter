@@ -8,6 +8,7 @@
 
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 新增景點**:新增 `/trips/:tripId/add-entry` 與 `/trips/:tripId/add-stop` 相容入口;時間軸 AppBar 可進入新增景點表單,支援搜尋 POI 或收藏 POI 加入指定 day,成功後觸發 travel recompute。
+- **P1 Entry 編輯**:新增 `/trips/:tripId/stop/:entryId/edit`;時間軸 entry 可進入編輯表單,支援讀取單一 entry、修改開始/結束時間與描述、刪除景點,更新時帶 `expectedVersion`,成功後觸發 travel recompute。
 
 ## [0.1.0] - 2026-06-10
 

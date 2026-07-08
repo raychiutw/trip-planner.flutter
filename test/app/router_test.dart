@@ -14,8 +14,10 @@ import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/trip_detail/add_entry_screen.dart';
+import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/trip.dart';
@@ -48,6 +50,17 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'Trip 1'));
   when(() => mockTripRepository.fetchDays(any())).thenAnswer(
     (_) async => const [TripDay(id: 11, dayNum: 2, title: '那霸', version: 1)],
+  );
+  when(() => mockTripRepository.fetchEntry(any(), any())).thenAnswer(
+    (_) async => const TimelineEntry(
+      id: 101,
+      dayId: 11,
+      sortOrder: 0,
+      title: '首里城公園',
+      description: '世界遺產',
+      version: 7,
+      master: EntryPoiInfo(poiId: 501, name: '首里城公園', type: 'attraction'),
+    ),
   );
   when(
     mockTripRepository.fetchPoiFavorites,
@@ -193,6 +206,26 @@ void main() {
 
     expect(find.byType(AddEntryScreen), findsOneWidget);
     expect(find.text('Day 2 · 那霸'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/stop/:entryId/edit 進入編輯景點表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/stop/101/edit');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditEntryScreen), findsOneWidget);
+    expect(find.text('首里城公園'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }

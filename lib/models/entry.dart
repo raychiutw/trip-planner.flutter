@@ -87,7 +87,9 @@ class TimelineEntry {
     required this.title,
     this.description,
     this.note,
+    this.source,
     required this.version,
+    this.entryPoisVersion,
     this.travel,
     this.master,
     this.alternates = const [],
@@ -104,7 +106,9 @@ class TimelineEntry {
   final String title;
   final String? description;
   final String? note;
+  final String? source;
   final int version;
+  final String? entryPoisVersion;
   final Travel? travel;
   final EntryPoiInfo? master;
   final List<EntryPoiInfo> alternates;
@@ -120,7 +124,9 @@ class TimelineEntry {
       title: json['title'] as String,
       description: json['description'] as String?,
       note: json['note'] as String?,
+      source: json['source'] as String?,
       version: (json['version'] as num?)?.toInt() ?? 0,
+      entryPoisVersion: json['entryPoisVersion'] as String?,
       travel: json['travel'] == null
           ? null
           : Travel.fromJson(json['travel'] as Map<String, dynamic>),
@@ -128,8 +134,10 @@ class TimelineEntry {
           ? null
           : EntryPoiInfo.fromJson(json['master'] as Map<String, dynamic>),
       alternates: (json['alternates'] as List<dynamic>? ?? [])
-          .map((alternateJson) =>
-              EntryPoiInfo.fromJson(alternateJson as Map<String, dynamic>))
+          .map(
+            (alternateJson) =>
+                EntryPoiInfo.fromJson(alternateJson as Map<String, dynamic>),
+          )
           .toList(),
     );
   }

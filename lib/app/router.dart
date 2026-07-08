@@ -13,6 +13,7 @@ import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/add_entry_screen.dart';
+import '../features/trip_detail/edit_entry_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
@@ -94,6 +95,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         builder: (context, state) => AddEntryScreen(
                           tripId: state.pathParameters['tripId']!,
                           initialDayNum: _dayNumFromQuery(state),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'stop/:entryId/edit',
+                        builder: (context, state) => EditEntryScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId:
+                              int.tryParse(
+                                state.pathParameters['entryId'] ?? '',
+                              ) ??
+                              -1,
                         ),
                       ),
                     ],

@@ -177,6 +177,96 @@ void main() {
     expect(kokusaiStreetEntry.alternates, isEmpty);
   });
 
+  test(
+    'fetchEntry：GET /trips/:id/entries/:eid 解析單一 entry 與 POI OCC token',
+    () async {
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray/entries/101',
+        (server) => server.reply(200, {
+          'id': 101,
+          'dayId': 11,
+          'sortOrder': 0,
+          'startTime': '10:00',
+          'endTime': '11:30',
+          'title': '首里城',
+          'description': '世界遺產',
+          'source': 'google',
+          'version': 7,
+          'entryPoisVersion': '3',
+          'master': {
+            'poiId': 501,
+            'name': '首里城公園',
+            'type': 'attraction',
+            'note': '黃昏時段去',
+          },
+          'alternates': [
+            {'poiId': 502, 'name': '玉陵', 'type': 'attraction'},
+          ],
+        }),
+      );
+
+      final entry = await tripRepository.fetchEntry(
+        'okinawa-trip-2026-Ray',
+        101,
+      );
+
+      expect(entry.id, 101);
+      expect(entry.version, 7);
+      expect(entry.entryPoisVersion, '3');
+      expect(entry.source, 'google');
+      expect(entry.master!.note, '黃昏時段去');
+      expect(entry.alternates.single.name, '玉陵');
+    },
+  );
+
+  test('updateEntry：PATCH /trips/:id/entries/:eid 帶 expectedVersion', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026-Ray/entries/101',
+      (server) => server.reply(200, {
+        'id': 101,
+        'dayId': 11,
+        'sortOrder': 0,
+        'startTime': '10:30',
+        'endTime': '12:00',
+        'title': '首里城',
+        'description': '改成上午晚點去',
+        'version': 8,
+      }),
+      data: {
+        'start_time': '10:30',
+        'end_time': '12:00',
+        'description': '改成上午晚點去',
+        'expectedVersion': 7,
+      },
+    );
+
+    final updated = await tripRepository.updateEntry(
+      'okinawa-trip-2026-Ray',
+      101,
+      expectedVersion: 7,
+      startTime: '10:30',
+      endTime: '12:00',
+      description: '改成上午晚點去',
+    );
+
+    expect(updated.startTime, '10:30');
+    expect(updated.endTime, '12:00');
+    expect(updated.description, '改成上午晚點去');
+    expect(updated.version, 8);
+  });
+
+  test('deleteEntry：DELETE /trips/:id/entries/:eid', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa-trip-2026-Ray/entries/101',
+      (server) => server.reply(200, {'ok': true}),
+    );
+
+    await expectLater(
+      tripRepository.deleteEntry('okinawa-trip-2026-Ray', 101),
+      completes,
+    );
+  });
+
   test('fetchNotes：GET /trips/:id/notes 解析 5 區聚合', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/notes',

@@ -144,6 +144,11 @@ Future<void> _pumpTimeline(
             builder: (context, state) =>
                 const Scaffold(body: Text('add-entry-page')),
           ),
+          GoRoute(
+            path: 'stop/:entryId/edit',
+            builder: (context, state) =>
+                Scaffold(body: Text('edit:${state.pathParameters['entryId']}')),
+          ),
         ],
       ),
     ],
@@ -200,6 +205,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('map-page'), findsOneWidget);
+  });
+
+  testWidgets('點 entry 編輯 icon 導向 stop/:entryId/edit', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byTooltip('編輯景點').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('edit:11'), findsOneWidget);
   });
 
   testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (

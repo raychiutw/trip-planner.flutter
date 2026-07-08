@@ -53,8 +53,9 @@ class TripTimelineScreen extends ConsumerWidget {
         ],
       ),
       body: daysAsync.when(
-        data: (days) =>
-            days.isEmpty ? const _EmptyTimeline() : _TimelineBody(days: days),
+        data: (days) => days.isEmpty
+            ? const _EmptyTimeline()
+            : _TimelineBody(tripId: tripId, days: days),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -69,8 +70,9 @@ class TripTimelineScreen extends ConsumerWidget {
 
 /// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
 class _TimelineBody extends StatefulWidget {
-  const _TimelineBody({required this.days});
+  const _TimelineBody({required this.tripId, required this.days});
 
+  final String tripId;
   final List<TripDay> days;
 
   @override
@@ -133,7 +135,11 @@ class _TimelineBodyState extends State<_TimelineBody> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final day in widget.days)
-                  _DaySection(key: _daySectionKeys[day.dayNum], day: day),
+                  _DaySection(
+                    key: _daySectionKeys[day.dayNum],
+                    tripId: widget.tripId,
+                    day: day,
+                  ),
               ],
             ),
           ),
@@ -145,8 +151,9 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
 /// 單日 section：day header → hotel 卡 → entries（entry 之間插 travel pill）。
 class _DaySection extends StatelessWidget {
-  const _DaySection({super.key, required this.day});
+  const _DaySection({super.key, required this.tripId, required this.day});
 
+  final String tripId;
   final TripDay day;
 
   @override
@@ -173,6 +180,9 @@ class _DaySection extends StatelessWidget {
             entry: timeline[entryIndex],
             isFirst: entryIndex == 0,
             isLast: entryIndex == timeline.length - 1,
+            onEdit: () => GoRouter.maybeOf(
+              context,
+            )?.go('/trips/$tripId/stop/${timeline[entryIndex].id}/edit'),
           ),
         ],
         const SizedBox(height: TpSpacing.s6),

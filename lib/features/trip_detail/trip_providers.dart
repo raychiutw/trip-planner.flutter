@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
 import '../../models/day.dart';
+import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../models/trip.dart';
 
@@ -11,10 +12,26 @@ final tripDetailProvider = FutureProvider.family<Trip, String>((ref, tripId) {
   return ref.watch(tripRepositoryProvider).fetchTrip(tripId);
 });
 
-final tripDaysProvider = FutureProvider.family<List<TripDay>, String>((ref, tripId) {
+final tripDaysProvider = FutureProvider.family<List<TripDay>, String>((
+  ref,
+  tripId,
+) {
   return ref.watch(tripRepositoryProvider).fetchDays(tripId);
 });
 
-final tripNotesProvider = FutureProvider.family<TripNotes, String>((ref, tripId) {
+final entryDetailProvider =
+    FutureProvider.family<TimelineEntry, ({String tripId, int entryId})>((
+      ref,
+      args,
+    ) {
+      return ref
+          .watch(tripRepositoryProvider)
+          .fetchEntry(args.tripId, args.entryId);
+    });
+
+final tripNotesProvider = FutureProvider.family<TripNotes, String>((
+  ref,
+  tripId,
+) {
   return ref.watch(tripRepositoryProvider).fetchNotes(tripId);
 });

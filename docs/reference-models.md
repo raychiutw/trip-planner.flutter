@@ -102,8 +102,9 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 | `sortOrder` | `int` | 缺漏 → 0 |
 | `time`、`startTime`、`endTime` | `String?` | `startTime`/`endTime` 是 `"HH:MM"` |
 | `title` | `String` | 必填 |
-| `description`、`note` | `String?` | |
+| `description`、`note`、`source` | `String?` | |
 | `version` | `int` | OCC,缺漏 → 0 |
+| `entryPoisVersion` | `String?` | entry POI 關聯的 OCC token |
 | `travel` | `Travel?` | 到達此 entry 的移動段 |
 | `master` | `EntryPoiInfo?` | 主 POI |
 | `alternates` | `List<EntryPoiInfo>` | 備選 POI,預設 `[]` |

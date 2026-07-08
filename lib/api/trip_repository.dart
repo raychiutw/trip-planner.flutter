@@ -2,6 +2,7 @@
 library;
 
 import '../models/day.dart';
+import '../models/entry.dart';
 import '../models/notes.dart';
 import '../models/poi.dart';
 import '../models/trip.dart';
@@ -47,6 +48,42 @@ class TripRepository {
     return (responseBody as List<dynamic>)
         .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
         .toList();
+  }
+
+  /// GET /trips/:id/entries/:entryId。
+  Future<TimelineEntry> fetchEntry(String tripId, int entryId) async {
+    final responseBody = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}',
+    );
+    return TimelineEntry.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// PATCH /trips/:id/entries/:entryId（OCC：expectedVersion 必帶）。
+  Future<TimelineEntry> updateEntry(
+    String tripId,
+    int entryId, {
+    required int expectedVersion,
+    required String? startTime,
+    required String? endTime,
+    required String? description,
+  }) async {
+    final responseBody = await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}',
+      body: {
+        'start_time': startTime,
+        'end_time': endTime,
+        'description': description,
+        'expectedVersion': expectedVersion,
+      },
+    );
+    return TimelineEntry.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /trips/:id/entries/:entryId。
+  Future<void> deleteEntry(String tripId, int entryId) {
+    return _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}',
+    );
   }
 
   /// GET /trips/:id/notes（5 區聚合）。

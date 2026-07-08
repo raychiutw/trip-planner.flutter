@@ -19,6 +19,7 @@ class TimelineEntryTile extends StatelessWidget {
     required this.entry,
     this.isFirst = false,
     this.isLast = false,
+    this.onEdit,
   });
 
   final TimelineEntry entry;
@@ -28,6 +29,8 @@ class TimelineEntryTile extends StatelessWidget {
 
   /// 當日最後一個 entry：rail 不畫圓點下方連線。
   final bool isLast;
+
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +90,7 @@ class TimelineEntryTile extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: _EntryCard(entry: entry, tone: tone),
+              child: _EntryCard(entry: entry, tone: tone, onEdit: onEdit),
             ),
           ),
         ],
@@ -98,10 +101,11 @@ class TimelineEntryTile extends StatelessWidget {
 
 /// 內容卡：tone 色階梯（卡底 subtle、hairline bg、分類字 deep）。
 class _EntryCard extends StatelessWidget {
-  const _EntryCard({required this.entry, required this.tone});
+  const _EntryCard({required this.entry, required this.tone, this.onEdit});
 
   final TimelineEntry entry;
   final EntryToneColors tone;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -114,38 +118,41 @@ class _EntryCard extends StatelessWidget {
     if (master != null) {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
-        metaItems.add(Text(
-          masterName,
-          style: TextStyle(fontSize: 13, color: mutedColor),
-        ));
+        metaItems.add(
+          Text(masterName, style: TextStyle(fontSize: 13, color: mutedColor)),
+        );
       }
       if (master.category != null) {
-        metaItems.add(Text(
-          master.category!,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: tone.deep,
+        metaItems.add(
+          Text(
+            master.category!,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: tone.deep,
+            ),
           ),
-        ));
+        );
       }
       if (master.rating != null) {
         // rating 一律 accent（設計系統：rating 屬 accent 職責）
-        metaItems.add(Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.star_rounded, size: 14, color: tones.accent),
-            const SizedBox(width: 2),
-            Text(
-              master.rating!.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 12,
-                color: mutedColor,
-                fontFeatures: const [FontFeature.tabularFigures()],
+        metaItems.add(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.star_rounded, size: 14, color: tones.accent),
+              const SizedBox(width: 2),
+              Text(
+                master.rating!.toStringAsFixed(1),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: mutedColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
-          ],
-        ));
+            ],
+          ),
+        );
       }
     }
 
@@ -160,12 +167,31 @@ class _EntryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            entry.title,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-              height: 1.4,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  entry.title,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              if (onEdit != null)
+                IconButton(
+                  tooltip: '編輯景點',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: onEdit,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: TpSpacing.tapMin,
+                    height: TpSpacing.tapMin,
+                  ),
+                ),
+            ],
           ),
           if (metaItems.isNotEmpty)
             Padding(
