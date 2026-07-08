@@ -1,0 +1,610 @@
+/// 新增景點到行程 day 的 fast-path 表單。
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../api/providers.dart';
+import '../../api/trip_repository.dart';
+import '../../models/day.dart';
+import '../../models/poi.dart';
+import '../../models/trip.dart';
+import '../../theme/tokens.dart';
+import '../favorites/favorites_screen.dart';
+import 'trip_providers.dart';
+
+class AddEntryScreen extends ConsumerStatefulWidget {
+  const AddEntryScreen({super.key, required this.tripId, this.initialDayNum});
+
+  final String tripId;
+  final int? initialDayNum;
+
+  @override
+  ConsumerState<AddEntryScreen> createState() => _AddEntryScreenState();
+}
+
+class _AddEntryScreenState extends ConsumerState<AddEntryScreen> {
+  final _queryController = TextEditingController();
+  final _startTimeController = TextEditingController(text: '09:00');
+  final _endTimeController = TextEditingController(text: '10:00');
+  AsyncValue<List<PoiSearchResult>>? _searchState;
+  int? _selectedDayNum;
+  String _source = 'search';
+  String? _submitError;
+  String? _submittingKey;
+
+  static final _timePattern = RegExp(r'^\d{2}:\d{2}$');
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDayNum = widget.initialDayNum;
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
+    final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
+    final tripTitle = _tripTitle(tripAsync.value);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(tripTitle == null ? '新增景點' : '新增景點 · $tripTitle'),
+      ),
+      body: daysAsync.when(
+        data: (days) => _buildWithDays(days),
+        error: (error, stackTrace) => _LoadErrorState(
+          message: '無法取得行程日期',
+          onRetry: () => ref.invalidate(tripDaysProvider(widget.tripId)),
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+
+  Widget _buildWithDays(List<TripDay> days) {
+    if (days.isEmpty) {
+      return const _CenteredMessage(message: '這趟行程還沒有 day 可以加入');
+    }
+    final effectiveDayNum = _resolveDayNum(days);
+
+    return ListView(
+      padding: const EdgeInsets.all(TpSpacing.s4),
+      children: [
+        _DayAndTimeFields(
+          days: days,
+          effectiveDayNum: effectiveDayNum,
+          startTimeController: _startTimeController,
+          endTimeController: _endTimeController,
+          enabled: _submittingKey == null,
+          onDayChanged: (dayNum) {
+            setState(() {
+              _selectedDayNum = dayNum;
+              _submitError = null;
+            });
+          },
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(
+              value: 'search',
+              icon: Icon(Icons.search),
+              label: Text('搜尋'),
+            ),
+            ButtonSegment(
+              value: 'favorites',
+              icon: Icon(Icons.favorite_border),
+              label: Text('收藏'),
+            ),
+          ],
+          selected: {_source},
+          onSelectionChanged: _submittingKey == null
+              ? (selection) => setState(() {
+                  _source = selection.single;
+                  _submitError = null;
+                })
+              : null,
+        ),
+        if (_submitError != null) ...[
+          const SizedBox(height: TpSpacing.s3),
+          _InlineError(message: _submitError!),
+        ],
+        const SizedBox(height: TpSpacing.s4),
+        if (_source == 'search')
+          _buildSearchTab(effectiveDayNum)
+        else
+          _buildFavoritesTab(effectiveDayNum),
+      ],
+    );
+  }
+
+  Widget _buildSearchTab(int dayNum) {
+    final searchState = _searchState;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                key: const ValueKey('add-entry-search-input'),
+                controller: _queryController,
+                decoration: const InputDecoration(
+                  labelText: '搜尋景點',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: _submittingKey == null,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _runSearch(),
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            IconButton.filledTonal(
+              tooltip: '搜尋',
+              icon: const Icon(Icons.search),
+              onPressed: _submittingKey == null ? _runSearch : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        if (searchState == null)
+          const _CenteredMessage(message: '輸入關鍵字後，選一個景點加入這一天')
+        else
+          searchState.when(
+            data: (results) {
+              if (results.isEmpty) {
+                return const _CenteredMessage(message: '找不到符合的景點');
+              }
+              return Column(
+                children: [
+                  for (var index = 0; index < results.length; index++) ...[
+                    _AddSearchResultCard(
+                      result: results[index],
+                      isSubmitting:
+                          _submittingKey == 'search:${results[index].placeId}',
+                      onAdd: () => _addSearchResult(results[index], dayNum),
+                    ),
+                    if (index != results.length - 1)
+                      const SizedBox(height: TpSpacing.s3),
+                  ],
+                ],
+              );
+            },
+            error: (error, stackTrace) =>
+                const _CenteredMessage(message: '搜尋失敗，請確認至少輸入 2 個字'),
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(TpSpacing.s6),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFavoritesTab(int dayNum) {
+    return ref
+        .watch(poiFavoritesProvider)
+        .when(
+          data: (favorites) {
+            if (favorites.isEmpty) {
+              return const _CenteredMessage(message: '還沒有收藏景點');
+            }
+            return Column(
+              children: [
+                for (var index = 0; index < favorites.length; index++) ...[
+                  _AddFavoriteCard(
+                    favorite: favorites[index],
+                    isSubmitting:
+                        _submittingKey == 'favorite:${favorites[index].id}',
+                    onAdd: () => _addFavorite(favorites[index], dayNum),
+                  ),
+                  if (index != favorites.length - 1)
+                    const SizedBox(height: TpSpacing.s3),
+                ],
+              ],
+            );
+          },
+          error: (error, stackTrace) => _LoadErrorState(
+            message: '無法取得收藏資料',
+            onRetry: () => ref.invalidate(poiFavoritesProvider),
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+        );
+  }
+
+  Future<void> _runSearch() async {
+    final query = _queryController.text.trim();
+    if (query.length < 2) {
+      setState(() {
+        _searchState = AsyncError(
+          ArgumentError('query too short'),
+          StackTrace.current,
+        );
+      });
+      return;
+    }
+    setState(() {
+      _searchState = const AsyncLoading();
+      _submitError = null;
+    });
+    final nextState = await AsyncValue.guard(
+      () => ref
+          .read(tripRepositoryProvider)
+          .searchPois(query: query, region: null, limit: 20),
+    );
+    if (!mounted) return;
+    setState(() => _searchState = nextState);
+  }
+
+  Future<void> _addSearchResult(PoiSearchResult result, int dayNum) async {
+    if (!_validateTimes()) return;
+    final startTime = _startTimeController.text.trim();
+    final endTime = _endTimeController.text.trim();
+    setState(() {
+      _submittingKey = 'search:${result.placeId}';
+      _submitError = null;
+    });
+    try {
+      final repository = ref.read(tripRepositoryProvider);
+      await repository.createEntryFromPoiSearchResult(
+        tripId: widget.tripId,
+        dayNum: dayNum,
+        poi: result,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      _afterEntryCreated(repository, dayNum);
+    } on Exception {
+      _showSubmitError();
+    } finally {
+      if (mounted) setState(() => _submittingKey = null);
+    }
+  }
+
+  Future<void> _addFavorite(PoiFavorite favorite, int dayNum) async {
+    if (!_validateTimes()) return;
+    final startTime = _startTimeController.text.trim();
+    final endTime = _endTimeController.text.trim();
+    setState(() {
+      _submittingKey = 'favorite:${favorite.id}';
+      _submitError = null;
+    });
+    try {
+      final repository = ref.read(tripRepositoryProvider);
+      await repository.addPoiFavoriteToTrip(
+        favorite.id,
+        tripId: widget.tripId,
+        dayNum: dayNum,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      _afterEntryCreated(repository, dayNum);
+    } on Exception {
+      _showSubmitError();
+    } finally {
+      if (mounted) setState(() => _submittingKey = null);
+    }
+  }
+
+  void _afterEntryCreated(TripRepository repository, int dayNum) {
+    unawaited(
+      repository
+          .recomputeTravel(widget.tripId, dayNum: dayNum)
+          .catchError((Object _) {}),
+    );
+    ref.invalidate(tripDaysProvider(widget.tripId));
+    if (mounted) context.go('/trips/${widget.tripId}');
+  }
+
+  bool _validateTimes() {
+    final startTime = _startTimeController.text.trim();
+    final endTime = _endTimeController.text.trim();
+    if (!_timePattern.hasMatch(startTime) || !_timePattern.hasMatch(endTime)) {
+      setState(() => _submitError = '時間格式需為 HH:MM');
+      return false;
+    }
+    return true;
+  }
+
+  void _showSubmitError() {
+    if (!mounted) return;
+    setState(() {
+      _submitError = '新增景點失敗，請確認時間沒有衝突後再試一次';
+    });
+  }
+
+  int _resolveDayNum(List<TripDay> days) {
+    final selectedDayNum = _selectedDayNum;
+    if (selectedDayNum != null &&
+        days.any((day) => day.dayNum == selectedDayNum)) {
+      return selectedDayNum;
+    }
+    return days.first.dayNum;
+  }
+
+  String? _tripTitle(Trip? trip) {
+    final title = trip?.title?.trim();
+    if (title != null && title.isNotEmpty) return title;
+    final name = trip?.name.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return null;
+  }
+}
+
+class _DayAndTimeFields extends StatelessWidget {
+  const _DayAndTimeFields({
+    required this.days,
+    required this.effectiveDayNum,
+    required this.startTimeController,
+    required this.endTimeController,
+    required this.enabled,
+    required this.onDayChanged,
+  });
+
+  final List<TripDay> days;
+  final int effectiveDayNum;
+  final TextEditingController startTimeController;
+  final TextEditingController endTimeController;
+  final bool enabled;
+  final ValueChanged<int?> onDayChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        DropdownButtonFormField<int>(
+          initialValue: effectiveDayNum,
+          decoration: const InputDecoration(
+            labelText: '日期',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            for (final day in days)
+              DropdownMenuItem(value: day.dayNum, child: Text(_dayTitle(day))),
+          ],
+          onChanged: enabled ? onDayChanged : null,
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: startTimeController,
+                decoration: const InputDecoration(
+                  labelText: '開始時間',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.datetime,
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s3),
+            Expanded(
+              child: TextFormField(
+                controller: endTimeController,
+                decoration: const InputDecoration(
+                  labelText: '結束時間',
+                  border: OutlineInputBorder(),
+                ),
+                enabled: enabled,
+                keyboardType: TextInputType.datetime,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _dayTitle(TripDay day) => 'Day ${day.dayNum} · ${day.displayTitle}';
+}
+
+class _AddSearchResultCard extends StatelessWidget {
+  const _AddSearchResultCard({
+    required this.result,
+    required this.isSubmitting,
+    required this.onAdd,
+  });
+
+  final PoiSearchResult result;
+  final bool isSubmitting;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(result.name, style: theme.textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s1),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s1,
+              children: [
+                Text(poiTypeLabel(result.category), style: metaStyle),
+                if (result.rating != null)
+                  Text(result.rating!.toStringAsFixed(1), style: metaStyle),
+              ],
+            ),
+            if (result.address != null &&
+                result.address!.trim().isNotEmpty) ...[
+              const SizedBox(height: TpSpacing.s2),
+              Text(result.address!, style: metaStyle),
+            ],
+            const SizedBox(height: TpSpacing.s3),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                key: ValueKey('add-entry-add-search-${result.placeId}'),
+                icon: isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_location_alt_outlined),
+                label: const Text('加入行程'),
+                onPressed: isSubmitting ? null : onAdd,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddFavoriteCard extends StatelessWidget {
+  const _AddFavoriteCard({
+    required this.favorite,
+    required this.isSubmitting,
+    required this.onAdd,
+  });
+
+  final PoiFavorite favorite;
+  final bool isSubmitting;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(favorite.displayName, style: theme.textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s1),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s1,
+              children: [
+                Text(poiTypeLabel(favorite.poiType), style: metaStyle),
+                if (favorite.poiRating != null)
+                  Text(
+                    favorite.poiRating!.toStringAsFixed(1),
+                    style: metaStyle,
+                  ),
+              ],
+            ),
+            if (favorite.poiAddress != null &&
+                favorite.poiAddress!.trim().isNotEmpty) ...[
+              const SizedBox(height: TpSpacing.s2),
+              Text(favorite.poiAddress!, style: metaStyle),
+            ],
+            const SizedBox(height: TpSpacing.s3),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                key: ValueKey('add-entry-add-favorite-${favorite.id}'),
+                icon: isSubmitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_location_alt_outlined),
+                label: const Text('加入行程'),
+                onPressed: isSubmitting ? null : onAdd,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s3),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error),
+            const SizedBox(width: TpSpacing.s2),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: colorScheme.onErrorContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadErrorState extends StatelessWidget {
+  const _LoadErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message),
+          const SizedBox(height: TpSpacing.s3),
+          FilledButton(onPressed: onRetry, child: const Text('重試')),
+        ],
+      ),
+    );
+  }
+}
+
+class _CenteredMessage extends StatelessWidget {
+  const _CenteredMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s6),
+        child: Text(message, textAlign: TextAlign.center),
+      ),
+    );
+  }
+}

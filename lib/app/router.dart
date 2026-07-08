@@ -12,6 +12,7 @@ import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
 import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/trip_detail/add_entry_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
@@ -79,6 +80,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         path: 'notes',
                         builder: (context, state) => TripNotesScreen(
                           tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'add-entry',
+                        builder: (context, state) => AddEntryScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          initialDayNum: _dayNumFromQuery(state),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'add-stop',
+                        builder: (context, state) => AddEntryScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          initialDayNum: _dayNumFromQuery(state),
                         ),
                       ),
                     ],
@@ -168,4 +183,8 @@ String? _nonEmptyQueryValue(Map<String, String> query, String key) {
   final value = query[key]?.trim();
   if (value == null || value.isEmpty) return null;
   return value;
+}
+
+int? _dayNumFromQuery(GoRouterState state) {
+  return int.tryParse(state.uri.queryParameters['day'] ?? '');
 }

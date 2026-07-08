@@ -36,6 +36,11 @@ class TripTimelineScreen extends ConsumerWidget {
         title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
+            tooltip: '新增景點',
+            icon: const Icon(Icons.add_location_alt_outlined),
+            onPressed: () => _goTo(context, '/trips/$tripId/add-entry'),
+          ),
+          IconButton(
             tooltip: '地圖',
             icon: const Icon(Icons.map_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/map'),
@@ -157,7 +162,11 @@ class _DaySection extends StatelessWidget {
           HotelCard(hotel: day.hotel!),
           const SizedBox(height: TpSpacing.s3),
         ],
-        for (var entryIndex = 0; entryIndex < timeline.length; entryIndex++) ...[
+        for (
+          var entryIndex = 0;
+          entryIndex < timeline.length;
+          entryIndex++
+        ) ...[
           if (entryIndex > 0 && timeline[entryIndex].travel != null)
             _TravelRow(travel: timeline[entryIndex].travel!),
           TimelineEntryTile(

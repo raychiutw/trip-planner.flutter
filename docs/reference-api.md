@@ -145,7 +145,8 @@ class TripRepository {
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
-`createEntryFromPoiSearchResult` 是 Explore direct-mode 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
+`createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
+`AddEntryScreen` 收藏 tab 仍走 `addPoiFavoriteToTrip` 的 4-field favorite fast-path,成功後同樣觸發 `recomputeTravel`。
 
 回傳的 model 結構見 [Models 參考](reference-models.md)。
 

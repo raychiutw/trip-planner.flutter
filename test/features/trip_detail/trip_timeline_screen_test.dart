@@ -63,7 +63,12 @@ const _fakeDays = [
         title: '美國村購物',
         version: 1,
         travel: Travel(type: 'walk', min: 10),
-        master: EntryPoiInfo(poiId: 103, name: '美國村', type: 'shopping', category: '購物'),
+        master: EntryPoiInfo(
+          poiId: 103,
+          name: '美國村',
+          type: 'shopping',
+          category: '購物',
+        ),
       ),
       TimelineEntry(
         id: 14,
@@ -99,7 +104,12 @@ const _fakeDays = [
         title: '首里城公園',
         version: 1,
         travel: Travel(type: 'monorail', min: 20),
-        master: EntryPoiInfo(poiId: 202, name: '首里城', type: 'attraction', rating: 4.4),
+        master: EntryPoiInfo(
+          poiId: 202,
+          name: '首里城',
+          type: 'attraction',
+          rating: 4.4,
+        ),
       ),
     ],
   ),
@@ -126,7 +136,13 @@ Future<void> _pumpTimeline(
           ),
           GoRoute(
             path: 'notes',
-            builder: (context, state) => const Scaffold(body: Text('notes-page')),
+            builder: (context, state) =>
+                const Scaffold(body: Text('notes-page')),
+          ),
+          GoRoute(
+            path: 'add-entry',
+            builder: (context, state) =>
+                const Scaffold(body: Text('add-entry-page')),
           ),
         ],
       ),
@@ -138,10 +154,12 @@ Future<void> _pumpTimeline(
       // 關閉 riverpod 3 預設自動 retry：error 測試需要 provider 停在 AsyncError
       retry: (retryCount, error) => null,
       overrides: [
-        tripDetailProvider(_tripId)
-            .overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
-        tripDaysProvider(_tripId)
-            .overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
+        tripDetailProvider(
+          _tripId,
+        ).overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
+        tripDaysProvider(
+          _tripId,
+        ).overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -150,8 +168,9 @@ Future<void> _pumpTimeline(
 }
 
 Color _entryDotColor(WidgetTester tester, int entryId) {
-  final dotContainer =
-      tester.widget<Container>(find.byKey(ValueKey('entry-dot-$entryId')));
+  final dotContainer = tester.widget<Container>(
+    find.byKey(ValueKey('entry-dot-$entryId')),
+  );
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
@@ -160,8 +179,18 @@ void main() {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
+    expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
     expect(find.byIcon(Icons.map_outlined), findsOneWidget);
     expect(find.byIcon(Icons.sticky_note_2_outlined), findsOneWidget);
+  });
+
+  testWidgets('點新增景點 icon 以 go_router 導向 add-entry 頁', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byIcon(Icons.add_location_alt_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('add-entry-page'), findsOneWidget);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
@@ -173,7 +202,9 @@ void main() {
     expect(find.text('map-page'), findsOneWidget);
   });
 
-  testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (tester) async {
+  testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (
+    tester,
+  ) async {
     await _pumpTimeline(tester);
 
     // 'DAY 01' 同時出現在頂部 pill 與 day header eyebrow
@@ -207,8 +238,9 @@ void main() {
     expect(find.text('美國村海濱飯店'), findsOneWidget);
     expect(find.byIcon(Icons.bed_outlined), findsOneWidget);
 
-    final hotelCardContainer =
-        tester.widget<Container>(find.byKey(const ValueKey('hotel-card-9')));
+    final hotelCardContainer = tester.widget<Container>(
+      find.byKey(const ValueKey('hotel-card-9')),
+    );
     final hotelCardDecoration = hotelCardContainer.decoration! as BoxDecoration;
     expect(hotelCardDecoration.color, TpColorsLight.sageSubtle);
   });
@@ -235,13 +267,16 @@ void main() {
 
   testWidgets('error 顯示重試按鈕，點擊後重新載入', (tester) async {
     var fetchDaysAttempts = 0;
-    await _pumpTimeline(tester, fetchDays: () {
-      fetchDaysAttempts++;
-      if (fetchDaysAttempts == 1) {
-        throw Exception('network down');
-      }
-      return _fakeDays;
-    });
+    await _pumpTimeline(
+      tester,
+      fetchDays: () {
+        fetchDaysAttempts++;
+        if (fetchDaysAttempts == 1) {
+          throw Exception('network down');
+        }
+        return _fakeDays;
+      },
+    );
 
     expect(find.text('重試'), findsOneWidget);
 

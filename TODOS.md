@@ -6,7 +6,7 @@
 
 - [x] 收藏 + 探索 + 收藏加入行程 fast-path(`/favorites`,`/explore`,`/favorites/:id/add-to-trip`;favorites tab 由 placeholder 轉正)(**Completed:** feature/favorites-explore)
 - [x] Explore direct-mode 加入行程(`/add-to-trip?place_id=...`;不需先收藏)(**Completed:** feature/favorites-explore)
-- [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用)
+- [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;已完成 `/trips/:id/add-entry` 搜尋/收藏新增 slice；OCC `expectedVersion`,409 `STALE_ENTRY` 重抓再套用仍待 edit/change/copy/move)
 - [ ] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料表單)
 - [ ] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)
 - [ ] 全域地圖(`/map`;map tab 轉正,跨行程 POI)

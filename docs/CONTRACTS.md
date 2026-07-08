@@ -157,7 +157,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
-// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）
+// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
@@ -174,6 +174,7 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
+class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?）
 class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
 class TripNotesScreen extends ConsumerWidget;          // features/trip_detail/trip_notes_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart

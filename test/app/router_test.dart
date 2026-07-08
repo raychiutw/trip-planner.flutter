@@ -13,9 +13,12 @@ import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
+import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
+import 'package:tripline/models/day.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi.dart';
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
@@ -40,6 +43,12 @@ const _loggedInUser = UserInfo(
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
+  when(
+    () => mockTripRepository.fetchTrip(any()),
+  ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'Trip 1'));
+  when(() => mockTripRepository.fetchDays(any())).thenAnswer(
+    (_) async => const [TripDay(id: 11, dayNum: 2, title: '那霸', version: 1)],
+  );
   when(
     mockTripRepository.fetchPoiFavorites,
   ).thenAnswer((_) async => const <PoiFavorite>[]);
@@ -164,6 +173,26 @@ void main() {
 
     expect(find.byType(AddPoiFavoriteToTripScreen), findsOneWidget);
     expect(find.text('還沒有可加入的行程'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/add-entry query 進入新增景點表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/add-entry?day=2');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddEntryScreen), findsOneWidget);
+    expect(find.text('Day 2 · 那霸'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }

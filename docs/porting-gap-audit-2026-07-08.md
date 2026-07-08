@@ -30,7 +30,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/add-to-trip` | `/add-to-trip?place_id=...` → `AddPoiFavoriteToTripScreen` | 已翻第一波 | 後續補衝突細節顯示 |
 | `/trips/new` → `NewTripPage` | 無 | 未翻 | P1：建立行程 |
 | `/trip/:id/edit` → `EditTripPage` | 無 | 未翻 | P1：編輯行程 meta |
-| `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | 無 | 未翻 | P1：新增景點表單群 |
+| `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | `/trips/:id/add-entry`、`/trips/:id/add-stop` → `AddEntryScreen` | 部分翻 | 已補搜尋/收藏新增 slice；自訂地圖 picker 待補 |
 | `/trip/:id/stop/:eid/edit/change-poi/copy/move` | 無 | 未翻 | P1：Entry CRUD / action forms |
 | `/trip/:id/collab`, `/invite` | 無 | 未翻 | P1：共編與邀請 |
 | `/trip/:id/health` | 無 | 未翻 | P1：AI 健檢報告 |
@@ -61,6 +61,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 2. **Trip action surface**
    - Routes：`/trips/new`、`/trips/:id/edit`、`/trips/:id/add-entry`、`add-stop`、`add-custom-stop`
    - API：trip create/update、entry create/update/delete、segments create/patch、places resolve/search
+   - 狀態：`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏新增 slice；自訂景點、entry edit/delete、segments edit 仍待補。
    - 理由：補上 mobile app 最直接的規劃能力；需 TDD + OCC handling。
 
 3. **Entry detail/action forms**
@@ -108,8 +109,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Entry CRUD 表單群** 或 **建立/編輯行程**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正。
+下一個 Build branch 建議接 **Entry edit/change/copy/move** 或 **建立/編輯行程**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正；Entry CRUD 已先補新增景點搜尋/收藏 slice。
 
-1. 若做 Entry CRUD：先從 `/trips/:id/add-entry` / `add-stop` 寫 repository + widget tests，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
+1. 若續做 Entry CRUD：優先補 `/trips/:id/stop/:entryId/edit` 與 `/change-poi`，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
 2. 若做建立/編輯行程：先補 `/trips/new` 與 `/trips/:id/edit` repository contract，再接 TripsListScreen 的新增入口。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。
