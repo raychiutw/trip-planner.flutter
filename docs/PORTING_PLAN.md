@@ -42,8 +42,9 @@
 | FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/days/:num/entries`、`POST /trips/:id/recompute-travel` |
 | AddEntryScreen | AddEntryPage / AddStopPage（第一個 slice） | `GET /trips/:id/days?all=1`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/days/:num/entries`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/recompute-travel` |
 | EditEntryScreen | EditEntryPage（時間/描述/刪除 slice） | `GET/PATCH/DELETE /trips/:id/entries/:entryId`、`POST /trips/:id/recompute-travel` |
+| ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏新增 slice 與 `/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice，change-poi/copy/move、自訂地圖 picker、409 `STALE_ENTRY` 重抓再套用、建立/編輯行程、聊天（request queue）、全域地圖、共編仍待辦。
+P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice，copy/move、備選移除/排序、自訂地圖 picker、409 `STALE_ENTRY` 重抓再套用、建立/編輯行程、聊天（request queue）、全域地圖、共編仍待辦。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構

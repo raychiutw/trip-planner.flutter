@@ -109,6 +109,10 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 | `master` | `EntryPoiInfo?` | 主 POI |
 | `alternates` | `List<EntryPoiInfo>` | 備選 POI,預設 `[]` |
 
+### EntryPoisMutationResult — `trip_entry_pois` 變更結果
+
+`POST /trips/:id/entries/:entryId/alternates` 回傳的 POI 關聯變更結果:`entryId: int`、`poiId: int`、`sortOrder: int?`、`entryPoisVersion: String?`。`entryPoisVersion` 是下一次 POI 變更要帶的 OCC token。
+
 ## poi.dart
 
 ### PoiFavoriteUsage — 收藏出現在哪些行程

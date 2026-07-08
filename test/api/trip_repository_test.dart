@@ -267,6 +267,138 @@ void main() {
     );
   });
 
+  test(
+    'replaceEntryMasterPoiFromSearchResult：PUT /poi-id 帶 entryPoisVersion',
+    () async {
+      const searchResult = PoiSearchResult(
+        placeId: 'ChIJ-shuri',
+        name: '首里城',
+        address: '沖繩縣那霸市首里金城町',
+        lat: 26.217,
+        lng: 127.719,
+        category: 'tourist_attraction',
+        country: 'JP',
+        rating: 4.4,
+      );
+      dioAdapter.onPut(
+        '/trips/okinawa-trip-2026-Ray/entries/101/poi-id',
+        (server) => server.reply(200, {'ok': true, 'poiId': 501}),
+        data: {
+          'name': '首里城',
+          'type': 'attraction',
+          'lat': 26.217,
+          'lng': 127.719,
+          'address': '沖繩縣那霸市首里金城町',
+          'category': 'tourist_attraction',
+          'source': 'google',
+          'country': 'JP',
+          'place_id': 'ChIJ-shuri',
+          'entryPoisVersion': '3',
+          'rating': 4.4,
+        },
+      );
+
+      await expectLater(
+        tripRepository.replaceEntryMasterPoiFromSearchResult(
+          tripId: 'okinawa-trip-2026-Ray',
+          entryId: 101,
+          poi: searchResult,
+          entryPoisVersion: '3',
+        ),
+        completes,
+      );
+    },
+  );
+
+  test('replaceEntryMasterPoiWithPoiId：PUT /poi-id 可用既有 POI id', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa-trip-2026-Ray/entries/101/poi-id',
+      (server) => server.reply(200, {'ok': true, 'poiId': 501}),
+      data: {'poiId': 501, 'entryPoisVersion': '3'},
+    );
+
+    await expectLater(
+      tripRepository.replaceEntryMasterPoiWithPoiId(
+        tripId: 'okinawa-trip-2026-Ray',
+        entryId: 101,
+        poiId: 501,
+        entryPoisVersion: '3',
+      ),
+      completes,
+    );
+  });
+
+  test(
+    'addEntryAlternateFromSearchResult：POST /alternates 回新 POI OCC token',
+    () async {
+      const searchResult = PoiSearchResult(
+        placeId: 'ChIJ-tamaudun',
+        name: '玉陵',
+        address: '沖繩縣那霸市',
+        lat: 26.219,
+        lng: 127.716,
+        category: 'tourist_attraction',
+        rating: 4.2,
+      );
+      dioAdapter.onPost(
+        '/trips/okinawa-trip-2026-Ray/entries/101/alternates',
+        (server) => server.reply(201, {
+          'entryId': 101,
+          'poiId': 502,
+          'sortOrder': 2,
+          'entryPoisVersion': '4',
+        }),
+        data: {
+          'name': '玉陵',
+          'type': 'attraction',
+          'lat': 26.219,
+          'lng': 127.716,
+          'address': '沖繩縣那霸市',
+          'category': 'tourist_attraction',
+          'source': 'google',
+          'place_id': 'ChIJ-tamaudun',
+          'entryPoisVersion': '3',
+          'rating': 4.2,
+        },
+      );
+
+      final result = await tripRepository.addEntryAlternateFromSearchResult(
+        tripId: 'okinawa-trip-2026-Ray',
+        entryId: 101,
+        poi: searchResult,
+        entryPoisVersion: '3',
+      );
+
+      expect(result.entryId, 101);
+      expect(result.poiId, 502);
+      expect(result.sortOrder, 2);
+      expect(result.entryPoisVersion, '4');
+    },
+  );
+
+  test('addEntryAlternateWithPoiId：POST /alternates 可用收藏 POI id', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/entries/101/alternates',
+      (server) => server.reply(201, {
+        'entryId': 101,
+        'poiId': 502,
+        'sortOrder': 2,
+        'entryPoisVersion': '4',
+      }),
+      data: {'poiId': 502, 'entryPoisVersion': '3'},
+    );
+
+    final result = await tripRepository.addEntryAlternateWithPoiId(
+      tripId: 'okinawa-trip-2026-Ray',
+      entryId: 101,
+      poiId: 502,
+      entryPoisVersion: '3',
+    );
+
+    expect(result.entryPoisVersion, '4');
+    expect(result.poiId, 502);
+  });
+
   test('fetchNotes：GET /trips/:id/notes 解析 5 區聚合', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/notes',

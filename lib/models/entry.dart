@@ -142,3 +142,27 @@ class TimelineEntry {
     );
   }
 }
+
+/// `trip_entry_pois` 變更後的 OCC token。
+class EntryPoisMutationResult {
+  const EntryPoisMutationResult({
+    required this.entryId,
+    required this.poiId,
+    this.sortOrder,
+    this.entryPoisVersion,
+  });
+
+  final int entryId;
+  final int poiId;
+  final int? sortOrder;
+  final String? entryPoisVersion;
+
+  factory EntryPoisMutationResult.fromJson(Map<String, dynamic> json) {
+    return EntryPoisMutationResult(
+      entryId: (json['entryId'] as num).toInt(),
+      poiId: (json['poiId'] as num).toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt(),
+      entryPoisVersion: json['entryPoisVersion'] as String?,
+    );
+  }
+}

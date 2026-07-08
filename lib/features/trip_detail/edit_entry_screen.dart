@@ -72,6 +72,12 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
       children: [
         _EntrySummaryCard(entry: entry),
         const SizedBox(height: TpSpacing.s4),
+        _PoiActions(
+          tripId: widget.tripId,
+          entryId: widget.entryId,
+          enabled: !_isSubmitting,
+        ),
+        const SizedBox(height: TpSpacing.s4),
         Row(
           children: [
             Expanded(
@@ -241,6 +247,49 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     final minutes = int.parse(parts[1]);
     if (hours > 23 || minutes > 59) return null;
     return hours * 60 + minutes;
+  }
+}
+
+class _PoiActions extends StatelessWidget {
+  const _PoiActions({
+    required this.tripId,
+    required this.entryId,
+    required this.enabled,
+  });
+
+  final String tripId;
+  final int entryId;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            key: const ValueKey('edit-entry-change-poi'),
+            icon: const Icon(Icons.swap_horiz_outlined),
+            label: const Text('置換景點'),
+            onPressed: enabled
+                ? () => context.go('/trips/$tripId/stop/$entryId/change-poi')
+                : null,
+          ),
+        ),
+        const SizedBox(width: TpSpacing.s3),
+        Expanded(
+          child: OutlinedButton.icon(
+            key: const ValueKey('edit-entry-add-alternate'),
+            icon: const Icon(Icons.add_location_alt_outlined),
+            label: const Text('加入備選'),
+            onPressed: enabled
+                ? () => context.go(
+                    '/trips/$tripId/stop/$entryId/change-poi?mode=alternate',
+                  )
+                : null,
+          ),
+        ),
+      ],
+    );
   }
 }
 

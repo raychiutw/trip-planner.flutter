@@ -84,6 +84,14 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/trips/:tripId/stop/:entryId/change-poi',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'change-poi:${state.pathParameters['entryId']}:${state.uri.queryParameters['mode'] ?? 'master'}',
+            ),
+          ),
+        ),
+        GoRoute(
           path: '/trips/:tripId',
           builder: (context, state) =>
               Scaffold(body: Text('trip:${state.pathParameters['tripId']}')),
@@ -107,6 +115,24 @@ void main() {
     expect(find.widgetWithText(TextFormField, '10:00'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '11:30'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '世界遺產'), findsOneWidget);
+  });
+
+  testWidgets('置換與加入備選按鈕導向 change-poi route', (tester) async {
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-change-poi')));
+    await tester.pumpAndSettle();
+    expect(find.text('change-poi:101:master'), findsOneWidget);
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-add-alternate')));
+    await tester.pumpAndSettle();
+    expect(find.text('change-poi:101:alternate'), findsOneWidget);
   });
 
   testWidgets('儲存時 PATCH entry 並帶 expectedVersion', (tester) async {

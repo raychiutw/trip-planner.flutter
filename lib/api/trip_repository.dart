@@ -86,6 +86,64 @@ class TripRepository {
     );
   }
 
+  /// PUT /trips/:id/entries/:entryId/poi-id，用搜尋結果置換 master POI。
+  Future<void> replaceEntryMasterPoiFromSearchResult({
+    required String tripId,
+    required int entryId,
+    required PoiSearchResult poi,
+    required String? entryPoisVersion,
+  }) {
+    return _client.put(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/poi-id',
+      body: _poiSearchMutationBody(poi, entryPoisVersion: entryPoisVersion),
+    );
+  }
+
+  /// PUT /trips/:id/entries/:entryId/poi-id，用既有 POI id 置換 master POI。
+  Future<void> replaceEntryMasterPoiWithPoiId({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    required String? entryPoisVersion,
+  }) {
+    return _client.put(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/poi-id',
+      body: {'poiId': poiId, 'entryPoisVersion': ?entryPoisVersion},
+    );
+  }
+
+  /// POST /trips/:id/entries/:entryId/alternates，用搜尋結果加入備選 POI。
+  Future<EntryPoisMutationResult> addEntryAlternateFromSearchResult({
+    required String tripId,
+    required int entryId,
+    required PoiSearchResult poi,
+    required String? entryPoisVersion,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/alternates',
+      body: _poiSearchMutationBody(poi, entryPoisVersion: entryPoisVersion),
+    );
+    return EntryPoisMutationResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
+  /// POST /trips/:id/entries/:entryId/alternates，用既有 POI id 加入備選 POI。
+  Future<EntryPoisMutationResult> addEntryAlternateWithPoiId({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    required String? entryPoisVersion,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/alternates',
+      body: {'poiId': poiId, 'entryPoisVersion': ?entryPoisVersion},
+    );
+    return EntryPoisMutationResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async {
     final responseBody = await _client.get(
@@ -239,5 +297,24 @@ class TripRepository {
       '/trips/${Uri.encodeComponent(tripId)}/recompute-travel',
       query: {if (dayNum != null) 'day': '$dayNum'},
     );
+  }
+
+  Map<String, dynamic> _poiSearchMutationBody(
+    PoiSearchResult poi, {
+    required String? entryPoisVersion,
+  }) {
+    return {
+      'name': poi.name,
+      'type': mapPoiCategoryToType(poi.category),
+      'lat': poi.lat,
+      'lng': poi.lng,
+      'address': ?poi.address,
+      'category': ?poi.category,
+      'source': 'google',
+      'country': ?poi.country,
+      'place_id': poi.placeId,
+      'entryPoisVersion': ?entryPoisVersion,
+      'rating': ?poi.rating,
+    };
   }
 }

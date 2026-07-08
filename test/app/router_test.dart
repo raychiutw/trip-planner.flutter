@@ -14,6 +14,7 @@ import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/trip_detail/add_entry_screen.dart';
+import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -226,6 +227,30 @@ void main() {
 
     expect(find.byType(EditEntryScreen), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/stop/:entryId/change-poi 進入置換景點表單', (
+    tester,
+  ) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go('/trips/trip-1/stop/101/change-poi?mode=alternate');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChangePoiScreen), findsOneWidget);
+    expect(find.text('加入備選景點'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }
