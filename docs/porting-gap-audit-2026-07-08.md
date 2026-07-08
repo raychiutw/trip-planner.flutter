@@ -31,7 +31,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trips/new` → `NewTripPage` | `/trips/new` → `TripFormScreen.create` | 已翻第一波 | 後續可補 POI autocomplete / flexible month parity |
 | `/trip/:id/edit` → `EditTripPage` | `/trips/:id/edit` → `TripFormScreen.edit` | 已翻第一波 | 已補基本資料、目的地與 day management；後續補 auto-save parity |
 | `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | `/trips/:id/add-entry`、`/trips/:id/add-stop`、`/trips/:id/add-custom-stop` → `AddEntryScreen` | 部分翻 | 已補搜尋/收藏新增與自訂地圖座標新增 slice |
-| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen`; timeline travel pill edit | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序、segments edit 與 409 重抓 retry slice；更多 web parity 細節仍待補 |
+| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen`; timeline travel pill edit | 已翻第一波 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序、segments edit 與 409 重抓 retry |
 | `/trip/:id/collab`, `/invite` | `/trips/:id/collab` → `CollabScreen`; `/invite?token=...` → `InviteScreen` | 已翻第一波 | 後續可補 ownership transfer / resend invitation 等 web parity 細節 |
 | `/trip/:id/health` | `/trips/:id/health` → `TripHealthScreen` | 已翻第一波 | 後續可補 SSE 與 empty-trip entry count guard parity |
 | `/trip/:id/print` | `/trips/:id/print` → `TripPrintScreen` | 已翻第一波 | 列印預覽、平台列印與分享 PDF；後續可補更細的 web print typography parity |
@@ -61,7 +61,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 2. **Trip action surface**
    - Routes：`/trips/new`、`/trips/:id/edit`、`/trips/:id/add-entry`、`add-stop`、`add-custom-stop`
    - API：trip create/update、entry create/update/delete、segments get/patch、places resolve/search
-   - 狀態：`/trips/new`、`/trips/:id/edit` 已有基本資料、目的地表單與 day management slice；`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏/自訂座標新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除與備選移除/排序 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；timeline travel pill 已有 segments edit slice；更多 web parity 細節仍待補。
+   - 狀態：`/trips/new`、`/trips/:id/edit` 已有基本資料、目的地表單與 day management slice；`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏/自訂座標新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除與備選移除/排序 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；timeline travel pill 已有 segments edit slice 與 stale retry。
    - 理由：補上 mobile app 最直接的規劃能力；需 TDD + OCC handling。
 
 3. **Entry detail/action forms**

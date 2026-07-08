@@ -6,7 +6,7 @@
 
 - [x] 收藏 + 探索 + 收藏加入行程 fast-path(`/favorites`,`/explore`,`/favorites/:id/add-to-trip`;favorites tab 由 placeholder 轉正)(**Completed:** feature/favorites-explore)
 - [x] Explore direct-mode 加入行程(`/add-to-trip?place_id=...`;不需先收藏)(**Completed:** feature/favorites-explore)
-- [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice、timeline travel segments edit slice；edit/move/segments 已帶 OCC `expectedVersion`,POI 變更已帶 `entryPoisVersion`,409 `STALE_ENTRY` 已重抓 entry/segments 並 retry 一次；後續仍可補更多 web parity 細節)
+- [x] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;搜尋/收藏/自訂座標新增、時間/描述/刪除、主景點置換/加備選、copy/move 跨日操作、備選移除/排序、timeline travel segments edit；edit/move/segments 已帶 OCC `expectedVersion`,POI 變更已帶 `entryPoisVersion`,409 `STALE_ENTRY` 已重抓 entry/segments 並 retry 一次)(**Completed:** feature/favorites-explore)
 - [x] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料、目的地、日期、語言、發布狀態表單與 edit day management:prepend/append/insert/delete/shift)(**Completed:** feature/favorites-explore)
 - [x] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)(**Completed:** feature/favorites-explore)
 - [x] 全域地圖(`/map`;map tab 轉正,以 trip picker 重用行程地圖內容)(**Completed:** feature/favorites-explore)
@@ -27,12 +27,12 @@
 - [x] 公開分享頁第一波(`/s/:token`;未登入可讀公開 payload,登入後可 clone)(**Completed:** feature/favorites-explore)
 - [x] 列印/PDF 第一波(`/trips/:id/print`;預覽 + 平台列印 + 分享 PDF,JSON 匯出已完成)(**Completed:** feature/favorites-explore)
 - [x] 設定子頁後續：connected apps、developer apps、OAuth consent（列出/撤銷已連結應用、developer app 清單/建立、consent allow/deny 第一波；外觀/通知與登入裝置 sessions 已完成）(**Completed:** feature/favorites-explore)
-- [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
+- [ ] OAuth PKCE + Bearer 認證(**Blocked:** 需後端註冊 public client / native redirect scheme,才能完整取代 session cookie + Origin 過渡方案)
 - [x] 離線快取第一波（Repository read-through JSON cache：`/my-trips`、`/trips`、trip detail、days、segments、notes；5xx/網路錯誤時回退本機快取，401/403 不遮蔽）(**Completed:** feature/favorites-explore)
 
 ## 技術債
 
-- [ ] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push — CHANGELOG 的 compare/release 連結目前指向尚不存在的 tag
+- [ ] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push — CHANGELOG 的 compare/release 連結目前指向尚不存在的 tag(**Blocked:** 需 PR merge 到 master 後執行)
 - [x] `--dart-define=TRIPLINE_API_URL` base URL 覆寫（可傳 origin 或完整 `/api` URL；Origin header 取 scheme/host/port）(**Completed:** feature/favorites-explore)
 - [x] 地圖介面抽象化（`features/map/map_adapter.dart` 集中 `flutter_map` adapter；TripMap / AddEntry 畫面改用 `TripMapPoint`、`TripMapRoute`、`TripMapMarker`）(**Completed:** feature/favorites-explore)
 
