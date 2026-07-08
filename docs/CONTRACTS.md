@@ -212,6 +212,12 @@ class TripRepository {
   Future<void> deleteTripPermission(int permissionId); // DELETE /permissions/:id
   Future<InvitationPreview> fetchInvitation(String token); // GET /invitations?token=...
   Future<InvitationAcceptResult> acceptInvitation(String token); // POST /invitations/accept
+  Future<List<TripShareLink>> fetchTripShares(String tripId); // GET /trips/:id/shares
+  Future<CreatedTripShare> createTripShare(String tripId, {required List<String> visibleSections, String label = '', int? expiresAt, bool anonymous = false}); // POST /trips/:id/shares
+  Future<void> updateTripShare(String tripId, int shareId, {required List<String> visibleSections, String label = '', int? expiresAt, bool anonymous = false}); // PATCH /trips/:id/shares/:shareId action=update
+  Future<CreatedTripShare> rotateTripShare(String tripId, int shareId); // PATCH action=rotate
+  Future<void> revokeTripShare(String tripId, int shareId); // PATCH action=revoke
+  Future<void> deleteTripShare(String tripId, int shareId); // DELETE /trips/:id/shares/:shareId
   Future<TripRequestPage> fetchTripRequests({
     required String tripId,
     int limit = 5,
@@ -403,7 +409,7 @@ class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_scr
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
-class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入）
+class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入 + 分享連結管理）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）

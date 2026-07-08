@@ -145,6 +145,25 @@ class TripRepository {
   Future<void> deleteTripPermission(int permissionId); // DELETE /permissions/:id
   Future<InvitationPreview> fetchInvitation(String token); // GET /invitations?token=...
   Future<InvitationAcceptResult> acceptInvitation(String token); // POST /invitations/accept
+  Future<List<TripShareLink>> fetchTripShares(String tripId); // GET /trips/:id/shares
+  Future<CreatedTripShare> createTripShare(
+    String tripId, {
+    required List<String> visibleSections,
+    String label = '',
+    int? expiresAt,
+    bool anonymous = false,
+  }); // POST /trips/:id/shares
+  Future<void> updateTripShare(
+    String tripId,
+    int shareId, {
+    required List<String> visibleSections,
+    String label = '',
+    int? expiresAt,
+    bool anonymous = false,
+  }); // PATCH /trips/:id/shares/:shareId action=update
+  Future<CreatedTripShare> rotateTripShare(String tripId, int shareId); // PATCH action=rotate
+  Future<void> revokeTripShare(String tripId, int shareId); // PATCH action=revoke
+  Future<void> deleteTripShare(String tripId, int shareId); // DELETE /trips/:id/shares/:shareId
   Future<TripRequestPage>   fetchTripRequests({
     required String tripId,
     int limit = 5,
@@ -310,6 +329,7 @@ class TripRepository {
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `fetchMyTrips` 解析 `/my-trips` rich summary rows,包含 owner/role/countries/start/end/updated/member/archive 欄位。`TripsListScreen` 以這份資料在 client 端做分類 tabs、搜尋與排序；「最新編輯」保留 API 回傳順序。
 共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`updateTripPermissionRole`、`deleteTripPermission`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 與 `updateTripPermissionRole` 只允許 `member` / `viewer`（預設/ fallback `member`）,client 會 trim/lowercase invitation email；owner role 不可由 Flutter 變更或移除,後端也會拒絕。
+分享連結管理由 `fetchTripShares`、`createTripShare`、`updateTripShare`、`rotateTripShare`、`revokeTripShare`、`deleteTripShare` 覆蓋。`createTripShare` / `rotateTripShare` 才會回 raw token/url；list 不會拿到既有網址。`visibleSections` 會經 `share.dart` allowlist 正規化,預設公開航班/住宿/行前須知,預訂與緊急聯絡預設關閉。
 `fetchTripRequests` / `createTripRequest` / `fetchTripRequest` 對應 web ChatPage 的 AI request queue。`fetchTripRequests` 預設讀 active trip 最新 5 筆且支援後端 paginated shape `{items, hasMore}`；若後端回 legacy array,repository 會包成 `TripRequestPage(hasMore: false)`。`ChatScreen` 第一波使用 polling `GET /requests/:id` 取代 web SSE。
 `fetchTripHealthReport` / `startTripHealthCheck` 對應 web `TripHealthCheckPage`。GET 解析 wrapper `{report}` 並允許 `report: null`;POST 送空 body 觸發後端建立 health-check request,回 pending `TripHealthReport`。`TripHealthScreen` 第一波用 `GET /trips/:id/health-check` 每 3 秒 polling report terminal state；若後端回 `TRIP_EMPTY`,畫面顯示 persistent error。
 `createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`importTripJson` 對齊 web 匯入行程,將已通過 client 端大小與 `schemaVersion == 1` 檢查的 raw JSON text 送到 `POST /trips/import`,成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。

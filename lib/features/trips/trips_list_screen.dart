@@ -10,6 +10,7 @@ import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
+import 'share_links_sheet.dart';
 
 const int _maxTripImportBytes = 512 * 1024;
 
@@ -77,7 +78,7 @@ enum _TripsFilterTab { all, mine, collab, archived }
 
 enum _TripsSortBy { updated, start, name }
 
-enum _TripListAction { edit, collab, health, notes, delete }
+enum _TripListAction { edit, collab, health, notes, share, delete }
 
 /// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 下拉更新 + 單欄卡片清單。
 /// 點卡片進詳情；長按開 bottom sheet 刪除（AlertDialog 二次確認）。
@@ -438,6 +439,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
     final selectedAction = await showModalBottomSheet<_TripListAction>(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
       ),
@@ -477,6 +479,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     Navigator.of(sheetContext).pop(_TripListAction.notes),
               ),
               ListTile(
+                key: ValueKey('trip-card-menu-share-${trip.tripId}'),
+                leading: const Icon(Icons.ios_share_outlined),
+                title: const Text('分享連結'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.share),
+              ),
+              ListTile(
                 key: ValueKey('trip-card-menu-delete-${trip.tripId}'),
                 leading: Icon(Icons.delete_outline, color: destructiveColor),
                 title: Text(
@@ -509,12 +518,27 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       case _TripListAction.notes:
         context.go('/trips/${trip.tripId}/notes');
         return;
+      case _TripListAction.share:
+        await _showShareLinks(context, trip);
+        return;
       case _TripListAction.delete:
         await _confirmAndDeleteTrip(context, trip);
         return;
       case null:
         return;
     }
+  }
+
+  Future<void> _showShareLinks(BuildContext context, TripSummary trip) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
+      ),
+      builder: (sheetContext) => TripShareLinksSheet(tripId: trip.tripId),
+    );
   }
 
   /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。

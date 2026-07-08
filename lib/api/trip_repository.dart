@@ -8,6 +8,7 @@ import '../models/collab.dart';
 import '../models/health.dart';
 import '../models/notes.dart';
 import '../models/poi.dart';
+import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -167,6 +168,83 @@ class TripRepository {
     return InvitationAcceptResult.fromJson(
       responseBody as Map<String, dynamic>,
     );
+  }
+
+  /// GET /trips/:id/shares，列出此行程的公開分享連結（不含 raw token）。
+  Future<List<TripShareLink>> fetchTripShares(String tripId) async {
+    final responseBody = await _client.get(_shareLinksPath(tripId));
+    final sharesJson =
+        (responseBody as Map<String, dynamic>)['shares'] as List<dynamic>? ??
+        const [];
+    return sharesJson
+        .map(
+          (shareJson) =>
+              TripShareLink.fromJson(shareJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// POST /trips/:id/shares，建立公開分享連結並回傳一次性 raw token/url。
+  Future<CreatedTripShare> createTripShare(
+    String tripId, {
+    required List<String> visibleSections,
+    String label = '',
+    int? expiresAt,
+    bool anonymous = false,
+  }) async {
+    final responseBody = await _client.post(
+      _shareLinksPath(tripId),
+      body: {
+        'visibleSections': sanitizeShareSectionKeys(visibleSections),
+        'label': label.trim(),
+        'expiresAt': expiresAt,
+        'anonymous': anonymous,
+      },
+    );
+    return CreatedTripShare.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// PATCH /trips/:id/shares/:shareId action=update，更新分享設定但不換 URL。
+  Future<void> updateTripShare(
+    String tripId,
+    int shareId, {
+    required List<String> visibleSections,
+    String label = '',
+    int? expiresAt,
+    bool anonymous = false,
+  }) {
+    return _client.patch(
+      _shareLinkPath(tripId, shareId),
+      body: {
+        'action': 'update',
+        'visibleSections': sanitizeShareSectionKeys(visibleSections),
+        'label': label.trim(),
+        'expiresAt': expiresAt,
+        'anonymous': anonymous,
+      },
+    );
+  }
+
+  /// PATCH /trips/:id/shares/:shareId action=rotate，重新產生一次性 raw token/url。
+  Future<CreatedTripShare> rotateTripShare(String tripId, int shareId) async {
+    final responseBody = await _client.patch(
+      _shareLinkPath(tripId, shareId),
+      body: {'action': 'rotate'},
+    );
+    return CreatedTripShare.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// PATCH /trips/:id/shares/:shareId action=revoke，關閉連結但保留統計。
+  Future<void> revokeTripShare(String tripId, int shareId) {
+    return _client.patch(
+      _shareLinkPath(tripId, shareId),
+      body: {'action': 'revoke'},
+    );
+  }
+
+  /// DELETE /trips/:id/shares/:shareId，永久刪除分享連結。
+  Future<void> deleteTripShare(String tripId, int shareId) {
+    return _client.delete(_shareLinkPath(tripId, shareId));
   }
 
   /// GET /requests?tripId=...，讀取 AI request queue。
@@ -1036,6 +1114,14 @@ class TripRepository {
 
   String _noteSectionPath(String tripId, TripNoteSection section) {
     return '/trips/${Uri.encodeComponent(tripId)}/notes/${section.pathSegment}';
+  }
+
+  String _shareLinksPath(String tripId) {
+    return '/trips/${Uri.encodeComponent(tripId)}/shares';
+  }
+
+  String _shareLinkPath(String tripId, int shareId) {
+    return '${_shareLinksPath(tripId)}/${Uri.encodeComponent('$shareId')}';
   }
 
   Future<T> _createNoteRow<T>({

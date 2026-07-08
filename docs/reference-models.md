@@ -143,6 +143,28 @@ helper：`isOwner`、`isViewer`、`roleLabel`（擁有者/共編成員/檢視者
 
 `ok: bool`、`tripId: String`、`tripTitle: String`。成功後 `InviteScreen` 導向 `/trips/:tripId`。
 
+## share.dart
+
+### TripShareLink — `GET /trips/:id/shares`
+
+分享連結管理 row，不含 raw token / token hash；既有網址無法從 list 重新顯示。
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `id` | `int` | share row id |
+| `label` | `String` | 使用者自訂名稱，空字串時 UI 顯示「未命名連結」 |
+| `visibleSections` | `String` | JSON array string；getter `visibleSectionKeys` 只保留 allowlist key |
+| `expiresAt` | `int?` | epoch milliseconds；`null` 表示永久 |
+| `viewCount` | `int` | 公開頁瀏覽次數 |
+| `anonymous` | `int` | 0/1；getter `isAnonymous` |
+| `createdBy`、`createdAt`、`revokedAt` | `String` / `String?` | 日期仍保留字串 |
+
+`kShareSectionKeys` = `flights` / `lodgings` / `reservations` / `pretrip` / `emergency`。`kDefaultShareSectionKeys` = `flights` / `lodgings` / `pretrip`。
+
+### CreatedTripShare — `POST /trips/:id/shares` / rotate
+
+一次性 raw token/url response:`id`、`token`、`url`、`label`、`visibleSections`、`expiresAt`、`anonymous`。只有建立與重新產生會回 raw token；client 需立即顯示或複製。
+
 ## day.dart
 
 ### TripLocation — 座標(server 合成,全 nullable)

@@ -385,6 +385,136 @@ void main() {
     expect(result.tripId, 'okinawa-trip-2026');
   });
 
+  test('fetchTripShares：GET /trips/:id/shares 解析 shares wrapper', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026/shares',
+      (server) => server.reply(200, {
+        'shares': [
+          {
+            'id': 7,
+            'label': '給爸媽',
+            'visibleSections': '["flights","pretrip"]',
+            'expiresAt': null,
+            'viewCount': 3,
+            'anonymous': 0,
+            'createdBy': 'user-1',
+            'createdAt': '2026-07-08T10:00:00Z',
+            'revokedAt': null,
+          },
+        ],
+      }),
+    );
+
+    final shares = await tripRepository.fetchTripShares('okinawa-trip-2026');
+
+    expect(shares.single.id, 7);
+    expect(shares.single.visibleSectionKeys, ['flights', 'pretrip']);
+    expect(shares.single.viewCount, 3);
+  });
+
+  test('createTripShare：POST /trips/:id/shares 建立分享連結', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026/shares',
+      (server) => server.reply(201, {
+        'id': 9,
+        'token': 'raw-token',
+        'url': '/s/raw-token',
+        'label': '旅伴',
+        'visibleSections': ['flights', 'lodgings', 'pretrip'],
+        'expiresAt': null,
+        'anonymous': 1,
+      }),
+      data: {
+        'visibleSections': ['flights', 'lodgings', 'pretrip'],
+        'label': '旅伴',
+        'expiresAt': null,
+        'anonymous': true,
+      },
+    );
+
+    final created = await tripRepository.createTripShare(
+      'okinawa-trip-2026',
+      visibleSections: const ['flights', 'lodgings', 'pretrip'],
+      label: '旅伴',
+      expiresAt: null,
+      anonymous: true,
+    );
+
+    expect(created.id, 9);
+    expect(created.url, '/s/raw-token');
+    expect(created.isAnonymous, isTrue);
+  });
+
+  test('updateTripShare：PATCH /trips/:id/shares/:shareId 更新設定', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026/shares/9',
+      (server) => server.reply(200, {'ok': true, 'updated': true}),
+      data: {
+        'action': 'update',
+        'visibleSections': ['flights'],
+        'label': '更新後',
+        'expiresAt': 1893456000000,
+        'anonymous': false,
+      },
+    );
+
+    await expectLater(
+      tripRepository.updateTripShare(
+        'okinawa-trip-2026',
+        9,
+        visibleSections: const ['flights'],
+        label: '更新後',
+        expiresAt: 1893456000000,
+        anonymous: false,
+      ),
+      completes,
+    );
+  });
+
+  test('rotateTripShare：PATCH action rotate 回一次性新 URL', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026/shares/9',
+      (server) => server.reply(200, {
+        'ok': true,
+        'token': 'new-token',
+        'url': '/s/new-token',
+      }),
+      data: {'action': 'rotate'},
+    );
+
+    final rotated = await tripRepository.rotateTripShare(
+      'okinawa-trip-2026',
+      9,
+    );
+
+    expect(rotated.url, '/s/new-token');
+  });
+
+  test('revokeTripShare：PATCH action revoke', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026/shares/9',
+      (server) => server.reply(200, {'ok': true, 'revoked': true}),
+      data: {'action': 'revoke'},
+    );
+
+    await expectLater(
+      tripRepository.revokeTripShare('okinawa-trip-2026', 9),
+      completes,
+    );
+  });
+
+  test('deleteTripShare：DELETE /trips/:id/shares/:shareId', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa-trip-2026/shares/9',
+      (server) => server.reply(200, {'ok': true, 'deleted': true}),
+    );
+
+    await expectLater(
+      tripRepository.deleteTripShare('okinawa-trip-2026', 9),
+      completes,
+    );
+  });
+
   test('createTrip：POST /trips 帶基本資料與目的地', () async {
     dioAdapter.onPost(
       '/trips',

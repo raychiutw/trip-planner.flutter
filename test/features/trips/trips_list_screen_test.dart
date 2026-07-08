@@ -7,6 +7,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/trip_card.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
+import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -22,6 +23,10 @@ class FakeTripImportFilePicker implements TripImportFilePicker {
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(<String>[]);
+  });
+
   const fakeTrips = [
     TripSummary(
       tripId: 'okinawa-trip-2026',
@@ -96,6 +101,18 @@ void main() {
       archivedAt: '2024-01-01T00:00:00Z',
     ),
   ];
+
+  const existingShare = TripShareLink(
+    id: 7,
+    label: '給爸媽',
+    visibleSections: '["flights","lodgings","pretrip"]',
+    expiresAt: null,
+    viewCount: 3,
+    anonymous: 0,
+    createdBy: 'user-1',
+    createdAt: '2026-07-08T10:00:00Z',
+    revokedAt: null,
+  );
 
   /// 把畫面包進假 GoRouter：/trips 是清單頁、/trips/:tripId 是導航目的地探針。
   /// （flutter_riverpod 3.x 未匯出 Override 型別，overrides 由各測試
@@ -484,6 +501,168 @@ void main() {
 
       expect(find.text('不支援的匯出格式（需 schemaVersion 1）'), findsOneWidget);
       verifyNever(() => mockTripRepository.importTripJson(any()));
+    });
+
+    testWidgets('卡片 action menu：分享連結開啟管理 sheet 並列出既有連結', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.fetchTripShares(any()),
+      ).thenAnswer((_) async => const [existingShare]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-trigger-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-share-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('分享這個行程'), findsOneWidget);
+      expect(find.text('使用中的連結（1）'), findsOneWidget);
+      expect(find.byKey(const ValueKey('share-link-row-7')), findsOneWidget);
+      expect(find.text('給爸媽'), findsOneWidget);
+      verify(
+        () => mockTripRepository.fetchTripShares('okinawa-trip-2026'),
+      ).called(1);
+    });
+
+    testWidgets('分享管理 sheet：建立連結後顯示一次性 URL', (tester) async {
+      const createdShare = CreatedTripShare(
+        id: 9,
+        token: 'raw-token',
+        url: '/s/raw-token',
+        label: '給旅伴',
+        visibleSections: ['flights', 'lodgings', 'reservations', 'pretrip'],
+        expiresAt: null,
+        anonymous: 0,
+      );
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.fetchTripShares(any()),
+      ).thenAnswer((_) async => const <TripShareLink>[]);
+      when(
+        () => mockTripRepository.createTripShare(
+          any(),
+          visibleSections: any(named: 'visibleSections'),
+          label: any(named: 'label'),
+          expiresAt: any(named: 'expiresAt'),
+          anonymous: any(named: 'anonymous'),
+        ),
+      ).thenAnswer((_) async => createdShare);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-trigger-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-share-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('share-link-label')),
+        '給旅伴',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('share-section-reservations')),
+      );
+      await tester.tap(find.byKey(const ValueKey('share-link-create')));
+      await tester.pumpAndSettle();
+
+      final capturedSections =
+          verify(
+                () => mockTripRepository.createTripShare(
+                  'okinawa-trip-2026',
+                  visibleSections: captureAny(named: 'visibleSections'),
+                  label: '給旅伴',
+                  expiresAt: null,
+                  anonymous: false,
+                ),
+              ).captured.single
+              as List<String>;
+      expect(capturedSections, [
+        'flights',
+        'lodgings',
+        'reservations',
+        'pretrip',
+      ]);
+      expect(
+        find.text('https://trip-planner-dby.pages.dev/s/raw-token'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('分享管理 sheet：可關閉既有連結並重新載入', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.fetchTripShares(any()),
+      ).thenAnswer((_) async => const [existingShare]);
+      when(
+        () => mockTripRepository.revokeTripShare(any(), any()),
+      ).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-trigger-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-share-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('share-link-revoke-7')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('share-link-revoke-7')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockTripRepository.revokeTripShare('okinawa-trip-2026', 7),
+      ).called(1);
+      verify(
+        () => mockTripRepository.fetchTripShares('okinawa-trip-2026'),
+      ).called(2);
     });
 
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
