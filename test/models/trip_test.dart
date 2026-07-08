@@ -8,13 +8,33 @@ void main() {
         'tripId': 'okinawa-trip-2026-Ray',
         'name': '沖繩之旅',
         'title': '沖繩家族旅行',
+        'owner': 'ray@example.com',
+        'ownerDisplayName': 'Ray',
+        'ownerUserId': 'user-ray',
+        'role': 'owner',
+        'countries': 'JP',
+        'startDate': '2026-10-01',
+        'endDate': '2026-10-05',
+        'updatedAt': '2026-07-08T10:00:00Z',
         'totalDays': 5,
+        'memberCount': 3,
+        'archivedAt': null,
       });
 
       expect(summary.tripId, 'okinawa-trip-2026-Ray');
       expect(summary.name, '沖繩之旅');
       expect(summary.title, '沖繩家族旅行');
+      expect(summary.owner, 'ray@example.com');
+      expect(summary.ownerDisplayName, 'Ray');
+      expect(summary.ownerUserId, 'user-ray');
+      expect(summary.role, 'owner');
+      expect(summary.countries, 'JP');
+      expect(summary.startDate, '2026-10-01');
+      expect(summary.endDate, '2026-10-05');
+      expect(summary.updatedAt, '2026-07-08T10:00:00Z');
       expect(summary.totalDays, 5);
+      expect(summary.memberCount, 3);
+      expect(summary.archivedAt, isNull);
     });
 
     test('nullable 欄位缺漏時為 null', () {
@@ -25,6 +45,14 @@ void main() {
 
       expect(summary.title, isNull);
       expect(summary.totalDays, isNull);
+      expect(summary.owner, isNull);
+      expect(summary.role, isNull);
+      expect(summary.countries, isNull);
+      expect(summary.startDate, isNull);
+      expect(summary.endDate, isNull);
+      expect(summary.updatedAt, isNull);
+      expect(summary.memberCount, isNull);
+      expect(summary.archivedAt, isNull);
     });
   });
 
@@ -59,10 +87,7 @@ void main() {
         'id': 'should-not-use',
         'name': '沖繩',
       });
-      final tripWithIdOnly = Trip.fromJson({
-        'id': 'kyoto-trip',
-        'name': '京都',
-      });
+      final tripWithIdOnly = Trip.fromJson({'id': 'kyoto-trip', 'name': '京都'});
 
       expect(tripWithTripId.id, 'okinawa-trip-2026-Ray');
       expect(tripWithIdOnly.id, 'kyoto-trip');

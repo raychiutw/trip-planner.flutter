@@ -6,6 +6,7 @@
 
 ### 新增
 
+- **P0 行程清單 parity**:TripsList 新增分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序（最新編輯/出發日近/名稱）與 filtered empty 狀態；`TripSummary` 解析 owner/role/countries/start/end/updated/member/archive 等 `/my-trips` rich fields。
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 建立/編輯行程**:新增 `/trips/new` 與 `/trips/:tripId/edit`;TripsList AppBar/空狀態可建立行程,長按卡片可進入編輯行程,支援基本資料、目的地、日期、語言與發布狀態送出。編輯模式已接上 day management,可前/後新增行程日、補回缺漏日期、刪除 day 前顯示景點影響範圍,並以新的 Day 1 日期平移整段行程。
 - **P1 新增景點**:新增 `/trips/:tripId/add-entry`、`/trips/:tripId/add-stop` 與 `/add-custom-stop` 相容入口;時間軸 AppBar 可進入新增景點表單,支援搜尋 POI、收藏 POI 或自訂地圖座標加入指定 day,成功後觸發 travel recompute。

@@ -26,7 +26,14 @@
 | `tripId` | `String` | 必填 |
 | `name` | `String` | 必填(機器名) |
 | `title` | `String?` | 人類可讀標題 |
+| `owner`、`ownerDisplayName`、`ownerUserId` | `String?` | owner email / 顯示名稱 / user id |
+| `role` | `String?` | `owner` / `member` / `viewer`;TripsList 分類 tabs 以此區分我的/共編 |
+| `countries` | `String?` | 搜尋 haystack 會納入國家字串 |
+| `startDate`、`endDate` | `String?` | `"YYYY-MM-DD"`；排序「出發日近」使用 `startDate` 升冪 |
+| `updatedAt` | `String?` | API 預設順序視為「最新編輯」順序 |
 | `totalDays` | `int?` | |
+| `memberCount` | `int?` | 成員數 |
+| `archivedAt` | `String?` | 非空表示已歸檔；TripsList「全部/我的/共編」會排除 archived |
 
 顯示名稱用 `trip_card.dart` 的 extension:`displayTitle` = `title`(trim 後非空)→ 否則 `name`。
 

@@ -14,7 +14,7 @@
 | `/auth/verify-email?token=...` | `VerifyEmailScreen` | **shell 外**；按鈕觸發 email verification POST |
 | `/invite?token=...` | `InviteScreen` | **shell 外**；公開邀請預覽,未登入可進入 |
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
-| `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
+| `/trips` | `TripsListScreen` | tab 2(**initialLocation**)；行程清單分類/搜尋/排序 |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由；timeline + travel segments edit |
 | `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料與行程天數管理 |

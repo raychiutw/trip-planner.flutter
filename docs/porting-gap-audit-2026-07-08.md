@@ -17,7 +17,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | Web route/component | Flutter route/component | 狀態 | 下一步 |
 |---|---|---|---|
 | `/login` → `LoginPage` | `/login` → `LoginScreen` | 已翻 | 已補 signup/forgot/reset/verify 入口 |
-| `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 部分翻 | 補 filter/sort/search、新增、分享、menu actions |
+| `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 部分翻 | 已補 filter/sort/search/filtered empty；尚缺匯入、分享、menu actions、尾端新增卡 |
 | `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 部分翻 | 補 action menu、focus/deeplink、segment 背景同步細節 |
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` → `TripMapScreen` | 部分翻 | 補 entry focus route、pin/card 雙向同步、路線/定位控制 |
 | `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 已翻第一波 | 後續可補 drag reorder、autosave-on-blur 與更完整 web parity |
@@ -44,7 +44,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 這些不是全新 P1 功能，但 web P0 畫面已有而 Flutter P0 只做到可用版。
 
-- **TripsListScreen**：目前有單欄清單、下拉更新、AppBar/空狀態新增入口、長按編輯/刪除。尚缺分類 tabs（全部/我的/共編/已歸檔）、排序、搜尋、匯入、完整 TripCardMenu（共編/健檢/筆記/分享等）、尾端新增卡、filtered empty。
+- **TripsListScreen**：目前有單欄清單、下拉更新、AppBar/空狀態新增入口、分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序、filtered empty、長按編輯/刪除。尚缺匯入、完整 TripCardMenu（共編/健檢/筆記/分享等）、分享、尾端新增卡。
 - **TripTimelineScreen**：目前有 day pills + timeline + travel pill + map/notes/health/add-entry actions；travel pill 會讀取 `trip_segments` source of truth 並可編輯 driving/walking/transit。尚缺 scroll-spy 自動同步 active day、今日自動定位、`focus` entry deep link、offline banner、segment 背景同步細節、行程切換 dropdown、overflow actions。
 - **TripMapScreen**：目前是 OSM pins + day tabs + entry cards。尚缺 `stop/:entryId/map` focus route、pin/card 雙向同步、overview 點 pin 自動切 day、路線 polyline、圖層/我的位置 FAB。
 - **TripNotesScreen**：目前 5-section accordion 已支援 5 區新增/編輯/刪除、notes row OCC `expectedVersion`、行前須知/緊急聯絡 AI generate 與 request polling pending 狀態；尚缺 drag reorder、autosave-on-blur 等 web parity 細節。
@@ -121,7 +121,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料、目的地與 day management slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波。
+下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。TripsList 已補分類/搜尋/排序/filtered empty 第一波；Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料、目的地與 day management slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波。
 
 1. 若續做 Trip action surface：優先補更完整的 segment 背景同步/失敗狀態、auto-save parity 或 overflow action 細節,避免與既有 entry/day mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。

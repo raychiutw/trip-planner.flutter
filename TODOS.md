@@ -17,7 +17,7 @@
 
 ## P0 parity debt
 
-- [ ] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/匯入/完整 TripCardMenu/分享/filtered empty
+- [ ] TripsListScreen 補 web parity:已完成分類 tabs/排序/搜尋/filtered empty；尚缺匯入/完整 TripCardMenu/分享/尾端新增卡
 - [ ] TripTimelineScreen 補 web parity:scroll-spy active day/今日自動定位/focus deep link/offline banner/segment 背景同步細節/overflow actions
 - [ ] TripMapScreen 補 web parity:`stop/:entryId/map` focus route/pin-card 雙向同步/overview 點 pin 切 day/polyline/定位 FAB
 - [ ] AccountScreen 補 web parity:displayName inline edit/外觀與通知 row 實際導航

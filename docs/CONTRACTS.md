@@ -36,7 +36,12 @@ abstract final class AppTheme {
 
 ```dart
 // trip.dart
-class TripSummary { final String tripId; final String name; final String? title; final int? totalDays; }       // GET /my-trips
+class TripSummary {     // GET /my-trips
+  final String tripId; final String name; final String? title;
+  final String? owner; final String? ownerDisplayName; final String? ownerUserId; final String? role;
+  final String? countries; final String? startDate; final String? endDate; final String? updatedAt;
+  final int? totalDays; final int? memberCount; final String? archivedAt;
+}
 class TripDestination { final int? destOrder; final String name; final double? lat; final double? lng; final int? dayQuota; final List<String> subAreas; }
 class TripDestinationInput { final String name; final double? lat; final double? lng; final int? dayQuota; final List<String> subAreas; Map<String, dynamic> toJson(); }
 class Trip {            // GET /trips (list item) 與 GET /trips/:id（detail）共用，寬鬆 nullable
@@ -397,7 +402,7 @@ class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_scr
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
-class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
+class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）

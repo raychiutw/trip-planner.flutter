@@ -7,20 +7,50 @@ class TripSummary {
     required this.tripId,
     required this.name,
     this.title,
+    this.owner,
+    this.ownerDisplayName,
+    this.ownerUserId,
+    this.role,
+    this.countries,
+    this.startDate,
+    this.endDate,
+    this.updatedAt,
     this.totalDays,
+    this.memberCount,
+    this.archivedAt,
   });
 
   final String tripId;
   final String name;
   final String? title;
+  final String? owner;
+  final String? ownerDisplayName;
+  final String? ownerUserId;
+  final String? role;
+  final String? countries;
+  final String? startDate;
+  final String? endDate;
+  final String? updatedAt;
   final int? totalDays;
+  final int? memberCount;
+  final String? archivedAt;
 
   factory TripSummary.fromJson(Map<String, dynamic> json) {
     return TripSummary(
       tripId: json['tripId'] as String,
       name: json['name'] as String,
       title: json['title'] as String?,
+      owner: json['owner'] as String?,
+      ownerDisplayName: json['ownerDisplayName'] as String?,
+      ownerUserId: json['ownerUserId'] as String?,
+      role: json['role'] as String?,
+      countries: json['countries'] as String?,
+      startDate: json['startDate'] as String?,
+      endDate: json['endDate'] as String?,
+      updatedAt: json['updatedAt'] as String?,
       totalDays: (json['totalDays'] as num?)?.toInt(),
+      memberCount: (json['memberCount'] as num?)?.toInt(),
+      archivedAt: json['archivedAt'] as String?,
     );
   }
 }

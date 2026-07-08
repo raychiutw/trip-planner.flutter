@@ -33,7 +33,7 @@
 |---|---|---|
 | 5-tab shell | GlobalBottomNav | — |
 | LoginScreen | LoginPage | `POST /oauth/login` |
-| TripsListScreen | TripsListPage | `GET /my-trips` + `GET /trips?all=1`、`DELETE /trips/:id` |
+| TripsListScreen | TripsListPage（分類/搜尋/排序第一波） | `GET /my-trips` rich summary（client-side filter/sort/search）、`DELETE /trips/:id` |
 | TripFormScreen | NewTripPage / EditTripPage（基本資料 + day management slice） | `POST /trips`、`GET /trips/:id`、`PUT /trips/:id`、`GET/POST /trips/:id/days`、`DELETE /trips/:id/days/:num`、`POST /trips/:id/days/shift` |
 | TripTimelineScreen | TripPage（embedded） | `GET /trips/:id` + `GET /trips/:id/days?all=1` + `GET/PATCH /trips/:id/segments` |
 | TripMapScreen | MapPage | 共用 trip scope 資料（不重抓） |
@@ -50,7 +50,7 @@
 | ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
+P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構

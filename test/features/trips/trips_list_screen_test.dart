@@ -34,6 +34,60 @@ void main() {
     ),
   ];
 
+  const filterTrips = [
+    TripSummary(
+      tripId: 'okinawa-trip-2026',
+      name: 'okinawa-trip-2026',
+      title: '沖繩家族之旅',
+      totalDays: 5,
+      owner: 'ray@example.com',
+      ownerDisplayName: 'Ray',
+      role: 'owner',
+      countries: 'JP',
+      startDate: '2026-10-01',
+      updatedAt: '2026-07-08T10:00:00Z',
+      memberCount: 1,
+    ),
+    TripSummary(
+      tripId: 'busan-trip-2024',
+      name: 'busan-trip-2024',
+      title: '釜山美食團',
+      totalDays: 3,
+      owner: 'friend@example.com',
+      ownerDisplayName: 'Friend',
+      role: 'member',
+      countries: 'KR',
+      startDate: '2024-12-05',
+      updatedAt: '2026-07-05T10:00:00Z',
+      memberCount: 2,
+    ),
+    TripSummary(
+      tripId: 'kyoto-trip-2025',
+      name: 'kyoto-trip-2025',
+      title: '京都紅葉',
+      totalDays: 4,
+      owner: 'friend@example.com',
+      ownerDisplayName: 'Friend',
+      role: 'viewer',
+      countries: 'JP',
+      startDate: '2025-11-10',
+      updatedAt: '2026-07-01T10:00:00Z',
+      memberCount: 3,
+    ),
+    TripSummary(
+      tripId: 'archived-trip-2023',
+      name: 'archived-trip-2023',
+      title: '舊金山會議',
+      totalDays: 2,
+      owner: 'ray@example.com',
+      role: 'owner',
+      countries: 'US',
+      startDate: '2023-05-01',
+      updatedAt: '2023-05-05T10:00:00Z',
+      archivedAt: '2024-01-01T00:00:00Z',
+    ),
+  ];
+
   /// 把畫面包進假 GoRouter：/trips 是清單頁、/trips/:tripId 是導航目的地探針。
   /// （flutter_riverpod 3.x 未匯出 Override 型別，overrides 由各測試
   /// 直接在 ProviderScope 建構處以 list literal 傳入。）
@@ -145,6 +199,91 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TripCard), findsNWidgets(3));
+    });
+
+    testWidgets('分類 tabs：全部排除 archived，mine/collab/archived 分別過濾', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [myTripsProvider.overrideWith((ref) async => filterTrips)],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('trips-list-toolbar')), findsOneWidget);
+      expect(find.byType(TripCard), findsNWidgets(3));
+      expect(find.text('舊金山會議'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-tab-mine')));
+      await tester.pump();
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-tab-collab')));
+      await tester.pump();
+      expect(find.byType(TripCard), findsNWidgets(2));
+      expect(find.text('釜山美食團'), findsOneWidget);
+      expect(find.text('京都紅葉'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-tab-archived')));
+      await tester.pump();
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('舊金山會議'), findsOneWidget);
+    });
+
+    testWidgets('搜尋行程名稱或國家，無結果時顯示 filtered empty', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [myTripsProvider.overrideWith((ref) async => filterTrips)],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-list-search-input')),
+        'KR',
+      );
+      await tester.pump();
+
+      expect(find.byType(TripCard), findsOneWidget);
+      expect(find.text('釜山美食團'), findsOneWidget);
+      expect(find.text('沖繩家族之旅'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('trips-list-search-input')),
+        '不存在',
+      );
+      await tester.pump();
+
+      expect(find.byType(TripCard), findsNothing);
+      expect(find.text('沒有符合條件的行程。試著切換分類或調整搜尋字。'), findsOneWidget);
+    });
+
+    testWidgets('排序選出發日近時依 startDate 升冪排列', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [myTripsProvider.overrideWith((ref) async => filterTrips)],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-sort')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('出發日近').last);
+      await tester.pumpAndSettle();
+
+      final renderedCards = tester
+          .widgetList<TripCard>(find.byType(TripCard))
+          .toList();
+      expect(renderedCards.map((card) => card.trip.tripId), [
+        'busan-trip-2024',
+        'kyoto-trip-2025',
+        'okinawa-trip-2026',
+      ]);
     });
   });
 

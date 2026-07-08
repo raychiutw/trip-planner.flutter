@@ -29,7 +29,16 @@ void main() {
           'tripId': 'okinawa-trip-2026-Ray',
           'name': 'Okinawa',
           'title': '沖繩自駕',
+          'owner': 'ray@example.com',
+          'ownerDisplayName': 'Ray',
+          'ownerUserId': 'user-ray',
+          'role': 'owner',
+          'countries': 'JP',
+          'startDate': '2026-10-01',
+          'endDate': '2026-10-05',
+          'updatedAt': '2026-07-08T10:00:00Z',
           'totalDays': 5,
+          'memberCount': 2,
         },
       ]),
     );
@@ -39,6 +48,9 @@ void main() {
     expect(myTrips, hasLength(1));
     expect(myTrips.single.tripId, 'okinawa-trip-2026-Ray');
     expect(myTrips.single.totalDays, 5);
+    expect(myTrips.single.role, 'owner');
+    expect(myTrips.single.startDate, '2026-10-01');
+    expect(myTrips.single.memberCount, 2);
   });
 
   test('fetchTrips：GET /trips 解析 Trip list', () async {
