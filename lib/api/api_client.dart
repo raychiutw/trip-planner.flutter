@@ -25,10 +25,11 @@ class ApiClient {
     required SessionStore sessionStore,
     Dio? dio,
     String origin = kTriplineOrigin,
+    String? apiBaseUrl,
   }) : _sessionStore = sessionStore,
        _origin = origin,
        _dio = dio ?? Dio() {
-    _dio.options.baseUrl = '$origin/api';
+    _dio.options.baseUrl = apiBaseUrl ?? '$origin/api';
     // 全收所有 status code，由 _send 自行判斷丟 ApiError
     _dio.options.validateStatus = (_) => true;
   }

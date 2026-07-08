@@ -77,8 +77,9 @@ final fakeRouter = GoRouter(
 測 `ApiClient`/repository 本身時不 mock repository,改 mock HTTP 層:
 
 ```dart
-// 不必在 BaseOptions 設 baseUrl — ApiClient 建構子會用 origin 覆寫成
-// '<origin>/api'。要改 base 走 ApiClient(origin:),不是 Dio(BaseOptions(...))。
+// 不必在 BaseOptions 設 baseUrl — ApiClient 建構子會用 origin/apiBaseUrl
+// 組出預設 '<origin>/api'。整體環境切換走 TRIPLINE_API_URL 或
+// apiEndpointProvider override,不是 Dio(BaseOptions(...))。
 final dio = Dio();
 final dioAdapter = DioAdapter(dio: dio);
 final client = ApiClient(

@@ -10,13 +10,69 @@ import 'auth_repository.dart';
 import 'session_store.dart';
 import 'trip_repository.dart';
 
+/// Build-time API override.
+///
+/// Accepts either an origin (`http://127.0.0.1:8788`) or a full API base URL
+/// (`http://127.0.0.1:8788/api`). Origin header always uses scheme/host/port.
+const String kTriplineApiUrlOverride = String.fromEnvironment(
+  'TRIPLINE_API_URL',
+);
+
+class ApiEndpointConfig {
+  const ApiEndpointConfig({required this.origin, required this.apiBaseUrl});
+
+  final String origin;
+  final String apiBaseUrl;
+
+  factory ApiEndpointConfig.fromApiUrl(String apiUrl) {
+    final trimmed = apiUrl.trim();
+    if (trimmed.isEmpty) {
+      return const ApiEndpointConfig(
+        origin: kTriplineOrigin,
+        apiBaseUrl: '$kTriplineOrigin/api',
+      );
+    }
+
+    final uri = Uri.parse(_trimTrailingSlashes(trimmed));
+    if (!uri.hasScheme || uri.host.isEmpty) {
+      throw ArgumentError.value(
+        apiUrl,
+        'apiUrl',
+        'TRIPLINE_API_URL must be an absolute URL',
+      );
+    }
+    if (uri.hasQuery || uri.hasFragment) {
+      throw ArgumentError.value(
+        apiUrl,
+        'apiUrl',
+        'TRIPLINE_API_URL must not include query or fragment',
+      );
+    }
+
+    final hasPath = uri.pathSegments.any((segment) => segment.isNotEmpty);
+    return ApiEndpointConfig(
+      origin: uri.origin,
+      apiBaseUrl: hasPath ? uri.toString() : '${uri.origin}/api',
+    );
+  }
+}
+
 final sessionStoreProvider = Provider<SessionStore>(
   (ref) => SecureSessionStore(),
 );
 
-final apiClientProvider = Provider<ApiClient>(
-  (ref) => ApiClient(sessionStore: ref.watch(sessionStoreProvider)),
+final apiEndpointProvider = Provider<ApiEndpointConfig>(
+  (ref) => ApiEndpointConfig.fromApiUrl(kTriplineApiUrlOverride),
 );
+
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final endpoint = ref.watch(apiEndpointProvider);
+  return ApiClient(
+    sessionStore: ref.watch(sessionStoreProvider),
+    origin: endpoint.origin,
+    apiBaseUrl: endpoint.apiBaseUrl,
+  );
+});
 
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(
@@ -92,3 +148,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(
   AuthNotifier.new,
 );
+
+String _trimTrailingSlashes(String value) {
+  var end = value.length;
+  while (end > 0 && value.codeUnitAt(end - 1) == 0x2f) {
+    end--;
+  }
+  return value.substring(0, end);
+}

@@ -53,6 +53,60 @@ void main() {
     );
   });
 
+  test('ApiEndpointConfig 預設正式站 origin 與 /api base URL', () {
+    final config = ApiEndpointConfig.fromApiUrl('');
+
+    expect(config.origin, kTriplineOrigin);
+    expect(config.apiBaseUrl, '$kTriplineOrigin/api');
+  });
+
+  test('ApiEndpointConfig 可由 TRIPLINE_API_URL 接受 origin 或 /api URL', () {
+    final originConfig = ApiEndpointConfig.fromApiUrl('http://127.0.0.1:8788');
+    final apiUrlConfig = ApiEndpointConfig.fromApiUrl(
+      'http://127.0.0.1:8788/api',
+    );
+
+    expect(originConfig.origin, 'http://127.0.0.1:8788');
+    expect(originConfig.apiBaseUrl, 'http://127.0.0.1:8788/api');
+    expect(apiUrlConfig.origin, 'http://127.0.0.1:8788');
+    expect(apiUrlConfig.apiBaseUrl, 'http://127.0.0.1:8788/api');
+  });
+
+  test('ApiEndpointConfig 正規化 trailing slash 並拒絕不安全 URL', () {
+    final config = ApiEndpointConfig.fromApiUrl(' http://127.0.0.1:8788/api/ ');
+
+    expect(config.origin, 'http://127.0.0.1:8788');
+    expect(config.apiBaseUrl, 'http://127.0.0.1:8788/api');
+    expect(() => ApiEndpointConfig.fromApiUrl('/api'), throwsArgumentError);
+    expect(
+      () => ApiEndpointConfig.fromApiUrl('http://127.0.0.1:8788/api?debug=1'),
+      throwsArgumentError,
+    );
+    expect(
+      () => ApiEndpointConfig.fromApiUrl('http://127.0.0.1:8788/api#local'),
+      throwsArgumentError,
+    );
+  });
+
+  test('apiClientProvider 使用 apiEndpointProvider 的 base URL 與 Origin', () {
+    final localContainer = ProviderContainer(
+      overrides: [
+        sessionStoreProvider.overrideWithValue(sessionStore),
+        apiEndpointProvider.overrideWithValue(
+          const ApiEndpointConfig(
+            origin: 'http://127.0.0.1:8788',
+            apiBaseUrl: 'http://127.0.0.1:8788/api',
+          ),
+        ),
+      ],
+    );
+    addTearDown(localContainer.dispose);
+
+    final client = localContainer.read(apiClientProvider);
+
+    expect(client.dio.options.baseUrl, 'http://127.0.0.1:8788/api');
+  });
+
   group('authStateProvider', () {
     test('build：未登入（userinfo 401）→ AsyncData(null)', () async {
       dioAdapter.onGet(

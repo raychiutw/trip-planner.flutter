@@ -8,12 +8,14 @@ Tripline 的 API 層封裝對 Cloudflare Pages Functions 後端(`https://trip-pl
 
 ```dart
 const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
+const String kTriplineApiUrlOverride = String.fromEnvironment('TRIPLINE_API_URL');
 
 class ApiClient {
   ApiClient({
     required SessionStore sessionStore,
     Dio? dio,                          // 測試注入用;預設 new Dio()
     String origin = kTriplineOrigin,   // base URL = '$origin/api'
+    String? apiBaseUrl,                // provider 由 TRIPLINE_API_URL 正規化後注入
   });
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query});
@@ -37,6 +39,15 @@ class ApiClient {
 4. **429 retry** — 僅限 `GET`:讀 `Retry-After` header 等待後重試**一次**;mutation(POST/PUT/PATCH/DELETE)**絕不重試**(避免重複寫入)。
 5. **204 / 空 body → `null`** — 不要對回傳值假設一定有 JSON。
 6. **Redirect response** — `postForRedirect()` 用於 OAuth consent 類型 endpoint；不跟隨 302,接受 2xx/3xx 並回 `statusCode` 與 `Location` header。
+
+### `TRIPLINE_API_URL`
+
+`apiEndpointProvider` 會讀 `--dart-define=TRIPLINE_API_URL=...`。空值使用正式站；有值時可傳 origin 或完整 API base URL：
+
+| 輸入 | dio baseUrl | Origin header |
+|---|---|---|
+| `http://127.0.0.1:8788` | `http://127.0.0.1:8788/api` | `http://127.0.0.1:8788` |
+| `http://127.0.0.1:8788/api` | `http://127.0.0.1:8788/api` | `http://127.0.0.1:8788` |
 
 ### `parseRetryAfterSeconds`
 
@@ -374,7 +385,8 @@ class TripRepository {
 
 ```dart
 final sessionStoreProvider   = Provider<SessionStore>((ref) => SecureSessionStore());
-final apiClientProvider      = Provider<ApiClient>(...);       // 注入 sessionStoreProvider
+final apiEndpointProvider    = Provider<ApiEndpointConfig>(...); // 讀 TRIPLINE_API_URL
+final apiClientProvider      = Provider<ApiClient>(...);       // 注入 sessionStoreProvider + endpoint config
 final authRepositoryProvider = Provider<AuthRepository>(...);  // 注入 client + store
 final tripRepositoryProvider = Provider<TripRepository>(...);  // 注入 client
 

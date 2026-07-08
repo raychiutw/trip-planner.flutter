@@ -46,7 +46,7 @@ app 啟動後停在登入頁(沒有 session 時 router 自動導向 `/login`)。
 
 > ⚠️ **本 app 連的是正式 API,沒有 staging。** 教學階段請只做唯讀操作 —
 > **不要試「長按刪除」**,它會打真的 `DELETE /trips/:id` 刪掉後端資料(且無法復原)。
-> 等之後 `--dart-define=TRIPLINE_API_URL` 覆寫實作後才有安全的本機後端可玩。
+> 本機後端可用 `--dart-define=TRIPLINE_API_URL=http://127.0.0.1:8788` 或完整 `/api` URL 覆寫。
 
 聊天 tab 已可送出 AI request 並 polling 回覆；全域地圖 tab 已可選擇行程並顯示該行程地圖；收藏 tab 已可瀏覽收藏、探索景點並把收藏加入行程；行程詳情右上角的共編入口已可管理成員角色、移除成員與處理待邀請清單；行程筆記頁已可新增/編輯/刪除 5 區筆記並觸發行前須知/緊急聯絡 AI 生成；AI 健檢頁已可觸發 health-check、polling 報告並依嚴重程度顯示建議。
 

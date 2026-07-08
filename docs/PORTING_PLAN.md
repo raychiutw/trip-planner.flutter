@@ -10,7 +10,7 @@
 |---|---|---|
 | State management | flutter_riverpod 3.x | scoped provider 天然對應 web 的 TripLayout 共用 fetch（規劃時為 2.x，實作採 3.x） |
 | Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
-| HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry |
+| HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry；`--dart-define=TRIPLINE_API_URL` 可覆寫 API base |
 | 認證 | 密碼登入拿 session cookie | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE+Bearer 留待後續（需註冊 public client） |
 | 地圖 | flutter_map + OSM tiles | 免 API key、零帳務設定；介面抽象化，之後可換 google_maps_flutter |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
@@ -18,7 +18,7 @@
 
 ## API client 必守規則（來自 web `src/lib/apiClient.ts` 行為）
 
-1. Base URL `https://trip-planner-dby.pages.dev/api`；`--dart-define=TRIPLINE_API_URL` 覆寫為規劃項尚未實作（目前以 `ApiClient(origin:)` 建構參數覆寫，測試即用此法）
+1. Base URL 預設 `https://trip-planner-dby.pages.dev/api`；可用 `--dart-define=TRIPLINE_API_URL=http://127.0.0.1:8788` 或 `.../api` 覆寫。若傳 origin,client 自動補 `/api`；若傳完整 API URL,直接作為 dio baseUrl。Origin header 永遠取 scheme/host/port。
 2. 認證：`Cookie: tripline_session=<token>` header（secure storage 持久化）
 3. POST/PUT/PATCH/DELETE 一律帶 `Origin: https://trip-planner-dby.pages.dev`（缺少 → 403）
 4. `/api/oauth/*` 路徑免 Origin；userinfo 只吃 cookie

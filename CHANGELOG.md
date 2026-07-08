@@ -15,6 +15,7 @@
 - **P2 列印/PDF 第一波**:新增 `/trips/:tripId/print` 列印預覽頁，timeline overflow 可進入；預覽整合 trip、days 與 notes，notes 載入失敗時仍顯示主文件，並支援平台列印與分享 PDF。
 - **P2 OAuth settings 第一波**:新增 `/account/connected-apps`、`/settings/connected-apps`、`/developer/apps`、`/developer/apps/new` 與公開 shell 外 `/oauth/consent`；可列出/撤銷已授權 app、查看與建立 developer OAuth client，並送出 consent allow/deny 後保留後端 302 `Location`。
 - **P2 登入裝置管理**:新增 `/account/sessions` 與 `/settings/sessions`；帳號頁可進入登入裝置清單，支援 `GET /account/sessions` 顯示目前/其他裝置、單一登出與登出其他裝置。
+- **API endpoint override**:新增 `--dart-define=TRIPLINE_API_URL=...` 支援，可傳 origin 或完整 `/api` URL；`ApiClient` 會分別設定 base URL 與 mutating request 的 Origin header。
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 建立/編輯行程**:新增 `/trips/new` 與 `/trips/:tripId/edit`;TripsList AppBar/空狀態可建立行程,長按卡片可進入編輯行程,支援基本資料、目的地、日期、語言與發布狀態送出。編輯模式已接上 day management,可前/後新增行程日、補回缺漏日期、刪除 day 前顯示景點影響範圍,並以新的 Day 1 日期平移整段行程。
 - **P1 新增景點**:新增 `/trips/:tripId/add-entry`、`/trips/:tripId/add-stop` 與 `/add-custom-stop` 相容入口;時間軸 AppBar 可進入新增景點表單,支援搜尋 POI、收藏 POI 或自訂地圖座標加入指定 day,成功後觸發 travel recompute。

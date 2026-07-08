@@ -174,7 +174,7 @@ class InMemorySessionStore implements SessionStore { /* 測試用 */ }
 // api_client.dart
 const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
 class ApiClient {
-  ApiClient({required SessionStore sessionStore, Dio? dio, String origin = kTriplineOrigin});
+  ApiClient({required SessionStore sessionStore, Dio? dio, String origin = kTriplineOrigin, String? apiBaseUrl});
   // base = '$origin/api'。行為規則（必含對應測試）：
   // 1. 每個 request 帶 Cookie: tripline_session=<token>（store 有值時）
   // 2. POST/PUT/PATCH/DELETE 帶 Origin: $origin header
@@ -398,6 +398,7 @@ class TripRepository {
 
 // providers.dart（riverpod 3.x 語法）
 final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSessionStore
+final apiEndpointProvider = Provider<ApiEndpointConfig>(...);  // 讀 --dart-define=TRIPLINE_API_URL，可接受 origin 或完整 /api URL
 final apiClientProvider = Provider<ApiClient>(...);
 final authRepositoryProvider = Provider<AuthRepository>(...);
 final tripRepositoryProvider = Provider<TripRepository>(...);
