@@ -359,6 +359,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> login(String email, String password);
   Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken});
   Future<void> logout();
+  Future<UserInfo> updateProfile({String? displayName});
 }
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new);
 ```
@@ -372,7 +373,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 | `AsyncLoading` | 啟動時查 `currentUser()` 中,或登入/註冊請求進行中 |
 | `AsyncError` | 登入或註冊失敗(`login()`/`signup()` 把例外收進 state,畫面讀此顯示 persistent banner) |
 
-`build()` 即 `currentUser()` — app 啟動時自動以既存 session 驗證登入狀態。`signup()` 成功後會把 `SignupResult` 轉成最小 `UserInfo`,讓 router 立即視為已登入。router 的 redirect 邏輯依賴此 provider,見[導航參考](reference-navigation.md)。
+`build()` 即 `currentUser()` — app 啟動時自動以既存 session 驗證登入狀態。`signup()` 成功後會把 `SignupResult` 轉成最小 `UserInfo`,讓 router 立即視為已登入。`updateProfile()` 透過 `TripRepository.updateProfile()` PATCH `/account/profile`,成功後以回傳的 `UserInfo` 直接刷新全域 auth state。router 的 redirect 邏輯依賴此 provider,見[導航參考](reference-navigation.md)。
 
 行程詳情層級的 scoped providers(`tripDetailProvider` 等 family)定義在 `lib/features/trip_detail/trip_providers.dart`,見[架構說明 — trip scope](explanation-architecture.md#trip-scope共用-fetch)。
 

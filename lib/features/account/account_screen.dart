@@ -1,6 +1,8 @@
 /// 帳號 hub 畫面（tab 5）：profile hero、統計、設定 rows、登出。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -96,16 +98,115 @@ String _resolveDisplayName(UserInfo user) {
 }
 
 /// 圓形 avatar（首字母大寫）+ 名稱 + email + 未驗證警示。
-class _ProfileHero extends StatelessWidget {
+class _ProfileHero extends ConsumerStatefulWidget {
   const _ProfileHero({required this.user});
 
   final UserInfo user;
 
   @override
+  ConsumerState<_ProfileHero> createState() => _ProfileHeroState();
+}
+
+class _ProfileHeroState extends ConsumerState<_ProfileHero> {
+  final _displayNameController = TextEditingController();
+  final _displayNameFocusNode = FocusNode();
+  bool _isEditing = false;
+  bool _isSaving = false;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayNameController.text = widget.user.displayName?.trim() ?? '';
+    _displayNameFocusNode.addListener(_handleDisplayNameFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileHero oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isEditing && oldWidget.user.displayName != widget.user.displayName) {
+      _displayNameController.text = widget.user.displayName?.trim() ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _displayNameFocusNode.removeListener(_handleDisplayNameFocusChange);
+    _displayNameFocusNode.dispose();
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  void _handleDisplayNameFocusChange() {
+    if (!_displayNameFocusNode.hasFocus && _isEditing) {
+      unawaited(_saveDisplayName());
+    }
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+      _errorText = null;
+      _displayNameController.text = widget.user.displayName?.trim() ?? '';
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _displayNameFocusNode.requestFocus();
+      _displayNameController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _displayNameController.text.length,
+      );
+    });
+  }
+
+  Future<void> _saveDisplayName() async {
+    if (_isSaving || !_isEditing) return;
+
+    final nextDisplayName = _normalizedDisplayName(_displayNameController.text);
+    final currentDisplayName = _normalizedDisplayName(
+      widget.user.displayName ?? '',
+    );
+    if (nextDisplayName == currentDisplayName) {
+      setState(() {
+        _isEditing = false;
+        _errorText = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _errorText = null;
+    });
+    try {
+      await ref
+          .read(authStateProvider.notifier)
+          .updateProfile(displayName: nextDisplayName);
+      if (!mounted) return;
+      setState(() {
+        _isEditing = false;
+        _isSaving = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _errorText = '無法更新顯示名稱';
+      });
+    }
+  }
+
+  String? _normalizedDisplayName(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    final resolvedName = _resolveDisplayName(user);
+    final resolvedName = _resolveDisplayName(widget.user);
 
     return Column(
       children: [
@@ -114,23 +215,129 @@ class _ProfileHero extends StatelessWidget {
           backgroundColor: tones.accentBg,
           child: Text(
             resolvedName.characters.first.toUpperCase(),
-            style: theme.textTheme.headlineMedium
-                ?.copyWith(color: tones.accentDeep),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: tones.accentDeep,
+            ),
           ),
         ),
         const SizedBox(height: TpSpacing.s3),
-        Text(resolvedName, style: theme.textTheme.titleLarge),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _isEditing
+              ? _DisplayNameField(
+                  controller: _displayNameController,
+                  focusNode: _displayNameFocusNode,
+                  errorText: _errorText,
+                  isSaving: _isSaving,
+                  onSubmitted: _saveDisplayName,
+                )
+              : _DisplayNameLabel(
+                  displayName: resolvedName,
+                  onEdit: _startEditing,
+                ),
+        ),
         const SizedBox(height: TpSpacing.s1),
         Text(
-          user.email,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          widget.user.email,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
-        if (!user.emailVerified) ...[
+        if (!widget.user.emailVerified) ...[
           const SizedBox(height: TpSpacing.s2),
           _UnverifiedChip(warningColor: tones.warning),
         ],
       ],
+    );
+  }
+}
+
+/// 可點擊編輯的 displayName label。
+class _DisplayNameLabel extends StatelessWidget {
+  const _DisplayNameLabel({required this.displayName, required this.onEdit});
+
+  final String displayName;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      key: const ValueKey('account-display-name-label'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            displayName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge,
+          ),
+        ),
+        const SizedBox(width: TpSpacing.s1),
+        IconButton(
+          key: const Key('account-display-name-edit'),
+          tooltip: '編輯顯示名稱',
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit_outlined, size: 20),
+        ),
+      ],
+    );
+  }
+}
+
+/// displayName inline 編輯欄位；失焦或送出都會儲存。
+class _DisplayNameField extends StatelessWidget {
+  const _DisplayNameField({
+    required this.controller,
+    required this.focusNode,
+    required this.errorText,
+    required this.isSaving,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String? errorText;
+  final bool isSaving;
+  final Future<void> Function() onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      key: const ValueKey('account-display-name-field-shell'),
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: TextField(
+        key: const Key('account-display-name-field'),
+        controller: controller,
+        focusNode: focusNode,
+        enabled: !isSaving,
+        textAlign: TextAlign.center,
+        textInputAction: TextInputAction.done,
+        decoration: InputDecoration(
+          labelText: '顯示名稱',
+          errorText: errorText,
+          isDense: true,
+          suffixIcon: isSaving
+              ? const Padding(
+                  padding: EdgeInsets.all(TpSpacing.s3),
+                  child: SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  key: const Key('account-display-name-save'),
+                  tooltip: '儲存顯示名稱',
+                  onPressed: () => unawaited(onSubmitted()),
+                  icon: const Icon(Icons.check),
+                ),
+        ),
+        onSubmitted: (_) => unawaited(onSubmitted()),
+        onTapOutside: (_) => focusNode.unfocus(),
+      ),
     );
   }
 }
@@ -159,10 +366,9 @@ class _UnverifiedChip extends StatelessWidget {
           const SizedBox(width: TpSpacing.s1),
           Text(
             'Email 未驗證',
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: warningColor),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: warningColor),
           ),
         ],
       ),
@@ -253,8 +459,9 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: TpSpacing.s1),
           Text(
             label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -279,8 +486,9 @@ class _SettingsGroup extends StatelessWidget {
           ),
           child: Text(
             '設定',
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         Card(
@@ -321,8 +529,9 @@ class _ComingSoonRow extends StatelessWidget {
       title: Text(title),
       trailing: Text(
         '即將推出',
-        style: theme.textTheme.labelMedium
-            ?.copyWith(color: theme.disabledColor),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.disabledColor,
+        ),
       ),
     );
   }

@@ -78,6 +78,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
   }
+
+  /// 更新帳號 profile，成功後同步刷新全域登入使用者狀態。
+  Future<UserInfo> updateProfile({String? displayName}) async {
+    final updatedUser = await ref
+        .read(tripRepositoryProvider)
+        .updateProfile(displayName: displayName);
+    state = AsyncData(updatedUser);
+    return updatedUser;
+  }
 }
 
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(

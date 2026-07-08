@@ -4,14 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
+class MockTripRepository extends Mock implements TripRepository {}
+
 void main() {
   late MockAuthRepository mockAuthRepository;
+  late MockTripRepository mockTripRepository;
 
   const verifiedUser = UserInfo(
     id: 'user-1',
@@ -28,6 +32,7 @@ void main() {
 
   setUp(() {
     mockAuthRepository = MockAuthRepository();
+    mockTripRepository = MockTripRepository();
     when(() => mockAuthRepository.logout()).thenAnswer((_) async {});
   });
 
@@ -47,6 +52,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          tripRepositoryProvider.overrideWithValue(mockTripRepository),
           accountStatsProvider.overrideWith((ref) => Future.value(stats)),
         ],
         child: MaterialApp(
@@ -103,6 +109,83 @@ void main() {
     expect(find.text('Email 未驗證'), findsNothing);
   });
 
+  testWidgets('displayName inline 編輯失焦後更新 profile 並刷新畫面', (tester) async {
+    const updatedUser = UserInfo(
+      id: 'user-1',
+      email: 'ray@example.com',
+      emailVerified: true,
+      displayName: '新名字',
+    );
+    when(
+      () => mockTripRepository.updateProfile(
+        displayName: any(named: 'displayName'),
+      ),
+    ).thenAnswer((_) async => updatedUser);
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const Key('account-display-name-edit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('account-display-name-field')),
+      '  新名字  ',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.updateProfile(displayName: '新名字'),
+    ).called(1);
+    expect(find.text('新名字'), findsOneWidget);
+  });
+
+  testWidgets('displayName 清成空白時送 null 並回到 email local part', (tester) async {
+    const updatedUser = UserInfo(
+      id: 'user-1',
+      email: 'ray@example.com',
+      emailVerified: true,
+    );
+    when(
+      () => mockTripRepository.updateProfile(displayName: null),
+    ).thenAnswer((_) async => updatedUser);
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const Key('account-display-name-edit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('account-display-name-field')),
+      '   ',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+
+    verify(() => mockTripRepository.updateProfile(displayName: null)).called(1);
+    expect(find.text('ray'), findsOneWidget);
+  });
+
+  testWidgets('displayName 更新失敗時停在編輯狀態並顯示錯誤', (tester) async {
+    when(
+      () => mockTripRepository.updateProfile(
+        displayName: any(named: 'displayName'),
+      ),
+    ).thenThrow(Exception('network failed'));
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const Key('account-display-name-edit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('account-display-name-field')),
+      '新名字',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.updateProfile(displayName: '新名字'),
+    ).called(1);
+    expect(find.byKey(const Key('account-display-name-field')), findsOneWidget);
+    expect(find.text('無法更新顯示名稱'), findsOneWidget);
+  });
+
   testWidgets('外觀與通知 rows 顯示「即將推出」且為 disabled', (tester) async {
     await pumpAccountScreen(tester);
 
@@ -110,10 +193,12 @@ void main() {
     expect(find.text('通知'), findsOneWidget);
     expect(find.text('即將推出'), findsNWidgets(2));
 
-    final appearanceTile =
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '外觀'));
-    final notificationsTile =
-        tester.widget<ListTile>(find.widgetWithText(ListTile, '通知'));
+    final appearanceTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '外觀'),
+    );
+    final notificationsTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '通知'),
+    );
     expect(appearanceTile.enabled, isFalse);
     expect(notificationsTile.enabled, isFalse);
   });

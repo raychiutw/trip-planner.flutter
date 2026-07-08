@@ -27,12 +27,14 @@ void main() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
     sessionStore = InMemorySessionStore();
-    container = ProviderContainer(overrides: [
-      sessionStoreProvider.overrideWithValue(sessionStore),
-      apiClientProvider.overrideWithValue(
-        ApiClient(sessionStore: sessionStore, dio: dio),
-      ),
-    ]);
+    container = ProviderContainer(
+      overrides: [
+        sessionStoreProvider.overrideWithValue(sessionStore),
+        apiClientProvider.overrideWithValue(
+          ApiClient(sessionStore: sessionStore, dio: dio),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
   });
 
@@ -142,6 +144,30 @@ void main() {
 
       expect(container.read(authStateProvider).value, isNull);
       expect(await sessionStore.read(), isNull);
+    });
+
+    test('updateProfile 後 state 更新為後端回傳 UserInfo', () async {
+      await sessionStore.write('abc.def');
+      dioAdapter.onGet(
+        '/oauth/userinfo',
+        (server) => server.reply(200, userInfoJson),
+      );
+      final loggedInUser = await container.read(authStateProvider.future);
+      expect(loggedInUser!.displayName, 'Ray');
+
+      final updatedUserInfoJson = {...userInfoJson, 'displayName': '新名字'};
+      dioAdapter.onPatch(
+        '/account/profile',
+        (server) => server.reply(200, updatedUserInfoJson),
+        data: {'displayName': '新名字'},
+      );
+
+      final updatedUser = await container
+          .read(authStateProvider.notifier)
+          .updateProfile(displayName: '新名字');
+
+      expect(updatedUser.displayName, '新名字');
+      expect(container.read(authStateProvider).value!.displayName, '新名字');
     });
   });
 }

@@ -372,7 +372,7 @@ final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSe
 final apiClientProvider = Provider<ApiClient>(...);
 final authRepositoryProvider = Provider<AuthRepository>(...);
 final tripRepositoryProvider = Provider<TripRepository>(...);
-class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken}); Future<void> logout(); }
+class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken}); Future<void> logout(); Future<UserInfo> updateProfile({String? displayName}); }
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new); // build() = currentUser()
 ```
 
