@@ -92,6 +92,16 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/trips/:tripId/stop/:entryId/copy',
+          builder: (context, state) =>
+              Scaffold(body: Text('copy:${state.pathParameters['entryId']}')),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/stop/:entryId/move',
+          builder: (context, state) =>
+              Scaffold(body: Text('move:${state.pathParameters['entryId']}')),
+        ),
+        GoRoute(
           path: '/trips/:tripId',
           builder: (context, state) =>
               Scaffold(body: Text('trip:${state.pathParameters['tripId']}')),
@@ -133,6 +143,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('edit-entry-add-alternate')));
     await tester.pumpAndSettle();
     expect(find.text('change-poi:101:alternate'), findsOneWidget);
+  });
+
+  testWidgets('複製與移動按鈕導向 entry action routes', (tester) async {
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-copy')));
+    await tester.pumpAndSettle();
+    expect(find.text('copy:101'), findsOneWidget);
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-move')));
+    await tester.pumpAndSettle();
+    expect(find.text('move:101'), findsOneWidget);
   });
 
   testWidgets('儲存時 PATCH entry 並帶 expectedVersion', (tester) async {

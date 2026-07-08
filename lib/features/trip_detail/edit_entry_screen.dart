@@ -263,30 +263,61 @@ class _PoiActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            key: const ValueKey('edit-entry-change-poi'),
-            icon: const Icon(Icons.swap_horiz_outlined),
-            label: const Text('置換景點'),
-            onPressed: enabled
-                ? () => context.go('/trips/$tripId/stop/$entryId/change-poi')
-                : null,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('edit-entry-change-poi'),
+                icon: const Icon(Icons.swap_horiz_outlined),
+                label: const Text('置換景點'),
+                onPressed: enabled
+                    ? () =>
+                          context.go('/trips/$tripId/stop/$entryId/change-poi')
+                    : null,
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s3),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('edit-entry-add-alternate'),
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('加入備選'),
+                onPressed: enabled
+                    ? () => context.go(
+                        '/trips/$tripId/stop/$entryId/change-poi?mode=alternate',
+                      )
+                    : null,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: TpSpacing.s3),
-        Expanded(
-          child: OutlinedButton.icon(
-            key: const ValueKey('edit-entry-add-alternate'),
-            icon: const Icon(Icons.add_location_alt_outlined),
-            label: const Text('加入備選'),
-            onPressed: enabled
-                ? () => context.go(
-                    '/trips/$tripId/stop/$entryId/change-poi?mode=alternate',
-                  )
-                : null,
-          ),
+        const SizedBox(height: TpSpacing.s2),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('edit-entry-copy'),
+                icon: const Icon(Icons.copy_outlined),
+                label: const Text('複製景點'),
+                onPressed: enabled
+                    ? () => context.go('/trips/$tripId/stop/$entryId/copy')
+                    : null,
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s3),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const ValueKey('edit-entry-move'),
+                icon: const Icon(Icons.drive_file_move),
+                label: const Text('移動景點'),
+                onPressed: enabled
+                    ? () => context.go('/trips/$tripId/stop/$entryId/move')
+                    : null,
+              ),
+            ),
+          ],
         ),
       ],
     );

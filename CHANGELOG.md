@@ -10,6 +10,7 @@
 - **P1 新增景點**:新增 `/trips/:tripId/add-entry` 與 `/trips/:tripId/add-stop` 相容入口;時間軸 AppBar 可進入新增景點表單,支援搜尋 POI 或收藏 POI 加入指定 day,成功後觸發 travel recompute。
 - **P1 Entry 編輯**:新增 `/trips/:tripId/stop/:entryId/edit`;時間軸 entry 可進入編輯表單,支援讀取單一 entry、修改開始/結束時間與描述、刪除景點,更新時帶 `expectedVersion`,成功後觸發 travel recompute。
 - **P1 Entry POI 變更**:新增 `/trips/:tripId/stop/:entryId/change-poi`;可用搜尋結果或收藏 POI 置換主景點,也可從 edit screen 加入備選景點,POI 變更帶 `entryPoisVersion` 避免覆蓋他人操作。
+- **P1 Entry 跨日操作**:新增 `/trips/:tripId/stop/:entryId/copy` 與 `/move`;edit screen 可進入複製/移動表單,copy 呼叫後端 copy endpoint,move 以 `day_id` + `expectedVersion` PATCH entry,成功後重算受影響 day 的 travel segments。
 
 ## [0.1.0] - 2026-06-10
 

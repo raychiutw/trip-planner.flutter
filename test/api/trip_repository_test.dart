@@ -267,6 +267,63 @@ void main() {
     );
   });
 
+  test('copyEntry：POST /trips/:id/entries/:eid/copy 指定 targetDayId', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/entries/101/copy',
+      (server) => server.reply(201, {
+        'id': 902,
+        'dayId': 12,
+        'sortOrder': 2,
+        'startTime': '10:00',
+        'endTime': '11:30',
+        'title': '首里城',
+        'description': '世界遺產',
+        'version': 1,
+      }),
+      data: {'targetDayId': 12},
+    );
+
+    final copied = await tripRepository.copyEntry(
+      tripId: 'okinawa-trip-2026-Ray',
+      entryId: 101,
+      targetDayId: 12,
+    );
+
+    expect(copied.id, 902);
+    expect(copied.dayId, 12);
+    expect(copied.startTime, '10:00');
+  });
+
+  test(
+    'moveEntry：PATCH /trips/:id/entries/:eid 帶 day_id 與 expectedVersion',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa-trip-2026-Ray/entries/101',
+        (server) => server.reply(200, {
+          'id': 101,
+          'dayId': 12,
+          'sortOrder': 2,
+          'startTime': '10:00',
+          'endTime': '11:30',
+          'title': '首里城',
+          'version': 8,
+        }),
+        data: {'day_id': 12, 'expectedVersion': 7},
+      );
+
+      final moved = await tripRepository.moveEntry(
+        tripId: 'okinawa-trip-2026-Ray',
+        entryId: 101,
+        targetDayId: 12,
+        expectedVersion: 7,
+      );
+
+      expect(moved.id, 101);
+      expect(moved.dayId, 12);
+      expect(moved.version, 8);
+    },
+  );
+
   test(
     'replaceEntryMasterPoiFromSearchResult：PUT /poi-id 帶 entryPoisVersion',
     () async {

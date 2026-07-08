@@ -86,6 +86,33 @@ class TripRepository {
     );
   }
 
+  /// POST /trips/:id/entries/:entryId/copy。
+  Future<TimelineEntry> copyEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/copy',
+      body: {'targetDayId': targetDayId},
+    );
+    return TimelineEntry.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// PATCH /trips/:id/entries/:entryId，用 `day_id` 跨日移動 entry。
+  Future<TimelineEntry> moveEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+    required int expectedVersion,
+  }) async {
+    final responseBody = await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}',
+      body: {'day_id': targetDayId, 'expectedVersion': expectedVersion},
+    );
+    return TimelineEntry.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// PUT /trips/:id/entries/:entryId/poi-id，用搜尋結果置換 master POI。
   Future<void> replaceEntryMasterPoiFromSearchResult({
     required String tripId,

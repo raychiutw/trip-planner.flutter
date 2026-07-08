@@ -126,6 +126,17 @@ class TripRepository {
     required String? description,
   }); // PATCH /trips/:id/entries/:entryId
   Future<void>              deleteEntry(String tripId, int entryId); // DELETE /trips/:id/entries/:entryId
+  Future<TimelineEntry>     copyEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+  }); // POST /trips/:id/entries/:entryId/copy
+  Future<TimelineEntry>     moveEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+    required int expectedVersion,
+  }); // PATCH /trips/:id/entries/:entryId
   Future<void>              replaceEntryMasterPoiFromSearchResult({
     required String tripId,
     required int entryId,
@@ -180,6 +191,7 @@ class TripRepository {
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。
+`copyEntry` 送 `POST /trips/:id/entries/:entryId/copy` 與 body `targetDayId`;`moveEntry` 復用 entry PATCH endpoint,body 使用 `day_id` 與必填 OCC `expectedVersion`。畫面成功後會對受影響 day 呼叫 `recomputeTravel`。
 `replaceEntryMasterPoi*` 與 `addEntryAlternate*` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。
 `createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
 `AddEntryScreen` 收藏 tab 仍走 `addPoiFavoriteToTrip` 的 4-field favorite fast-path,成功後同樣觸發 `recomputeTravel`。

@@ -15,6 +15,7 @@ import '../features/shell/app_shell.dart';
 import '../features/trip_detail/add_entry_screen.dart';
 import '../features/trip_detail/change_poi_screen.dart';
 import '../features/trip_detail/edit_entry_screen.dart';
+import '../features/trip_detail/entry_action_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
@@ -121,6 +122,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                           mode: state.uri.queryParameters['mode'] == 'alternate'
                               ? ChangePoiMode.alternate
                               : ChangePoiMode.master,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'stop/:entryId/copy',
+                        builder: (context, state) => EntryActionScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId:
+                              int.tryParse(
+                                state.pathParameters['entryId'] ?? '',
+                              ) ??
+                              -1,
+                          action: EntryActionKind.copy,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'stop/:entryId/move',
+                        builder: (context, state) => EntryActionScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId:
+                              int.tryParse(
+                                state.pathParameters['entryId'] ?? '',
+                              ) ??
+                              -1,
+                          action: EntryActionKind.move,
                         ),
                       ),
                     ],

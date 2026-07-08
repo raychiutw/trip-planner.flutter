@@ -16,6 +16,8 @@
 | `/trips/:tripId/add-stop?day=N` | `AddEntryScreen` | tab 2 孫路由；相容入口 |
 | `/trips/:tripId/stop/:entryId/edit` | `EditEntryScreen` | tab 2 孫路由；時間/描述/刪除 slice |
 | `/trips/:tripId/stop/:entryId/change-poi?mode=alternate` | `ChangePoiScreen` | tab 2 孫路由；預設置換主景點,`mode=alternate` 加備選 |
+| `/trips/:tripId/stop/:entryId/copy` | `EntryActionScreen` | tab 2 孫路由；跨日複製 entry |
+| `/trips/:tripId/stop/:entryId/move` | `EntryActionScreen` | tab 2 孫路由；跨日移動 entry |
 | `/map` | `PlaceholderScreen('全域地圖')` | tab 3(P1 待實作) |
 | `/favorites` | `FavoritesScreen` | tab 4 |
 | `/favorites/:favoriteId/add-to-trip` | `AddPoiFavoriteToTripScreen` | tab 4 子路由 |
