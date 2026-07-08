@@ -59,7 +59,7 @@ wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.t
 
 ### OCC
 
-models 帶 `version` 欄位;後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用。P0 唯讀未用到,P1 Entry CRUD 會用。
+models 帶 `version` 欄位;後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用。Entry edit/move 與 POI mutation 目前已在畫面層重抓 entry,用最新 `version` / `entryPoisVersion` retry 同一個操作一次。
 
 ## 測試慣例
 

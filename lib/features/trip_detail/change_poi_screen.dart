@@ -245,21 +245,10 @@ class _ChangePoiScreenState extends ConsumerState<ChangePoiScreen> {
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
+      await _submitSearchResultWithRetry(repository, entry, result);
       if (_isAlternate) {
-        await repository.addEntryAlternateFromSearchResult(
-          tripId: widget.tripId,
-          entryId: widget.entryId,
-          poi: result,
-          entryPoisVersion: entry.entryPoisVersion,
-        );
         _afterAlternateMutation();
       } else {
-        await repository.replaceEntryMasterPoiFromSearchResult(
-          tripId: widget.tripId,
-          entryId: widget.entryId,
-          poi: result,
-          entryPoisVersion: entry.entryPoisVersion,
-        );
         _afterMasterMutation(repository);
       }
     } on ApiError catch (error) {
@@ -281,21 +270,10 @@ class _ChangePoiScreenState extends ConsumerState<ChangePoiScreen> {
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
+      await _submitFavoriteWithRetry(repository, entry, favorite);
       if (_isAlternate) {
-        await repository.addEntryAlternateWithPoiId(
-          tripId: widget.tripId,
-          entryId: widget.entryId,
-          poiId: favorite.poiId,
-          entryPoisVersion: entry.entryPoisVersion,
-        );
         _afterAlternateMutation();
       } else {
-        await repository.replaceEntryMasterPoiWithPoiId(
-          tripId: widget.tripId,
-          entryId: widget.entryId,
-          poiId: favorite.poiId,
-          entryPoisVersion: entry.entryPoisVersion,
-        );
         _afterMasterMutation(repository);
       }
     } on ApiError catch (error) {
@@ -304,6 +282,90 @@ class _ChangePoiScreenState extends ConsumerState<ChangePoiScreen> {
       _showSubmitError(null);
     } finally {
       if (mounted) setState(() => _submittingKey = null);
+    }
+  }
+
+  Future<void> _submitSearchResultWithRetry(
+    TripRepository repository,
+    TimelineEntry entry,
+    PoiSearchResult result,
+  ) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      if (_isAlternate) {
+        await repository.addEntryAlternateFromSearchResult(
+          tripId: widget.tripId,
+          entryId: widget.entryId,
+          poi: result,
+          entryPoisVersion: tokenEntry.entryPoisVersion,
+        );
+      } else {
+        await repository.replaceEntryMasterPoiFromSearchResult(
+          tripId: widget.tripId,
+          entryId: widget.entryId,
+          poi: result,
+          entryPoisVersion: tokenEntry.entryPoisVersion,
+        );
+      }
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<void> _submitFavoriteWithRetry(
+    TripRepository repository,
+    TimelineEntry entry,
+    PoiFavorite favorite,
+  ) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      if (_isAlternate) {
+        await repository.addEntryAlternateWithPoiId(
+          tripId: widget.tripId,
+          entryId: widget.entryId,
+          poiId: favorite.poiId,
+          entryPoisVersion: tokenEntry.entryPoisVersion,
+        );
+      } else {
+        await repository.replaceEntryMasterPoiWithPoiId(
+          tripId: widget.tripId,
+          entryId: widget.entryId,
+          poiId: favorite.poiId,
+          entryPoisVersion: tokenEntry.entryPoisVersion,
+        );
+      }
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<TimelineEntry?> _fetchLatestEntryForRetry(
+    TripRepository repository,
+  ) async {
+    try {
+      return await repository.fetchEntry(widget.tripId, widget.entryId);
+    } on Exception {
+      return null;
     }
   }
 

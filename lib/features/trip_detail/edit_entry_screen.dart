@@ -191,10 +191,9 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
-      await repository.updateEntry(
-        widget.tripId,
-        widget.entryId,
-        expectedVersion: entry.version,
+      await _updateEntryWithRetry(
+        repository,
+        entry,
         startTime: startTime.isEmpty ? null : startTime,
         endTime: endTime.isEmpty ? null : endTime,
         description: description.isEmpty ? null : description,
@@ -276,12 +275,7 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
-      await repository.deleteEntryAlternate(
-        tripId: widget.tripId,
-        entryId: widget.entryId,
-        poiId: alternate.poiId,
-        entryPoisVersion: entry.entryPoisVersion,
-      );
+      await _deleteAlternateWithRetry(repository, entry, alternate.poiId);
       _refreshEntryPois();
     } on Object catch (error) {
       if (!mounted) return;
@@ -318,12 +312,7 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
-      await repository.reorderEntryAlternates(
-        tripId: widget.tripId,
-        entryId: widget.entryId,
-        orderedPoiIds: orderedPoiIds,
-        entryPoisVersion: entry.entryPoisVersion,
-      );
+      await _reorderAlternatesWithRetry(repository, entry, orderedPoiIds);
       _refreshEntryPois();
     } on Object catch (error) {
       if (!mounted) return;
@@ -332,6 +321,104 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
       });
     } finally {
       if (mounted) setState(() => _alternatePendingPoiId = null);
+    }
+  }
+
+  Future<void> _updateEntryWithRetry(
+    TripRepository repository,
+    TimelineEntry entry, {
+    required String? startTime,
+    required String? endTime,
+    required String? description,
+  }) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      await repository.updateEntry(
+        widget.tripId,
+        widget.entryId,
+        expectedVersion: tokenEntry.version,
+        startTime: startTime,
+        endTime: endTime,
+        description: description,
+      );
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<void> _deleteAlternateWithRetry(
+    TripRepository repository,
+    TimelineEntry entry,
+    int poiId,
+  ) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      await repository.deleteEntryAlternate(
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        poiId: poiId,
+        entryPoisVersion: tokenEntry.entryPoisVersion,
+      );
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<void> _reorderAlternatesWithRetry(
+    TripRepository repository,
+    TimelineEntry entry,
+    List<int> orderedPoiIds,
+  ) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      await repository.reorderEntryAlternates(
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        orderedPoiIds: orderedPoiIds,
+        entryPoisVersion: tokenEntry.entryPoisVersion,
+      );
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<TimelineEntry?> _fetchLatestEntryForRetry(
+    TripRepository repository,
+  ) async {
+    try {
+      return await repository.fetchEntry(widget.tripId, widget.entryId);
+    } on Exception {
+      return null;
     }
   }
 

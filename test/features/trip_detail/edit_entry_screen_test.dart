@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
@@ -24,6 +25,28 @@ void main() {
     source: 'google',
     version: 7,
     entryPoisVersion: '3',
+    master: EntryPoiInfo(
+      poiId: 501,
+      name: '首里城公園',
+      type: 'attraction',
+      note: '黃昏時段去',
+    ),
+    alternates: [
+      EntryPoiInfo(poiId: 502, name: '玉陵', type: 'attraction', sortOrder: 2),
+      EntryPoiInfo(poiId: 503, name: '識名園', type: 'attraction', sortOrder: 3),
+    ],
+  );
+  const refreshedEntry = TimelineEntry(
+    id: 101,
+    dayId: 11,
+    sortOrder: 0,
+    startTime: '10:00',
+    endTime: '11:30',
+    title: '首里城公園',
+    description: '世界遺產',
+    source: 'google',
+    version: 8,
+    entryPoisVersion: '4',
     master: EntryPoiInfo(
       poiId: 501,
       name: '首里城公園',
@@ -220,6 +243,72 @@ void main() {
     expect(find.text('編輯景點'), findsOneWidget);
   });
 
+  testWidgets('移除備選遇到 STALE_ENTRY 時重抓 entryPoisVersion 後 retry', (
+    tester,
+  ) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, 101)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: tripId,
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '3',
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 3, current 4',
+      ),
+    );
+    when(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: tripId,
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    ).thenAnswer(
+      (_) async => const EntryPoisMutationResult(
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '5',
+      ),
+    );
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-alt-delete-502')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '移除'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: tripId,
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: tripId,
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+  });
+
   testWidgets('調整備選順序時 PATCH reorder 並帶完整 poiId 順序', (tester) async {
     await tester.pumpWidget(buildRouterApp());
     await tester.pump();
@@ -237,6 +326,70 @@ void main() {
       ),
     ).called(1);
     expect(find.text('編輯景點'), findsOneWidget);
+  });
+
+  testWidgets('調整備選順序遇到 STALE_ENTRY 時重抓 entryPoisVersion 後 retry', (
+    tester,
+  ) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, 101)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: tripId,
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '3',
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 3, current 4',
+      ),
+    );
+    when(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: tripId,
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '4',
+      ),
+    ).thenAnswer(
+      (_) async => const EntryAlternatesReorderResult(
+        entryId: 101,
+        order: [503, 502],
+        entryPoisVersion: '5',
+      ),
+    );
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-alt-down-502')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: tripId,
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: tripId,
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
   });
 
   testWidgets('儲存時 PATCH entry 並帶 expectedVersion', (tester) async {
@@ -273,6 +426,96 @@ void main() {
       ),
     ).called(1);
     verify(() => mockTripRepository.recomputeTravel(tripId)).called(1);
+    expect(find.text('trip:$tripId'), findsOneWidget);
+  });
+
+  testWidgets('儲存遇到 STALE_ENTRY 時重抓 entry version 後 retry', (tester) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, 101)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.updateEntry(
+        tripId,
+        101,
+        expectedVersion: 7,
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        description: any(named: 'description'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 7, current 8',
+      ),
+    );
+    when(
+      () => mockTripRepository.updateEntry(
+        tripId,
+        101,
+        expectedVersion: 8,
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        description: any(named: 'description'),
+      ),
+    ).thenAnswer(
+      (_) async => const TimelineEntry(
+        id: 101,
+        dayId: 11,
+        sortOrder: 0,
+        startTime: '10:30',
+        endTime: '12:00',
+        title: '首里城公園',
+        description: '改成上午晚點去',
+        version: 9,
+      ),
+    );
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-entry-start-time')),
+      '10:30',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-entry-end-time')),
+      '12:00',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-entry-description')),
+      '改成上午晚點去',
+    );
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-entry-save')).last);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.updateEntry(
+        tripId,
+        101,
+        expectedVersion: 7,
+        startTime: '10:30',
+        endTime: '12:00',
+        description: '改成上午晚點去',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.updateEntry(
+        tripId,
+        101,
+        expectedVersion: 8,
+        startTime: '10:30',
+        endTime: '12:00',
+        description: '改成上午晚點去',
+      ),
+    ).called(1);
     expect(find.text('trip:$tripId'), findsOneWidget);
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
@@ -22,6 +23,16 @@ void main() {
     endTime: '11:30',
     title: '首里城公園',
     version: 7,
+    master: EntryPoiInfo(poiId: 501, name: '首里城公園', type: 'attraction'),
+  );
+  const refreshedEntry = TimelineEntry(
+    id: 101,
+    dayId: 11,
+    sortOrder: 0,
+    startTime: '10:00',
+    endTime: '11:30',
+    title: '首里城公園',
+    version: 8,
     master: EntryPoiInfo(poiId: 501, name: '首里城公園', type: 'attraction'),
   );
   const days = [
@@ -159,6 +170,73 @@ void main() {
     ).called(1);
     verify(
       () => mockTripRepository.recomputeTravel(tripId, dayNum: 2),
+    ).called(1);
+    expect(find.text('trip:$tripId'), findsOneWidget);
+  });
+
+  testWidgets('move 遇到 STALE_ENTRY 時重抓 entry version 後 retry', (tester) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, 101)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.moveEntry(
+        tripId: tripId,
+        entryId: 101,
+        targetDayId: 12,
+        expectedVersion: 7,
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 7, current 8',
+      ),
+    );
+    when(
+      () => mockTripRepository.moveEntry(
+        tripId: tripId,
+        entryId: 101,
+        targetDayId: 12,
+        expectedVersion: 8,
+      ),
+    ).thenAnswer(
+      (_) async => const TimelineEntry(
+        id: 101,
+        dayId: 12,
+        sortOrder: 2,
+        title: '首里城公園',
+        version: 9,
+      ),
+    );
+
+    await tester.pumpWidget(buildRouterApp(EntryActionKind.move));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Day 2 · 那霸'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '移動'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.moveEntry(
+        tripId: tripId,
+        entryId: 101,
+        targetDayId: 12,
+        expectedVersion: 7,
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.moveEntry(
+        tripId: tripId,
+        entryId: 101,
+        targetDayId: 12,
+        expectedVersion: 8,
+      ),
     ).called(1);
     expect(find.text('trip:$tripId'), findsOneWidget);
   });

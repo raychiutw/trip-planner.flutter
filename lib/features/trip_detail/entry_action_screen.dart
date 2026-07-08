@@ -155,12 +155,7 @@ class _EntryActionScreenState extends ConsumerState<EntryActionScreen> {
           sourceDayNum: null,
         );
       } else {
-        await repository.moveEntry(
-          tripId: widget.tripId,
-          entryId: widget.entryId,
-          targetDayId: targetDay.id,
-          expectedVersion: entry.version,
-        );
+        await _moveEntryWithRetry(repository, entry, targetDay.id);
         _afterMutation(
           repository,
           targetDayNum: targetDay.dayNum,
@@ -173,6 +168,44 @@ class _EntryActionScreenState extends ConsumerState<EntryActionScreen> {
       _showSubmitError(null);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _moveEntryWithRetry(
+    TripRepository repository,
+    TimelineEntry entry,
+    int targetDayId,
+  ) async {
+    Future<void> send(TimelineEntry tokenEntry) async {
+      await repository.moveEntry(
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        targetDayId: targetDayId,
+        expectedVersion: tokenEntry.version,
+      );
+    }
+
+    try {
+      await send(entry);
+    } on ApiError catch (error, stackTrace) {
+      if (error.code != 'STALE_ENTRY') {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      final latest = await _fetchLatestEntryForRetry(repository);
+      if (latest == null) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      await send(latest);
+    }
+  }
+
+  Future<TimelineEntry?> _fetchLatestEntryForRetry(
+    TripRepository repository,
+  ) async {
+    try {
+      return await repository.fetchEntry(widget.tripId, widget.entryId);
+    } on Exception {
+      return null;
     }
   }
 

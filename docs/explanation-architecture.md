@@ -98,7 +98,7 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 
 ## OCC(樂觀並行控制)
 
-`TripDay`/`TimelineEntry`/notes row 都帶 `version` 欄位。後端 PATCH 要求 `expectedVersion`,版本不符回 409 `STALE_ENTRY`,client 應重抓再套用。P0 全唯讀所以尚未用到,但 model 已保留 `version` — P1 做 Entry CRUD 時直接可用。
+`TripDay`/`TimelineEntry`/notes row 都帶 `version` 欄位。後端 PATCH 要求 `expectedVersion`,版本不符回 409 `STALE_ENTRY`,client 應重抓再套用。Entry edit/move 使用 `version`,POI master/alternates mutation 使用 `entryPoisVersion`;畫面收到 stale 後會重抓 entry,再用最新 token retry 同一個使用者操作一次。
 
 ## 測試策略
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
@@ -24,6 +25,17 @@ void main() {
     title: '首里城公園',
     version: 7,
     entryPoisVersion: '3',
+    master: EntryPoiInfo(poiId: 501, name: '首里城公園', type: 'attraction'),
+  );
+  const refreshedEntry = TimelineEntry(
+    id: entryId,
+    dayId: 11,
+    sortOrder: 0,
+    startTime: '10:00',
+    endTime: '11:30',
+    title: '首里城公園',
+    version: 7,
+    entryPoisVersion: '4',
     master: EntryPoiInfo(poiId: 501, name: '首里城公園', type: 'attraction'),
   );
   const searchResult = PoiSearchResult(
@@ -166,6 +178,75 @@ void main() {
     expect(find.text('trip:$tripId'), findsOneWidget);
   });
 
+  testWidgets('置換主景點遇到 STALE_ENTRY 時重抓 entryPoisVersion 後 retry', (
+    tester,
+  ) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, entryId)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.replaceEntryMasterPoiFromSearchResult(
+        tripId: tripId,
+        entryId: entryId,
+        poi: searchResult,
+        entryPoisVersion: '3',
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 3, current 4',
+      ),
+    );
+    when(
+      () => mockTripRepository.replaceEntryMasterPoiFromSearchResult(
+        tripId: tripId,
+        entryId: entryId,
+        poi: searchResult,
+        entryPoisVersion: '4',
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('change-poi-search-input')),
+      '玉陵',
+    );
+    await tester.tap(find.byTooltip('搜尋'));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(
+      find.byKey(const ValueKey('change-poi-submit-search-ChIJ-tamaudun')),
+    );
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.replaceEntryMasterPoiFromSearchResult(
+        tripId: tripId,
+        entryId: entryId,
+        poi: searchResult,
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.replaceEntryMasterPoiFromSearchResult(
+        tripId: tripId,
+        entryId: entryId,
+        poi: searchResult,
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+    expect(find.text('trip:$tripId'), findsOneWidget);
+  });
+
   testWidgets('收藏可加為備選並回到 edit screen', (tester) async {
     await tester.pumpWidget(buildRouterApp(mode: 'alternate'));
     await tester.pump();
@@ -190,6 +271,77 @@ void main() {
         entryId: entryId,
         poiId: 502,
         entryPoisVersion: '3',
+      ),
+    ).called(1);
+    expect(find.text('edit:$entryId'), findsOneWidget);
+  });
+
+  testWidgets('收藏加入備選遇到 STALE_ENTRY 時重抓 entryPoisVersion 後 retry', (
+    tester,
+  ) async {
+    var fetchCount = 0;
+    when(() => mockTripRepository.fetchEntry(tripId, entryId)).thenAnswer((
+      _,
+    ) async {
+      fetchCount++;
+      return fetchCount == 1 ? entry : refreshedEntry;
+    });
+    when(
+      () => mockTripRepository.addEntryAlternateWithPoiId(
+        tripId: tripId,
+        entryId: entryId,
+        poiId: 502,
+        entryPoisVersion: '3',
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 3, current 4',
+      ),
+    );
+    when(
+      () => mockTripRepository.addEntryAlternateWithPoiId(
+        tripId: tripId,
+        entryId: entryId,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    ).thenAnswer(
+      (_) async => const EntryPoisMutationResult(
+        entryId: entryId,
+        poiId: 502,
+        sortOrder: 2,
+        entryPoisVersion: '5',
+      ),
+    );
+
+    await tester.pumpWidget(buildRouterApp(mode: 'alternate'));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('收藏'));
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(
+      find.byKey(const ValueKey('change-poi-submit-favorite-88')),
+    );
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.addEntryAlternateWithPoiId(
+        tripId: tripId,
+        entryId: entryId,
+        poiId: 502,
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.addEntryAlternateWithPoiId(
+        tripId: tripId,
+        entryId: entryId,
+        poiId: 502,
+        entryPoisVersion: '4',
       ),
     ).called(1);
     expect(find.text('edit:$entryId'), findsOneWidget);

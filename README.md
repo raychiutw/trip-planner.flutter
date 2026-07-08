@@ -13,7 +13,7 @@
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
 - 帳號（profile、統計、登出）
 
-**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice；建立/編輯行程、AI 聊天、全域地圖、共編邀請仍待辦。
+**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice，並支援 `STALE_ENTRY` 重抓 retry；建立/編輯行程、AI 聊天、全域地圖、共編邀請仍待辦。
 **P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
 ## 開發
