@@ -181,6 +181,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         ),
                       ),
                       GoRoute(
+                        path: 'stop/:entryId/map',
+                        builder: (context, state) => TripMapScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          focusEntryId:
+                              int.tryParse(
+                                state.pathParameters['entryId'] ?? '',
+                              ) ??
+                              -1,
+                        ),
+                      ),
+                      GoRoute(
                         path: 'stop/:entryId/edit',
                         builder: (context, state) => EditEntryScreen(
                           tripId: state.pathParameters['tripId']!,

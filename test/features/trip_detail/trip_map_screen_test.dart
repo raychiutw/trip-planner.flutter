@@ -64,29 +64,40 @@ final _dayTwo = TripDay(
   ],
 );
 
-Widget _buildScreen(List<TripDay> days) {
+Widget _buildScreen(
+  List<TripDay> days, {
+  String initialLocation = '/trips/trip-1/map',
+}) {
   final router = GoRouter(
+    initialLocation: initialLocation,
     routes: [
       GoRoute(
-        path: '/',
+        path: '/trips/:tripId/map',
         builder: (context, state) => TripMapScreen(
-          tripId: 'trip-1',
+          tripId: state.pathParameters['tripId']!,
+          tileProvider: _TransparentTileProvider(),
+        ),
+      ),
+      GoRoute(
+        path: '/trips/:tripId/stop/:entryId/map',
+        builder: (context, state) => TripMapScreen(
+          tripId: state.pathParameters['tripId']!,
+          focusEntryId: int.tryParse(state.pathParameters['entryId'] ?? ''),
           tileProvider: _TransparentTileProvider(),
         ),
       ),
     ],
   );
   return ProviderScope(
-    overrides: [
-      tripDaysProvider.overrideWith((ref, tripId) async => days),
-    ],
+    overrides: [tripDaysProvider.overrideWith((ref, tripId) async => days)],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
 }
 
 void main() {
-  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution',
-      (tester) async {
+  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
+    tester,
+  ) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -133,6 +144,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
+  });
+
+  testWidgets('focus route 初載切到 entry 所在日並只顯示該日 pins/cards', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], initialLocation: '/trips/trip-1/stop/21/map'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(find.text('首里城'), findsNothing);
   });
 
   testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {

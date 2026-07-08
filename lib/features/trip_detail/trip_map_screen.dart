@@ -24,9 +24,17 @@ const List<Color> kDayPinPalette = [
 
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ flutter_map OSM ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
-  const TripMapScreen({super.key, required this.tripId, this.tileProvider});
+  const TripMapScreen({
+    super.key,
+    required this.tripId,
+    this.focusEntryId,
+    this.tileProvider,
+  });
 
   final String tripId;
+
+  /// Optional entry id used by `stop/:entryId/map` to focus a specific pin.
+  final int? focusEntryId;
 
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
   final TileProvider? tileProvider;
@@ -35,7 +43,11 @@ class TripMapScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('行程地圖')),
-      body: TripMapContent(tripId: tripId, tileProvider: tileProvider),
+      body: TripMapContent(
+        tripId: tripId,
+        focusEntryId: focusEntryId,
+        tileProvider: tileProvider,
+      ),
     );
   }
 }
@@ -45,11 +57,16 @@ class TripMapContent extends ConsumerWidget {
   const TripMapContent({
     super.key,
     required this.tripId,
+    this.focusEntryId,
     this.tileProvider,
     this.emptyMessage = '此行程尚無地點座標',
   });
 
   final String tripId;
+
+  /// Optional entry id used to initialize the selected day and map camera.
+  final int? focusEntryId;
+
   final TileProvider? tileProvider;
   final String emptyMessage;
 
@@ -66,6 +83,7 @@ class TripMapContent extends ConsumerWidget {
       ),
       data: (days) => _TripMapView(
         days: days,
+        focusEntryId: focusEntryId,
         tileProvider: tileProvider,
         emptyMessage: emptyMessage,
       ),
@@ -97,11 +115,13 @@ class _DayPin {
 class _TripMapView extends StatefulWidget {
   const _TripMapView({
     required this.days,
+    required this.focusEntryId,
     required this.emptyMessage,
     this.tileProvider,
   });
 
   final List<TripDay> days;
+  final int? focusEntryId;
   final String emptyMessage;
   final TileProvider? tileProvider;
 
@@ -113,10 +133,28 @@ class _TripMapViewState extends State<_TripMapView> {
   final MapController _mapController = MapController();
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
-  int _selectedTabIndex = 0;
+  late int _selectedTabIndex;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
   bool _mapIsReady = false;
+  bool _didApplyInitialFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTabIndex = _tabIndexForEntry(widget.focusEntryId) ?? 0;
+  }
+
+  @override
+  void didUpdateWidget(covariant _TripMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusEntryId != widget.focusEntryId ||
+        !identical(oldWidget.days, widget.days)) {
+      _didApplyInitialFocus = false;
+      _selectedTabIndex = _tabIndexForEntry(widget.focusEntryId) ?? 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+    }
+  }
 
   @override
   void dispose() {
@@ -159,6 +197,26 @@ class _TripMapViewState extends State<_TripMapView> {
     return pinsByDay[tabIndex - 1];
   }
 
+  int? _tabIndexForEntry(int? entryId) {
+    if (entryId == null) return null;
+    for (final (dayIndex, day) in widget.days.indexed) {
+      if (day.timeline.any((entry) => entry.id == entryId)) {
+        return dayIndex + 1;
+      }
+    }
+    return null;
+  }
+
+  _DayPin? _pinForEntry(int? entryId) {
+    if (entryId == null) return null;
+    for (final dayPins in _pinsByDay) {
+      for (final pin in dayPins) {
+        if (pin.entry.id == entryId) return pin;
+      }
+    }
+    return null;
+  }
+
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
@@ -178,6 +236,18 @@ class _TripMapViewState extends State<_TripMapView> {
   void _focusPin(_DayPin pin) {
     if (!_mapIsReady) return;
     _mapController.move(pin.point, 16);
+  }
+
+  void _applyInitialFocus() {
+    if (!mounted || !_mapIsReady || _didApplyInitialFocus) return;
+    _didApplyInitialFocus = true;
+
+    final focusedPin = _pinForEntry(widget.focusEntryId);
+    if (focusedPin != null) {
+      _focusPin(focusedPin);
+      return;
+    }
+    _fitToPoints([for (final pin in _pinsForTab(_selectedTabIndex)) pin.point]);
   }
 
   @override
@@ -288,7 +358,10 @@ class _TripMapViewState extends State<_TripMapView> {
           padding: const EdgeInsets.all(TpSpacing.s10),
           maxZoom: 16,
         ),
-        onMapReady: () => _mapIsReady = true,
+        onMapReady: () {
+          _mapIsReady = true;
+          _applyInitialFocus();
+        },
       ),
       children: [
         TileLayer(

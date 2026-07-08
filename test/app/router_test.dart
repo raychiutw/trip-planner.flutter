@@ -29,6 +29,7 @@ import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
 import 'package:tripline/features/trip_detail/trip_health_screen.dart';
+import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/chat.dart';
@@ -100,7 +101,50 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
     ),
   );
   when(() => mockTripRepository.fetchDays(any())).thenAnswer(
-    (_) async => const [TripDay(id: 11, dayNum: 2, title: '那霸', version: 1)],
+    (_) async => const [
+      TripDay(
+        id: 10,
+        dayNum: 1,
+        title: '北部',
+        version: 1,
+        timeline: [
+          TimelineEntry(
+            id: 51,
+            sortOrder: 0,
+            title: '美麗海水族館',
+            version: 1,
+            startTime: '10:00',
+            master: EntryPoiInfo(
+              poiId: 501,
+              name: '美麗海水族館',
+              lat: 26.694,
+              lng: 127.878,
+            ),
+          ),
+        ],
+      ),
+      TripDay(
+        id: 11,
+        dayNum: 2,
+        title: '那霸',
+        version: 1,
+        timeline: [
+          TimelineEntry(
+            id: 101,
+            sortOrder: 0,
+            title: '首里城公園',
+            version: 1,
+            startTime: '09:00',
+            master: EntryPoiInfo(
+              poiId: 601,
+              name: '首里城公園',
+              lat: 26.217,
+              lng: 127.719,
+            ),
+          ),
+        ],
+      ),
+    ],
   );
   when(
     () => mockTripRepository.fetchTripHealthReport(any()),
@@ -311,6 +355,25 @@ void main() {
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
     expect(find.text('AI 健檢'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/stop/:entryId/map 進入行程地圖', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/stop/101/map');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripMapScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

@@ -385,7 +385,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）
-// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
+// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/stop/:entryId/map（TripMapScreen focus route）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // redirect：未登入(authState data null) 且非 public shell 外 route → /login；已登入在 /login → /trips
 
@@ -418,7 +418,7 @@ class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/a
 class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/edit_entry_screen.dart（接受 tripId, entryId）
 class ChangePoiScreen extends ConsumerStatefulWidget;  // features/trip_detail/change_poi_screen.dart（接受 tripId, entryId, mode）
 class EntryActionScreen extends ConsumerStatefulWidget; // features/trip_detail/entry_action_screen.dart（接受 tripId, entryId, action）
-class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
+class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM；接受 tripId, focusEntryId?）
 class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
