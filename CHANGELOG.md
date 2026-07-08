@@ -8,7 +8,7 @@
 
 - **P0 帳號頁 parity**:AccountScreen 新增 displayName inline 編輯；失焦或送出會呼叫 `PATCH /account/profile`，成功後同步刷新全域登入使用者狀態，空白會清除顯示名稱，失敗時保留欄位錯誤。外觀/通知 rows 改為實際導航，新增 `/account/appearance`、`/account/notifications` 與 `/settings/*` alias；外觀頁可切換 `ThemeMode`，通知頁可調整本機通知偏好。
 - **P0 時間軸 parity**:TripTimelineScreen 支援 `?focus=<entryId>` deep link，資料載入後會捲到指定 entry；手動捲動 timeline 時也會以 scroll-spy 同步 active day pill；若行程日期包含今天，初載會自動定位到今日 day。
-- **P0 地圖 parity**:TripMapScreen 新增 `/trips/:tripId/stop/:entryId/map` focus route，初載會切到 entry 所在日並聚焦該 pin。
+- **P0 地圖 parity**:TripMapScreen 新增 `/trips/:tripId/stop/:entryId/map` focus route，初載會切到 entry 所在日並聚焦該 pin；總覽點 pin 也會自動切到該 pin 所在 day。
 - **P0 行程清單 parity**:TripsList 新增分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序（最新編輯/出發日近/名稱）、filtered empty、TripCard action menu（編輯/共編/AI 健檢/筆記/分享/刪除）、尾端新增卡、JSON 匯入（512KB/schemaVersion 1 檢查）與分享連結管理（列出/建立/編輯/重新產生/關閉/刪除）；`TripSummary` 解析 owner/role/countries/start/end/updated/member/archive 等 `/my-trips` rich fields。
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 建立/編輯行程**:新增 `/trips/new` 與 `/trips/:tripId/edit`;TripsList AppBar/空狀態可建立行程,長按卡片可進入編輯行程,支援基本資料、目的地、日期、語言與發布狀態送出。編輯模式已接上 day management,可前/後新增行程日、補回缺漏日期、刪除 day 前顯示景點影響範圍,並以新的 Day 1 日期平移整段行程。

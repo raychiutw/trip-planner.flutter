@@ -36,7 +36,7 @@
 | TripsListScreen | TripsListPage（分類/搜尋/排序/action menu/JSON 匯入/ShareLink 第一波） | `GET /my-trips` rich summary（client-side filter/sort/search）、`DELETE /trips/:id`、`POST /trips/import`、`GET/POST/PATCH/DELETE /trips/:id/shares`、現有 trips child routes |
 | TripFormScreen | NewTripPage / EditTripPage（基本資料 + day management slice） | `POST /trips`、`GET /trips/:id`、`PUT /trips/:id`、`GET/POST /trips/:id/days`、`DELETE /trips/:id/days/:num`、`POST /trips/:id/days/shift` |
 | TripTimelineScreen | TripPage（embedded） | `GET /trips/:id` + `GET /trips/:id/days?all=1` + `GET/PATCH /trips/:id/segments`；支援 `?focus=<entryId>` 初載定位、今日自動定位與 scroll-spy active day |
-| TripMapScreen | MapPage | 共用 trip scope 資料（不重抓）；支援 `stop/:entryId/map` focus route |
+| TripMapScreen | MapPage | 共用 trip scope 資料（不重抓）；支援 `stop/:entryId/map` focus route 與 overview pin → day 切換 |
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes`、各 section CRUD、`POST /trips/:id/notes/:docType/generate` + request polling |
 | TripHealthScreen | TripHealthCheckPage | `GET/POST /trips/:id/health-check` + report polling |
 | AccountScreen / settings first wave | AccountPage / AppearanceSettingsPage / NotificationsSettingsPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout`、本機 theme/notification preferences |
@@ -50,7 +50,7 @@
 | ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/分享連結管理；TripTimelineScreen 已補 focus entry deep link、今日自動定位與 scroll-spy active day；TripMapScreen 已補 `stop/:entryId/map` focus route；AccountScreen 已補 displayName inline edit 與外觀/通知設定第一波；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
+P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/分享連結管理；TripTimelineScreen 已補 focus entry deep link、今日自動定位與 scroll-spy active day；TripMapScreen 已補 `stop/:entryId/map` focus route 與 overview pin → day 切換；AccountScreen 已補 displayName inline edit 與外觀/通知設定第一波；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
 P2：公開分享頁/列印/JSON 匯出、settings sessions / connected apps / developer apps、OAuth 生態、離線快取。
 
 ## 目錄結構

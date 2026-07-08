@@ -238,6 +238,14 @@ class _TripMapViewState extends State<_TripMapView> {
     _mapController.move(pin.point, 16);
   }
 
+  void _selectPin(_DayPin pin) {
+    final targetTabIndex = pin.dayIndex + 1;
+    if (_selectedTabIndex != targetTabIndex) {
+      setState(() => _selectedTabIndex = targetTabIndex);
+    }
+    _focusPin(pin);
+  }
+
   void _applyInitialFocus() {
     if (!mounted || !_mapIsReady || _didApplyInitialFocus) return;
     _didApplyInitialFocus = true;
@@ -381,25 +389,29 @@ class _TripMapViewState extends State<_TripMapView> {
 
   Marker _buildMarker(_DayPin pin) {
     return Marker(
-      key: ValueKey('map-pin-${pin.entry.id}'),
       point: pin.point,
       width: 32,
       height: 32,
-      child: Container(
-        decoration: BoxDecoration(
-          color: pin.color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          '${pin.pinNumber}',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            fontFeatures: [FontFeature.tabularFigures()],
-            color: Colors.white,
+      child: GestureDetector(
+        key: ValueKey('map-pin-${pin.entry.id}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _selectPin(pin),
+        child: Container(
+          decoration: BoxDecoration(
+            color: pin.color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '${pin.pinNumber}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+              fontFeatures: [FontFeature.tabularFigures()],
+              color: Colors.white,
+            ),
           ),
         ),
       ),

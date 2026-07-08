@@ -146,6 +146,22 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
   });
 
+  testWidgets('總覽點 pin 會切到該 entry 所在 day', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('map-pin-21')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(find.text('首里城'), findsNothing);
+  });
+
   testWidgets('focus route 初載切到 entry 所在日並只顯示該日 pins/cards', (tester) async {
     await tester.pumpWidget(
       _buildScreen([
