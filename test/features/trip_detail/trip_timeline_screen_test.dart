@@ -126,6 +126,7 @@ const _fakeDays = [
 Future<void> _pumpTimeline(
   WidgetTester tester, {
   String initialLocation = '/trips/$_tripId',
+  DateTime? today,
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
   FutureOr<List<TripSegment>> Function()? fetchSegments,
@@ -139,6 +140,7 @@ Future<void> _pumpTimeline(
         builder: (context, state) => TripTimelineScreen(
           tripId: state.pathParameters['tripId']!,
           focusEntryId: int.tryParse(state.uri.queryParameters['focus'] ?? ''),
+          today: today,
         ),
         routes: [
           GoRoute(
@@ -524,6 +526,15 @@ void main() {
     final focusedEntryTop = tester.getTopLeft(find.text('首里城公園')).dy;
     expect(focusedEntryTop, lessThan(500));
 
+    expect(_dayPillColor(tester, 2), TpColorsLight.accentSubtle);
+  });
+
+  testWidgets('今日日期初載自動定位到相同日期 day', (tester) async {
+    await _pumpTimeline(tester, today: DateTime(2026, 4, 24));
+    await tester.pumpAndSettle();
+
+    final todaySectionTop = tester.getTopLeft(find.text('南部文化')).dy;
+    expect(todaySectionTop, lessThan(360));
     expect(_dayPillColor(tester, 2), TpColorsLight.accentSubtle);
   });
 

@@ -19,12 +19,16 @@ class TripTimelineScreen extends ConsumerWidget {
     super.key,
     required this.tripId,
     this.focusEntryId,
+    this.today,
   });
 
   final String tripId;
 
   /// Optional entry id to scroll into view after timeline data loads.
   final int? focusEntryId;
+
+  /// Optional date used by tests to make today auto-scroll deterministic.
+  final DateTime? today;
 
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
@@ -76,6 +80,7 @@ class TripTimelineScreen extends ConsumerWidget {
             : _TimelineBody(
                 tripId: tripId,
                 focusEntryId: focusEntryId,
+                today: today,
                 days: days,
                 segments: segmentsAsync.value ?? const <TripSegment>[],
                 showSegmentError: segmentsAsync.hasError,
@@ -99,6 +104,7 @@ class _TimelineBody extends StatefulWidget {
   const _TimelineBody({
     required this.tripId,
     required this.focusEntryId,
+    required this.today,
     required this.days,
     required this.segments,
     required this.showSegmentError,
@@ -107,6 +113,7 @@ class _TimelineBody extends StatefulWidget {
 
   final String tripId;
   final int? focusEntryId;
+  final DateTime? today;
   final List<TripDay> days;
   final List<TripSegment> segments;
   final bool showSegmentError;
@@ -131,7 +138,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
       ..addListener(_syncActiveDayFromScroll);
     _rebuildScrollKeys();
     _activeDayNum =
-        _dayNumForEntry(widget.focusEntryId) ??
+        _initialTargetDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
     _scheduleInitialFocus();
   }
@@ -143,11 +150,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
       _rebuildScrollKeys();
     }
     if (oldWidget.focusEntryId != widget.focusEntryId ||
+        oldWidget.today != widget.today ||
         !identical(oldWidget.days, widget.days)) {
       _didApplyInitialFocus = false;
-      final focusedDayNum = _dayNumForEntry(widget.focusEntryId);
-      if (focusedDayNum != null && focusedDayNum != _activeDayNum) {
-        _activeDayNum = focusedDayNum;
+      final targetDayNum = _initialTargetDayNum();
+      if (targetDayNum != null && targetDayNum != _activeDayNum) {
+        _activeDayNum = targetDayNum;
       }
       _scheduleInitialFocus();
     }
@@ -179,29 +187,56 @@ class _TimelineBodyState extends State<_TimelineBody> {
     return null;
   }
 
+  int? _dayNumForDate(DateTime date) {
+    final dateKey = _dateKey(date);
+    for (final day in widget.days) {
+      if (day.date == dateKey) return day.dayNum;
+    }
+    return null;
+  }
+
+  int? _initialTargetDayNum() {
+    return _dayNumForEntry(widget.focusEntryId) ??
+        _dayNumForDate(widget.today ?? DateTime.now());
+  }
+
   void _scheduleInitialFocus() {
-    if (widget.focusEntryId == null || _didApplyInitialFocus) return;
+    if (_didApplyInitialFocus || _initialTargetDayNum() == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
   }
 
   void _applyInitialFocus() {
     if (!mounted || _didApplyInitialFocus) return;
     final focusEntryId = widget.focusEntryId;
-    if (focusEntryId == null) return;
-
-    final entryContext = _entryKeys[focusEntryId]?.currentContext;
-    if (entryContext == null) return;
-
-    _didApplyInitialFocus = true;
     final focusedDayNum = _dayNumForEntry(focusEntryId);
-    if (focusedDayNum != null && focusedDayNum != _activeDayNum) {
-      setState(() => _activeDayNum = focusedDayNum);
+    final entryContext = focusEntryId == null
+        ? null
+        : _entryKeys[focusEntryId]?.currentContext;
+    if (entryContext != null) {
+      _didApplyInitialFocus = true;
+      if (focusedDayNum != null && focusedDayNum != _activeDayNum) {
+        setState(() => _activeDayNum = focusedDayNum);
+      }
+      Scrollable.ensureVisible(
+        entryContext,
+        duration: TpMotion.normal,
+        curve: TpMotion.appleEase,
+        alignment: 0.08,
+      );
+      return;
+    }
+
+    final todayDayNum = _dayNumForDate(widget.today ?? DateTime.now());
+    final sectionContext = _daySectionKeys[todayDayNum]?.currentContext;
+    if (todayDayNum == null || sectionContext == null) return;
+    _didApplyInitialFocus = true;
+    if (todayDayNum != _activeDayNum) {
+      setState(() => _activeDayNum = todayDayNum);
     }
     Scrollable.ensureVisible(
-      entryContext,
+      sectionContext,
       duration: TpMotion.normal,
       curve: TpMotion.appleEase,
-      alignment: 0.08,
     );
   }
 
@@ -474,6 +509,12 @@ class _SegmentErrorBanner extends StatelessWidget {
 
 String _segmentPairKey(int fromEntryId, int toEntryId) {
   return '$fromEntryId:$toEntryId';
+}
+
+String _dateKey(DateTime date) {
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '${date.year}-$month-$day';
 }
 
 /// loading skeleton：非動畫灰階條列。
