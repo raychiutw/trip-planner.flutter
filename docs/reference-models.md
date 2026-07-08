@@ -108,6 +108,39 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 | `master` | `EntryPoiInfo?` | 主 POI |
 | `alternates` | `List<EntryPoiInfo>` | 備選 POI,預設 `[]` |
 
+## poi.dart
+
+### PoiFavoriteUsage — 收藏出現在哪些行程
+
+`tripId: String`、`tripName: String`、`dayNum: int?`、`dayDate: String?`、`entryId: int?`。
+
+### PoiFavorite — `GET /poi-favorites`
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `id` | `int` | 收藏 row id |
+| `userId` | `String` | owner user id |
+| `poiId` | `int` | pois table id |
+| `favoritedAt` | `String` | ISO datetime 字串 |
+| `note` | `String?` | 收藏備註 |
+| `poiName`、`poiAddress`、`poiType` | `String?` | JOIN pois 欄位 |
+| `poiLat`、`poiLng`、`poiRating` | `double?` | 數字走 `num?.toDouble()` |
+| `usages` | `List<PoiFavoriteUsage>` | 缺漏 → `[]` |
+
+getter `displayName`: `poiName` trim 後非空 → 否則 `POI #$poiId`。
+
+### PoiSearchResult — `GET /poi-search`
+
+此 endpoint 是少數仍回 snake_case 的 wire shape:`place_id`、`country_name`、`business_status`。Dart 欄位為 `placeId`、`countryName`、`businessStatus`。
+
+必填欄位:`placeId`、`name`、`lat`、`lng`;選填欄位:`address`、`category`、`country`、`countryName`、`rating`、`businessStatus`。
+
+### PoiFavoriteAddToTripResult — `POST /poi-favorites/:id/add-to-trip`
+
+`ok: bool`、`entryId: int`、`dayId: int`、`sortOrder: int`、`startTime: String`、`endTime: String`、`note: String?`。
+
+helper `mapPoiCategoryToType` 會把 Google primaryType / 既有 `poiType` 映射到後端白名單:`hotel`、`restaurant`、`shopping`、`parking`、`attraction`、`transport`、`activity`、`other`。`poiTypeLabel` 回 zh-TW 類型文案。
+
 ## notes.dart
 
 `GET /trips/:id/notes` 回應的 5 區聚合。5 個 row class 共通欄位:`id: int`、`sortOrder: int`、`version: int`;文字欄位 DB 為 `NOT NULL DEFAULT ''`,缺漏一律預設 `''`(非 null)。

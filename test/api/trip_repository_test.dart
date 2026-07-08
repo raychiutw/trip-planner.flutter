@@ -4,6 +4,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/poi.dart';
 
 void main() {
   late Dio dio;
@@ -13,8 +14,7 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    final apiClient =
-        ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
     tripRepository = TripRepository(client: apiClient);
   });
 
@@ -58,8 +58,7 @@ void main() {
     expect(publishedTrips.single.published, isTrue);
   });
 
-  test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）',
-      () async {
+  test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray',
       (server) => server.reply(200, {
@@ -198,18 +197,14 @@ void main() {
       }),
     );
 
-    final tripNotes =
-        await tripRepository.fetchNotes('okinawa-trip-2026-Ray');
+    final tripNotes = await tripRepository.fetchNotes('okinawa-trip-2026-Ray');
 
     expect(tripNotes.flights.single.flightNo, 'IT232');
     expect(tripNotes.lodgings, isEmpty);
   });
 
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
-    dioAdapter.onDelete(
-      '/trips/old-trip',
-      (server) => server.reply(204, null),
-    );
+    dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 
     await expectLater(tripRepository.deleteTrip('old-trip'), completes);
   });
@@ -244,9 +239,168 @@ void main() {
       data: {'displayName': '新名字'},
     );
 
-    final updatedUser =
-        await tripRepository.updateProfile(displayName: '新名字');
+    final updatedUser = await tripRepository.updateProfile(displayName: '新名字');
 
     expect(updatedUser.displayName, '新名字');
+  });
+
+  test('fetchPoiFavorites：GET /poi-favorites 解析收藏清單', () async {
+    dioAdapter.onGet(
+      '/poi-favorites',
+      (server) => server.reply(200, [
+        {
+          'id': 77,
+          'userId': 'user-1',
+          'poiId': 501,
+          'favoritedAt': '2026-07-08T10:00:00Z',
+          'note': '黃昏時段去',
+          'poiName': '首里城公園',
+          'poiAddress': '沖繩縣那霸市',
+          'poiLat': 26.217,
+          'poiLng': 127.719,
+          'poiType': 'attraction',
+          'poiRating': 4.4,
+          'usages': [
+            {
+              'tripId': 'okinawa-trip-2026',
+              'tripName': 'Okinawa',
+              'dayNum': 2,
+              'dayDate': '2026-04-24',
+              'entryId': 101,
+            },
+          ],
+        },
+      ]),
+    );
+
+    final favorites = await tripRepository.fetchPoiFavorites();
+
+    expect(favorites, hasLength(1));
+    expect(favorites.single.poiName, '首里城公園');
+    expect(favorites.single.usages.single.dayNum, 2);
+  });
+
+  test('searchPois：GET /poi-search 解析 results wrapper 與 query', () async {
+    dioAdapter.onGet(
+      '/poi-search',
+      (server) => server.reply(200, {
+        'results': [
+          {
+            'place_id': 'ChIJ-shuri',
+            'name': '首里城',
+            'address': '沖繩縣那霸市首里金城町',
+            'lat': 26.217,
+            'lng': 127.719,
+            'category': 'tourist_attraction',
+            'country': 'JP',
+            'country_name': '日本',
+            'rating': 4.4,
+            'business_status': 'OPERATIONAL',
+          },
+        ],
+      }),
+      queryParameters: {'q': '首里城', 'region': '沖繩', 'limit': '20'},
+    );
+
+    final results = await tripRepository.searchPois(query: '首里城', region: '沖繩');
+
+    expect(results.single.placeId, 'ChIJ-shuri');
+    expect(results.single.countryName, '日本');
+    expect(results.single.rating, 4.4);
+  });
+
+  test('findOrCreatePoi：POST /pois/find-or-create 映射 type 後回 POI id', () async {
+    const searchResult = PoiSearchResult(
+      placeId: 'ChIJ-shuri',
+      name: '首里城',
+      address: '沖繩縣那霸市首里金城町',
+      lat: 26.217,
+      lng: 127.719,
+      category: 'tourist_attraction',
+      country: 'JP',
+      rating: 4.4,
+    );
+    dioAdapter.onPost(
+      '/pois/find-or-create',
+      (server) => server.reply(200, {'id': 501}),
+      data: {
+        'name': '首里城',
+        'type': 'attraction',
+        'lat': 26.217,
+        'lng': 127.719,
+        'address': '沖繩縣那霸市首里金城町',
+        'category': 'tourist_attraction',
+        'source': 'user-explore',
+        'country': 'JP',
+        'place_id': 'ChIJ-shuri',
+      },
+    );
+
+    final poiId = await tripRepository.findOrCreatePoi(searchResult);
+
+    expect(poiId, 501);
+  });
+
+  test('createPoiFavorite：POST /poi-favorites 回新增收藏', () async {
+    dioAdapter.onPost(
+      '/poi-favorites',
+      (server) => server.reply(201, {
+        'id': 88,
+        'userId': 'user-1',
+        'poiId': 501,
+        'favoritedAt': '2026-07-08T12:00:00Z',
+        'note': '想排進下午',
+      }),
+      data: {'poiId': 501, 'note': '想排進下午'},
+    );
+
+    final favorite = await tripRepository.createPoiFavorite(
+      poiId: 501,
+      note: '想排進下午',
+    );
+
+    expect(favorite.id, 88);
+    expect(favorite.note, '想排進下午');
+  });
+
+  test('deletePoiFavorite：DELETE /poi-favorites/:id（204 視為成功）', () async {
+    dioAdapter.onDelete(
+      '/poi-favorites/88',
+      (server) => server.reply(204, null),
+    );
+
+    await expectLater(tripRepository.deletePoiFavorite(88), completes);
+  });
+
+  test('addPoiFavoriteToTrip：POST /poi-favorites/:id/add-to-trip', () async {
+    dioAdapter.onPost(
+      '/poi-favorites/88/add-to-trip',
+      (server) => server.reply(201, {
+        'ok': true,
+        'entryId': 901,
+        'dayId': 11,
+        'sortOrder': 2,
+        'startTime': '09:00',
+        'endTime': '10:00',
+        'note': 'trip_segments 將由背景 /recompute-travel 計算填入',
+      }),
+      data: {
+        'tripId': 'okinawa-trip-2026',
+        'dayNum': 2,
+        'startTime': '09:00',
+        'endTime': '10:00',
+      },
+    );
+
+    final result = await tripRepository.addPoiFavoriteToTrip(
+      88,
+      tripId: 'okinawa-trip-2026',
+      dayNum: 2,
+      startTime: '09:00',
+      endTime: '10:00',
+    );
+
+    expect(result.entryId, 901);
+    expect(result.sortOrder, 2);
   });
 }

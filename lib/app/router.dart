@@ -8,6 +8,9 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
+import '../features/favorites/explore_screen.dart';
+import '../features/favorites/favorites_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
@@ -39,10 +42,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // 登入頁在 shell 外（無底部導航）
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -99,8 +99,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/favorites',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: '收藏'),
+                builder: (context, state) => const FavoritesScreen(),
+                routes: [
+                  GoRoute(
+                    path: ':favoriteId/add-to-trip',
+                    builder: (context, state) => AddPoiFavoriteToTripScreen(
+                      favoriteId:
+                          int.tryParse(state.pathParameters['favoriteId']!) ??
+                          -1,
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/explore',
+                builder: (context, state) => const ExploreScreen(),
               ),
             ],
           ),

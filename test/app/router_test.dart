@@ -10,8 +10,11 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/favorites/explore_screen.dart';
+import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/user.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
@@ -36,6 +39,9 @@ const _loggedInUser = UserInfo(
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
+  when(
+    mockTripRepository.fetchPoiFavorites,
+  ).thenAnswer((_) async => const <PoiFavorite>[]);
 
   final container = ProviderContainer(
     overrides: [
@@ -95,6 +101,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /favorites 進入 FavoritesScreen', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/favorites');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FavoritesScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /explore 進入 ExploreScreen', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/explore');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ExploreScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }

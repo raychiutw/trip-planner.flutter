@@ -3,6 +3,7 @@ library;
 
 import '../models/day.dart';
 import '../models/notes.dart';
+import '../models/poi.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -17,8 +18,9 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips() async {
     final responseBody = await _client.get('/my-trips');
     return (responseBody as List<dynamic>)
-        .map((tripJson) =>
-            TripSummary.fromJson(tripJson as Map<String, dynamic>))
+        .map(
+          (tripJson) => TripSummary.fromJson(tripJson as Map<String, dynamic>),
+        )
         .toList();
   }
 
@@ -32,8 +34,7 @@ class TripRepository {
 
   /// GET /trips/:id。
   Future<Trip> fetchTrip(String id) async {
-    final responseBody =
-        await _client.get('/trips/${Uri.encodeComponent(id)}');
+    final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
     return Trip.fromJson(responseBody as Map<String, dynamic>);
   }
 
@@ -50,8 +51,9 @@ class TripRepository {
 
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async {
-    final responseBody =
-        await _client.get('/trips/${Uri.encodeComponent(id)}/notes');
+    final responseBody = await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/notes',
+    );
     return TripNotes.fromJson(responseBody as Map<String, dynamic>);
   }
 
@@ -72,5 +74,100 @@ class TripRepository {
       body: {'displayName': displayName},
     );
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /poi-favorites。
+  Future<List<PoiFavorite>> fetchPoiFavorites() async {
+    final responseBody = await _client.get('/poi-favorites');
+    return (responseBody as List<dynamic>)
+        .map(
+          (favoriteJson) =>
+              PoiFavorite.fromJson(favoriteJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// GET /poi-search?q=...&region=...&limit=...。
+  Future<List<PoiSearchResult>> searchPois({
+    required String query,
+    String? region,
+    int limit = 20,
+  }) async {
+    final trimmedQuery = query.trim();
+    final trimmedRegion = region?.trim();
+    final responseBody = await _client.get(
+      '/poi-search',
+      query: {
+        'q': trimmedQuery,
+        if (trimmedRegion != null && trimmedRegion.isNotEmpty)
+          'region': trimmedRegion,
+        'limit': '$limit',
+      },
+    );
+    final results =
+        (responseBody as Map<String, dynamic>)['results'] as List<dynamic>;
+    return results
+        .map(
+          (resultJson) =>
+              PoiSearchResult.fromJson(resultJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// POST /pois/find-or-create，回傳 POI table id。
+  Future<int> findOrCreatePoi(PoiSearchResult poi) async {
+    final responseBody = await _client.post(
+      '/pois/find-or-create',
+      body: {
+        'name': poi.name,
+        'type': mapPoiCategoryToType(poi.category),
+        'lat': poi.lat,
+        'lng': poi.lng,
+        'address': poi.address ?? '',
+        'category': poi.category ?? '',
+        'source': 'user-explore',
+        'country': poi.country,
+        'place_id': poi.placeId,
+      },
+    );
+    return ((responseBody as Map<String, dynamic>)['id'] as num).toInt();
+  }
+
+  /// POST /poi-favorites。
+  Future<PoiFavorite> createPoiFavorite({
+    required int poiId,
+    String? note,
+  }) async {
+    final responseBody = await _client.post(
+      '/poi-favorites',
+      body: {'poiId': poiId, 'note': ?note},
+    );
+    return PoiFavorite.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /poi-favorites/:id。
+  Future<void> deletePoiFavorite(int id) =>
+      _client.delete('/poi-favorites/${Uri.encodeComponent('$id')}');
+
+  /// POST /poi-favorites/:id/add-to-trip。
+  Future<PoiFavoriteAddToTripResult> addPoiFavoriteToTrip(
+    int favoriteId, {
+    required String tripId,
+    required int dayNum,
+    required String startTime,
+    required String endTime,
+  }) async {
+    final responseBody = await _client.post(
+      '/poi-favorites/${Uri.encodeComponent('$favoriteId')}/add-to-trip',
+      body: {
+        'tripId': tripId,
+        'dayNum': dayNum,
+        'startTime': startTime,
+        'endTime': endTime,
+      },
+    );
+    return PoiFavoriteAddToTripResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
   }
 }

@@ -106,7 +106,7 @@ class AuthRepository {
 
 ## TripRepository(`trip_repository.dart`)
 
-對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。路徑參數一律 `Uri.encodeComponent` 編碼。
+對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`、`/api/poi-favorites`、`/api/poi-search`。路徑參數一律 `Uri.encodeComponent` 編碼。
 
 ```dart
 class TripRepository {
@@ -120,10 +120,23 @@ class TripRepository {
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
+  Future<List<PoiFavorite>> fetchPoiFavorites();         // GET /poi-favorites
+  Future<List<PoiSearchResult>> searchPois({required String query, String? region, int limit = 20}); // GET /poi-search
+  Future<int>               findOrCreatePoi(PoiSearchResult poi); // POST /pois/find-or-create
+  Future<PoiFavorite>       createPoiFavorite({required int poiId, String? note}); // POST /poi-favorites
+  Future<void>              deletePoiFavorite(int id);   // DELETE /poi-favorites/:id
+  Future<PoiFavoriteAddToTripResult> addPoiFavoriteToTrip(
+    int favoriteId, {
+    required String tripId,
+    required int dayNum,
+    required String startTime,
+    required String endTime,
+  }); // POST /poi-favorites/:id/add-to-trip
 }
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
+`addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 
 回傳的 model 結構見 [Models 參考](reference-models.md)。
 

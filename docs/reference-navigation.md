@@ -13,7 +13,9 @@
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/map` | `PlaceholderScreen('全域地圖')` | tab 3(P1 待實作) |
-| `/favorites` | `PlaceholderScreen('收藏')` | tab 4(P1 待實作) |
+| `/favorites` | `FavoritesScreen` | tab 4 |
+| `/favorites/:favoriteId/add-to-trip` | `AddPoiFavoriteToTripScreen` | tab 4 子路由 |
+| `/explore` | `ExploreScreen` | tab 4 secondary route |
 | `/account` | `AccountScreen` | tab 5 |
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。

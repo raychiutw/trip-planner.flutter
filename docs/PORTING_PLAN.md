@@ -38,9 +38,10 @@
 | TripMapScreen | MapPage | 共用 trip scope 資料（不重抓） |
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes` + 各 section CRUD |
 | AccountScreen | AccountPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout` |
-| ChatScreen / FavoritesScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
+| ChatScreen / GlobalMapScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
+| FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip` |
 
-P1（第二波）：收藏 + Explore、Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
+P1（第二波）：收藏 + Explore 已完成第一波（direct `/add-to-trip` 尚未）；Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構
@@ -59,8 +60,9 @@ lib/
   features/auth/            # LoginScreen
   features/trips/           # TripsListScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen + trip scope providers
+  features/favorites/       # FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen
   features/account/         # AccountScreen
-  features/shell/           # 5-tab scaffold + placeholder screens
+  features/shell/           # 5-tab scaffold + remaining placeholder screens
   widgets/                  # 共用：toast、confirm dialog、empty state、chips
 test/                       # 與 lib/ 鏡像
 ```

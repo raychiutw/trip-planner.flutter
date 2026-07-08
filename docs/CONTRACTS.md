@@ -148,8 +148,9 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 ```dart
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
-// /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesPlaceholderScreen) /account(AccountScreen)
+// /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）
+// favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart

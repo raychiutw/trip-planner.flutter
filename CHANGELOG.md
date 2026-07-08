@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程。
+
 ## [0.1.0] - 2026-06-10
 
 P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽自己的行程、逐日時間軸、地圖與筆記,資料與 web 版完全同步(共用同一套後端)。
