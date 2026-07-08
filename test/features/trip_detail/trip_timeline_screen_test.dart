@@ -130,6 +130,7 @@ Future<void> _pumpTimeline(
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
   FutureOr<List<TripSegment>> Function()? fetchSegments,
+  Stream<bool>? onlineStatus,
   TripRepository? repository,
 }) async {
   final router = GoRouter(
@@ -193,6 +194,8 @@ Future<void> _pumpTimeline(
         tripSegmentsProvider(_tripId).overrideWith(
           (ref) => (fetchSegments ?? () => const <TripSegment>[])(),
         ),
+        if (onlineStatus != null)
+          timelineOnlineProvider.overrideWith((ref) => onlineStatus),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -257,6 +260,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('health-page'), findsOneWidget);
+  });
+
+  testWidgets('離線時顯示 persistent offline banner', (tester) async {
+    await _pumpTimeline(tester, onlineStatus: Stream.value(false));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('timeline-offline-banner')),
+      findsOneWidget,
+    );
+    expect(find.text('目前是離線模式'), findsOneWidget);
+    expect(find.textContaining('快取資料'), findsOneWidget);
+  });
+
+  testWidgets('重連後重新整理 days 與 segments', (tester) async {
+    final onlineStatus = StreamController<bool>();
+    var fetchDaysAttempts = 0;
+    var fetchSegmentsAttempts = 0;
+    onlineStatus.add(false);
+
+    await _pumpTimeline(
+      tester,
+      onlineStatus: onlineStatus.stream,
+      fetchDays: () {
+        fetchDaysAttempts++;
+        return _fakeDays;
+      },
+      fetchSegments: () {
+        fetchSegmentsAttempts++;
+        return const <TripSegment>[];
+      },
+    );
+    await tester.pumpAndSettle();
+
+    expect(fetchDaysAttempts, 1);
+    expect(fetchSegmentsAttempts, 1);
+
+    onlineStatus.add(true);
+    await tester.pumpAndSettle();
+
+    expect(fetchDaysAttempts, 2);
+    expect(fetchSegmentsAttempts, 2);
+    await onlineStatus.close();
   });
 
   testWidgets('點新增景點 icon 以 go_router 導向 add-entry 頁', (tester) async {

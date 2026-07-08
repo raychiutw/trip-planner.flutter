@@ -18,7 +18,7 @@
 ## P0 parity debt
 
 - [x] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/filtered empty/TripCard action menu/尾端新增卡/JSON 匯入/分享連結管理(**Completed:** feature/favorites-explore)
-- [ ] TripTimelineScreen 補 web parity:offline banner/segment 背景同步細節（focus deep link、scroll-spy active day、今日自動定位、overflow actions 已完成）
+- [ ] TripTimelineScreen 補 web parity:segment 背景同步細節（offline banner、focus deep link、scroll-spy active day、今日自動定位、overflow actions 已完成）
 - [x] TripMapScreen 補 web parity:focus route、overview pin day switch、pin-card 雙向同步、polyline、定位/圖層 FAB(**Completed:** feature/favorites-explore)
 - [x] AccountScreen 補 web parity:displayName inline edit、外觀/通知 row 實際導航與 `/account/*`、`/settings/*` alias 第一波(**Completed:** feature/favorites-explore)
 

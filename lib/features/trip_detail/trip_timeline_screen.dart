@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/day.dart';
@@ -13,6 +14,16 @@ import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_pill.dart';
 
 enum _TimelineOverflowAction { health, collab }
+
+final timelineOnlineProvider = StreamProvider<bool>((ref) async* {
+  final connectivity = Connectivity();
+  bool hasNetwork(List<ConnectivityResult> results) {
+    return !results.contains(ConnectivityResult.none);
+  }
+
+  yield hasNetwork(await connectivity.checkConnectivity());
+  yield* connectivity.onConnectivityChanged.map(hasNetwork).distinct();
+});
 
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
@@ -42,8 +53,18 @@ class TripTimelineScreen extends ConsumerWidget {
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
+    final isOnline = ref.watch(timelineOnlineProvider).value ?? true;
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
+
+    ref.listen<AsyncValue<bool>>(timelineOnlineProvider, (previous, next) {
+      final wasOnline = previous?.value ?? true;
+      final nowOnline = next.value ?? true;
+      if (!wasOnline && nowOnline) {
+        ref.invalidate(tripDaysProvider(tripId));
+        ref.invalidate(tripSegmentsProvider(tripId));
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -108,6 +129,7 @@ class TripTimelineScreen extends ConsumerWidget {
                 today: today,
                 days: days,
                 segments: segmentsAsync.value ?? const <TripSegment>[],
+                isOnline: isOnline,
                 showSegmentError: segmentsAsync.hasError,
                 onSegmentsRetry: () =>
                     ref.invalidate(tripSegmentsProvider(tripId)),
@@ -132,6 +154,7 @@ class _TimelineBody extends StatefulWidget {
     required this.today,
     required this.days,
     required this.segments,
+    required this.isOnline,
     required this.showSegmentError,
     required this.onSegmentsRetry,
   });
@@ -141,6 +164,7 @@ class _TimelineBody extends StatefulWidget {
   final DateTime? today;
   final List<TripDay> days;
   final List<TripSegment> segments;
+  final bool isOnline;
   final bool showSegmentError;
   final VoidCallback onSegmentsRetry;
 
@@ -325,6 +349,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
           activeDayNum: _activeDayNum,
           onDaySelected: _scrollToDay,
         ),
+        if (!widget.isOnline) const _OfflineBanner(),
         if (widget.showSegmentError)
           _SegmentErrorBanner(onRetry: widget.onSegmentsRetry),
         Expanded(
@@ -486,6 +511,55 @@ class _TravelRow extends StatelessWidget {
                         ),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('timeline-offline-banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s4,
+        vertical: TpSpacing.s3,
+      ),
+      color: theme.colorScheme.tertiaryContainer,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.wifi_off_outlined,
+            size: 20,
+            color: theme.colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: TpSpacing.s2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '目前是離線模式',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s1),
+                Text(
+                  '正在顯示快取資料，重新連線後會自動更新時間軸。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
