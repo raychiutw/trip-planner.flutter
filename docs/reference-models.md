@@ -266,6 +266,20 @@ class TripNotes {
 
 `jobId: int`、`requestId: int`、`status: String`、`tripId: String`、`docType: String`。`TripNotesScreen` 會用 `requestId` polling `GET /requests/:id`;完成後重新整理 `tripNotesProvider`。
 
+## auth.dart
+
+### SignupResult — `POST /oauth/signup`
+
+註冊成功回應：`ok: bool`、`userId: String`、`email: String`、`requiresVerification: bool`、`joinedTrip: SignupJoinedTrip?`、`invitationError: String?`。`joinedTrip` 只有 signup body 帶 `invitationToken` 且後端接受邀請成功時才會存在。
+
+### SignupJoinedTrip
+
+`id: String`、`title: String`。Signup 成功且直接加入共編行程時,`SignupScreen` 會導向 `/trips/:id`。
+
+### AuthMessageResult
+
+`POST /oauth/forgot-password`、`POST /oauth/reset-password`、`POST /oauth/send-verification` 共用 `{ok, message}` shape:`ok: bool`、`message: String`。
+
 ## user.dart
 
 ### UserInfo — `GET /oauth/userinfo` 回應

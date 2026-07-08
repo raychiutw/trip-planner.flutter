@@ -5,6 +5,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/session_store.dart';
+import 'package:tripline/models/auth.dart';
 
 void main() {
   late Dio dio;
@@ -26,13 +27,14 @@ void main() {
     dioAdapter = DioAdapter(dio: dio);
     sessionStore = InMemorySessionStore();
     final apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
-    authRepository =
-        AuthRepository(client: apiClient, sessionStore: sessionStore);
+    authRepository = AuthRepository(
+      client: apiClient,
+      sessionStore: sessionStore,
+    );
   });
 
   group('login', () {
-    test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo',
-        () async {
+    test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo', () async {
       dioAdapter.onPost(
         '/oauth/login',
         (server) => server.reply(
@@ -76,9 +78,11 @@ void main() {
 
       await expectLater(
         authRepository.login(email: 'ray@example.com', password: 'wrong'),
-        throwsA(isA<ApiError>()
-            .having((error) => error.status, 'status', 401)
-            .having((error) => error.code, 'code', 'LOGIN_INVALID')),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 401)
+              .having((error) => error.code, 'code', 'LOGIN_INVALID'),
+        ),
       );
       expect(await sessionStore.read(), isNull);
     });
@@ -86,10 +90,11 @@ void main() {
     test('200 但無 tripline_session cookie → 丟 ApiError', () async {
       dioAdapter.onPost(
         '/oauth/login',
-        (server) => server.reply(
-          200,
-          {'ok': true, 'userId': 'u1hex', 'email': 'ray@example.com'},
-        ),
+        (server) => server.reply(200, {
+          'ok': true,
+          'userId': 'u1hex',
+          'email': 'ray@example.com',
+        }),
         data: {'email': 'ray@example.com', 'password': 'secret'},
       );
 
@@ -98,6 +103,134 @@ void main() {
         throwsA(isA<ApiError>()),
       );
       expect(await sessionStore.read(), isNull);
+    });
+  });
+
+  group('signup', () {
+    test('解析 set-cookie、回 SignupResult 並寫入 store', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(
+          201,
+          {
+            'ok': true,
+            'userId': 'u1hex',
+            'email': 'ray@example.com',
+            'requiresVerification': true,
+            'joinedTrip': {'id': 'trip-1', 'title': '沖繩家族旅行'},
+            'invitationError': null,
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'set-cookie': [
+              'tripline_session=signup.token; Path=/; HttpOnly; Secure',
+            ],
+          },
+        ),
+        data: {
+          'email': 'ray@example.com',
+          'password': 'secret123',
+          'displayName': 'Ray',
+          'invitationToken': 'invite-token',
+        },
+      );
+
+      final result = await authRepository.signup(
+        email: 'ray@example.com',
+        password: 'secret123',
+        displayName: 'Ray',
+        invitationToken: 'invite-token',
+      );
+
+      expect(await sessionStore.read(), 'signup.token');
+      expect(result.email, 'ray@example.com');
+      expect(result.requiresVerification, isTrue);
+      expect(result.joinedTrip?.id, 'trip-1');
+    });
+
+    test('註冊成功但無 session cookie → 丟 ApiError', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(201, {
+          'ok': true,
+          'userId': 'u1hex',
+          'email': 'ray@example.com',
+        }),
+        data: {'email': 'ray@example.com', 'password': 'secret123'},
+      );
+
+      await expectLater(
+        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        throwsA(
+          isA<ApiError>().having(
+            (error) => error.code,
+            'code',
+            'AUTH_NO_SESSION_COOKIE',
+          ),
+        ),
+      );
+      expect(await sessionStore.read(), isNull);
+    });
+  });
+
+  group('password and verification helpers', () {
+    test('requestPasswordReset 打 POST /oauth/forgot-password', () async {
+      dioAdapter.onPost(
+        '/oauth/forgot-password',
+        (server) =>
+            server.reply(200, {'ok': true, 'message': '若 email 已註冊，重設連結將寄至信箱'}),
+        data: {'email': 'ray@example.com'},
+      );
+
+      final result = await authRepository.requestPasswordReset(
+        'ray@example.com',
+      );
+
+      expect(result, isA<AuthMessageResult>());
+      expect(result.ok, isTrue);
+      expect(result.message, contains('重設連結'));
+    });
+
+    test('resetPassword 打 POST /oauth/reset-password', () async {
+      dioAdapter.onPost(
+        '/oauth/reset-password',
+        (server) => server.reply(200, {'ok': true, 'message': '密碼已更新，請用新密碼登入'}),
+        data: {'token': 'reset-token', 'password': 'secret123'},
+      );
+
+      final result = await authRepository.resetPassword(
+        token: 'reset-token',
+        password: 'secret123',
+      );
+
+      expect(result.ok, isTrue);
+      expect(result.message, contains('密碼已更新'));
+    });
+
+    test('verifyEmail 打 POST /oauth/verify', () async {
+      dioAdapter.onPost(
+        '/oauth/verify',
+        (server) => server.reply(200, {'ok': true}),
+        data: {'token': 'verify-token'},
+      );
+
+      await authRepository.verifyEmail('verify-token');
+    });
+
+    test('sendVerificationEmail 打 POST /oauth/send-verification', () async {
+      dioAdapter.onPost(
+        '/oauth/send-verification',
+        (server) =>
+            server.reply(200, {'ok': true, 'message': '若帳號需要驗證，驗證信會寄至信箱'}),
+        data: {'email': 'ray@example.com'},
+      );
+
+      final result = await authRepository.sendVerificationEmail(
+        'ray@example.com',
+      );
+
+      expect(result.ok, isTrue);
+      expect(result.message, contains('驗證信'));
     });
   });
 

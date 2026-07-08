@@ -10,13 +10,13 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
 2. **Trip action surface**：新增/編輯行程、景點 CRUD 與共編邀請已有第一波；剩餘子流程、健檢、列印/分享仍待 Flutter route 或完整實作。
-3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、settings、connected apps、developer apps、consent 尚未翻。
+3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證已完成第一波；settings、connected apps、developer apps、consent 尚未翻。
 
 ## 現行 Route 對照
 
 | Web route/component | Flutter route/component | 狀態 | 下一步 |
 |---|---|---|---|
-| `/login` → `LoginPage` | `/login` → `LoginScreen` | 已翻 | 後續補 signup/forgot/reset/verify |
+| `/login` → `LoginPage` | `/login` → `LoginScreen` | 已翻 | 已補 signup/forgot/reset/verify 入口 |
 | `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 部分翻 | 補 filter/sort/search、新增、分享、menu actions |
 | `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 部分翻 | 補 action menu、focus/deeplink、segment 即時 refetch |
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` → `TripMapScreen` | 部分翻 | 補 entry focus route、pin/card 雙向同步、路線/定位控制 |
@@ -36,7 +36,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id/health` | `/trips/:id/health` → `TripHealthScreen` | 已翻第一波 | 後續可補 SSE 與 empty-trip entry count guard parity |
 | `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
 | `/s/:token` | 無 | 未翻 | P2：公開分享頁 |
-| `/signup`, `/login/forgot`, `/auth/password/reset`, `/auth/verify-email` | 無 | 未翻 | P1/P2：auth 補齊 |
+| `/signup`, `/signup/check-email`, `/login/forgot`, `/auth/password/reset`, `/auth/verify-email` | 對應 Auth supplement screens | 已翻第一波 | 後續可補更完整 resend cooldown / platform mail app deep link |
 | `/account/*`, `/settings/*` 子頁 | 無 | 未翻 | P2：設定/裝置/連結 app |
 | `/developer/apps*`, `/oauth/consent` | 無 | 未翻 | P2：OAuth 生態 |
 
@@ -102,6 +102,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 9. **Auth supplement**
    - Routes：signup、forgot/reset password、verify email
+   - 狀態：已完成 `/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email` 第一波；verify email 保留 user gesture，不自動 POST token。
    - 理由：不是已登入核心流，但 mobile app 完整性需要；PKCE/Bearer 另列 P2。
 
 ## P2 / 可延後
@@ -120,7 +121,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Auth 補齊** 或 **Trip action parity**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波。
+下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波。
 
 1. 若續做 Trip action surface：優先補 edit day management 或 segments edit,避免與既有 entry mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。

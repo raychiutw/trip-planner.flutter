@@ -20,6 +20,8 @@ void main() {
   const submitButtonKey = ValueKey('login-submit-button');
   const errorBannerKey = ValueKey('login-error-banner');
   const passwordToggleKey = ValueKey('login-password-visibility-toggle');
+  const signupLinkKey = ValueKey('login-signup-link');
+  const forgotLinkKey = ValueKey('login-forgot-link');
 
   const loggedInUser = UserInfo(id: 'u1hex', email: 'ray@example.com');
 
@@ -28,8 +30,7 @@ void main() {
   setUp(() {
     mockAuthRepository = MockAuthRepository();
     // authStateProvider build() 會先查目前使用者；預設模擬未登入
-    when(() => mockAuthRepository.currentUser())
-        .thenAnswer((_) async => null);
+    when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => null);
   });
 
   /// 把 LoginScreen 包進簡單 GoRouter 假 route（導航目的地不在此驗證）。
@@ -37,6 +38,16 @@ void main() {
     final fakeRouter = GoRouter(
       routes: [
         GoRoute(path: '/', builder: (context, state) => const LoginScreen()),
+        GoRoute(
+          path: '/signup',
+          builder: (context, state) =>
+              const Scaffold(body: Text('signup-probe')),
+        ),
+        GoRoute(
+          path: '/login/forgot',
+          builder: (context, state) =>
+              const Scaffold(body: Text('forgot-probe')),
+        ),
       ],
     );
     await tester.pumpWidget(
@@ -70,6 +81,8 @@ void main() {
       expect(find.byKey(emailFieldKey), findsOneWidget);
       expect(find.byKey(passwordFieldKey), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '登入'), findsOneWidget);
+      expect(find.byKey(signupLinkKey), findsOneWidget);
+      expect(find.byKey(forgotLinkKey), findsOneWidget);
 
       final emailTextField = innerTextFieldOf(tester, emailFieldKey);
       expect(emailTextField.keyboardType, TextInputType.emailAddress);
@@ -86,6 +99,19 @@ void main() {
 
       final passwordTextField = innerTextFieldOf(tester, passwordFieldKey);
       expect(passwordTextField.obscureText, isFalse);
+    });
+
+    testWidgets('可前往註冊與忘記密碼流程', (tester) async {
+      await pumpLoginScreen(tester);
+
+      await tester.tap(find.byKey(signupLinkKey));
+      await tester.pumpAndSettle();
+      expect(find.text('signup-probe'), findsOneWidget);
+
+      await pumpLoginScreen(tester);
+      await tester.tap(find.byKey(forgotLinkKey));
+      await tester.pumpAndSettle();
+      expect(find.text('forgot-probe'), findsOneWidget);
     });
   });
 
@@ -153,8 +179,9 @@ void main() {
         ),
         findsOneWidget,
       );
-      final submitButton =
-          tester.widget<FilledButton>(find.byKey(submitButtonKey));
+      final submitButton = tester.widget<FilledButton>(
+        find.byKey(submitButtonKey),
+      );
       expect(submitButton.onPressed, isNull);
 
       // 再點一次不會重複呼叫
@@ -197,7 +224,9 @@ void main() {
       expect(find.text('帳號或密碼錯誤'), findsOneWidget);
     });
 
-    testWidgets('LOGIN_RATE_LIMITED 英文 message：改用繁中人話 fallback', (tester) async {
+    testWidgets('LOGIN_RATE_LIMITED 英文 message：改用繁中人話 fallback', (
+      tester,
+    ) async {
       when(
         () => mockAuthRepository.login(
           email: any(named: 'email'),

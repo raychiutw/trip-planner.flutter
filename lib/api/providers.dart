@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/auth.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
@@ -31,8 +32,7 @@ final tripRepositoryProvider = Provider<TripRepository>(
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   @override
-  Future<UserInfo?> build() =>
-      ref.watch(authRepositoryProvider).currentUser();
+  Future<UserInfo?> build() => ref.watch(authRepositoryProvider).currentUser();
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
@@ -43,11 +43,43 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     );
   }
 
+  /// 註冊成功後把 signup 回應轉成最小 UserInfo，讓 router 立刻視為已登入。
+  Future<SignupResult?> signup({
+    required String email,
+    required String password,
+    String? displayName,
+    String? invitationToken,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final result = await ref
+          .read(authRepositoryProvider)
+          .signup(
+            email: email,
+            password: password,
+            displayName: displayName,
+            invitationToken: invitationToken,
+          );
+      state = AsyncData(
+        UserInfo(
+          id: result.userId,
+          email: result.email,
+          emailVerified: !result.requiresVerification,
+        ),
+      );
+      return result;
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      return null;
+    }
+  }
+
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(null);
   }
 }
 
-final authStateProvider =
-    AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new);
+final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(
+  AuthNotifier.new,
+);

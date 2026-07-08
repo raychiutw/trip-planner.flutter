@@ -7,6 +7,11 @@
 | 路徑 | 畫面 | 位置 |
 |---|---|---|
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
+| `/signup?invitation=...` | `SignupScreen` | **shell 外**；公開註冊,可帶共編 invitation token |
+| `/signup/check-email?email=...` | `EmailVerifyPendingScreen` | **shell 外**；查看信箱與重寄驗證信 |
+| `/login/forgot` | `ForgotPasswordScreen` | **shell 外**；忘記密碼 generic reset request |
+| `/auth/password/reset?token=...` | `ResetPasswordScreen` | **shell 外**；重設密碼 |
+| `/auth/verify-email?token=...` | `VerifyEmailScreen` | **shell 外**；按鈕觸發 email verification POST |
 | `/invite?token=...` | `InviteScreen` | **shell 外**；公開邀請預覽,未登入可進入 |
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
@@ -42,19 +47,21 @@ redirect: (context, state) {
 
   final isLoggedIn = authState.value != null;
   final isOnLogin = state.matchedLocation == '/login';
-  final isOnInvite = state.matchedLocation == '/invite';
-  if (!isLoggedIn && !isOnLogin && !isOnInvite) return '/login';
+  final isPublicRoute = _publicShellOutsideRoutes.contains(state.matchedLocation);
+  if (!isLoggedIn && !isPublicRoute) return '/login';
   if (isLoggedIn && isOnLogin) return '/trips';
   return null;
 }
 ```
 
-三條規則:
+四條規則:
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
-2. 未登入 + 不在 `/login` 或 `/invite` → 踢去 `/login`。
-3. 未登入可留在 `/invite` 看公開邀請預覽；真正接受邀請仍需登入且 email 相符。
+2. 未登入 + 不在公開 shell 外 route → 踢去 `/login`。
+3. 未登入可留在 `/invite` 看公開邀請預覽,也可走 signup/forgot/reset/verify auth 補齊流程；真正接受邀請仍需登入且 email 相符。
 4. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
+
+公開 shell 外 routes 目前是:`/login`、`/invite`、`/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email`。
 
 ## auth 變化 → redirect 重算的橋接
 

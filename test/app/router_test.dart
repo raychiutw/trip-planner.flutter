@@ -10,7 +10,12 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
+import 'package:tripline/features/auth/email_verify_pending_screen.dart';
+import 'package:tripline/features/auth/forgot_password_screen.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/reset_password_screen.dart';
+import 'package:tripline/features/auth/signup_screen.dart';
+import 'package:tripline/features/auth/verify_email_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/collab/collab_screen.dart';
 import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
@@ -325,6 +330,43 @@ void main() {
 
     expect(find.byType(InviteScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入時 auth supplement routes 可公開進入', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+
+    router.go('/signup?invitation=invite-token');
+    await tester.pumpAndSettle();
+    expect(find.byType(SignupScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    router.go('/signup/check-email?email=ray%40example.com');
+    await tester.pumpAndSettle();
+    expect(find.byType(EmailVerifyPendingScreen), findsOneWidget);
+    expect(find.text('ray@example.com'), findsOneWidget);
+
+    router.go('/login/forgot');
+    await tester.pumpAndSettle();
+    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+
+    router.go('/auth/password/reset?token=reset-token');
+    await tester.pumpAndSettle();
+    expect(find.byType(ResetPasswordScreen), findsOneWidget);
+
+    router.go('/auth/verify-email?token=verify-token');
+    await tester.pumpAndSettle();
+    expect(find.byType(VerifyEmailScreen), findsOneWidget);
   });
 
   testWidgets('已登入時 /favorites 進入 FavoritesScreen', (tester) async {

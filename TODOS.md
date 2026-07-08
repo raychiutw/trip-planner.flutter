@@ -13,7 +13,7 @@
 - [x] 共編邀請(`/trips/:id/collab`,`/invite`;成員/待邀請讀取、新增 member/viewer 邀請、撤回 pending invitation、既有成員 member/viewer role update、移除非 owner 成員、公開邀請預覽與 email 相符接受)(**Completed:** feature/favorites-explore)
 - [x] 行程筆記 CRUD + AI generate(`/trips/:id/notes`;5 區新增/編輯/刪除與 AI generate/polling 第一波)(**Completed:** feature/favorites-explore)
 - [x] AI 健檢報告(`/trips/:id/health`;GET/POST health-check、severity 分組、reports polling 第一波)(**Completed:** feature/favorites-explore)
-- [ ] Auth 補齊(`/signup`,`/login/forgot`,`/auth/password/reset`,`/auth/verify-email`)
+- [x] Auth 補齊(`/signup`,`/signup/check-email`,`/login/forgot`,`/auth/password/reset`,`/auth/verify-email`;signup session cookie、重寄驗證信、忘記/重設密碼、user-gesture email verify 第一波)(**Completed:** feature/favorites-explore)
 
 ## P0 parity debt
 

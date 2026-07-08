@@ -93,6 +93,11 @@ class AuthRepository {
   AuthRepository({required ApiClient client, required SessionStore sessionStore});
 
   Future<UserInfo> login({required String email, required String password});
+  Future<SignupResult> signup({required String email, required String password, String? displayName, String? invitationToken});
+  Future<AuthMessageResult> requestPasswordReset(String email);
+  Future<AuthMessageResult> resetPassword({required String token, required String password});
+  Future<void> verifyEmail(String token);
+  Future<AuthMessageResult> sendVerificationEmail(String email);
   Future<void> logout();
   Future<UserInfo?> currentUser();
 }
@@ -101,6 +106,11 @@ class AuthRepository {
 | 方法 | 行為 |
 |---|---|
 | `login` | `POST /oauth/login`(走 raw `client.dio` 才能讀 headers)→ 用 regex 從 `set-cookie` 解析 `tripline_session=<value>` → 寫入 store → `GET /oauth/userinfo` 回 `UserInfo`。找不到 cookie 時 throw `ApiError(code: 'AUTH_NO_SESSION_COOKIE')` |
+| `signup` | `POST /oauth/signup`(走 raw `client.dio` 讀 `set-cookie`)→ 寫入 `tripline_session` → 回 `SignupResult`。`displayName` 與 `invitationToken` 只有非空才送出 |
+| `requestPasswordReset` | `POST /oauth/forgot-password`；後端用 generic 200 避免 email enumeration,回 `AuthMessageResult` |
+| `resetPassword` | `POST /oauth/reset-password`；成功後不建立 session,使用者需回登入頁 |
+| `verifyEmail` | `POST /oauth/verify`；Flutter 畫面要求 user gesture 後才送 token,避免 email security scanner 消耗 token |
+| `sendVerificationEmail` | `POST /oauth/send-verification`；用於 signup 後 best-effort 寄送與 check-email 頁手動重寄 |
 | `logout` | `POST /oauth/logout`(**失敗忽略**,server 端登出失敗不影響本機)+ `store.clear()`(必執行,在 `finally`) |
 | `currentUser` | `GET /oauth/userinfo`;**401 回 `null` 不 throw**(未登入是正常狀態),其他錯誤 rethrow |
 
@@ -302,6 +312,7 @@ final tripRepositoryProvider = Provider<TripRepository>(...);  // 注入 client
 
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> login(String email, String password);
+  Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken});
   Future<void> logout();
 }
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new);
@@ -313,10 +324,10 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 |---|---|
 | `AsyncData(null)` | 未登入 |
 | `AsyncData(UserInfo)` | 已登入 |
-| `AsyncLoading` | 啟動時查 `currentUser()` 中,或登入請求進行中 |
-| `AsyncError` | 登入失敗(`login()` 用 `AsyncValue.guard` 把例外收進 state,LoginScreen 讀此顯示錯誤 banner) |
+| `AsyncLoading` | 啟動時查 `currentUser()` 中,或登入/註冊請求進行中 |
+| `AsyncError` | 登入或註冊失敗(`login()`/`signup()` 把例外收進 state,畫面讀此顯示 persistent banner) |
 
-`build()` 即 `currentUser()` — app 啟動時自動以既存 session 驗證登入狀態。router 的 redirect 邏輯依賴此 provider,見[導航參考](reference-navigation.md)。
+`build()` 即 `currentUser()` — app 啟動時自動以既存 session 驗證登入狀態。`signup()` 成功後會把 `SignupResult` 轉成最小 `UserInfo`,讓 router 立即視為已登入。router 的 redirect 邏輯依賴此 provider,見[導航參考](reference-navigation.md)。
 
 行程詳情層級的 scoped providers(`tripDetailProvider` 等 family)定義在 `lib/features/trip_detail/trip_providers.dart`,見[架構說明 — trip scope](explanation-architecture.md#trip-scope共用-fetch)。
 

@@ -7,7 +7,12 @@ import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
+import '../features/auth/email_verify_pending_screen.dart';
+import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/reset_password_screen.dart';
+import '../features/auth/signup_screen.dart';
+import '../features/auth/verify_email_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/collab/collab_screen.dart';
 import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
@@ -47,14 +52,43 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      final isOnInvite = state.matchedLocation == '/invite';
-      if (!isLoggedIn && !isOnLogin && !isOnInvite) return '/login';
+      final isPublicRoute = _publicShellOutsideRoutes.contains(
+        state.matchedLocation,
+      );
+      if (!isLoggedIn && !isPublicRoute) return '/login';
       if (isLoggedIn && isOnLogin) return '/trips';
       return null;
     },
     routes: [
       // 登入頁在 shell 外（無底部導航）
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => SignupScreen(
+          invitationToken: state.uri.queryParameters['invitation'],
+        ),
+      ),
+      GoRoute(
+        path: '/signup/check-email',
+        builder: (context, state) => EmailVerifyPendingScreen(
+          email: state.uri.queryParameters['email'],
+          invitationError: state.uri.queryParameters['invitationError'],
+        ),
+      ),
+      GoRoute(
+        path: '/login/forgot',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/auth/password/reset',
+        builder: (context, state) =>
+            ResetPasswordScreen(token: state.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/auth/verify-email',
+        builder: (context, state) =>
+            VerifyEmailScreen(token: state.uri.queryParameters['token']),
+      ),
       GoRoute(
         path: '/invite',
         builder: (context, state) =>
@@ -290,3 +324,13 @@ String? _entrySourceFromQuery(GoRouterState state) {
     _ => null,
   };
 }
+
+const _publicShellOutsideRoutes = {
+  '/login',
+  '/invite',
+  '/signup',
+  '/signup/check-email',
+  '/login/forgot',
+  '/auth/password/reset',
+  '/auth/verify-email',
+};

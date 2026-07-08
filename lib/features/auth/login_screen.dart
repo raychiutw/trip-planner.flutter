@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
@@ -43,10 +44,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
-    await ref.read(authStateProvider.notifier).login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
+    await ref
+        .read(authStateProvider.notifier)
+        .login(_emailController.text.trim(), _passwordController.text);
   }
 
   /// 錯誤訊息：server 回繁中直接用；否則查 code 對照表；再不然通用訊息。
@@ -85,15 +85,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       'Tripline',
                       textAlign: TextAlign.center,
-                      style: textTheme.displaySmall
-                          ?.copyWith(color: colorScheme.primary),
+                      style: textTheme.displaySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: TpSpacing.s2),
                     Text(
                       '把每段旅程，安排得剛剛好',
                       textAlign: TextAlign.center,
-                      style: textTheme.bodyLarge
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: TpSpacing.s8),
                     if (authState.hasError) ...[
@@ -109,8 +111,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         child: Text(
                           _loginErrorMessage(authState.error!),
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: colorScheme.error),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.error,
+                          ),
                         ),
                       ),
                       const SizedBox(height: TpSpacing.s4),
@@ -125,8 +128,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: const InputDecoration(labelText: 'Email'),
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
-                              ? '請輸入 Email'
-                              : null,
+                          ? '請輸入 Email'
+                          : null,
                     ),
                     const SizedBox(height: TpSpacing.s4),
                     TextFormField(
@@ -167,6 +170,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('登入'),
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        key: const ValueKey('login-forgot-link'),
+                        onPressed: isSubmitting
+                            ? null
+                            : () => context.go('/login/forgot'),
+                        child: const Text('忘記密碼？'),
+                      ),
+                    ),
+                    const SizedBox(height: TpSpacing.s2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '還沒有帳號？',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        TextButton(
+                          key: const ValueKey('login-signup-link'),
+                          onPressed: isSubmitting
+                              ? null
+                              : () => context.go('/signup'),
+                          child: const Text('建立帳號'),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -19,6 +19,7 @@
 - **P1 共編邀請**:新增 `/trips/:tripId/collab` 與 `/invite?token=...` 第一波;共編頁可讀取成員與 pending invitations、送出 member/viewer 邀請、撤回 pending 邀請、調整既有非 owner 成員角色並移除成員;邀請頁支援公開預覽、未登入登入 CTA、登入 email 相符後接受邀請並進入行程。
 - **P1 行程筆記**:`/trips/:tripId/notes` 由唯讀 accordion 升級為 CRUD 第一波;5 區可新增/編輯/刪除 row,mutation 帶 notes row `expectedVersion`,行前須知與緊急聯絡可觸發 AI generate 並 polling request 狀態後重新整理。
 - **P1 AI 健檢**:新增 `/trips/:tripId/health`;可讀取最新 health report、觸發 `POST /trips/:id/health-check`、pending 時 polling report,完成後依 high/medium/low 分組顯示 findings 並可導向 Day 或景點編輯頁。
+- **P1 Auth 補齊**:新增 `/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email`;支援 signup 讀 `Set-Cookie` 建立 session、best-effort 寄/重寄驗證信、忘記/重設密碼與 user-gesture email verification。
 
 ## [0.1.0] - 2026-06-10
 

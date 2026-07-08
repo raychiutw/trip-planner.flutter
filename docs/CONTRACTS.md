@@ -165,6 +165,11 @@ class AuthRepository {
   AuthRepository({required ApiClient client, required SessionStore sessionStore});
   Future<UserInfo> login({required String email, required String password});
   // POST /oauth/login {email,password} → 解析 response set-cookie 中 tripline_session=<value>，寫入 store，再 GET /oauth/userinfo
+  Future<SignupResult> signup({required String email, required String password, String? displayName, String? invitationToken}); // POST /oauth/signup → 讀 set-cookie 寫入 store
+  Future<AuthMessageResult> requestPasswordReset(String email); // POST /oauth/forgot-password
+  Future<AuthMessageResult> resetPassword({required String token, required String password}); // POST /oauth/reset-password
+  Future<void> verifyEmail(String token); // POST /oauth/verify；user gesture 後才呼叫
+  Future<AuthMessageResult> sendVerificationEmail(String email); // POST /oauth/send-verification
   Future<void> logout();          // POST /oauth/logout（忽略失敗）+ store.clear()
   Future<UserInfo?> currentUser(); // GET /oauth/userinfo；401 → null（不 throw）
 }
@@ -327,7 +332,7 @@ final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSe
 final apiClientProvider = Provider<ApiClient>(...);
 final authRepositoryProvider = Provider<AuthRepository>(...);
 final tripRepositoryProvider = Provider<TripRepository>(...);
-class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<void> logout(); }
+class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken}); Future<void> logout(); }
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new); // build() = currentUser()
 ```
 
@@ -337,10 +342,10 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
-// shell 外：/login（LoginScreen）、/invite（InviteScreen；允許未登入公開預覽）
+// shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）
 // trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
-// redirect：未登入(authState data null) 且非 /login 或 /invite → /login；已登入在 /login → /trips
+// redirect：未登入(authState data null) 且非 public shell 外 route → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart
 class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // NavigationBar 5 tabs：聊天/行程/地圖/收藏/帳號
@@ -354,6 +359,11 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 
 // 各 screen class 名
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
+class SignupScreen extends ConsumerStatefulWidget;     // features/auth/signup_screen.dart（接受 invitationToken?）
+class EmailVerifyPendingScreen extends ConsumerStatefulWidget; // features/auth/email_verify_pending_screen.dart（接受 email?, invitationError?）
+class ForgotPasswordScreen extends ConsumerStatefulWidget; // features/auth/forgot_password_screen.dart
+class ResetPasswordScreen extends ConsumerStatefulWidget; // features/auth/reset_password_screen.dart（接受 token?）
+class VerifyEmailScreen extends ConsumerStatefulWidget; // features/auth/verify_email_screen.dart（接受 token?）
 class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_screen.dart
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
@@ -375,6 +385,6 @@ class AccountScreen extends ConsumerWidget;            // features/account/accou
 ## 測試要求（TDD）
 
 - models：每個 model 至少 1 個 fromJson 測試（fixture 對齊 discovery/models.md 欄位表，含 nullable/0-1 bool/num 轉型 edge case）
-- api：ApiClient 4 條行為規則各 1 測試（http_mock_adapter）；AuthRepository login 解析 set-cookie 測試
+- api：ApiClient 4 條行為規則各 1 測試（http_mock_adapter）；AuthRepository login/signup 解析 set-cookie 測試
 - screens：每個 screen 至少 1 個 widget test（ProviderScope override 假 repository）
 - 全部 `flutter analyze` 零 error/warning、`flutter test` 綠
