@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
@@ -67,6 +68,7 @@ final _dayTwo = TripDay(
 Widget _buildScreen(
   List<TripDay> days, {
   String initialLocation = '/trips/trip-1/map',
+  Future<LatLng?> Function()? locationProvider,
 }) {
   final router = GoRouter(
     initialLocation: initialLocation,
@@ -76,6 +78,7 @@ Widget _buildScreen(
         builder: (context, state) => TripMapScreen(
           tripId: state.pathParameters['tripId']!,
           tileProvider: _TransparentTileProvider(),
+          locationProvider: locationProvider,
         ),
       ),
       GoRoute(
@@ -84,6 +87,7 @@ Widget _buildScreen(
           tripId: state.pathParameters['tripId']!,
           focusEntryId: int.tryParse(state.pathParameters['entryId'] ?? ''),
           tileProvider: _TransparentTileProvider(),
+          locationProvider: locationProvider,
         ),
       ),
     ],
@@ -152,6 +156,46 @@ void main() {
     expect(polylines, hasLength(1));
     expect(polylines.single.points, hasLength(2));
     expect(polylines.single.color, kDayPinPalette.first);
+  });
+
+  testWidgets('圖層 FAB：可開啟選單並切換地形圖層', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-map-layer-menu')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-layer-fab')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-map-layer-menu')), findsOneWidget);
+    expect(find.text('地形'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-layer-terrain')));
+    await tester.pumpAndSettle();
+
+    final tileLayer = tester.widget<TileLayer>(
+      find.byKey(const ValueKey('trip-map-tile-layer')),
+    );
+    expect(tileLayer.urlTemplate, contains('opentopomap'));
+    expect(find.byKey(const ValueKey('trip-map-layer-menu')), findsNothing);
+  });
+
+  testWidgets('定位 FAB：取得目前位置後顯示使用者 marker', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], locationProvider: () async => const LatLng(26.22, 127.70)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-locate-fab')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('trip-map-user-location')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../models/day.dart';
@@ -22,6 +23,46 @@ const List<Color> kDayPinPalette = [
   Color(0xFFF43F5E), // rose
 ];
 
+typedef TripMapLocationProvider = Future<LatLng?> Function();
+
+enum _MapTileStyle { roadmap, terrain, satellite }
+
+class _MapTilePreset {
+  const _MapTilePreset({
+    required this.style,
+    required this.label,
+    required this.urlTemplate,
+    required this.attribution,
+  });
+
+  final _MapTileStyle style;
+  final String label;
+  final String urlTemplate;
+  final String attribution;
+}
+
+const List<_MapTilePreset> _mapTilePresets = [
+  _MapTilePreset(
+    style: _MapTileStyle.roadmap,
+    label: '路線圖',
+    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: 'OpenStreetMap contributors',
+  ),
+  _MapTilePreset(
+    style: _MapTileStyle.terrain,
+    label: '地形',
+    urlTemplate: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: 'OpenTopoMap, OpenStreetMap contributors',
+  ),
+  _MapTilePreset(
+    style: _MapTileStyle.satellite,
+    label: '衛星',
+    urlTemplate:
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Esri, OpenStreetMap contributors',
+  ),
+];
+
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ flutter_map OSM ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
   const TripMapScreen({
@@ -29,6 +70,7 @@ class TripMapScreen extends ConsumerWidget {
     required this.tripId,
     this.focusEntryId,
     this.tileProvider,
+    this.locationProvider,
   });
 
   final String tripId;
@@ -39,6 +81,9 @@ class TripMapScreen extends ConsumerWidget {
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
   final TileProvider? tileProvider;
 
+  /// 測試注入點：production 使用裝置定位，widget test 可傳固定座標。
+  final TripMapLocationProvider? locationProvider;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -47,6 +92,7 @@ class TripMapScreen extends ConsumerWidget {
         tripId: tripId,
         focusEntryId: focusEntryId,
         tileProvider: tileProvider,
+        locationProvider: locationProvider,
       ),
     );
   }
@@ -59,6 +105,7 @@ class TripMapContent extends ConsumerWidget {
     required this.tripId,
     this.focusEntryId,
     this.tileProvider,
+    this.locationProvider,
     this.emptyMessage = '此行程尚無地點座標',
   });
 
@@ -68,6 +115,7 @@ class TripMapContent extends ConsumerWidget {
   final int? focusEntryId;
 
   final TileProvider? tileProvider;
+  final TripMapLocationProvider? locationProvider;
   final String emptyMessage;
 
   @override
@@ -85,6 +133,7 @@ class TripMapContent extends ConsumerWidget {
         days: days,
         focusEntryId: focusEntryId,
         tileProvider: tileProvider,
+        locationProvider: locationProvider,
         emptyMessage: emptyMessage,
       ),
     );
@@ -118,12 +167,14 @@ class _TripMapView extends StatefulWidget {
     required this.focusEntryId,
     required this.emptyMessage,
     this.tileProvider,
+    this.locationProvider,
   });
 
   final List<TripDay> days;
   final int? focusEntryId;
   final String emptyMessage;
   final TileProvider? tileProvider;
+  final TripMapLocationProvider? locationProvider;
 
   @override
   State<_TripMapView> createState() => _TripMapViewState();
@@ -138,7 +189,18 @@ class _TripMapViewState extends State<_TripMapView> {
   /// fitCamera/move 只能在地圖 render 後呼叫。
   bool _mapIsReady = false;
   bool _didApplyInitialFocus = false;
+  bool _isLayerMenuOpen = false;
+  bool _isLocating = false;
   int? _selectedEntryId;
+  LatLng? _userLocation;
+  _MapTileStyle _tileStyle = _MapTileStyle.roadmap;
+
+  _MapTilePreset get _activeTilePreset {
+    return _mapTilePresets.firstWhere(
+      (preset) => preset.style == _tileStyle,
+      orElse: () => _mapTilePresets.first,
+    );
+  }
 
   @override
   void initState() {
@@ -242,6 +304,7 @@ class _TripMapViewState extends State<_TripMapView> {
     setState(() {
       _selectedTabIndex = tabIndex;
       _selectedEntryId = null;
+      _isLayerMenuOpen = false;
     });
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
   }
@@ -267,13 +330,83 @@ class _TripMapViewState extends State<_TripMapView> {
     setState(() {
       _selectedTabIndex = targetTabIndex;
       _selectedEntryId = pin.entry.id;
+      _isLayerMenuOpen = false;
     });
     _focusPin(pin);
   }
 
   void _selectCard(_DayPin pin) {
-    setState(() => _selectedEntryId = pin.entry.id);
+    setState(() {
+      _selectedEntryId = pin.entry.id;
+      _isLayerMenuOpen = false;
+    });
     _focusPin(pin);
+  }
+
+  void _selectTileStyle(_MapTileStyle style) {
+    setState(() {
+      _tileStyle = style;
+      _isLayerMenuOpen = false;
+    });
+  }
+
+  void _showMapMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<LatLng?> _resolveDeviceLocation() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showMapMessage('定位服務未開啟');
+        return null;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMapMessage('尚未授權定位');
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      return LatLng(position.latitude, position.longitude);
+    } catch (error) {
+      _showMapMessage('無法取得位置：$error');
+      return null;
+    }
+  }
+
+  Future<void> _locateUser() async {
+    if (_isLocating) return;
+    setState(() {
+      _isLocating = true;
+      _isLayerMenuOpen = false;
+    });
+    try {
+      final provider = widget.locationProvider ?? _resolveDeviceLocation;
+      final point = await provider();
+      if (!mounted) return;
+      if (point == null) {
+        if (widget.locationProvider != null) _showMapMessage('無法取得位置');
+        return;
+      }
+      setState(() => _userLocation = point);
+      if (_mapIsReady) {
+        _mapController.move(point, 15);
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
   }
 
   void _applyInitialFocus() {
@@ -387,39 +520,49 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
+    final tilePreset = _activeTilePreset;
     final visiblePolylines = _polylinesForTab(_selectedTabIndex);
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints([
-            for (final pin in allPins) pin.point,
-          ]),
-          padding: const EdgeInsets.all(TpSpacing.s10),
-          maxZoom: 16,
-        ),
-        onMapReady: () {
-          _mapIsReady = true;
-          _applyInitialFocus();
-        },
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.raychiu.tripline',
-          tileProvider: widget.tileProvider,
-        ),
-        if (visiblePolylines.isNotEmpty)
-          PolylineLayer<Object>(
-            key: const ValueKey('trip-map-polylines'),
-            polylines: visiblePolylines,
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCameraFit: CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints([
+                for (final pin in allPins) pin.point,
+              ]),
+              padding: const EdgeInsets.all(TpSpacing.s10),
+              maxZoom: 16,
+            ),
+            onMapReady: () {
+              _mapIsReady = true;
+              _applyInitialFocus();
+            },
           ),
-        MarkerLayer(
-          markers: [for (final pin in visiblePins) _buildMarker(pin)],
+          children: [
+            TileLayer(
+              key: const ValueKey('trip-map-tile-layer'),
+              urlTemplate: tilePreset.urlTemplate,
+              userAgentPackageName: 'com.raychiu.tripline',
+              tileProvider: widget.tileProvider,
+            ),
+            if (visiblePolylines.isNotEmpty)
+              PolylineLayer<Object>(
+                key: const ValueKey('trip-map-polylines'),
+                polylines: visiblePolylines,
+              ),
+            MarkerLayer(
+              markers: [
+                for (final pin in visiblePins) _buildMarker(pin),
+                if (_userLocation != null) _buildUserLocationMarker(),
+              ],
+            ),
+            RichAttributionWidget(
+              attributions: [TextSourceAttribution(tilePreset.attribution)],
+            ),
+          ],
         ),
-        RichAttributionWidget(
-          attributions: [TextSourceAttribution('OpenStreetMap contributors')],
-        ),
+        _buildMapFabs(context),
       ],
     );
   }
@@ -454,6 +597,98 @@ class _TripMapViewState extends State<_TripMapView> {
               fontFeatures: [FontFeature.tabularFigures()],
               color: Colors.white,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Marker _buildUserLocationMarker() {
+    return Marker(
+      point: _userLocation!,
+      width: 28,
+      height: 28,
+      child: Container(
+        key: const ValueKey('trip-map-user-location'),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withAlpha(220),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(60),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapFabs(BuildContext context) {
+    return Positioned(
+      right: TpSpacing.s4,
+      bottom: TpSpacing.s4,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isLayerMenuOpen) ...[
+            _buildLayerMenu(context),
+            const SizedBox(height: TpSpacing.s2),
+          ],
+          _MapFabButton(
+            key: const ValueKey('trip-map-layer-fab'),
+            icon: Icons.layers_outlined,
+            tooltip: '切換地圖圖層',
+            selected: _isLayerMenuOpen,
+            onPressed: () {
+              setState(() => _isLayerMenuOpen = !_isLayerMenuOpen);
+            },
+          ),
+          const SizedBox(height: TpSpacing.s2),
+          _MapFabButton(
+            key: const ValueKey('trip-map-locate-fab'),
+            icon: _isLocating ? null : Icons.my_location,
+            tooltip: '定位到我的位置',
+            selected: _isLocating,
+            onPressed: _isLocating ? null : _locateUser,
+            child: _isLocating
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLayerMenu(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      key: const ValueKey('trip-map-layer-menu'),
+      elevation: 6,
+      color: theme.colorScheme.surface,
+      borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+      child: SizedBox(
+        width: 128,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s1),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final preset in _mapTilePresets)
+                _LayerOption(
+                  key: ValueKey('trip-map-layer-${preset.style.name}'),
+                  label: preset.label,
+                  selected: preset.style == _tileStyle,
+                  onTap: () => _selectTileStyle(preset.style),
+                ),
+            ],
           ),
         ),
       ),
@@ -549,6 +784,108 @@ class _TripMapViewState extends State<_TripMapView> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapFabButton extends StatelessWidget {
+  const _MapFabButton({
+    super.key,
+    required this.tooltip,
+    required this.selected,
+    required this.onPressed,
+    this.icon,
+    this.child,
+  });
+
+  final IconData? icon;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback? onPressed;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: selected ? colorScheme.primary : colorScheme.surface,
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: TpSpacing.tapMin,
+            height: TpSpacing.tapMin,
+            child: Center(
+              child:
+                  child ??
+                  Icon(
+                    icon,
+                    size: 22,
+                    color: selected
+                        ? colorScheme.onPrimary
+                        : colorScheme.onSurface,
+                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LayerOption extends StatelessWidget {
+  const _LayerOption({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: const BorderRadius.all(Radius.circular(TpRadius.sm)),
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
+        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s3),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.primary.withAlpha(28)
+              : Colors.transparent,
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.sm)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 18,
+              color: selected ? colorScheme.primary : colorScheme.outline,
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0,
+                color: selected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );
