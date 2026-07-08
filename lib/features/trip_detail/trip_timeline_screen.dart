@@ -117,6 +117,8 @@ class _TimelineBody extends StatefulWidget {
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
+  final _scrollViewKey = GlobalKey();
+  late final ScrollController _scrollController;
   late Map<int, GlobalKey> _daySectionKeys;
   late Map<int, GlobalKey> _entryKeys;
   late int _activeDayNum;
@@ -125,6 +127,8 @@ class _TimelineBodyState extends State<_TimelineBody> {
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()
+      ..addListener(_syncActiveDayFromScroll);
     _rebuildScrollKeys();
     _activeDayNum =
         _dayNumForEntry(widget.focusEntryId) ??
@@ -147,6 +151,14 @@ class _TimelineBodyState extends State<_TimelineBody> {
       }
       _scheduleInitialFocus();
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_syncActiveDayFromScroll)
+      ..dispose();
+    super.dispose();
   }
 
   void _rebuildScrollKeys() {
@@ -193,6 +205,40 @@ class _TimelineBodyState extends State<_TimelineBody> {
     );
   }
 
+  void _syncActiveDayFromScroll() {
+    final viewportContext = _scrollViewKey.currentContext;
+    final viewportRenderObject = viewportContext?.findRenderObject();
+    if (!mounted || viewportRenderObject is! RenderBox) return;
+
+    final viewportTop = viewportRenderObject.localToGlobal(Offset.zero).dy;
+    final viewportBottom = viewportTop + viewportRenderObject.size.height;
+    final anchorY = viewportTop + viewportRenderObject.size.height * 0.2;
+    int? nextActiveDayNum;
+    var bestDistance = double.infinity;
+
+    for (final day in widget.days) {
+      final sectionContext = _daySectionKeys[day.dayNum]?.currentContext;
+      final sectionRenderObject = sectionContext?.findRenderObject();
+      if (sectionRenderObject is! RenderBox) continue;
+
+      final sectionTop = sectionRenderObject.localToGlobal(Offset.zero).dy;
+      final sectionBottom = sectionTop + sectionRenderObject.size.height;
+      final isVisible =
+          sectionBottom >= viewportTop && sectionTop <= viewportBottom;
+      if (!isVisible) continue;
+
+      final distance = (sectionTop - anchorY).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nextActiveDayNum = day.dayNum;
+      }
+    }
+
+    if (nextActiveDayNum != null && nextActiveDayNum != _activeDayNum) {
+      setState(() => _activeDayNum = nextActiveDayNum!);
+    }
+  }
+
   void _scrollToDay(int dayNum) {
     setState(() => _activeDayNum = dayNum);
     final sectionContext = _daySectionKeys[dayNum]?.currentContext;
@@ -223,6 +269,8 @@ class _TimelineBodyState extends State<_TimelineBody> {
           _SegmentErrorBanner(onRetry: widget.onSegmentsRetry),
         Expanded(
           child: SingleChildScrollView(
+            key: _scrollViewKey,
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
               TpSpacing.s4,

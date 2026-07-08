@@ -195,6 +195,13 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
+Color _dayPillColor(WidgetTester tester, int dayNum) {
+  final dayPill = tester.widget<Container>(
+    find.byKey(ValueKey('day-pill-$dayNum')),
+  );
+  return (dayPill.decoration! as BoxDecoration).color!;
+}
+
 void main() {
   const editableSegment = TripSegment(
     id: 9001,
@@ -495,6 +502,21 @@ void main() {
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
   });
 
+  testWidgets('手動捲動到 day section 時同步 active day pill', (tester) async {
+    await _pumpTimeline(tester);
+
+    expect(_dayPillColor(tester, 1), TpColorsLight.accentSubtle);
+
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -560),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('南部文化')).dy, lessThan(360));
+    expect(_dayPillColor(tester, 2), TpColorsLight.accentSubtle);
+  });
+
   testWidgets('focus query 初載捲到指定 entry 並同步 active day', (tester) async {
     await _pumpTimeline(tester, initialLocation: '/trips/$_tripId?focus=22');
     await tester.pumpAndSettle();
@@ -502,11 +524,7 @@ void main() {
     final focusedEntryTop = tester.getTopLeft(find.text('首里城公園')).dy;
     expect(focusedEntryTop, lessThan(500));
 
-    final day2Pill = tester.widget<Container>(
-      find.byKey(const ValueKey('day-pill-2')),
-    );
-    final day2PillDecoration = day2Pill.decoration! as BoxDecoration;
-    expect(day2PillDecoration.color, TpColorsLight.accentSubtle);
+    expect(_dayPillColor(tester, 2), TpColorsLight.accentSubtle);
   });
 
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
