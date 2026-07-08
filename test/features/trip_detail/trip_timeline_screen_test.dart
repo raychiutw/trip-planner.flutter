@@ -153,6 +153,16 @@ Future<void> _pumpTimeline(
                 const Scaffold(body: Text('notes-page')),
           ),
           GoRoute(
+            path: 'health',
+            builder: (context, state) =>
+                const Scaffold(body: Text('health-page')),
+          ),
+          GoRoute(
+            path: 'collab',
+            builder: (context, state) =>
+                const Scaffold(body: Text('collab-page')),
+          ),
+          GoRoute(
             path: 'add-entry',
             builder: (context, state) =>
                 const Scaffold(body: Text('add-entry-page')),
@@ -226,6 +236,27 @@ void main() {
     expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
     expect(find.byIcon(Icons.map_outlined), findsOneWidget);
     expect(find.byIcon(Icons.sticky_note_2_outlined), findsOneWidget);
+  });
+
+  testWidgets('AppBar overflow menu 提供 AI 健檢與共編設定', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-actions')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('timeline-overflow-health')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('timeline-overflow-collab')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-health')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('health-page'), findsOneWidget);
   });
 
   testWidgets('點新增景點 icon 以 go_router 導向 add-entry 頁', (tester) async {

@@ -12,6 +12,8 @@ import 'widgets/hotel_card.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_pill.dart';
 
+enum _TimelineOverflowAction { health, collab }
+
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerWidget {
@@ -62,15 +64,38 @@ class TripTimelineScreen extends ConsumerWidget {
             icon: const Icon(Icons.sticky_note_2_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/notes'),
           ),
-          IconButton(
-            tooltip: 'AI 健檢',
-            icon: const Icon(Icons.health_and_safety_outlined),
-            onPressed: () => _goTo(context, '/trips/$tripId/health'),
-          ),
-          IconButton(
-            tooltip: '共編',
-            icon: const Icon(Icons.group_outlined),
-            onPressed: () => _goTo(context, '/trips/$tripId/collab'),
+          PopupMenuButton<_TimelineOverflowAction>(
+            key: const ValueKey('timeline-overflow-actions'),
+            tooltip: '更多行程動作',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) {
+              switch (action) {
+                case _TimelineOverflowAction.health:
+                  _goTo(context, '/trips/$tripId/health');
+                case _TimelineOverflowAction.collab:
+                  _goTo(context, '/trips/$tripId/collab');
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                key: ValueKey('timeline-overflow-health'),
+                value: _TimelineOverflowAction.health,
+                child: ListTile(
+                  leading: Icon(Icons.health_and_safety_outlined),
+                  title: Text('AI 健檢'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('timeline-overflow-collab'),
+                value: _TimelineOverflowAction.collab,
+                child: ListTile(
+                  leading: Icon(Icons.group_outlined),
+                  title: Text('共編設定'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
