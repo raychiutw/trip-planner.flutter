@@ -9,7 +9,7 @@ P1 全數完成 🎉(見 Completed)。
 ## P2
 
 - [x] 分享/列印/匯入:**公開分享頁 + 複製公開行程、列印/PDF 預覽、JSON 匯入/匯出 已完成**。
-- [~] 設定子頁:**外觀、個人資料、登入裝置、已連結 OAuth app、開發者 OAuth app 已完成**;通知仍延後。
+- [x] 設定子頁:**外觀、個人資料、通知設定、登入裝置、已連結 OAuth app、開發者 OAuth app 已完成**。通知偏好 toggle 待後端 API 開放。
 - [~] OAuth PKCE + Bearer 認證:**client 端、登入按鈕、consent 頁、connected/developer app 管理已完成 + 單測**(pkce/token/refresh/Bearer ApiClient/loopback 編排),預設關閉(`--dart-define` 啟用)。**e2e 待 backend owner provision active public client + loopback redirect**(見 `docs/howto-oauth-pkce.md`)。
 - [x] 離線快取:讀取快取、離線寫入佇列、flush、OCC rebase/conflict UI 已完成。
 
@@ -24,6 +24,7 @@ P1 全數完成 🎉(見 Completed)。
 - [x] 建立/編輯行程:目的地優先 POI 建立(固定/彈性日期 + 每地天數)+ 編輯(PUT 欄位,明確儲存)(**Completed:** 2026-06-12)
 - [x] P2 分享/列印/匯入:公開分享頁 `/s/:token` + clone、行程列印/PDF 預覽、JSON import/export(**Completed:** 2026-07-08)
 - [x] P2 帳號安全與 OAuth 設定:登入裝置、connected apps、developer apps、OAuth consent shell route(**Completed:** 2026-07-08)
+- [x] P2 通知設定頁:web parity stub + `/settings/notifications`、`/account/notifications` route(**Completed:** 2026-07-08)
 - [x] 地圖 adapter:`TripMapPoint`/`FlutterMapCanvas` 抽象化,保留之後替換地圖 SDK 的空間(**Completed:** 2026-07-08)
 - [x] 全域地圖(map tab 轉正):收藏 POI 跨行程 flutter_map(依 poi_type 上色 + 點選資訊卡)(**Completed:** 2026-06-12)
 - [x] 共編邀請(成員管理):成員/角色/移除 + 待接受邀請撤銷 + email 邀請(`/permissions` + `/invitations`)(**Completed:** 2026-06-12)

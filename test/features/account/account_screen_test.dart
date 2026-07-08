@@ -103,7 +103,7 @@ void main() {
     expect(find.text('Email 未驗證'), findsNothing);
   });
 
-  testWidgets('帳號設定 rows 可進子頁；通知 仍「即將推出」', (tester) async {
+  testWidgets('帳號設定 rows 可進子頁；通知 row 已轉正', (tester) async {
     await pumpAccountScreen(tester);
 
     expect(find.byKey(const ValueKey('settings-profile')), findsOneWidget);
@@ -117,13 +117,17 @@ void main() {
       find.byKey(const ValueKey('settings-developer-apps')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('settings-notifications')),
+      findsOneWidget,
+    );
     expect(find.text('通知'), findsOneWidget);
-    expect(find.text('即將推出'), findsOneWidget);
 
     final notificationsTile = tester.widget<ListTile>(
-      find.widgetWithText(ListTile, '通知'),
+      find.byKey(const ValueKey('settings-notifications')),
     );
-    expect(notificationsTile.enabled, isFalse);
+    expect(notificationsTile.enabled, isTrue);
+    expect(notificationsTile.trailing, isA<Icon>());
   });
 
   testWidgets('點登出 row 出現確認對話框，確認後呼叫 logout', (tester) async {

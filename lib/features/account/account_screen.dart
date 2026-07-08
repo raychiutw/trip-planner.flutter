@@ -265,7 +265,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「個人資料」「外觀」「登入裝置」「OAuth app」可進子頁;「通知」即將推出。
+/// 設定群組：「個人資料」「外觀」「登入裝置」「OAuth app」「通知」可進子頁。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
@@ -351,38 +351,17 @@ class _SettingsGroup extends StatelessWidget {
                 thickness: 1,
                 color: theme.colorScheme.outlineVariant,
               ),
-              const _ComingSoonRow(
-                icon: Icons.notifications_outlined,
-                title: '通知',
+              ListTile(
+                key: const ValueKey('settings-notifications'),
+                leading: const Icon(Icons.notifications_outlined),
+                title: const Text('通知'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/notifications'),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 即將推出設定 row（disabled 樣式）。
-class _ComingSoonRow extends StatelessWidget {
-  const _ComingSoonRow({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListTile(
-      enabled: false,
-      leading: Icon(icon, size: 20),
-      title: Text(title),
-      trailing: Text(
-        '即將推出',
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.disabledColor,
-        ),
-      ),
     );
   }
 }

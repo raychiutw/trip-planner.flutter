@@ -38,10 +38,10 @@
 | TripMapScreen | MapPage | 共用 trip scope 資料（不重抓） |
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes` + 各 section CRUD |
 | AccountScreen | AccountPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout` |
-| ChatScreen / FavoritesScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
+| ChatScreen / FavoritesScreen | P1 已轉正 | `POST /requests` chat flow、收藏清單 / Explore / 加入行程 |
 
 P1（第二波）：收藏 + Explore、Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
-P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取已補齊；通知設定與 OAuth e2e public client provision 仍為外部/後續項。
+P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取已補齊；通知偏好 toggle 待後端 API 開放,OAuth e2e public client provision 仍為外部/後續項。
 
 ## 目錄結構
 

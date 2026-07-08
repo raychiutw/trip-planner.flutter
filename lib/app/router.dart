@@ -11,6 +11,7 @@ import '../features/account/account_screen.dart';
 import '../features/account/connected_apps_screen.dart';
 import '../features/account/developer_apps_screen.dart';
 import '../features/account/settings/appearance_screen.dart';
+import '../features/account/settings/notifications_screen.dart';
 import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/oauth_consent_screen.dart';
@@ -90,6 +91,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/profile',
         builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/account/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/settings/sessions',

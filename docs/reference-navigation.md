@@ -7,16 +7,29 @@
 | 路徑 | 畫面 | 位置 |
 |---|---|---|
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
-| `/chat` | `PlaceholderScreen('聊天')` | tab 1(P1 待實作) |
+| `/chat` | `ChatScreen` | tab 1 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
-| `/map` | `PlaceholderScreen('全域地圖')` | tab 3(P1 待實作) |
+| `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
+| `/map` | `GlobalMapScreen` | tab 3 |
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |
 | `/favorites/add-to-trip` | `AddToTripScreen` | tab 4 子路由(加入行程,extra `AddToTripArgs`) |
 | `/account` | `AccountScreen` | tab 5 |
+| `/settings/profile` | `ProfileEditScreen` | shell 外設定頁 |
+| `/settings/appearance` | `AppearanceScreen` | shell 外設定頁 |
+| `/settings/notifications` | `NotificationsScreen` | shell 外設定頁 |
+| `/account/notifications` | `NotificationsScreen` | shell 外 web 相容 alias |
+| `/settings/sessions` | `AccountSessionsScreen` | shell 外設定頁 |
+| `/settings/connected-apps` | `ConnectedAppsScreen` | shell 外設定頁 |
+| `/settings/developer-apps` | `DeveloperAppsScreen` | shell 外設定頁 |
+| `/settings/developer-apps/new` | `DeveloperAppNewScreen` | shell 外設定頁 |
+| `/developer/apps` | `DeveloperAppsScreen` | shell 外 web 相容 alias |
+| `/developer/apps/new` | `DeveloperAppNewScreen` | shell 外 web 相容 alias |
+| `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
+| `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 
@@ -29,8 +42,11 @@ redirect: (context, state) {
 
   final isLoggedIn = authState.value != null;
   final isOnLogin = state.matchedLocation == '/login';
-  if (!isLoggedIn && !isOnLogin) return '/login';
-  if (isLoggedIn && isOnLogin) return '/trips';
+  final isPublicRoute = _isPublicShellOutsideRoute(state);
+  if (!isLoggedIn && !isOnLogin && !isPublicRoute) {
+    return _loginLocationWithRedirect(state);
+  }
+  if (isLoggedIn && isOnLogin) return _redirectAfterLogin(state);
   return null;
 }
 ```
@@ -38,8 +54,9 @@ redirect: (context, state) {
 三條規則:
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
-2. 未登入 + 不在 `/login` → 踢去 `/login`。
-3. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
+2. 未登入 + 不在 `/login` 或公開 route → 踢去 `/login`,並用安全站內 `redirect_after` 保留原路徑。
+3. 未登入可進公開 route:`/s/:token`、`/oauth/consent`。
+4. 已登入 + 在 `/login` → 優先回到安全站內 `redirect_after`,否則送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
 
 ## auth 變化 → redirect 重算的橋接
 
