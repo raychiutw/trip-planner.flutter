@@ -19,7 +19,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/login` → `LoginPage` | `/login` → `LoginScreen` | 已翻 | 已補 signup/forgot/reset/verify 入口 |
 | `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 已翻第一波 | 已補 filter/sort/search/filtered empty/menu actions/尾端新增卡/JSON 匯入/分享連結管理 |
 | `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 部分翻 | 已補 focus/deeplink、今日自動定位、scroll-spy；續補 action menu、segment 背景同步細節 |
-| `/trip/:id/map` → `MapPage` | `/trips/:id/map` + `/trips/:id/stop/:entryId/map` → `TripMapScreen` | 部分翻 | 已補 entry focus route、overview 點 pin 切 day、pin/card selected sync；續補路線/定位控制 |
+| `/trip/:id/map` → `MapPage` | `/trips/:id/map` + `/trips/:id/stop/:entryId/map` → `TripMapScreen` | 部分翻 | 已補 entry focus route、overview 點 pin 切 day、pin/card selected sync、polyline；續補定位/圖層控制 |
 | `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 已翻第一波 | 後續可補 drag reorder、autosave-on-blur 與更完整 web parity |
 | `/account` → `AccountPage` | `/account` → `AccountScreen` | 已翻第一波 | 已補 displayName inline edit、外觀/通知 rows 導航 |
 | `/chat` → `ChatPage` | `/chat` → `ChatScreen` | 已翻第一波 | 後續可補 SSE、歷史分頁與更完整 trip picker parity |
@@ -46,7 +46,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 - **TripsListScreen**：目前有單欄清單、下拉更新、AppBar/空狀態新增入口、分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序、filtered empty、TripCard action menu（編輯/共編/AI 健檢/筆記/分享/刪除）、尾端新增卡、JSON 匯入與 ShareLink 分享管理。
 - **TripTimelineScreen**：目前有 day pills + timeline + travel pill + map/notes/health/add-entry actions；travel pill 會讀取 `trip_segments` source of truth 並可編輯 driving/walking/transit；`?focus=<entryId>` 可初載定位指定 entry，若行程日期包含今天會初載定位今日 day，手動捲動也會以 scroll-spy 同步 active day。尚缺 offline banner、segment 背景同步細節、行程切換 dropdown、overflow actions。
-- **TripMapScreen**：目前是 OSM pins + day tabs + entry cards；`stop/:entryId/map` 會初載切到 entry 所在 day 並聚焦該 pin，總覽點 pin 也會自動切到該 pin 所在 day，pin/card 點擊會同步 selected 狀態。尚缺路線 polyline、圖層/我的位置 FAB。
+- **TripMapScreen**：目前是 OSM pins + day tabs + entry cards；`stop/:entryId/map` 會初載切到 entry 所在 day 並聚焦該 pin，總覽點 pin 也會自動切到該 pin 所在 day，pin/card 點擊會同步 selected 狀態，overview/單日會依 day 畫出 route polyline。尚缺圖層/我的位置 FAB。
 - **TripNotesScreen**：目前 5-section accordion 已支援 5 區新增/編輯/刪除、notes row OCC `expectedVersion`、行前須知/緊急聯絡 AI generate 與 request polling pending 狀態；尚缺 drag reorder、autosave-on-blur 等 web parity 細節。
 - **AccountScreen**：目前 profile/stat/logout、displayName inline edit、外觀/通知 settings 第一波可用。尚缺 connected apps、sessions、developer/OAuth 生態頁面。
 

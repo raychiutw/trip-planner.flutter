@@ -200,6 +200,24 @@ class _TripMapViewState extends State<_TripMapView> {
     return pinsByDay[tabIndex - 1];
   }
 
+  List<Polyline<Object>> _polylinesForTab(int tabIndex) {
+    final pinsByDay = _pinsByDay;
+    final dayPinGroups = tabIndex == 0
+        ? pinsByDay
+        : <List<_DayPin>>[pinsByDay[tabIndex - 1]];
+    return [
+      for (final dayPins in dayPinGroups)
+        if (dayPins.length >= 2)
+          Polyline<Object>(
+            points: [for (final pin in dayPins) pin.point],
+            color: dayPins.first.color,
+            strokeWidth: 4,
+            borderColor: Colors.white.withAlpha(220),
+            borderStrokeWidth: 2,
+          ),
+    ];
+  }
+
   int? _tabIndexForEntry(int? entryId) {
     if (entryId == null) return null;
     for (final (dayIndex, day) in widget.days.indexed) {
@@ -369,6 +387,7 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
+    final visiblePolylines = _polylinesForTab(_selectedTabIndex);
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
@@ -390,6 +409,11 @@ class _TripMapViewState extends State<_TripMapView> {
           userAgentPackageName: 'com.raychiu.tripline',
           tileProvider: widget.tileProvider,
         ),
+        if (visiblePolylines.isNotEmpty)
+          PolylineLayer<Object>(
+            key: const ValueKey('trip-map-polylines'),
+            polylines: visiblePolylines,
+          ),
         MarkerLayer(
           markers: [for (final pin in visiblePins) _buildMarker(pin)],
         ),

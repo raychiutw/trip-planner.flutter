@@ -109,6 +109,13 @@ BorderSide _cardBorderSide(WidgetTester tester, int entryId) {
   return shape.side;
 }
 
+List<Polyline<Object>> _routePolylines(WidgetTester tester) {
+  final layer = tester.widget<PolylineLayer<Object>>(
+    find.byKey(const ValueKey('trip-map-polylines')),
+  );
+  return layer.polylines;
+}
+
 void main() {
   testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
     tester,
@@ -135,6 +142,16 @@ void main() {
 
     // OSM attribution 必須顯示
     expect(find.byType(RichAttributionWidget), findsOneWidget);
+  });
+
+  testWidgets('總覽：依 day 渲染路線 polyline', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    final polylines = _routePolylines(tester);
+    expect(polylines, hasLength(1));
+    expect(polylines.single.points, hasLength(2));
+    expect(polylines.single.color, kDayPinPalette.first);
   });
 
   testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
