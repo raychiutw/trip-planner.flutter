@@ -19,7 +19,7 @@
 
 - [x] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/filtered empty/TripCard action menu/尾端新增卡/JSON 匯入/分享連結管理(**Completed:** feature/favorites-explore)
 - [ ] TripTimelineScreen 補 web parity:offline banner/segment 背景同步細節/overflow actions（focus deep link、scroll-spy active day、今日自動定位已完成）
-- [ ] TripMapScreen 補 web parity:pin-card 雙向同步/polyline/定位 FAB（`stop/:entryId/map` focus route、overview 點 pin 切 day 已完成）
+- [ ] TripMapScreen 補 web parity:polyline/定位 FAB（`stop/:entryId/map` focus route、overview 點 pin 切 day、pin-card 雙向同步已完成）
 - [x] AccountScreen 補 web parity:displayName inline edit、外觀/通知 row 實際導航與 `/account/*`、`/settings/*` alias 第一波(**Completed:** feature/favorites-explore)
 
 ## P2

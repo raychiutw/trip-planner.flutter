@@ -138,11 +138,13 @@ class _TripMapViewState extends State<_TripMapView> {
   /// fitCamera/move 只能在地圖 render 後呼叫。
   bool _mapIsReady = false;
   bool _didApplyInitialFocus = false;
+  int? _selectedEntryId;
 
   @override
   void initState() {
     super.initState();
     _selectedTabIndex = _tabIndexForEntry(widget.focusEntryId) ?? 0;
+    _selectedEntryId = _pinForEntry(widget.focusEntryId)?.entry.id;
   }
 
   @override
@@ -152,6 +154,7 @@ class _TripMapViewState extends State<_TripMapView> {
         !identical(oldWidget.days, widget.days)) {
       _didApplyInitialFocus = false;
       _selectedTabIndex = _tabIndexForEntry(widget.focusEntryId) ?? 0;
+      _selectedEntryId = _pinForEntry(widget.focusEntryId)?.entry.id;
       WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
     }
   }
@@ -218,7 +221,10 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   void _selectTab(int tabIndex) {
-    setState(() => _selectedTabIndex = tabIndex);
+    setState(() {
+      _selectedTabIndex = tabIndex;
+      _selectedEntryId = null;
+    });
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
   }
 
@@ -240,9 +246,15 @@ class _TripMapViewState extends State<_TripMapView> {
 
   void _selectPin(_DayPin pin) {
     final targetTabIndex = pin.dayIndex + 1;
-    if (_selectedTabIndex != targetTabIndex) {
-      setState(() => _selectedTabIndex = targetTabIndex);
-    }
+    setState(() {
+      _selectedTabIndex = targetTabIndex;
+      _selectedEntryId = pin.entry.id;
+    });
+    _focusPin(pin);
+  }
+
+  void _selectCard(_DayPin pin) {
+    setState(() => _selectedEntryId = pin.entry.id);
     _focusPin(pin);
   }
 
@@ -252,6 +264,7 @@ class _TripMapViewState extends State<_TripMapView> {
 
     final focusedPin = _pinForEntry(widget.focusEntryId);
     if (focusedPin != null) {
+      setState(() => _selectedEntryId = focusedPin.entry.id);
       _focusPin(focusedPin);
       return;
     }
@@ -388,6 +401,7 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   Marker _buildMarker(_DayPin pin) {
+    final isSelected = pin.entry.id == _selectedEntryId;
     return Marker(
       point: pin.point,
       width: 32,
@@ -397,10 +411,14 @@ class _TripMapViewState extends State<_TripMapView> {
         behavior: HitTestBehavior.opaque,
         onTap: () => _selectPin(pin),
         child: Container(
+          key: ValueKey('map-pin-dot-${pin.entry.id}'),
           decoration: BoxDecoration(
             color: pin.color,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
+            border: Border.all(
+              color: isSelected ? Colors.black : Colors.white,
+              width: isSelected ? 4 : 2,
+            ),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -445,6 +463,7 @@ class _TripMapViewState extends State<_TripMapView> {
   Widget _buildEntryCard(BuildContext context, _DayPin pin) {
     final theme = Theme.of(context);
     final timeText = pin.entry.startTime ?? pin.entry.time ?? '--:--';
+    final isSelected = pin.entry.id == _selectedEntryId;
     // 總覽模式加 D{N} 前綴標示所屬日。
     final timeLabel = _selectedTabIndex == 0
         ? 'D${pin.dayNum} · $timeText'
@@ -453,10 +472,18 @@ class _TripMapViewState extends State<_TripMapView> {
     return SizedBox(
       width: 220,
       child: Card(
+        key: ValueKey('entry-card-shell-${pin.entry.id}'),
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+          side: BorderSide(
+            color: isSelected ? pin.color : Colors.transparent,
+            width: isSelected ? 2 : 0,
+          ),
+        ),
         child: InkWell(
           key: ValueKey('entry-card-${pin.entry.id}'),
           borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-          onTap: () => _focusPin(pin),
+          onTap: () => _selectCard(pin),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: TpSpacing.s3,

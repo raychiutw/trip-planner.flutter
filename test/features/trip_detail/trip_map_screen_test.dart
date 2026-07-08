@@ -94,6 +94,21 @@ Widget _buildScreen(
   );
 }
 
+BoxDecoration _pinDecoration(WidgetTester tester, int entryId) {
+  final pinDot = tester.widget<Container>(
+    find.byKey(ValueKey('map-pin-dot-$entryId')),
+  );
+  return pinDot.decoration! as BoxDecoration;
+}
+
+BorderSide _cardBorderSide(WidgetTester tester, int entryId) {
+  final card = tester.widget<Card>(
+    find.byKey(ValueKey('entry-card-shell-$entryId')),
+  );
+  final shape = card.shape! as RoundedRectangleBorder;
+  return shape.side;
+}
+
 void main() {
   testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
     tester,
@@ -144,6 +159,28 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
+  });
+
+  testWidgets('點 entry card 會同步選取對應 pin 與 card', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-card-12')));
+    await tester.pumpAndSettle();
+
+    final selectedPinBorder = _pinDecoration(tester, 12).border! as Border;
+    expect(selectedPinBorder.top.width, 4);
+    expect(_cardBorderSide(tester, 12).width, 2);
+  });
+
+  testWidgets('點 pin 會同步選取對應 card', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('map-pin-12')));
+    await tester.pumpAndSettle();
+
+    expect(_cardBorderSide(tester, 12).width, 2);
   });
 
   testWidgets('總覽點 pin 會切到該 entry 所在 day', (tester) async {
