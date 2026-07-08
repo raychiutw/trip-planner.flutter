@@ -28,6 +28,7 @@ class TripTimelineScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
+    final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
@@ -65,7 +66,14 @@ class TripTimelineScreen extends ConsumerWidget {
       body: daysAsync.when(
         data: (days) => days.isEmpty
             ? const _EmptyTimeline()
-            : _TimelineBody(tripId: tripId, days: days),
+            : _TimelineBody(
+                tripId: tripId,
+                days: days,
+                segments: segmentsAsync.value ?? const <TripSegment>[],
+                showSegmentError: segmentsAsync.hasError,
+                onSegmentsRetry: () =>
+                    ref.invalidate(tripSegmentsProvider(tripId)),
+              ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -80,10 +88,19 @@ class TripTimelineScreen extends ConsumerWidget {
 
 /// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
 class _TimelineBody extends StatefulWidget {
-  const _TimelineBody({required this.tripId, required this.days});
+  const _TimelineBody({
+    required this.tripId,
+    required this.days,
+    required this.segments,
+    required this.showSegmentError,
+    required this.onSegmentsRetry,
+  });
 
   final String tripId;
   final List<TripDay> days;
+  final List<TripSegment> segments;
+  final bool showSegmentError;
+  final VoidCallback onSegmentsRetry;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
@@ -126,6 +143,11 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
   @override
   Widget build(BuildContext context) {
+    final segmentsByPair = {
+      for (final segment in widget.segments)
+        _segmentPairKey(segment.fromEntryId, segment.toEntryId): segment,
+    };
+
     return Column(
       children: [
         DayPills(
@@ -133,6 +155,8 @@ class _TimelineBodyState extends State<_TimelineBody> {
           activeDayNum: _activeDayNum,
           onDaySelected: _scrollToDay,
         ),
+        if (widget.showSegmentError)
+          _SegmentErrorBanner(onRetry: widget.onSegmentsRetry),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
@@ -149,6 +173,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     key: _daySectionKeys[day.dayNum],
                     tripId: widget.tripId,
                     day: day,
+                    segmentsByPair: segmentsByPair,
                   ),
               ],
             ),
@@ -161,10 +186,16 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
 /// 單日 section：day header → hotel 卡 → entries（entry 之間插 travel pill）。
 class _DaySection extends StatelessWidget {
-  const _DaySection({super.key, required this.tripId, required this.day});
+  const _DaySection({
+    super.key,
+    required this.tripId,
+    required this.day,
+    required this.segmentsByPair,
+  });
 
   final String tripId;
   final TripDay day;
+  final Map<String, TripSegment> segmentsByPair;
 
   @override
   Widget build(BuildContext context) {
@@ -179,33 +210,66 @@ class _DaySection extends StatelessWidget {
           HotelCard(hotel: day.hotel!),
           const SizedBox(height: TpSpacing.s3),
         ],
-        for (
-          var entryIndex = 0;
-          entryIndex < timeline.length;
-          entryIndex++
-        ) ...[
-          if (entryIndex > 0 && timeline[entryIndex].travel != null)
-            _TravelRow(travel: timeline[entryIndex].travel!),
-          TimelineEntryTile(
-            entry: timeline[entryIndex],
-            isFirst: entryIndex == 0,
-            isLast: entryIndex == timeline.length - 1,
-            onEdit: () => GoRouter.maybeOf(
-              context,
-            )?.go('/trips/$tripId/stop/${timeline[entryIndex].id}/edit'),
-          ),
-        ],
+        ..._buildTimelineRows(context, timeline),
         const SizedBox(height: TpSpacing.s6),
       ],
     );
+  }
+
+  List<Widget> _buildTimelineRows(
+    BuildContext context,
+    List<TimelineEntry> timeline,
+  ) {
+    final rows = <Widget>[];
+    for (var entryIndex = 0; entryIndex < timeline.length; entryIndex++) {
+      final entry = timeline[entryIndex];
+      if (entryIndex > 0) {
+        final previousEntry = timeline[entryIndex - 1];
+        final segment =
+            segmentsByPair[_segmentPairKey(previousEntry.id, entry.id)];
+        final travel = segment?.toTravel() ?? entry.travel;
+        if (travel != null) {
+          rows.add(
+            _TravelRow(
+              tripId: tripId,
+              travel: travel,
+              segment: segment,
+              fromTitle: previousEntry.title,
+              toTitle: entry.title,
+            ),
+          );
+        }
+      }
+      rows.add(
+        TimelineEntryTile(
+          entry: entry,
+          isFirst: entryIndex == 0,
+          isLast: entryIndex == timeline.length - 1,
+          onEdit: () => GoRouter.maybeOf(
+            context,
+          )?.go('/trips/$tripId/stop/${entry.id}/edit'),
+        ),
+      );
+    }
+    return rows;
   }
 }
 
 /// travel pill 列：沿用 tile 的時間欄 + rail 縮排，rail 連線視覺連續。
 class _TravelRow extends StatelessWidget {
-  const _TravelRow({required this.travel});
+  const _TravelRow({
+    required this.tripId,
+    required this.travel,
+    required this.segment,
+    required this.fromTitle,
+    required this.toTitle,
+  });
 
+  final String tripId;
   final Travel travel;
+  final TripSegment? segment;
+  final String fromTitle;
+  final String toTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +293,22 @@ class _TravelRow extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: TpSpacing.s3),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: TravelPill(travel: travel),
+                child: TravelPill(
+                  travel: travel,
+                  isStale: segment?.isStale ?? false,
+                  onTap: segment == null
+                      ? null
+                      : () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (context) => TravelSegmentEditorSheet(
+                            tripId: tripId,
+                            segment: segment!,
+                            fromTitle: fromTitle,
+                            toTitle: toTitle,
+                          ),
+                        ),
+                ),
               ),
             ),
           ),
@@ -237,6 +316,48 @@ class _TravelRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SegmentErrorBanner extends StatelessWidget {
+  const _SegmentErrorBanner({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s4,
+        vertical: TpSpacing.s2,
+      ),
+      color: theme.colorScheme.errorContainer,
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 18,
+            color: theme.colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: TpSpacing.s2),
+          Expanded(
+            child: Text(
+              '交通段載入失敗，已暫用舊資料顯示',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('重試')),
+        ],
+      ),
+    );
+  }
+}
+
+String _segmentPairKey(int fromEntryId, int toEntryId) {
+  return '$fromEntryId:$toEntryId';
 }
 
 /// loading skeleton：非動畫灰階條列。

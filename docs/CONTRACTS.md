@@ -58,6 +58,11 @@ class TripDay {         // GET /trips/:id/days?all=1 item
 
 // entry.dart
 class Travel { final String type; final String? desc; final int? min; final int? distanceM; final String? source; }
+class TripSegment {
+  final int id; final String tripId; final int fromEntryId; final int toEntryId; final String mode;
+  final int? min; final int? distanceM; final String? source; final int? computedAt; final int? updatedAt; final int version;
+  bool get isStale; Travel toTravel();
+}
 class EntryPoiInfo {
   final int poiId; final String? name; final double? lat; final double? lng; final String? type; // poi_type enum 字串
   final String? category; final String? hours; final double? rating; final String? price; final String? note; final int? sortOrder;
@@ -233,6 +238,14 @@ class TripRepository {
     required List<TripDestinationInput> destinations,
   });                                                // PUT /trips/:id
   Future<List<TripDay>> fetchDays(String id);        // GET /trips/:id/days?all=1
+  Future<List<TripSegment>> fetchTripSegments(String tripId); // GET /trips/:id/segments
+  Future<TripSegment> updateTripSegment({
+    required String tripId,
+    required int segmentId,
+    required String mode,
+    int? min,
+    required int expectedVersion,
+  });                                                // PATCH /trips/:id/segments/:sid
   Future<TimelineEntry> fetchEntry(String tripId, int entryId); // GET /trips/:id/entries/:entryId
   Future<TimelineEntry> updateEntry(
     String tripId,
@@ -354,6 +367,7 @@ class PlaceholderScreen extends StatelessWidget { const PlaceholderScreen({requi
 // features/trip_detail/trip_providers.dart（由 timeline agent 實作，map/notes agent 只 import）
 final tripDetailProvider = FutureProvider.family<Trip, String>(...);
 final tripDaysProvider = FutureProvider.family<List<TripDay>, String>(...);
+final tripSegmentsProvider = FutureProvider.family<List<TripSegment>, String>(...);
 final entryDetailProvider = FutureProvider.family<TimelineEntry, ({String tripId, int entryId})>(...);
 final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 

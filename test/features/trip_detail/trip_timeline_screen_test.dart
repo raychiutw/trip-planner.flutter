@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -15,6 +19,8 @@ import 'package:tripline/theme/tokens.dart';
 const _tripId = 'okinawa-2026';
 
 const _fakeTrip = Trip(id: _tripId, name: '沖繩自駕 2026', title: '沖繩自駕五日');
+
+class _MockTripRepository extends Mock implements TripRepository {}
 
 /// 假 2 天行程：day 1 含 hotel + 三色 entries + travel；day 2 含 sage（transport）entry。
 const _fakeDays = [
@@ -121,6 +127,8 @@ Future<void> _pumpTimeline(
   WidgetTester tester, {
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
+  FutureOr<List<TripSegment>> Function()? fetchSegments,
+  TripRepository? repository,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
@@ -159,12 +167,17 @@ Future<void> _pumpTimeline(
       // 關閉 riverpod 3 預設自動 retry：error 測試需要 provider 停在 AsyncError
       retry: (retryCount, error) => null,
       overrides: [
+        if (repository != null)
+          tripRepositoryProvider.overrideWithValue(repository),
         tripDetailProvider(
           _tripId,
         ).overrideWith((ref) => (fetchTrip ?? () => _fakeTrip)()),
         tripDaysProvider(
           _tripId,
         ).overrideWith((ref) => (fetchDays ?? () => _fakeDays)()),
+        tripSegmentsProvider(_tripId).overrideWith(
+          (ref) => (fetchSegments ?? () => const <TripSegment>[])(),
+        ),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -180,6 +193,20 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
 }
 
 void main() {
+  const editableSegment = TripSegment(
+    id: 9001,
+    tripId: _tripId,
+    fromEntryId: 11,
+    toEntryId: 12,
+    mode: 'driving',
+    min: 18,
+    distanceM: 7400,
+    source: 'google',
+    computedAt: 1783500000000,
+    updatedAt: 1783500010000,
+    version: 4,
+  );
+
   testWidgets('AppBar 顯示行程標題與地圖/筆記 actions', (tester) async {
     await _pumpTimeline(tester);
 
@@ -244,6 +271,199 @@ void main() {
     expect(find.text('10 分鐘'), findsOneWidget);
     expect(find.byIcon(Icons.directions_car), findsNWidgets(2));
     expect(find.byIcon(Icons.directions_walk), findsOneWidget);
+  });
+
+  testWidgets('segments provider 覆蓋 legacy travel，點 pill 開啟移動方式編輯', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester, fetchSegments: () => const [editableSegment]);
+
+    expect(find.text('18 分鐘'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+
+    await tester.tap(find.text('18 分鐘'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('調整移動方式'), findsOneWidget);
+    expect(find.text('美麗海水族館 到 海人食堂'), findsOneWidget);
+    expect(find.text('開車'), findsOneWidget);
+    expect(find.text('步行'), findsOneWidget);
+    expect(find.text('大眾運輸'), findsOneWidget);
+  });
+
+  testWidgets('切換 walking 時 PATCH segment 並帶 expectedVersion', (tester) async {
+    final repository = _MockTripRepository();
+    when(
+      () => repository.updateTripSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        min: any(named: 'min'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 9001,
+        tripId: _tripId,
+        fromEntryId: 11,
+        toEntryId: 12,
+        mode: 'walking',
+        min: 12,
+        distanceM: 900,
+        source: 'google',
+        computedAt: 1783500020000,
+        updatedAt: 1783500020000,
+        version: 5,
+      ),
+    );
+
+    await _pumpTimeline(
+      tester,
+      fetchSegments: () => const [editableSegment],
+      repository: repository,
+    );
+
+    await tester.tap(find.text('18 分鐘'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('步行'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-segment-save')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repository.updateTripSegment(
+        tripId: _tripId,
+        segmentId: 9001,
+        mode: 'walking',
+        min: null,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('transit 分鐘需介於 1 到 1440，無效時不送 PATCH', (tester) async {
+    final repository = _MockTripRepository();
+
+    await _pumpTimeline(
+      tester,
+      fetchSegments: () => const [editableSegment],
+      repository: repository,
+    );
+
+    await tester.tap(find.text('18 分鐘'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('大眾運輸'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('travel-segment-min')),
+      '0',
+    );
+    await tester.tap(find.byKey(const ValueKey('travel-segment-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('大眾運輸時間需介於 1 到 1440 分鐘'), findsOneWidget);
+    verifyNever(
+      () => repository.updateTripSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        min: any(named: 'min'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    );
+  });
+
+  testWidgets('segment PATCH 遇到 STALE_ENTRY 時抓最新 version 後 retry', (
+    tester,
+  ) async {
+    final repository = _MockTripRepository();
+    const refreshedSegment = TripSegment(
+      id: 9001,
+      tripId: _tripId,
+      fromEntryId: 11,
+      toEntryId: 12,
+      mode: 'driving',
+      min: 19,
+      distanceM: 7600,
+      source: 'google',
+      computedAt: 1783500020000,
+      updatedAt: 1783500020000,
+      version: 6,
+    );
+    when(
+      () => repository.updateTripSegment(
+        tripId: _tripId,
+        segmentId: 9001,
+        mode: 'walking',
+        min: null,
+        expectedVersion: 4,
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'STALE_ENTRY',
+        message: 'expected version 4, current 6',
+      ),
+    );
+    when(
+      () => repository.fetchTripSegments(_tripId),
+    ).thenAnswer((_) async => const [refreshedSegment]);
+    when(
+      () => repository.updateTripSegment(
+        tripId: _tripId,
+        segmentId: 9001,
+        mode: 'walking',
+        min: null,
+        expectedVersion: 6,
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 9001,
+        tripId: _tripId,
+        fromEntryId: 11,
+        toEntryId: 12,
+        mode: 'walking',
+        min: 12,
+        distanceM: 900,
+        source: 'google',
+        computedAt: 1783500030000,
+        updatedAt: 1783500030000,
+        version: 7,
+      ),
+    );
+
+    await _pumpTimeline(
+      tester,
+      fetchSegments: () => const [editableSegment],
+      repository: repository,
+    );
+
+    await tester.tap(find.text('18 分鐘'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('步行'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-segment-save')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repository.updateTripSegment(
+        tripId: _tripId,
+        segmentId: 9001,
+        mode: 'walking',
+        min: null,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+    verify(() => repository.fetchTripSegments(_tripId)).called(1);
+    verify(
+      () => repository.updateTripSegment(
+        tripId: _tripId,
+        segmentId: 9001,
+        mode: 'walking',
+        min: null,
+        expectedVersion: 6,
+      ),
+    ).called(1);
   });
 
   testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {

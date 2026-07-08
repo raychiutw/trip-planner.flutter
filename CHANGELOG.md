@@ -13,7 +13,8 @@
 - **P1 Entry POI 變更**:新增 `/trips/:tripId/stop/:entryId/change-poi`;可用搜尋結果或收藏 POI 置換主景點,也可從 edit screen 加入備選景點,POI 變更帶 `entryPoisVersion` 避免覆蓋他人操作。
 - **P1 Entry 跨日操作**:新增 `/trips/:tripId/stop/:entryId/copy` 與 `/move`;edit screen 可進入複製/移動表單,copy 呼叫後端 copy endpoint,move 以 `day_id` + `expectedVersion` PATCH entry,成功後重算受影響 day 的 travel segments。
 - **P1 Entry 備選管理**:edit screen 顯示備選 POI 列表,支援移除與上/下移排序;移除以 DELETE query string 帶 `entryPoisVersion`,排序以 PATCH `/alternates/reorder` 帶完整 `order` 與 OCC token。
-- **P1 Entry OCC 重試**:edit、move、change-poi 與備選管理遇 `STALE_ENTRY` 時會重抓最新 entry,以新的 `version` / `entryPoisVersion` retry 同一個使用者操作一次。
+- **P1 Travel segments 編輯**:時間軸 travel pill 會讀取 `GET /trips/:id/segments` 作為 source of truth,可調整 driving / walking / transit;transit 需手填 1-1440 分鐘,mutation 以 `PATCH /segments/:sid` 帶 `expectedVersion`,成功後重新整理 segments 與 days。
+- **P1 Entry OCC 重試**:edit、move、change-poi、備選管理與 travel segments edit 遇 `STALE_ENTRY` 時會重抓最新 entry/segments,以新的 `version` / `entryPoisVersion` retry 同一個使用者操作一次。
 - **P1 AI 聊天**:`/chat` 由 placeholder 轉為 `ChatScreen`;會載入使用者行程、顯示 active trip 最近 request history、送出 `POST /requests` 後以 pending bubble 顯示「思考中...」並 polling `GET /requests/:id` 替換成 AI 回覆。
 - **P1 全域地圖**:`/map` 由 placeholder 轉為 `GlobalMapScreen`;會載入我的行程、預設第一趟行程並可切換行程,重用 `TripMapContent` 顯示 OSM pins/day tabs/entry cards;無行程時提供新增行程 CTA。
 - **P1 共編邀請**:新增 `/trips/:tripId/collab` 與 `/invite?token=...` 第一波;共編頁可讀取成員與 pending invitations、送出 member/viewer 邀請、撤回 pending 邀請、調整既有非 owner 成員角色並移除成員;邀請頁支援公開預覽、未登入登入 CTA、登入 email 相符後接受邀請並進入行程。

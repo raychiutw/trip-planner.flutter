@@ -557,6 +557,111 @@ void main() {
   });
 
   test(
+    'fetchTripSegments：GET /trips/:id/segments 解析 snake_case rows',
+    () async {
+      dioAdapter.onGet(
+        '/trips/okinawa-trip-2026-Ray/segments',
+        (server) => server.reply(200, [
+          {
+            'id': 9001,
+            'trip_id': 'okinawa-trip-2026-Ray',
+            'from_entry_id': 101,
+            'to_entry_id': 102,
+            'mode': 'driving',
+            'min': 18,
+            'distance_m': 7400,
+            'source': 'google',
+            'computed_at': 1783500000000,
+            'updated_at': 1783500010000,
+            'version': 4,
+          },
+        ]),
+      );
+
+      final segments = await tripRepository.fetchTripSegments(
+        'okinawa-trip-2026-Ray',
+      );
+
+      expect(segments, hasLength(1));
+      expect(segments.single.id, 9001);
+      expect(segments.single.tripId, 'okinawa-trip-2026-Ray');
+      expect(segments.single.fromEntryId, 101);
+      expect(segments.single.toEntryId, 102);
+      expect(segments.single.mode, 'driving');
+      expect(segments.single.min, 18);
+      expect(segments.single.distanceM, 7400);
+      expect(segments.single.version, 4);
+    },
+  );
+
+  test(
+    'updateTripSegment：PATCH /segments/:sid 帶 mode/min/expectedVersion',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa-trip-2026-Ray/segments/9001',
+        (server) => server.reply(200, {
+          'id': 9001,
+          'trip_id': 'okinawa-trip-2026-Ray',
+          'from_entry_id': 101,
+          'to_entry_id': 102,
+          'mode': 'transit',
+          'min': 32,
+          'distance_m': null,
+          'source': 'manual',
+          'computed_at': 1783500000000,
+          'updated_at': 1783500010000,
+          'version': 5,
+        }),
+        data: {'mode': 'transit', 'min': 32, 'expectedVersion': 4},
+      );
+
+      final segment = await tripRepository.updateTripSegment(
+        tripId: 'okinawa-trip-2026-Ray',
+        segmentId: 9001,
+        mode: 'transit',
+        min: 32,
+        expectedVersion: 4,
+      );
+
+      expect(segment.mode, 'transit');
+      expect(segment.min, 32);
+      expect(segment.source, 'manual');
+      expect(segment.version, 5);
+    },
+  );
+
+  test('updateTripSegment：driving/walking 不送 min', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026-Ray/segments/9001',
+      (server) => server.reply(200, {
+        'id': 9001,
+        'trip_id': 'okinawa-trip-2026-Ray',
+        'from_entry_id': 101,
+        'to_entry_id': 102,
+        'mode': 'walking',
+        'min': 12,
+        'distance_m': 900,
+        'source': 'google',
+        'computed_at': 1783500000000,
+        'updated_at': 1783500010000,
+        'version': 5,
+      }),
+      data: {'mode': 'walking', 'expectedVersion': 4},
+    );
+
+    final segment = await tripRepository.updateTripSegment(
+      tripId: 'okinawa-trip-2026-Ray',
+      segmentId: 9001,
+      mode: 'walking',
+      expectedVersion: 4,
+    );
+
+    expect(segment.mode, 'walking');
+    expect(segment.min, 12);
+    expect(segment.version, 5);
+  });
+
+  test(
     'fetchEntry：GET /trips/:id/entries/:eid 解析單一 entry 與 POI OCC token',
     () async {
       dioAdapter.onGet(

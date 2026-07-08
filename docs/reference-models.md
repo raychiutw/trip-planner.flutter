@@ -10,7 +10,7 @@
 
 | 規則 | 寫法 |
 |---|---|
-| wire format 是 **camelCase**(server `deepCamel()` 已轉) | 直接讀 camelCase key,不做 snake_case 轉換 |
+| wire format 多數是 **camelCase**(server `deepCamel()` 已轉) | 直接讀 camelCase key；少數 endpoint 仍回 snake_case 時在該 model 明確相容 |
 | 數字可能是 int 或 double | `(json['x'] as num?)?.toDouble()` / `?.toInt()` |
 | bool flag server 回 `0`/`1` 或 `true`/`false` | `json['published'] == 1 \|\| json['published'] == true` |
 | 日期時間全是**字串**,不存 DateTime | 顯示層需要時再 parse;entry 的 `startTime`/`endTime` 是 `"HH:MM"`、day 的 `date` 是 `"YYYY-MM-DD"` |
@@ -174,6 +174,24 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 | `desc`、`source` | `String?` | |
 | `min` | `int?` | 分鐘 |
 | `distanceM` | `int?` | 公尺 |
+
+### TripSegment — `GET /trips/:id/segments`
+
+`trip_segments` source of truth。後端目前回 snake_case row,model 同時相容 camelCase 以便未來 `deepCamel()` 後不需再改 UI。`TripTimelineScreen` 以 from/to entry pair 對應 timeline entry 之間的 travel pill。
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `id` | `int` | segment row id |
+| `tripId` | `String` | 來源 `trip_id` / `tripId` |
+| `fromEntryId`、`toEntryId` | `int` | 來源 `from_entry_id` / `to_entry_id` |
+| `mode` | `String` | `driving` / `walking` / `transit` |
+| `min` | `int?` | 分鐘；driving/walking 重算失敗時可保留舊值 |
+| `distanceM` | `int?` | 公尺；transit 為 null |
+| `source` | `String?` | `google` / `manual` |
+| `computedAt`、`updatedAt` | `int?` | epoch milliseconds；`computedAt == null` 表示 stale |
+| `version` | `int` | PATCH `/segments/:sid` 的 OCC token |
+
+helper：`isStale`、`toTravel()`。`toTravel()` 會把 `mode/min/distanceM/source` 轉成 timeline pill 顯示用的 `Travel`。
 
 ### EntryPoiInfo — entry 掛載的 POI(trip_entry_pois JOIN pois)
 

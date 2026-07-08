@@ -28,6 +28,62 @@ class Travel {
   }
 }
 
+/// `trip_segments` row；v2.29+ 的交通段 source of truth。
+class TripSegment {
+  const TripSegment({
+    required this.id,
+    required this.tripId,
+    required this.fromEntryId,
+    required this.toEntryId,
+    required this.mode,
+    this.min,
+    this.distanceM,
+    this.source,
+    this.computedAt,
+    this.updatedAt,
+    required this.version,
+  });
+
+  final int id;
+  final String tripId;
+  final int fromEntryId;
+  final int toEntryId;
+  final String mode;
+  final int? min;
+  final int? distanceM;
+  final String? source;
+  final int? computedAt;
+  final int? updatedAt;
+  final int version;
+
+  /// driving/walking 若 Routes 重算失敗，backend 會保留 min 並把 computed_at 清空。
+  bool get isStale => computedAt == null;
+
+  Travel toTravel() {
+    return Travel(type: mode, min: min, distanceM: distanceM, source: source);
+  }
+
+  factory TripSegment.fromJson(Map<String, dynamic> json) {
+    return TripSegment(
+      id: _readRequiredInt(json, 'id'),
+      tripId: _readRequiredString(json, 'tripId', snakeKey: 'trip_id'),
+      fromEntryId: _readRequiredInt(
+        json,
+        'fromEntryId',
+        snakeKey: 'from_entry_id',
+      ),
+      toEntryId: _readRequiredInt(json, 'toEntryId', snakeKey: 'to_entry_id'),
+      mode: _readRequiredString(json, 'mode'),
+      min: _readInt(json, 'min'),
+      distanceM: _readInt(json, 'distanceM', snakeKey: 'distance_m'),
+      source: _readString(json, 'source'),
+      computedAt: _readInt(json, 'computedAt', snakeKey: 'computed_at'),
+      updatedAt: _readInt(json, 'updatedAt', snakeKey: 'updated_at'),
+      version: _readRequiredInt(json, 'version'),
+    );
+  }
+}
+
 /// Entry 掛載的 POI 資訊（trip_entry_pois JOIN pois；除 poiId 外全 nullable）。
 class EntryPoiInfo {
   const EntryPoiInfo({
@@ -188,4 +244,34 @@ class EntryAlternatesReorderResult {
       entryPoisVersion: json['entryPoisVersion'] as String?,
     );
   }
+}
+
+Object? _readField(Map<String, dynamic> json, String key, {String? snakeKey}) {
+  if (json.containsKey(key)) return json[key];
+  if (snakeKey != null && json.containsKey(snakeKey)) return json[snakeKey];
+  return null;
+}
+
+String? _readString(Map<String, dynamic> json, String key, {String? snakeKey}) {
+  return _readField(json, key, snakeKey: snakeKey) as String?;
+}
+
+String _readRequiredString(
+  Map<String, dynamic> json,
+  String key, {
+  String? snakeKey,
+}) {
+  return _readString(json, key, snakeKey: snakeKey)!;
+}
+
+int? _readInt(Map<String, dynamic> json, String key, {String? snakeKey}) {
+  return (_readField(json, key, snakeKey: snakeKey) as num?)?.toInt();
+}
+
+int _readRequiredInt(
+  Map<String, dynamic> json,
+  String key, {
+  String? snakeKey,
+}) {
+  return _readInt(json, key, snakeKey: snakeKey)!;
 }

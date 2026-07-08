@@ -178,6 +178,14 @@ class TripRepository {
     required List<TripDestinationInput> destinations,
   }); // PUT /trips/:id
   Future<List<TripDay>>     fetchDays(String id);        // GET /trips/:id/days?all=1
+  Future<List<TripSegment>> fetchTripSegments(String tripId); // GET /trips/:id/segments
+  Future<TripSegment>       updateTripSegment({
+    required String tripId,
+    required int segmentId,
+    required String mode,
+    int? min,
+    required int expectedVersion,
+  }); // PATCH /trips/:id/segments/:sid
   Future<TimelineEntry>     fetchEntry(String tripId, int entryId); // GET /trips/:id/entries/:entryId
   Future<TimelineEntry>     updateEntry(
     String tripId,
@@ -291,10 +299,11 @@ class TripRepository {
 `fetchTripHealthReport` / `startTripHealthCheck` 對應 web `TripHealthCheckPage`。GET 解析 wrapper `{report}` 並允許 `report: null`;POST 送空 body 觸發後端建立 health-check request,回 pending `TripHealthReport`。`TripHealthScreen` 第一波用 `GET /trips/:id/health-check` 每 3 秒 polling report terminal state；若後端回 `TRIP_EMPTY`,畫面顯示 persistent error。
 `createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
+`fetchTripSegments` 讀取 `trip_segments` source of truth；後端目前回 snake_case row,由 `TripSegment.fromJson` 解析。`updateTripSegment` 對既有 segment 送 `mode` 與必填 `expectedVersion`;只有 `mode == 'transit'` 且 `min` 非 null 時送 `min`,driving/walking 讓後端依 from/to entry 座標重算。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。
 `copyEntry` 送 `POST /trips/:id/entries/:entryId/copy` 與 body `targetDayId`;`moveEntry` 復用 entry PATCH endpoint,body 使用 `day_id` 與必填 OCC `expectedVersion`。畫面成功後會對受影響 day 呼叫 `recomputeTravel`。
 `replaceEntryMasterPoi*`、`addEntryAlternate*`、`deleteEntryAlternate` 與 `reorderEntryAlternates` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。刪除備選因 DELETE 無 body,以 query string 帶 `entryPoisVersion`;排序 body 使用完整 alternate `poiId` 陣列 `order`（不含 master）。
-`EditEntryScreen`、`ChangePoiScreen` 與 `EntryActionScreen` 在 edit/move/POI mutation 收到 409 `STALE_ENTRY` 時會先 `fetchEntry`,再以最新 `version` 或 `entryPoisVersion` retry 同一個使用者操作一次；非 stale 錯誤不做自動 retry。
+`EditEntryScreen`、`ChangePoiScreen` 與 `EntryActionScreen` 在 edit/move/POI mutation 收到 409 `STALE_ENTRY` 時會先 `fetchEntry`,再以最新 `version` 或 `entryPoisVersion` retry 同一個使用者操作一次；travel segment edit 收到 `STALE_ENTRY` 時會先 `fetchTripSegments`,用同一 `id` 或同一 from/to pair 的最新 `version` retry 一次；非 stale 錯誤不做自動 retry。
 行程筆記 CRUD 第一波由 `fetchNotes` + 5 組 `createTrip*` / `updateTrip*` + `deleteTripNoteRow` 覆蓋。POST/PATCH body 送後端白名單 snake_case 欄位；PATCH 一律帶 notes row `expectedVersion`。`generateTripNotes` 只給行前須知/緊急聯絡用,docType 對齊後端 `tips` / `lodging-tips` / `emergency`,畫面會用回傳的 `requestId` 呼叫 `fetchTripRequest` polling terminal state 後重新整理 notes。
 `createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
 `createCustomEntry` 是 `AddEntryScreen` 自訂 tab / `/add-custom-stop` 使用的 map-pin path:送 `name`、`note`、`lat`、`lng`、`source: custom`、`time` 與 `poi_type`;client 會先驗證 title 非空與 lat/lng 範圍,成功後觸發 `recomputeTravel`。
@@ -330,6 +339,8 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 `build()` 即 `currentUser()` — app 啟動時自動以既存 session 驗證登入狀態。`signup()` 成功後會把 `SignupResult` 轉成最小 `UserInfo`,讓 router 立即視為已登入。router 的 redirect 邏輯依賴此 provider,見[導航參考](reference-navigation.md)。
 
 行程詳情層級的 scoped providers(`tripDetailProvider` 等 family)定義在 `lib/features/trip_detail/trip_providers.dart`,見[架構說明 — trip scope](explanation-architecture.md#trip-scope共用-fetch)。
+
+Trip detail scope 目前包含 `tripDetailProvider`、`tripDaysProvider`、`tripSegmentsProvider`、`entryDetailProvider` 與 `tripNotesProvider`。`TripTimelineScreen` 以 `tripSegmentsProvider` 覆蓋 legacy `TimelineEntry.travel`,segments 載入失敗時保留 days payload fallback 並顯示 persistent banner。
 
 ## 相關文件
 

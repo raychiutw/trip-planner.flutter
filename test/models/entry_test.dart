@@ -29,6 +29,60 @@ void main() {
     });
   });
 
+  group('TripSegment.fromJson', () {
+    test('解析後端 snake_case segment row', () {
+      final segment = TripSegment.fromJson({
+        'id': 42,
+        'trip_id': 'okinawa-2026',
+        'from_entry_id': 101,
+        'to_entry_id': 102,
+        'mode': 'driving',
+        'min': 25,
+        'distance_m': 12000,
+        'source': 'google',
+        'computed_at': 1783500000000,
+        'updated_at': 1783500010000,
+        'version': 7,
+      });
+
+      expect(segment.id, 42);
+      expect(segment.tripId, 'okinawa-2026');
+      expect(segment.fromEntryId, 101);
+      expect(segment.toEntryId, 102);
+      expect(segment.mode, 'driving');
+      expect(segment.min, 25);
+      expect(segment.distanceM, 12000);
+      expect(segment.source, 'google');
+      expect(segment.computedAt, 1783500000000);
+      expect(segment.updatedAt, 1783500010000);
+      expect(segment.version, 7);
+      expect(segment.isStale, isFalse);
+    });
+
+    test('支援 camelCase 欄位並可轉成 Travel 顯示資料', () {
+      final segment = TripSegment.fromJson({
+        'id': 43,
+        'tripId': 'okinawa-2026',
+        'fromEntryId': 102,
+        'toEntryId': 103,
+        'mode': 'transit',
+        'min': 35,
+        'distanceM': null,
+        'source': 'manual',
+        'computedAt': null,
+        'updatedAt': 1783500010000,
+        'version': 2,
+      });
+
+      expect(segment.isStale, isTrue);
+      final travel = segment.toTravel();
+      expect(travel.type, 'transit');
+      expect(travel.min, 35);
+      expect(travel.distanceM, isNull);
+      expect(travel.source, 'manual');
+    });
+  });
+
   group('EntryPoiInfo.fromJson', () {
     test('rating int 轉 double', () {
       final poiInfo = EntryPoiInfo.fromJson({

@@ -19,6 +19,13 @@ final tripDaysProvider = FutureProvider.family<List<TripDay>, String>((
   return ref.watch(tripRepositoryProvider).fetchDays(tripId);
 });
 
+final tripSegmentsProvider = FutureProvider.family<List<TripSegment>, String>((
+  ref,
+  tripId,
+) {
+  return ref.watch(tripRepositoryProvider).fetchTripSegments(tripId);
+});
+
 final entryDetailProvider =
     FutureProvider.family<TimelineEntry, ({String tripId, int entryId})>((
       ref,

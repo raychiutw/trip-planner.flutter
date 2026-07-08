@@ -285,6 +285,38 @@ class TripRepository {
         .toList();
   }
 
+  /// GET /trips/:id/segments（trip_segments source of truth）。
+  Future<List<TripSegment>> fetchTripSegments(String tripId) async {
+    final responseBody = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/segments',
+    );
+    return (responseBody as List<dynamic>)
+        .map(
+          (segmentJson) =>
+              TripSegment.fromJson(segmentJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// PATCH /trips/:id/segments/:sid，更新交通模式並帶 OCC version。
+  Future<TripSegment> updateTripSegment({
+    required String tripId,
+    required int segmentId,
+    required String mode,
+    int? min,
+    required int expectedVersion,
+  }) async {
+    final responseBody = await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/segments/${Uri.encodeComponent('$segmentId')}',
+      body: {
+        'mode': mode,
+        if (mode == 'transit' && min != null) 'min': min,
+        'expectedVersion': expectedVersion,
+      },
+    );
+    return TripSegment.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// GET /trips/:id/entries/:entryId。
   Future<TimelineEntry> fetchEntry(String tripId, int entryId) async {
     final responseBody = await _client.get(
