@@ -4,6 +4,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/trip.dart';
 
@@ -841,6 +842,198 @@ void main() {
     expect(tripNotes.flights.single.flightNo, 'IT232');
     expect(tripNotes.lodgings, isEmpty);
   });
+
+  test('createTripFlight：POST /notes/flights 使用 snake_case body', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/notes/flights',
+      (server) => server.reply(201, {
+        'id': 9,
+        'sortOrder': 0,
+        'version': 1,
+        'airline': '台灣虎航',
+        'flightNo': 'IT232',
+        'departAirport': 'TPE',
+        'arriveAirport': 'OKA',
+      }),
+      data: {
+        'airline': '台灣虎航',
+        'flight_no': 'IT232',
+        'depart_airport': 'TPE',
+        'arrive_airport': 'OKA',
+      },
+    );
+
+    final flight = await tripRepository.createTripFlight(
+      tripId: 'okinawa-trip-2026-Ray',
+      airline: '台灣虎航',
+      flightNo: 'IT232',
+      departAirport: 'TPE',
+      arriveAirport: 'OKA',
+    );
+
+    expect(flight.id, 9);
+    expect(flight.flightNo, 'IT232');
+  });
+
+  test('createTripLodging：POST /notes/lodgings 新增住宿', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/notes/lodgings',
+      (server) => server.reply(201, {
+        'id': 10,
+        'sortOrder': 0,
+        'version': 1,
+        'name': '那霸海濱飯店',
+        'address': '沖繩縣那霸市',
+      }),
+      data: {'name': '那霸海濱飯店', 'address': '沖繩縣那霸市'},
+    );
+
+    final lodging = await tripRepository.createTripLodging(
+      tripId: 'okinawa-trip-2026-Ray',
+      name: '那霸海濱飯店',
+      address: '沖繩縣那霸市',
+    );
+
+    expect(lodging.id, 10);
+    expect(lodging.name, '那霸海濱飯店');
+  });
+
+  test(
+    'updateTripReservation：PATCH /notes/reservations/:rowId 帶 OCC',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa-trip-2026-Ray/notes/reservations/21',
+        (server) => server.reply(200, {
+          'id': 21,
+          'sortOrder': 0,
+          'version': 8,
+          'kind': 'restaurant',
+          'title': '燒肉乃我那霸',
+          'partySize': 4,
+        }),
+        data: {
+          'kind': 'restaurant',
+          'title': '燒肉乃我那霸',
+          'party_size': 4,
+          'expectedVersion': 7,
+        },
+      );
+
+      final reservation = await tripRepository.updateTripReservation(
+        tripId: 'okinawa-trip-2026-Ray',
+        rowId: 21,
+        expectedVersion: 7,
+        kind: 'restaurant',
+        title: '燒肉乃我那霸',
+        partySize: 4,
+      );
+
+      expect(reservation.version, 8);
+      expect(reservation.partySize, 4);
+    },
+  );
+
+  test('updateTripPretripNote：PATCH /notes/pretrip/:rowId 更新標題內容', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa-trip-2026-Ray/notes/pretrip/31',
+      (server) => server.reply(200, {
+        'id': 31,
+        'sortOrder': 0,
+        'version': 3,
+        'title': '日幣兌換',
+        'content': '機場 ATM 通常比臨櫃划算。',
+      }),
+      data: {
+        'title': '日幣兌換',
+        'content': '機場 ATM 通常比臨櫃划算。',
+        'expectedVersion': 2,
+      },
+    );
+
+    final note = await tripRepository.updateTripPretripNote(
+      tripId: 'okinawa-trip-2026-Ray',
+      rowId: 31,
+      expectedVersion: 2,
+      title: '日幣兌換',
+      content: '機場 ATM 通常比臨櫃划算。',
+    );
+
+    expect(note.version, 3);
+    expect(note.title, '日幣兌換');
+  });
+
+  test(
+    'updateTripEmergencyContact：PATCH /notes/emergency/:rowId 更新聯絡人',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa-trip-2026-Ray/notes/emergency/41',
+        (server) => server.reply(200, {
+          'id': 41,
+          'sortOrder': 0,
+          'version': 4,
+          'name': '日本警察',
+          'kind': 'police',
+          'phone': '110',
+        }),
+        data: {
+          'name': '日本警察',
+          'kind': 'police',
+          'phone': '110',
+          'expectedVersion': 3,
+        },
+      );
+
+      final contact = await tripRepository.updateTripEmergencyContact(
+        tripId: 'okinawa-trip-2026-Ray',
+        rowId: 41,
+        expectedVersion: 3,
+        name: '日本警察',
+        kind: 'police',
+        phone: '110',
+      );
+
+      expect(contact.version, 4);
+      expect(contact.kind, 'police');
+    },
+  );
+
+  test('deleteTripNoteRow：DELETE /notes/:section/:rowId', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa-trip-2026-Ray/notes/emergency/41',
+      (server) => server.reply(200, {'ok': true}),
+    );
+
+    await tripRepository.deleteTripNoteRow(
+      tripId: 'okinawa-trip-2026-Ray',
+      section: TripNoteSection.emergency,
+      rowId: 41,
+    );
+  });
+
+  test(
+    'generateTripNotes：POST /notes/:docType/generate 解析 request id',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa-trip-2026-Ray/notes/tips/generate',
+        (server) => server.reply(202, {
+          'jobId': 77,
+          'requestId': 9901,
+          'status': 'pending',
+          'tripId': 'okinawa-trip-2026-Ray',
+          'docType': 'tips',
+        }),
+        data: <String, dynamic>{},
+      );
+
+      final job = await tripRepository.generateTripNotes(
+        tripId: 'okinawa-trip-2026-Ray',
+        docType: 'tips',
+      );
+
+      expect(job.jobId, 77);
+      expect(job.requestId, 9901);
+    },
+  );
 
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));

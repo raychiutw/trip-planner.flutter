@@ -100,12 +100,14 @@ class InvitationPreview {
 class InvitationAcceptResult { final bool ok; final String tripId; final String tripTitle; }
 
 // notes.dart — 5 個 row class 共通欄位：int id, int sortOrder, int version；文字欄位非 null 預設 ''
+enum TripNoteSection { flights, lodgings, reservations, pretrip, emergency }
 class TripFlight { airline, flightNo, cabinClass, departAirport, arriveAirport, departAt, arriveAt, note — 全 String }
 class TripLodging { name, address, checkInAt, checkOutAt, bookingNo, phone, note — String; final int? dayId; }
 class TripReservation { final String kind; title, reservedAt, reservationNo, phone, note — String; final int partySize; }
 class TripPretripNote { section, title, content — String; final bool aiGenerated; }
 class TripEmergencyContact { name, relationship, phone, email — String; final String kind; final bool aiGenerated; }
 class TripNotes { final List<TripFlight> flights; final List<TripLodging> lodgings; final List<TripReservation> reservations; final List<TripPretripNote> pretripNotes; final List<TripEmergencyContact> emergencyContacts; }
+class TripNoteAiGenerationJob { final int jobId; final int requestId; final String status; final String tripId; final String docType; }
 
 // user.dart
 class UserInfo { final String id; final String email; final bool emailVerified; final String? displayName; final String? avatarUrl; }
@@ -268,6 +270,18 @@ class TripRepository {
     required String? entryPoisVersion,
   });                                                // PATCH /trips/:id/entries/:entryId/alternates/reorder
   Future<TripNotes> fetchNotes(String id);           // GET /trips/:id/notes
+  Future<TripFlight> createTripFlight({required String tripId, String? airline, String? flightNo, String? cabinClass, String? departAirport, String? arriveAirport, String? departAt, String? arriveAt, String? note}); // POST /trips/:id/notes/flights
+  Future<TripFlight> updateTripFlight({required String tripId, required int rowId, required int expectedVersion, String? airline, String? flightNo, String? cabinClass, String? departAirport, String? arriveAirport, String? departAt, String? arriveAt, String? note}); // PATCH /trips/:id/notes/flights/:rowId
+  Future<TripLodging> createTripLodging({required String tripId, String? name, String? address, String? checkInAt, String? checkOutAt, String? bookingNo, String? phone, String? note}); // POST /trips/:id/notes/lodgings
+  Future<TripLodging> updateTripLodging({required String tripId, required int rowId, required int expectedVersion, String? name, String? address, String? checkInAt, String? checkOutAt, String? bookingNo, String? phone, String? note}); // PATCH /trips/:id/notes/lodgings/:rowId
+  Future<TripReservation> createTripReservation({required String tripId, String? kind, String? title, String? reservedAt, int? partySize, String? reservationNo, String? phone, String? note}); // POST /trips/:id/notes/reservations
+  Future<TripReservation> updateTripReservation({required String tripId, required int rowId, required int expectedVersion, String? kind, String? title, String? reservedAt, int? partySize, String? reservationNo, String? phone, String? note}); // PATCH /trips/:id/notes/reservations/:rowId
+  Future<TripPretripNote> createTripPretripNote({required String tripId, String? section, String? title, String? content}); // POST /trips/:id/notes/pretrip
+  Future<TripPretripNote> updateTripPretripNote({required String tripId, required int rowId, required int expectedVersion, String? section, String? title, String? content}); // PATCH /trips/:id/notes/pretrip/:rowId
+  Future<TripEmergencyContact> createTripEmergencyContact({required String tripId, String? name, String? relationship, String? phone, String? email, String? kind}); // POST /trips/:id/notes/emergency
+  Future<TripEmergencyContact> updateTripEmergencyContact({required String tripId, required int rowId, required int expectedVersion, String? name, String? relationship, String? phone, String? email, String? kind}); // PATCH /trips/:id/notes/emergency/:rowId
+  Future<void> deleteTripNoteRow({required String tripId, required TripNoteSection section, required int rowId}); // DELETE /trips/:id/notes/:section/:rowId
+  Future<TripNoteAiGenerationJob> generateTripNotes({required String tripId, required String docType}); // POST /trips/:id/notes/:docType/generate
   Future<void> deleteTrip(String id);
   Future<AccountStats> fetchStats();                 // GET /account/stats
   Future<UserInfo> updateProfile({String? displayName}); // PATCH /account/profile
@@ -337,7 +351,7 @@ class ChangePoiScreen extends ConsumerStatefulWidget;  // features/trip_detail/c
 class EntryActionScreen extends ConsumerStatefulWidget; // features/trip_detail/entry_action_screen.dart（接受 tripId, entryId, action）
 class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
 class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
-class TripNotesScreen extends ConsumerWidget;          // features/trip_detail/trip_notes_screen.dart
+class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 ```
 

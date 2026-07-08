@@ -424,6 +424,301 @@ class TripRepository {
     return TripNotes.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// POST /trips/:id/notes/flights，新增航班筆記 row。
+  Future<TripFlight> createTripFlight({
+    required String tripId,
+    String? airline,
+    String? flightNo,
+    String? cabinClass,
+    String? departAirport,
+    String? arriveAirport,
+    String? departAt,
+    String? arriveAt,
+    String? note,
+  }) {
+    return _createNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.flights,
+      body: {
+        'airline': ?airline?.trim(),
+        'flight_no': ?flightNo?.trim(),
+        'cabin_class': ?cabinClass?.trim(),
+        'depart_airport': ?departAirport?.trim(),
+        'arrive_airport': ?arriveAirport?.trim(),
+        'depart_at': ?departAt?.trim(),
+        'arrive_at': ?arriveAt?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripFlight.fromJson,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/flights/:rowId，更新航班並帶 OCC。
+  Future<TripFlight> updateTripFlight({
+    required String tripId,
+    required int rowId,
+    required int expectedVersion,
+    String? airline,
+    String? flightNo,
+    String? cabinClass,
+    String? departAirport,
+    String? arriveAirport,
+    String? departAt,
+    String? arriveAt,
+    String? note,
+  }) {
+    return _updateNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.flights,
+      rowId: rowId,
+      expectedVersion: expectedVersion,
+      body: {
+        'airline': ?airline?.trim(),
+        'flight_no': ?flightNo?.trim(),
+        'cabin_class': ?cabinClass?.trim(),
+        'depart_airport': ?departAirport?.trim(),
+        'arrive_airport': ?arriveAirport?.trim(),
+        'depart_at': ?departAt?.trim(),
+        'arrive_at': ?arriveAt?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripFlight.fromJson,
+    );
+  }
+
+  /// POST /trips/:id/notes/lodgings，新增住宿筆記 row。
+  Future<TripLodging> createTripLodging({
+    required String tripId,
+    String? name,
+    String? address,
+    String? checkInAt,
+    String? checkOutAt,
+    String? bookingNo,
+    String? phone,
+    String? note,
+  }) {
+    return _createNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.lodgings,
+      body: {
+        'name': ?name?.trim(),
+        'address': ?address?.trim(),
+        'check_in_at': ?checkInAt?.trim(),
+        'check_out_at': ?checkOutAt?.trim(),
+        'booking_no': ?bookingNo?.trim(),
+        'phone': ?phone?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripLodging.fromJson,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/lodgings/:rowId，更新住宿並帶 OCC。
+  Future<TripLodging> updateTripLodging({
+    required String tripId,
+    required int rowId,
+    required int expectedVersion,
+    String? name,
+    String? address,
+    String? checkInAt,
+    String? checkOutAt,
+    String? bookingNo,
+    String? phone,
+    String? note,
+  }) {
+    return _updateNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.lodgings,
+      rowId: rowId,
+      expectedVersion: expectedVersion,
+      body: {
+        'name': ?name?.trim(),
+        'address': ?address?.trim(),
+        'check_in_at': ?checkInAt?.trim(),
+        'check_out_at': ?checkOutAt?.trim(),
+        'booking_no': ?bookingNo?.trim(),
+        'phone': ?phone?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripLodging.fromJson,
+    );
+  }
+
+  /// POST /trips/:id/notes/reservations，新增預訂筆記 row。
+  Future<TripReservation> createTripReservation({
+    required String tripId,
+    String? kind,
+    String? title,
+    String? reservedAt,
+    int? partySize,
+    String? reservationNo,
+    String? phone,
+    String? note,
+  }) {
+    return _createNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.reservations,
+      body: {
+        'kind': ?kind?.trim(),
+        'title': ?title?.trim(),
+        'reserved_at': ?reservedAt?.trim(),
+        'party_size': ?partySize,
+        'reservation_no': ?reservationNo?.trim(),
+        'phone': ?phone?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripReservation.fromJson,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/reservations/:rowId，更新預訂並帶 OCC。
+  Future<TripReservation> updateTripReservation({
+    required String tripId,
+    required int rowId,
+    required int expectedVersion,
+    String? kind,
+    String? title,
+    String? reservedAt,
+    int? partySize,
+    String? reservationNo,
+    String? phone,
+    String? note,
+  }) {
+    return _updateNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.reservations,
+      rowId: rowId,
+      expectedVersion: expectedVersion,
+      body: {
+        'kind': ?kind?.trim(),
+        'title': ?title?.trim(),
+        'reserved_at': ?reservedAt?.trim(),
+        'party_size': ?partySize,
+        'reservation_no': ?reservationNo?.trim(),
+        'phone': ?phone?.trim(),
+        'note': ?note?.trim(),
+      },
+      fromJson: TripReservation.fromJson,
+    );
+  }
+
+  /// POST /trips/:id/notes/pretrip，新增行前須知 row。
+  Future<TripPretripNote> createTripPretripNote({
+    required String tripId,
+    String? section,
+    String? title,
+    String? content,
+  }) {
+    return _createNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.pretrip,
+      body: {
+        'section': ?section?.trim(),
+        'title': ?title?.trim(),
+        'content': ?content?.trim(),
+      },
+      fromJson: TripPretripNote.fromJson,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/pretrip/:rowId，更新行前須知並帶 OCC。
+  Future<TripPretripNote> updateTripPretripNote({
+    required String tripId,
+    required int rowId,
+    required int expectedVersion,
+    String? section,
+    String? title,
+    String? content,
+  }) {
+    return _updateNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.pretrip,
+      rowId: rowId,
+      expectedVersion: expectedVersion,
+      body: {
+        'section': ?section?.trim(),
+        'title': ?title?.trim(),
+        'content': ?content?.trim(),
+      },
+      fromJson: TripPretripNote.fromJson,
+    );
+  }
+
+  /// POST /trips/:id/notes/emergency，新增緊急聯絡 row。
+  Future<TripEmergencyContact> createTripEmergencyContact({
+    required String tripId,
+    String? name,
+    String? relationship,
+    String? phone,
+    String? email,
+    String? kind,
+  }) {
+    return _createNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.emergency,
+      body: {
+        'name': ?name?.trim(),
+        'relationship': ?relationship?.trim(),
+        'phone': ?phone?.trim(),
+        'email': ?email?.trim(),
+        'kind': ?kind?.trim(),
+      },
+      fromJson: TripEmergencyContact.fromJson,
+    );
+  }
+
+  /// PATCH /trips/:id/notes/emergency/:rowId，更新緊急聯絡並帶 OCC。
+  Future<TripEmergencyContact> updateTripEmergencyContact({
+    required String tripId,
+    required int rowId,
+    required int expectedVersion,
+    String? name,
+    String? relationship,
+    String? phone,
+    String? email,
+    String? kind,
+  }) {
+    return _updateNoteRow(
+      tripId: tripId,
+      section: TripNoteSection.emergency,
+      rowId: rowId,
+      expectedVersion: expectedVersion,
+      body: {
+        'name': ?name?.trim(),
+        'relationship': ?relationship?.trim(),
+        'phone': ?phone?.trim(),
+        'email': ?email?.trim(),
+        'kind': ?kind?.trim(),
+      },
+      fromJson: TripEmergencyContact.fromJson,
+    );
+  }
+
+  /// DELETE /trips/:id/notes/:section/:rowId。
+  Future<void> deleteTripNoteRow({
+    required String tripId,
+    required TripNoteSection section,
+    required int rowId,
+  }) {
+    return _client.delete(
+      '${_noteSectionPath(tripId, section)}/${Uri.encodeComponent('$rowId')}',
+    );
+  }
+
+  /// POST /trips/:id/notes/:docType/generate，觸發 AI 生成筆記。
+  Future<TripNoteAiGenerationJob> generateTripNotes({
+    required String tripId,
+    required String docType,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${Uri.encodeComponent(docType)}/generate',
+      body: <String, dynamic>{},
+    );
+    return TripNoteAiGenerationJob.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
   /// DELETE /trips/:id（限 owner/admin）。
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
@@ -632,6 +927,38 @@ class TripRepository {
         .toList();
     if (entries.isEmpty) return path;
     return '$path?${entries.join('&')}';
+  }
+
+  String _noteSectionPath(String tripId, TripNoteSection section) {
+    return '/trips/${Uri.encodeComponent(tripId)}/notes/${section.pathSegment}';
+  }
+
+  Future<T> _createNoteRow<T>({
+    required String tripId,
+    required TripNoteSection section,
+    required Map<String, dynamic> body,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) async {
+    final responseBody = await _client.post(
+      _noteSectionPath(tripId, section),
+      body: body,
+    );
+    return fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  Future<T> _updateNoteRow<T>({
+    required String tripId,
+    required TripNoteSection section,
+    required int rowId,
+    required int expectedVersion,
+    required Map<String, dynamic> body,
+    required T Function(Map<String, dynamic> json) fromJson,
+  }) async {
+    final responseBody = await _client.patch(
+      '${_noteSectionPath(tripId, section)}/${Uri.encodeComponent('$rowId')}',
+      body: {...body, 'expectedVersion': expectedVersion},
+    );
+    return fromJson(responseBody as Map<String, dynamic>);
   }
 
   List<Map<String, dynamic>> _destinationPayload(

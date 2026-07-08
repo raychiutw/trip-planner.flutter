@@ -3,6 +3,21 @@
 /// `NOT NULL DEFAULT ''`，缺漏時預設空字串。
 library;
 
+/// 行程筆記 section，對應 `/trips/:id/notes/:section` 的路徑片段。
+enum TripNoteSection { flights, lodgings, reservations, pretrip, emergency }
+
+extension TripNoteSectionPath on TripNoteSection {
+  String get pathSegment {
+    return switch (this) {
+      TripNoteSection.flights => 'flights',
+      TripNoteSection.lodgings => 'lodgings',
+      TripNoteSection.reservations => 'reservations',
+      TripNoteSection.pretrip => 'pretrip',
+      TripNoteSection.emergency => 'emergency',
+    };
+  }
+}
+
 /// 航班（trip_flights）。
 class TripFlight {
   const TripFlight({
@@ -234,25 +249,65 @@ class TripNotes {
   factory TripNotes.fromJson(Map<String, dynamic> json) {
     return TripNotes(
       flights: (json['flights'] as List<dynamic>? ?? [])
-          .map((flightJson) =>
-              TripFlight.fromJson(flightJson as Map<String, dynamic>))
+          .map(
+            (flightJson) =>
+                TripFlight.fromJson(flightJson as Map<String, dynamic>),
+          )
           .toList(),
       lodgings: (json['lodgings'] as List<dynamic>? ?? [])
-          .map((lodgingJson) =>
-              TripLodging.fromJson(lodgingJson as Map<String, dynamic>))
+          .map(
+            (lodgingJson) =>
+                TripLodging.fromJson(lodgingJson as Map<String, dynamic>),
+          )
           .toList(),
       reservations: (json['reservations'] as List<dynamic>? ?? [])
-          .map((reservationJson) =>
-              TripReservation.fromJson(reservationJson as Map<String, dynamic>))
+          .map(
+            (reservationJson) => TripReservation.fromJson(
+              reservationJson as Map<String, dynamic>,
+            ),
+          )
           .toList(),
       pretripNotes: (json['pretripNotes'] as List<dynamic>? ?? [])
-          .map((pretripNoteJson) =>
-              TripPretripNote.fromJson(pretripNoteJson as Map<String, dynamic>))
+          .map(
+            (pretripNoteJson) => TripPretripNote.fromJson(
+              pretripNoteJson as Map<String, dynamic>,
+            ),
+          )
           .toList(),
       emergencyContacts: (json['emergencyContacts'] as List<dynamic>? ?? [])
-          .map((contactJson) => TripEmergencyContact.fromJson(
-              contactJson as Map<String, dynamic>))
+          .map(
+            (contactJson) => TripEmergencyContact.fromJson(
+              contactJson as Map<String, dynamic>,
+            ),
+          )
           .toList(),
+    );
+  }
+}
+
+/// `POST /trips/:id/notes/:docType/generate` 回傳的 AI 生成 job。
+class TripNoteAiGenerationJob {
+  const TripNoteAiGenerationJob({
+    required this.jobId,
+    required this.requestId,
+    required this.status,
+    required this.tripId,
+    required this.docType,
+  });
+
+  final int jobId;
+  final int requestId;
+  final String status;
+  final String tripId;
+  final String docType;
+
+  factory TripNoteAiGenerationJob.fromJson(Map<String, dynamic> json) {
+    return TripNoteAiGenerationJob(
+      jobId: (json['jobId'] as num).toInt(),
+      requestId: (json['requestId'] as num).toInt(),
+      status: json['status'] as String? ?? 'pending',
+      tripId: json['tripId'] as String? ?? '',
+      docType: json['docType'] as String? ?? '',
     );
   }
 }

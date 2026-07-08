@@ -224,6 +224,18 @@ class TripRepository {
     required String? entryPoisVersion,
   }); // PATCH /trips/:id/entries/:entryId/alternates/reorder
   Future<TripNotes>         fetchNotes(String id);       // GET /trips/:id/notes
+  Future<TripFlight>        createTripFlight({required String tripId, String? airline, String? flightNo, String? cabinClass, String? departAirport, String? arriveAirport, String? departAt, String? arriveAt, String? note}); // POST /trips/:id/notes/flights
+  Future<TripFlight>        updateTripFlight({required String tripId, required int rowId, required int expectedVersion, String? airline, String? flightNo, String? cabinClass, String? departAirport, String? arriveAirport, String? departAt, String? arriveAt, String? note}); // PATCH /trips/:id/notes/flights/:rowId
+  Future<TripLodging>       createTripLodging({required String tripId, String? name, String? address, String? checkInAt, String? checkOutAt, String? bookingNo, String? phone, String? note}); // POST /trips/:id/notes/lodgings
+  Future<TripLodging>       updateTripLodging({required String tripId, required int rowId, required int expectedVersion, String? name, String? address, String? checkInAt, String? checkOutAt, String? bookingNo, String? phone, String? note}); // PATCH /trips/:id/notes/lodgings/:rowId
+  Future<TripReservation>   createTripReservation({required String tripId, String? kind, String? title, String? reservedAt, int? partySize, String? reservationNo, String? phone, String? note}); // POST /trips/:id/notes/reservations
+  Future<TripReservation>   updateTripReservation({required String tripId, required int rowId, required int expectedVersion, String? kind, String? title, String? reservedAt, int? partySize, String? reservationNo, String? phone, String? note}); // PATCH /trips/:id/notes/reservations/:rowId
+  Future<TripPretripNote>   createTripPretripNote({required String tripId, String? section, String? title, String? content}); // POST /trips/:id/notes/pretrip
+  Future<TripPretripNote>   updateTripPretripNote({required String tripId, required int rowId, required int expectedVersion, String? section, String? title, String? content}); // PATCH /trips/:id/notes/pretrip/:rowId
+  Future<TripEmergencyContact> createTripEmergencyContact({required String tripId, String? name, String? relationship, String? phone, String? email, String? kind}); // POST /trips/:id/notes/emergency
+  Future<TripEmergencyContact> updateTripEmergencyContact({required String tripId, required int rowId, required int expectedVersion, String? name, String? relationship, String? phone, String? email, String? kind}); // PATCH /trips/:id/notes/emergency/:rowId
+  Future<void>              deleteTripNoteRow({required String tripId, required TripNoteSection section, required int rowId}); // DELETE /trips/:id/notes/:section/:rowId
+  Future<TripNoteAiGenerationJob> generateTripNotes({required String tripId, required String docType}); // POST /trips/:id/notes/:docType/generate
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
@@ -270,6 +282,7 @@ class TripRepository {
 `copyEntry` 送 `POST /trips/:id/entries/:entryId/copy` 與 body `targetDayId`;`moveEntry` 復用 entry PATCH endpoint,body 使用 `day_id` 與必填 OCC `expectedVersion`。畫面成功後會對受影響 day 呼叫 `recomputeTravel`。
 `replaceEntryMasterPoi*`、`addEntryAlternate*`、`deleteEntryAlternate` 與 `reorderEntryAlternates` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。刪除備選因 DELETE 無 body,以 query string 帶 `entryPoisVersion`;排序 body 使用完整 alternate `poiId` 陣列 `order`（不含 master）。
 `EditEntryScreen`、`ChangePoiScreen` 與 `EntryActionScreen` 在 edit/move/POI mutation 收到 409 `STALE_ENTRY` 時會先 `fetchEntry`,再以最新 `version` 或 `entryPoisVersion` retry 同一個使用者操作一次；非 stale 錯誤不做自動 retry。
+行程筆記 CRUD 第一波由 `fetchNotes` + 5 組 `createTrip*` / `updateTrip*` + `deleteTripNoteRow` 覆蓋。POST/PATCH body 送後端白名單 snake_case 欄位；PATCH 一律帶 notes row `expectedVersion`。`generateTripNotes` 只給行前須知/緊急聯絡用,docType 對齊後端 `tips` / `lodging-tips` / `emergency`,畫面會用回傳的 `requestId` 呼叫 `fetchTripRequest` polling terminal state 後重新整理 notes。
 `createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
 `createCustomEntry` 是 `AddEntryScreen` 自訂 tab / `/add-custom-stop` 使用的 map-pin path:送 `name`、`note`、`lat`、`lng`、`source: custom`、`time` 與 `poi_type`;client 會先驗證 title 非空與 lat/lng 範圍,成功後觸發 `recomputeTravel`。
 `AddEntryScreen` 收藏 tab 仍走 `addPoiFavoriteToTrip` 的 4-field favorite fast-path,成功後同樣觸發 `recomputeTravel`。

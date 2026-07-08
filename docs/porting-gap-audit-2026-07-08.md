@@ -20,7 +20,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 部分翻 | 補 filter/sort/search、新增、分享、menu actions |
 | `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 部分翻 | 補 action menu、focus/deeplink、segment 即時 refetch |
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` → `TripMapScreen` | 部分翻 | 補 entry focus route、pin/card 雙向同步、路線/定位控制 |
-| `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 唯讀翻寫 | 補 5 區 CRUD + AI generate/pending |
+| `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 已翻第一波 | 後續可補 drag reorder、autosave-on-blur 與更完整 web parity |
 | `/account` → `AccountPage` | `/account` → `AccountScreen` | 部分翻 | 補 displayName inline edit、settings rows 導航 |
 | `/chat` → `ChatPage` | `/chat` → `ChatScreen` | 已翻第一波 | 後續可補 SSE、歷史分頁與更完整 trip picker parity |
 | `/map` → `GlobalMapPage` | `/map` → `GlobalMapScreen` | 已翻第一波 | 後續可補 active trip persistence、定位 FAB 與更完整 web sheet parity |
@@ -47,7 +47,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 - **TripsListScreen**：目前有單欄清單、下拉更新、AppBar/空狀態新增入口、長按編輯/刪除。尚缺分類 tabs（全部/我的/共編/已歸檔）、排序、搜尋、匯入、完整 TripCardMenu（共編/健檢/筆記/分享等）、尾端新增卡、filtered empty。
 - **TripTimelineScreen**：目前有 day pills + timeline + travel pill + map/notes/add-entry actions。尚缺 scroll-spy 自動同步 active day、今日自動定位、`focus` entry deep link、offline banner、segment 即時 refetch、行程切換 dropdown、overflow actions。
 - **TripMapScreen**：目前是 OSM pins + day tabs + entry cards。尚缺 `stop/:entryId/map` focus route、pin/card 雙向同步、overview 點 pin 自動切 day、路線 polyline、圖層/我的位置 FAB。
-- **TripNotesScreen**：目前 5-section accordion 唯讀。尚缺 CRUD、OCC、AI generate、request pending 狀態。
+- **TripNotesScreen**：目前 5-section accordion 已支援 5 區新增/編輯/刪除、notes row OCC `expectedVersion`、行前須知/緊急聯絡 AI generate 與 request polling pending 狀態；尚缺 drag reorder、autosave-on-blur 等 web parity 細節。
 - **AccountScreen**：目前 profile/stat/logout 可用。尚缺 displayName inline edit UI、外觀/通知/connected apps/sessions/developer rows 實際頁面。
 
 ## P1 建議切分
@@ -91,6 +91,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 7. **Notes CRUD + AI**
    - Routes：沿用 `/trips/:id/notes`
    - API：5 section CRUD、`/notes/:docType/generate`、request pending refresh
+   - 狀態：已完成第一波 5 區新增/編輯/刪除、AI generate/polling；後續補 reorder / autosave parity。
    - 理由：現有 notes models 已解析 5 區，是可漸進升級的 P1。
 
 8. **Health check**
@@ -118,7 +119,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Notes CRUD + AI**、**AI 健檢** 或 **Auth 補齊**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波。
+下一個 Build branch 建議接 **AI 健檢**、**Auth 補齊** 或 **Trip action parity**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波。
 
 1. 若續做 Trip action surface：優先補 edit day management 或 segments edit,避免與既有 entry mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。

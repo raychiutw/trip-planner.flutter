@@ -217,6 +217,8 @@ helper `mapPoiCategoryToType` 會把 Google primaryType / 既有 `poiType` 映�
 
 `GET /trips/:id/notes` 回應的 5 區聚合。5 個 row class 共通欄位:`id: int`、`sortOrder: int`、`version: int`;文字欄位 DB 為 `NOT NULL DEFAULT ''`,缺漏一律預設 `''`(非 null)。
 
+`TripNoteSection` 對應 row mutation path segment:`flights`、`lodgings`、`reservations`、`pretrip`、`emergency`;repository 的 `deleteTripNoteRow` 使用此 enum 避免手寫 path 字串。
+
 | Class | 專屬欄位 |
 |---|---|
 | `TripFlight`(航班) | `airline`、`flightNo`、`cabinClass`、`departAirport`、`arriveAirport`、`departAt`、`arriveAt`(ISO8601 local datetime 字串)、`note` |
@@ -234,6 +236,10 @@ class TripNotes {
   final List<TripEmergencyContact> emergencyContacts;
 }
 ```
+
+### TripNoteAiGenerationJob — `POST /trips/:id/notes/:docType/generate`
+
+`jobId: int`、`requestId: int`、`status: String`、`tripId: String`、`docType: String`。`TripNotesScreen` 會用 `requestId` polling `GET /requests/:id`;完成後重新整理 `tripNotesProvider`。
 
 ## user.dart
 

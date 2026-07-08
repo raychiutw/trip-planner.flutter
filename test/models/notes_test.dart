@@ -32,7 +32,11 @@ void main() {
     });
 
     test('文字欄位缺漏時預設空字串', () {
-      final flight = TripFlight.fromJson({'id': 2, 'sortOrder': 1, 'version': 1});
+      final flight = TripFlight.fromJson({
+        'id': 2,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(flight.airline, '');
       expect(flight.flightNo, '');
@@ -73,7 +77,11 @@ void main() {
     });
 
     test('dayId nullable、文字欄位缺漏預設空字串', () {
-      final lodging = TripLodging.fromJson({'id': 12, 'sortOrder': 2, 'version': 1});
+      final lodging = TripLodging.fromJson({
+        'id': 12,
+        'sortOrder': 2,
+        'version': 1,
+      });
 
       expect(lodging.dayId, isNull);
       expect(lodging.name, '');
@@ -107,8 +115,11 @@ void main() {
     });
 
     test('partySize 缺漏預設 0、kind 缺漏預設 restaurant', () {
-      final reservation =
-          TripReservation.fromJson({'id': 22, 'sortOrder': 1, 'version': 1});
+      final reservation = TripReservation.fromJson({
+        'id': 22,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(reservation.partySize, 0);
       expect(reservation.kind, 'restaurant');
@@ -166,8 +177,11 @@ void main() {
     });
 
     test('kind 缺漏預設 other、aiGenerated 缺漏預設 false', () {
-      final contact =
-          TripEmergencyContact.fromJson({'id': 42, 'sortOrder': 1, 'version': 1});
+      final contact = TripEmergencyContact.fromJson({
+        'id': 42,
+        'sortOrder': 1,
+        'version': 1,
+      });
 
       expect(contact.kind, 'other');
       expect(contact.aiGenerated, isFalse);
@@ -215,6 +229,24 @@ void main() {
       expect(notes.reservations, isEmpty);
       expect(notes.pretripNotes, isEmpty);
       expect(notes.emergencyContacts, isEmpty);
+    });
+  });
+
+  group('TripNoteAiGenerationJob.fromJson', () {
+    test('解析 AI 生成 job 與 request id', () {
+      final job = TripNoteAiGenerationJob.fromJson({
+        'jobId': 77,
+        'requestId': 9901,
+        'status': 'pending',
+        'tripId': 'okinawa-trip-2026',
+        'docType': 'tips',
+      });
+
+      expect(job.jobId, 77);
+      expect(job.requestId, 9901);
+      expect(job.status, 'pending');
+      expect(job.tripId, 'okinawa-trip-2026');
+      expect(job.docType, 'tips');
     });
   });
 }
