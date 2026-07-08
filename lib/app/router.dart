@@ -15,6 +15,7 @@ import '../features/shell/app_shell.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
+import '../models/poi.dart';
 import '../features/trips/trips_list_screen.dart';
 
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
@@ -115,6 +116,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/explore',
                 builder: (context, state) => const ExploreScreen(),
               ),
+              GoRoute(
+                path: '/add-to-trip',
+                builder: (context, state) => AddPoiFavoriteToTripScreen(
+                  directPoi: _poiSearchResultFromQuery(
+                    state.uri.queryParameters,
+                  ),
+                ),
+              ),
             ],
           ),
           StatefulShellBranch(
@@ -132,3 +141,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+PoiSearchResult? _poiSearchResultFromQuery(Map<String, String> query) {
+  final placeId = _nonEmptyQueryValue(query, 'place_id');
+  final name = _nonEmptyQueryValue(query, 'name');
+  final lat = double.tryParse(query['lat'] ?? '');
+  final lng = double.tryParse(query['lng'] ?? '');
+  if (placeId == null || name == null || lat == null || lng == null) {
+    return null;
+  }
+  return PoiSearchResult(
+    placeId: placeId,
+    name: name,
+    address: _nonEmptyQueryValue(query, 'address'),
+    lat: lat,
+    lng: lng,
+    category: _nonEmptyQueryValue(query, 'category'),
+    country: _nonEmptyQueryValue(query, 'country'),
+    countryName: _nonEmptyQueryValue(query, 'country_name'),
+    rating: double.tryParse(query['rating'] ?? ''),
+    businessStatus: _nonEmptyQueryValue(query, 'business_status'),
+  );
+}
+
+String? _nonEmptyQueryValue(Map<String, String> query, String key) {
+  final value = query[key]?.trim();
+  if (value == null || value.isEmpty) return null;
+  return value;
+}

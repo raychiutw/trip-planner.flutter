@@ -17,7 +17,7 @@ class ApiClient {
   });
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query});
-  Future<dynamic> post(String path, {Object? body});
+  Future<dynamic> post(String path, {Map<String, dynamic>? query, Object? body});
   Future<dynamic> put(String path, {Object? body});
   Future<dynamic> patch(String path, {Object? body});
   Future<dynamic> delete(String path);
@@ -132,11 +132,20 @@ class TripRepository {
     required String startTime,
     required String endTime,
   }); // POST /poi-favorites/:id/add-to-trip
+  Future<void> createEntryFromPoiSearchResult({
+    required String tripId,
+    required int dayNum,
+    required PoiSearchResult poi,
+    required String startTime,
+    required String endTime,
+  }); // POST /trips/:id/days/:num/entries
+  Future<void>              recomputeTravel(String tripId, {int? dayNum}); // POST /trips/:id/recompute-travel?day=N
 }
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
+`createEntryFromPoiSearchResult` 是 Explore direct-mode 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
 
 回傳的 model 結構見 [Models 參考](reference-models.md)。
 

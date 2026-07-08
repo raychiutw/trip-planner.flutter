@@ -39,9 +39,9 @@
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes` + 各 section CRUD |
 | AccountScreen | AccountPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout` |
 | ChatScreen / GlobalMapScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
-| FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip` |
+| FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/days/:num/entries`、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：收藏 + Explore 已完成第一波（direct `/add-to-trip` 尚未）；Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
+P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構

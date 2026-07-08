@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../models/poi.dart';
@@ -85,6 +86,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     type: results[index].category,
                   )],
                 ),
+                onAddToTrip: () => _openAddToTrip(results[index]),
               ),
               if (index != results.length - 1)
                 const SizedBox(height: TpSpacing.s3),
@@ -155,6 +157,36 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       }
     }
   }
+
+  void _openAddToTrip(PoiSearchResult result) {
+    context.go(
+      Uri(
+        path: '/add-to-trip',
+        queryParameters: _addToTripQueryParameters(result),
+      ).toString(),
+    );
+  }
+}
+
+Map<String, String> _addToTripQueryParameters(PoiSearchResult result) {
+  return {
+    'place_id': result.placeId,
+    'name': result.name,
+    'lat': '${result.lat}',
+    'lng': '${result.lng}',
+    if (result.address != null && result.address!.trim().isNotEmpty)
+      'address': result.address!,
+    if (result.category != null && result.category!.trim().isNotEmpty)
+      'category': result.category!,
+    if (result.country != null && result.country!.trim().isNotEmpty)
+      'country': result.country!,
+    if (result.countryName != null && result.countryName!.trim().isNotEmpty)
+      'country_name': result.countryName!,
+    if (result.rating != null) 'rating': '${result.rating}',
+    if (result.businessStatus != null &&
+        result.businessStatus!.trim().isNotEmpty)
+      'business_status': result.businessStatus!,
+  };
 }
 
 class _SearchBox extends StatelessWidget {
@@ -217,12 +249,14 @@ class _SearchResultCard extends StatelessWidget {
     required this.favorite,
     required this.isSaving,
     required this.onToggleFavorite,
+    required this.onAddToTrip,
   });
 
   final PoiSearchResult result;
   final PoiFavorite? favorite;
   final bool isSaving;
   final VoidCallback onToggleFavorite;
+  final VoidCallback onAddToTrip;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +297,15 @@ class _SearchResultCard extends StatelessWidget {
                     const SizedBox(height: TpSpacing.s2),
                     Text(result.address!, style: metaStyle),
                   ],
+                  const SizedBox(height: TpSpacing.s3),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add_location_alt_outlined),
+                      label: const Text('加入行程'),
+                      onPressed: onAddToTrip,
+                    ),
+                  ),
                 ],
               ),
             ),

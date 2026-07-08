@@ -17,9 +17,9 @@ class ApiClient {
     required SessionStore sessionStore,
     Dio? dio,
     String origin = kTriplineOrigin,
-  })  : _sessionStore = sessionStore,
-        _origin = origin,
-        _dio = dio ?? Dio() {
+  }) : _sessionStore = sessionStore,
+       _origin = origin,
+       _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     // 全收所有 status code，由 _send 自行判斷丟 ApiError
     _dio.options.validateStatus = (_) => true;
@@ -35,8 +35,11 @@ class ApiClient {
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
       _send('GET', path, query: query);
 
-  Future<dynamic> post(String path, {Object? body}) =>
-      _send('POST', path, body: body);
+  Future<dynamic> post(
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) => _send('POST', path, query: query, body: body);
 
   Future<dynamic> put(String path, {Object? body}) =>
       _send('PUT', path, body: body);
@@ -94,11 +97,17 @@ class ApiClient {
 
     final statusCode = response.statusCode ?? 0;
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
-      final waitSeconds =
-          parseRetryAfterSeconds(response.headers.value('retry-after'));
+      final waitSeconds = parseRetryAfterSeconds(
+        response.headers.value('retry-after'),
+      );
       await Future<void>.delayed(Duration(seconds: waitSeconds));
-      return _send(method, path,
-          query: query, body: body, isRetryAttempt: true);
+      return _send(
+        method,
+        path,
+        query: query,
+        body: body,
+        isRetryAttempt: true,
+      );
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);

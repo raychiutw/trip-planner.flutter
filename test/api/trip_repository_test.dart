@@ -403,4 +403,60 @@ void main() {
     expect(result.entryId, 901);
     expect(result.sortOrder, 2);
   });
+
+  test('createEntryFromPoiSearchResult：direct-mode POST entries', () async {
+    const searchResult = PoiSearchResult(
+      placeId: 'ChIJ-shuri',
+      name: '首里城',
+      address: '沖繩縣那霸市首里金城町',
+      lat: 26.217,
+      lng: 127.719,
+      category: 'tourist_attraction',
+      country: 'JP',
+    );
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026/days/2/entries',
+      (server) => server.reply(201, {
+        'id': 901,
+        'dayId': 11,
+        'sortOrder': 2,
+        'startTime': '09:00',
+        'endTime': '10:00',
+        'source': 'google',
+      }),
+      data: {
+        'name': '首里城',
+        'note': '沖繩縣那霸市首里金城町',
+        'lat': 26.217,
+        'lng': 127.719,
+        'source': 'google',
+        'time': '09:00-10:00',
+        'poi_type': 'attraction',
+      },
+    );
+
+    await expectLater(
+      tripRepository.createEntryFromPoiSearchResult(
+        tripId: 'okinawa-trip-2026',
+        dayNum: 2,
+        poi: searchResult,
+        startTime: '09:00',
+        endTime: '10:00',
+      ),
+      completes,
+    );
+  });
+
+  test('recomputeTravel：POST /trips/:id/recompute-travel?day=N', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026/recompute-travel',
+      (server) => server.reply(202, {'ok': true}),
+      queryParameters: {'day': '2'},
+    );
+
+    await expectLater(
+      tripRepository.recomputeTravel('okinawa-trip-2026', dayNum: 2),
+      completes,
+    );
+  });
 }

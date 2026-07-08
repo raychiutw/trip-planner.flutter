@@ -1,6 +1,8 @@
 /// 收藏 POI 加入行程 fast-path 表單。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,9 +29,14 @@ final favoriteTargetDaysProvider = FutureProvider.family<List<TripDay>, String>(
 
 /// `/favorites/:favoriteId/add-to-trip`。
 class AddPoiFavoriteToTripScreen extends ConsumerStatefulWidget {
-  const AddPoiFavoriteToTripScreen({super.key, required this.favoriteId});
+  const AddPoiFavoriteToTripScreen({
+    super.key,
+    this.favoriteId,
+    this.directPoi,
+  });
 
-  final int favoriteId;
+  final int? favoriteId;
+  final PoiSearchResult? directPoi;
 
   @override
   ConsumerState<AddPoiFavoriteToTripScreen> createState() =>
@@ -56,34 +63,69 @@ class _AddPoiFavoriteToTripScreenState
 
   @override
   Widget build(BuildContext context) {
-    final favoritesAsync = ref.watch(poiFavoritesProvider);
+    final directPoi = widget.directPoi;
+    if (directPoi == null && widget.favoriteId == null) {
+      return const Scaffold(
+        appBar: _AddToTripAppBar(title: '加入行程'),
+        body: _CenteredMessage(message: '景點資料缺漏，請從探索頁重新進入'),
+      );
+    }
     final tripsAsync = ref.watch(favoriteTargetTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('加入收藏到行程')),
-      body: favoritesAsync.when(
-        data: (favorites) => tripsAsync.when(
-          data: (trips) => _buildWithData(favorites, trips),
-          error: (error, stackTrace) => _LoadErrorState(
-            message: '無法取得行程清單',
-            onRetry: () => ref.invalidate(favoriteTargetTripsProvider),
-          ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-        ),
-        error: (error, stackTrace) => _LoadErrorState(
-          message: '無法取得收藏資料',
-          onRetry: () => ref.invalidate(poiFavoritesProvider),
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
+      appBar: _AddToTripAppBar(
+        title: directPoi == null ? '加入收藏到行程' : '加入景點到行程',
       ),
+      body: directPoi != null
+          ? tripsAsync.when(
+              data: (trips) => _buildWithTarget(
+                _PoiTarget.fromSearchResult(directPoi),
+                trips,
+              ),
+              error: (error, stackTrace) => _LoadErrorState(
+                message: '無法取得行程清單',
+                onRetry: () => ref.invalidate(favoriteTargetTripsProvider),
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+            )
+          : ref
+                .watch(poiFavoritesProvider)
+                .when(
+                  data: (favorites) => tripsAsync.when(
+                    data: (trips) => _buildWithFavoriteData(favorites, trips),
+                    error: (error, stackTrace) => _LoadErrorState(
+                      message: '無法取得行程清單',
+                      onRetry: () =>
+                          ref.invalidate(favoriteTargetTripsProvider),
+                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, stackTrace) => _LoadErrorState(
+                    message: '無法取得收藏資料',
+                    onRetry: () => ref.invalidate(poiFavoritesProvider),
+                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                ),
     );
   }
 
-  Widget _buildWithData(List<PoiFavorite> favorites, List<TripSummary> trips) {
-    final favorite = _findFavorite(favorites, widget.favoriteId);
+  Widget _buildWithFavoriteData(
+    List<PoiFavorite> favorites,
+    List<TripSummary> trips,
+  ) {
+    final favoriteId = widget.favoriteId;
+    final favorite = favoriteId == null
+        ? null
+        : _findFavorite(favorites, favoriteId);
     if (favorite == null) {
       return const _CenteredMessage(message: '找不到這筆收藏');
     }
+    return _buildWithTarget(_PoiTarget.fromFavorite(favorite), trips);
+  }
+
+  Widget _buildWithTarget(_PoiTarget target, List<TripSummary> trips) {
     if (trips.isEmpty) {
       return const _CenteredMessage(message: '還沒有可加入的行程');
     }
@@ -93,7 +135,7 @@ class _AddPoiFavoriteToTripScreenState
 
     return daysAsync.when(
       data: (days) => _buildForm(
-        favorite: favorite,
+        target: target,
         trips: trips,
         days: days,
         effectiveTripId: effectiveTripId,
@@ -108,7 +150,7 @@ class _AddPoiFavoriteToTripScreenState
   }
 
   Widget _buildForm({
-    required PoiFavorite favorite,
+    required _PoiTarget target,
     required List<TripSummary> trips,
     required List<TripDay> days,
     required String effectiveTripId,
@@ -121,7 +163,7 @@ class _AddPoiFavoriteToTripScreenState
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        _FavoriteSummaryCard(favorite: favorite),
+        _FavoriteSummaryCard(target: target),
         const SizedBox(height: TpSpacing.s4),
         DropdownButtonFormField<String>(
           initialValue: effectiveTripId,
@@ -211,7 +253,7 @@ class _AddPoiFavoriteToTripScreenState
           onPressed: _isSubmitting
               ? null
               : () => _submit(
-                  favoriteId: favorite.id,
+                  target: target,
                   tripId: effectiveTripId,
                   dayNum: effectiveDayNum,
                 ),
@@ -237,7 +279,7 @@ class _AddPoiFavoriteToTripScreenState
   }
 
   Future<void> _submit({
-    required int favoriteId,
+    required _PoiTarget target,
     required String tripId,
     required int dayNum,
   }) async {
@@ -255,15 +297,30 @@ class _AddPoiFavoriteToTripScreenState
       _submitError = null;
     });
     try {
-      await ref
-          .read(tripRepositoryProvider)
-          .addPoiFavoriteToTrip(
-            favoriteId,
-            tripId: tripId,
-            dayNum: dayNum,
-            startTime: startTime,
-            endTime: endTime,
-          );
+      final repository = ref.read(tripRepositoryProvider);
+      final directPoi = target.directPoi;
+      if (directPoi != null) {
+        await repository.createEntryFromPoiSearchResult(
+          tripId: tripId,
+          dayNum: dayNum,
+          poi: directPoi,
+          startTime: startTime,
+          endTime: endTime,
+        );
+        unawaited(
+          repository
+              .recomputeTravel(tripId, dayNum: dayNum)
+              .catchError((Object _) {}),
+        );
+      } else {
+        await repository.addPoiFavoriteToTrip(
+          target.favoriteId!,
+          tripId: tripId,
+          dayNum: dayNum,
+          startTime: startTime,
+          endTime: endTime,
+        );
+      }
       ref.invalidate(tripDaysProvider(tripId));
       ref.invalidate(favoriteTargetDaysProvider(tripId));
       ref.invalidate(poiFavoritesProvider);
@@ -292,10 +349,62 @@ class _AddPoiFavoriteToTripScreenState
   String _dayTitle(TripDay day) => 'Day ${day.dayNum} · ${day.displayTitle}';
 }
 
-class _FavoriteSummaryCard extends StatelessWidget {
-  const _FavoriteSummaryCard({required this.favorite});
+class _AddToTripAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _AddToTripAppBar({required this.title});
 
-  final PoiFavorite favorite;
+  final String title;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(title: Text(title));
+  }
+}
+
+class _PoiTarget {
+  const _PoiTarget({
+    required this.name,
+    this.address,
+    this.type,
+    this.rating,
+    this.favoriteId,
+    this.directPoi,
+  });
+
+  final String name;
+  final String? address;
+  final String? type;
+  final double? rating;
+  final int? favoriteId;
+  final PoiSearchResult? directPoi;
+
+  factory _PoiTarget.fromFavorite(PoiFavorite favorite) {
+    return _PoiTarget(
+      name: favorite.displayName,
+      address: favorite.poiAddress,
+      type: favorite.poiType,
+      rating: favorite.poiRating,
+      favoriteId: favorite.id,
+    );
+  }
+
+  factory _PoiTarget.fromSearchResult(PoiSearchResult result) {
+    return _PoiTarget(
+      name: result.name,
+      address: result.address,
+      type: result.category,
+      rating: result.rating,
+      directPoi: result,
+    );
+  }
+}
+
+class _FavoriteSummaryCard extends StatelessWidget {
+  const _FavoriteSummaryCard({required this.target});
+
+  final _PoiTarget target;
 
   @override
   Widget build(BuildContext context) {
@@ -310,13 +419,17 @@ class _FavoriteSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(favorite.displayName, style: theme.textTheme.titleMedium),
+            Text(target.name, style: theme.textTheme.titleMedium),
             const SizedBox(height: TpSpacing.s1),
-            Text(poiTypeLabel(favorite.poiType), style: metaStyle),
-            if (favorite.poiAddress != null &&
-                favorite.poiAddress!.trim().isNotEmpty) ...[
+            Text(poiTypeLabel(target.type), style: metaStyle),
+            if (target.rating != null) ...[
+              const SizedBox(height: TpSpacing.s1),
+              Text(target.rating!.toStringAsFixed(1), style: metaStyle),
+            ],
+            if (target.address != null &&
+                target.address!.trim().isNotEmpty) ...[
               const SizedBox(height: TpSpacing.s2),
-              Text(favorite.poiAddress!, style: metaStyle),
+              Text(target.address!, style: metaStyle),
             ],
           ],
         ),

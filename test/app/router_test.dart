@@ -10,6 +10,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -139,6 +140,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /add-to-trip query 進入加入行程表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go(
+          '/add-to-trip?place_id=ChIJ-shuri&name=%E9%A6%96%E9%87%8C%E5%9F%8E&lat=26.217&lng=127.719&category=tourist_attraction',
+        );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddPoiFavoriteToTripScreen), findsOneWidget);
+    expect(find.text('還沒有可加入的行程'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -65,6 +66,33 @@ void main() {
     );
   }
 
+  Widget buildRouterApp() {
+    final router = GoRouter(
+      initialLocation: '/explore',
+      routes: [
+        GoRoute(
+          path: '/explore',
+          builder: (context, state) => const ExploreScreen(),
+        ),
+        GoRoute(
+          path: '/add-to-trip',
+          builder: (context, state) {
+            final query = state.uri.queryParameters;
+            return Scaffold(
+              body: Text(
+                'direct:${query['place_id']}:${query['name']}:${query['lat']}',
+              ),
+            );
+          },
+        ),
+      ],
+    );
+    return ProviderScope(
+      overrides: [tripRepositoryProvider.overrideWithValue(mockTripRepository)],
+      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    );
+  }
+
   testWidgets('輸入關鍵字後搜尋並渲染結果卡', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pump();
@@ -106,6 +134,21 @@ void main() {
       () => mockTripRepository.findOrCreatePoi(shuriSearchResult),
     ).called(1);
     verify(() => mockTripRepository.createPoiFavorite(poiId: 501)).called(1);
+  });
+
+  testWidgets('點加入行程導向 /add-to-trip 並帶入搜尋結果 query', (tester) async {
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), '首里城');
+    await tester.tap(find.byTooltip('搜尋'));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '加入行程'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('direct:ChIJ-shuri:首里城:26.217'), findsOneWidget);
   });
 
   testWidgets('已收藏結果顯示已收藏 heart，點擊後取消收藏', (tester) async {

@@ -37,8 +37,20 @@ void main() {
     title: '那霸市區',
     version: 1,
   );
+  const searchResult = PoiSearchResult(
+    placeId: 'ChIJ-shuri',
+    name: '首里城',
+    address: '沖繩縣那霸市首里金城町',
+    lat: 26.217,
+    lng: 127.719,
+    category: 'tourist_attraction',
+  );
 
   late MockTripRepository mockTripRepository;
+
+  setUpAll(() {
+    registerFallbackValue(searchResult);
+  });
 
   setUp(() {
     mockTripRepository = MockTripRepository();
@@ -69,6 +81,21 @@ void main() {
         endTime: '10:00',
       ),
     );
+    when(
+      () => mockTripRepository.createEntryFromPoiSearchResult(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        poi: any(named: 'poi'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockTripRepository.recomputeTravel(
+        any(),
+        dayNum: any(named: 'dayNum'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   Widget buildRouterApp() {
@@ -80,6 +107,31 @@ void main() {
           builder: (context, state) => AddPoiFavoriteToTripScreen(
             favoriteId: int.parse(state.pathParameters['favoriteId']!),
           ),
+        ),
+        GoRoute(
+          path: '/trips/:tripId',
+          builder: (context, state) =>
+              Scaffold(body: Text('trip:${state.pathParameters['tripId']}')),
+        ),
+      ],
+    );
+    return ProviderScope(
+      overrides: [tripRepositoryProvider.overrideWithValue(mockTripRepository)],
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: fakeRouter,
+      ),
+    );
+  }
+
+  Widget buildDirectRouterApp() {
+    final fakeRouter = GoRouter(
+      initialLocation: '/add-to-trip',
+      routes: [
+        GoRoute(
+          path: '/add-to-trip',
+          builder: (context, state) =>
+              const AddPoiFavoriteToTripScreen(directPoi: searchResult),
         ),
         GoRoute(
           path: '/trips/:tripId',
@@ -126,6 +178,63 @@ void main() {
         startTime: '09:00',
         endTime: '10:00',
       ),
+    ).called(1);
+    expect(find.text('trip:okinawa-trip-2026'), findsOneWidget);
+  });
+
+  testWidgets('direct-mode 送出後直建 entry 並觸發 recomputeTravel', (tester) async {
+    await tester.pumpWidget(buildDirectRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('首里城'), findsOneWidget);
+    expect(find.text('沖繩縣那霸市首里金城町'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '加入行程'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.createEntryFromPoiSearchResult(
+        tripId: 'okinawa-trip-2026',
+        dayNum: 2,
+        poi: searchResult,
+        startTime: '09:00',
+        endTime: '10:00',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.recomputeTravel('okinawa-trip-2026', dayNum: 2),
+    ).called(1);
+    verifyNever(() => mockTripRepository.fetchPoiFavorites());
+    expect(find.text('trip:okinawa-trip-2026'), findsOneWidget);
+  });
+
+  testWidgets('direct-mode recomputeTravel 失敗不阻擋已建立 entry 的導回', (tester) async {
+    when(
+      () => mockTripRepository.recomputeTravel(
+        any(),
+        dayNum: any(named: 'dayNum'),
+      ),
+    ).thenAnswer((_) async => throw Exception('recompute failed'));
+
+    await tester.pumpWidget(buildDirectRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(FilledButton, '加入行程'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.createEntryFromPoiSearchResult(
+        tripId: 'okinawa-trip-2026',
+        dayNum: 2,
+        poi: searchResult,
+        startTime: '09:00',
+        endTime: '10:00',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.recomputeTravel('okinawa-trip-2026', dayNum: 2),
     ).called(1);
     expect(find.text('trip:okinawa-trip-2026'), findsOneWidget);
   });

@@ -105,7 +105,7 @@ class ApiClient {
   // 3. 非 2xx → throw ApiError；429 且 GET → 讀 Retry-After（cap 30s）retry 一次；mutation 不 retry
   // 4. 204 / 空 body → 回 null
   Future<dynamic> get(String path, {Map<String, dynamic>? query});
-  Future<dynamic> post(String path, {Object? body});
+  Future<dynamic> post(String path, {Map<String, dynamic>? query, Object? body});
   Future<dynamic> put(String path, {Object? body});
   Future<dynamic> patch(String path, {Object? body});
   Future<dynamic> delete(String path);
@@ -132,6 +132,14 @@ class TripRepository {
   Future<void> deleteTrip(String id);
   Future<AccountStats> fetchStats();                 // GET /account/stats
   Future<UserInfo> updateProfile({String? displayName}); // PATCH /account/profile
+  Future<void> createEntryFromPoiSearchResult({
+    required String tripId,
+    required int dayNum,
+    required PoiSearchResult poi,
+    required String startTime,
+    required String endTime,
+  });                                                // POST /trips/:id/days/:num/entries
+  Future<void> recomputeTravel(String tripId, {int? dayNum}); // POST /trips/:id/recompute-travel?day=N
 }
 
 // providers.dart（riverpod 3.x 語法）
@@ -150,7 +158,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）
-// favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）
+// favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart

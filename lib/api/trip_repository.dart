@@ -170,4 +170,37 @@ class TripRepository {
       responseBody as Map<String, dynamic>,
     );
   }
+
+  /// POST /trips/:id/days/:num/entries，用 Explore direct-mode POI 直建 entry。
+  Future<void> createEntryFromPoiSearchResult({
+    required String tripId,
+    required int dayNum,
+    required PoiSearchResult poi,
+    required String startTime,
+    required String endTime,
+  }) {
+    final time = startTime.trim().isNotEmpty && endTime.trim().isNotEmpty
+        ? '${startTime.trim()}-${endTime.trim()}'
+        : null;
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
+      body: {
+        'name': poi.name,
+        'note': ?poi.address,
+        'lat': poi.lat,
+        'lng': poi.lng,
+        'source': 'google',
+        'time': ?time,
+        'poi_type': mapPoiCategoryToType(poi.category),
+      },
+    );
+  }
+
+  /// POST /trips/:id/recompute-travel?day=N。
+  Future<void> recomputeTravel(String tripId, {int? dayNum}) {
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/recompute-travel',
+      query: {if (dayNum != null) 'day': '$dayNum'},
+    );
+  }
 }

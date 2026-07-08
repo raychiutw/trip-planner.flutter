@@ -25,9 +25,9 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/chat` → `ChatPage` | `/chat` → placeholder | 未翻 | P1：AI request queue |
 | `/map` → `GlobalMapPage` | `/map` → placeholder | 未翻 | P1：跨行程 POI map |
 | `/favorites` → `PoiFavoritesPage` | `/favorites` → `FavoritesScreen` | 已翻第一波 | 後續可補更多 web card actions |
-| `/explore` → `ExplorePage` | `/explore` → `ExploreScreen` | 已翻第一波 | 後續補 direct add-to-trip landing polish |
+| `/explore` → `ExplorePage` | `/explore` → `ExploreScreen` | 已翻第一波 | 後續可補分類 chips / landing polish |
 | `/favorites/:id/add-to-trip` | `/favorites/:favoriteId/add-to-trip` → `AddPoiFavoriteToTripScreen` | 已翻第一波 | 後續補衝突細節顯示 |
-| `/add-to-trip` | 無 | 未翻 | P1：Explore POI 不先收藏的 direct-mode fast-path |
+| `/add-to-trip` | `/add-to-trip?place_id=...` → `AddPoiFavoriteToTripScreen` | 已翻第一波 | 後續補衝突細節顯示 |
 | `/trips/new` → `NewTripPage` | 無 | 未翻 | P1：建立行程 |
 | `/trip/:id/edit` → `EditTripPage` | 無 | 未翻 | P1：編輯行程 meta |
 | `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | 無 | 未翻 | P1：新增景點表單群 |
@@ -54,8 +54,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 1. **Favorites / Explore / Add-to-trip**
    - Routes：`/favorites`、`/explore`、`/favorites/:id/add-to-trip`、`/add-to-trip`
-   - API：`GET /poi-favorites`、`POST/DELETE /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`
-   - 狀態：`/favorites`、`/explore`、`/favorites/:id/add-to-trip` 已完成第一波；`/add-to-trip` direct-mode 尚未翻。
+   - API：`GET /poi-favorites`、`POST/DELETE /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST /trips/:id/days/:num/entries`、`POST /trips/:id/recompute-travel`
+   - 狀態：`/favorites`、`/explore`、`/favorites/:id/add-to-trip`、`/add-to-trip` 已完成第一波。
    - 理由：功能邊界獨立；完成後 primary tab 不再是 placeholder。
 
 2. **Trip action surface**
@@ -108,8 +108,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Explore direct-mode `/add-to-trip`** 或 **Entry CRUD 表單群**。Favorites / Explore / 收藏加入行程第一波已把 primary tab placeholder 轉正，剩下 direct-mode 可獨立補齊。
+下一個 Build branch 建議接 **Entry CRUD 表單群** 或 **建立/編輯行程**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正。
 
-1. 若先補 direct-mode：為 `/add-to-trip?place_id=...` 加 router/widget/repository tests，沿用 `findOrCreatePoi` 後直接送 entry 建立 flow。
-2. 若改做 Entry CRUD：先從 `/trips/:id/add-entry` / `add-stop` 寫 repository + widget tests，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
+1. 若做 Entry CRUD：先從 `/trips/:id/add-entry` / `add-stop` 寫 repository + widget tests，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
+2. 若做建立/編輯行程：先補 `/trips/new` 與 `/trips/:id/edit` repository contract，再接 TripsListScreen 的新增入口。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。
