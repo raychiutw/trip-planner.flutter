@@ -60,4 +60,20 @@ void main() {
     expect(result.ok, isTrue);
     expect(result.tripId, 'okinawa-trip-2026');
   });
+
+  test('PermissionRoleUpdateResult.fromJson 解析 role update 結果', () {
+    final changed = PermissionRoleUpdateResult.fromJson({
+      'ok': true,
+      'role': 'viewer',
+    });
+    final unchanged = PermissionRoleUpdateResult.fromJson({
+      'ok': true,
+      'unchanged': true,
+    });
+
+    expect(changed.ok, isTrue);
+    expect(changed.role, 'viewer');
+    expect(changed.unchanged, isFalse);
+    expect(unchanged.unchanged, isTrue);
+  });
 }

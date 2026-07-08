@@ -86,6 +86,7 @@ class TripPermission {
   bool get isOwner; bool get isViewer; String get roleLabel; String get displayLabel;
 }
 class PermissionInviteResult { final bool ok; final String status; final String email; final int? id; final String? expiresAt; }
+class PermissionRoleUpdateResult { final bool ok; final String? role; final bool unchanged; }
 class PendingInvitation {
   final String id; final String invitedEmail; final String? createdAt; final String? expiresAt;
   final int? daysRemaining; final bool isExpired; String get statusLabel;
@@ -169,6 +170,11 @@ class TripRepository {
     required String tripId,
     required String email,
   });                                                // POST /invitations/revoke
+  Future<PermissionRoleUpdateResult> updateTripPermissionRole({
+    required int permissionId,
+    required String role,
+  });                                                // PATCH /permissions/:id
+  Future<void> deleteTripPermission(int permissionId); // DELETE /permissions/:id
   Future<InvitationPreview> fetchInvitation(String token); // GET /invitations?token=...
   Future<InvitationAcceptResult> acceptInvitation(String token); // POST /invitations/accept
   Future<TripRequestPage> fetchTripRequests({

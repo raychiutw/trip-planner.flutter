@@ -33,6 +33,8 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
   bool _loading = true;
   bool _submitting = false;
   String? _revokingEmail;
+  int? _changingPermissionId;
+  int? _removingPermissionId;
 
   @override
   void initState() {
@@ -114,7 +116,13 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
         if (_permissions.isEmpty)
           const _EmptyText('尚無成員資料')
         else
-          _PermissionList(permissions: _permissions),
+          _PermissionList(
+            permissions: _permissions,
+            changingPermissionId: _changingPermissionId,
+            removingPermissionId: _removingPermissionId,
+            onRoleChanged: _changePermissionRole,
+            onRemove: _confirmRemovePermission,
+          ),
         const SizedBox(height: TpSpacing.s6),
         _SectionTitle(title: '待接受邀請', count: _pendingInvitations.items.length),
         if (_pendingError != null) ...[
@@ -228,6 +236,82 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
       setState(() {
         _revokingEmail = null;
         _actionError = '撤回邀請失敗，請稍後再試';
+      });
+    }
+  }
+
+  Future<void> _changePermissionRole(
+    TripPermission permission,
+    String role,
+  ) async {
+    if (permission.isOwner ||
+        permission.role == role ||
+        _changingPermissionId != null) {
+      return;
+    }
+    setState(() {
+      _changingPermissionId = permission.id;
+      _actionError = null;
+    });
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .updateTripPermissionRole(permissionId: permission.id, role: role);
+      await _load();
+      if (!mounted) return;
+      setState(() => _changingPermissionId = null);
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _changingPermissionId = null;
+        _actionError = '角色更新失敗，請稍後再試';
+      });
+    }
+  }
+
+  Future<void> _confirmRemovePermission(TripPermission permission) async {
+    if (permission.isOwner || _removingPermissionId != null) return;
+    final shouldRemove = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('移除共編成員'),
+          content: Text('${permission.email} 將失去此行程的存取權。確定移除？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              key: const ValueKey('collab-remove-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('移除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldRemove != true) return;
+    await _deletePermission(permission);
+  }
+
+  Future<void> _deletePermission(TripPermission permission) async {
+    setState(() {
+      _removingPermissionId = permission.id;
+      _actionError = null;
+    });
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .deleteTripPermission(permission.id);
+      await _load();
+      if (!mounted) return;
+      setState(() => _removingPermissionId = null);
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _removingPermissionId = null;
+        _actionError = '移除成員失敗，請稍後再試';
       });
     }
   }
@@ -413,9 +497,19 @@ class _RoleButton extends StatelessWidget {
 }
 
 class _PermissionList extends StatelessWidget {
-  const _PermissionList({required this.permissions});
+  const _PermissionList({
+    required this.permissions,
+    required this.changingPermissionId,
+    required this.removingPermissionId,
+    required this.onRoleChanged,
+    required this.onRemove,
+  });
 
   final List<TripPermission> permissions;
+  final int? changingPermissionId;
+  final int? removingPermissionId;
+  final void Function(TripPermission permission, String role) onRoleChanged;
+  final ValueChanged<TripPermission> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -438,13 +532,12 @@ class _PermissionList extends StatelessWidget {
               subtitle: permission.displayLabel == permission.email
                   ? null
                   : Text(permission.email),
-              trailing: Text(
-                permission.roleLabel,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: permission.isOwner
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
+              trailing: _PermissionActions(
+                permission: permission,
+                changing: changingPermissionId == permission.id,
+                removing: removingPermissionId == permission.id,
+                onRoleChanged: onRoleChanged,
+                onRemove: onRemove,
               ),
             ),
             if (index != permissions.length - 1)
@@ -456,6 +549,97 @@ class _PermissionList extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _PermissionActions extends StatelessWidget {
+  const _PermissionActions({
+    required this.permission,
+    required this.changing,
+    required this.removing,
+    required this.onRoleChanged,
+    required this.onRemove,
+  });
+
+  final TripPermission permission;
+  final bool changing;
+  final bool removing;
+  final void Function(TripPermission permission, String role) onRoleChanged;
+  final ValueChanged<TripPermission> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (permission.isOwner) {
+      return Text(
+        permission.roleLabel,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PopupMenuButton<String>(
+          key: ValueKey('collab-role-trigger-${permission.id}'),
+          tooltip: '變更角色',
+          enabled: !changing && !removing,
+          onSelected: (role) => onRoleChanged(permission, role),
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              key: ValueKey('collab-role-option-${permission.id}-member'),
+              value: 'member',
+              enabled: permission.role != 'member',
+              child: const Text('共編成員'),
+            ),
+            PopupMenuItem(
+              key: ValueKey('collab-role-option-${permission.id}-viewer'),
+              value: 'viewer',
+              enabled: permission.role != 'viewer',
+              child: const Text('檢視者'),
+            ),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: TpSpacing.s2,
+              vertical: TpSpacing.s1,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (changing) ...[
+                  const SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: TpSpacing.s1),
+                ],
+                Text(
+                  permission.roleLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Icon(Icons.arrow_drop_down, size: 18),
+              ],
+            ),
+          ),
+        ),
+        IconButton(
+          key: ValueKey('collab-remove-${permission.id}'),
+          tooltip: '移除成員',
+          icon: removing
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.person_remove_outlined),
+          onPressed: changing || removing ? null : () => onRemove(permission),
+        ),
+      ],
     );
   }
 }

@@ -74,6 +74,26 @@ class PermissionInviteResult {
   }
 }
 
+class PermissionRoleUpdateResult {
+  const PermissionRoleUpdateResult({
+    required this.ok,
+    this.role,
+    this.unchanged = false,
+  });
+
+  final bool ok;
+  final String? role;
+  final bool unchanged;
+
+  factory PermissionRoleUpdateResult.fromJson(Map<String, dynamic> json) {
+    return PermissionRoleUpdateResult(
+      ok: json['ok'] == true,
+      role: json['role'] as String?,
+      unchanged: json['unchanged'] == true,
+    );
+  }
+}
+
 class PendingInvitation {
   const PendingInvitation({
     required this.id,

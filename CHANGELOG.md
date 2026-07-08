@@ -16,7 +16,7 @@
 - **P1 Entry OCC 重試**:edit、move、change-poi 與備選管理遇 `STALE_ENTRY` 時會重抓最新 entry,以新的 `version` / `entryPoisVersion` retry 同一個使用者操作一次。
 - **P1 AI 聊天**:`/chat` 由 placeholder 轉為 `ChatScreen`;會載入使用者行程、顯示 active trip 最近 request history、送出 `POST /requests` 後以 pending bubble 顯示「思考中...」並 polling `GET /requests/:id` 替換成 AI 回覆。
 - **P1 全域地圖**:`/map` 由 placeholder 轉為 `GlobalMapScreen`;會載入我的行程、預設第一趟行程並可切換行程,重用 `TripMapContent` 顯示 OSM pins/day tabs/entry cards;無行程時提供新增行程 CTA。
-- **P1 共編邀請**:新增 `/trips/:tripId/collab` 與 `/invite?token=...` 第一波;共編頁可讀取成員與 pending invitations、送出 member/viewer 邀請、撤回 pending 邀請;邀請頁支援公開預覽、未登入登入 CTA、登入 email 相符後接受邀請並進入行程。
+- **P1 共編邀請**:新增 `/trips/:tripId/collab` 與 `/invite?token=...` 第一波;共編頁可讀取成員與 pending invitations、送出 member/viewer 邀請、撤回 pending 邀請、調整既有非 owner 成員角色並移除成員;邀請頁支援公開預覽、未登入登入 CTA、登入 email 相符後接受邀請並進入行程。
 
 ## [0.1.0] - 2026-06-10
 

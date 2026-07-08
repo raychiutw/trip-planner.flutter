@@ -238,6 +238,31 @@ void main() {
     );
   });
 
+  test('updateTripPermissionRole：PATCH /permissions/:id 更新角色', () async {
+    dioAdapter.onPatch(
+      '/permissions/2',
+      (server) => server.reply(200, {'ok': true, 'role': 'viewer'}),
+      data: {'role': 'viewer'},
+    );
+
+    final result = await tripRepository.updateTripPermissionRole(
+      permissionId: 2,
+      role: 'viewer',
+    );
+
+    expect(result.role, 'viewer');
+    expect(result.unchanged, isFalse);
+  });
+
+  test('deleteTripPermission：DELETE /permissions/:id 移除既有成員', () async {
+    dioAdapter.onDelete(
+      '/permissions/2',
+      (server) => server.reply(200, {'ok': true}),
+    );
+
+    await tripRepository.deleteTripPermission(2);
+  });
+
   test('fetchInvitation：GET /invitations?token 解析公開邀請預覽', () async {
     dioAdapter.onGet(
       '/invitations',

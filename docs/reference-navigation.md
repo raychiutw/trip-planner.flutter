@@ -15,7 +15,7 @@
 | `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
-| `/trips/:tripId/collab` | `CollabScreen` | tab 2 孫路由；成員/待邀請與新增/撤回 pending invitation |
+| `/trips/:tripId/collab` | `CollabScreen` | tab 2 孫路由；成員/待邀請、新增/撤回 pending invitation、非 owner 成員 role update/remove |
 | `/trips/:tripId/add-entry?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites/custom slice |
 | `/trips/:tripId/add-stop?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；相容入口 |
 | `/trips/:tripId/add-custom-stop?day=N` | `AddEntryScreen` | tab 2 孫路由；自訂地圖座標入口 |

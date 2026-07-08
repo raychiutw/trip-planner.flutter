@@ -93,6 +93,10 @@ helper：`isOwner`、`isViewer`、`roleLabel`（擁有者/共編成員/檢視者
 
 `ok: bool`、`status: String`、`email: String`、`id: int?`、`expiresAt: String?`。後端為防止 email enumeration,既有使用者與新邀請都可能回 `status: invitation_sent`。
 
+### PermissionRoleUpdateResult — `PATCH /permissions/:id`
+
+`ok: bool`、`role: String?`、`unchanged: bool`。role update 只允許 `member` / `viewer`;若送同一個角色,後端可回 `{ok:true, unchanged:true}` 且不寫 audit log。
+
 ### PendingInvitation / PendingInvitationPage — `GET /invitations?tripId=...`
 
 `PendingInvitation` 欄位：`id: String`（token hash）、`invitedEmail: String`、`createdAt: String?`、`expiresAt: String?`、`daysRemaining: int?`、`isExpired: bool`。helper `statusLabel` 會顯示「已過期」「待接受」或「剩 N 天」。

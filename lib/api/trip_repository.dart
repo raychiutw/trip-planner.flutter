@@ -104,6 +104,27 @@ class TripRepository {
     );
   }
 
+  /// PATCH /permissions/:id，更新既有成員角色（member ↔ viewer）。
+  Future<PermissionRoleUpdateResult> updateTripPermissionRole({
+    required int permissionId,
+    required String role,
+  }) async {
+    final responseBody = await _client.patch(
+      '/permissions/${Uri.encodeComponent('$permissionId')}',
+      body: {'role': role == 'viewer' ? 'viewer' : 'member'},
+    );
+    return PermissionRoleUpdateResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
+  /// DELETE /permissions/:id，移除既有非 owner 成員權限。
+  Future<void> deleteTripPermission(int permissionId) {
+    return _client.delete(
+      '/permissions/${Uri.encodeComponent('$permissionId')}',
+    );
+  }
+
   /// GET /invitations?token=...，公開邀請預覽。
   Future<InvitationPreview> fetchInvitation(String token) async {
     final responseBody = await _client.get(

@@ -126,6 +126,11 @@ class TripRepository {
     required String tripId,
     required String email,
   }); // POST /invitations/revoke
+  Future<PermissionRoleUpdateResult> updateTripPermissionRole({
+    required int permissionId,
+    required String role,
+  }); // PATCH /permissions/:id
+  Future<void> deleteTripPermission(int permissionId); // DELETE /permissions/:id
   Future<InvitationPreview> fetchInvitation(String token); // GET /invitations?token=...
   Future<InvitationAcceptResult> acceptInvitation(String token); // POST /invitations/accept
   Future<TripRequestPage>   fetchTripRequests({
@@ -257,7 +262,7 @@ class TripRepository {
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
-共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 只允許 `member` / `viewer`（預設 `member`）,client 會 trim/lowercase email；既有成員 role update 與 remove 尚未暴露在 Flutter repository。
+共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`updateTripPermissionRole`、`deleteTripPermission`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 與 `updateTripPermissionRole` 只允許 `member` / `viewer`（預設/ fallback `member`）,client 會 trim/lowercase invitation email；owner role 不可由 Flutter 變更或移除,後端也會拒絕。
 `fetchTripRequests` / `createTripRequest` / `fetchTripRequest` 對應 web ChatPage 的 AI request queue。`fetchTripRequests` 預設讀 active trip 最新 5 筆且支援後端 paginated shape `{items, hasMore}`；若後端回 legacy array,repository 會包成 `TripRequestPage(hasMore: false)`。`ChatScreen` 第一波使用 polling `GET /requests/:id` 取代 web SSE。
 `createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。

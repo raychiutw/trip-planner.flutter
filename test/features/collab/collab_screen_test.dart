@@ -92,6 +92,15 @@ void main() {
         email: any(named: 'email'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => repository.updateTripPermissionRole(
+        permissionId: any(named: 'permissionId'),
+        role: any(named: 'role'),
+      ),
+    ).thenAnswer(
+      (_) async => const PermissionRoleUpdateResult(ok: true, role: 'viewer'),
+    );
+    when(() => repository.deleteTripPermission(any())).thenAnswer((_) async {});
   });
 
   testWidgets('載入成員與待邀請清單', (tester) async {
@@ -157,5 +166,45 @@ void main() {
         email: 'pending@example.com',
       ),
     ).called(1);
+  });
+
+  testWidgets('可將既有成員改為檢視者', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('collab-role-trigger-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('collab-role-option-2-viewer')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () =>
+          repository.updateTripPermissionRole(permissionId: 2, role: 'viewer'),
+    ).called(1);
+    verify(
+      () => repository.fetchTripPermissions('okinawa-trip-2026'),
+    ).called(greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('可經確認移除既有非 owner 成員', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('collab-remove-2')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('friend@example.com'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('collab-remove-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.deleteTripPermission(2)).called(1);
+  });
+
+  testWidgets('owner row 不顯示角色切換與移除控制', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('collab-role-trigger-1')), findsNothing);
+    expect(find.byKey(const ValueKey('collab-remove-1')), findsNothing);
   });
 }

@@ -10,7 +10,7 @@
 - [x] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料、目的地、日期、語言與發布狀態表單)(**Completed:** feature/favorites-explore)
 - [x] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)(**Completed:** feature/favorites-explore)
 - [x] 全域地圖(`/map`;map tab 轉正,以 trip picker 重用行程地圖內容)(**Completed:** feature/favorites-explore)
-- [ ] 共編邀請(`/trips/:id/collab`,`/invite`;已完成成員/待邀請讀取、新增 member/viewer 邀請、撤回 pending invitation、公開邀請預覽與 email 相符接受；尚缺既有成員 role update / remove)
+- [x] 共編邀請(`/trips/:id/collab`,`/invite`;成員/待邀請讀取、新增 member/viewer 邀請、撤回 pending invitation、既有成員 member/viewer role update、移除非 owner 成員、公開邀請預覽與 email 相符接受)(**Completed:** feature/favorites-explore)
 - [ ] 行程筆記 CRUD + AI generate(`/trips/:id/notes`;5 區由唯讀轉可編輯)
 - [ ] AI 健檢報告(`/trips/:id/health`;reports polling)
 - [ ] Auth 補齊(`/signup`,`/login/forgot`,`/auth/password/reset`,`/auth/verify-email`)
