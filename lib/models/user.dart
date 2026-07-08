@@ -1,4 +1,4 @@
-/// 使用者 models（`GET /oauth/userinfo`、`GET /account/stats`、sessions）。
+/// 使用者 models（`GET /oauth/userinfo`、`GET /account/stats`、account settings）。
 library;
 
 /// `GET /oauth/userinfo` 回應。
@@ -50,6 +50,54 @@ class AccountStats {
       tripCount: (json['tripCount'] as num?)?.toInt() ?? 0,
       totalDays: (json['totalDays'] as num?)?.toInt() ?? 0,
       collaboratorCount: (json['collaboratorCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// `GET/PATCH /account/notifications` 回應中的 preferences。
+class AccountNotificationPreferences {
+  const AccountNotificationPreferences({
+    required this.tripUpdates,
+    required this.invitations,
+    required this.system,
+    this.updatedAt,
+  });
+
+  final bool tripUpdates;
+  final bool invitations;
+  final bool system;
+  final String? updatedAt;
+
+  factory AccountNotificationPreferences.fromJson(Map<String, dynamic> json) {
+    return AccountNotificationPreferences(
+      tripUpdates: _boolFromAnyKey(
+        json,
+        'trip_updates',
+        'tripUpdates',
+        defaultValue: true,
+      ),
+      invitations: _boolFromAnyKey(
+        json,
+        'invitations',
+        'invitations',
+        defaultValue: true,
+      ),
+      system: _boolFromAnyKey(json, 'system', 'system', defaultValue: true),
+      updatedAt: _stringFromAnyKey(json, 'updated_at', 'updatedAt'),
+    );
+  }
+
+  AccountNotificationPreferences copyWith({
+    bool? tripUpdates,
+    bool? invitations,
+    bool? system,
+    String? updatedAt,
+  }) {
+    return AccountNotificationPreferences(
+      tripUpdates: tripUpdates ?? this.tripUpdates,
+      invitations: invitations ?? this.invitations,
+      system: system ?? this.system,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
@@ -129,4 +177,18 @@ String? _stringFromAnyKey(
 ) {
   final value = json[key] ?? json[fallbackKey];
   return value is String && value.trim().isNotEmpty ? value : null;
+}
+
+bool _boolFromAnyKey(
+  Map<String, dynamic> json,
+  String key,
+  String fallbackKey, {
+  required bool defaultValue,
+}) {
+  final value = json[key] ?? json[fallbackKey];
+  return switch (value) {
+    bool b => b,
+    num n => n != 0,
+    _ => defaultValue,
+  };
 }

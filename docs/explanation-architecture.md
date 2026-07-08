@@ -1,6 +1,6 @@
 # 架構說明:Tripline Flutter 為什麼長這樣
 
-Tripline Flutter 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的行動版移植。核心約束只有一條:**後端不動**。同一套 Cloudflare Pages Functions API 同時服務 web 與 app,本 repo 只是另一個 client。這條約束決定了下面大多數設計。
+Tripline Flutter 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的行動版移植。核心約束是盡量共用同一套 Cloudflare Pages Functions API；mobile OAuth public client 與通知偏好 API 已在 backend 補齊，其餘功能仍以既有 web API 合約為準。這條約束決定了下面大多數設計。
 
 ## 分層
 
@@ -47,15 +47,21 @@ appRouterProvider (redirect + refreshListenable)
 
 整條鏈的根是 `sessionStoreProvider`。測試只要 override 根節點(或任一中間節點)就能替換整個下游,見 [How to 用 provider override 寫測試](howto-test-with-providers.md)。
 
-## 認證:為什麼是 session cookie 而不是 OAuth Bearer
+## 認證:session cookie 與 OAuth PKCE
 
 ### 問題
 
-後端認證體系是給瀏覽器設計的:`POST /api/oauth/login` 發 `Set-Cookie: tripline_session`,之後靠 cookie 辨識;CSRF 防護靠檢查 mutating request 的 `Origin` header(allowlist)。OAuth PKCE + Bearer token 流程存在,但需要在後端註冊 public client,而「後端不動」是本案前提。
+後端認證體系原本是給瀏覽器設計的:`POST /api/oauth/login` 發 `Set-Cookie: tripline_session`,之後靠 cookie 辨識;CSRF 防護靠檢查 mutating request 的 `Origin` header(allowlist)。production backend 現在也註冊了 mobile public client `tripline-mobile`,可用 OAuth PKCE + Bearer token 登入;未指定 OAuth 設定時,app 仍保留 session cookie 相容路徑。
 
 ### 做法
 
-App 自己扮演瀏覽器:
+OAuth 設定完整時,app 走 PKCE:
+
+1. 使用 `TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile` 與 loopback redirect URI 啟動授權
+2. callback 換 token 後,API request 帶 `Authorization: Bearer <access_token>`
+3. refresh token 交給 secure storage 保存,由 `OAuthLoginService` 在需要時更新 session
+
+未啟用 OAuth 時,app 自己扮演瀏覽器:
 
 1. 登入時走 raw dio 讀 `set-cookie`,regex 撈出 `tripline_session=<token>`,存 flutter_secure_storage(iOS Keychain / Android Keystore)
 2. 之後每個 request 手動帶 `Cookie: tripline_session=<token>`
@@ -63,11 +69,10 @@ App 自己扮演瀏覽器:
 
 ### 取捨
 
-- ✅ 後端零改動,web/app 行為完全一致(連錯誤 shape 都相同)
-- ✅ secure storage 比瀏覽器 cookie jar 更可控
-- ❌ 偽造 Origin 是 hack(瀏覽器不允許,native 才做得到);若後端改驗 CSRF token 就會壞
-- ❌ session 過期只能重新打密碼,沒有 refresh token 機制
-- 之後遷移路徑:P2 註冊 OAuth public client 走 PKCE + Bearer,屆時只需改 `ApiClient` 與 `AuthRepository`,上層無感
+- ✅ OAuth PKCE 是 mobile 正式路徑,不需要偽造 `Origin`,也支援 refresh token
+- ✅ session cookie fallback 保留舊測試與開發環境相容性
+- ❌ loopback callback 仍依賴裝置/平台行為,端對端驗證目前以手動測試為主
+- ❌ OAuth 設定缺漏時會回到 cookie fallback,release build 需要確認 `--dart-define` 已帶齊
 
 ## 429 retry:為什麼只 retry GET
 

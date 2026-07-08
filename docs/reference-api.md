@@ -120,11 +120,14 @@ class TripRepository {
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
+  Future<AccountNotificationPreferences> fetchAccountNotificationPreferences(); // GET /account/notifications
+  Future<AccountNotificationPreferences> updateAccountNotificationPreferences({bool? tripUpdates, bool? invitations, bool? system}); // PATCH /account/notifications
   Future<void>              addEntryToDay({required String tripId, required int dayNum, required String title, String? poiType, double? lat, double? lng, String? startTime, String? endTime, String source}); // POST /trips/:id/days/:num/entries（探索 direct add）
 }
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
+`updateAccountNotificationPreferences` 至少要傳一個欄位；空 patch 會在 client 端丟 `ArgumentError`，避免打到後端 400。
 
 ## FavoritesRepository(`favorites_repository.dart`)
 

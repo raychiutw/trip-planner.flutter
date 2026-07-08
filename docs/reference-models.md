@@ -145,6 +145,15 @@ class TripNotes {
 
 `tripCount: int`、`totalDays: int`、`collaboratorCount: int` — 全部缺漏預設 `0`。
 
+### AccountNotificationPreferences — `GET/PATCH /account/notifications`
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `tripUpdates` | `bool` | 行程更新通知,缺漏預設 `true` |
+| `invitations` | `bool` | 旅伴邀請通知,缺漏預設 `true` |
+| `system` | `bool` | 系統通知,缺漏預設 `true` |
+| `updatedAt` | `String?` | 後端最後更新時間;尚未儲存 preference 時為 `null` |
+
 ## 相關文件
 
 - [API 層參考](reference-api.md) — 哪個 repository 方法回哪個 model

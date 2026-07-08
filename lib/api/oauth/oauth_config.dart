@@ -1,4 +1,4 @@
-/// OAuth client 設定(由 --dart-define 注入;待 backend owner provision public client)。
+/// OAuth client 設定(由 --dart-define 注入;production client: tripline-mobile)。
 /// 例:--dart-define=TRIPLINE_OAUTH_CLIENT_ID=tripline-mobile
 ///     --dart-define=TRIPLINE_OAUTH_REDIRECT_PORT=8765
 library;

@@ -16,7 +16,7 @@
 ### Token endpoint — `POST /api/oauth/token`（form-urlencoded 或 JSON）
 - grants：`authorization_code`（+PKCE S256）、`refresh_token`（rotation + reuse 偵測，重放會 cascade revoke 整個 family）、`client_credentials`（限 confidential client）。
 - Response：`{ access_token, refresh_token, token_type:'Bearer', expires_in:3600, scope, id_token? }`。access 1h、refresh 30d。
-- client 須事先註冊於 `client_apps`（dev portal `/api/dev/apps`）；public client 可免 secret 但 PKCE 必驗。
+- client 須事先註冊於 `client_apps`（dev portal `/api/dev/apps`）；production mobile client 已 provision `tripline-mobile`，public client 可免 secret 但 PKCE 必驗。
 - `GET /api/oauth/authorize`：驗 client/redirect_uri 後，**需瀏覽器 session cookie**；未登入 302 → `/login?redirect_after=...`，登入後發 code 302 回 `redirect_uri?code=&state=`。
 
 ### 密碼登入 — `POST /api/oauth/login`
@@ -26,7 +26,7 @@
 
 ### Mobile 最可行路徑（兩條都可行）
 1. **直接密碼登入拿 cookie（最簡單）**：POST `/api/oauth/login` → 存 `tripline_session` cookie（dio + CookieJar / 自行讀 Set-Cookie）。注意 CSRF：cookie-based **mutating request（POST/PUT/PATCH/DELETE）必須帶 `Origin: https://trip-planner-dby.pages.dev`**（native client 預設不送 Origin → 會被 `checkCsrf` 以 403 `Origin header required` 拒絕）。`/api/oauth/*` 路徑免 Origin。
-2. **OAuth code+PKCE 拿 Bearer（較正規）**：系統瀏覽器開 `/api/oauth/authorize`（custom scheme redirect_uri）→ 換 token → 之後全部帶 `Authorization: Bearer`。**Bearer 且無 Origin header 時 CSRF 直接 skip**，對 native app 最乾淨；refresh_token 有 rotation，平行 refresh 會觸發 family revoke，client 須序列化 refresh。前提：要先在 `client_apps` 註冊一個 public client。
+2. **OAuth code+PKCE 拿 Bearer（較正規）**：系統瀏覽器開 `/api/oauth/authorize`（loopback redirect_uri）→ 換 token → 之後全部帶 `Authorization: Bearer`。**Bearer 且無 Origin header 時 CSRF 直接 skip**，對 native app 最乾淨；refresh_token 有 rotation，平行 refresh 會觸發 family revoke，client 須序列化 refresh。production 可使用已 provision 的 `tripline-mobile` public client。
 
 ## 2. 核心 endpoints 合約
 
