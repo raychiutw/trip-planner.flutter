@@ -125,18 +125,21 @@ const _fakeDays = [
 /// 故在此 helper 內 inline 組 overrides，型別交由推斷）。
 Future<void> _pumpTimeline(
   WidgetTester tester, {
+  String initialLocation = '/trips/$_tripId',
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
   FutureOr<List<TripSegment>> Function()? fetchSegments,
   TripRepository? repository,
 }) async {
   final router = GoRouter(
-    initialLocation: '/trips/$_tripId',
+    initialLocation: initialLocation,
     routes: [
       GoRoute(
         path: '/trips/:tripId',
-        builder: (context, state) =>
-            TripTimelineScreen(tripId: state.pathParameters['tripId']!),
+        builder: (context, state) => TripTimelineScreen(
+          tripId: state.pathParameters['tripId']!,
+          focusEntryId: int.tryParse(state.uri.queryParameters['focus'] ?? ''),
+        ),
         routes: [
           GoRoute(
             path: 'map',
@@ -490,6 +493,20 @@ void main() {
 
     final day2TitleTopAfterTap = tester.getTopLeft(find.text('南部文化')).dy;
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
+  });
+
+  testWidgets('focus query 初載捲到指定 entry 並同步 active day', (tester) async {
+    await _pumpTimeline(tester, initialLocation: '/trips/$_tripId?focus=22');
+    await tester.pumpAndSettle();
+
+    final focusedEntryTop = tester.getTopLeft(find.text('首里城公園')).dy;
+    expect(focusedEntryTop, lessThan(500));
+
+    final day2Pill = tester.widget<Container>(
+      find.byKey(const ValueKey('day-pill-2')),
+    );
+    final day2PillDecoration = day2Pill.decoration! as BoxDecoration;
+    expect(day2PillDecoration.color, TpColorsLight.accentSubtle);
   });
 
   testWidgets('loading 顯示 skeleton 條列', (tester) async {

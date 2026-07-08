@@ -413,7 +413,7 @@ class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
 class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入 + 分享連結管理）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
-class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
+class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId, focusEntryId?）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）
 class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/edit_entry_screen.dart（接受 tripId, entryId）
 class ChangePoiScreen extends ConsumerStatefulWidget;  // features/trip_detail/change_poi_screen.dart（接受 tripId, entryId, mode）

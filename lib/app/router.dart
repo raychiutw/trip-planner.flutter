@@ -121,6 +121,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: ':tripId',
                     builder: (context, state) => TripTimelineScreen(
                       tripId: state.pathParameters['tripId']!,
+                      focusEntryId: int.tryParse(
+                        state.uri.queryParameters['focus'] ?? '',
+                      ),
                     ),
                     routes: [
                       GoRoute(

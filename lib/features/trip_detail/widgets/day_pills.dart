@@ -46,7 +46,8 @@ class DayPills extends StatelessWidget {
           vertical: TpSpacing.s2,
         ),
         itemCount: days.length,
-        separatorBuilder: (context, index) => const SizedBox(width: TpSpacing.s2),
+        separatorBuilder: (context, index) =>
+            const SizedBox(width: TpSpacing.s2),
         itemBuilder: (context, index) => _DayPill(
           day: days[index],
           isActive: days[index].dayNum == activeDayNum,
@@ -77,6 +78,7 @@ class _DayPill extends StatelessWidget {
       borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
       onTap: onTap,
       child: Container(
+        key: ValueKey('day-pill-${day.dayNum}'),
         constraints: const BoxConstraints(
           minHeight: TpSpacing.tapMin,
           minWidth: 64,

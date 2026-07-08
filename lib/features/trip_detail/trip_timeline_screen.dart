@@ -15,9 +15,16 @@ import 'widgets/travel_pill.dart';
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerWidget {
-  const TripTimelineScreen({super.key, required this.tripId});
+  const TripTimelineScreen({
+    super.key,
+    required this.tripId,
+    this.focusEntryId,
+  });
 
   final String tripId;
+
+  /// Optional entry id to scroll into view after timeline data loads.
+  final int? focusEntryId;
 
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
@@ -68,6 +75,7 @@ class TripTimelineScreen extends ConsumerWidget {
             ? const _EmptyTimeline()
             : _TimelineBody(
                 tripId: tripId,
+                focusEntryId: focusEntryId,
                 days: days,
                 segments: segmentsAsync.value ?? const <TripSegment>[],
                 showSegmentError: segmentsAsync.hasError,
@@ -90,6 +98,7 @@ class TripTimelineScreen extends ConsumerWidget {
 class _TimelineBody extends StatefulWidget {
   const _TimelineBody({
     required this.tripId,
+    required this.focusEntryId,
     required this.days,
     required this.segments,
     required this.showSegmentError,
@@ -97,6 +106,7 @@ class _TimelineBody extends StatefulWidget {
   });
 
   final String tripId;
+  final int? focusEntryId;
   final List<TripDay> days;
   final List<TripSegment> segments;
   final bool showSegmentError;
@@ -108,25 +118,79 @@ class _TimelineBody extends StatefulWidget {
 
 class _TimelineBodyState extends State<_TimelineBody> {
   late Map<int, GlobalKey> _daySectionKeys;
+  late Map<int, GlobalKey> _entryKeys;
   late int _activeDayNum;
+  bool _didApplyInitialFocus = false;
 
   @override
   void initState() {
     super.initState();
-    _rebuildDaySectionKeys();
-    _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
+    _rebuildScrollKeys();
+    _activeDayNum =
+        _dayNumForEntry(widget.focusEntryId) ??
+        (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
+    _scheduleInitialFocus();
   }
 
   @override
   void didUpdateWidget(covariant _TimelineBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.days, widget.days)) {
-      _rebuildDaySectionKeys();
+      _rebuildScrollKeys();
+    }
+    if (oldWidget.focusEntryId != widget.focusEntryId ||
+        !identical(oldWidget.days, widget.days)) {
+      _didApplyInitialFocus = false;
+      final focusedDayNum = _dayNumForEntry(widget.focusEntryId);
+      if (focusedDayNum != null && focusedDayNum != _activeDayNum) {
+        _activeDayNum = focusedDayNum;
+      }
+      _scheduleInitialFocus();
     }
   }
 
-  void _rebuildDaySectionKeys() {
+  void _rebuildScrollKeys() {
     _daySectionKeys = {for (final day in widget.days) day.dayNum: GlobalKey()};
+    _entryKeys = {
+      for (final day in widget.days)
+        for (final entry in day.timeline) entry.id: GlobalKey(),
+    };
+  }
+
+  int? _dayNumForEntry(int? entryId) {
+    if (entryId == null) return null;
+    for (final day in widget.days) {
+      if (day.timeline.any((entry) => entry.id == entryId)) {
+        return day.dayNum;
+      }
+    }
+    return null;
+  }
+
+  void _scheduleInitialFocus() {
+    if (widget.focusEntryId == null || _didApplyInitialFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+  }
+
+  void _applyInitialFocus() {
+    if (!mounted || _didApplyInitialFocus) return;
+    final focusEntryId = widget.focusEntryId;
+    if (focusEntryId == null) return;
+
+    final entryContext = _entryKeys[focusEntryId]?.currentContext;
+    if (entryContext == null) return;
+
+    _didApplyInitialFocus = true;
+    final focusedDayNum = _dayNumForEntry(focusEntryId);
+    if (focusedDayNum != null && focusedDayNum != _activeDayNum) {
+      setState(() => _activeDayNum = focusedDayNum);
+    }
+    Scrollable.ensureVisible(
+      entryContext,
+      duration: TpMotion.normal,
+      curve: TpMotion.appleEase,
+      alignment: 0.08,
+    );
   }
 
   void _scrollToDay(int dayNum) {
@@ -173,6 +237,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     key: _daySectionKeys[day.dayNum],
                     tripId: widget.tripId,
                     day: day,
+                    entryKeys: _entryKeys,
                     segmentsByPair: segmentsByPair,
                   ),
               ],
@@ -190,11 +255,13 @@ class _DaySection extends StatelessWidget {
     super.key,
     required this.tripId,
     required this.day,
+    required this.entryKeys,
     required this.segmentsByPair,
   });
 
   final String tripId;
   final TripDay day;
+  final Map<int, GlobalKey> entryKeys;
   final Map<String, TripSegment> segmentsByPair;
 
   @override
@@ -242,6 +309,7 @@ class _DaySection extends StatelessWidget {
       }
       rows.add(
         TimelineEntryTile(
+          key: entryKeys[entry.id],
           entry: entry,
           isFirst: entryIndex == 0,
           isLast: entryIndex == timeline.length - 1,
