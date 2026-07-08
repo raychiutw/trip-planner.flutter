@@ -22,6 +22,29 @@ class FakeTripImportFilePicker implements TripImportFilePicker {
   Future<TripImportFile?> pick() async => file;
 }
 
+class SavedTripExport {
+  const SavedTripExport({required this.fileName, required this.content});
+
+  final String fileName;
+  final String content;
+}
+
+class FakeTripExportFileSaver implements TripExportFileSaver {
+  FakeTripExportFileSaver({this.result = true});
+
+  final bool result;
+  final saved = <SavedTripExport>[];
+
+  @override
+  Future<bool> save({
+    required String suggestedName,
+    required String content,
+  }) async {
+    saved.add(SavedTripExport(fileName: suggestedName, content: content));
+    return result;
+  }
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(<String>[]);
@@ -502,6 +525,52 @@ void main() {
 
       expect(find.text('不支援的匯出格式（需 schemaVersion 1）'), findsOneWidget);
       verifyNever(() => mockTripRepository.importTripJson(any()));
+    });
+
+    testWidgets('卡片 action menu：匯出 JSON 會建立匯出檔並顯示成功', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      final fileSaver = FakeTripExportFileSaver();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.exportTripJson('okinawa-trip-2026'),
+      ).thenAnswer(
+        (_) async => const TripJsonExport(
+          fileName: '沖繩家族之旅-2026-07-08.json',
+          content: '{"schemaVersion":1}',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripExportFileSaverProvider.overrideWithValue(fileSaver),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(
+        find.byKey(const ValueKey('trip-card-menu-trigger-okinawa-trip-2026')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey('trip-card-menu-export-json-okinawa-trip-2026'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockTripRepository.exportTripJson('okinawa-trip-2026'),
+      ).called(1);
+      expect(fileSaver.saved, hasLength(1));
+      expect(fileSaver.saved.single.fileName, '沖繩家族之旅-2026-07-08.json');
+      expect(fileSaver.saved.single.content, '{"schemaVersion":1}');
+      expect(find.text('匯出成功'), findsOneWidget);
     });
 
     testWidgets('卡片 action menu：分享連結開啟管理 sheet 並列出既有連結', (tester) async {

@@ -17,14 +17,14 @@
 
 ## P0 parity debt
 
-- [x] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/filtered empty/TripCard action menu/尾端新增卡/JSON 匯入/分享連結管理(**Completed:** feature/favorites-explore)
+- [x] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/filtered empty/TripCard action menu/尾端新增卡/JSON 匯入/匯出/分享連結管理(**Completed:** feature/favorites-explore)
 - [x] TripTimelineScreen 補 web parity:focus deep link、scroll-spy active day、今日自動定位、overflow actions(編輯/AI 健檢/共編/分享連結)、offline banner、segment 背景同步細節、行程切換 dropdown(**Completed:** feature/favorites-explore)
 - [x] TripMapScreen 補 web parity:focus route、overview pin day switch、pin-card 雙向同步、polyline、定位/圖層 FAB(**Completed:** feature/favorites-explore)
 - [x] AccountScreen 補 web parity:displayName inline edit、外觀/通知 row 實際導航與 `/account/*`、`/settings/*` alias 第一波(**Completed:** feature/favorites-explore)
 
 ## P2
 
-- [ ] 公開分享頁/列印/JSON 匯出(`/s/:token`,`/trips/:id/print`,PDF/JSON 匯出)
+- [ ] 公開分享頁/列印/PDF(`/s/:token`,`/trips/:id/print`;JSON 匯出已完成)
 - [ ] 設定子頁後續：sessions、connected apps、developer apps、OAuth consent（外觀/通知第一波已完成）
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
 - [ ] 離線快取

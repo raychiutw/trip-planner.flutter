@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
@@ -578,6 +580,95 @@ void main() {
     final tripId = await tripRepository.importTripJson(exportedJson);
 
     expect(tripId, 'imp-okinawa-trip-2026');
+  });
+
+  test('exportTripJson：組出 schemaVersion 1 匯出檔並把 segments 改成位置索引', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026',
+      (server) => server.reply(200, {
+        'name': '沖繩/家族:旅行',
+        'title': '沖繩家族旅行',
+        'countries': 'JP',
+      }),
+    );
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026/days?all=1',
+      (server) => server.reply(200, [
+        {
+          'dayNum': 1,
+          'date': '2026-10-01',
+          'timeline': [
+            {'id': 11, 'title': '首里城'},
+            {'id': 12, 'title': '國際通'},
+          ],
+        },
+      ]),
+    );
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026/segments',
+      (server) => server.reply(200, [
+        {
+          'from_entry_id': 11,
+          'to_entry_id': 12,
+          'mode': 'walking',
+          'min': 18,
+          'distance_m': 950,
+          'source': 'manual',
+        },
+        {
+          'from_entry_id': 999,
+          'to_entry_id': 12,
+          'mode': 'driving',
+          'min': 10,
+          'distance_m': 1200,
+          'source': 'stale',
+        },
+      ]),
+    );
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026/notes',
+      (server) => server.reply(200, {
+        'flights': [
+          {'id': 1, 'flightNo': 'BR112'},
+        ],
+        'lodgings': [],
+        'reservations': [],
+        'pretripNotes': [],
+        'emergencyContacts': [],
+      }),
+    );
+
+    final export = await tripRepository.exportTripJson(
+      'okinawa-trip-2026',
+      now: DateTime.utc(2026, 7, 8),
+    );
+
+    expect(export.fileName, '沖繩_家族_旅行-2026-07-08.json');
+    final payload = jsonDecode(export.content) as Map<String, dynamic>;
+    expect(payload['schemaVersion'], 1);
+    expect((payload['meta'] as Map<String, dynamic>)['title'], '沖繩家族旅行');
+
+    final days = payload['days'] as List<dynamic>;
+    final timeline =
+        (days.single as Map<String, dynamic>)['timeline'] as List<dynamic>;
+    expect((timeline.first as Map<String, dynamic>)['entryPosition'], 0);
+    expect((timeline.last as Map<String, dynamic>)['entryPosition'], 1);
+
+    final segments = payload['segments'] as List<dynamic>;
+    expect(segments, hasLength(1));
+    expect(segments.single, {
+      'fromEntryIdx': 0,
+      'toEntryIdx': 1,
+      'mode': 'walking',
+      'min': 18,
+      'distanceM': 950,
+      'source': 'manual',
+    });
+    expect(
+      ((payload['notes'] as Map<String, dynamic>)['flights'] as List<dynamic>)
+          .single,
+      {'id': 1, 'flightNo': 'BR112'},
+    );
   });
 
   test(

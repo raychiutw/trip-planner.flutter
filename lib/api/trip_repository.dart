@@ -1,6 +1,8 @@
 /// 行程資料 repository：my-trips / trips / days / notes / stats / profile。
 library;
 
+import 'dart:convert';
+
 import '../models/day.dart';
 import '../models/entry.dart';
 import '../models/chat.dart';
@@ -12,6 +14,17 @@ import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
+
+/// 行程 JSON 匯出結果，`content` 可直接寫入 `fileName`。
+class TripJsonExport {
+  const TripJsonExport({required this.fileName, required this.content});
+
+  /// 建議檔名，已過濾路徑分隔字元與 Windows 保留字元。
+  final String fileName;
+
+  /// schemaVersion 1 的 pretty JSON content。
+  final String content;
+}
 
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
@@ -335,6 +348,31 @@ class TripRepository {
   Future<String> importTripJson(String jsonText) async {
     final responseBody = await _client.post('/trips/import', body: jsonText);
     return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
+  /// 匯出 web import 可吃的 schemaVersion 1 JSON。
+  Future<TripJsonExport> exportTripJson(String tripId, {DateTime? now}) async {
+    final encodedTripId = Uri.encodeComponent(tripId);
+    final meta = _copyJsonMap(await _client.get('/trips/$encodedTripId'));
+    final days = _asRecordList(
+      await _client.get('/trips/$encodedTripId/days?all=1'),
+    );
+    final segments = await _fetchOptionalRecordList(
+      '/trips/$encodedTripId/segments',
+    );
+    final notes = await _fetchOptionalMap('/trips/$encodedTripId/notes');
+    final output = _buildTripExportJson(
+      meta: meta,
+      days: days,
+      segments: segments,
+      notes: notes,
+    );
+
+    return TripJsonExport(
+      fileName:
+          '${_tripExportFileBase(meta, tripId, now ?? DateTime.now())}.json',
+      content: const JsonEncoder.withIndent('  ').convert(output),
+    );
   }
 
   /// PUT /trips/:id，更新 scalar 欄位並用 full-replacement 寫 destinations。
@@ -1124,6 +1162,24 @@ class TripRepository {
     return '${_shareLinksPath(tripId)}/${Uri.encodeComponent('$shareId')}';
   }
 
+  Future<List<Map<String, dynamic>>> _fetchOptionalRecordList(
+    String path,
+  ) async {
+    try {
+      return _asRecordList(await _client.get(path));
+    } on Exception {
+      return const <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchOptionalMap(String path) async {
+    try {
+      return _copyJsonMap(await _client.get(path));
+    } on Exception {
+      return _emptyExportNotes();
+    }
+  }
+
   Future<T> _createNoteRow<T>({
     required String tripId,
     required TripNoteSection section,
@@ -1166,4 +1222,125 @@ class TripRepository {
     if (trimmed == null || trimmed.isEmpty) return null;
     return trimmed;
   }
+}
+
+Map<String, dynamic> _buildTripExportJson({
+  required Map<String, dynamic> meta,
+  required List<Map<String, dynamic>> days,
+  required List<Map<String, dynamic>> segments,
+  required Map<String, dynamic> notes,
+}) {
+  final entryIdToPosition = <int, int>{};
+  var entryPosition = 0;
+  final exportDays = days.map((day) {
+    final dayCopy = Map<String, dynamic>.from(day);
+    final timeline = _asRecordList(dayCopy['timeline']).map((entry) {
+      final entryCopy = Map<String, dynamic>.from(entry);
+      final id = _intOrNull(entryCopy['id']);
+      if (id != null) {
+        entryIdToPosition[id] = entryPosition;
+      }
+      entryCopy['entryPosition'] = entryPosition;
+      entryPosition += 1;
+      return entryCopy;
+    }).toList();
+    dayCopy['timeline'] = timeline;
+    return dayCopy;
+  }).toList();
+
+  final exportSegments = <Map<String, dynamic>>[];
+  for (final segment in segments) {
+    final fromEntryPosition =
+        entryIdToPosition[_intFromAnyKey(
+          segment,
+          'fromEntryId',
+          'from_entry_id',
+        )];
+    final toEntryPosition =
+        entryIdToPosition[_intFromAnyKey(segment, 'toEntryId', 'to_entry_id')];
+    if (fromEntryPosition == null || toEntryPosition == null) continue;
+    exportSegments.add({
+      'fromEntryIdx': fromEntryPosition,
+      'toEntryIdx': toEntryPosition,
+      'mode': _stringOrNull(segment['mode']) ?? '',
+      'min': _numberOrNull(segment['min']),
+      'distanceM': _numberFromAnyKey(segment, 'distanceM', 'distance_m'),
+      'source': _stringOrNull(segment['source']),
+    });
+  }
+
+  return {
+    'schemaVersion': 1,
+    'meta': meta,
+    'days': exportDays,
+    'notes': notes,
+    'segments': exportSegments,
+  };
+}
+
+List<Map<String, dynamic>> _asRecordList(Object? value) {
+  if (value is! List) return const <Map<String, dynamic>>[];
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+}
+
+Map<String, dynamic> _copyJsonMap(Object? value) {
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return <String, dynamic>{};
+}
+
+Map<String, dynamic> _emptyExportNotes() {
+  return {
+    'flights': const <dynamic>[],
+    'lodgings': const <dynamic>[],
+    'reservations': const <dynamic>[],
+    'pretripNotes': const <dynamic>[],
+    'emergencyContacts': const <dynamic>[],
+  };
+}
+
+String _tripExportFileBase(
+  Map<String, dynamic> meta,
+  String fallbackTripId,
+  DateTime now,
+) {
+  final rawName = _stringOrNull(meta['name']) ?? fallbackTripId;
+  return _safeFileBase('$rawName-${_datePart(now)}');
+}
+
+String _safeFileBase(String raw) {
+  final stripped = raw.replaceAll(RegExp(r'[\\/\x00-\x1F<>:"|?*]'), '_').trim();
+  if (stripped.isEmpty) return 'trip';
+  return stripped.length > 80 ? stripped.substring(0, 80) : stripped;
+}
+
+String _datePart(DateTime dateTime) {
+  final year = dateTime.year.toString().padLeft(4, '0');
+  final month = dateTime.month.toString().padLeft(2, '0');
+  final day = dateTime.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
+}
+
+int? _intOrNull(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return null;
+}
+
+num? _numberOrNull(Object? value) => value is num ? value : null;
+
+String? _stringOrNull(Object? value) => value is String ? value : null;
+
+int? _intFromAnyKey(Map<String, dynamic> json, String key, String fallbackKey) {
+  return _intOrNull(json[key]) ?? _intOrNull(json[fallbackKey]);
+}
+
+num? _numberFromAnyKey(
+  Map<String, dynamic> json,
+  String key,
+  String fallbackKey,
+) {
+  return _numberOrNull(json[key]) ?? _numberOrNull(json[fallbackKey]);
 }

@@ -243,6 +243,7 @@ class TripRepository {
     List<TripDestinationInput> destinations = const [],
   });                                                // POST /trips
   Future<String> importTripJson(String jsonText);    // POST /trips/import raw JSON text
+  Future<TripJsonExport> exportTripJson(String tripId); // GET trip/days/segments/notes -> schemaVersion 1 JSON
   Future<void> updateTrip({
     required String id,
     required String? title,
@@ -411,7 +412,7 @@ class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_scr
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
-class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入 + 分享連結管理）
+class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入/匯出 + 分享連結管理）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
 class TripTimelineScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_timeline_screen.dart（接受 tripId, focusEntryId?, today?；初載 focus/today 定位 + scroll-spy 同步 active day；AppBar my-trips switcher；保存 segment auto-recompute 防重 signature）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）

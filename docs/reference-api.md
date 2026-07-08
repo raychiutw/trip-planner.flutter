@@ -189,6 +189,7 @@ class TripRepository {
     List<TripDestinationInput> destinations = const [],
   }); // POST /trips
   Future<String>            importTripJson(String jsonText); // POST /trips/import raw JSON text
+  Future<TripJsonExport>    exportTripJson(String tripId);   // GET trip/days/segments/notes → schemaVersion 1 JSON
   Future<void>              updateTrip({
     required String id,
     required String? title,
@@ -332,7 +333,7 @@ class TripRepository {
 分享連結管理由 `fetchTripShares`、`createTripShare`、`updateTripShare`、`rotateTripShare`、`revokeTripShare`、`deleteTripShare` 覆蓋。`createTripShare` / `rotateTripShare` 才會回 raw token/url；list 不會拿到既有網址。`visibleSections` 會經 `share.dart` allowlist 正規化,預設公開航班/住宿/行前須知,預訂與緊急聯絡預設關閉。
 `fetchTripRequests` / `createTripRequest` / `fetchTripRequest` 對應 web ChatPage 的 AI request queue。`fetchTripRequests` 預設讀 active trip 最新 5 筆且支援後端 paginated shape `{items, hasMore}`；若後端回 legacy array,repository 會包成 `TripRequestPage(hasMore: false)`。`ChatScreen` 第一波使用 polling `GET /requests/:id` 取代 web SSE。
 `fetchTripHealthReport` / `startTripHealthCheck` 對應 web `TripHealthCheckPage`。GET 解析 wrapper `{report}` 並允許 `report: null`;POST 送空 body 觸發後端建立 health-check request,回 pending `TripHealthReport`。`TripHealthScreen` 第一波用 `GET /trips/:id/health-check` 每 3 秒 polling report terminal state；若後端回 `TRIP_EMPTY`,畫面顯示 persistent error。
-`createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`importTripJson` 對齊 web 匯入行程,將已通過 client 端大小與 `schemaVersion == 1` 檢查的 raw JSON text 送到 `POST /trips/import`,成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
+`createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`importTripJson` 對齊 web 匯入行程,將已通過 client 端大小與 `schemaVersion == 1` 檢查的 raw JSON text 送到 `POST /trips/import`,成功回傳新 `tripId`。`exportTripJson` 對齊 web round-trip 匯出格式,讀 trip meta、`days?all=1`、segments 與 notes,輸出 schemaVersion 1 JSON；segments 會以 timeline 位置索引重建,缺 entry 的孤兒 segment 會略過。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `createTripDay` / `deleteTripDay` / `shiftTripDays` 對齊 web `EditTripPage` 的 day management immediate mutation。`createTripDay` body 送 `position: start|end|insert`,只有 `insert` 補缺日時才送 `date`;`deleteTripDay` 解析後端 `removedEntryCount`,UI 會先用目前 day timeline 顯示刪除影響範圍;`shiftTripDays` 送新的 Day 1 `startDate`,回傳新的起訖日期摘要。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `fetchTripSegments` 讀取 `trip_segments` source of truth；後端目前回 snake_case row,由 `TripSegment.fromJson` 解析。`updateTripSegment` 對既有 segment 送 `mode` 與必填 `expectedVersion`;只有 `mode == 'transit'` 且 `min` 非 null 時送 `min`,driving/walking 讓後端依 from/to entry 座標重算。

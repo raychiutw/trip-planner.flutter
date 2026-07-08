@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,11 @@ final myTripsProvider = FutureProvider<List<TripSummary>>((ref) {
 /// 匯入 JSON 檔案選擇器；widget test 以 provider override 注入假檔案。
 final tripImportFilePickerProvider = Provider<TripImportFilePicker>((ref) {
   return const FileSelectorTripImportFilePicker();
+});
+
+/// 匯出 JSON 檔案寫入器；widget test 以 provider override 注入假 saver。
+final tripExportFileSaverProvider = Provider<TripExportFileSaver>((ref) {
+  return const FileSelectorTripExportFileSaver();
 });
 
 /// TripsList 匯入用的檔案內容。
@@ -74,11 +80,49 @@ class FileSelectorTripImportFilePicker implements TripImportFilePicker {
   }
 }
 
+/// TripsList 匯出檔案寫入抽象，避免 widget test 開啟原生儲存對話框。
+abstract class TripExportFileSaver {
+  const TripExportFileSaver();
+
+  /// 儲存 JSON content；使用者取消時回傳 false。
+  Future<bool> save({required String suggestedName, required String content});
+}
+
+/// 使用 `file_selector` 的實際 JSON 檔案 saver。
+class FileSelectorTripExportFileSaver implements TripExportFileSaver {
+  const FileSelectorTripExportFileSaver();
+
+  @override
+  Future<bool> save({
+    required String suggestedName,
+    required String content,
+  }) async {
+    final location = await getSaveLocation(
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'JSON',
+          extensions: ['json'],
+          mimeTypes: ['application/json'],
+        ),
+      ],
+      suggestedName: suggestedName,
+      confirmButtonText: '儲存',
+    );
+    if (location == null) return false;
+    await XFile.fromData(
+      Uint8List.fromList(utf8.encode(content)),
+      mimeType: 'application/json',
+      name: suggestedName,
+    ).saveTo(location.path);
+    return true;
+  }
+}
+
 enum _TripsFilterTab { all, mine, collab, archived }
 
 enum _TripsSortBy { updated, start, name }
 
-enum _TripListAction { edit, collab, health, notes, share, delete }
+enum _TripListAction { edit, collab, health, notes, exportJson, share, delete }
 
 /// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 下拉更新 + 單欄卡片清單。
 /// 點卡片進詳情；長按開 bottom sheet 刪除（AlertDialog 二次確認）。
@@ -479,6 +523,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     Navigator.of(sheetContext).pop(_TripListAction.notes),
               ),
               ListTile(
+                key: ValueKey('trip-card-menu-export-json-${trip.tripId}'),
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('匯出 JSON'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.exportJson),
+              ),
+              ListTile(
                 key: ValueKey('trip-card-menu-share-${trip.tripId}'),
                 leading: const Icon(Icons.ios_share_outlined),
                 title: const Text('分享連結'),
@@ -518,6 +569,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       case _TripListAction.notes:
         context.go('/trips/${trip.tripId}/notes');
         return;
+      case _TripListAction.exportJson:
+        await _exportTripJson(context, trip);
+        return;
       case _TripListAction.share:
         await _showShareLinks(context, trip);
         return;
@@ -526,6 +580,32 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         return;
       case null:
         return;
+    }
+  }
+
+  Future<void> _exportTripJson(BuildContext context, TripSummary trip) async {
+    try {
+      final export = await ref
+          .read(tripRepositoryProvider)
+          .exportTripJson(trip.tripId);
+      if (!context.mounted) return;
+      final saved = await ref
+          .read(tripExportFileSaverProvider)
+          .save(suggestedName: export.fileName, content: export.content);
+      if (!context.mounted || !saved) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('匯出成功')));
+    } on ApiError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.detail ?? error.message)));
+    } on Exception {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('匯出失敗，請稍後再試')));
     }
   }
 
