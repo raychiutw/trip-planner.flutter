@@ -83,6 +83,42 @@ void main() {
     expect(tripDetail.destinations.single.name, '那霸');
   });
 
+  test('fetchPublicTripShare：GET /share/:token 解析公開分享 payload', () async {
+    dioAdapter.onGet(
+      '/share/share-token',
+      (server) => server.reply(200, {
+        'meta': {
+          'name': 'okinawa-trip',
+          'title': '沖繩家族旅行',
+          'sharedBy': 'Ray',
+          'destinations': [
+            {'name': '那霸'},
+          ],
+        },
+        'days': const [],
+        'notes': const {},
+      }),
+    );
+
+    final share = await tripRepository.fetchPublicTripShare('share-token');
+
+    expect(share.displayTitle, '沖繩家族旅行');
+    expect(share.sharedBy, 'Ray');
+    expect(share.destinationsLabel, '那霸');
+  });
+
+  test('clonePublicTripShare：POST /share/:token/clone 回傳新 tripId', () async {
+    dioAdapter.onPost(
+      '/share/share-token/clone',
+      (server) => server.reply(200, {'tripId': 'cloned-trip'}),
+      data: <String, dynamic>{},
+    );
+
+    final tripId = await tripRepository.clonePublicTripShare('share-token');
+
+    expect(tripId, 'cloned-trip');
+  });
+
   test('fetchDays：GET /trips/:id/days?all=1 解析巢狀 timeline', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/days',
@@ -1048,9 +1084,7 @@ void main() {
         (server) => server.throws(
           503,
           DioException(
-            requestOptions: RequestOptions(
-              path: '/trips/okinawa/entries/7',
-            ),
+            requestOptions: RequestOptions(path: '/trips/okinawa/entries/7'),
             type: DioExceptionType.connectionError,
           ),
         ),
@@ -1083,12 +1117,7 @@ void main() {
       // 預先寫入含 reservations row id=5 的 notes 快取
       await cache.writeResponse(notesKey, {
         'reservations': [
-          {
-            'id': 5,
-            'title': '舊餐廳',
-            'date': '2026-05-01',
-            'version': 2,
-          },
+          {'id': 5, 'title': '舊餐廳', 'date': '2026-05-01', 'version': 2},
         ],
         'flights': <dynamic>[],
       });

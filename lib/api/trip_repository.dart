@@ -9,6 +9,7 @@ import '../models/notes.dart';
 import '../models/poi_search_result.dart';
 import '../models/poi_type.dart';
 import '../models/segment.dart';
+import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -480,5 +481,22 @@ class TripRepository {
       body: {'displayName': displayName},
     );
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /share/:token（公開分享頁,不需登入）。
+  Future<PublicTripShare> fetchPublicTripShare(String token) async {
+    final responseBody = await _client.get(
+      '/share/${Uri.encodeComponent(token)}',
+    );
+    return PublicTripShare.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /share/:token/clone，將公開行程複製到目前登入帳號。
+  Future<String> clonePublicTripShare(String token) async {
+    final responseBody = await _client.post(
+      '/share/${Uri.encodeComponent(token)}/clone',
+      body: <String, dynamic>{},
+    );
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
   }
 }

@@ -15,6 +15,7 @@ import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
 import '../features/map/global_map_screen.dart';
+import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
@@ -46,7 +47,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      if (!isLoggedIn && !isOnLogin) return '/login';
+      final isPublicShareRoute =
+          state.matchedLocation == '/s/:token' ||
+          (state.uri.pathSegments.length == 2 &&
+              state.uri.pathSegments.first == 's');
+      if (!isLoggedIn && !isOnLogin && !isPublicShareRoute) return '/login';
       if (isLoggedIn && isOnLogin) return '/trips';
       return null;
     },
@@ -80,6 +85,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/profile',
         builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/s/:token',
+        builder: (context, state) =>
+            PublicShareScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

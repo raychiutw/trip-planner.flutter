@@ -10,8 +10,10 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/share.dart';
 import 'package:tripline/models/user.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
@@ -36,6 +38,9 @@ const _loggedInUser = UserInfo(
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
+  when(
+    () => mockTripRepository.fetchPublicTripShare(any()),
+  ).thenAnswer((_) async => const PublicTripShare(name: 'public-trip'));
 
   final container = ProviderContainer(
     overrides: [
@@ -95,6 +100,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入可進入公開分享頁 /s/:token', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/s/public-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicShareScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }
