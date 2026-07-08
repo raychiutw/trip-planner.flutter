@@ -11,9 +11,13 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
+import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/day.dart';
+import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/share.dart';
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
@@ -41,6 +45,15 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(
     () => mockTripRepository.fetchPublicTripShare(any()),
   ).thenAnswer((_) async => const PublicTripShare(name: 'public-trip'));
+  when(
+    () => mockTripRepository.fetchTrip(any()),
+  ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'print-trip'));
+  when(
+    () => mockTripRepository.fetchDays(any()),
+  ).thenAnswer((_) async => <TripDay>[]);
+  when(
+    () => mockTripRepository.fetchNotes(any()),
+  ).thenAnswer((_) async => const TripNotes());
 
   final container = ProviderContainer(
     overrides: [
@@ -119,6 +132,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PublicShareScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可進入 /trips/:tripId/print', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/print');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripPrintScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }
