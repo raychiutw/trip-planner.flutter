@@ -11,8 +11,8 @@
 | State management | flutter_riverpod 3.x | scoped provider 天然對應 web 的 TripLayout 共用 fetch（規劃時為 2.x，實作採 3.x） |
 | Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
 | HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry |
-| 認證 | 密碼登入拿 session cookie | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE+Bearer 留待後續（需註冊 public client） |
-| 地圖 | flutter_map + OSM tiles | 免 API key、零帳務設定；介面抽象化，之後可換 google_maps_flutter |
+| 認證 | Cookie 登入 + OAuth PKCE/Bearer 就緒 | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE/Bearer client 端已實作並以 dart-define 啟用，e2e 仍需註冊 active public client |
+| 地圖 | flutter_map + OSM tiles + adapter | 免 API key、零帳務設定；`features/map/map_adapter.dart` 集中 SDK 轉接，之後可換 google_maps_flutter |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
 | 測試 | flutter_test + mocktail + http_mock_adapter | TDD：models 解析測試、api client 行為測試、widget 測試 |
 
@@ -41,7 +41,7 @@
 | ChatScreen / FavoritesScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
 
 P1（第二波）：收藏 + Explore、Entry CRUD 表單群、建立/編輯行程、聊天（request queue）、全域地圖、共編。
-P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
+P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取已補齊；通知設定與 OAuth e2e public client provision 仍為外部/後續項。
 
 ## 目錄結構
 
@@ -59,6 +59,7 @@ lib/
   features/auth/            # LoginScreen
   features/trips/           # TripsListScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen + trip scope providers
+  features/map/             # GlobalMapScreen + map_adapter.dart
   features/account/         # AccountScreen
   features/shell/           # 5-tab scaffold + placeholder screens
   widgets/                  # 共用：toast、confirm dialog、empty state、chips

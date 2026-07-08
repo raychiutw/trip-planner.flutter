@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **公開分享頁補齊**:`/s/:token` 可未登入瀏覽公開行程、查看 days/notes 摘要,登入後可複製到自己的帳號。
+- **列印與 PDF 預覽**:行程詳情新增列印頁,可預覽每日行程、筆記摘要並分享/輸出 PDF。新增 `pdf`、`printing` 依賴。
+- **JSON 匯入/匯出**:行程清單支援 web 相容 `schemaVersion:1` JSON import/export,含 days、segments、notes。新增 `file_selector` 依賴。
+- **帳號安全與 OAuth 設定**:新增登入裝置管理(`/account/sessions`)、已連結應用撤銷(`/account/connected-apps`)、開發者 OAuth app 清單/建立(`/dev/apps`)與 OAuth consent shell route(`/oauth/consent`)。
+- **地圖 adapter**:新增 `features/map/map_adapter.dart`,集中 `flutter_map` 轉接層;`TripMapScreen` 與 `GlobalMapScreen` 改走 adapter,保留日後替換地圖 SDK 的空間。
+
+### 修正
+
+- 更新 reorder callback 參數名稱,對齊目前 Flutter SDK 的 `onReorder` API。
+
 ## [0.4.0] - 2026-06-16
 
 行程清單名稱排序 + 聊天語音指令(本 repo 可做的 web parity 後續)。
