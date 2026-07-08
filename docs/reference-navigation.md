@@ -12,8 +12,9 @@
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
-| `/trips/:tripId/add-entry?day=N` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites slice |
-| `/trips/:tripId/add-stop?day=N` | `AddEntryScreen` | tab 2 孫路由；相容入口 |
+| `/trips/:tripId/add-entry?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites/custom slice |
+| `/trips/:tripId/add-stop?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；相容入口 |
+| `/trips/:tripId/add-custom-stop?day=N` | `AddEntryScreen` | tab 2 孫路由；自訂地圖座標入口 |
 | `/trips/:tripId/stop/:entryId/edit` | `EditEntryScreen` | tab 2 孫路由；時間/描述/刪除 slice |
 | `/trips/:tripId/stop/:entryId/change-poi?mode=alternate` | `ChangePoiScreen` | tab 2 孫路由；預設置換主景點,`mode=alternate` 加備選 |
 | `/trips/:tripId/stop/:entryId/copy` | `EntryActionScreen` | tab 2 孫路由；跨日複製 entry |

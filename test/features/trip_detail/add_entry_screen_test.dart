@@ -74,6 +74,19 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     when(
+      () => mockTripRepository.createCustomEntry(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        name: any(named: 'name'),
+        note: any(named: 'note'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        poiType: any(named: 'poiType'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
       () => mockTripRepository.recomputeTravel(
         any(),
         dayNum: any(named: 'dayNum'),
@@ -110,6 +123,15 @@ void main() {
           builder: (context, state) => AddEntryScreen(
             tripId: state.pathParameters['tripId']!,
             initialDayNum: int.tryParse(state.uri.queryParameters['day'] ?? ''),
+            initialSource: state.uri.queryParameters['tab'],
+          ),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/add-custom-stop',
+          builder: (context, state) => AddEntryScreen(
+            tripId: state.pathParameters['tripId']!,
+            initialDayNum: int.tryParse(state.uri.queryParameters['day'] ?? ''),
+            initialSource: 'custom',
           ),
         ),
         GoRoute(
@@ -189,6 +211,65 @@ void main() {
         startTime: '09:00',
         endTime: '10:00',
       ),
+    ).called(1);
+    expect(find.text('trip:$tripId'), findsOneWidget);
+  });
+
+  testWidgets('自訂 tab 可用座標新增景點並觸發 recompute', (tester) async {
+    await tester.pumpWidget(
+      buildRouterApp(initialLocation: '/trips/$tripId/add-custom-stop?day=2'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('自訂'), findsOneWidget);
+    expect(find.text('Day 2 · 那霸'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-custom-title')),
+      '巷口咖啡',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-start-time')),
+      '14:30',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-end-time')),
+      '15:30',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-custom-lat')),
+      '26.2145',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-custom-lng')),
+      '127.6812',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('add-entry-custom-note')),
+      '朋友推薦的甜點店',
+    );
+    final submitButton = find.byKey(const ValueKey('add-entry-add-custom'));
+    await tester.ensureVisible(submitButton);
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.createCustomEntry(
+        tripId: tripId,
+        dayNum: 2,
+        name: '巷口咖啡',
+        note: '朋友推薦的甜點店',
+        lat: 26.2145,
+        lng: 127.6812,
+        poiType: 'attraction',
+        startTime: '14:30',
+        endTime: '15:30',
+      ),
+    ).called(1);
+    verify(
+      () => mockTripRepository.recomputeTravel(tripId, dayNum: 2),
     ).called(1);
     expect(find.text('trip:$tripId'), findsOneWidget);
   });

@@ -5,6 +5,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -208,6 +209,30 @@ void main() {
 
     expect(find.byType(AddEntryScreen), findsOneWidget);
     expect(find.text('Day 2 · 那霸'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/add-custom-stop 進入自訂景點表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/add-custom-stop?day=2');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddEntryScreen), findsOneWidget);
+    expect(find.text('Day 2 · 那霸'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('add-entry-custom-title')),
+      findsOneWidget,
+    );
     expect(find.byType(LoginScreen), findsNothing);
   });
 

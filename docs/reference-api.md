@@ -196,6 +196,17 @@ class TripRepository {
     required String startTime,
     required String endTime,
   }); // POST /trips/:id/days/:num/entries
+  Future<void> createCustomEntry({
+    required String tripId,
+    required int dayNum,
+    required String name,
+    required String? note,
+    required double lat,
+    required double lng,
+    required String poiType,
+    required String startTime,
+    required String endTime,
+  }); // POST /trips/:id/days/:num/entries
   Future<void>              recomputeTravel(String tripId, {int? dayNum}); // POST /trips/:id/recompute-travel?day=N
 }
 ```
@@ -207,6 +218,7 @@ class TripRepository {
 `replaceEntryMasterPoi*`、`addEntryAlternate*`、`deleteEntryAlternate` 與 `reorderEntryAlternates` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。刪除備選因 DELETE 無 body,以 query string 帶 `entryPoisVersion`;排序 body 使用完整 alternate `poiId` 陣列 `order`（不含 master）。
 `EditEntryScreen`、`ChangePoiScreen` 與 `EntryActionScreen` 在 edit/move/POI mutation 收到 409 `STALE_ENTRY` 時會先 `fetchEntry`,再以最新 `version` 或 `entryPoisVersion` retry 同一個使用者操作一次；非 stale 錯誤不做自動 retry。
 `createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
+`createCustomEntry` 是 `AddEntryScreen` 自訂 tab / `/add-custom-stop` 使用的 map-pin path:送 `name`、`note`、`lat`、`lng`、`source: custom`、`time` 與 `poi_type`;client 會先驗證 title 非空與 lat/lng 範圍,成功後觸發 `recomputeTravel`。
 `AddEntryScreen` 收藏 tab 仍走 `addPoiFavoriteToTrip` 的 4-field favorite fast-path,成功後同樣觸發 `recomputeTravel`。
 
 回傳的 model 結構見 [Models 參考](reference-models.md)。

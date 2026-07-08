@@ -352,6 +352,38 @@ class TripRepository {
     );
   }
 
+  /// POST /trips/:id/days/:num/entries，用自訂地圖座標直建 entry。
+  Future<void> createCustomEntry({
+    required String tripId,
+    required int dayNum,
+    required String name,
+    required String? note,
+    required double lat,
+    required double lng,
+    required String poiType,
+    required String startTime,
+    required String endTime,
+  }) {
+    final time = startTime.trim().isNotEmpty && endTime.trim().isNotEmpty
+        ? '${startTime.trim()}-${endTime.trim()}'
+        : null;
+    final trimmedNote = note?.trim();
+    return _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
+      body: {
+        'name': name.trim(),
+        'note': ?(trimmedNote == null || trimmedNote.isEmpty
+            ? null
+            : trimmedNote),
+        'lat': lat,
+        'lng': lng,
+        'source': 'custom',
+        'time': ?time,
+        'poi_type': mapPoiCategoryToType(poiType),
+      },
+    );
+  }
+
   /// POST /trips/:id/recompute-travel?day=N。
   Future<void> recomputeTravel(String tripId, {int? dayNum}) {
     return _client.post(

@@ -780,6 +780,44 @@ void main() {
     );
   });
 
+  test('createCustomEntry：POST entries 帶自訂座標、類型與 note', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026/days/2/entries',
+      (server) => server.reply(201, {
+        'id': 902,
+        'dayId': 11,
+        'sortOrder': 3,
+        'startTime': '14:30',
+        'endTime': '15:30',
+        'source': 'custom',
+      }),
+      data: {
+        'name': '巷口咖啡',
+        'note': '朋友推薦的甜點店',
+        'lat': 26.2145,
+        'lng': 127.6812,
+        'source': 'custom',
+        'time': '14:30-15:30',
+        'poi_type': 'restaurant',
+      },
+    );
+
+    await expectLater(
+      tripRepository.createCustomEntry(
+        tripId: 'okinawa-trip-2026',
+        dayNum: 2,
+        name: '巷口咖啡',
+        note: '朋友推薦的甜點店',
+        lat: 26.2145,
+        lng: 127.6812,
+        poiType: 'restaurant',
+        startTime: '14:30',
+        endTime: '15:30',
+      ),
+      completes,
+    );
+  });
+
   test('recomputeTravel：POST /trips/:id/recompute-travel?day=N', () async {
     dioAdapter.onPost(
       '/trips/okinawa-trip-2026/recompute-travel',

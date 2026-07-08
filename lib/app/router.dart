@@ -90,6 +90,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         builder: (context, state) => AddEntryScreen(
                           tripId: state.pathParameters['tripId']!,
                           initialDayNum: _dayNumFromQuery(state),
+                          initialSource: _entrySourceFromQuery(state),
                         ),
                       ),
                       GoRoute(
@@ -97,6 +98,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         builder: (context, state) => AddEntryScreen(
                           tripId: state.pathParameters['tripId']!,
                           initialDayNum: _dayNumFromQuery(state),
+                          initialSource: _entrySourceFromQuery(state),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'add-custom-stop',
+                        builder: (context, state) => AddEntryScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          initialDayNum: _dayNumFromQuery(state),
+                          initialSource: 'custom',
                         ),
                       ),
                       GoRoute(
@@ -239,4 +249,12 @@ String? _nonEmptyQueryValue(Map<String, String> query, String key) {
 
 int? _dayNumFromQuery(GoRouterState state) {
   return int.tryParse(state.uri.queryParameters['day'] ?? '');
+}
+
+String? _entrySourceFromQuery(GoRouterState state) {
+  final tab = state.uri.queryParameters['tab']?.trim();
+  return switch (tab) {
+    'search' || 'favorites' || 'custom' => tab,
+    _ => null,
+  };
 }
