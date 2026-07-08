@@ -166,3 +166,26 @@ class EntryPoisMutationResult {
     );
   }
 }
+
+/// 備選 POI 重新排序後的 OCC token。
+class EntryAlternatesReorderResult {
+  const EntryAlternatesReorderResult({
+    required this.entryId,
+    required this.order,
+    this.entryPoisVersion,
+  });
+
+  final int entryId;
+  final List<int> order;
+  final String? entryPoisVersion;
+
+  factory EntryAlternatesReorderResult.fromJson(Map<String, dynamic> json) {
+    return EntryAlternatesReorderResult(
+      entryId: (json['entryId'] as num).toInt(),
+      order: (json['order'] as List<dynamic>? ?? [])
+          .map((poiId) => (poiId as num).toInt())
+          .toList(),
+      entryPoisVersion: json['entryPoisVersion'] as String?,
+    );
+  }
+}

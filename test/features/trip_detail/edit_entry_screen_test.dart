@@ -30,7 +30,10 @@ void main() {
       type: 'attraction',
       note: '黃昏時段去',
     ),
-    alternates: [EntryPoiInfo(poiId: 502, name: '玉陵', type: 'attraction')],
+    alternates: [
+      EntryPoiInfo(poiId: 502, name: '玉陵', type: 'attraction', sortOrder: 2),
+      EntryPoiInfo(poiId: 503, name: '識名園', type: 'attraction', sortOrder: 3),
+    ],
   );
 
   late MockTripRepository mockTripRepository;
@@ -64,6 +67,34 @@ void main() {
     when(
       () => mockTripRepository.deleteEntry(any(), any()),
     ).thenAnswer((_) async {});
+    when(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const EntryPoisMutationResult(
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    );
+    when(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        orderedPoiIds: any(named: 'orderedPoiIds'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const EntryAlternatesReorderResult(
+        entryId: 101,
+        order: [503, 502],
+        entryPoisVersion: '4',
+      ),
+    );
     when(
       () => mockTripRepository.recomputeTravel(
         any(),
@@ -121,7 +152,10 @@ void main() {
 
     expect(find.text('編輯景點'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
-    expect(find.text('備選：玉陵'), findsOneWidget);
+    expect(find.text('備選：玉陵、識名園'), findsOneWidget);
+    expect(find.text('備選景點'), findsOneWidget);
+    expect(find.text('玉陵'), findsOneWidget);
+    expect(find.text('識名園'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '10:00'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '11:30'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '世界遺產'), findsOneWidget);
@@ -163,6 +197,48 @@ void main() {
     expect(find.text('move:101'), findsOneWidget);
   });
 
+  testWidgets('移除備選時 DELETE alternate 並帶 entryPoisVersion', (tester) async {
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-alt-delete-502')));
+    await tester.pumpAndSettle();
+    expect(find.text('移除備選？'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '移除'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.deleteEntryAlternate(
+        tripId: tripId,
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    expect(find.text('編輯景點'), findsOneWidget);
+  });
+
+  testWidgets('調整備選順序時 PATCH reorder 並帶完整 poiId 順序', (tester) async {
+    await tester.pumpWidget(buildRouterApp());
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('edit-entry-alt-down-502')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.reorderEntryAlternates(
+        tripId: tripId,
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '3',
+      ),
+    ).called(1);
+    expect(find.text('編輯景點'), findsOneWidget);
+  });
+
   testWidgets('儲存時 PATCH entry 並帶 expectedVersion', (tester) async {
     await tester.pumpWidget(buildRouterApp());
     await tester.pump();
@@ -180,7 +256,10 @@ void main() {
       find.byKey(const ValueKey('edit-entry-description')),
       '改成上午晚點去',
     );
-    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pumpAndSettle();
+    final saveButton = find.byKey(const ValueKey('edit-entry-save')).last;
+    await tester.tap(saveButton);
     await tester.pumpAndSettle();
 
     verify(
@@ -202,7 +281,10 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.widgetWithText(OutlinedButton, '刪除景點'));
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pumpAndSettle();
+    final deleteButton = find.byKey(const ValueKey('edit-entry-delete')).last;
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '刪除'));
     await tester.pumpAndSettle();

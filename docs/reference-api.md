@@ -161,6 +161,18 @@ class TripRepository {
     required int poiId,
     required String? entryPoisVersion,
   }); // POST /trips/:id/entries/:entryId/alternates
+  Future<EntryPoisMutationResult> deleteEntryAlternate({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    required String? entryPoisVersion,
+  }); // DELETE /trips/:id/entries/:entryId/alternates/:poiId?entryPoisVersion=...
+  Future<EntryAlternatesReorderResult> reorderEntryAlternates({
+    required String tripId,
+    required int entryId,
+    required List<int> orderedPoiIds,
+    required String? entryPoisVersion,
+  }); // PATCH /trips/:id/entries/:entryId/alternates/reorder
   Future<TripNotes>         fetchNotes(String id);       // GET /trips/:id/notes
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
@@ -192,7 +204,7 @@ class TripRepository {
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。
 `copyEntry` 送 `POST /trips/:id/entries/:entryId/copy` 與 body `targetDayId`;`moveEntry` 復用 entry PATCH endpoint,body 使用 `day_id` 與必填 OCC `expectedVersion`。畫面成功後會對受影響 day 呼叫 `recomputeTravel`。
-`replaceEntryMasterPoi*` 與 `addEntryAlternate*` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。
+`replaceEntryMasterPoi*`、`addEntryAlternate*`、`deleteEntryAlternate` 與 `reorderEntryAlternates` 會送 `entryPoisVersion`（可為 null）對齊後端 POI 關聯 OCC；search-result 版本會把 `PoiSearchResult.category` 映射成後端白名單 `type`,並帶 `place_id`。刪除備選因 DELETE 無 body,以 query string 帶 `entryPoisVersion`;排序 body 使用完整 alternate `poiId` 陣列 `order`（不含 master）。
 `createEntryFromPoiSearchResult` 是 Explore direct-mode 與 `AddEntryScreen` 搜尋 tab 使用的 fast-path:用搜尋結果建立 day entry,送 `name`、`note`(地址)、`lat`、`lng`、`source: google`、`time` 與映射後的 `poi_type`;成功後畫面會觸發 `recomputeTravel` 更新 travel segments。
 `AddEntryScreen` 收藏 tab 仍走 `addPoiFavoriteToTrip` 的 4-field favorite fast-path,成功後同樣觸發 `recomputeTravel`。
 

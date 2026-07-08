@@ -171,6 +171,40 @@ class TripRepository {
     );
   }
 
+  /// DELETE /trips/:id/entries/:entryId/alternates/:poiId。
+  Future<EntryPoisMutationResult> deleteEntryAlternate({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    required String? entryPoisVersion,
+  }) async {
+    final responseBody = await _client.delete(
+      _withOptionalQuery(
+        '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/alternates/${Uri.encodeComponent('$poiId')}',
+        {'entryPoisVersion': entryPoisVersion},
+      ),
+    );
+    return EntryPoisMutationResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
+  /// PATCH /trips/:id/entries/:entryId/alternates/reorder。
+  Future<EntryAlternatesReorderResult> reorderEntryAlternates({
+    required String tripId,
+    required int entryId,
+    required List<int> orderedPoiIds,
+    required String? entryPoisVersion,
+  }) async {
+    final responseBody = await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/${Uri.encodeComponent('$entryId')}/alternates/reorder',
+      body: {'order': orderedPoiIds, 'entryPoisVersion': ?entryPoisVersion},
+    );
+    return EntryAlternatesReorderResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async {
     final responseBody = await _client.get(
@@ -343,5 +377,17 @@ class TripRepository {
       'entryPoisVersion': ?entryPoisVersion,
       'rating': ?poi.rating,
     };
+  }
+
+  String _withOptionalQuery(String path, Map<String, String?> query) {
+    final entries = query.entries
+        .where((entry) => entry.value != null && entry.value!.isNotEmpty)
+        .map(
+          (entry) =>
+              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value!)}',
+        )
+        .toList();
+    if (entries.isEmpty) return path;
+    return '$path?${entries.join('&')}';
   }
 }

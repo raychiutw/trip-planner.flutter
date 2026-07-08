@@ -111,7 +111,11 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 
 ### EntryPoisMutationResult — `trip_entry_pois` 變更結果
 
-`POST /trips/:id/entries/:entryId/alternates` 回傳的 POI 關聯變更結果:`entryId: int`、`poiId: int`、`sortOrder: int?`、`entryPoisVersion: String?`。`entryPoisVersion` 是下一次 POI 變更要帶的 OCC token。
+`POST /trips/:id/entries/:entryId/alternates` 與 `DELETE /trips/:id/entries/:entryId/alternates/:poiId` 回傳的 POI 關聯變更結果:`entryId: int`、`poiId: int`、`sortOrder: int?`、`entryPoisVersion: String?`。`entryPoisVersion` 是下一次 POI 變更要帶的 OCC token。
+
+### EntryAlternatesReorderResult — 備選排序結果
+
+`PATCH /trips/:id/entries/:entryId/alternates/reorder` 回傳:`entryId: int`、`order: List<int>`、`entryPoisVersion: String?`。`order` 是不含 master 的 alternate `poiId` 新順序。
 
 ## poi.dart
 

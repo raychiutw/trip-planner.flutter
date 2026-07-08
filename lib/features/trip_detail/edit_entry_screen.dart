@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../api/trip_repository.dart';
 import '../../models/entry.dart';
@@ -33,7 +34,9 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
   final _descriptionController = TextEditingController();
   bool _hasHydrated = false;
   bool _isSubmitting = false;
+  int? _alternatePendingPoiId;
   String? _submitError;
+  String? _alternateError;
 
   static final _timePattern = RegExp(r'^\d{2}:\d{2}$');
 
@@ -76,6 +79,19 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
           tripId: widget.tripId,
           entryId: widget.entryId,
           enabled: !_isSubmitting,
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        _AlternatesSection(
+          alternates: entry.alternates,
+          pendingPoiId: _alternatePendingPoiId,
+          error: _alternateError,
+          enabled: !_isSubmitting && _alternatePendingPoiId == null,
+          onMove: (alternate, delta) => _reorderAlternate(
+            entry: entry,
+            alternate: alternate,
+            delta: delta,
+          ),
+          onDelete: (alternate) => _confirmRemoveAlternate(entry, alternate),
         ),
         const SizedBox(height: TpSpacing.s4),
         Row(
@@ -125,6 +141,7 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
         ],
         const SizedBox(height: TpSpacing.s5),
         FilledButton.icon(
+          key: const ValueKey('edit-entry-save'),
           icon: _isSubmitting
               ? const SizedBox.square(
                   dimension: 18,
@@ -136,6 +153,7 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
         ),
         const SizedBox(height: TpSpacing.s3),
         OutlinedButton.icon(
+          key: const ValueKey('edit-entry-delete'),
           icon: const Icon(Icons.delete_outline),
           label: const Text('刪除景點'),
           onPressed: _isSubmitting ? null : () => _confirmDelete(entry),
@@ -228,6 +246,95 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     }
   }
 
+  Future<void> _confirmRemoveAlternate(
+    TimelineEntry entry,
+    EntryPoiInfo alternate,
+  ) async {
+    final name = _poiName(alternate);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('移除備選？'),
+        content: Text('確定要移除「$name」嗎？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() {
+      _alternatePendingPoiId = alternate.poiId;
+      _alternateError = null;
+    });
+    try {
+      final repository = ref.read(tripRepositoryProvider);
+      await repository.deleteEntryAlternate(
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        poiId: alternate.poiId,
+        entryPoisVersion: entry.entryPoisVersion,
+      );
+      _refreshEntryPois();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _alternateError = _alternateErrorMessage(error, '移除備選失敗，請稍後再試');
+      });
+    } finally {
+      if (mounted) setState(() => _alternatePendingPoiId = null);
+    }
+  }
+
+  Future<void> _reorderAlternate({
+    required TimelineEntry entry,
+    required EntryPoiInfo alternate,
+    required int delta,
+  }) async {
+    final index = entry.alternates.indexWhere(
+      (item) => item.poiId == alternate.poiId,
+    );
+    final targetIndex = index + delta;
+    if (index < 0 ||
+        targetIndex < 0 ||
+        targetIndex >= entry.alternates.length) {
+      return;
+    }
+    final orderedPoiIds = entry.alternates.map((item) => item.poiId).toList();
+    final currentPoiId = orderedPoiIds[index];
+    orderedPoiIds[index] = orderedPoiIds[targetIndex];
+    orderedPoiIds[targetIndex] = currentPoiId;
+
+    setState(() {
+      _alternatePendingPoiId = alternate.poiId;
+      _alternateError = null;
+    });
+    try {
+      final repository = ref.read(tripRepositoryProvider);
+      await repository.reorderEntryAlternates(
+        tripId: widget.tripId,
+        entryId: widget.entryId,
+        orderedPoiIds: orderedPoiIds,
+        entryPoisVersion: entry.entryPoisVersion,
+      );
+      _refreshEntryPois();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _alternateError = _alternateErrorMessage(error, '調整備選順序失敗，請稍後再試');
+      });
+    } finally {
+      if (mounted) setState(() => _alternatePendingPoiId = null);
+    }
+  }
+
   void _afterMutation(TripRepository repository) {
     ref.invalidate(
       entryDetailProvider((tripId: widget.tripId, entryId: widget.entryId)),
@@ -237,6 +344,20 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
       repository.recomputeTravel(widget.tripId).catchError((Object _) {}),
     );
     if (mounted) context.go('/trips/${widget.tripId}');
+  }
+
+  void _refreshEntryPois() {
+    ref.invalidate(
+      entryDetailProvider((tripId: widget.tripId, entryId: widget.entryId)),
+    );
+    ref.invalidate(tripDaysProvider(widget.tripId));
+  }
+
+  String _alternateErrorMessage(Object error, String fallback) {
+    if (error is ApiError && error.code == 'STALE_ENTRY') {
+      return '備選資料已被其他操作更新，請重新整理後再試';
+    }
+    return fallback;
   }
 
   int? _parseOptionalTime(String value) {
@@ -249,6 +370,8 @@ class _EditEntryScreenState extends ConsumerState<EditEntryScreen> {
     return hours * 60 + minutes;
   }
 }
+
+String _poiName(EntryPoiInfo poi) => poi.name ?? 'POI #${poi.poiId}';
 
 class _PoiActions extends StatelessWidget {
   const _PoiActions({
@@ -357,6 +480,156 @@ class _EntrySummaryCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AlternatesSection extends StatelessWidget {
+  const _AlternatesSection({
+    required this.alternates,
+    required this.pendingPoiId,
+    required this.error,
+    required this.enabled,
+    required this.onMove,
+    required this.onDelete,
+  });
+
+  final List<EntryPoiInfo> alternates;
+  final int? pendingPoiId;
+  final String? error;
+  final bool enabled;
+  final void Function(EntryPoiInfo alternate, int delta) onMove;
+  final void Function(EntryPoiInfo alternate) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('備選景點', style: theme.textTheme.titleSmall),
+            const SizedBox(width: TpSpacing.s2),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TpRadius.md),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TpSpacing.s2,
+                  vertical: TpSpacing.s1,
+                ),
+                child: Text('${alternates.length} 個'),
+              ),
+            ),
+          ],
+        ),
+        if (error != null) ...[
+          const SizedBox(height: TpSpacing.s2),
+          _InlineError(message: error!),
+        ],
+        const SizedBox(height: TpSpacing.s2),
+        if (alternates.isEmpty)
+          Text(
+            '還沒有備選景點。可從搜尋或收藏加入。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (var index = 0; index < alternates.length; index++) ...[
+            _AlternateTile(
+              alternate: alternates[index],
+              displayOrder: index + 2,
+              isPending: pendingPoiId == alternates[index].poiId,
+              canMoveUp: enabled && index > 0,
+              canMoveDown: enabled && index < alternates.length - 1,
+              canDelete: enabled,
+              onMoveUp: () => onMove(alternates[index], -1),
+              onMoveDown: () => onMove(alternates[index], 1),
+              onDelete: () => onDelete(alternates[index]),
+            ),
+            if (index < alternates.length - 1)
+              const SizedBox(height: TpSpacing.s2),
+          ],
+      ],
+    );
+  }
+}
+
+class _AlternateTile extends StatelessWidget {
+  const _AlternateTile({
+    required this.alternate,
+    required this.displayOrder,
+    required this.isPending,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.canDelete,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onDelete,
+  });
+
+  final EntryPoiInfo alternate;
+  final int displayOrder;
+  final bool isPending;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final bool canDelete;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 16,
+          backgroundColor: colorScheme.secondaryContainer,
+          foregroundColor: colorScheme.onSecondaryContainer,
+          child: Text('$displayOrder'),
+        ),
+        title: Text(_poiName(alternate)),
+        subtitle: alternate.type == null ? null : Text(alternate.type!),
+        trailing: isPending
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: ValueKey('edit-entry-alt-up-${alternate.poiId}'),
+                    tooltip: '上移',
+                    icon: const Icon(Icons.keyboard_arrow_up),
+                    onPressed: canMoveUp ? onMoveUp : null,
+                  ),
+                  IconButton(
+                    key: ValueKey('edit-entry-alt-down-${alternate.poiId}'),
+                    tooltip: '下移',
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                    onPressed: canMoveDown ? onMoveDown : null,
+                  ),
+                  IconButton(
+                    key: ValueKey('edit-entry-alt-delete-${alternate.poiId}'),
+                    tooltip: '移除',
+                    icon: const Icon(Icons.delete_outline),
+                    color: theme.colorScheme.error,
+                    onPressed: canDelete ? onDelete : null,
+                  ),
+                ],
+              ),
       ),
     );
   }

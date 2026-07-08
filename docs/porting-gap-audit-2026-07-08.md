@@ -31,7 +31,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trips/new` → `NewTripPage` | 無 | 未翻 | P1：建立行程 |
 | `/trip/:id/edit` → `EditTripPage` | 無 | 未翻 | P1：編輯行程 meta |
 | `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | `/trips/:id/add-entry`、`/trips/:id/add-stop` → `AddEntryScreen` | 部分翻 | 已補搜尋/收藏新增 slice；自訂地圖 picker 待補 |
-| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen` | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move slice；備選移除/排序待補 |
+| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen` | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序 slice；自訂 stop / 409 重抓仍待補 |
 | `/trip/:id/collab`, `/invite` | 無 | 未翻 | P1：共編與邀請 |
 | `/trip/:id/health` | 無 | 未翻 | P1：AI 健檢報告 |
 | `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
@@ -61,13 +61,13 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 2. **Trip action surface**
    - Routes：`/trips/new`、`/trips/:id/edit`、`/trips/:id/add-entry`、`add-stop`、`add-custom-stop`
    - API：trip create/update、entry create/update/delete、segments create/patch、places resolve/search
-   - 狀態：`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；自訂景點、備選管理、segments edit 仍待補。
+   - 狀態：`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除與備選移除/排序 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；自訂景點、segments edit 仍待補。
    - 理由：補上 mobile app 最直接的規劃能力；需 TDD + OCC handling。
 
 3. **Entry detail/action forms**
    - Routes：`stop/:entryId/edit`、`change-poi`、`copy`、`move`
    - API：entry PATCH、entry POI master/alternates、copy/move endpoints、recompute-travel trigger
-   - 狀態：`stop/:entryId/edit` 已先補讀取、時間/描述更新與刪除；`change-poi` 已補搜尋/收藏置換 master 與新增 alternate；`copy` / `move` 已補跨日複製/移動；備選移除/排序與 409 `STALE_ENTRY` 重抓再套用仍待補。
+   - 狀態：`stop/:entryId/edit` 已先補讀取、時間/描述更新、刪除與備選移除/排序；`change-poi` 已補搜尋/收藏置換 master 與新增 alternate；`copy` / `move` 已補跨日複製/移動；409 `STALE_ENTRY` 重抓再套用仍待補。
    - 理由：和第 2 項共用 models/providers，可分 PR 避免過大。
 
 4. **Chat / request queue**
@@ -110,8 +110,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Entry 備選管理 / custom stop** 或 **建立/編輯行程**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正；Entry CRUD 已先補新增景點搜尋/收藏、edit 時間/描述/刪除、change-poi 主景點置換/加備選、copy/move 跨日操作 slice。
+下一個 Build branch 建議接 **Entry custom stop / stale refresh** 或 **建立/編輯行程**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正；Entry CRUD 已先補新增景點搜尋/收藏、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作 slice。
 
-1. 若續做 Entry CRUD：優先補備選移除/排序、自訂地圖 picker，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
+1. 若續做 Entry CRUD：優先補自訂地圖 picker，OCC 與 409 `STALE_ENTRY` handling 要同步進測試。
 2. 若做建立/編輯行程：先補 `/trips/new` 與 `/trips/:id/edit` repository contract，再接 TripsListScreen 的新增入口。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。

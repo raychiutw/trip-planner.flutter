@@ -456,6 +456,60 @@ void main() {
     expect(result.poiId, 502);
   });
 
+  test(
+    'deleteEntryAlternate：DELETE /alternates/:poiId 以 query 帶 entryPoisVersion',
+    () async {
+      dioAdapter.onDelete(
+        '/trips/okinawa-trip-2026-Ray/entries/101/alternates/502?entryPoisVersion=3',
+        (server) => server.reply(200, {
+          'entryId': 101,
+          'poiId': 502,
+          'entryPoisVersion': '4',
+        }),
+      );
+
+      final result = await tripRepository.deleteEntryAlternate(
+        tripId: 'okinawa-trip-2026-Ray',
+        entryId: 101,
+        poiId: 502,
+        entryPoisVersion: '3',
+      );
+
+      expect(result.entryId, 101);
+      expect(result.poiId, 502);
+      expect(result.entryPoisVersion, '4');
+    },
+  );
+
+  test(
+    'reorderEntryAlternates：PATCH /alternates/reorder 帶完整 poiId 順序與 OCC',
+    () async {
+      dioAdapter.onPatch(
+        '/trips/okinawa-trip-2026-Ray/entries/101/alternates/reorder',
+        (server) => server.reply(200, {
+          'entryId': 101,
+          'order': [503, 502],
+          'entryPoisVersion': '4',
+        }),
+        data: {
+          'order': [503, 502],
+          'entryPoisVersion': '3',
+        },
+      );
+
+      final result = await tripRepository.reorderEntryAlternates(
+        tripId: 'okinawa-trip-2026-Ray',
+        entryId: 101,
+        orderedPoiIds: const [503, 502],
+        entryPoisVersion: '3',
+      );
+
+      expect(result.entryId, 101);
+      expect(result.order, [503, 502]);
+      expect(result.entryPoisVersion, '4');
+    },
+  );
+
   test('fetchNotes：GET /trips/:id/notes 解析 5 區聚合', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/notes',

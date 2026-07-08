@@ -67,6 +67,7 @@ class TimelineEntry {
   final Travel? travel; final EntryPoiInfo? master; final List<EntryPoiInfo> alternates;
 }
 class EntryPoisMutationResult { final int entryId; final int poiId; final int? sortOrder; final String? entryPoisVersion; }
+class EntryAlternatesReorderResult { final int entryId; final List<int> order; final String? entryPoisVersion; }
 
 // notes.dart — 5 個 row class 共通欄位：int id, int sortOrder, int version；文字欄位非 null 預設 ''
 class TripFlight { airline, flightNo, cabinClass, departAirport, arriveAirport, departAt, arriveAt, note — 全 String }
@@ -174,6 +175,18 @@ class TripRepository {
     required int poiId,
     required String? entryPoisVersion,
   });                                                // POST /trips/:id/entries/:entryId/alternates
+  Future<EntryPoisMutationResult> deleteEntryAlternate({
+    required String tripId,
+    required int entryId,
+    required int poiId,
+    required String? entryPoisVersion,
+  });                                                // DELETE /trips/:id/entries/:entryId/alternates/:poiId?entryPoisVersion=...
+  Future<EntryAlternatesReorderResult> reorderEntryAlternates({
+    required String tripId,
+    required int entryId,
+    required List<int> orderedPoiIds,
+    required String? entryPoisVersion,
+  });                                                // PATCH /trips/:id/entries/:entryId/alternates/reorder
   Future<TripNotes> fetchNotes(String id);           // GET /trips/:id/notes
   Future<void> deleteTrip(String id);
   Future<AccountStats> fetchStats();                 // GET /account/stats
