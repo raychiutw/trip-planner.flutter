@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
+import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
@@ -26,6 +27,10 @@ final timelineOnlineProvider = StreamProvider<bool>((ref) async* {
 
   yield hasNetwork(await connectivity.checkConnectivity());
   yield* connectivity.onConnectivityChanged.map(hasNetwork).distinct();
+});
+
+final timelineTripSwitcherProvider = FutureProvider<List<TripSummary>>((ref) {
+  return ref.watch(tripRepositoryProvider).fetchMyTrips();
 });
 
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
@@ -73,6 +78,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
     final isOnline = ref.watch(timelineOnlineProvider).value ?? true;
+    final tripSwitchOptions =
+        ref.watch(timelineTripSwitcherProvider).value ?? const <TripSummary>[];
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
@@ -94,6 +101,41 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             icon: const Icon(Icons.add_location_alt_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/add-entry'),
           ),
+          if (tripSwitchOptions.isNotEmpty)
+            PopupMenuButton<String>(
+              key: const ValueKey('timeline-trip-switcher'),
+              tooltip: '切換行程',
+              icon: const Icon(Icons.swap_horiz),
+              onSelected: (nextTripId) {
+                if (nextTripId == tripId) return;
+                _goTo(context, '/trips/${Uri.encodeComponent(nextTripId)}');
+              },
+              itemBuilder: (context) => [
+                for (final trip in tripSwitchOptions)
+                  PopupMenuItem<String>(
+                    key: ValueKey('timeline-trip-switch-${trip.tripId}'),
+                    value: trip.tripId,
+                    child: ListTile(
+                      leading: Icon(
+                        trip.tripId == tripId
+                            ? Icons.check
+                            : Icons.luggage_outlined,
+                      ),
+                      title: Text(
+                        _tripSummaryTitle(trip),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        _tripSummaryMeta(trip),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+              ],
+            ),
           IconButton(
             tooltip: '地圖',
             icon: const Icon(Icons.map_outlined),
@@ -731,6 +773,22 @@ List<_SegmentAutoRecomputeJob> _segmentAutoRecomputeJobs({
 bool _hasCoordinates(TimelineEntry entry) {
   final master = entry.master;
   return master?.lat != null && master?.lng != null;
+}
+
+String _tripSummaryTitle(TripSummary trip) {
+  final title = trip.title?.trim();
+  if (title != null && title.isNotEmpty) return title;
+  final name = trip.name.trim();
+  return name.isEmpty ? trip.tripId : name;
+}
+
+String _tripSummaryMeta(TripSummary trip) {
+  final countries = trip.countries?.trim().toUpperCase();
+  final parts = [
+    if (countries != null && countries.isNotEmpty) countries,
+    if (trip.totalDays != null) '${trip.totalDays} 天',
+  ];
+  return parts.isEmpty ? trip.tripId : parts.join(' · ');
 }
 
 String _dateKey(DateTime date) {

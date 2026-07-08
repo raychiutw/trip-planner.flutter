@@ -17,8 +17,25 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
 const _tripId = 'okinawa-2026';
+const _tokyoTripId = 'tokyo-2026';
 
 const _fakeTrip = Trip(id: _tripId, name: '沖繩自駕 2026', title: '沖繩自駕五日');
+const _tokyoTrip = Trip(id: _tokyoTripId, name: '東京週末', title: '東京週末');
+
+const _fakeTripSwitchOptions = [
+  TripSummary(
+    tripId: _tripId,
+    name: 'okinawa-2026',
+    title: '沖繩自駕五日',
+    countries: 'JP',
+  ),
+  TripSummary(
+    tripId: _tokyoTripId,
+    name: 'tokyo-2026',
+    title: '東京週末',
+    countries: 'JP',
+  ),
+];
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -172,6 +189,7 @@ Future<void> _pumpTimeline(
   FutureOr<List<TripDay>> Function()? fetchDays,
   FutureOr<List<TripSegment>> Function()? fetchSegments,
   Stream<bool>? onlineStatus,
+  List<TripSummary> switcherTrips = const <TripSummary>[],
   TripRepository? repository,
 }) async {
   final router = GoRouter(
@@ -235,6 +253,7 @@ Future<void> _pumpTimeline(
         tripSegmentsProvider(_tripId).overrideWith(
           (ref) => (fetchSegments ?? () => const <TripSegment>[])(),
         ),
+        timelineTripSwitcherProvider.overrideWith((ref) async => switcherTrips),
         if (onlineStatus != null)
           timelineOnlineProvider.overrideWith((ref) => onlineStatus),
       ],
@@ -301,6 +320,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('health-page'), findsOneWidget);
+  });
+
+  testWidgets('AppBar trip switcher 列出 my trips 並切換 route', (tester) async {
+    final repository = _MockTripRepository();
+    when(
+      () => repository.fetchTrip(_tokyoTripId),
+    ).thenAnswer((_) async => _tokyoTrip);
+    when(() => repository.fetchDays(_tokyoTripId)).thenAnswer(
+      (_) async => const [TripDay(id: 7, dayNum: 1, title: '東京散步', version: 1)],
+    );
+    when(
+      () => repository.fetchTripSegments(_tokyoTripId),
+    ).thenAnswer((_) async => const <TripSegment>[]);
+
+    await _pumpTimeline(
+      tester,
+      switcherTrips: _fakeTripSwitchOptions,
+      repository: repository,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('timeline-trip-switcher')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('timeline-trip-switch-$_tokyoTripId')),
+      findsOneWidget,
+    );
+    expect(find.text('東京週末'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('timeline-trip-switch-$_tokyoTripId')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('東京週末'), findsOneWidget);
+    verify(() => repository.fetchTrip(_tokyoTripId)).called(1);
   });
 
   testWidgets('離線時顯示 persistent offline banner', (tester) async {
