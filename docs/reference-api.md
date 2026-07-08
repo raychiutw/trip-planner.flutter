@@ -377,7 +377,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 
 行程詳情層級的 scoped providers(`tripDetailProvider` 等 family)定義在 `lib/features/trip_detail/trip_providers.dart`,見[架構說明 — trip scope](explanation-architecture.md#trip-scope共用-fetch)。
 
-Trip detail scope 目前包含 `tripDetailProvider`、`tripDaysProvider`、`tripSegmentsProvider`、`entryDetailProvider` 與 `tripNotesProvider`。`TripTimelineScreen` 以 `tripSegmentsProvider` 覆蓋 legacy `TimelineEntry.travel`,segments 載入失敗時保留 days payload fallback 並顯示 persistent banner。
+Trip detail scope 目前包含 `tripDetailProvider`、`tripDaysProvider`、`tripSegmentsProvider`、`entryDetailProvider` 與 `tripNotesProvider`。`TripTimelineScreen` 以 `tripSegmentsProvider` 覆蓋 legacy `TimelineEntry.travel`,segments 載入失敗時保留 days payload fallback 並顯示 persistent banner；segments 成功載入後若發現有座標的缺 row 或 `computedAt == null` stale row，會用 per-trip signature 防重並以 day scope 背景呼叫 `recomputeTravel`，成功後刷新 days/segments。
 
 ## 相關文件
 

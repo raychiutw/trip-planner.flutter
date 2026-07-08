@@ -121,6 +121,47 @@ const _fakeDays = [
   ),
 ];
 
+const _fakeDaysWithCoordinateGap = [
+  TripDay(
+    id: 3,
+    dayNum: 1,
+    date: '2026-04-25',
+    dayOfWeek: '六',
+    title: '座標測試日',
+    version: 1,
+    timeline: [
+      TimelineEntry(
+        id: 31,
+        sortOrder: 0,
+        startTime: '09:00',
+        title: '波上宮',
+        version: 1,
+        master: EntryPoiInfo(
+          poiId: 301,
+          name: '波上宮',
+          type: 'attraction',
+          lat: 26.2209,
+          lng: 127.6754,
+        ),
+      ),
+      TimelineEntry(
+        id: 32,
+        sortOrder: 1,
+        startTime: '10:30',
+        title: '首里城',
+        version: 1,
+        master: EntryPoiInfo(
+          poiId: 302,
+          name: '首里城',
+          type: 'attraction',
+          lat: 26.2170,
+          lng: 127.7194,
+        ),
+      ),
+    ],
+  ),
+];
+
 /// 以 create callback 注入假資料（flutter_riverpod 3.x 未匯出 Override 型別，
 /// 故在此 helper 內 inline 組 overrides，型別交由推斷）。
 Future<void> _pumpTimeline(
@@ -553,6 +594,42 @@ void main() {
         expectedVersion: 6,
       ),
     ).called(1);
+  });
+
+  testWidgets('segments 成功載入但缺相鄰 pair 時自動 day-scoped recompute', (
+    tester,
+  ) async {
+    final repository = _MockTripRepository();
+    when(
+      () => repository.recomputeTravel(_tripId, dayNum: any(named: 'dayNum')),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      fetchDays: () => _fakeDaysWithCoordinateGap,
+      fetchSegments: () => const <TripSegment>[],
+      repository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    verify(() => repository.recomputeTravel(_tripId, dayNum: 1)).called(1);
+  });
+
+  testWidgets('segments 載入失敗時不觸發 auto recompute', (tester) async {
+    final repository = _MockTripRepository();
+
+    await _pumpTimeline(
+      tester,
+      fetchDays: () => _fakeDaysWithCoordinateGap,
+      fetchSegments: () => throw Exception('segments down'),
+      repository: repository,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('交通段載入失敗，已暫用舊資料顯示'), findsOneWidget);
+    verifyNever(
+      () => repository.recomputeTravel(any(), dayNum: any(named: 'dayNum')),
+    );
   });
 
   testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {

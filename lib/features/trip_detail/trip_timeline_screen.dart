@@ -1,8 +1,11 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
@@ -27,7 +30,7 @@ final timelineOnlineProvider = StreamProvider<bool>((ref) async* {
 
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
-class TripTimelineScreen extends ConsumerWidget {
+class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
     super.key,
     required this.tripId,
@@ -43,13 +46,29 @@ class TripTimelineScreen extends ConsumerWidget {
   /// Optional date used by tests to make today auto-scroll deterministic.
   final DateTime? today;
 
+  @override
+  ConsumerState<TripTimelineScreen> createState() => _TripTimelineScreenState();
+}
+
+class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
+  final Set<String> _autoRecomputeAttempts = <String>{};
+
+  @override
+  void didUpdateWidget(covariant TripTimelineScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tripId != widget.tripId) {
+      _autoRecomputeAttempts.clear();
+    }
+  }
+
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
     GoRouter.maybeOf(context)?.go(location);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final tripId = widget.tripId;
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
@@ -121,19 +140,32 @@ class TripTimelineScreen extends ConsumerWidget {
         ],
       ),
       body: daysAsync.when(
-        data: (days) => days.isEmpty
-            ? const _EmptyTimeline()
-            : _TimelineBody(
-                tripId: tripId,
-                focusEntryId: focusEntryId,
-                today: today,
-                days: days,
-                segments: segmentsAsync.value ?? const <TripSegment>[],
-                isOnline: isOnline,
-                showSegmentError: segmentsAsync.hasError,
-                onSegmentsRetry: () =>
-                    ref.invalidate(tripSegmentsProvider(tripId)),
-              ),
+        data: (days) {
+          final loadedSegments = segmentsAsync.whenOrNull(
+            data: (segments) => segments,
+          );
+          if (days.isNotEmpty && loadedSegments != null) {
+            _queueSegmentAutoRecompute(
+              tripId: tripId,
+              days: days,
+              segments: loadedSegments,
+            );
+          }
+
+          return days.isEmpty
+              ? const _EmptyTimeline()
+              : _TimelineBody(
+                  tripId: tripId,
+                  focusEntryId: widget.focusEntryId,
+                  today: widget.today,
+                  days: days,
+                  segments: segmentsAsync.value ?? const <TripSegment>[],
+                  isOnline: isOnline,
+                  showSegmentError: segmentsAsync.hasError,
+                  onSegmentsRetry: () =>
+                      ref.invalidate(tripSegmentsProvider(tripId)),
+                );
+        },
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -143,6 +175,46 @@ class TripTimelineScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _queueSegmentAutoRecompute({
+    required String tripId,
+    required List<TripDay> days,
+    required List<TripSegment> segments,
+  }) {
+    final jobs = _segmentAutoRecomputeJobs(days: days, segments: segments);
+    final pendingJobs = <_SegmentAutoRecomputeJob>[];
+
+    for (final job in jobs) {
+      final attemptKey = '$tripId|${job.dayNum}|${job.signature}';
+      if (_autoRecomputeAttempts.add(attemptKey)) {
+        pendingJobs.add(job);
+      }
+    }
+
+    if (pendingJobs.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final job in pendingJobs) {
+        unawaited(_runSegmentAutoRecompute(tripId: tripId, job: job));
+      }
+    });
+  }
+
+  Future<void> _runSegmentAutoRecompute({
+    required String tripId,
+    required _SegmentAutoRecomputeJob job,
+  }) async {
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .recomputeTravel(tripId, dayNum: job.dayNum);
+      if (!mounted) return;
+      ref.invalidate(tripSegmentsProvider(tripId));
+      ref.invalidate(tripDaysProvider(tripId));
+    } catch (_) {
+      // Auto-healing mirrors web: keep fallback UI and avoid noisy toasts.
+    }
   }
 }
 
@@ -608,6 +680,57 @@ class _SegmentErrorBanner extends StatelessWidget {
 
 String _segmentPairKey(int fromEntryId, int toEntryId) {
   return '$fromEntryId:$toEntryId';
+}
+
+class _SegmentAutoRecomputeJob {
+  const _SegmentAutoRecomputeJob({
+    required this.dayNum,
+    required this.signature,
+  });
+
+  final int dayNum;
+  final String signature;
+}
+
+List<_SegmentAutoRecomputeJob> _segmentAutoRecomputeJobs({
+  required List<TripDay> days,
+  required List<TripSegment> segments,
+}) {
+  final segmentsByPair = {
+    for (final segment in segments)
+      _segmentPairKey(segment.fromEntryId, segment.toEntryId): segment,
+  };
+  final jobs = <_SegmentAutoRecomputeJob>[];
+
+  for (final day in days) {
+    final gaps = <String>[];
+    for (var entryIndex = 1; entryIndex < day.timeline.length; entryIndex++) {
+      final previousEntry = day.timeline[entryIndex - 1];
+      final entry = day.timeline[entryIndex];
+      if (!_hasCoordinates(previousEntry) || !_hasCoordinates(entry)) {
+        continue;
+      }
+
+      final pairKey = _segmentPairKey(previousEntry.id, entry.id);
+      final segment = segmentsByPair[pairKey];
+      if (segment == null || segment.isStale) {
+        gaps.add(pairKey);
+      }
+    }
+
+    if (gaps.isNotEmpty) {
+      jobs.add(
+        _SegmentAutoRecomputeJob(dayNum: day.dayNum, signature: gaps.join(',')),
+      );
+    }
+  }
+
+  return jobs;
+}
+
+bool _hasCoordinates(TimelineEntry entry) {
+  final master = entry.master;
+  return master?.lat != null && master?.lng != null;
 }
 
 String _dateKey(DateTime date) {
