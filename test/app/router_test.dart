@@ -10,6 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
+import 'package:tripline/features/account/account_settings_screens.dart';
 import 'package:tripline/features/auth/email_verify_pending_screen.dart';
 import 'package:tripline/features/auth/forgot_password_screen.dart';
 import 'package:tripline/features/auth/login_screen.dart';
@@ -386,6 +387,39 @@ void main() {
 
     expect(find.byType(FavoritesScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 account/settings 子路由進入設定頁', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+
+    router.go('/account/appearance');
+    await tester.pumpAndSettle();
+    expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
+    expect(find.text('外觀'), findsOneWidget);
+
+    router.go('/account/notifications');
+    await tester.pumpAndSettle();
+    expect(find.byType(NotificationSettingsScreen), findsOneWidget);
+    expect(find.text('通知'), findsOneWidget);
+
+    router.go('/settings/appearance');
+    await tester.pumpAndSettle();
+    expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
+
+    router.go('/settings/notifications');
+    await tester.pumpAndSettle();
+    expect(find.byType(NotificationSettingsScreen), findsOneWidget);
   });
 
   testWidgets('已登入時 /explore 進入 ExploreScreen', (tester) async {

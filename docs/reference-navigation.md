@@ -35,6 +35,10 @@
 | `/explore` | `ExploreScreen` | tab 4 secondary route |
 | `/add-to-trip?place_id=...` | `AddPoiFavoriteToTripScreen` | tab 4 secondary route；Explore direct-mode |
 | `/account` | `AccountScreen` | tab 5；profile、displayName inline 編輯、統計與登出 |
+| `/account/appearance` | `AppearanceSettingsScreen` | tab 5 子路由；切換 ThemeMode |
+| `/account/notifications` | `NotificationSettingsScreen` | tab 5 子路由；本機通知偏好 |
+| `/settings/appearance` | `AppearanceSettingsScreen` | tab 5 alias |
+| `/settings/notifications` | `NotificationSettingsScreen` | tab 5 alias |
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 

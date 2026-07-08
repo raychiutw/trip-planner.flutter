@@ -372,6 +372,8 @@ final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSe
 final apiClientProvider = Provider<ApiClient>(...);
 final authRepositoryProvider = Provider<AuthRepository>(...);
 final tripRepositoryProvider = Provider<TripRepository>(...);
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(...); // app/app_preferences.dart
+final notificationPreferencesProvider = NotifierProvider<NotificationPreferencesNotifier, NotificationPreferences>(...);
 class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken}); Future<void> logout(); Future<UserInfo> updateProfile({String? displayName}); }
 final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNotifier.new); // build() = currentUser()
 ```
@@ -421,6 +423,8 @@ class TripMapContent extends ConsumerWidget;           // features/trip_detail/t
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
+class AppearanceSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
+class NotificationSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 ```
 
 ## 測試要求（TDD）

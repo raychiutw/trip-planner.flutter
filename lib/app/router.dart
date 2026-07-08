@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
+import '../features/account/account_settings_screens.dart';
 import '../features/auth/email_verify_pending_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/login_screen.dart';
@@ -274,6 +275,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/account',
                 builder: (context, state) => const AccountScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'appearance',
+                    builder: (context, state) =>
+                        const AppearanceSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) =>
+                        const NotificationSettingsScreen(),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/settings/appearance',
+                builder: (context, state) => const AppearanceSettingsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/notifications',
+                builder: (context, state) => const NotificationSettingsScreen(),
               ),
             ],
           ),

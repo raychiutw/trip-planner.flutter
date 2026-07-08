@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/app_preferences.dart';
 import 'app/router.dart';
 import 'theme/app_theme.dart';
 
@@ -21,7 +22,7 @@ class TriplineApp extends ConsumerWidget {
       title: 'Tripline',
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(appRouterProvider),
     );
   }

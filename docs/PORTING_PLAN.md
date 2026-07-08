@@ -39,7 +39,7 @@
 | TripMapScreen | MapPage | 共用 trip scope 資料（不重抓） |
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes`、各 section CRUD、`POST /trips/:id/notes/:docType/generate` + request polling |
 | TripHealthScreen | TripHealthCheckPage | `GET/POST /trips/:id/health-check` + report polling |
-| AccountScreen | AccountPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout` |
+| AccountScreen / settings first wave | AccountPage / AppearanceSettingsPage / NotificationsSettingsPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout`、本機 theme/notification preferences |
 | Auth supplement screens | SignupPage / EmailVerifyPendingPage / ForgotPasswordPage / ResetPasswordPage / VerifyEmailPage | `POST /oauth/signup`、`POST /oauth/send-verification`、`POST /oauth/forgot-password`、`POST /oauth/reset-password`、`POST /oauth/verify` |
 | ChatScreen | ChatPage（request queue 第一波） | `GET /requests?tripId=...`、`POST /requests`、`GET /requests/:id` |
 | GlobalMapScreen | GlobalMapPage（trip-bound resolver 第一波） | `GET /my-trips` + `GET /trips/:id/days?all=1` |
@@ -50,14 +50,15 @@
 | ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/分享連結管理；AccountScreen 已補 displayName inline edit；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
-P2：公開分享頁/列印/JSON 匯出、設定子頁、OAuth 生態、離線快取。
+P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/分享連結管理；AccountScreen 已補 displayName inline edit 與外觀/通知設定第一波；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
+P2：公開分享頁/列印/JSON 匯出、settings sessions / connected apps / developer apps、OAuth 生態、離線快取。
 
 ## 目錄結構
 
 ```
 lib/
   main.dart                 # ProviderScope + MaterialApp.router
+  app/app_preferences.dart  # themeMode 與通知偏好本機 provider
   app/router.dart           # go_router + StatefulShellRoute + auth redirect
   theme/tokens.dart         # design token 常數（tokens.css 對應）
   theme/app_theme.dart      # light/dark ThemeData + ThemeExtension（三色 4 階）

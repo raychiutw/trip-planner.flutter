@@ -20,12 +20,12 @@
 - [x] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/filtered empty/TripCard action menu/尾端新增卡/JSON 匯入/分享連結管理(**Completed:** feature/favorites-explore)
 - [ ] TripTimelineScreen 補 web parity:scroll-spy active day/今日自動定位/focus deep link/offline banner/segment 背景同步細節/overflow actions
 - [ ] TripMapScreen 補 web parity:`stop/:entryId/map` focus route/pin-card 雙向同步/overview 點 pin 切 day/polyline/定位 FAB
-- [ ] AccountScreen 補 web parity:外觀與通知 row 實際導航（displayName inline edit 已完成）
+- [x] AccountScreen 補 web parity:displayName inline edit、外觀/通知 row 實際導航與 `/account/*`、`/settings/*` alias 第一波(**Completed:** feature/favorites-explore)
 
 ## P2
 
 - [ ] 公開分享頁/列印/JSON 匯出(`/s/:token`,`/trips/:id/print`,PDF/JSON 匯出)
-- [ ] 設定子頁(`/account/*`,`/settings/*`,`/developer/apps*`,`/oauth/consent`)
+- [ ] 設定子頁後續：sessions、connected apps、developer apps、OAuth consent（外觀/通知第一波已完成）
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
 - [ ] 離線快取
 

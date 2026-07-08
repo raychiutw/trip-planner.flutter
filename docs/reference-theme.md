@@ -70,7 +70,7 @@ abstract final class AppTheme {
 }
 ```
 
-`main.dart` 以 `themeMode: ThemeMode.system` 同時掛 light/dark。主要客製:卡片 elevation 0 + 1px hairline border(`border` 色)、radius 8、NavigationBar 風格、Inter → Noto Sans TC 字體 fallback。
+`main.dart` 同時掛 light/dark,並以 `themeModeProvider`（`lib/app/app_preferences.dart`）決定 `ThemeMode`。預設跟隨系統；`/account/appearance` 可切換為系統、淺色或深色。主要客製:卡片 elevation 0 + 1px hairline border(`border` 色)、radius 8、NavigationBar 風格、Inter → Noto Sans TC 字體 fallback。
 
 ## POI type → tone 對照
 

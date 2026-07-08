@@ -10,7 +10,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
 2. **Trip action surface**：新增/編輯行程、景點 CRUD 與共編邀請已有第一波；剩餘子流程、健檢、列印/分享仍待 Flutter route 或完整實作。
-3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證已完成第一波；settings、connected apps、developer apps、consent 尚未翻。
+3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證與外觀/通知設定已完成第一波；sessions、connected apps、developer apps、consent 尚未翻。
 
 ## 現行 Route 對照
 
@@ -21,7 +21,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 部分翻 | 補 action menu、focus/deeplink、segment 背景同步細節 |
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` → `TripMapScreen` | 部分翻 | 補 entry focus route、pin/card 雙向同步、路線/定位控制 |
 | `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 已翻第一波 | 後續可補 drag reorder、autosave-on-blur 與更完整 web parity |
-| `/account` → `AccountPage` | `/account` → `AccountScreen` | 部分翻 | 已補 displayName inline edit；續補 settings rows 導航 |
+| `/account` → `AccountPage` | `/account` → `AccountScreen` | 已翻第一波 | 已補 displayName inline edit、外觀/通知 rows 導航 |
 | `/chat` → `ChatPage` | `/chat` → `ChatScreen` | 已翻第一波 | 後續可補 SSE、歷史分頁與更完整 trip picker parity |
 | `/map` → `GlobalMapPage` | `/map` → `GlobalMapScreen` | 已翻第一波 | 後續可補 active trip persistence、定位 FAB 與更完整 web sheet parity |
 | `/favorites` → `PoiFavoritesPage` | `/favorites` → `FavoritesScreen` | 已翻第一波 | 後續可補更多 web card actions |
@@ -37,7 +37,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
 | `/s/:token` | 無 | 未翻 | P2：公開分享頁 |
 | `/signup`, `/signup/check-email`, `/login/forgot`, `/auth/password/reset`, `/auth/verify-email` | 對應 Auth supplement screens | 已翻第一波 | 後續可補更完整 resend cooldown / platform mail app deep link |
-| `/account/*`, `/settings/*` 子頁 | 無 | 未翻 | P2：設定/裝置/連結 app |
+| `/account/appearance`, `/account/notifications`, `/settings/appearance`, `/settings/notifications` | 對應 Flutter settings screens | 已翻第一波 | 後續補 sessions、connected apps、developer apps、OAuth consent |
 | `/developer/apps*`, `/oauth/consent` | 無 | 未翻 | P2：OAuth 生態 |
 
 ## P0 Parity Debt
@@ -48,7 +48,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 - **TripTimelineScreen**：目前有 day pills + timeline + travel pill + map/notes/health/add-entry actions；travel pill 會讀取 `trip_segments` source of truth 並可編輯 driving/walking/transit。尚缺 scroll-spy 自動同步 active day、今日自動定位、`focus` entry deep link、offline banner、segment 背景同步細節、行程切換 dropdown、overflow actions。
 - **TripMapScreen**：目前是 OSM pins + day tabs + entry cards。尚缺 `stop/:entryId/map` focus route、pin/card 雙向同步、overview 點 pin 自動切 day、路線 polyline、圖層/我的位置 FAB。
 - **TripNotesScreen**：目前 5-section accordion 已支援 5 區新增/編輯/刪除、notes row OCC `expectedVersion`、行前須知/緊急聯絡 AI generate 與 request polling pending 狀態；尚缺 drag reorder、autosave-on-blur 等 web parity 細節。
-- **AccountScreen**：目前 profile/stat/logout 與 displayName inline edit 可用。尚缺外觀/通知/connected apps/sessions/developer rows 實際頁面。
+- **AccountScreen**：目前 profile/stat/logout、displayName inline edit、外觀/通知 settings 第一波可用。尚缺 connected apps、sessions、developer/OAuth 生態頁面。
 
 ## P1 建議切分
 
@@ -108,7 +108,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 ## P2 / 可延後
 
 - 公開分享頁 `/s/:token`、列印/PDF、JSON 匯出。
-- Account/settings 子頁：appearance、notifications、sessions、connected apps。
+- Account/settings 後續子頁：sessions、connected apps、developer apps、OAuth consent。
 - OAuth developer apps / consent / PKCE Bearer 認證。
 - 離線快取與 web service worker 等價能力。
 - GlobalMap 進階：跨行程聚合、路線、多圖層、定位權限。

@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../models/user.dart';
@@ -469,7 +470,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「外觀」「通知」皆為即將推出（disabled）。
+/// 設定群組：外觀與通知子頁入口。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
@@ -495,15 +496,20 @@ class _SettingsGroup extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
-              const _ComingSoonRow(icon: Icons.palette_outlined, title: '外觀'),
+              _SettingsNavigationRow(
+                icon: Icons.palette_outlined,
+                title: '外觀',
+                onTap: () => context.go('/account/appearance'),
+              ),
               Divider(
                 height: 1,
                 thickness: 1,
                 color: theme.colorScheme.outlineVariant,
               ),
-              const _ComingSoonRow(
+              _SettingsNavigationRow(
                 icon: Icons.notifications_outlined,
                 title: '通知',
+                onTap: () => context.go('/account/notifications'),
               ),
             ],
           ),
@@ -513,26 +519,25 @@ class _SettingsGroup extends StatelessWidget {
   }
 }
 
-/// 即將推出設定 row（disabled 樣式）。
-class _ComingSoonRow extends StatelessWidget {
-  const _ComingSoonRow({required this.icon, required this.title});
+/// 可進入設定子頁的 row。
+class _SettingsNavigationRow extends StatelessWidget {
+  const _SettingsNavigationRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String title;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ListTile(
-      enabled: false,
       leading: Icon(icon, size: 20),
       title: Text(title),
-      trailing: Text(
-        '即將推出',
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.disabledColor,
-        ),
-      ),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: onTap,
     );
   }
 }
