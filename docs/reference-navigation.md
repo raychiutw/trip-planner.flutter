@@ -17,7 +17,7 @@
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由；timeline + travel segments edit |
-| `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料 |
+| `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料與行程天數管理 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由；5 區 notes CRUD + 行前須知/緊急聯絡 AI generate |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由；AI health-check report、severity 分組與 pending polling |

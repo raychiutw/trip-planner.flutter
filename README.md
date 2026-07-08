@@ -15,7 +15,7 @@
 - Auth 補齊（註冊、查看信箱/重寄驗證信、忘記/重設密碼、Email 驗證）
 - 帳號（profile、統計、登出）
 
-**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice、travel segments edit slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告、Auth 補齊已完成第一波。
+**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料、目的地與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice、travel segments edit slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告、Auth 補齊已完成第一波。
 **P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
 ## 開發

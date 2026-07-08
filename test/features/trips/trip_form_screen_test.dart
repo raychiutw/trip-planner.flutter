@@ -6,10 +6,67 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
+import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+List<TripDay> _continuousTripDays() => const [
+  TripDay(
+    id: 11,
+    dayNum: 1,
+    date: '2026-10-01',
+    dayOfWeek: '四',
+    label: 'Day 1',
+    title: '抵達日',
+    version: 1,
+  ),
+  TripDay(
+    id: 12,
+    dayNum: 2,
+    date: '2026-10-02',
+    dayOfWeek: '五',
+    label: 'Day 2',
+    title: '市區散策',
+    version: 1,
+    timeline: [
+      TimelineEntry(id: 101, dayId: 12, sortOrder: 0, title: '首里城', version: 1),
+      TimelineEntry(id: 102, dayId: 12, sortOrder: 1, title: '國際通', version: 1),
+    ],
+  ),
+  TripDay(
+    id: 13,
+    dayNum: 3,
+    date: '2026-10-03',
+    dayOfWeek: '六',
+    label: 'Day 3',
+    title: '北部觀光',
+    version: 1,
+  ),
+];
+
+List<TripDay> _gapTripDays() => const [
+  TripDay(
+    id: 11,
+    dayNum: 1,
+    date: '2026-10-01',
+    dayOfWeek: '四',
+    label: 'Day 1',
+    title: '抵達日',
+    version: 1,
+  ),
+  TripDay(
+    id: 13,
+    dayNum: 2,
+    date: '2026-10-03',
+    dayOfWeek: '六',
+    label: 'Day 2',
+    title: '北部觀光',
+    version: 1,
+  ),
+];
 
 void main() {
   late MockTripRepository mockTripRepository;
@@ -50,6 +107,9 @@ void main() {
       ),
     );
     when(
+      () => mockTripRepository.fetchDays(any()),
+    ).thenAnswer((_) async => _continuousTripDays());
+    when(
       () => mockTripRepository.updateTrip(
         id: any(named: 'id'),
         title: any(named: 'title'),
@@ -59,6 +119,44 @@ void main() {
         destinations: any(named: 'destinations'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => mockTripRepository.createTripDay(
+        tripId: any(named: 'tripId'),
+        position: any(named: 'position'),
+        date: any(named: 'date'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripDay(
+        id: 14,
+        dayNum: 4,
+        date: '2026-10-04',
+        dayOfWeek: '日',
+        label: 'Day 4',
+        title: 'Day 4',
+        version: 0,
+      ),
+    );
+    when(
+      () => mockTripRepository.deleteTripDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripDayDeleteResult(ok: true, removedEntryCount: 2),
+    );
+    when(
+      () => mockTripRepository.shiftTripDays(
+        tripId: any(named: 'tripId'),
+        startDate: any(named: 'startDate'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripDaysShiftResult(
+        ok: true,
+        newStartDate: '2026-10-05',
+        newEndDate: '2026-10-07',
+        daysShifted: 3,
+      ),
+    );
   });
 
   Widget buildRouterApp({required String initialLocation}) {
@@ -170,5 +268,107 @@ void main() {
     final destinations = captured.single as List<TripDestinationInput>;
     expect(destinations.single.name, '那霸');
     expect(find.text('trips-list-probe'), findsOneWidget);
+  });
+
+  testWidgets('編輯行程可從結尾新增一天', (tester) async {
+    await tester.pumpWidget(
+      buildRouterApp(initialLocation: '/trips/okinawa-trip-2026/edit'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('行程天數'), findsOneWidget);
+    expect(find.text('2026-10-01 - 2026-10-03'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('trip-form-day-append')),
+    );
+    await tester.tap(find.byKey(const ValueKey('trip-form-day-append')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.createTripDay(
+        tripId: 'okinawa-trip-2026',
+        position: 'end',
+        date: null,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('編輯行程可補回缺漏日期', (tester) async {
+    when(
+      () => mockTripRepository.fetchDays(any()),
+    ).thenAnswer((_) async => _gapTripDays());
+    await tester.pumpWidget(
+      buildRouterApp(initialLocation: '/trips/okinawa-trip-2026/edit'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('trip-form-day-gap-2026-10-02')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('trip-form-day-gap-2026-10-02')),
+    );
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.createTripDay(
+        tripId: 'okinawa-trip-2026',
+        position: 'insert',
+        date: '2026-10-02',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('編輯行程刪除有景點的 day 前會確認並顯示影響範圍', (tester) async {
+    await tester.pumpWidget(
+      buildRouterApp(initialLocation: '/trips/okinawa-trip-2026/edit'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('trip-form-day-remove-2')),
+    );
+    await tester.tap(find.byKey(const ValueKey('trip-form-day-remove-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('這會刪除 Day 2 與 2 個景點，後續行程日會重新編號。'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('trip-form-day-delete-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.deleteTripDay(
+        tripId: 'okinawa-trip-2026',
+        dayNum: 2,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('編輯行程可整段平移日期', (tester) async {
+    await tester.pumpWidget(
+      buildRouterApp(initialLocation: '/trips/okinawa-trip-2026/edit'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('trip-form-day-shift')),
+    );
+    await tester.tap(find.byKey(const ValueKey('trip-form-day-shift')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('trip-form-day-shift-date')),
+      '2026-10-05',
+    );
+    await tester.tap(find.byKey(const ValueKey('trip-form-day-shift-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.shiftTripDays(
+        tripId: 'okinawa-trip-2026',
+        startDate: '2026-10-05',
+      ),
+    ).called(1);
   });
 }

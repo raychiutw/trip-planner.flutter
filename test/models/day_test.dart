@@ -101,6 +101,23 @@ void main() {
       expect(day.timeline, isEmpty);
     });
 
+    test('解析 day management 回傳的 snake_case 欄位與預設 version', () {
+      final day = TripDay.fromJson({
+        'id': 103,
+        'day_num': 4,
+        'date': '2026-10-04',
+        'day_of_week': '日',
+        'label': 'Day 4',
+        'title': '返程前採買',
+      });
+
+      expect(day.id, 103);
+      expect(day.dayNum, 4);
+      expect(day.date, '2026-10-04');
+      expect(day.dayOfWeek, '日');
+      expect(day.version, 0);
+    });
+
     test('displayTitle fallback：title → label → Day N', () {
       final dayWithTitle = TripDay.fromJson({
         'id': 1,
@@ -120,6 +137,34 @@ void main() {
       expect(dayWithTitle.displayTitle, '抵達日');
       expect(dayWithLabel.displayTitle, '中部');
       expect(dayBare.displayTitle, 'Day 3');
+    });
+  });
+
+  group('TripDayDeleteResult.fromJson', () {
+    test('解析刪除行程日結果', () {
+      final result = TripDayDeleteResult.fromJson({
+        'ok': true,
+        'removedEntryCount': 3,
+      });
+
+      expect(result.ok, isTrue);
+      expect(result.removedEntryCount, 3);
+    });
+  });
+
+  group('TripDaysShiftResult.fromJson', () {
+    test('解析整段日期平移結果', () {
+      final result = TripDaysShiftResult.fromJson({
+        'ok': true,
+        'newStartDate': '2026-10-05',
+        'newEndDate': '2026-10-07',
+        'daysShifted': 3,
+      });
+
+      expect(result.ok, isTrue);
+      expect(result.newStartDate, '2026-10-05');
+      expect(result.newEndDate, '2026-10-07');
+      expect(result.daysShifted, 3);
     });
   });
 }

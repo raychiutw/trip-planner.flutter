@@ -285,6 +285,49 @@ class TripRepository {
         .toList();
   }
 
+  /// POST /trips/:id/days，於開頭、結尾或指定日期補一個行程日。
+  Future<TripDay> createTripDay({
+    required String tripId,
+    required String position,
+    String? date,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days',
+      body: {
+        'position': position,
+        if (date != null && date.trim().isNotEmpty) 'date': date.trim(),
+      },
+    );
+    final dayJson = (responseBody as Map<String, dynamic>)['day'];
+    if (dayJson is! Map<String, dynamic>) {
+      throw StateError('create day response missing day');
+    }
+    return TripDay.fromJson(dayJson);
+  }
+
+  /// DELETE /trips/:id/days/:num，刪除行程日並由 server 重編 day_num。
+  Future<TripDayDeleteResult> deleteTripDay({
+    required String tripId,
+    required int dayNum,
+  }) async {
+    final responseBody = await _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/days/${Uri.encodeComponent('$dayNum')}',
+    );
+    return TripDayDeleteResult.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /trips/:id/days/shift，以新的 Day 1 日期平移整段行程日期。
+  Future<TripDaysShiftResult> shiftTripDays({
+    required String tripId,
+    required String startDate,
+  }) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days/shift',
+      body: {'startDate': startDate.trim()},
+    );
+    return TripDaysShiftResult.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// GET /trips/:id/segments（trip_segments source of truth）。
   Future<List<TripSegment>> fetchTripSegments(String tripId) async {
     final responseBody = await _client.get(

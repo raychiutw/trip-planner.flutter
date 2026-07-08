@@ -55,6 +55,8 @@ class TripDay {         // GET /trips/:id/days?all=1 item
   final String? title; final int version; final DayHotel? hotel; final List<TimelineEntry> timeline;
   String get displayTitle; // title ?? label ?? 'Day $dayNum'
 }
+class TripDayDeleteResult { final bool ok; final int removedEntryCount; }
+class TripDaysShiftResult { final bool ok; final String newStartDate; final String? newEndDate; final int daysShifted; }
 
 // entry.dart
 class Travel { final String type; final String? desc; final int? min; final int? distanceM; final String? source; }
@@ -238,6 +240,19 @@ class TripRepository {
     required List<TripDestinationInput> destinations,
   });                                                // PUT /trips/:id
   Future<List<TripDay>> fetchDays(String id);        // GET /trips/:id/days?all=1
+  Future<TripDay> createTripDay({
+    required String tripId,
+    required String position,
+    String? date,
+  });                                                // POST /trips/:id/days
+  Future<TripDayDeleteResult> deleteTripDay({
+    required String tripId,
+    required int dayNum,
+  });                                                // DELETE /trips/:id/days/:num
+  Future<TripDaysShiftResult> shiftTripDays({
+    required String tripId,
+    required String startDate,
+  });                                                // POST /trips/:id/days/shift
   Future<List<TripSegment>> fetchTripSegments(String tripId); // GET /trips/:id/segments
   Future<TripSegment> updateTripSegment({
     required String tripId,
@@ -383,7 +398,7 @@ class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
-class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors）
+class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）
 class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/edit_entry_screen.dart（接受 tripId, entryId）

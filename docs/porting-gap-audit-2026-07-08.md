@@ -29,9 +29,9 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/favorites/:id/add-to-trip` | `/favorites/:favoriteId/add-to-trip` → `AddPoiFavoriteToTripScreen` | 已翻第一波 | 後續補衝突細節顯示 |
 | `/add-to-trip` | `/add-to-trip?place_id=...` → `AddPoiFavoriteToTripScreen` | 已翻第一波 | 後續補衝突細節顯示 |
 | `/trips/new` → `NewTripPage` | `/trips/new` → `TripFormScreen.create` | 已翻第一波 | 後續可補 POI autocomplete / flexible month parity |
-| `/trip/:id/edit` → `EditTripPage` | `/trips/:id/edit` → `TripFormScreen.edit` | 已翻 meta slice | 後續補 day management / auto-save parity |
+| `/trip/:id/edit` → `EditTripPage` | `/trips/:id/edit` → `TripFormScreen.edit` | 已翻第一波 | 已補基本資料、目的地與 day management；後續補 auto-save parity |
 | `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | `/trips/:id/add-entry`、`/trips/:id/add-stop`、`/trips/:id/add-custom-stop` → `AddEntryScreen` | 部分翻 | 已補搜尋/收藏新增與自訂地圖座標新增 slice |
-| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen`; timeline travel pill edit | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序、segments edit 與 409 重抓 retry slice；edit day management 等 web parity 細節仍待補 |
+| `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen`; timeline travel pill edit | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序、segments edit 與 409 重抓 retry slice；更多 web parity 細節仍待補 |
 | `/trip/:id/collab`, `/invite` | `/trips/:id/collab` → `CollabScreen`; `/invite?token=...` → `InviteScreen` | 已翻第一波 | 後續可補 ownership transfer / resend invitation 等 web parity 細節 |
 | `/trip/:id/health` | `/trips/:id/health` → `TripHealthScreen` | 已翻第一波 | 後續可補 SSE 與 empty-trip entry count guard parity |
 | `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
@@ -61,7 +61,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 2. **Trip action surface**
    - Routes：`/trips/new`、`/trips/:id/edit`、`/trips/:id/add-entry`、`add-stop`、`add-custom-stop`
    - API：trip create/update、entry create/update/delete、segments get/patch、places resolve/search
-   - 狀態：`/trips/new`、`/trips/:id/edit` 已有基本資料與目的地表單 slice；`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏/自訂座標新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除與備選移除/排序 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；timeline travel pill 已有 segments edit slice；edit day management 等 web parity 細節仍待補。
+   - 狀態：`/trips/new`、`/trips/:id/edit` 已有基本資料、目的地表單與 day management slice；`/trips/:id/add-entry` / `add-stop` 已有搜尋/收藏/自訂座標新增 slice；`/trips/:id/stop/:entryId/edit` 已有時間/描述/刪除與備選移除/排序 slice；`/trips/:id/stop/:entryId/change-poi` 已有主景點置換/加備選 slice；`/trips/:id/stop/:entryId/copy` 與 `/move` 已有跨日操作 slice；timeline travel pill 已有 segments edit slice；更多 web parity 細節仍待補。
    - 理由：補上 mobile app 最直接的規劃能力；需 TDD + OCC handling。
 
 3. **Entry detail/action forms**
@@ -121,8 +121,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波。
+下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料、目的地與 day management slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波。
 
-1. 若續做 Trip action surface：優先補 edit day management 或更完整的 segment 背景同步/失敗狀態細節,避免與既有 entry mutation contract 脫節。
+1. 若續做 Trip action surface：優先補更完整的 segment 背景同步/失敗狀態、auto-save parity 或 overflow action 細節,避免與既有 entry/day mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。

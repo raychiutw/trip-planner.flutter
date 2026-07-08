@@ -556,6 +556,99 @@ void main() {
     expect(kokusaiStreetEntry.alternates, isEmpty);
   });
 
+  test('createTripDay：POST /trips/:id/days 可從結尾新增一天', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(201, {
+        'day': {
+          'id': 14,
+          'day_num': 4,
+          'date': '2026-10-04',
+          'day_of_week': '日',
+          'label': 'Day 4',
+          'title': 'Day 4',
+        },
+      }),
+      data: {'position': 'end'},
+    );
+
+    final day = await tripRepository.createTripDay(
+      tripId: 'okinawa-trip-2026-Ray',
+      position: 'end',
+    );
+
+    expect(day.dayNum, 4);
+    expect(day.date, '2026-10-04');
+    expect(day.dayOfWeek, '日');
+  });
+
+  test('createTripDay：insert 位置帶 date 補回缺漏日期', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(201, {
+        'day': {
+          'id': 12,
+          'day_num': 2,
+          'date': '2026-10-02',
+          'day_of_week': '五',
+          'label': 'Day 2',
+          'title': 'Day 2',
+        },
+      }),
+      data: {'position': 'insert', 'date': '2026-10-02'},
+    );
+
+    final day = await tripRepository.createTripDay(
+      tripId: 'okinawa-trip-2026-Ray',
+      position: 'insert',
+      date: '2026-10-02',
+    );
+
+    expect(day.dayNum, 2);
+    expect(day.date, '2026-10-02');
+  });
+
+  test(
+    'deleteTripDay：DELETE /trips/:id/days/:num 回 removedEntryCount',
+    () async {
+      dioAdapter.onDelete(
+        '/trips/okinawa-trip-2026-Ray/days/2',
+        (server) => server.reply(200, {'ok': true, 'removedEntryCount': 3}),
+      );
+
+      final result = await tripRepository.deleteTripDay(
+        tripId: 'okinawa-trip-2026-Ray',
+        dayNum: 2,
+      );
+
+      expect(result.ok, isTrue);
+      expect(result.removedEntryCount, 3);
+    },
+  );
+
+  test('shiftTripDays：POST /trips/:id/days/shift 整段平移日期', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/days/shift',
+      (server) => server.reply(200, {
+        'ok': true,
+        'newStartDate': '2026-10-05',
+        'newEndDate': '2026-10-07',
+        'daysShifted': 3,
+      }),
+      data: {'startDate': '2026-10-05'},
+    );
+
+    final result = await tripRepository.shiftTripDays(
+      tripId: 'okinawa-trip-2026-Ray',
+      startDate: '2026-10-05',
+    );
+
+    expect(result.ok, isTrue);
+    expect(result.newStartDate, '2026-10-05');
+    expect(result.newEndDate, '2026-10-07');
+    expect(result.daysShifted, 3);
+  });
+
   test(
     'fetchTripSegments：GET /trips/:id/segments 解析 snake_case rows',
     () async {

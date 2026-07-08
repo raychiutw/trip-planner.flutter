@@ -151,18 +151,24 @@ helper：`isOwner`、`isViewer`、`roleLabel`（擁有者/共編成員/檢視者
 | `checkout`、`note` | `String?` |
 | `location` | `TripLocation?` |
 
-### TripDay — `GET /trips/:id/days?all=1` item
+### TripDay — `GET /trips/:id/days?all=1` item / `POST /trips/:id/days` 回傳 day
 
 | 欄位 | 型別 | 備註 |
 |---|---|---|
-| `id`、`dayNum` | `int` | 必填 |
+| `id`、`dayNum` | `int` | 必填；`dayNum` 同時相容 `day_num` |
 | `date` | `String?` | `"YYYY-MM-DD"` |
-| `dayOfWeek`、`label`、`title` | `String?` | |
+| `dayOfWeek`、`label`、`title` | `String?` | `dayOfWeek` 同時相容 `day_of_week` |
 | `version` | `int` | OCC 版本號,缺漏 → 0 |
 | `hotel` | `DayHotel?` | |
 | `timeline` | `List<TimelineEntry>` | 預設 `[]` |
 
 getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
+
+### TripDayDeleteResult / TripDaysShiftResult — day management mutation result
+
+`TripDayDeleteResult` 對應 `DELETE /trips/:id/days/:num`:`ok: bool`、`removedEntryCount: int`。`removedEntryCount` 是後端實際 cascade 刪掉的 entry 數量。
+
+`TripDaysShiftResult` 對應 `POST /trips/:id/days/shift`:`ok: bool`、`newStartDate: String`、`newEndDate: String?`、`daysShifted: int`。日期仍以 `"YYYY-MM-DD"` 字串保存。
 
 ## entry.dart
 
