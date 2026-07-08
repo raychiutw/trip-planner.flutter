@@ -33,18 +33,41 @@ class TripMapScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final daysAsync = ref.watch(tripDaysProvider(tripId));
     return Scaffold(
       appBar: AppBar(title: const Text('行程地圖')),
-      body: daysAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('載入失敗：$error', textAlign: TextAlign.center),
-          ),
+      body: TripMapContent(tripId: tripId, tileProvider: tileProvider),
+    );
+  }
+}
+
+/// 可嵌入的行程地圖內容：讀取指定 trip days 後渲染地圖、day tabs 與 entry cards。
+class TripMapContent extends ConsumerWidget {
+  const TripMapContent({
+    super.key,
+    required this.tripId,
+    this.tileProvider,
+    this.emptyMessage = '此行程尚無地點座標',
+  });
+
+  final String tripId;
+  final TileProvider? tileProvider;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final daysAsync = ref.watch(tripDaysProvider(tripId));
+    return daysAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s6),
+          child: Text('載入失敗：$error', textAlign: TextAlign.center),
         ),
-        data: (days) => _TripMapView(days: days, tileProvider: tileProvider),
+      ),
+      data: (days) => _TripMapView(
+        days: days,
+        tileProvider: tileProvider,
+        emptyMessage: emptyMessage,
       ),
     );
   }
@@ -72,9 +95,14 @@ class _DayPin {
 }
 
 class _TripMapView extends StatefulWidget {
-  const _TripMapView({required this.days, this.tileProvider});
+  const _TripMapView({
+    required this.days,
+    required this.emptyMessage,
+    this.tileProvider,
+  });
 
   final List<TripDay> days;
+  final String emptyMessage;
   final TileProvider? tileProvider;
 
   @override
@@ -110,13 +138,15 @@ class _TripMapViewState extends State<_TripMapView> {
       final lat = entry.master?.lat;
       final lng = entry.master?.lng;
       if (lat == null || lng == null) continue;
-      dayPins.add(_DayPin(
-        dayIndex: dayIndex,
-        dayNum: day.dayNum,
-        pinNumber: dayPins.length + 1,
-        entry: entry,
-        point: LatLng(lat, lng),
-      ));
+      dayPins.add(
+        _DayPin(
+          dayIndex: dayIndex,
+          dayNum: day.dayNum,
+          pinNumber: dayPins.length + 1,
+          entry: entry,
+          point: LatLng(lat, lng),
+        ),
+      );
     }
     return dayPins;
   }
@@ -156,10 +186,10 @@ class _TripMapViewState extends State<_TripMapView> {
     if (allPins.isEmpty) {
       return Center(
         child: Text(
-          '此行程尚無地點座標',
+          widget.emptyMessage,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -252,9 +282,9 @@ class _TripMapViewState extends State<_TripMapView> {
       mapController: _mapController,
       options: MapOptions(
         initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(
-            [for (final pin in allPins) pin.point],
-          ),
+          bounds: LatLngBounds.fromPoints([
+            for (final pin in allPins) pin.point,
+          ]),
           padding: const EdgeInsets.all(TpSpacing.s10),
           maxZoom: 16,
         ),
@@ -270,9 +300,7 @@ class _TripMapViewState extends State<_TripMapView> {
           markers: [for (final pin in visiblePins) _buildMarker(pin)],
         ),
         RichAttributionWidget(
-          attributions: [
-            TextSourceAttribution('OpenStreetMap contributors'),
-          ],
+          attributions: [TextSourceAttribution('OpenStreetMap contributors')],
         ),
       ],
     );
@@ -333,8 +361,9 @@ class _TripMapViewState extends State<_TripMapView> {
     final theme = Theme.of(context);
     final timeText = pin.entry.startTime ?? pin.entry.time ?? '--:--';
     // 總覽模式加 D{N} 前綴標示所屬日。
-    final timeLabel =
-        _selectedTabIndex == 0 ? 'D${pin.dayNum} · $timeText' : timeText;
+    final timeLabel = _selectedTabIndex == 0
+        ? 'D${pin.dayNum} · $timeText'
+        : timeText;
 
     return SizedBox(
       width: 220,

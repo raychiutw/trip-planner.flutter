@@ -15,6 +15,7 @@ import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
+import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
@@ -166,6 +167,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ChatScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /map 進入 GlobalMapScreen', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/map');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GlobalMapScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

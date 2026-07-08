@@ -268,7 +268,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 ```dart
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
-// /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
+// /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
@@ -286,6 +286,7 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 // 各 screen class 名
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
 class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_screen.dart
+class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
@@ -294,6 +295,7 @@ class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/e
 class ChangePoiScreen extends ConsumerStatefulWidget;  // features/trip_detail/change_poi_screen.dart（接受 tripId, entryId, mode）
 class EntryActionScreen extends ConsumerStatefulWidget; // features/trip_detail/entry_action_screen.dart（接受 tripId, entryId, action）
 class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
+class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
 class TripNotesScreen extends ConsumerWidget;          // features/trip_detail/trip_notes_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 ```

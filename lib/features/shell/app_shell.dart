@@ -26,29 +26,20 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.chat_bubble_outline),
             label: '聊天',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            label: '行程',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            label: '地圖',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: '行程'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), label: '地圖'),
           NavigationDestination(
             icon: Icon(Icons.favorite_outline),
             label: '收藏',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: '帳號',
-          ),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: '帳號'),
         ],
       ),
     );
   }
 }
 
-/// 尚未實作功能的占位畫面（聊天／全域地圖／收藏）。
+/// 尚未實作功能的占位畫面。
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key, required this.title});
 
@@ -62,8 +53,9 @@ class PlaceholderScreen extends StatelessWidget {
       body: Center(
         child: Text(
           '即將推出',
-          style: theme.textTheme.bodyLarge
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );

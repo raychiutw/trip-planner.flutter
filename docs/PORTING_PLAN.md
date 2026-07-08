@@ -40,14 +40,14 @@
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes` + 各 section CRUD |
 | AccountScreen | AccountPage | `GET /oauth/userinfo`、`GET /account/stats`、`PATCH /account/profile`、`POST /oauth/logout` |
 | ChatScreen | ChatPage（request queue 第一波） | `GET /requests?tripId=...`、`POST /requests`、`GET /requests/:id` |
-| GlobalMapScreen | placeholder（P1） | tab 佔位，顯示「即將推出」 |
+| GlobalMapScreen | GlobalMapPage（trip-bound resolver 第一波） | `GET /my-trips` + `GET /trips/:id/days?all=1` |
 | FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/days/:num/entries`、`POST /trips/:id/recompute-travel` |
 | AddEntryScreen | AddEntryPage / AddStopPage / AddCustomStopPage（新增景點 slice） | `GET /trips/:id/days?all=1`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/days/:num/entries`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/recompute-travel` |
 | EditEntryScreen | EditEntryPage（時間/描述/刪除 + 備選管理 slice） | `GET/PATCH/DELETE /trips/:id/entries/:entryId`、`DELETE /trips/:id/entries/:entryId/alternates/:poiId`、`PATCH /trips/:id/entries/:entryId/alternates/reorder`、`POST /trips/:id/recompute-travel` |
 | ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling 已完成第一波；全域地圖、共編仍待辦。
+P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling 與全域地圖 tab resolver 已完成第一波；共編仍待辦。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構
@@ -65,6 +65,7 @@ lib/
   api/trip_repository.dart  # my-trips / trips / days / requests / notes / stats
   features/auth/            # LoginScreen
   features/chat/            # ChatScreen
+  features/map/             # GlobalMapScreen
   features/trips/           # TripsListScreen + TripFormScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen + trip scope providers
   features/favorites/       # FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen

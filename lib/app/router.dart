@@ -12,6 +12,7 @@ import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
 import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
+import '../features/map/global_map_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/add_entry_screen.dart';
 import '../features/trip_detail/change_poi_screen.dart';
@@ -179,8 +180,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/map',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: '全域地圖'),
+                builder: (context, state) => const GlobalMapScreen(),
               ),
             ],
           ),

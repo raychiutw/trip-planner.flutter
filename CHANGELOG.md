@@ -15,6 +15,7 @@
 - **P1 Entry 備選管理**:edit screen 顯示備選 POI 列表,支援移除與上/下移排序;移除以 DELETE query string 帶 `entryPoisVersion`,排序以 PATCH `/alternates/reorder` 帶完整 `order` 與 OCC token。
 - **P1 Entry OCC 重試**:edit、move、change-poi 與備選管理遇 `STALE_ENTRY` 時會重抓最新 entry,以新的 `version` / `entryPoisVersion` retry 同一個使用者操作一次。
 - **P1 AI 聊天**:`/chat` 由 placeholder 轉為 `ChatScreen`;會載入使用者行程、顯示 active trip 最近 request history、送出 `POST /requests` 後以 pending bubble 顯示「思考中...」並 polling `GET /requests/:id` 替換成 AI 回覆。
+- **P1 全域地圖**:`/map` 由 placeholder 轉為 `GlobalMapScreen`;會載入我的行程、預設第一趟行程並可切換行程,重用 `TripMapContent` 顯示 OSM pins/day tabs/entry cards;無行程時提供新增行程 CTA。
 
 ## [0.1.0] - 2026-06-10
 
