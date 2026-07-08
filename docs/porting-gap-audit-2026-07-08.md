@@ -9,7 +9,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 還沒翻寫的主體集中在三類：
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
-2. **Trip action surface**：新增/編輯行程、景點 CRUD 與共編邀請已有第一波；剩餘子流程、健檢、列印/分享仍待 Flutter route 或完整實作。
+2. **Trip action surface**：新增/編輯行程、景點 CRUD、共編邀請、健檢與分享連結管理已有第一波；剩餘子流程、列印/公開分享頁仍待 Flutter route 或完整實作。
 3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證與外觀/通知設定已完成第一波；sessions、connected apps、developer apps、consent 尚未翻。
 
 ## 現行 Route 對照
@@ -18,7 +18,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 |---|---|---|---|
 | `/login` → `LoginPage` | `/login` → `LoginScreen` | 已翻 | 已補 signup/forgot/reset/verify 入口 |
 | `/trips` → `TripsListPage` | `/trips` → `TripsListScreen` | 已翻第一波 | 已補 filter/sort/search/filtered empty/menu actions/尾端新增卡/JSON 匯入/分享連結管理 |
-| `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 已翻第一波 | 已補 focus/deeplink、今日自動定位、scroll-spy、行程切換 dropdown、overflow actions、offline banner、segment 背景同步 |
+| `/trip/:id` embedded `TripPage` | `/trips/:id` → `TripTimelineScreen` | 已翻第一波 | 已補 focus/deeplink、今日自動定位、scroll-spy、行程切換 dropdown、overflow actions（編輯/AI 健檢/共編/分享連結）、offline banner、segment 背景同步 |
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` + `/trips/:id/stop/:entryId/map` → `TripMapScreen` | 已翻第一波 | 已補 entry focus route、overview 點 pin 切 day、pin/card selected sync、polyline、圖層/定位 FAB |
 | `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 已翻第一波 | 後續可補 drag reorder、autosave-on-blur 與更完整 web parity |
 | `/account` → `AccountPage` | `/account` → `AccountScreen` | 已翻第一波 | 已補 displayName inline edit、外觀/通知 rows 導航 |
@@ -45,7 +45,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 這些不是全新 P1 功能，但 web P0 畫面已有而 Flutter P0 只做到可用版。
 
 - **TripsListScreen**：目前有單欄清單、下拉更新、AppBar/空狀態新增入口、分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序、filtered empty、TripCard action menu（編輯/共編/AI 健檢/筆記/分享/刪除）、尾端新增卡、JSON 匯入與 ShareLink 分享管理。
-- **TripTimelineScreen**：目前有 day pills + timeline + travel pill + add/map/notes direct actions，AI 健檢與共編設定收進 overflow menu；AppBar 可從 `/my-trips` dropdown 切換行程；travel pill 會讀取 `trip_segments` source of truth 並可編輯 driving/walking/transit；`?focus=<entryId>` 可初載定位指定 entry，若行程日期包含今天會初載定位今日 day，手動捲動也會以 scroll-spy 同步 active day；離線時會顯示 persistent banner，重連後自動刷新 days/segments；segments 成功載入後若發現有座標的缺 row 或 stale row，會以 day scope 背景觸發 travel recompute 並刷新時間軸。
+- **TripTimelineScreen**：目前有 day pills + timeline + travel pill + add/map/notes direct actions，編輯行程、AI 健檢、共編設定與分享連結管理收進 overflow menu；AppBar 可從 `/my-trips` dropdown 切換行程；travel pill 會讀取 `trip_segments` source of truth 並可編輯 driving/walking/transit；`?focus=<entryId>` 可初載定位指定 entry，若行程日期包含今天會初載定位今日 day，手動捲動也會以 scroll-spy 同步 active day；離線時會顯示 persistent banner，重連後自動刷新 days/segments；segments 成功載入後若發現有座標的缺 row 或 stale row，會以 day scope 背景觸發 travel recompute 並刷新時間軸。
 - **TripMapScreen**：目前是 OSM pins + day tabs + entry cards；`stop/:entryId/map` 會初載切到 entry 所在 day 並聚焦該 pin，總覽點 pin 也會自動切到該 pin 所在 day，pin/card 點擊會同步 selected 狀態，overview/單日會依 day 畫出 route polyline；右下 FAB 可切換路線圖/地形/衛星圖層並以 geolocator 顯示目前位置 marker。
 - **TripNotesScreen**：目前 5-section accordion 已支援 5 區新增/編輯/刪除、notes row OCC `expectedVersion`、行前須知/緊急聯絡 AI generate 與 request polling pending 狀態；尚缺 drag reorder、autosave-on-blur 等 web parity 細節。
 - **AccountScreen**：目前 profile/stat/logout、displayName inline edit、外觀/通知 settings 第一波可用。尚缺 connected apps、sessions、developer/OAuth 生態頁面。

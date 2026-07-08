@@ -213,6 +213,11 @@ Future<void> _pumpTimeline(
                 const Scaffold(body: Text('notes-page')),
           ),
           GoRoute(
+            path: 'edit',
+            builder: (context, state) =>
+                const Scaffold(body: Text('edit-trip-page')),
+          ),
+          GoRoute(
             path: 'health',
             builder: (context, state) =>
                 const Scaffold(body: Text('health-page')),
@@ -315,11 +320,47 @@ void main() {
       find.byKey(const ValueKey('timeline-overflow-collab')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('timeline-overflow-edit')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('timeline-overflow-share')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('timeline-overflow-health')));
     await tester.pumpAndSettle();
 
     expect(find.text('health-page'), findsOneWidget);
+  });
+
+  testWidgets('AppBar overflow menu 可進入編輯行程', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-edit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('edit-trip-page'), findsOneWidget);
+  });
+
+  testWidgets('AppBar overflow menu 可開啟分享連結管理', (tester) async {
+    final repository = _MockTripRepository();
+    when(
+      () => repository.fetchTripShares(_tripId),
+    ).thenAnswer((_) async => const []);
+
+    await _pumpTimeline(tester, repository: repository);
+
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-share')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('分享這個行程'), findsOneWidget);
+    verify(() => repository.fetchTripShares(_tripId)).called(1);
   });
 
   testWidgets('AppBar trip switcher 列出 my trips 並切換 route', (tester) async {

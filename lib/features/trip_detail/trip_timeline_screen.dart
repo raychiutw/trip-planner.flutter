@@ -10,6 +10,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../trips/share_links_sheet.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
@@ -17,7 +18,7 @@ import 'widgets/hotel_card.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_pill.dart';
 
-enum _TimelineOverflowAction { health, collab }
+enum _TimelineOverflowAction { edit, health, collab, share }
 
 final timelineOnlineProvider = StreamProvider<bool>((ref) async* {
   final connectivity = Connectivity();
@@ -152,13 +153,37 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             icon: const Icon(Icons.more_vert),
             onSelected: (action) {
               switch (action) {
+                case _TimelineOverflowAction.edit:
+                  _goTo(context, '/trips/$tripId/edit');
                 case _TimelineOverflowAction.health:
                   _goTo(context, '/trips/$tripId/health');
                 case _TimelineOverflowAction.collab:
                   _goTo(context, '/trips/$tripId/collab');
+                case _TimelineOverflowAction.share:
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(TpRadius.xl),
+                      ),
+                    ),
+                    builder: (sheetContext) =>
+                        TripShareLinksSheet(tripId: tripId),
+                  );
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(
+                key: ValueKey('timeline-overflow-edit'),
+                value: _TimelineOverflowAction.edit,
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('編輯行程'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
               PopupMenuItem(
                 key: ValueKey('timeline-overflow-health'),
                 value: _TimelineOverflowAction.health,
@@ -174,6 +199,15 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 child: ListTile(
                   leading: Icon(Icons.group_outlined),
                   title: Text('共編設定'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('timeline-overflow-share'),
+                value: _TimelineOverflowAction.share,
+                child: ListTile(
+                  leading: Icon(Icons.ios_share_outlined),
+                  title: Text('分享連結'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
