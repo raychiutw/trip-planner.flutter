@@ -13,6 +13,7 @@
 | `/auth/password/reset?token=...` | `ResetPasswordScreen` | **shell 外**；重設密碼 |
 | `/auth/verify-email?token=...` | `VerifyEmailScreen` | **shell 外**；按鈕觸發 email verification POST |
 | `/invite?token=...` | `InviteScreen` | **shell 外**；公開邀請預覽,未登入可進入 |
+| `/s/:token` | `PublicShareScreen` | **shell 外**；公開分享頁,未登入可瀏覽,登入後可複製行程 |
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**)；行程清單分類/搜尋/排序、JSON 匯入/匯出、分享連結管理與卡片 action menu |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
@@ -54,7 +55,7 @@ redirect: (context, state) {
 
   final isLoggedIn = authState.value != null;
   final isOnLogin = state.matchedLocation == '/login';
-  final isPublicRoute = _publicShellOutsideRoutes.contains(state.matchedLocation);
+  final isPublicRoute = _isPublicShellOutsideRoute(state);
   if (!isLoggedIn && !isPublicRoute) return '/login';
   if (isLoggedIn && isOnLogin) return '/trips';
   return null;
@@ -65,10 +66,10 @@ redirect: (context, state) {
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
 2. 未登入 + 不在公開 shell 外 route → 踢去 `/login`。
-3. 未登入可留在 `/invite` 看公開邀請預覽,也可走 signup/forgot/reset/verify auth 補齊流程；真正接受邀請仍需登入且 email 相符。
+3. 未登入可留在 `/invite` 看公開邀請預覽,可進 `/s/:token` 看公開分享頁,也可走 signup/forgot/reset/verify auth 補齊流程；真正接受邀請或複製公開行程仍需登入。
 4. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
 
-公開 shell 外 routes 目前是:`/login`、`/invite`、`/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email`。
+公開 shell 外 routes 目前是:`/login`、`/invite`、`/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email` 與 `/s/*`。
 
 ## auth 變化 → redirect 重算的橋接
 

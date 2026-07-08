@@ -3,6 +3,9 @@ library;
 
 import 'dart:convert';
 
+import 'day.dart';
+import 'notes.dart';
+
 /// 後端允許公開切換的 notes section keys。
 const List<String> kShareSectionKeys = [
   'flights',
@@ -122,10 +125,93 @@ class CreatedTripShare {
   bool get isAnonymous => anonymous == 1;
 }
 
+/// `GET /share/:token` 回傳的公開分享 payload。
+class PublicTripShare {
+  const PublicTripShare({
+    required this.name,
+    this.title,
+    this.countries,
+    this.sharedBy = '',
+    this.destinations = const [],
+    this.days = const [],
+    this.notes = const TripNotes(),
+  });
+
+  factory PublicTripShare.fromJson(Map<String, dynamic> json) {
+    final meta = json['meta'] is Map
+        ? Map<String, dynamic>.from(json['meta'] as Map)
+        : <String, dynamic>{};
+    return PublicTripShare(
+      name: meta['name']?.toString() ?? '',
+      title: _nullableString(meta['title']),
+      countries: _nullableString(meta['countries']),
+      sharedBy: _nullableString(meta['sharedBy'] ?? meta['shared_by']) ?? '',
+      destinations: _destinationNames(meta['destinations']),
+      days: (json['days'] as List<dynamic>? ?? const [])
+          .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
+          .toList(),
+      notes: json['notes'] is Map
+          ? TripNotes.fromJson(Map<String, dynamic>.from(json['notes'] as Map))
+          : const TripNotes(),
+    );
+  }
+
+  final String name;
+  final String? title;
+  final String? countries;
+
+  /// Owner display_name；anonymous share 會是空字串。
+  final String sharedBy;
+  final List<String> destinations;
+  final List<TripDay> days;
+  final TripNotes notes;
+
+  String get displayTitle {
+    final trimmedTitle = title?.trim();
+    if (trimmedTitle != null && trimmedTitle.isNotEmpty) {
+      return trimmedTitle;
+    }
+    final trimmedName = name.trim();
+    return trimmedName.isEmpty ? '未命名行程' : trimmedName;
+  }
+
+  String get destinationsLabel {
+    if (destinations.isNotEmpty) return destinations.join(' · ');
+    return countries?.trim() ?? '';
+  }
+
+  String get dateRange {
+    final datedDays = days
+        .map((day) => day.date?.trim())
+        .whereType<String>()
+        .where((date) => date.isNotEmpty)
+        .toList();
+    if (datedDays.isEmpty) return '';
+    final first = datedDays.first;
+    final last = datedDays.last;
+    return first == last ? first : '$first – $last';
+  }
+}
+
 /// 移除未知 section key 並維持 canonical 順序。
 List<String> sanitizeShareSectionKeys(Iterable<String> input) {
   final requested = input.toSet();
   return kShareSectionKeys.where(requested.contains).toList();
+}
+
+List<String> _destinationNames(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .whereType<Map>()
+      .map((item) => item['name']?.toString().trim() ?? '')
+      .where((name) => name.isNotEmpty)
+      .toList();
+}
+
+String? _nullableString(Object? value) {
+  final stringValue = value?.toString();
+  if (stringValue == null || stringValue.trim().isEmpty) return null;
+  return stringValue;
 }
 
 int _int(Object? value) => (value as num?)?.toInt() ?? 0;

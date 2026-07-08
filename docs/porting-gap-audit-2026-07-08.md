@@ -9,7 +9,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 還沒翻寫的主體集中在三類：
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
-2. **Trip action surface**：新增/編輯行程、景點 CRUD、共編邀請、健檢與分享連結管理已有第一波；剩餘子流程、列印/公開分享頁仍待 Flutter route 或完整實作。
+2. **Trip action surface**：新增/編輯行程、景點 CRUD、共編邀請、健檢、分享連結管理與公開分享頁已有第一波；剩餘子流程、列印/PDF 仍待 Flutter route 或完整實作。
 3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、外觀/通知設定與 sessions 已完成第一波；connected apps、developer apps、consent 尚未翻。
 
 ## 現行 Route 對照
@@ -34,8 +34,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen`; timeline travel pill edit | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序、segments edit 與 409 重抓 retry slice；更多 web parity 細節仍待補 |
 | `/trip/:id/collab`, `/invite` | `/trips/:id/collab` → `CollabScreen`; `/invite?token=...` → `InviteScreen` | 已翻第一波 | 後續可補 ownership transfer / resend invitation 等 web parity 細節 |
 | `/trip/:id/health` | `/trips/:id/health` → `TripHealthScreen` | 已翻第一波 | 後續可補 SSE 與 empty-trip entry count guard parity |
-| `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
-| `/s/:token` | 無 | 未翻 | P2：公開分享頁 |
+| `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF |
+| `/s/:token` | `/s/:token` → `PublicShareScreen` | 已翻第一波 | 未登入可看公開 payload；登入後可 clone |
 | `/signup`, `/signup/check-email`, `/login/forgot`, `/auth/password/reset`, `/auth/verify-email` | 對應 Auth supplement screens | 已翻第一波 | 後續可補更完整 resend cooldown / platform mail app deep link |
 | `/account/appearance`, `/account/notifications`, `/account/sessions`, `/settings/appearance`, `/settings/notifications`, `/settings/sessions` | 對應 Flutter settings screens | 已翻第一波 | sessions 已補登入裝置清單、單一登出與登出其他裝置；後續補 connected apps、developer apps、OAuth consent |
 | `/developer/apps*`, `/oauth/consent` | 無 | 未翻 | P2：OAuth 生態 |
@@ -107,7 +107,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## P2 / 可延後
 
-- 公開分享頁 `/s/:token`、列印/PDF；JSON 匯出已由 TripsList action menu 完成。
+- 公開分享頁 `/s/:token` 第一波已完成；列印/PDF 仍待補。JSON 匯出已由 TripsList action menu 完成。
 - Account/settings 後續子頁：connected apps、developer apps、OAuth consent（sessions 第一波已完成）。
 - OAuth developer apps / consent / PKCE Bearer 認證。
 - 離線快取與 web service worker 等價能力。
@@ -121,8 +121,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。TripsList 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/匯出/分享連結管理第一波；Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料、目的地與 day management slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波；登入裝置 sessions 已補清單、單一登出與登出其他裝置第一波。
+下一個 Build branch 建議接 **Trip action parity** 或 **P0 parity debt**。TripsList 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/匯出/分享連結管理第一波；Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料、目的地與 day management slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作、travel segments edit 與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/角色更新/移除成員/接受 invite 第一波；行程筆記已補 5 區 CRUD + AI generate/polling 第一波；AI 健檢已補 health report / polling 第一波；Auth 補齊已補 signup / forgot-reset / email verify 第一波；登入裝置 sessions 已補清單、單一登出與登出其他裝置第一波；公開分享頁已補 `/s/:token` 無登入瀏覽與登入後 clone 第一波。
 
-1. 若續做 Trip action surface：優先補 auto-save parity、列印/公開分享或更多 entry action 細節,避免與既有 entry/day mutation contract 脫節。
+1. 若續做 Trip action surface：優先補 auto-save parity、列印/PDF 或更多 entry action 細節,避免與既有 entry/day mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。

@@ -32,7 +32,7 @@ abstract final class AppTheme {
 }
 ```
 
-## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, health.dart, notes.dart, user.dart）
+## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, health.dart, share.dart, notes.dart, user.dart）
 
 ```dart
 // trip.dart
@@ -124,6 +124,13 @@ class InvitationPreview {
   String get inviterLabel;
 }
 class InvitationAcceptResult { final bool ok; final String tripId; final String tripTitle; }
+
+// share.dart
+class PublicTripShare {
+  final String name; final String? title; final String? countries; final String sharedBy;
+  final List<String> destinations; final List<TripDay> days; final TripNotes notes;
+  String get displayTitle; String get destinationsLabel; String get dateRange;
+}
 
 // notes.dart — 5 個 row class 共通欄位：int id, int sortOrder, int version；文字欄位非 null 預設 ''
 enum TripNoteSection { flights, lodgings, reservations, pretrip, emergency }
@@ -220,6 +227,8 @@ class TripRepository {
   Future<CreatedTripShare> rotateTripShare(String tripId, int shareId); // PATCH action=rotate
   Future<void> revokeTripShare(String tripId, int shareId); // PATCH action=revoke
   Future<void> deleteTripShare(String tripId, int shareId); // DELETE /trips/:id/shares/:shareId
+  Future<PublicTripShare> fetchPublicTripShare(String token); // GET /share/:token
+  Future<String> clonePublicTripShare(String token); // POST /share/:token/clone
   Future<TripRequestPage> fetchTripRequests({
     required String tripId,
     int limit = 5,
@@ -390,7 +399,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
-// shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）
+// shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）、/s/:token（PublicShareScreen；允許未登入公開瀏覽）
 // trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/stop/:entryId/map（TripMapScreen focus route）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // redirect：未登入(authState data null) 且非 public shell 外 route → /login；已登入在 /login → /trips
@@ -416,6 +425,7 @@ class VerifyEmailScreen extends ConsumerStatefulWidget; // features/auth/verify_
 class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_screen.dart
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
+class PublicShareScreen extends ConsumerStatefulWidget; // features/share/public_share_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
 class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入/匯出 + 分享連結管理）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）

@@ -260,6 +260,23 @@ class TripRepository {
     return _client.delete(_shareLinkPath(tripId, shareId));
   }
 
+  /// GET /share/:token，公開分享頁資料（無需登入）。
+  Future<PublicTripShare> fetchPublicTripShare(String token) async {
+    final responseBody = await _client.get(
+      '/share/${Uri.encodeComponent(token)}',
+    );
+    return PublicTripShare.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /share/:token/clone，將公開分享行程複製到目前登入帳號。
+  Future<String> clonePublicTripShare(String token) async {
+    final responseBody = await _client.post(
+      '/share/${Uri.encodeComponent(token)}/clone',
+      body: <String, dynamic>{},
+    );
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
   /// GET /requests?tripId=...，讀取 AI request queue。
   Future<TripRequestPage> fetchTripRequests({
     required String tripId,

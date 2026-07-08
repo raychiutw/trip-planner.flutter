@@ -165,6 +165,12 @@ helper：`isOwner`、`isViewer`、`roleLabel`（擁有者/共編成員/檢視者
 
 一次性 raw token/url response:`id`、`token`、`url`、`label`、`visibleSections`、`expiresAt`、`anonymous`。只有建立與重新產生會回 raw token；client 需立即顯示或複製。
 
+### PublicTripShare — `GET /share/:token`
+
+公開分享頁 payload，不需登入。`meta` 解析 `name`、`title`、`countries`、`sharedBy` 與 `destinations`;`days` 直接沿用 `TripDay.fromJson`;`notes` 沿用 `TripNotes.fromJson`。後端已依分享連結的 `visibleSections` 過濾 notes,Flutter 不再自行打開未公開 sections。
+
+helper：`displayTitle` 以 `title` 非空優先,否則 `name`,最後顯示「未命名行程」；`destinationsLabel` 以目的地名稱串接,缺漏時 fallback `countries`；`dateRange` 從 days 的日期字串產生單日或起訖範圍。
+
 ## day.dart
 
 ### TripLocation — 座標(server 合成,全 nullable)

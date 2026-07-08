@@ -25,6 +25,7 @@ import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
+import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
@@ -40,6 +41,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/health.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi.dart';
+import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 
@@ -176,6 +178,14 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   ).thenAnswer((_) async => const <PoiFavorite>[]);
   when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
     (_) async => const AccountSessionsPage(currentSid: null, sessions: []),
+  );
+  when(() => mockTripRepository.fetchPublicTripShare(any())).thenAnswer(
+    (_) async => const PublicTripShare(
+      name: 'okinawa-trip-2026',
+      title: '沖繩家族旅行',
+      sharedBy: 'Ray',
+      days: [],
+    ),
   );
 
   final container = ProviderContainer(
@@ -397,6 +407,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(InviteScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入時 /s/:token 可進入公開分享頁', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/s/raw-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublicShareScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

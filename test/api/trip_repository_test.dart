@@ -517,6 +517,62 @@ void main() {
     );
   });
 
+  test('fetchPublicTripShare：GET /share/:token 解析公開分享 payload', () async {
+    dioAdapter.onGet(
+      '/share/raw-token',
+      (server) => server.reply(200, {
+        'meta': {
+          'name': 'okinawa-trip-2026',
+          'title': '沖繩家族旅行',
+          'sharedBy': 'Ray',
+          'destinations': [
+            {'name': '那霸'},
+          ],
+        },
+        'days': [
+          {
+            'id': 10,
+            'dayNum': 1,
+            'date': '2026-10-01',
+            'version': 1,
+            'timeline': [
+              {'id': 101, 'sortOrder': 0, 'title': '首里城公園', 'version': 1},
+            ],
+          },
+        ],
+        'notes': {
+          'flights': [],
+          'lodgings': [],
+          'reservations': [],
+          'pretripNotes': [],
+          'emergencyContacts': [],
+        },
+      }),
+    );
+
+    final share = await tripRepository.fetchPublicTripShare('raw-token');
+
+    expect(share.displayTitle, '沖繩家族旅行');
+    expect(share.sharedBy, 'Ray');
+    expect(share.days.single.timeline.single.title, '首里城公園');
+  });
+
+  test('clonePublicTripShare：POST /share/:token/clone 回新 tripId', () async {
+    dioAdapter.onPost(
+      '/share/raw-token/clone',
+      (server) => server.reply(201, {
+        'ok': true,
+        'tripId': 'cln-trip-1',
+        'daysCreated': 3,
+      }),
+      data: <String, dynamic>{},
+    );
+
+    final tripId = await tripRepository.clonePublicTripShare('raw-token');
+
+    expect(tripId, 'cln-trip-1');
+  });
+
   test('createTrip：POST /trips 帶基本資料與目的地', () async {
     dioAdapter.onPost(
       '/trips',

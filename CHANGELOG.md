@@ -11,6 +11,7 @@
 - **P0 地圖 parity**:TripMapScreen 新增 `/trips/:tripId/stop/:entryId/map` focus route，初載會切到 entry 所在日並聚焦該 pin；總覽點 pin 也會自動切到該 pin 所在 day；pin/card 點擊會同步 selected 狀態；overview/單日會依 day 畫出 route polyline；右下 FAB 支援路線圖/地形/衛星圖層切換與裝置定位 marker。
 - **P0 行程清單 parity**:TripsList 新增分類 tabs（全部/我的/共編/已歸檔）、搜尋、排序（最新編輯/出發日近/名稱）、filtered empty、TripCard action menu（編輯/共編/AI 健檢/筆記/匯出 JSON/分享/刪除）、尾端新增卡、JSON 匯入（512KB/schemaVersion 1 檢查）與分享連結管理（列出/建立/編輯/重新產生/關閉/刪除）；`TripSummary` 解析 owner/role/countries/start/end/updated/member/archive 等 `/my-trips` rich fields。
 - **P2 JSON 匯出**:TripsList 卡片 action menu 可匯出 schemaVersion 1 JSON；匯出內容沿用 web round-trip schema，days timeline 會加 `entryPosition`，travel segments 會由 entry id 轉為位置索引並略過孤兒 segment。
+- **P2 公開分享頁第一波**:新增 shell 外 `/s/:token` 公開頁；未登入可讀 `GET /share/:token` 並顯示分享者、日期/目的地、days timeline 與公開 notes sections；登入後可用 `POST /share/:token/clone` 複製到自己的行程，失效/撤回/過期連結顯示 persistent not-found 狀態。
 - **P2 登入裝置管理**:新增 `/account/sessions` 與 `/settings/sessions`；帳號頁可進入登入裝置清單，支援 `GET /account/sessions` 顯示目前/其他裝置、單一登出與登出其他裝置。
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 建立/編輯行程**:新增 `/trips/new` 與 `/trips/:tripId/edit`;TripsList AppBar/空狀態可建立行程,長按卡片可進入編輯行程,支援基本資料、目的地、日期、語言與發布狀態送出。編輯模式已接上 day management,可前/後新增行程日、補回缺漏日期、刪除 day 前顯示景點影響範圍,並以新的 Day 1 日期平移整段行程。

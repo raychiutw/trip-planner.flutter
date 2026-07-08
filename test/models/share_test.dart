@@ -55,4 +55,55 @@ void main() {
     expect(created.visibleSections, ['flights', 'pretrip']);
     expect(created.isAnonymous, isTrue);
   });
+
+  test('PublicTripShare.fromJson 解析公開分享 payload 與 meta fallback', () {
+    final share = PublicTripShare.fromJson({
+      'meta': {
+        'name': 'okinawa-trip-2026',
+        'title': '沖繩家族旅行',
+        'countries': 'JP',
+        'sharedBy': 'Ray',
+        'destinations': [
+          {'name': '那霸'},
+          {'name': '名護'},
+        ],
+      },
+      'days': [
+        {
+          'id': 10,
+          'dayNum': 1,
+          'date': '2026-10-01',
+          'dayOfWeek': '四',
+          'label': '抵達日',
+          'version': 1,
+          'timeline': [
+            {
+              'id': 101,
+              'sortOrder': 0,
+              'title': '首里城公園',
+              'version': 1,
+              'startTime': '09:00',
+              'endTime': '10:30',
+            },
+          ],
+        },
+      ],
+      'notes': {
+        'flights': [
+          {'id': 1, 'sortOrder': 0, 'flightNo': 'BR112'},
+        ],
+        'lodgings': [],
+        'reservations': [],
+        'pretripNotes': [],
+        'emergencyContacts': [],
+      },
+    });
+
+    expect(share.displayTitle, '沖繩家族旅行');
+    expect(share.sharedBy, 'Ray');
+    expect(share.destinationsLabel, '那霸 · 名護');
+    expect(share.dateRange, '2026-10-01');
+    expect(share.days.single.timeline.single.title, '首里城公園');
+    expect(share.notes.flights.single.flightNo, 'BR112');
+  });
 }

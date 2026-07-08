@@ -44,6 +44,7 @@
 | ChatScreen | ChatPage（request queue 第一波） | `GET /requests?tripId=...`、`POST /requests`、`GET /requests/:id` |
 | GlobalMapScreen | GlobalMapPage（trip-bound resolver 第一波） | `GET /my-trips` + `GET /trips/:id/days?all=1` |
 | CollabScreen / InviteScreen | CollabPage / InvitePage（共編邀請第一波） | `GET/POST/PATCH/DELETE /permissions`、`GET /invitations?tripId=...`、`POST /invitations/revoke`、`GET /invitations?token=...`、`POST /invitations/accept` |
+| PublicShareScreen | TripSharePage（公開分享第一波） | shell 外 `/s/:token`；`GET /share/:token` 無需登入讀公開行程、`POST /share/:token/clone` 需登入複製到自己的行程 |
 | FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen | PoiFavoritesPage / ExplorePage / AddPoiFavoriteToTripPage | `GET /poi-favorites`、`GET /poi-search`、`POST /pois/find-or-create`、`POST/DELETE /poi-favorites`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/days/:num/entries`、`POST /trips/:id/recompute-travel` |
 | AddEntryScreen | AddEntryPage / AddStopPage / AddCustomStopPage（新增景點 slice） | `GET /trips/:id/days?all=1`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/days/:num/entries`、`POST /poi-favorites/:id/add-to-trip`、`POST /trips/:id/recompute-travel` |
 | EditEntryScreen | EditEntryPage（時間/描述/刪除 + 備選管理 slice） | `GET/PATCH/DELETE /trips/:id/entries/:entryId`、`DELETE /trips/:id/entries/:entryId/alternates/:poiId`、`PATCH /trips/:id/entries/:entryId/alternates/reorder`、`POST /trips/:id/recompute-travel` |
@@ -51,7 +52,7 @@
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
 P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/匯出/分享連結管理；TripTimelineScreen 已補 focus entry deep link、今日自動定位、scroll-spy active day、行程切換 dropdown、overflow actions（編輯/AI 健檢/共編/分享連結）、離線 banner 與缺/stale segment day-scoped 背景 recompute；TripMapScreen 已補 `stop/:entryId/map` focus route、overview pin → day 切換、pin-card selected sync、day route polyline、圖層切換與裝置定位；AccountScreen 已補 displayName inline edit、外觀/通知設定與登入裝置 sessions 第一波；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
-P2：公開分享頁/列印/PDF、settings connected apps / developer apps、OAuth 生態、離線快取。
+P2：公開分享頁第一波已完成；列印/PDF、settings connected apps / developer apps、OAuth 生態、離線快取仍待補。
 
 ## 目錄結構
 
@@ -71,6 +72,7 @@ lib/
   features/chat/            # ChatScreen
   features/collab/          # CollabScreen
   features/invite/          # InviteScreen
+  features/share/           # PublicShareScreen
   features/map/             # GlobalMapScreen
   features/trips/           # TripsListScreen + TripFormScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen / TripHealthScreen + trip scope providers

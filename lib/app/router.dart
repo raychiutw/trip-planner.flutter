@@ -22,6 +22,7 @@ import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
+import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/add_entry_screen.dart';
 import '../features/trip_detail/change_poi_screen.dart';
@@ -54,9 +55,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      final isPublicRoute = _publicShellOutsideRoutes.contains(
-        state.matchedLocation,
-      );
+      final isPublicRoute = _isPublicShellOutsideRoute(state);
       if (!isLoggedIn && !isPublicRoute) return '/login';
       if (isLoggedIn && isOnLogin) return '/trips';
       return null;
@@ -95,6 +94,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/invite',
         builder: (context, state) =>
             InviteScreen(token: state.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/s/:token',
+        builder: (context, state) =>
+            PublicShareScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -378,3 +382,11 @@ const _publicShellOutsideRoutes = {
   '/auth/password/reset',
   '/auth/verify-email',
 };
+
+bool _isPublicShellOutsideRoute(GoRouterState state) {
+  if (_publicShellOutsideRoutes.contains(state.matchedLocation)) {
+    return true;
+  }
+  final pathSegments = state.uri.pathSegments;
+  return pathSegments.length == 2 && pathSegments.first == 's';
+}
