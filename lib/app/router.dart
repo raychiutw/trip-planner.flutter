@@ -20,6 +20,7 @@ import '../features/trip_detail/add_entry_screen.dart';
 import '../features/trip_detail/change_poi_screen.dart';
 import '../features/trip_detail/edit_entry_screen.dart';
 import '../features/trip_detail/entry_action_screen.dart';
+import '../features/trip_detail/trip_health_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
@@ -102,6 +103,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'notes',
                         builder: (context, state) => TripNotesScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'health',
+                        builder: (context, state) => TripHealthScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),

@@ -74,6 +74,31 @@ helper：`isInflight` = `open` 或 `processing`；`isCompleted` = `completed`；
 
 `items: List<TripRequest>`、`hasMore: bool`。repository 也相容 legacy array response,會包成 `TripRequestPage(hasMore: false)`。
 
+## health.dart
+
+### TripHealthReport — `GET/POST /trips/:id/health-check`
+
+AI 行程健檢最新報告。GET 回 wrapper `{report}`，其中 `report` 可為 `null`；POST 正常回 pending report。wire format 是 camelCase，日期時間仍保留字串。
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `tripId` | `String` | 所屬行程 |
+| `userId` | `String` | 觸發健檢的使用者 id |
+| `status` | `String` | `pending` / `completed` / `failed` |
+| `requestId` | `int?` | 對應 `trip_requests.id` |
+| `findings` | `List<TripHealthFinding>` | 缺漏 → `[]` |
+| `errorMessage` | `String?` | failed 狀態顯示用 |
+| `createdAt` | `String` | datetime 字串；缺漏時預設 `''` |
+| `completedAt` | `String?` | datetime 字串 |
+
+helper：`isPending`、`isCompleted`、`isFailed`、`severityCount(severity)`、`findingsForSeverity(severity)`。
+
+### TripHealthFinding / TripHealthActionTarget
+
+`TripHealthFinding` 欄位：`severity: String`（high/medium/low）、`title: String`、`description: String`、`dimension: String?`（timing/distance/meals/sights/hotel）、`suggestion: String?`、`actionTarget: TripHealthActionTarget?`。helper `severityLabel`、`severityHeading`、`dimensionLabel` 回 zh-TW 顯示文案。
+
+`TripHealthActionTarget` 欄位：`day: int?`、`entryId: int?`。parser 同時相容 camelCase `entryId` 與舊 snake_case `entry_id`。
+
 ## collab.dart
 
 ### TripPermission — `GET /permissions?tripId=...`

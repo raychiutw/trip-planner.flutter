@@ -4,6 +4,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/models/health.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/trip.dart';
@@ -77,6 +78,77 @@ void main() {
 
     expect(tripDetail.id, 'okinawa-trip-2026-Ray');
     expect(tripDetail.destinations.single.name, '那霸');
+  });
+
+  test('fetchTripHealthReport：GET /health-check 解析 wrapper report', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/health-check',
+      (server) => server.reply(200, {
+        'report': {
+          'tripId': 'okinawa-trip-2026-Ray',
+          'userId': 'user-1',
+          'status': 'completed',
+          'requestId': 88,
+          'findings': [
+            {
+              'severity': 'medium',
+              'dimension': 'meals',
+              'title': '晚餐間隔過長',
+              'description': 'Day 2 晚餐安排偏晚。',
+              'suggestion': '補一個下午茶。',
+              'actionTarget': {'day': 2},
+            },
+          ],
+          'createdAt': '2026-07-08T10:00:00Z',
+          'completedAt': '2026-07-08T10:05:00Z',
+        },
+      }),
+    );
+
+    final report = await tripRepository.fetchTripHealthReport(
+      'okinawa-trip-2026-Ray',
+    );
+
+    expect(report, isA<TripHealthReport>());
+    expect(report!.isCompleted, isTrue);
+    expect(report.findings.single.dimensionLabel, '餐飲');
+  });
+
+  test('fetchTripHealthReport：GET /health-check report null', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/health-check',
+      (server) => server.reply(200, {'report': null}),
+    );
+
+    final report = await tripRepository.fetchTripHealthReport(
+      'okinawa-trip-2026-Ray',
+    );
+
+    expect(report, isNull);
+  });
+
+  test('startTripHealthCheck：POST /health-check 回 pending report', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa-trip-2026-Ray/health-check',
+      (server) => server.reply(202, {
+        'report': {
+          'tripId': 'okinawa-trip-2026-Ray',
+          'userId': 'user-1',
+          'status': 'pending',
+          'requestId': 99,
+          'findings': [],
+          'createdAt': '2026-07-08T10:00:00Z',
+        },
+      }),
+      data: <String, dynamic>{},
+    );
+
+    final report = await tripRepository.startTripHealthCheck(
+      'okinawa-trip-2026-Ray',
+    );
+
+    expect(report.isPending, isTrue);
+    expect(report.requestId, 99);
   });
 
   test('fetchTripRequests：GET /requests 帶 tripId、limit、sort', () async {

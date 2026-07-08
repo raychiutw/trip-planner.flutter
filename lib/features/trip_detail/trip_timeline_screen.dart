@@ -51,6 +51,11 @@ class TripTimelineScreen extends ConsumerWidget {
             onPressed: () => _goTo(context, '/trips/$tripId/notes'),
           ),
           IconButton(
+            tooltip: 'AI 健檢',
+            icon: const Icon(Icons.health_and_safety_outlined),
+            onPressed: () => _goTo(context, '/trips/$tripId/health'),
+          ),
+          IconButton(
             tooltip: '共編',
             icon: const Icon(Icons.group_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/collab'),

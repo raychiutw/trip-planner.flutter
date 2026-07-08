@@ -22,12 +22,14 @@ import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
+import 'package:tripline/features/trip_detail/trip_health_screen.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/chat.dart';
 import 'package:tripline/models/collab.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/health.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/trip.dart';
@@ -93,6 +95,19 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   );
   when(() => mockTripRepository.fetchDays(any())).thenAnswer(
     (_) async => const [TripDay(id: 11, dayNum: 2, title: '那霸', version: 1)],
+  );
+  when(
+    () => mockTripRepository.fetchTripHealthReport(any()),
+  ).thenAnswer((_) async => null);
+  when(() => mockTripRepository.startTripHealthCheck(any())).thenAnswer(
+    (_) async => const TripHealthReport(
+      tripId: 'trip-1',
+      userId: 'user-1',
+      status: 'pending',
+      requestId: 99,
+      findings: [],
+      createdAt: '2026-07-08T10:00:00Z',
+    ),
   );
   when(() => mockTripRepository.fetchEntry(any(), any())).thenAnswer(
     (_) async => const TimelineEntry(
@@ -270,6 +285,26 @@ void main() {
 
     expect(find.byType(CollabScreen), findsOneWidget);
     expect(find.text('共編設定'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/health 進入 AI 健檢頁', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/health');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.text('AI 健檢'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

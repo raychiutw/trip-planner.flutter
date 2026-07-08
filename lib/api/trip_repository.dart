@@ -5,6 +5,7 @@ import '../models/day.dart';
 import '../models/entry.dart';
 import '../models/chat.dart';
 import '../models/collab.dart';
+import '../models/health.dart';
 import '../models/notes.dart';
 import '../models/poi.dart';
 import '../models/trip.dart';
@@ -39,6 +40,29 @@ class TripRepository {
   Future<Trip> fetchTrip(String id) async {
     final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
     return Trip.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /trips/:id/health-check，讀取最新 AI 健檢報告。
+  Future<TripHealthReport?> fetchTripHealthReport(String tripId) async {
+    final responseBody = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/health-check',
+    );
+    final reportJson = (responseBody as Map<String, dynamic>)['report'];
+    if (reportJson == null) return null;
+    return TripHealthReport.fromJson(reportJson as Map<String, dynamic>);
+  }
+
+  /// POST /trips/:id/health-check，觸發新一輪 AI 健檢。
+  Future<TripHealthReport> startTripHealthCheck(String tripId) async {
+    final responseBody = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/health-check',
+      body: <String, dynamic>{},
+    );
+    final reportJson = (responseBody as Map<String, dynamic>)['report'];
+    if (reportJson is! Map<String, dynamic>) {
+      throw StateError('health-check response missing report');
+    }
+    return TripHealthReport.fromJson(reportJson);
   }
 
   /// GET /permissions?tripId=...，讀取行程成員與角色。

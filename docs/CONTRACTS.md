@@ -32,7 +32,7 @@ abstract final class AppTheme {
 }
 ```
 
-## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, notes.dart, user.dart）
+## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, health.dart, notes.dart, user.dart）
 
 ```dart
 // trip.dart
@@ -78,6 +78,20 @@ class TripRequest {
   bool get isInflight; bool get isCompleted; bool get isFailed; String? get displayReply;
 }
 class TripRequestPage { final List<TripRequest> items; final bool hasMore; }
+
+// health.dart
+class TripHealthActionTarget { final int? day; final int? entryId; }
+class TripHealthFinding {
+  final String severity; final String title; final String description;
+  final String? dimension; final String? suggestion; final TripHealthActionTarget? actionTarget;
+  String get severityLabel; String get severityHeading; String get dimensionLabel;
+}
+class TripHealthReport {
+  final String tripId; final String userId; final String status; final int? requestId;
+  final List<TripHealthFinding> findings; final String? errorMessage; final String createdAt; final String? completedAt;
+  bool get isPending; bool get isCompleted; bool get isFailed;
+  int severityCount(String severity); List<TripHealthFinding> findingsForSeverity(String severity);
+}
 
 // collab.dart
 class TripPermission {
@@ -161,6 +175,8 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();          // GET /my-trips
   Future<List<Trip>> fetchTrips();                   // GET /trips
   Future<Trip> fetchTrip(String id);                 // GET /trips/:id
+  Future<TripHealthReport?> fetchTripHealthReport(String tripId); // GET /trips/:id/health-check
+  Future<TripHealthReport> startTripHealthCheck(String tripId); // POST /trips/:id/health-check
   Future<List<TripPermission>> fetchTripPermissions(String tripId); // GET /permissions?tripId=...
   Future<PendingInvitationPage> fetchPendingInvitations(String tripId); // GET /invitations?tripId=...
   Future<PermissionInviteResult> createTripPermissionInvite({
@@ -322,7 +338,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // shell 外：/login（LoginScreen）、/invite（InviteScreen；允許未登入公開預覽）
-// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
+// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // redirect：未登入(authState data null) 且非 /login 或 /invite → /login；已登入在 /login → /trips
 
@@ -352,6 +368,7 @@ class EntryActionScreen extends ConsumerStatefulWidget; // features/trip_detail/
 class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
 class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
+class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 ```
 

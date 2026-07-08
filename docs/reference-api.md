@@ -115,6 +115,8 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();              // GET /my-trips
   Future<List<Trip>>        fetchTrips();                // GET /trips(published 清單)
   Future<Trip>              fetchTrip(String id);        // GET /trips/:id
+  Future<TripHealthReport?> fetchTripHealthReport(String tripId); // GET /trips/:id/health-check
+  Future<TripHealthReport>  startTripHealthCheck(String tripId); // POST /trips/:id/health-check
   Future<List<TripPermission>> fetchTripPermissions(String tripId); // GET /permissions?tripId=...
   Future<PendingInvitationPage> fetchPendingInvitations(String tripId); // GET /invitations?tripId=...
   Future<PermissionInviteResult> createTripPermissionInvite({
@@ -276,6 +278,7 @@ class TripRepository {
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`updateTripPermissionRole`、`deleteTripPermission`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 與 `updateTripPermissionRole` 只允許 `member` / `viewer`（預設/ fallback `member`）,client 會 trim/lowercase invitation email；owner role 不可由 Flutter 變更或移除,後端也會拒絕。
 `fetchTripRequests` / `createTripRequest` / `fetchTripRequest` 對應 web ChatPage 的 AI request queue。`fetchTripRequests` 預設讀 active trip 最新 5 筆且支援後端 paginated shape `{items, hasMore}`；若後端回 legacy array,repository 會包成 `TripRequestPage(hasMore: false)`。`ChatScreen` 第一波使用 polling `GET /requests/:id` 取代 web SSE。
+`fetchTripHealthReport` / `startTripHealthCheck` 對應 web `TripHealthCheckPage`。GET 解析 wrapper `{report}` 並允許 `report: null`;POST 送空 body 觸發後端建立 health-check request,回 pending `TripHealthReport`。`TripHealthScreen` 第一波用 `GET /trips/:id/health-check` 每 3 秒 polling report terminal state；若後端回 `TRIP_EMPTY`,畫面顯示 persistent error。
 `createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。
