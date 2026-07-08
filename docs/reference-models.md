@@ -348,6 +348,12 @@ class TripNotes {
 
 `tripCount: int`、`totalDays: int`、`collaboratorCount: int` — 全部缺漏預設 `0`。
 
+### AccountSessionsPage / AccountSession — `GET /account/sessions`
+
+`AccountSessionsPage` 欄位：`currentSid: String?`、`sessions: List<AccountSession>`。後端目前用 raw JSON 回 snake_case `current_sid` 與 `sessions`,parser 也相容 camelCase。
+
+`AccountSession` 欄位：`sid: String`、`uaSummary: String?`、`ipHashPrefix: String?`、`createdAt: String`、`lastSeenAt: String`、`isCurrent: bool`。wire key 同時相容 `ua_summary`/`uaSummary`、`ip_hash_prefix`/`ipHashPrefix`、`created_at`/`createdAt`、`last_seen_at`/`lastSeenAt`、`is_current`/`isCurrent`。`ipHashPrefix` 只用於辨識,不顯示完整 IP。
+
 ## 相關文件
 
 - [API 層參考](reference-api.md) — 哪個 repository 方法回哪個 model

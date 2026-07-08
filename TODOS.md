@@ -25,7 +25,7 @@
 ## P2
 
 - [ ] 公開分享頁/列印/PDF(`/s/:token`,`/trips/:id/print`;JSON 匯出已完成)
-- [ ] 設定子頁後續：sessions、connected apps、developer apps、OAuth consent（外觀/通知第一波已完成）
+- [ ] 設定子頁後續：connected apps、developer apps、OAuth consent（外觀/通知與登入裝置 sessions 第一波已完成）
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
 - [ ] 離線快取
 

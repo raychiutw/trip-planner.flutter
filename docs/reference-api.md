@@ -293,6 +293,9 @@ class TripRepository {
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
+  Future<AccountSessionsPage> fetchAccountSessions();    // GET /account/sessions
+  Future<int>               revokeOtherAccountSessions(); // DELETE /account/sessions
+  Future<void>              revokeAccountSession(String sid); // DELETE /account/sessions/:sid
   Future<List<PoiFavorite>> fetchPoiFavorites();         // GET /poi-favorites
   Future<List<PoiSearchResult>> searchPois({required String query, String? region, int limit = 20}); // GET /poi-search
   Future<int>               findOrCreatePoi(PoiSearchResult poi); // POST /pois/find-or-create
@@ -328,6 +331,7 @@ class TripRepository {
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
+`fetchAccountSessions` 對齊 web `SessionsPage`,讀取 raw snake_case response `{current_sid, sessions}`；`AccountSession` parser 同時相容 camelCase 以便未來後端調整。`revokeOtherAccountSessions` 會 DELETE `/account/sessions` 並回傳 `revoked` 數量；`revokeAccountSession` DELETE 指定 sid,路徑以 `Uri.encodeComponent` 編碼。
 `fetchMyTrips` 解析 `/my-trips` rich summary rows,包含 owner/role/countries/start/end/updated/member/archive 欄位。`TripsListScreen` 以這份資料在 client 端做分類 tabs、搜尋與排序；「最新編輯」保留 API 回傳順序。
 共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`updateTripPermissionRole`、`deleteTripPermission`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 與 `updateTripPermissionRole` 只允許 `member` / `viewer`（預設/ fallback `member`）,client 會 trim/lowercase invitation email；owner role 不可由 Flutter 變更或移除,後端也會拒絕。
 分享連結管理由 `fetchTripShares`、`createTripShare`、`updateTripShare`、`rotateTripShare`、`revokeTripShare`、`deleteTripShare` 覆蓋。`createTripShare` / `rotateTripShare` 才會回 raw token/url；list 不會拿到既有網址。`visibleSections` 會經 `share.dart` allowlist 正規化,預設公開航班/住宿/行前須知,預訂與緊急聯絡預設關閉。

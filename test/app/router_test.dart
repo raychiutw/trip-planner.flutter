@@ -10,6 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
+import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_settings_screens.dart';
 import 'package:tripline/features/auth/email_verify_pending_screen.dart';
 import 'package:tripline/features/auth/forgot_password_screen.dart';
@@ -173,6 +174,9 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(
     mockTripRepository.fetchPoiFavorites,
   ).thenAnswer((_) async => const <PoiFavorite>[]);
+  when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
+    (_) async => const AccountSessionsPage(currentSid: null, sessions: []),
+  );
 
   final container = ProviderContainer(
     overrides: [
@@ -476,6 +480,11 @@ void main() {
     expect(find.byType(NotificationSettingsScreen), findsOneWidget);
     expect(find.text('通知'), findsOneWidget);
 
+    router.go('/account/sessions');
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
+    expect(find.text('登入裝置'), findsOneWidget);
+
     router.go('/settings/appearance');
     await tester.pumpAndSettle();
     expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
@@ -483,6 +492,10 @@ void main() {
     router.go('/settings/notifications');
     await tester.pumpAndSettle();
     expect(find.byType(NotificationSettingsScreen), findsOneWidget);
+
+    router.go('/settings/sessions');
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
   });
 
   testWidgets('已登入時 /explore 進入 ExploreScreen', (tester) async {

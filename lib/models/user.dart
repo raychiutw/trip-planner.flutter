@@ -1,4 +1,4 @@
-/// 使用者 models（`GET /oauth/userinfo`、`GET /account/stats`）。
+/// 使用者 models（`GET /oauth/userinfo`、`GET /account/stats`、sessions）。
 library;
 
 /// `GET /oauth/userinfo` 回應。
@@ -52,4 +52,81 @@ class AccountStats {
       collaboratorCount: (json['collaboratorCount'] as num?)?.toInt() ?? 0,
     );
   }
+}
+
+/// `GET /account/sessions` 回應 wrapper。
+class AccountSessionsPage {
+  const AccountSessionsPage({required this.currentSid, required this.sessions});
+
+  /// 後端標示的目前 session id，未登入或 cookie 無 sid 時可能為 null。
+  final String? currentSid;
+
+  /// 目前帳號可見的登入裝置清單。
+  final List<AccountSession> sessions;
+
+  factory AccountSessionsPage.fromJson(Map<String, dynamic> json) {
+    final rawSessions = json['sessions'];
+    return AccountSessionsPage(
+      currentSid: _stringFromAnyKey(json, 'current_sid', 'currentSid'),
+      sessions: rawSessions is List<dynamic>
+          ? rawSessions
+                .whereType<Map>()
+                .map(
+                  (sessionJson) => AccountSession.fromJson(
+                    Map<String, dynamic>.from(sessionJson),
+                  ),
+                )
+                .toList()
+          : const <AccountSession>[],
+    );
+  }
+}
+
+/// 登入中的單一裝置/session row。
+class AccountSession {
+  const AccountSession({
+    required this.sid,
+    this.uaSummary,
+    this.ipHashPrefix,
+    required this.createdAt,
+    required this.lastSeenAt,
+    required this.isCurrent,
+  });
+
+  /// Opaque session id。
+  final String sid;
+
+  /// 後端整理過的 User-Agent 摘要。
+  final String? uaSummary;
+
+  /// IP hash prefix，只用於辨識，不顯示完整 IP。
+  final String? ipHashPrefix;
+
+  final String createdAt;
+  final String lastSeenAt;
+  final bool isCurrent;
+
+  factory AccountSession.fromJson(Map<String, dynamic> json) {
+    return AccountSession(
+      sid: json['sid'] as String,
+      uaSummary: _stringFromAnyKey(json, 'ua_summary', 'uaSummary'),
+      ipHashPrefix: _stringFromAnyKey(json, 'ip_hash_prefix', 'ipHashPrefix'),
+      createdAt: _stringFromAnyKey(json, 'created_at', 'createdAt') ?? '',
+      lastSeenAt: _stringFromAnyKey(json, 'last_seen_at', 'lastSeenAt') ?? '',
+      isCurrent:
+          json['is_current'] == true ||
+          json['is_current'] == 1 ||
+          json['isCurrent'] == true ||
+          json['isCurrent'] == 1,
+    );
+  }
+}
+
+String? _stringFromAnyKey(
+  Map<String, dynamic> json,
+  String key,
+  String fallbackKey,
+) {
+  final value = json[key] ?? json[fallbackKey];
+  return value is String && value.trim().isNotEmpty ? value : null;
 }

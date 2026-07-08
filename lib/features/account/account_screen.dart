@@ -470,7 +470,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：外觀與通知子頁入口。
+/// 設定群組：外觀、通知與登入裝置子頁入口。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
@@ -510,6 +510,16 @@ class _SettingsGroup extends StatelessWidget {
                 icon: Icons.notifications_outlined,
                 title: '通知',
                 onTap: () => context.go('/account/notifications'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              _SettingsNavigationRow(
+                icon: Icons.devices_outlined,
+                title: '登入裝置',
+                onTap: () => context.go('/account/sessions'),
               ),
             ],
           ),

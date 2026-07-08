@@ -138,6 +138,8 @@ class TripNoteAiGenerationJob { final int jobId; final int requestId; final Stri
 // user.dart
 class UserInfo { final String id; final String email; final bool emailVerified; final String? displayName; final String? avatarUrl; }
 class AccountStats { /* 欄位以 web repo functions/api/account/stats.ts 實際輸出（camelCase 化）為準，實作前先讀該檔 */ }
+class AccountSessionsPage { final String? currentSid; final List<AccountSession> sessions; } // GET /account/sessions
+class AccountSession { final String sid; final String? uaSummary; final String? ipHashPrefix; final String createdAt; final String lastSeenAt; final bool isCurrent; }
 ```
 
 ## lib/api/
@@ -347,6 +349,9 @@ class TripRepository {
   Future<void> deleteTrip(String id);
   Future<AccountStats> fetchStats();                 // GET /account/stats
   Future<UserInfo> updateProfile({String? displayName}); // PATCH /account/profile
+  Future<AccountSessionsPage> fetchAccountSessions(); // GET /account/sessions
+  Future<int> revokeOtherAccountSessions();          // DELETE /account/sessions
+  Future<void> revokeAccountSession(String sid);     // DELETE /account/sessions/:sid
   Future<void> createEntryFromPoiSearchResult({
     required String tripId,
     required int dayNum,
@@ -424,6 +429,7 @@ class TripMapContent extends ConsumerWidget;           // features/trip_detail/t
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
+class AccountSessionsScreen extends ConsumerStatefulWidget; // features/account/account_sessions_screen.dart
 class AppearanceSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 class NotificationSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 ```

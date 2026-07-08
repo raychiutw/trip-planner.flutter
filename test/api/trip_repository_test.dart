@@ -1596,6 +1596,68 @@ void main() {
     expect(updatedUser.displayName, '新名字');
   });
 
+  test('fetchAccountSessions：GET /account/sessions 解析登入裝置', () async {
+    dioAdapter.onGet(
+      '/account/sessions',
+      (server) => server.reply(200, {
+        'current_sid': 'sid-current',
+        'sessions': [
+          {
+            'sid': 'sid-current',
+            'ua_summary': 'Chrome on Windows',
+            'ip_hash_prefix': 'a1b2c3',
+            'created_at': '2026-07-01T10:00:00Z',
+            'last_seen_at': '2026-07-08T09:30:00Z',
+            'is_current': true,
+          },
+          {
+            'sid': 'sid-phone',
+            'ua_summary': 'Safari on iPhone',
+            'created_at': '2026-07-02T10:00:00Z',
+            'last_seen_at': '2026-07-08T08:00:00Z',
+            'is_current': false,
+          },
+        ],
+      }),
+    );
+
+    final page = await tripRepository.fetchAccountSessions();
+
+    expect(page.currentSid, 'sid-current');
+    expect(page.sessions, hasLength(2));
+    expect(page.sessions.first.sid, 'sid-current');
+    expect(page.sessions.first.uaSummary, 'Chrome on Windows');
+    expect(page.sessions.first.ipHashPrefix, 'a1b2c3');
+    expect(page.sessions.first.isCurrent, isTrue);
+    expect(page.sessions.last.isCurrent, isFalse);
+  });
+
+  test(
+    'revokeOtherAccountSessions：DELETE /account/sessions 回 revoked 數量',
+    () async {
+      dioAdapter.onDelete(
+        '/account/sessions',
+        (server) => server.reply(200, {'ok': true, 'revoked': 2}),
+      );
+
+      final revoked = await tripRepository.revokeOtherAccountSessions();
+
+      expect(revoked, 2);
+    },
+  );
+
+  test('revokeAccountSession：DELETE /account/sessions/:sid', () async {
+    dioAdapter.onDelete(
+      '/account/sessions/sid-phone',
+      (server) => server.reply(200, {'ok': true, 'revoked_sid': 'sid-phone'}),
+    );
+
+    await expectLater(
+      tripRepository.revokeAccountSession('sid-phone'),
+      completes,
+    );
+  });
+
   test('fetchPoiFavorites：GET /poi-favorites 解析收藏清單', () async {
     dioAdapter.onGet(
       '/poi-favorites',

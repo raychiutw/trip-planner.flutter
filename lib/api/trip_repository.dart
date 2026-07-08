@@ -959,6 +959,26 @@ class TripRepository {
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// GET /account/sessions，列出目前帳號登入裝置。
+  Future<AccountSessionsPage> fetchAccountSessions() async {
+    final responseBody = await _client.get('/account/sessions');
+    return AccountSessionsPage.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /account/sessions，登出其他裝置並回傳撤銷數量。
+  Future<int> revokeOtherAccountSessions() async {
+    final responseBody = await _client.delete('/account/sessions');
+    if (responseBody is Map<String, dynamic>) {
+      return (responseBody['revoked'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
+  /// DELETE /account/sessions/:sid，登出指定裝置。
+  Future<void> revokeAccountSession(String sid) {
+    return _client.delete('/account/sessions/${Uri.encodeComponent(sid)}');
+  }
+
   /// GET /poi-favorites。
   Future<List<PoiFavorite>> fetchPoiFavorites() async {
     final responseBody = await _client.get('/poi-favorites');

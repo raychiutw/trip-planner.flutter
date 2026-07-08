@@ -186,13 +186,14 @@ void main() {
     expect(find.text('無法更新顯示名稱'), findsOneWidget);
   });
 
-  testWidgets('外觀與通知 rows 顯示 chevron 且可導航', (tester) async {
+  testWidgets('設定 rows 顯示 chevron 且可導航', (tester) async {
     await pumpAccountScreen(tester);
 
     expect(find.text('外觀'), findsOneWidget);
     expect(find.text('通知'), findsOneWidget);
+    expect(find.text('登入裝置'), findsOneWidget);
     expect(find.text('即將推出'), findsNothing);
-    expect(find.byIcon(Icons.chevron_right), findsNWidgets(2));
+    expect(find.byIcon(Icons.chevron_right), findsNWidgets(3));
 
     final appearanceTile = tester.widget<ListTile>(
       find.widgetWithText(ListTile, '外觀'),
@@ -200,8 +201,12 @@ void main() {
     final notificationsTile = tester.widget<ListTile>(
       find.widgetWithText(ListTile, '通知'),
     );
+    final sessionsTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '登入裝置'),
+    );
     expect(appearanceTile.enabled, isTrue);
     expect(notificationsTile.enabled, isTrue);
+    expect(sessionsTile.enabled, isTrue);
   });
 
   testWidgets('點登出 row 出現確認對話框，確認後呼叫 logout', (tester) async {

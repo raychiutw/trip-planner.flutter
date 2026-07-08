@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
+import '../features/account/account_sessions_screen.dart';
 import '../features/account/account_screen.dart';
 import '../features/account/account_settings_screens.dart';
 import '../features/auth/email_verify_pending_screen.dart';
@@ -300,6 +301,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) =>
                         const NotificationSettingsScreen(),
                   ),
+                  GoRoute(
+                    path: 'sessions',
+                    builder: (context, state) => const AccountSessionsScreen(),
+                  ),
                 ],
               ),
               GoRoute(
@@ -309,6 +314,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/settings/notifications',
                 builder: (context, state) => const NotificationSettingsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/sessions',
+                builder: (context, state) => const AccountSessionsScreen(),
               ),
             ],
           ),
