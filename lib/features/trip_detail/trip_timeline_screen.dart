@@ -315,7 +315,7 @@ class _DaySection extends ConsumerWidget {
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
           itemCount: timeline.length,
-          onReorderItem: (oldIndex, newIndex) =>
+          onReorder: (oldIndex, newIndex) =>
               _reorder(context, ref, oldIndex, newIndex),
           itemBuilder: (context, i) {
             final entry = timeline[i];

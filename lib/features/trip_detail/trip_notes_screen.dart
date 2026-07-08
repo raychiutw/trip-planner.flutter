@@ -275,7 +275,7 @@ class _NotesSection extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               buildDefaultDragHandles: false,
               itemCount: rows.length,
-              onReorderItem: (oldIndex, newIndex) =>
+              onReorder: (oldIndex, newIndex) =>
                   _reorder(context, ref, oldIndex, newIndex),
               itemBuilder: (context, i) => _NoteRowTile(
                 key: ValueKey('note-row-${section.name}-${rows[i].id}'),

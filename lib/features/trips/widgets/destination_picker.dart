@@ -130,7 +130,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
           ReorderableListView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            onReorderItem: widget.onReorder, // newIndex 已調整
+            onReorder: widget.onReorder, // newIndex 已調整
             children: [
               for (var i = 0; i < dests.length; i++)
                 ListTile(
