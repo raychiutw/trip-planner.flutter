@@ -8,6 +8,7 @@ import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/health.dart';
 import 'package:tripline/models/notes.dart';
+import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/trip.dart';
 
@@ -1966,5 +1967,104 @@ void main() {
       tripRepository.recomputeTravel('okinawa-trip-2026', dayNum: 2),
       completes,
     );
+  });
+
+  test(
+    'fetchConnectedApps：GET /account/connected-apps 解析 apps wrapper',
+    () async {
+      dioAdapter.onGet(
+        '/account/connected-apps',
+        (server) => server.reply(200, {
+          'apps': [
+            {
+              'client_id': 'tp_alpha',
+              'app_name': 'Alpha App',
+              'app_description': '同步工具',
+              'homepage_url': 'https://alpha.example.com',
+              'status': 'active',
+              'scopes': ['openid', 'email'],
+              'granted_at': 1783500000000,
+            },
+          ],
+        }),
+      );
+
+      final apps = await tripRepository.fetchConnectedApps();
+
+      expect(apps.single.clientId, 'tp_alpha');
+      expect(apps.single.appName, 'Alpha App');
+      expect(apps.single.scopes, ['openid', 'email']);
+    },
+  );
+
+  test('revokeConnectedApp：DELETE /account/connected-apps/:clientId', () async {
+    dioAdapter.onDelete(
+      '/account/connected-apps/tp_alpha',
+      (server) =>
+          server.reply(200, {'ok': true, 'revoked_client_id': 'tp_alpha'}),
+    );
+
+    await expectLater(tripRepository.revokeConnectedApp('tp_alpha'), completes);
+  });
+
+  test('fetchDeveloperApps：GET /dev/apps 解析 developer apps wrapper', () async {
+    dioAdapter.onGet(
+      '/dev/apps',
+      (server) => server.reply(200, {
+        'apps': [
+          {
+            'client_id': 'tp_dev',
+            'client_type': 'public',
+            'app_name': 'Dev App',
+            'app_description': null,
+            'homepage_url': 'https://dev.example.com',
+            'redirect_uris': ['https://dev.example.com/callback'],
+            'allowed_scopes': ['openid', 'profile'],
+            'status': 'pending_review',
+            'created_at': '2026-07-08T10:00:00Z',
+            'updated_at': '2026-07-08T10:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    final apps = await tripRepository.fetchDeveloperApps();
+
+    expect(apps.single, isA<DeveloperApp>());
+    expect(apps.single.clientId, 'tp_dev');
+    expect(apps.single.statusLabel, '待審核');
+  });
+
+  test('createDeveloperApp：POST /dev/apps 建立 OAuth app', () async {
+    dioAdapter.onPost(
+      '/dev/apps',
+      (server) => server.reply(201, {
+        'client_id': 'tp_new',
+        'client_secret': null,
+        'app_name': 'New App',
+        'client_type': 'public',
+        'status': 'pending_review',
+        'redirect_uris': ['https://new.example.com/callback'],
+        'allowed_scopes': ['openid', 'email'],
+      }),
+      data: {
+        'app_name': 'New App',
+        'client_type': 'public',
+        'redirect_uris': ['https://new.example.com/callback'],
+        'allowed_scopes': ['openid', 'email'],
+        'app_description': null,
+        'homepage_url': null,
+      },
+    );
+
+    final created = await tripRepository.createDeveloperApp(
+      appName: ' New App ',
+      clientType: 'public',
+      redirectUris: const ['https://new.example.com/callback'],
+      allowedScopes: const ['openid', 'email'],
+    );
+
+    expect(created.clientId, 'tp_new');
+    expect(created.clientSecret, isNull);
   });
 }

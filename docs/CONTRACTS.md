@@ -32,7 +32,7 @@ abstract final class AppTheme {
 }
 ```
 
-## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, health.dart, share.dart, notes.dart, user.dart）
+## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, collab.dart, health.dart, share.dart, notes.dart, oauth.dart, user.dart）
 
 ```dart
 // trip.dart
@@ -142,6 +142,13 @@ class TripEmergencyContact { name, relationship, phone, email — String; final 
 class TripNotes { final List<TripFlight> flights; final List<TripLodging> lodgings; final List<TripReservation> reservations; final List<TripPretripNote> pretripNotes; final List<TripEmergencyContact> emergencyContacts; }
 class TripNoteAiGenerationJob { final int jobId; final int requestId; final String status; final String tripId; final String docType; }
 
+// oauth.dart
+class ConnectedApp { final String clientId; final String appName; final String? appLogoUrl; final String? appDescription; final String? homepageUrl; final String status; final List<String> scopes; final int grantedAt; String get statusLabel; }
+class DeveloperApp { final String clientId; final String clientType; final String appName; final String? appDescription; final String? homepageUrl; final List<String> redirectUris; final List<String> allowedScopes; final String status; final String createdAt; final String updatedAt; String get statusLabel; String get clientTypeLabel; }
+class CreatedDeveloperApp { final String clientId; final String? clientSecret; final String appName; final String clientType; final String status; final List<String> redirectUris; final List<String> allowedScopes; String get statusLabel; }
+class OAuthConsentRequest { final String clientId; final String redirectUri; final String scope; final String state; final String responseType; final String? codeChallenge; final String? codeChallengeMethod; List<String> get requestedScopes; bool get hasPlausibleRedirectUri; bool get isComplete; Map<String, dynamic> toBody(String decision); }
+class OAuthConsentResult { final int statusCode; final String? redirectLocation; }
+
 // user.dart
 class UserInfo { final String id; final String email; final bool emailVerified; final String? displayName; final String? avatarUrl; }
 class AccountStats { /* 欄位以 web repo functions/api/account/stats.ts 實際輸出（camelCase 化）為準，實作前先讀該檔 */ }
@@ -178,8 +185,10 @@ class ApiClient {
   Future<dynamic> put(String path, {Object? body});
   Future<dynamic> patch(String path, {Object? body});
   Future<dynamic> delete(String path);
+  Future<ApiRedirectResponse> postForRedirect(String path, {Map<String, dynamic>? query, Object? body});
   Dio get dio; // 供 auth repository 讀 set-cookie 用
 }
+class ApiRedirectResponse { final int statusCode; final String? location; }
 
 // auth_repository.dart
 class AuthRepository {
@@ -191,6 +200,7 @@ class AuthRepository {
   Future<AuthMessageResult> resetPassword({required String token, required String password}); // POST /oauth/reset-password
   Future<void> verifyEmail(String token); // POST /oauth/verify；user gesture 後才呼叫
   Future<AuthMessageResult> sendVerificationEmail(String email); // POST /oauth/send-verification
+  Future<OAuthConsentResult> submitOAuthConsent(OAuthConsentRequest request, {required String decision}); // POST /oauth/consent，保留 302 Location
   Future<void> logout();          // POST /oauth/logout（忽略失敗）+ store.clear()
   Future<UserInfo?> currentUser(); // GET /oauth/userinfo；401 → null（不 throw）
 }
@@ -361,6 +371,10 @@ class TripRepository {
   Future<AccountSessionsPage> fetchAccountSessions(); // GET /account/sessions
   Future<int> revokeOtherAccountSessions();          // DELETE /account/sessions
   Future<void> revokeAccountSession(String sid);     // DELETE /account/sessions/:sid
+  Future<List<ConnectedApp>> fetchConnectedApps();   // GET /account/connected-apps
+  Future<void> revokeConnectedApp(String clientId);  // DELETE /account/connected-apps/:clientId
+  Future<List<DeveloperApp>> fetchDeveloperApps();   // GET /dev/apps
+  Future<CreatedDeveloperApp> createDeveloperApp({required String appName, String clientType = 'public', required List<String> redirectUris, List<String> allowedScopes = const ['openid', 'profile', 'email'], String? appDescription, String? homepageUrl}); // POST /dev/apps
   Future<void> createEntryFromPoiSearchResult({
     required String tripId,
     required int dayNum,
@@ -399,9 +413,10 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
-// shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）、/s/:token（PublicShareScreen；允許未登入公開瀏覽）
+// shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/oauth/consent（OAuthConsentScreen；公開保留 query）、/invite（InviteScreen；允許未登入公開預覽）、/s/:token（PublicShareScreen；允許未登入公開瀏覽）
 // trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/stop/:entryId/map（TripMapScreen focus route）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/print（TripPrintScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
+// account branch 子路由：/account/appearance、/account/notifications、/account/connected-apps、/account/sessions；settings alias 同步；secondary route：/developer/apps、/developer/apps/new
 // redirect：未登入(authState data null) 且非 public shell 外 route → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart
@@ -422,6 +437,7 @@ class EmailVerifyPendingScreen extends ConsumerStatefulWidget; // features/auth/
 class ForgotPasswordScreen extends ConsumerStatefulWidget; // features/auth/forgot_password_screen.dart
 class ResetPasswordScreen extends ConsumerStatefulWidget; // features/auth/reset_password_screen.dart（接受 token?）
 class VerifyEmailScreen extends ConsumerStatefulWidget; // features/auth/verify_email_screen.dart（接受 token?）
+class OAuthConsentScreen extends ConsumerStatefulWidget; // features/auth/oauth_consent_screen.dart（接受 OAuthConsentRequest）
 class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_screen.dart
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
@@ -443,6 +459,9 @@ class TripPrintData;                                   // features/trip_detail/t
 abstract class TripPrintActions;                       // features/trip_detail/trip_pdf_service.dart（測試可替換列印/PDF action）
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 class AccountSessionsScreen extends ConsumerStatefulWidget; // features/account/account_sessions_screen.dart
+class ConnectedAppsScreen extends ConsumerStatefulWidget; // features/account/connected_apps_screen.dart
+class DeveloperAppsScreen extends ConsumerWidget;      // features/account/developer_apps_screen.dart
+class DeveloperAppNewScreen extends ConsumerStatefulWidget; // features/account/developer_apps_screen.dart
 class AppearanceSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 class NotificationSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart
 ```

@@ -191,9 +191,11 @@ void main() {
 
     expect(find.text('外觀'), findsOneWidget);
     expect(find.text('通知'), findsOneWidget);
+    expect(find.text('已連結的應用程式'), findsOneWidget);
+    expect(find.text('開發者選項'), findsOneWidget);
     expect(find.text('登入裝置'), findsOneWidget);
     expect(find.text('即將推出'), findsNothing);
-    expect(find.byIcon(Icons.chevron_right), findsNWidgets(3));
+    expect(find.byIcon(Icons.chevron_right), findsNWidgets(5));
 
     final appearanceTile = tester.widget<ListTile>(
       find.widgetWithText(ListTile, '外觀'),
@@ -201,11 +203,19 @@ void main() {
     final notificationsTile = tester.widget<ListTile>(
       find.widgetWithText(ListTile, '通知'),
     );
+    final connectedAppsTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '已連結的應用程式'),
+    );
+    final developerTile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, '開發者選項'),
+    );
     final sessionsTile = tester.widget<ListTile>(
       find.widgetWithText(ListTile, '登入裝置'),
     );
     expect(appearanceTile.enabled, isTrue);
     expect(notificationsTile.enabled, isTrue);
+    expect(connectedAppsTile.enabled, isTrue);
+    expect(developerTile.enabled, isTrue);
     expect(sessionsTile.enabled, isTrue);
   });
 

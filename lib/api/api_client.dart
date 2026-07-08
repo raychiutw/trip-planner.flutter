@@ -11,6 +11,14 @@ import 'session_store.dart';
 /// CSRF Origin allowlist 要求的正式站 origin。
 const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
 
+/// Redirect-style API response where callers need the `Location` header.
+class ApiRedirectResponse {
+  const ApiRedirectResponse({required this.statusCode, required this.location});
+
+  final int statusCode;
+  final String? location;
+}
+
 /// Tripline API client，base = `<origin>/api`。
 class ApiClient {
   ApiClient({
@@ -49,6 +57,28 @@ class ApiClient {
 
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
+  Future<ApiRedirectResponse> postForRedirect(
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
+    final response = await _request(
+      'POST',
+      path,
+      query: query,
+      body: body,
+      followRedirects: false,
+    );
+    final statusCode = response.statusCode ?? 0;
+    if (statusCode < 200 || statusCode >= 400) {
+      throw ApiError.fromResponse(statusCode, response.data);
+    }
+    return ApiRedirectResponse(
+      statusCode: statusCode,
+      location: response.headers.value('location'),
+    );
+  }
+
   /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
   static int parseRetryAfterSeconds(String? headerValue) {
     const maxWaitSeconds = 30;
@@ -77,23 +107,7 @@ class ApiClient {
     Object? body,
     bool isRetryAttempt = false,
   }) async {
-    final requestHeaders = <String, dynamic>{};
-    final sessionToken = await _sessionStore.read();
-    if (sessionToken != null && sessionToken.isNotEmpty) {
-      requestHeaders['Cookie'] = 'tripline_session=$sessionToken';
-    }
-    final isMutation = method != 'GET' && method != 'HEAD';
-    if (isMutation) {
-      // cookie 認證的 mutating request 必帶 Origin（後端 CSRF 檢查）
-      requestHeaders['Origin'] = _origin;
-    }
-
-    final response = await _dio.request<dynamic>(
-      path,
-      queryParameters: query,
-      data: body,
-      options: Options(method: method, headers: requestHeaders),
-    );
+    final response = await _request(method, path, query: query, body: body);
 
     final statusCode = response.statusCode ?? 0;
     if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
@@ -119,5 +133,35 @@ class ApiClient {
       return null;
     }
     return responseData;
+  }
+
+  Future<Response<dynamic>> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+    bool followRedirects = true,
+  }) async {
+    final requestHeaders = <String, dynamic>{};
+    final sessionToken = await _sessionStore.read();
+    if (sessionToken != null && sessionToken.isNotEmpty) {
+      requestHeaders['Cookie'] = 'tripline_session=$sessionToken';
+    }
+    final isMutation = method != 'GET' && method != 'HEAD';
+    if (isMutation) {
+      // cookie 認證的 mutating request 必帶 Origin（後端 CSRF 檢查）
+      requestHeaders['Origin'] = _origin;
+    }
+
+    return _dio.request<dynamic>(
+      path,
+      queryParameters: query,
+      data: body,
+      options: Options(
+        method: method,
+        headers: requestHeaders,
+        followRedirects: followRedirects,
+      ),
+    );
   }
 }

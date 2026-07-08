@@ -7,11 +7,14 @@ import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
 import '../features/account/account_sessions_screen.dart';
+import '../features/account/connected_apps_screen.dart';
+import '../features/account/developer_apps_screen.dart';
 import '../features/account/account_screen.dart';
 import '../features/account/account_settings_screens.dart';
 import '../features/auth/email_verify_pending_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/oauth_consent_screen.dart';
 import '../features/auth/reset_password_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/verify_email_screen.dart';
@@ -34,6 +37,7 @@ import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_print_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
 import '../models/poi.dart';
+import '../models/oauth.dart';
 import '../features/trips/trip_form_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 
@@ -90,6 +94,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/auth/verify-email',
         builder: (context, state) =>
             VerifyEmailScreen(token: state.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/oauth/consent',
+        builder: (context, state) =>
+            OAuthConsentScreen(request: OAuthConsentRequest.fromUri(state.uri)),
       ),
       GoRoute(
         path: '/invite',
@@ -313,6 +322,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         const NotificationSettingsScreen(),
                   ),
                   GoRoute(
+                    path: 'connected-apps',
+                    builder: (context, state) => const ConnectedAppsScreen(),
+                  ),
+                  GoRoute(
                     path: 'sessions',
                     builder: (context, state) => const AccountSessionsScreen(),
                   ),
@@ -327,8 +340,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const NotificationSettingsScreen(),
               ),
               GoRoute(
+                path: '/settings/connected-apps',
+                builder: (context, state) => const ConnectedAppsScreen(),
+              ),
+              GoRoute(
                 path: '/settings/sessions',
                 builder: (context, state) => const AccountSessionsScreen(),
+              ),
+              GoRoute(
+                path: '/developer/apps',
+                builder: (context, state) => const DeveloperAppsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    builder: (context, state) => const DeveloperAppNewScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -388,6 +415,7 @@ const _publicShellOutsideRoutes = {
   '/login/forgot',
   '/auth/password/reset',
   '/auth/verify-email',
+  '/oauth/consent',
 };
 
 bool _isPublicShellOutsideRoute(GoRouterState state) {

@@ -12,6 +12,7 @@
 | `/login/forgot` | `ForgotPasswordScreen` | **shell 外**；忘記密碼 generic reset request |
 | `/auth/password/reset?token=...` | `ResetPasswordScreen` | **shell 外**；重設密碼 |
 | `/auth/verify-email?token=...` | `VerifyEmailScreen` | **shell 外**；按鈕觸發 email verification POST |
+| `/oauth/consent?client_id=...` | `OAuthConsentScreen` | **shell 外**；公開 OAuth 授權請求頁,提交後保留 302 `Location` |
 | `/invite?token=...` | `InviteScreen` | **shell 外**；公開邀請預覽,未登入可進入 |
 | `/s/:token` | `PublicShareScreen` | **shell 外**；公開分享頁,未登入可瀏覽,登入後可複製行程 |
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
@@ -40,10 +41,14 @@
 | `/account` | `AccountScreen` | tab 5；profile、displayName inline 編輯、統計與登出 |
 | `/account/appearance` | `AppearanceSettingsScreen` | tab 5 子路由；切換 ThemeMode |
 | `/account/notifications` | `NotificationSettingsScreen` | tab 5 子路由；本機通知偏好 |
+| `/account/connected-apps` | `ConnectedAppsScreen` | tab 5 子路由；列出/撤銷已授權 OAuth apps |
 | `/account/sessions` | `AccountSessionsScreen` | tab 5 子路由；登入裝置清單、單一登出與登出其他裝置 |
 | `/settings/appearance` | `AppearanceSettingsScreen` | tab 5 alias |
 | `/settings/notifications` | `NotificationSettingsScreen` | tab 5 alias |
+| `/settings/connected-apps` | `ConnectedAppsScreen` | tab 5 alias |
 | `/settings/sessions` | `AccountSessionsScreen` | tab 5 alias |
+| `/developer/apps` | `DeveloperAppsScreen` | tab 5 secondary route；developer OAuth apps 清單 |
+| `/developer/apps/new` | `DeveloperAppNewScreen` | tab 5 secondary route；建立 OAuth client app |
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 
@@ -67,10 +72,10 @@ redirect: (context, state) {
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
 2. 未登入 + 不在公開 shell 外 route → 踢去 `/login`。
-3. 未登入可留在 `/invite` 看公開邀請預覽,可進 `/s/:token` 看公開分享頁,也可走 signup/forgot/reset/verify auth 補齊流程；真正接受邀請或複製公開行程仍需登入。
+3. 未登入可留在 `/invite` 看公開邀請預覽,可進 `/s/:token` 看公開分享頁,可進 `/oauth/consent` 保留授權 query,也可走 signup/forgot/reset/verify auth 補齊流程；真正接受邀請、複製公開行程或送出 consent 仍需有效 session。
 4. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
 
-公開 shell 外 routes 目前是:`/login`、`/invite`、`/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email` 與 `/s/*`。
+公開 shell 外 routes 目前是:`/login`、`/invite`、`/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email`、`/oauth/consent` 與 `/s/*`。
 
 ## auth 變化 → redirect 重算的橋接
 

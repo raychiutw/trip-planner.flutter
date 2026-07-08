@@ -11,10 +11,13 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
+import 'package:tripline/features/account/connected_apps_screen.dart';
+import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/features/account/account_settings_screens.dart';
 import 'package:tripline/features/auth/email_verify_pending_screen.dart';
 import 'package:tripline/features/auth/forgot_password_screen.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/auth/reset_password_screen.dart';
 import 'package:tripline/features/auth/signup_screen.dart';
 import 'package:tripline/features/auth/verify_email_screen.dart';
@@ -42,6 +45,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/health.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/notes.dart';
+import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
@@ -184,6 +188,12 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
     (_) async => const AccountSessionsPage(currentSid: null, sessions: []),
   );
+  when(
+    () => mockTripRepository.fetchConnectedApps(),
+  ).thenAnswer((_) async => const <ConnectedApp>[]);
+  when(
+    () => mockTripRepository.fetchDeveloperApps(),
+  ).thenAnswer((_) async => const <DeveloperApp>[]);
   when(() => mockTripRepository.fetchPublicTripShare(any())).thenAnswer(
     (_) async => const PublicTripShare(
       name: 'okinawa-trip-2026',
@@ -539,6 +549,21 @@ void main() {
     expect(find.byType(AccountSessionsScreen), findsOneWidget);
     expect(find.text('登入裝置'), findsOneWidget);
 
+    router.go('/account/connected-apps');
+    await tester.pumpAndSettle();
+    expect(find.byType(ConnectedAppsScreen), findsOneWidget);
+    expect(find.text('已連結的應用程式'), findsOneWidget);
+
+    router.go('/developer/apps');
+    await tester.pumpAndSettle();
+    expect(find.byType(DeveloperAppsScreen), findsOneWidget);
+    expect(find.text('開發者應用'), findsOneWidget);
+
+    router.go('/developer/apps/new');
+    await tester.pumpAndSettle();
+    expect(find.byType(DeveloperAppNewScreen), findsOneWidget);
+    expect(find.text('新增 OAuth 應用'), findsOneWidget);
+
     router.go('/settings/appearance');
     await tester.pumpAndSettle();
     expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
@@ -550,6 +575,34 @@ void main() {
     router.go('/settings/sessions');
     await tester.pumpAndSettle();
     expect(find.byType(AccountSessionsScreen), findsOneWidget);
+
+    router.go('/settings/connected-apps');
+    await tester.pumpAndSettle();
+    expect(find.byType(ConnectedAppsScreen), findsOneWidget);
+  });
+
+  testWidgets('未登入時 /oauth/consent 可保留 query 進入授權頁', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go(
+          '/oauth/consent?client_id=tp_alpha&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&scope=openid%20email&state=abc123&response_type=code',
+        );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OAuthConsentScreen), findsOneWidget);
+    expect(find.text('未知應用程式 (client_id=tp_alpha)'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
   });
 
   testWidgets('已登入時 /explore 進入 ExploreScreen', (tester) async {

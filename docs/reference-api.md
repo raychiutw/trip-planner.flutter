@@ -21,6 +21,7 @@ class ApiClient {
   Future<dynamic> put(String path, {Object? body});
   Future<dynamic> patch(String path, {Object? body});
   Future<dynamic> delete(String path);
+  Future<ApiRedirectResponse> postForRedirect(String path, {Map<String, dynamic>? query, Object? body});
 
   Dio get dio;  // 供 AuthRepository 直接讀 response headers(set-cookie)
 
@@ -35,6 +36,7 @@ class ApiClient {
 3. **錯誤轉換** — 非 2xx 一律 throw [`ApiError`](#apierrorapi_errordart)。dio 的 `validateStatus` 設為全收,狀態碼判斷集中在 `_send()`。
 4. **429 retry** — 僅限 `GET`:讀 `Retry-After` header 等待後重試**一次**;mutation(POST/PUT/PATCH/DELETE)**絕不重試**(避免重複寫入)。
 5. **204 / 空 body → `null`** — 不要對回傳值假設一定有 JSON。
+6. **Redirect response** — `postForRedirect()` 用於 OAuth consent 類型 endpoint；不跟隨 302,接受 2xx/3xx 並回 `statusCode` 與 `Location` header。
 
 ### `parseRetryAfterSeconds`
 
@@ -98,6 +100,7 @@ class AuthRepository {
   Future<AuthMessageResult> resetPassword({required String token, required String password});
   Future<void> verifyEmail(String token);
   Future<AuthMessageResult> sendVerificationEmail(String email);
+  Future<OAuthConsentResult> submitOAuthConsent(OAuthConsentRequest request, {required String decision});
   Future<void> logout();
   Future<UserInfo?> currentUser();
 }
@@ -111,6 +114,7 @@ class AuthRepository {
 | `resetPassword` | `POST /oauth/reset-password`；成功後不建立 session,使用者需回登入頁 |
 | `verifyEmail` | `POST /oauth/verify`；Flutter 畫面要求 user gesture 後才送 token,避免 email security scanner 消耗 token |
 | `sendVerificationEmail` | `POST /oauth/send-verification`；用於 signup 後 best-effort 寄送與 check-email 頁手動重寄 |
+| `submitOAuthConsent` | `POST /oauth/consent`；body 由 `OAuthConsentRequest.toBody(decision)` 產生,用 `ApiClient.postForRedirect()` 保留後端 302 `Location` |
 | `logout` | `POST /oauth/logout`(**失敗忽略**,server 端登出失敗不影響本機)+ `store.clear()`(必執行,在 `finally`) |
 | `currentUser` | `GET /oauth/userinfo`;**401 回 `null` 不 throw**(未登入是正常狀態),其他錯誤 rethrow |
 
@@ -298,6 +302,17 @@ class TripRepository {
   Future<AccountSessionsPage> fetchAccountSessions();    // GET /account/sessions
   Future<int>               revokeOtherAccountSessions(); // DELETE /account/sessions
   Future<void>              revokeAccountSession(String sid); // DELETE /account/sessions/:sid
+  Future<List<ConnectedApp>> fetchConnectedApps();        // GET /account/connected-apps
+  Future<void>              revokeConnectedApp(String clientId); // DELETE /account/connected-apps/:clientId
+  Future<List<DeveloperApp>> fetchDeveloperApps();        // GET /dev/apps
+  Future<CreatedDeveloperApp> createDeveloperApp({
+    required String appName,
+    String clientType = 'public',
+    required List<String> redirectUris,
+    List<String> allowedScopes = const ['openid', 'profile', 'email'],
+    String? appDescription,
+    String? homepageUrl,
+  }); // POST /dev/apps
   Future<List<PoiFavorite>> fetchPoiFavorites();         // GET /poi-favorites
   Future<List<PoiSearchResult>> searchPois({required String query, String? region, int limit = 20}); // GET /poi-search
   Future<int>               findOrCreatePoi(PoiSearchResult poi); // POST /pois/find-or-create
@@ -334,6 +349,7 @@ class TripRepository {
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `fetchAccountSessions` 對齊 web `SessionsPage`,讀取 raw snake_case response `{current_sid, sessions}`；`AccountSession` parser 同時相容 camelCase 以便未來後端調整。`revokeOtherAccountSessions` 會 DELETE `/account/sessions` 並回傳 `revoked` 數量；`revokeAccountSession` DELETE 指定 sid,路徑以 `Uri.encodeComponent` 編碼。
+`fetchConnectedApps` / `revokeConnectedApp` 對齊 web `ConnectedAppsPage`,讀取 `{apps}` wrapper 並撤銷指定 OAuth client 的 consent/access/refresh token。`fetchDeveloperApps` / `createDeveloperApp` 對齊 web developer dashboard；建立 app 時 client 只允許 user-self-service scopes `openid`、`profile`、`email`、`offline_access`,confidential client 的 `clientSecret` 只在建立回應出現一次。
 `fetchMyTrips` 解析 `/my-trips` rich summary rows,包含 owner/role/countries/start/end/updated/member/archive 欄位。`TripsListScreen` 以這份資料在 client 端做分類 tabs、搜尋與排序；「最新編輯」保留 API 回傳順序。
 共編/邀請第一波由 `fetchTripPermissions`、`fetchPendingInvitations`、`createTripPermissionInvite`、`revokeTripInvitation`、`updateTripPermissionRole`、`deleteTripPermission`、`fetchInvitation`、`acceptInvitation` 覆蓋。`createTripPermissionInvite` 與 `updateTripPermissionRole` 只允許 `member` / `viewer`（預設/ fallback `member`）,client 會 trim/lowercase invitation email；owner role 不可由 Flutter 變更或移除,後端也會拒絕。
 分享連結管理由 `fetchTripShares`、`createTripShare`、`updateTripShare`、`rotateTripShare`、`revokeTripShare`、`deleteTripShare` 覆蓋。`createTripShare` / `rotateTripShare` 才會回 raw token/url；list 不會拿到既有網址。`visibleSections` 會經 `share.dart` allowlist 正規化,預設公開航班/住宿/行前須知,預訂與緊急聯絡預設關閉。公開分享頁另由 `fetchPublicTripShare` 讀 `GET /share/:token`（無需登入）並解析 `PublicTripShare`;登入使用者可用 `clonePublicTripShare` 呼叫 `POST /share/:token/clone`,成功回新 `tripId`。

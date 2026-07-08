@@ -6,6 +6,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/models/auth.dart';
+import 'package:tripline/models/oauth.dart';
 
 void main() {
   late Dio dio;
@@ -272,6 +273,51 @@ void main() {
       await expectLater(
         authRepository.currentUser(),
         throwsA(isA<ApiError>().having((error) => error.status, 'status', 500)),
+      );
+    });
+  });
+
+  group('oauth consent', () {
+    test('submitOAuthConsent 打 POST /oauth/consent 並保留 302 Location', () async {
+      final request = OAuthConsentRequest.fromUri(
+        Uri.parse(
+          'https://trip.example/oauth/consent?client_id=tp_alpha'
+          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
+          '&scope=openid%20email'
+          '&state=abc123'
+          '&response_type=code',
+        ),
+      );
+      dioAdapter.onPost(
+        '/oauth/consent',
+        (server) => server.reply(
+          302,
+          '',
+          headers: {
+            'location': [
+              '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
+            ],
+          },
+        ),
+        data: {
+          'client_id': 'tp_alpha',
+          'redirect_uri': 'https://app.example.com/callback',
+          'scope': 'openid email',
+          'state': 'abc123',
+          'response_type': 'code',
+          'decision': 'allow',
+        },
+      );
+
+      final result = await authRepository.submitOAuthConsent(
+        request,
+        decision: 'allow',
+      );
+
+      expect(result.statusCode, 302);
+      expect(
+        result.redirectLocation,
+        '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
       );
     });
   });

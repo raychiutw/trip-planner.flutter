@@ -339,6 +339,26 @@ class TripNotes {
 
 `POST /oauth/forgot-password`、`POST /oauth/reset-password`、`POST /oauth/send-verification` 共用 `{ok, message}` shape:`ok: bool`、`message: String`。
 
+## oauth.dart
+
+### ConnectedApp — `GET /account/connected-apps`
+
+使用者已授權的 OAuth client app。parser 同時相容 snake_case 與 camelCase：`clientId`、`appName`、`appLogoUrl?`、`appDescription?`、`homepageUrl?`、`status`、`scopes: List<String>`、`grantedAt: int`。`statusLabel` 會把 `active` / `pending_review` / `disabled` / `revoked` 轉成 zh-TW 顯示文案。
+
+### DeveloperApp / CreatedDeveloperApp — `GET/POST /dev/apps`
+
+`DeveloperApp` 欄位：`clientId`、`clientType`（`public` / `confidential`）、`appName`、`appDescription?`、`homepageUrl?`、`redirectUris`、`allowedScopes`、`status`、`createdAt`、`updatedAt`。`redirectUris` / `allowedScopes` 可解析 JSON string 或 list。
+
+`CreatedDeveloperApp` 是建立成功的一次性回應：`clientId`、`clientSecret?`、`appName`、`clientType`、`status`、`redirectUris`、`allowedScopes`。`clientSecret` 只有 confidential client 會回傳,且只在 POST response 出現一次。
+
+### OAuthConsentRequest / OAuthConsentResult — `/oauth/consent`
+
+`OAuthConsentRequest.fromUri(uri)` 從 query 還原 `client_id`、`redirect_uri`、`scope`、`state`、`response_type`、`code_challenge?`、`code_challenge_method?`。helper：`requestedScopes` 以空白切 scope；`hasPlausibleRedirectUri` 只做 client-side `http`/`https` 格式檢查；`toBody(decision)` 產生 `POST /oauth/consent` body。
+
+`OAuthConsentResult` 保存 `statusCode` 與 `redirectLocation`。Flutter 不自動開啟 external redirect；畫面會顯示後端回傳的 `Location`。
+
+`kDeveloperAllowedScopes` = `openid` / `profile` / `email` / `offline_access`。`oauthScopeLabel(scope)` 對齊 web consent 文案,未知 scope 直接顯示原字串。
+
 ## user.dart
 
 ### UserInfo — `GET /oauth/userinfo` 回應

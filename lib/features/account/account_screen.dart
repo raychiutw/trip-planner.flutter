@@ -517,6 +517,26 @@ class _SettingsGroup extends StatelessWidget {
                 color: theme.colorScheme.outlineVariant,
               ),
               _SettingsNavigationRow(
+                icon: Icons.extension_outlined,
+                title: '已連結的應用程式',
+                onTap: () => context.go('/account/connected-apps'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              _SettingsNavigationRow(
+                icon: Icons.code_outlined,
+                title: '開發者選項',
+                onTap: () => context.go('/developer/apps'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              _SettingsNavigationRow(
                 icon: Icons.devices_outlined,
                 title: '登入裝置',
                 onTap: () => context.go('/account/sessions'),

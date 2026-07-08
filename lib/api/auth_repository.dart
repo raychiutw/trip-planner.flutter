@@ -4,6 +4,7 @@ library;
 import 'package:dio/dio.dart';
 
 import '../models/auth.dart';
+import '../models/oauth.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'api_error.dart';
@@ -144,6 +145,21 @@ class AuthRepository {
       if (apiError.status == 401) return null;
       rethrow;
     }
+  }
+
+  /// POST /oauth/consent；後端以 302 Location 表示後續 authorize/deny 目的地。
+  Future<OAuthConsentResult> submitOAuthConsent(
+    OAuthConsentRequest request, {
+    required String decision,
+  }) async {
+    final response = await _client.postForRedirect(
+      '/oauth/consent',
+      body: request.toBody(decision),
+    );
+    return OAuthConsentResult(
+      statusCode: response.statusCode,
+      redirectLocation: response.location,
+    );
   }
 
   Future<void> _writeSessionCookie(Response<dynamic> response) async {
