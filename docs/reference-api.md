@@ -386,6 +386,8 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 
 Trip detail scope 目前包含 `tripDetailProvider`、`tripDaysProvider`、`tripSegmentsProvider`、`entryDetailProvider` 與 `tripNotesProvider`。`TripTimelineScreen` 另以 `timelineTripSwitcherProvider` 讀 `/my-trips` 供 AppBar 行程切換 dropdown 使用。時間軸以 `tripSegmentsProvider` 覆蓋 legacy `TimelineEntry.travel`,segments 載入失敗時保留 days payload fallback 並顯示 persistent banner；segments 成功載入後若發現有座標的缺 row 或 `computedAt == null` stale row，會用 per-trip signature 防重並以 day scope 背景呼叫 `recomputeTravel`，成功後刷新 days/segments。
 
+`TripPrintScreen` 使用 `tripPrintDataProvider(tripId)` 平行讀取 `fetchTrip`、`fetchDays` 與 `fetchNotes`。notes 屬列印文件的附加資料，載入失敗時 fallback `TripNotes()`，避免航班/住宿等 notes 暫時錯誤阻斷主行程列印。平台列印與分享 PDF 透過 `tripPrintActionsProvider` 注入，正式環境由 `PrintingTripPrintActions` 使用 `pdf` / `printing` 套件產生文件。
+
 ## 相關文件
 
 - [架構說明](explanation-architecture.md) — 認證與 CSRF 設計的「為什麼」

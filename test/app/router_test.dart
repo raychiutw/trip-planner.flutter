@@ -32,6 +32,7 @@ import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
 import 'package:tripline/features/trip_detail/trip_health_screen.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
+import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/chat.dart';
@@ -40,6 +41,7 @@ import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/health.dart';
 import 'package:tripline/main.dart';
+import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/poi.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
@@ -149,6 +151,9 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       ),
     ],
   );
+  when(
+    () => mockTripRepository.fetchNotes(any()),
+  ).thenAnswer((_) async => const TripNotes());
   when(
     () => mockTripRepository.fetchTripHealthReport(any()),
   ).thenAnswer((_) async => null);
@@ -369,6 +374,26 @@ void main() {
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
     expect(find.text('AI 健檢'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/print 進入列印預覽頁', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/print');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripPrintScreen), findsOneWidget);
+    expect(find.text('列印預覽'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

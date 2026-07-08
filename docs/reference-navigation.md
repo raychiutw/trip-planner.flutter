@@ -17,12 +17,13 @@
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**)；行程清單分類/搜尋/排序、JSON 匯入/匯出、分享連結管理與卡片 action menu |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
-| `/trips/:tripId?focus=<entryId>` | `TripTimelineScreen` | tab 2 子路由；timeline + travel segments edit + AppBar 行程切換與 overflow 編輯/AI 健檢/共編/分享；`focus` query 會初載捲到指定 entry |
+| `/trips/:tripId?focus=<entryId>` | `TripTimelineScreen` | tab 2 子路由；timeline + travel segments edit + AppBar 行程切換與 overflow 編輯/AI 健檢/列印 PDF/共編/分享；`focus` query 會初載捲到指定 entry |
 | `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料與行程天數管理 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/stop/:entryId/map` | `TripMapScreen` | tab 2 孫路由；初載切到 entry 所在 day 並聚焦 pin |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由；5 區 notes CRUD + 行前須知/緊急聯絡 AI generate |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由；AI health-check report、severity 分組與 pending polling |
+| `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由；列印預覽、平台列印與分享 PDF |
 | `/trips/:tripId/collab` | `CollabScreen` | tab 2 孫路由；成員/待邀請、新增/撤回 pending invitation、非 owner 成員 role update/remove |
 | `/trips/:tripId/add-entry?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites/custom slice |
 | `/trips/:tripId/add-stop?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；相容入口 |

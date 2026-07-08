@@ -400,7 +400,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // shell 外：/login（LoginScreen）、/signup（SignupScreen）、/signup/check-email（EmailVerifyPendingScreen）、/login/forgot（ForgotPasswordScreen）、/auth/password/reset（ResetPasswordScreen）、/auth/verify-email（VerifyEmailScreen）、/invite（InviteScreen；允許未登入公開預覽）、/s/:token（PublicShareScreen；允許未登入公開瀏覽）
-// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/stop/:entryId/map（TripMapScreen focus route）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
+// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/stop/:entryId/map（TripMapScreen focus route）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/health（TripHealthScreen）、/trips/:tripId/print（TripPrintScreen）、/trips/:tripId/collab（CollabScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // redirect：未登入(authState data null) 且非 public shell 外 route → /login；已登入在 /login → /trips
 
@@ -438,6 +438,9 @@ class TripMapScreen extends ConsumerWidget;            // features/trip_detail/t
 class TripMapContent extends ConsumerWidget;           // features/trip_detail/trip_map_screen.dart（可嵌入地圖內容）
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class TripHealthScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_health_screen.dart
+class TripPrintScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_print_screen.dart（列印預覽 + 平台列印/PDF 分享）
+class TripPrintData;                                   // features/trip_detail/trip_print_data.dart（trip + days + notes 聚合文件資料）
+abstract class TripPrintActions;                       // features/trip_detail/trip_pdf_service.dart（測試可替換列印/PDF action）
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 class AccountSessionsScreen extends ConsumerStatefulWidget; // features/account/account_sessions_screen.dart
 class AppearanceSettingsScreen extends ConsumerWidget; // features/account/account_settings_screens.dart

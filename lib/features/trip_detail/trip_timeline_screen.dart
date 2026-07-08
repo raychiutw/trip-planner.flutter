@@ -18,7 +18,7 @@ import 'widgets/hotel_card.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_pill.dart';
 
-enum _TimelineOverflowAction { edit, health, collab, share }
+enum _TimelineOverflowAction { edit, health, print, collab, share }
 
 final timelineOnlineProvider = StreamProvider<bool>((ref) async* {
   final connectivity = Connectivity();
@@ -157,6 +157,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   _goTo(context, '/trips/$tripId/edit');
                 case _TimelineOverflowAction.health:
                   _goTo(context, '/trips/$tripId/health');
+                case _TimelineOverflowAction.print:
+                  _goTo(context, '/trips/$tripId/print');
                 case _TimelineOverflowAction.collab:
                   _goTo(context, '/trips/$tripId/collab');
                 case _TimelineOverflowAction.share:
@@ -190,6 +192,15 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 child: ListTile(
                   leading: Icon(Icons.health_and_safety_outlined),
                   title: Text('AI 健檢'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('timeline-overflow-print'),
+                value: _TimelineOverflowAction.print,
+                child: ListTile(
+                  leading: Icon(Icons.print_outlined),
+                  title: Text('列印/PDF'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),

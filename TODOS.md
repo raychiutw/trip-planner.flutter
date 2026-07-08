@@ -25,7 +25,7 @@
 ## P2
 
 - [x] 公開分享頁第一波(`/s/:token`;未登入可讀公開 payload,登入後可 clone)(**Completed:** feature/favorites-explore)
-- [ ] 列印/PDF(`/trips/:id/print`;JSON 匯出已完成)
+- [x] 列印/PDF 第一波(`/trips/:id/print`;預覽 + 平台列印 + 分享 PDF,JSON 匯出已完成)(**Completed:** feature/favorites-explore)
 - [ ] 設定子頁後續：connected apps、developer apps、OAuth consent（外觀/通知與登入裝置 sessions 第一波已完成）
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
 - [ ] 離線快取

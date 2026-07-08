@@ -223,6 +223,11 @@ Future<void> _pumpTimeline(
                 const Scaffold(body: Text('health-page')),
           ),
           GoRoute(
+            path: 'print',
+            builder: (context, state) =>
+                const Scaffold(body: Text('print-page')),
+          ),
+          GoRoute(
             path: 'collab',
             builder: (context, state) =>
                 const Scaffold(body: Text('collab-page')),
@@ -328,6 +333,10 @@ void main() {
       find.byKey(const ValueKey('timeline-overflow-share')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('timeline-overflow-print')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('timeline-overflow-health')));
     await tester.pumpAndSettle();
@@ -344,6 +353,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('edit-trip-page'), findsOneWidget);
+  });
+
+  testWidgets('AppBar overflow menu 可進入列印/PDF 預覽', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('timeline-overflow-print')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('print-page'), findsOneWidget);
   });
 
   testWidgets('AppBar overflow menu 可開啟分享連結管理', (tester) async {

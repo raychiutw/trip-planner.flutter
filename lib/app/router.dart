@@ -31,6 +31,7 @@ import '../features/trip_detail/entry_action_screen.dart';
 import '../features/trip_detail/trip_health_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
+import '../features/trip_detail/trip_print_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
 import '../models/poi.dart';
 import '../features/trips/trip_form_screen.dart';
@@ -152,6 +153,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'health',
                         builder: (context, state) => TripHealthScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'print',
+                        builder: (context, state) => TripPrintScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),
