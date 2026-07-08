@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
 import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
@@ -57,8 +58,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/chat',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: '聊天'),
+                builder: (context, state) => const ChatScreen(),
               ),
             ],
           ),

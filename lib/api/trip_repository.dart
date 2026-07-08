@@ -3,6 +3,7 @@ library;
 
 import '../models/day.dart';
 import '../models/entry.dart';
+import '../models/chat.dart';
 import '../models/notes.dart';
 import '../models/poi.dart';
 import '../models/trip.dart';
@@ -37,6 +38,58 @@ class TripRepository {
   Future<Trip> fetchTrip(String id) async {
     final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
     return Trip.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /requests?tripId=...，讀取 AI request queue。
+  Future<TripRequestPage> fetchTripRequests({
+    required String tripId,
+    int limit = 5,
+    String sort = 'desc',
+    String? before,
+    int? beforeId,
+  }) async {
+    final responseBody = await _client.get(
+      '/requests',
+      query: {
+        'tripId': tripId,
+        'limit': '$limit',
+        'sort': sort == 'asc' ? 'asc' : 'desc',
+        if (before != null && before.isNotEmpty) 'before': before,
+        if (beforeId != null) 'beforeId': '$beforeId',
+      },
+    );
+    if (responseBody is List<dynamic>) {
+      return TripRequestPage(
+        items: responseBody
+            .map(
+              (itemJson) =>
+                  TripRequest.fromJson(itemJson as Map<String, dynamic>),
+            )
+            .toList(),
+        hasMore: false,
+      );
+    }
+    return TripRequestPage.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /requests，建立 AI request。
+  Future<TripRequest> createTripRequest({
+    required String tripId,
+    required String message,
+  }) async {
+    final responseBody = await _client.post(
+      '/requests',
+      body: {'tripId': tripId, 'message': message.trim()},
+    );
+    return TripRequest.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /requests/:id，取得 request 最新狀態與 reply。
+  Future<TripRequest> fetchTripRequest(int id) async {
+    final responseBody = await _client.get(
+      '/requests/${Uri.encodeComponent('$id')}',
+    );
+    return TripRequest.fromJson(responseBody as Map<String, dynamic>);
   }
 
   /// POST /trips，建立行程、days、owner permission 與文件 stub。

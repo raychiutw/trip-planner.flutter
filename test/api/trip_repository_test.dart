@@ -78,6 +78,78 @@ void main() {
     expect(tripDetail.destinations.single.name, '那霸');
   });
 
+  test('fetchTripRequests：GET /requests 帶 tripId、limit、sort', () async {
+    dioAdapter.onGet(
+      '/requests',
+      (server) => server.reply(200, {
+        'items': [
+          {
+            'id': 42,
+            'tripId': 'okinawa-trip-2026',
+            'message': '幫我安排晚餐',
+            'reply': '已補上晚餐建議。',
+            'status': 'completed',
+          },
+        ],
+        'hasMore': false,
+      }),
+      queryParameters: {
+        'tripId': 'okinawa-trip-2026',
+        'limit': '5',
+        'sort': 'desc',
+      },
+    );
+
+    final page = await tripRepository.fetchTripRequests(
+      tripId: 'okinawa-trip-2026',
+      limit: 5,
+      sort: 'desc',
+    );
+
+    expect(page.items.single.id, 42);
+    expect(page.items.single.displayReply, '已補上晚餐建議。');
+    expect(page.hasMore, isFalse);
+  });
+
+  test('createTripRequest：POST /requests 建立 AI request', () async {
+    dioAdapter.onPost(
+      '/requests',
+      (server) => server.reply(201, {
+        'id': 43,
+        'tripId': 'okinawa-trip-2026',
+        'message': '幫我調整第二天',
+        'status': 'open',
+      }),
+      data: {'tripId': 'okinawa-trip-2026', 'message': '幫我調整第二天'},
+    );
+
+    final request = await tripRepository.createTripRequest(
+      tripId: 'okinawa-trip-2026',
+      message: '幫我調整第二天',
+    );
+
+    expect(request.id, 43);
+    expect(request.isInflight, isTrue);
+  });
+
+  test('fetchTripRequest：GET /requests/:id 取得 request 最新狀態', () async {
+    dioAdapter.onGet(
+      '/requests/43',
+      (server) => server.reply(200, {
+        'id': 43,
+        'tripId': 'okinawa-trip-2026',
+        'message': '幫我調整第二天',
+        'reply': '已完成調整。',
+        'status': 'completed',
+      }),
+    );
+
+    final request = await tripRepository.fetchTripRequest(43);
+
+    expect(request.isCompleted, isTrue);
+    expect(request.displayReply, '已完成調整。');
+  });
+
   test('createTrip：POST /trips 帶基本資料與目的地', () async {
     dioAdapter.onPost(
       '/trips',

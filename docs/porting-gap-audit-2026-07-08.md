@@ -8,7 +8,7 @@
 Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab shell、行程清單、行程時間軸、行程地圖、行程筆記唯讀、帳號 hub。
 還沒翻寫的主體集中在三類：
 
-1. **Primary tab placeholder**：`/chat`、`/map` 仍是 `PlaceholderScreen`；`/favorites` 已轉正。
+1. **Primary tab placeholder**：`/map` 仍是 `PlaceholderScreen`；`/favorites` 與 `/chat` 已轉正。
 2. **Trip action surface**：新增/編輯行程、景點 CRUD 剩餘子流程、共編、健檢、列印/分享仍待 Flutter route 或完整實作。
 3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、settings、connected apps、developer apps、consent 尚未翻。
 
@@ -22,7 +22,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id/map` → `MapPage` | `/trips/:id/map` → `TripMapScreen` | 部分翻 | 補 entry focus route、pin/card 雙向同步、路線/定位控制 |
 | `/trip/:id/notes` → `TripNotesPage` | `/trips/:id/notes` → `TripNotesScreen` | 唯讀翻寫 | 補 5 區 CRUD + AI generate/pending |
 | `/account` → `AccountPage` | `/account` → `AccountScreen` | 部分翻 | 補 displayName inline edit、settings rows 導航 |
-| `/chat` → `ChatPage` | `/chat` → placeholder | 未翻 | P1：AI request queue |
+| `/chat` → `ChatPage` | `/chat` → `ChatScreen` | 已翻第一波 | 後續可補 SSE、歷史分頁與更完整 trip picker parity |
 | `/map` → `GlobalMapPage` | `/map` → placeholder | 未翻 | P1：跨行程 POI map |
 | `/favorites` → `PoiFavoritesPage` | `/favorites` → `FavoritesScreen` | 已翻第一波 | 後續可補更多 web card actions |
 | `/explore` → `ExplorePage` | `/explore` → `ExploreScreen` | 已翻第一波 | 後續可補分類 chips / landing polish |
@@ -72,8 +72,9 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 4. **Chat / request queue**
    - Route：`/chat`
-   - API：trip_requests / SSE or polling
-   - 理由：依賴 active trip 與 request lifecycle；完成後 primary tab 才不再是 placeholder。
+   - API：`GET /requests?tripId=...`、`POST /requests`、`GET /requests/:id`
+   - 狀態：已完成第一波 request history、create request、pending bubble 與 polling 替換 AI 回覆；未先做 SSE。
+   - 理由：依賴 active trip 與 request lifecycle；第一波已讓 primary tab 不再是 placeholder。
 
 5. **Collab / Invite**
    - Routes：`/trips/:id/collab`、`/invite`
@@ -110,8 +111,8 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **AI 聊天 request queue** 或 **全域地圖**。Favorites / Explore / 加入行程 fast-path 第一波已把 primary tab placeholder 轉正；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice。
+下一個 Build branch 建議接 **全域地圖** 或 **共編邀請**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice。
 
 1. 若續做 Trip action surface：優先補 edit day management 或 segments edit,避免與既有 entry mutation contract 脫節。
-2. 若做 Chat：先補 request queue repository contract 與 pending/polling 狀態，再把 `/chat` 從 placeholder 轉正。
+2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。
 3. 本分支完成後，重跑 `flutter analyze`、`flutter test`，再更新 `TODOS.md` 的 P1 剩餘項。

@@ -32,7 +32,7 @@ abstract final class AppTheme {
 }
 ```
 
-## lib/models/（檔案：trip.dart, day.dart, entry.dart, notes.dart, user.dart）
+## lib/models/（檔案：trip.dart, day.dart, entry.dart, chat.dart, notes.dart, user.dart）
 
 ```dart
 // trip.dart
@@ -69,6 +69,15 @@ class TimelineEntry {
 }
 class EntryPoisMutationResult { final int entryId; final int poiId; final int? sortOrder; final String? entryPoisVersion; }
 class EntryAlternatesReorderResult { final int entryId; final List<int> order; final String? entryPoisVersion; }
+
+// chat.dart
+class TripRequest {
+  final int id; final String tripId; final String message; final String? reply; final String status;
+  final String? submittedBy; final String? submittedByDisplayName; final String? processedBy;
+  final String? createdAt; final String? updatedAt;
+  bool get isInflight; bool get isCompleted; bool get isFailed; String? get displayReply;
+}
+class TripRequestPage { final List<TripRequest> items; final bool hasMore; }
 
 // notes.dart — 5 個 row class 共通欄位：int id, int sortOrder, int version；文字欄位非 null 預設 ''
 class TripFlight { airline, flightNo, cabinClass, departAirport, arriveAirport, departAt, arriveAt, note — 全 String }
@@ -130,6 +139,18 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();          // GET /my-trips
   Future<List<Trip>> fetchTrips();                   // GET /trips
   Future<Trip> fetchTrip(String id);                 // GET /trips/:id
+  Future<TripRequestPage> fetchTripRequests({
+    required String tripId,
+    int limit = 5,
+    String sort = 'desc',
+    String? before,
+    int? beforeId,
+  });                                                // GET /requests?tripId=...&limit=...&sort=...
+  Future<TripRequest> createTripRequest({
+    required String tripId,
+    required String message,
+  });                                                // POST /requests
+  Future<TripRequest> fetchTripRequest(int id);      // GET /requests/:id
   Future<String> createTrip({
     required String id,
     required String name,
@@ -247,7 +268,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 ```dart
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
-// /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
+// /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
 // trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
@@ -264,6 +285,7 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 
 // 各 screen class 名
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
+class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）

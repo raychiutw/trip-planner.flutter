@@ -8,7 +8,7 @@
 - [x] Explore direct-mode 加入行程(`/add-to-trip?place_id=...`;不需先收藏)(**Completed:** feature/favorites-explore)
 - [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice；edit/move 已帶 OCC `expectedVersion`,POI 變更已帶 `entryPoisVersion`,409 `STALE_ENTRY` 已重抓 entry 並 retry 一次；後續仍可補 segments edit 與更多 web parity 細節)
 - [x] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料、目的地、日期、語言與發布狀態表單)(**Completed:** feature/favorites-explore)
-- [ ] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)
+- [x] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)(**Completed:** feature/favorites-explore)
 - [ ] 全域地圖(`/map`;map tab 轉正,跨行程 POI)
 - [ ] 共編邀請(`/trips/:id/collab`,`/invite`;成員管理 + invitation accept/revoke)
 - [ ] 行程筆記 CRUD + AI generate(`/trips/:id/notes`;5 區由唯讀轉可編輯)

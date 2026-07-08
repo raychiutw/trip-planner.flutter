@@ -52,6 +52,28 @@
 | `startDate`、`endDate` | `String?` | `"YYYY-MM-DD"` |
 | `destinations` | `List<TripDestination>` | 預設 `[]` |
 
+## chat.dart
+
+### TripRequest — `GET /requests` / `POST /requests` / `GET /requests/:id`
+
+AI request queue row。wire format 是 server `deepCamel()` 後的 camelCase；日期時間仍保留字串。
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `id` | `int` | request row id |
+| `tripId` | `String` | 所屬行程 |
+| `message` | `String` | 使用者送出的訊息；缺漏預設 `''` |
+| `reply` | `String?` | AI 回覆；空白時 `displayReply` 回 `null` |
+| `status` | `String` | 預設 `open`;常見值 `open` / `processing` / `completed` / `failed` |
+| `submittedBy`、`submittedByDisplayName`、`processedBy` | `String?` | 使用者/處理者資訊 |
+| `createdAt`、`updatedAt` | `String?` | ISO datetime 字串 |
+
+helper：`isInflight` = `open` 或 `processing`；`isCompleted` = `completed`；`isFailed` = `failed`；`displayReply` 會 trim 空白。
+
+### TripRequestPage — `GET /requests` paginated response
+
+`items: List<TripRequest>`、`hasMore: bool`。repository 也相容 legacy array response,會包成 `TripRequestPage(hasMore: false)`。
+
 ## day.dart
 
 ### TripLocation — 座標(server 合成,全 nullable)

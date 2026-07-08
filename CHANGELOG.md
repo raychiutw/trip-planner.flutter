@@ -14,6 +14,7 @@
 - **P1 Entry 跨日操作**:新增 `/trips/:tripId/stop/:entryId/copy` 與 `/move`;edit screen 可進入複製/移動表單,copy 呼叫後端 copy endpoint,move 以 `day_id` + `expectedVersion` PATCH entry,成功後重算受影響 day 的 travel segments。
 - **P1 Entry 備選管理**:edit screen 顯示備選 POI 列表,支援移除與上/下移排序;移除以 DELETE query string 帶 `entryPoisVersion`,排序以 PATCH `/alternates/reorder` 帶完整 `order` 與 OCC token。
 - **P1 Entry OCC 重試**:edit、move、change-poi 與備選管理遇 `STALE_ENTRY` 時會重抓最新 entry,以新的 `version` / `entryPoisVersion` retry 同一個使用者操作一次。
+- **P1 AI 聊天**:`/chat` 由 placeholder 轉為 `ChatScreen`;會載入使用者行程、顯示 active trip 最近 request history、送出 `POST /requests` 後以 pending bubble 顯示「思考中...」並 polling `GET /requests/:id` 替換成 AI 回覆。
 
 ## [0.1.0] - 2026-06-10
 

@@ -13,7 +13,7 @@
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
 - 帳號（profile、統計、登出）
 
-**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天、全域地圖、共編邀請仍待辦。
+**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling 已完成第一波；全域地圖、共編邀請仍待辦。
 **P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
 ## 開發
@@ -30,10 +30,10 @@ flutter run        # 連 prod API（注意：請用測試帳號）
 ```
 lib/
   theme/        # design tokens（對應 web css/tokens.css）+ ThemeData + TpTones 三色 ThemeExtension
-  models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
+  models/       # Trip/Day/Entry/Chat/Notes/User —— camelCase wire fromJson
   api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
   app/          # go_router（5-tab StatefulShellRoute + auth redirect）
-  features/     # auth / trips / trip_detail（timeline·map·notes）/ favorites / account / shell
+  features/     # auth / chat / trips / trip_detail（timeline·map·notes）/ favorites / account / shell
 docs/
   PORTING_PLAN.md   # 移植藍圖與架構決策
   CONTRACTS.md      # 模組介面契約（多 agent 平行開發用）

@@ -115,6 +115,18 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();              // GET /my-trips
   Future<List<Trip>>        fetchTrips();                // GET /trips(published 清單)
   Future<Trip>              fetchTrip(String id);        // GET /trips/:id
+  Future<TripRequestPage>   fetchTripRequests({
+    required String tripId,
+    int limit = 5,
+    String sort = 'desc',
+    String? before,
+    int? beforeId,
+  }); // GET /requests?tripId=...&limit=...&sort=...
+  Future<TripRequest>       createTripRequest({
+    required String tripId,
+    required String message,
+  }); // POST /requests
+  Future<TripRequest>       fetchTripRequest(int id);    // GET /requests/:id
   Future<String>            createTrip({
     required String id,
     required String name,
@@ -232,6 +244,7 @@ class TripRepository {
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
+`fetchTripRequests` / `createTripRequest` / `fetchTripRequest` 對應 web ChatPage 的 AI request queue。`fetchTripRequests` 預設讀 active trip 最新 5 筆且支援後端 paginated shape `{items, hasMore}`；若後端回 legacy array,repository 會包成 `TripRequestPage(hasMore: false)`。`ChatScreen` 第一波使用 polling `GET /requests/:id` 取代 web SSE。
 `createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。

@@ -11,6 +11,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
@@ -20,6 +21,7 @@ import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
+import 'package:tripline/models/chat.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/main.dart';
@@ -49,6 +51,13 @@ const _loggedInUser = UserInfo(
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
+  when(
+    () => mockTripRepository.fetchTripRequests(
+      tripId: any(named: 'tripId'),
+      limit: any(named: 'limit'),
+      sort: any(named: 'sort'),
+    ),
+  ).thenAnswer((_) async => const TripRequestPage(items: [], hasMore: false));
   when(() => mockTripRepository.fetchTrip(any())).thenAnswer(
     (_) async => const Trip(
       id: 'trip-1',
@@ -138,6 +147,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /chat 進入 ChatScreen', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/chat');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

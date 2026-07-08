@@ -7,7 +7,7 @@
 | 路徑 | 畫面 | 位置 |
 |---|---|---|
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
-| `/chat` | `PlaceholderScreen('聊天')` | tab 1(P1 待實作) |
+| `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
