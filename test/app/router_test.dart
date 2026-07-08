@@ -10,6 +10,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -132,6 +133,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PublicShareScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入可進入 OAuth consent shell route', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go(
+          '/oauth/consent?client_id=tp_alpha'
+          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
+          '&scope=openid%20email'
+          '&state=abc123'
+          '&response_type=code',
+        );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OAuthConsentScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

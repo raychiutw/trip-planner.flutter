@@ -39,7 +39,7 @@ void main() {
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
-    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.physicalSize = const Size(800, 1800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -103,13 +103,20 @@ void main() {
     expect(find.text('Email 未驗證'), findsNothing);
   });
 
-  testWidgets('個人資料/外觀 可點;通知 仍「即將推出」', (tester) async {
+  testWidgets('帳號設定 rows 可進子頁；通知 仍「即將推出」', (tester) async {
     await pumpAccountScreen(tester);
 
-    // 個人資料 + 外觀 轉成可導航設定列
     expect(find.byKey(const ValueKey('settings-profile')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings-appearance')), findsOneWidget);
-    // 通知 仍為即將推出(唯一一個)
+    expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-connected-apps')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-developer-apps')),
+      findsOneWidget,
+    );
     expect(find.text('通知'), findsOneWidget);
     expect(find.text('即將推出'), findsOneWidget);
 

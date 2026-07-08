@@ -8,6 +8,7 @@ import '../models/destination_input.dart';
 import '../models/entry.dart';
 import '../models/note_section.dart';
 import '../models/notes.dart';
+import '../models/oauth.dart';
 import '../models/poi_search_result.dart';
 import '../models/poi_type.dart';
 import '../models/segment.dart';
@@ -524,6 +525,87 @@ class TripRepository {
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// GET /account/sessions，列出目前帳號登入裝置。
+  Future<AccountSessionsPage> fetchAccountSessions() async {
+    final responseBody = await _client.get('/account/sessions');
+    return AccountSessionsPage.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /account/sessions，登出其他裝置並回傳撤銷數量。
+  Future<int> revokeOtherAccountSessions() async {
+    final responseBody = await _client.delete('/account/sessions');
+    if (responseBody is Map<String, dynamic>) {
+      return (responseBody['revoked'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
+  /// DELETE /account/sessions/:sid，登出指定裝置。
+  Future<void> revokeAccountSession(String sid) {
+    return _client.delete('/account/sessions/${Uri.encodeComponent(sid)}');
+  }
+
+  /// GET /account/connected-apps，列出目前帳號授權過的 OAuth app。
+  Future<List<ConnectedApp>> fetchConnectedApps() async {
+    final responseBody = await _client.get('/account/connected-apps');
+    final appsJson =
+        (responseBody as Map<String, dynamic>)['apps'] as List<dynamic>? ??
+        const [];
+    return appsJson
+        .map(
+          (appJson) => ConnectedApp.fromJson(appJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// DELETE /account/connected-apps/:clientId，撤銷 app access/refresh token。
+  Future<void> revokeConnectedApp(String clientId) {
+    return _client.delete(
+      '/account/connected-apps/${Uri.encodeComponent(clientId)}',
+    );
+  }
+
+  /// GET /dev/apps，列出目前帳號建立的 OAuth client apps。
+  Future<List<DeveloperApp>> fetchDeveloperApps() async {
+    final responseBody = await _client.get('/dev/apps');
+    final appsJson =
+        (responseBody as Map<String, dynamic>)['apps'] as List<dynamic>? ??
+        const [];
+    return appsJson
+        .map(
+          (appJson) => DeveloperApp.fromJson(appJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// POST /dev/apps，建立 OAuth client app。
+  Future<CreatedDeveloperApp> createDeveloperApp({
+    required String appName,
+    String clientType = 'public',
+    required List<String> redirectUris,
+    List<String> allowedScopes = const ['openid', 'profile', 'email'],
+    String? appDescription,
+    String? homepageUrl,
+  }) async {
+    final responseBody = await _client.post(
+      '/dev/apps',
+      body: {
+        'app_name': appName.trim(),
+        'client_type': clientType == 'confidential' ? 'confidential' : 'public',
+        'redirect_uris': redirectUris
+            .map((uri) => uri.trim())
+            .where((uri) => uri.isNotEmpty)
+            .toList(),
+        'allowed_scopes': allowedScopes
+            .where(kDeveloperAllowedScopes.contains)
+            .toList(),
+        'app_description': _trimmedOrNull(appDescription),
+        'homepage_url': _trimmedOrNull(homepageUrl),
+      },
+    );
+    return CreatedDeveloperApp.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// GET /share/:token（公開分享頁,不需登入）。
   Future<PublicTripShare> fetchPublicTripShare(String token) async {
     final responseBody = await _client.get(
@@ -676,3 +758,9 @@ num? _numberFromAnyKey(
 int? _intOrNull(Object? value) => (value as num?)?.toInt();
 
 num? _numberOrNull(Object? value) => value is num ? value : null;
+
+String? _trimmedOrNull(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return trimmed;
+}

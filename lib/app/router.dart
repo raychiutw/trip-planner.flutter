@@ -6,10 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
+import '../features/account/account_sessions_screen.dart';
 import '../features/account/account_screen.dart';
+import '../features/account/connected_apps_screen.dart';
+import '../features/account/developer_apps_screen.dart';
 import '../features/account/settings/appearance_screen.dart';
 import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/oauth_consent_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
@@ -28,6 +32,7 @@ import '../features/trips/edit/edit_trip_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
+import '../models/oauth.dart';
 
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -48,11 +53,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      final isPublicShareRoute =
-          state.matchedLocation == '/s/:token' ||
-          (state.uri.pathSegments.length == 2 &&
-              state.uri.pathSegments.first == 's');
-      if (!isLoggedIn && !isOnLogin && !isPublicShareRoute) return '/login';
+      final isPublicRoute = _isPublicShellOutsideRoute(state);
+      if (!isLoggedIn && !isOnLogin && !isPublicRoute) return '/login';
       if (isLoggedIn && isOnLogin) return '/trips';
       return null;
     },
@@ -86,6 +88,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/profile',
         builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/settings/sessions',
+        builder: (context, state) => const AccountSessionsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/connected-apps',
+        builder: (context, state) => const ConnectedAppsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/developer-apps',
+        builder: (context, state) => const DeveloperAppsScreen(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const DeveloperAppNewScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/developer/apps',
+        builder: (context, state) => const DeveloperAppsScreen(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const DeveloperAppNewScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/oauth/consent',
+        builder: (context, state) =>
+            OAuthConsentScreen(request: OAuthConsentRequest.fromUri(state.uri)),
       ),
       GoRoute(
         path: '/s/:token',
@@ -192,3 +227,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+const _publicShellOutsideRoutes = {'/login', '/oauth/consent'};
+
+bool _isPublicShellOutsideRoute(GoRouterState state) {
+  if (_publicShellOutsideRoutes.contains(state.matchedLocation)) return true;
+  final pathSegments = state.uri.pathSegments;
+  return pathSegments.length == 2 && pathSegments.first == 's';
+}

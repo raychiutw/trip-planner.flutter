@@ -265,7 +265,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「個人資料」「外觀」可進子頁;「通知」即將推出（disabled）。
+/// 設定群組：「個人資料」「外觀」「登入裝置」「OAuth app」可進子頁;「通知」即將推出。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
@@ -309,6 +309,42 @@ class _SettingsGroup extends StatelessWidget {
                 title: const Text('外觀'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/appearance'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-sessions'),
+                leading: const Icon(Icons.devices_outlined),
+                title: const Text('登入裝置'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/sessions'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-connected-apps'),
+                leading: const Icon(Icons.extension_outlined),
+                title: const Text('已連結的應用程式'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/connected-apps'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-developer-apps'),
+                leading: const Icon(Icons.code_outlined),
+                title: const Text('開發者應用'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/developer-apps'),
               ),
               Divider(
                 height: 1,
