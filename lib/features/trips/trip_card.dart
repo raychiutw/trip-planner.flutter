@@ -25,12 +25,14 @@ class TripCard extends StatelessWidget {
     required this.tone,
     this.onTap,
     this.onLongPress,
+    this.trailing,
   });
 
   final TripSummary trip;
   final TripCardTone tone;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +59,9 @@ class TripCard extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 trip.displayTitle.characters.first,
-                style: theme.textTheme.displaySmall
-                    ?.copyWith(color: coverForeground),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: coverForeground,
+                ),
               ),
             ),
             Padding(
@@ -96,11 +99,12 @@ class TripCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  trailing ??
+                      Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                 ],
               ),
             ),

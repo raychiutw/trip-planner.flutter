@@ -16,6 +16,8 @@ enum _TripsFilterTab { all, mine, collab, archived }
 
 enum _TripsSortBy { updated, start, name }
 
+enum _TripListAction { edit, collab, health, notes, delete }
+
 /// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 下拉更新 + 單欄卡片清單。
 /// 點卡片進詳情；長按開 bottom sheet 刪除（AlertDialog 二次確認）。
 class TripsListScreen extends ConsumerStatefulWidget {
@@ -86,17 +88,26 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             isArchivedTab: _filterTab == _TripsFilterTab.archived,
             onReset: () => setState(() => _filterTab = _TripsFilterTab.all),
           )
-        else
+        else ...[
           for (var index = 0; index < visibleTrips.length; index++) ...[
             TripCard(
               trip: visibleTrips[index],
               tone: TripCardTone.values[index % TripCardTone.values.length],
               onTap: () => context.go('/trips/${visibleTrips[index].tripId}'),
               onLongPress: () => _showTripActions(context, visibleTrips[index]),
+              trailing: IconButton(
+                key: ValueKey(
+                  'trip-card-menu-trigger-${visibleTrips[index].tripId}',
+                ),
+                tooltip: '行程選項',
+                icon: const Icon(Icons.more_vert),
+                onPressed: () => _showTripActions(context, visibleTrips[index]),
+              ),
             ),
-            if (index != visibleTrips.length - 1)
-              const SizedBox(height: TpSpacing.s3),
+            const SizedBox(height: TpSpacing.s3),
           ],
+          _NewTripCard(onPressed: () => context.go('/trips/new')),
+        ],
       ],
     );
   }
@@ -307,7 +318,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   /// 長按卡片 → bottom sheet（刪除行程）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
-    final selectedAction = await showModalBottomSheet<String>(
+    final selectedAction = await showModalBottomSheet<_TripListAction>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
@@ -320,11 +331,35 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             children: [
               const SizedBox(height: TpSpacing.s2),
               ListTile(
+                key: ValueKey('trip-card-menu-edit-${trip.tripId}'),
                 leading: const Icon(Icons.edit_outlined),
                 title: const Text('編輯行程'),
-                onTap: () => Navigator.of(sheetContext).pop('edit'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.edit),
               ),
               ListTile(
+                key: ValueKey('trip-card-menu-collab-${trip.tripId}'),
+                leading: const Icon(Icons.group_outlined),
+                title: const Text('共編設定'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.collab),
+              ),
+              ListTile(
+                key: ValueKey('trip-card-menu-health-${trip.tripId}'),
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: const Text('AI 健檢'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.health),
+              ),
+              ListTile(
+                key: ValueKey('trip-card-menu-notes-${trip.tripId}'),
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('行程筆記'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.notes),
+              ),
+              ListTile(
+                key: ValueKey('trip-card-menu-delete-${trip.tripId}'),
                 leading: Icon(Icons.delete_outline, color: destructiveColor),
                 title: Text(
                   '刪除行程',
@@ -333,7 +368,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                onTap: () => Navigator.of(sheetContext).pop('delete'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.delete),
               ),
               const SizedBox(height: TpSpacing.s2),
             ],
@@ -342,12 +378,25 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       },
     );
     if (!context.mounted) return;
-    if (selectedAction == 'edit') {
-      context.go('/trips/${trip.tripId}/edit');
-      return;
+    switch (selectedAction) {
+      case _TripListAction.edit:
+        context.go('/trips/${trip.tripId}/edit');
+        return;
+      case _TripListAction.collab:
+        context.go('/trips/${trip.tripId}/collab');
+        return;
+      case _TripListAction.health:
+        context.go('/trips/${trip.tripId}/health');
+        return;
+      case _TripListAction.notes:
+        context.go('/trips/${trip.tripId}/notes');
+        return;
+      case _TripListAction.delete:
+        await _confirmAndDeleteTrip(context, trip);
+        return;
+      case null:
+        return;
     }
-    if (selectedAction != 'delete') return;
-    await _confirmAndDeleteTrip(context, trip);
   }
 
   /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。
@@ -395,6 +444,49 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
     }
+  }
+}
+
+/// 清單尾端新增卡：對齊 web trailing card 的入口位置。
+class _NewTripCard extends StatelessWidget {
+  const _NewTripCard({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('trips-list-new-trip-card'),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TpSpacing.s4,
+            vertical: TpSpacing.s6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_circle_outline,
+                size: 32,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                '新增行程',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

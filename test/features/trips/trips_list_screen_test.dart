@@ -114,6 +114,21 @@ void main() {
           builder: (context, state) =>
               Scaffold(body: Text('edit:${state.pathParameters['tripId']}')),
         ),
+        GoRoute(
+          path: '/trips/:tripId/collab',
+          builder: (context, state) =>
+              Scaffold(body: Text('collab:${state.pathParameters['tripId']}')),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/health',
+          builder: (context, state) =>
+              Scaffold(body: Text('health:${state.pathParameters['tripId']}')),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/notes',
+          builder: (context, state) =>
+              Scaffold(body: Text('notes:${state.pathParameters['tripId']}')),
+        ),
       ],
     );
     return MaterialApp.router(
@@ -285,6 +300,29 @@ void main() {
         'okinawa-trip-2026',
       ]);
     });
+
+    testWidgets('尾端新增卡 → 導航到 /trips/new', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [myTripsProvider.overrideWith((ref) async => fakeTrips)],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      final newTripCard = find.byKey(
+        const ValueKey('trips-list-new-trip-card'),
+      );
+      await tester.scrollUntilVisible(
+        newTripCard,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(newTripCard);
+      await tester.pumpAndSettle();
+
+      expect(find.text('new-trip-probe'), findsOneWidget);
+    });
   });
 
   group('TripsListScreen 互動', () {
@@ -316,6 +354,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('detail:okinawa-trip-2026'), findsOneWidget);
+    });
+
+    testWidgets('卡片 action menu：edit/collab/health/notes 導向對應頁', (
+      tester,
+    ) async {
+      Future<void> pumpTrips() async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [myTripsProvider.overrideWith((ref) async => fakeTrips)],
+            child: buildRouterApp(),
+          ),
+        );
+        await tester.pump();
+      }
+
+      final scenarios = [
+        (
+          key: 'trip-card-menu-edit-okinawa-trip-2026',
+          probe: 'edit:okinawa-trip-2026',
+        ),
+        (
+          key: 'trip-card-menu-collab-okinawa-trip-2026',
+          probe: 'collab:okinawa-trip-2026',
+        ),
+        (
+          key: 'trip-card-menu-health-okinawa-trip-2026',
+          probe: 'health:okinawa-trip-2026',
+        ),
+        (
+          key: 'trip-card-menu-notes-okinawa-trip-2026',
+          probe: 'notes:okinawa-trip-2026',
+        ),
+      ];
+
+      for (final scenario in scenarios) {
+        await pumpTrips();
+        await tester.tap(
+          find.byKey(
+            const ValueKey('trip-card-menu-trigger-okinawa-trip-2026'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('刪除行程'), findsOneWidget);
+
+        await tester.tap(find.byKey(ValueKey(scenario.key)));
+        await tester.pumpAndSettle();
+
+        expect(find.text(scenario.probe), findsOneWidget);
+      }
     });
 
     testWidgets('長按 → bottom sheet → 編輯行程', (tester) async {
