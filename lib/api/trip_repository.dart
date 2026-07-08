@@ -253,6 +253,12 @@ class TripRepository {
     return (responseBody as Map<String, dynamic>)['tripId'] as String;
   }
 
+  /// POST /trips/import，送出 web 匯出的 raw JSON text 並回傳新 tripId。
+  Future<String> importTripJson(String jsonText) async {
+    final responseBody = await _client.post('/trips/import', body: jsonText);
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
   /// PUT /trips/:id，更新 scalar 欄位並用 full-replacement 寫 destinations。
   Future<void> updateTrip({
     required String id,

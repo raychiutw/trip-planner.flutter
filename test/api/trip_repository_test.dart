@@ -433,6 +433,23 @@ void main() {
     expect(tripId, 'okinawa-trip-2026');
   });
 
+  test('importTripJson：POST /trips/import 送 raw JSON text 並回 tripId', () async {
+    const exportedJson = '{"schemaVersion":1,"trip":{"name":"imported"}}';
+    dioAdapter.onPost(
+      '/trips/import',
+      (server) => server.reply(201, {
+        'ok': true,
+        'tripId': 'imp-okinawa-trip-2026',
+        'daysCreated': 3,
+      }),
+      data: exportedJson,
+    );
+
+    final tripId = await tripRepository.importTripJson(exportedJson);
+
+    expect(tripId, 'imp-okinawa-trip-2026');
+  });
+
   test(
     'updateTrip：PUT /trips/:id 帶 scalar 欄位與 destinations full replacement',
     () async {

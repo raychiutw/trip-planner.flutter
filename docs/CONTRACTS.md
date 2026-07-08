@@ -236,6 +236,7 @@ class TripRepository {
     String lang = 'zh-TW',
     List<TripDestinationInput> destinations = const [],
   });                                                // POST /trips
+  Future<String> importTripJson(String jsonText);    // POST /trips/import raw JSON text
   Future<void> updateTrip({
     required String id,
     required String? title,
@@ -402,7 +403,7 @@ class ChatScreen extends ConsumerStatefulWidget;       // features/chat/chat_scr
 class CollabScreen extends ConsumerStatefulWidget;     // features/collab/collab_screen.dart（接受 tripId）
 class InviteScreen extends ConsumerStatefulWidget;     // features/invite/invite_screen.dart（接受 token）
 class GlobalMapScreen extends ConsumerStatefulWidget;  // features/map/global_map_screen.dart
-class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu）
+class TripsListScreen extends ConsumerStatefulWidget;  // features/trips/trips_list_screen.dart（分類/搜尋/排序 local state + action menu + JSON 匯入）
 class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors；edit 含 day management）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）

@@ -1,16 +1,77 @@
+import 'dart:convert';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
 
+const int _maxTripImportBytes = 512 * 1024;
+
 /// `GET /my-trips` 清單（本畫面專屬 scope；刪除後 invalidate refresh）。
 final myTripsProvider = FutureProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).fetchMyTrips();
 });
+
+/// 匯入 JSON 檔案選擇器；widget test 以 provider override 注入假檔案。
+final tripImportFilePickerProvider = Provider<TripImportFilePicker>((ref) {
+  return const FileSelectorTripImportFilePicker();
+});
+
+/// TripsList 匯入用的檔案內容。
+class TripImportFile {
+  const TripImportFile({
+    required this.name,
+    required this.length,
+    required this.content,
+  });
+
+  /// 原始檔名。
+  final String name;
+
+  /// 檔案大小，單位 byte。
+  final int length;
+
+  /// raw JSON text。
+  final String content;
+}
+
+/// TripsList 匯入檔案來源抽象，避免 widget test 開啟原生檔案 picker。
+abstract class TripImportFilePicker {
+  const TripImportFilePicker();
+
+  /// 選擇並讀取 JSON 檔；取消時回傳 null。
+  Future<TripImportFile?> pick();
+}
+
+/// 使用 `file_selector` 的實際 JSON 檔案 picker。
+class FileSelectorTripImportFilePicker implements TripImportFilePicker {
+  const FileSelectorTripImportFilePicker();
+
+  @override
+  Future<TripImportFile?> pick() async {
+    final file = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'JSON',
+          extensions: ['json'],
+          mimeTypes: ['application/json'],
+        ),
+      ],
+    );
+    if (file == null) return null;
+    return TripImportFile(
+      name: file.name,
+      length: await file.length(),
+      content: await file.readAsString(),
+    );
+  }
+}
 
 enum _TripsFilterTab { all, mine, collab, archived }
 
@@ -32,6 +93,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   _TripsFilterTab _filterTab = _TripsFilterTab.all;
   _TripsSortBy _sortBy = _TripsSortBy.updated;
+  bool _isImporting = false;
 
   @override
   void dispose() {
@@ -47,6 +109,17 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       appBar: AppBar(
         title: const Text('我的行程'),
         actions: [
+          IconButton(
+            key: const ValueKey('trips-list-import-trigger'),
+            tooltip: '匯入行程 JSON',
+            icon: _isImporting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            onPressed: _isImporting ? null : _importTripFromJson,
+          ),
           IconButton(
             key: const ValueKey('trips-list-add-trip'),
             tooltip: '新增行程',
@@ -70,6 +143,51 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
+  }
+
+  Future<void> _importTripFromJson() async {
+    setState(() => _isImporting = true);
+    try {
+      final file = await ref.read(tripImportFilePickerProvider).pick();
+      if (!mounted || file == null) return;
+      if (file.length > _maxTripImportBytes) {
+        _showImportMessage('檔案過大（上限 512KB）');
+        return;
+      }
+
+      final decodedJson = jsonDecode(file.content);
+      if (decodedJson is! Map || decodedJson['schemaVersion'] != 1) {
+        _showImportMessage('不支援的匯出格式（需 schemaVersion 1）');
+        return;
+      }
+
+      final tripId = await ref
+          .read(tripRepositoryProvider)
+          .importTripJson(file.content);
+      if (!mounted) return;
+      ref.invalidate(myTripsProvider);
+      _showImportMessage('匯入成功');
+      context.go('/trips/$tripId');
+    } on FormatException {
+      if (!mounted) return;
+      _showImportMessage('不是有效的 JSON 檔');
+    } on ApiError catch (error) {
+      if (!mounted) return;
+      _showImportMessage(error.detail ?? error.message);
+    } on Exception {
+      if (!mounted) return;
+      _showImportMessage('匯入失敗，請稍後再試');
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
+  void _showImportMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildTripsContent(

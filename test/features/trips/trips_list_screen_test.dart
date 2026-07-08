@@ -12,6 +12,15 @@ import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
+class FakeTripImportFilePicker implements TripImportFilePicker {
+  const FakeTripImportFilePicker(this.file);
+
+  final TripImportFile? file;
+
+  @override
+  Future<TripImportFile?> pick() async => file;
+}
+
 void main() {
   const fakeTrips = [
     TripSummary(
@@ -339,6 +348,142 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('new-trip-probe'), findsOneWidget);
+    });
+
+    testWidgets('AppBar 匯入 JSON → 驗證 schema 後 POST raw text 並進新行程', (
+      tester,
+    ) async {
+      const importedJson = '{"schemaVersion":1,"trip":{"name":"imported"}}';
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+      when(
+        () => mockTripRepository.importTripJson(any()),
+      ).thenAnswer((_) async => 'imp-okinawa-trip-2026');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              const FakeTripImportFilePicker(
+                TripImportFile(
+                  name: 'tripline-export.json',
+                  length: importedJson.length,
+                  content: importedJson,
+                ),
+              ),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pumpAndSettle();
+
+      verify(() => mockTripRepository.importTripJson(importedJson)).called(1);
+      expect(find.text('detail:imp-okinawa-trip-2026'), findsOneWidget);
+    });
+
+    testWidgets('AppBar 匯入 JSON：檔案過大時顯示錯誤且不打 API', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              const FakeTripImportFilePicker(
+                TripImportFile(
+                  name: 'huge.json',
+                  length: 512 * 1024 + 1,
+                  content: '{"schemaVersion":1}',
+                ),
+              ),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pump();
+
+      expect(find.text('檔案過大（上限 512KB）'), findsOneWidget);
+      verifyNever(() => mockTripRepository.importTripJson(any()));
+    });
+
+    testWidgets('AppBar 匯入 JSON：JSON 格式錯誤時顯示錯誤且不打 API', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              const FakeTripImportFilePicker(
+                TripImportFile(
+                  name: 'broken.json',
+                  length: 8,
+                  content: 'not-json',
+                ),
+              ),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pump();
+
+      expect(find.text('不是有效的 JSON 檔'), findsOneWidget);
+      verifyNever(() => mockTripRepository.importTripJson(any()));
+    });
+
+    testWidgets('AppBar 匯入 JSON：schemaVersion 不是 1 時顯示錯誤且不打 API', (
+      tester,
+    ) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.fetchMyTrips(),
+      ).thenAnswer((_) async => fakeTrips);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              const FakeTripImportFilePicker(
+                TripImportFile(
+                  name: 'unsupported.json',
+                  length: 19,
+                  content: '{"schemaVersion":2}',
+                ),
+              ),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pump();
+
+      expect(find.text('不支援的匯出格式（需 schemaVersion 1）'), findsOneWidget);
+      verifyNever(() => mockTripRepository.importTripJson(any()));
     });
 
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {

@@ -7,7 +7,7 @@
 **P0（已完成）**
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
 - 5-tab shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
-- 行程清單（三色 tone 卡片、pull-to-refresh、分類/搜尋/排序、action menu、filtered empty、尾端新增卡）
+- 行程清單（三色 tone 卡片、pull-to-refresh、分類/搜尋/排序、action menu、filtered empty、尾端新增卡、JSON 匯入）
 - 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
 - 行程地圖（flutter_map + OSM、逐日 pin、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，新增/編輯/刪除與 AI 生成第一波）
@@ -16,7 +16,7 @@
 - 帳號（profile、統計、登出）
 
 **P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料、目的地與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice、travel segments edit slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告、Auth 補齊已完成第一波。
-**P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
+**P2**：分享/列印/JSON 匯出、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
 ## 開發
 
