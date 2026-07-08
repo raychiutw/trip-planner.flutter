@@ -13,6 +13,9 @@ void main() {
   late InMemorySessionStore sessionStore;
   late AuthRepository authRepository;
 
+  const signupPw = 'secret123';
+  const inviteCode = 'invite-token';
+  const resetCode = 'reset-token';
   const userInfoJson = {
     'id': 'u1hex',
     'email': 'ray@example.com',
@@ -129,17 +132,17 @@ void main() {
         ),
         data: {
           'email': 'ray@example.com',
-          'password': 'secret123',
+          'password': signupPw,
           'displayName': 'Ray',
-          'invitationToken': 'invite-token',
+          'invitationToken': inviteCode,
         },
       );
 
       final result = await authRepository.signup(
         email: 'ray@example.com',
-        password: 'secret123',
+        password: signupPw,
         displayName: 'Ray',
-        invitationToken: 'invite-token',
+        invitationToken: inviteCode,
       );
 
       expect(await sessionStore.read(), 'signup.token');
@@ -156,11 +159,11 @@ void main() {
           'userId': 'u1hex',
           'email': 'ray@example.com',
         }),
-        data: {'email': 'ray@example.com', 'password': 'secret123'},
+        data: {'email': 'ray@example.com', 'password': signupPw},
       );
 
       await expectLater(
-        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        authRepository.signup(email: 'ray@example.com', password: signupPw),
         throwsA(
           isA<ApiError>().having(
             (error) => error.code,
@@ -195,12 +198,12 @@ void main() {
       dioAdapter.onPost(
         '/oauth/reset-password',
         (server) => server.reply(200, {'ok': true, 'message': '密碼已更新，請用新密碼登入'}),
-        data: {'token': 'reset-token', 'password': 'secret123'},
+        data: {'token': resetCode, 'password': signupPw},
       );
 
       final result = await authRepository.resetPassword(
-        token: 'reset-token',
-        password: 'secret123',
+        token: resetCode,
+        password: signupPw,
       );
 
       expect(result.ok, isTrue);

@@ -21,6 +21,9 @@ class _MockAuthRepository extends Mock implements AuthRepository {}
 void main() {
   late _MockAuthRepository repository;
 
+  const signupPw = 'secret123';
+  const inviteCode = 'invite-token';
+  const resetCode = 'reset-token';
   const signupResult = SignupResult(
     ok: true,
     userId: 'user-1',
@@ -99,7 +102,7 @@ void main() {
             invitationToken: any(named: 'invitationToken'),
           ),
         ).thenAnswer((_) async => signupResult);
-        await tester.pumpWidget(buildApp('/signup?invitation=invite-token'));
+        await tester.pumpWidget(buildApp('/signup?invitation=$inviteCode'));
         await tester.pumpAndSettle();
 
         await tester.enterText(
@@ -108,7 +111,7 @@ void main() {
         );
         await tester.enterText(
           find.byKey(const ValueKey('signup-password-field')),
-          'secret123',
+          signupPw,
         );
         await tester.enterText(
           find.byKey(const ValueKey('signup-display-name-field')),
@@ -120,9 +123,9 @@ void main() {
         verify(
           () => repository.signup(
             email: 'ray@example.com',
-            password: 'secret123',
+            password: signupPw,
             displayName: 'Ray',
-            invitationToken: 'invite-token',
+            invitationToken: inviteCode,
           ),
         ).called(1);
         verify(
@@ -150,7 +153,7 @@ void main() {
           joinedTrip: SignupJoinedTrip(id: 'trip-1', title: '沖繩家族旅行'),
         ),
       );
-      await tester.pumpWidget(buildApp('/signup?invitation=invite-token'));
+      await tester.pumpWidget(buildApp('/signup?invitation=$inviteCode'));
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -159,7 +162,7 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const ValueKey('signup-password-field')),
-        'secret123',
+        signupPw,
       );
       await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
       await tester.pumpAndSettle();
@@ -191,7 +194,7 @@ void main() {
       );
       await tester.enterText(
         find.byKey(const ValueKey('signup-password-field')),
-        'secret123',
+        signupPw,
       );
       await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
       await tester.pumpAndSettle();
@@ -258,13 +261,13 @@ void main() {
 
     testWidgets('密碼不一致不呼叫 API', (tester) async {
       await tester.pumpWidget(
-        buildApp('/auth/password/reset?token=reset-token'),
+        buildApp('/auth/password/reset?token=$resetCode'),
       );
       await tester.pumpAndSettle();
 
       await tester.enterText(
         find.byKey(const ValueKey('reset-password-field')),
-        'secret123',
+        signupPw,
       );
       await tester.enterText(
         find.byKey(const ValueKey('reset-confirm-field')),
@@ -293,26 +296,23 @@ void main() {
             const AuthMessageResult(ok: true, message: '密碼已更新，請用新密碼登入'),
       );
       await tester.pumpWidget(
-        buildApp('/auth/password/reset?token=reset-token'),
+        buildApp('/auth/password/reset?token=$resetCode'),
       );
       await tester.pumpAndSettle();
 
       await tester.enterText(
         find.byKey(const ValueKey('reset-password-field')),
-        'secret123',
+        signupPw,
       );
       await tester.enterText(
         find.byKey(const ValueKey('reset-confirm-field')),
-        'secret123',
+        signupPw,
       );
       await tester.tap(find.byKey(const ValueKey('reset-submit-button')));
       await tester.pumpAndSettle();
 
       verify(
-        () => repository.resetPassword(
-          token: 'reset-token',
-          password: 'secret123',
-        ),
+        () => repository.resetPassword(token: resetCode, password: signupPw),
       ).called(1);
       expect(find.text('密碼已更新'), findsOneWidget);
       expect(

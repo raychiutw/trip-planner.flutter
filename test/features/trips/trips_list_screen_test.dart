@@ -27,6 +27,7 @@ void main() {
     registerFallbackValue(<String>[]);
   });
 
+  const shareCode = 'raw-token';
   const fakeTrips = [
     TripSummary(
       tripId: 'okinawa-trip-2026',
@@ -543,8 +544,8 @@ void main() {
     testWidgets('分享管理 sheet：建立連結後顯示一次性 URL', (tester) async {
       const createdShare = CreatedTripShare(
         id: 9,
-        token: 'raw-token',
-        url: '/s/raw-token',
+        token: shareCode,
+        url: '/s/$shareCode',
         label: '給旅伴',
         visibleSections: ['flights', 'lodgings', 'reservations', 'pretrip'],
         expiresAt: null,
@@ -614,7 +615,7 @@ void main() {
         'pretrip',
       ]);
       expect(
-        find.text('https://trip-planner-dby.pages.dev/s/raw-token'),
+        find.text('https://trip-planner-dby.pages.dev/s/$shareCode'),
         findsOneWidget,
       );
     });
