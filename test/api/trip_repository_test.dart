@@ -150,6 +150,131 @@ void main() {
     expect(request.displayReply, '已完成調整。');
   });
 
+  test('fetchTripPermissions：GET /permissions?tripId 解析成員', () async {
+    dioAdapter.onGet(
+      '/permissions',
+      (server) => server.reply(200, [
+        {
+          'id': 1,
+          'email': 'owner@example.com',
+          'displayName': 'Owner',
+          'tripId': 'okinawa-trip-2026',
+          'role': 'owner',
+        },
+      ]),
+      queryParameters: {'tripId': 'okinawa-trip-2026'},
+    );
+
+    final permissions = await tripRepository.fetchTripPermissions(
+      'okinawa-trip-2026',
+    );
+
+    expect(permissions.single.isOwner, isTrue);
+    expect(permissions.single.roleLabel, '擁有者');
+  });
+
+  test('fetchPendingInvitations：GET /invitations?tripId 解析 wrapper', () async {
+    dioAdapter.onGet(
+      '/invitations',
+      (server) => server.reply(200, {
+        'items': [
+          {
+            'id': 'hash-1',
+            'invitedEmail': 'pending@example.com',
+            'createdAt': '2026-07-01T00:00:00Z',
+            'expiresAt': '2026-07-08T00:00:00Z',
+            'daysRemaining': 2,
+            'isExpired': false,
+          },
+        ],
+      }),
+      queryParameters: {'tripId': 'okinawa-trip-2026'},
+    );
+
+    final page = await tripRepository.fetchPendingInvitations(
+      'okinawa-trip-2026',
+    );
+
+    expect(page.items.single.invitedEmail, 'pending@example.com');
+    expect(page.items.single.isExpired, isFalse);
+  });
+
+  test('createTripPermissionInvite：POST /permissions 新增邀請', () async {
+    dioAdapter.onPost(
+      '/permissions',
+      (server) => server.reply(201, {
+        'ok': true,
+        'status': 'invitation_sent',
+        'email': 'friend@example.com',
+        'expiresAt': '2026-07-15T00:00:00Z',
+      }),
+      data: {
+        'tripId': 'okinawa-trip-2026',
+        'email': 'friend@example.com',
+        'role': 'viewer',
+      },
+    );
+
+    final result = await tripRepository.createTripPermissionInvite(
+      tripId: 'okinawa-trip-2026',
+      email: 'friend@example.com',
+      role: 'viewer',
+    );
+
+    expect(result.status, 'invitation_sent');
+    expect(result.email, 'friend@example.com');
+  });
+
+  test('revokeTripInvitation：POST /invitations/revoke', () async {
+    dioAdapter.onPost(
+      '/invitations/revoke',
+      (server) => server.reply(200, {'ok': true, 'revoked': 1}),
+      data: {'tripId': 'okinawa-trip-2026', 'email': 'pending@example.com'},
+    );
+
+    await tripRepository.revokeTripInvitation(
+      tripId: 'okinawa-trip-2026',
+      email: 'pending@example.com',
+    );
+  });
+
+  test('fetchInvitation：GET /invitations?token 解析公開邀請預覽', () async {
+    dioAdapter.onGet(
+      '/invitations',
+      (server) => server.reply(200, {
+        'tripId': 'okinawa-trip-2026',
+        'tripTitle': '沖繩家族旅行',
+        'invitedEmail': 'friend@example.com',
+        'inviterDisplayName': 'Ray',
+        'inviterEmail': 'ray@example.com',
+        'expiresAt': '2026-07-15T00:00:00Z',
+      }),
+      queryParameters: {'token': 'invite-token'},
+    );
+
+    final preview = await tripRepository.fetchInvitation('invite-token');
+
+    expect(preview.tripTitle, '沖繩家族旅行');
+    expect(preview.inviterLabel, 'Ray');
+  });
+
+  test('acceptInvitation：POST /invitations/accept', () async {
+    dioAdapter.onPost(
+      '/invitations/accept',
+      (server) => server.reply(200, {
+        'ok': true,
+        'tripId': 'okinawa-trip-2026',
+        'tripTitle': '沖繩家族旅行',
+      }),
+      data: {'token': 'invite-token'},
+    );
+
+    final result = await tripRepository.acceptInvitation('invite-token');
+
+    expect(result.ok, isTrue);
+    expect(result.tripId, 'okinawa-trip-2026');
+  });
+
   test('createTrip：POST /trips 帶基本資料與目的地', () async {
     dioAdapter.onPost(
       '/trips',

@@ -9,7 +9,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 還沒翻寫的主體集中在三類：
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
-2. **Trip action surface**：新增/編輯行程、景點 CRUD 剩餘子流程、共編、健檢、列印/分享仍待 Flutter route 或完整實作。
+2. **Trip action surface**：新增/編輯行程、景點 CRUD 與共編邀請已有第一波；剩餘子流程、健檢、列印/分享仍待 Flutter route 或完整實作。
 3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、settings、connected apps、developer apps、consent 尚未翻。
 
 ## 現行 Route 對照
@@ -32,7 +32,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 | `/trip/:id/edit` → `EditTripPage` | `/trips/:id/edit` → `TripFormScreen.edit` | 已翻 meta slice | 後續補 day management / auto-save parity |
 | `/trip/:id/add-entry`, `add-stop`, `add-custom-stop` | `/trips/:id/add-entry`、`/trips/:id/add-stop`、`/trips/:id/add-custom-stop` → `AddEntryScreen` | 部分翻 | 已補搜尋/收藏新增與自訂地圖座標新增 slice |
 | `/trip/:id/stop/:eid/edit/change-poi/copy/move` | `/trips/:id/stop/:entryId/edit` → `EditEntryScreen`; `/trips/:id/stop/:entryId/change-poi` → `ChangePoiScreen`; `/trips/:id/stop/:entryId/copy`、`/move` → `EntryActionScreen` | 部分翻 | 已補時間/描述/刪除、主景點置換、加備選、copy/move、備選移除/排序與 409 重抓 retry slice；segments edit 等 web parity 細節仍待補 |
-| `/trip/:id/collab`, `/invite` | 無 | 未翻 | P1：共編與邀請 |
+| `/trip/:id/collab`, `/invite` | `/trips/:id/collab` → `CollabScreen`; `/invite?token=...` → `InviteScreen` | 已翻第一波 | 尚缺既有成員 role update / remove |
 | `/trip/:id/health` | 無 | 未翻 | P1：AI 健檢報告 |
 | `/trip/:id/print` | 無 | 未翻 | P2：列印/PDF/分享 |
 | `/s/:token` | 無 | 未翻 | P2：公開分享頁 |
@@ -85,6 +85,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 6. **Collab / Invite**
    - Routes：`/trips/:id/collab`、`/invite`
    - API：permissions、invitations、accept/revoke
+   - 狀態：已完成第一波成員/待邀請讀取、新增 member/viewer 邀請、撤回 pending invitation、公開邀請預覽與登入 email 相符接受；既有成員 role update / remove 尚待補。
    - 理由：涉及權限語意與 invite token，應獨立安全 review。
 
 7. **Notes CRUD + AI**
@@ -117,7 +118,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 ## 下一步
 
-下一個 Build branch 建議接 **共編邀請** 或 **Notes CRUD + AI**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice。
+下一個 Build branch 建議接 **Notes CRUD + AI**、**共編 role update/remove** 或 **AI 健檢**。Favorites / Explore / 加入行程 fast-path 第一波已把 favorites tab 轉正；AI 聊天已完成 request queue + pending/polling 第一波；全域地圖已完成 trip picker + 行程地圖重用第一波；建立/編輯行程已補基本資料 slice；Entry CRUD 已先補新增景點搜尋/收藏/自訂座標、edit 時間/描述/刪除與備選移除/排序、change-poi 主景點置換/加備選、copy/move 跨日操作與 stale retry slice；共編邀請已補讀取/新增邀請/撤回 pending/接受 invite 第一波。
 
 1. 若續做 Trip action surface：優先補 edit day management 或 segments edit,避免與既有 entry mutation contract 脫節。
 2. 若續做 Chat：補 SSE、歷史分頁與 web trip picker parity。

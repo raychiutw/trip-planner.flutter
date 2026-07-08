@@ -13,7 +13,7 @@
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
 - 帳號（profile、統計、登出）
 
-**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling 與全域地圖 tab resolver 已完成第一波；共編邀請仍待辦。
+**P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling、全域地圖 tab resolver、共編邀請第一波（成員/待邀請讀取、新增邀請、撤回 pending、公開邀請預覽/接受）已完成；共編既有成員角色調整/移除仍待辦。
 **P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
 
 ## 開發
@@ -33,7 +33,7 @@ lib/
   models/       # Trip/Day/Entry/Chat/Notes/User —— camelCase wire fromJson
   api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
   app/          # go_router（5-tab StatefulShellRoute + auth redirect）
-  features/     # auth / chat / map / trips / trip_detail（timeline·map·notes）/ favorites / account / shell
+  features/     # auth / chat / collab / invite / map / trips / trip_detail（timeline·map·notes）/ favorites / account / shell
 docs/
   PORTING_PLAN.md   # 移植藍圖與架構決策
   CONTRACTS.md      # 模組介面契約（多 agent 平行開發用）

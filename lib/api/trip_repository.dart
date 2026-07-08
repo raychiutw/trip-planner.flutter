@@ -4,6 +4,7 @@ library;
 import '../models/day.dart';
 import '../models/entry.dart';
 import '../models/chat.dart';
+import '../models/collab.dart';
 import '../models/notes.dart';
 import '../models/poi.dart';
 import '../models/trip.dart';
@@ -38,6 +39,89 @@ class TripRepository {
   Future<Trip> fetchTrip(String id) async {
     final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
     return Trip.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /permissions?tripId=...，讀取行程成員與角色。
+  Future<List<TripPermission>> fetchTripPermissions(String tripId) async {
+    final responseBody = await _client.get(
+      '/permissions',
+      query: {'tripId': tripId},
+    );
+    return (responseBody as List<dynamic>)
+        .map(
+          (permissionJson) =>
+              TripPermission.fromJson(permissionJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// GET /invitations?tripId=...，讀取待接受邀請。
+  Future<PendingInvitationPage> fetchPendingInvitations(String tripId) async {
+    final responseBody = await _client.get(
+      '/invitations',
+      query: {'tripId': tripId},
+    );
+    if (responseBody is List<dynamic>) {
+      return PendingInvitationPage(
+        items: responseBody
+            .map(
+              (itemJson) =>
+                  PendingInvitation.fromJson(itemJson as Map<String, dynamic>),
+            )
+            .toList(),
+      );
+    }
+    return PendingInvitationPage.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /permissions，新增既有成員權限或寄出 pending invitation。
+  Future<PermissionInviteResult> createTripPermissionInvite({
+    required String tripId,
+    required String email,
+    String role = 'member',
+  }) async {
+    final responseBody = await _client.post(
+      '/permissions',
+      body: {
+        'tripId': tripId,
+        'email': email.trim().toLowerCase(),
+        'role': role == 'viewer' ? 'viewer' : 'member',
+      },
+    );
+    return PermissionInviteResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
+  }
+
+  /// POST /invitations/revoke，撤回指定 email 的 pending invitation。
+  Future<void> revokeTripInvitation({
+    required String tripId,
+    required String email,
+  }) {
+    return _client.post(
+      '/invitations/revoke',
+      body: {'tripId': tripId, 'email': email.trim().toLowerCase()},
+    );
+  }
+
+  /// GET /invitations?token=...，公開邀請預覽。
+  Future<InvitationPreview> fetchInvitation(String token) async {
+    final responseBody = await _client.get(
+      '/invitations',
+      query: {'token': token},
+    );
+    return InvitationPreview.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /invitations/accept，接受登入使用者 email 相符的邀請。
+  Future<InvitationAcceptResult> acceptInvitation(String token) async {
+    final responseBody = await _client.post(
+      '/invitations/accept',
+      body: {'token': token},
+    );
+    return InvitationAcceptResult.fromJson(
+      responseBody as Map<String, dynamic>,
+    );
   }
 
   /// GET /requests?tripId=...，讀取 AI request queue。

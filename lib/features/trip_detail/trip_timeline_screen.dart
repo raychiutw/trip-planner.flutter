@@ -50,6 +50,11 @@ class TripTimelineScreen extends ConsumerWidget {
             icon: const Icon(Icons.sticky_note_2_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/notes'),
           ),
+          IconButton(
+            tooltip: '共編',
+            icon: const Icon(Icons.group_outlined),
+            onPressed: () => _goTo(context, '/trips/$tripId/collab'),
+          ),
         ],
       ),
       body: daysAsync.when(

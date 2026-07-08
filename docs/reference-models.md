@@ -74,6 +74,39 @@ helper：`isInflight` = `open` 或 `processing`；`isCompleted` = `completed`；
 
 `items: List<TripRequest>`、`hasMore: bool`。repository 也相容 legacy array response,會包成 `TripRequestPage(hasMore: false)`。
 
+## collab.dart
+
+### TripPermission — `GET /permissions?tripId=...`
+
+| 欄位 | 型別 | 備註 |
+|---|---|---|
+| `id` | `int` | permission row id |
+| `email` | `String` | 成員 email；缺漏預設 `''` |
+| `displayName` | `String?` | 使用者顯示名稱 |
+| `tripId` | `String` | 所屬行程 |
+| `role` | `String` | `owner` / `member` / `viewer`，缺漏預設 `viewer` |
+| `userId` | `String?` | 後端 join 使用者 id |
+
+helper：`isOwner`、`isViewer`、`roleLabel`（擁有者/共編成員/檢視者）、`displayLabel`（displayName 非空優先,否則 email）。
+
+### PermissionInviteResult — `POST /permissions`
+
+`ok: bool`、`status: String`、`email: String`、`id: int?`、`expiresAt: String?`。後端為防止 email enumeration,既有使用者與新邀請都可能回 `status: invitation_sent`。
+
+### PendingInvitation / PendingInvitationPage — `GET /invitations?tripId=...`
+
+`PendingInvitation` 欄位：`id: String`（token hash）、`invitedEmail: String`、`createdAt: String?`、`expiresAt: String?`、`daysRemaining: int?`、`isExpired: bool`。helper `statusLabel` 會顯示「已過期」「待接受」或「剩 N 天」。
+
+`PendingInvitationPage` 目前只有 `items: List<PendingInvitation>`。
+
+### InvitationPreview — `GET /invitations?token=...`
+
+公開邀請預覽（不需登入）：`tripId: String`、`tripTitle: String`、`invitedEmail: String`、`inviterDisplayName: String?`、`inviterEmail: String`、`expiresAt: String`。helper `inviterLabel` 以 displayName 非空優先,否則 inviter email。
+
+### InvitationAcceptResult — `POST /invitations/accept`
+
+`ok: bool`、`tripId: String`、`tripTitle: String`。成功後 `InviteScreen` 導向 `/trips/:tripId`。
+
 ## day.dart
 
 ### TripLocation — 座標(server 合成,全 nullable)

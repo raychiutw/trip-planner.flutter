@@ -12,9 +12,11 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
+import 'package:tripline/features/collab/collab_screen.dart';
 import 'package:tripline/features/favorites/add_poi_favorite_to_trip_screen.dart';
 import 'package:tripline/features/favorites/explore_screen.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
+import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
@@ -23,6 +25,7 @@ import 'package:tripline/features/trip_detail/entry_action_screen.dart';
 import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/chat.dart';
+import 'package:tripline/models/collab.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/main.dart';
@@ -59,6 +62,22 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       sort: any(named: 'sort'),
     ),
   ).thenAnswer((_) async => const TripRequestPage(items: [], hasMore: false));
+  when(
+    () => mockTripRepository.fetchTripPermissions(any()),
+  ).thenAnswer((_) async => const <TripPermission>[]);
+  when(
+    () => mockTripRepository.fetchPendingInvitations(any()),
+  ).thenAnswer((_) async => const PendingInvitationPage(items: []));
+  when(() => mockTripRepository.fetchInvitation(any())).thenAnswer(
+    (_) async => const InvitationPreview(
+      tripId: 'trip-1',
+      tripTitle: '沖繩家族之旅',
+      invitedEmail: 'traveler@example.com',
+      inviterDisplayName: 'Ray',
+      inviterEmail: 'ray@example.com',
+      expiresAt: '2026-07-15T00:00:00Z',
+    ),
+  );
   when(() => mockTripRepository.fetchTrip(any())).thenAnswer(
     (_) async => const Trip(
       id: 'trip-1',
@@ -231,6 +250,45 @@ void main() {
     expect(find.byType(TripFormScreen), findsOneWidget);
     expect(find.text('編輯行程'), findsOneWidget);
     expect(find.text('沖繩家族之旅'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/collab 進入共編設定頁', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/collab');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CollabScreen), findsOneWidget);
+    expect(find.text('共編設定'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入時 /invite?token 可進入 InviteScreen', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/invite?token=invite-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InviteScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

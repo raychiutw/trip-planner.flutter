@@ -9,9 +9,11 @@ import '../api/providers.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/chat/chat_screen.dart';
+import '../features/collab/collab_screen.dart';
 import '../features/favorites/add_poi_favorite_to_trip_screen.dart';
 import '../features/favorites/explore_screen.dart';
 import '../features/favorites/favorites_screen.dart';
+import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/add_entry_screen.dart';
@@ -44,13 +46,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      if (!isLoggedIn && !isOnLogin) return '/login';
+      final isOnInvite = state.matchedLocation == '/invite';
+      if (!isLoggedIn && !isOnLogin && !isOnInvite) return '/login';
       if (isLoggedIn && isOnLogin) return '/trips';
       return null;
     },
     routes: [
       // 登入頁在 shell 外（無底部導航）
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/invite',
+        builder: (context, state) =>
+            InviteScreen(token: state.uri.queryParameters['token']),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -94,6 +102,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'notes',
                         builder: (context, state) => TripNotesScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'collab',
+                        builder: (context, state) => CollabScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),

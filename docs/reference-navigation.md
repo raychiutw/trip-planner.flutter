@@ -7,6 +7,7 @@
 | 路徑 | 畫面 | 位置 |
 |---|---|---|
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
+| `/invite?token=...` | `InviteScreen` | **shell 外**；公開邀請預覽,未登入可進入 |
 | `/chat` | `ChatScreen` | tab 1；AI request queue 第一波 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
@@ -14,6 +15,7 @@
 | `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
+| `/trips/:tripId/collab` | `CollabScreen` | tab 2 孫路由；成員/待邀請與新增/撤回 pending invitation |
 | `/trips/:tripId/add-entry?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites/custom slice |
 | `/trips/:tripId/add-stop?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；相容入口 |
 | `/trips/:tripId/add-custom-stop?day=N` | `AddEntryScreen` | tab 2 孫路由；自訂地圖座標入口 |
@@ -39,7 +41,8 @@ redirect: (context, state) {
 
   final isLoggedIn = authState.value != null;
   final isOnLogin = state.matchedLocation == '/login';
-  if (!isLoggedIn && !isOnLogin) return '/login';
+  final isOnInvite = state.matchedLocation == '/invite';
+  if (!isLoggedIn && !isOnLogin && !isOnInvite) return '/login';
   if (isLoggedIn && isOnLogin) return '/trips';
   return null;
 }
@@ -48,8 +51,9 @@ redirect: (context, state) {
 三條規則:
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
-2. 未登入 + 不在 `/login` → 踢去 `/login`。
-3. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
+2. 未登入 + 不在 `/login` 或 `/invite` → 踢去 `/login`。
+3. 未登入可留在 `/invite` 看公開邀請預覽；真正接受邀請仍需登入且 email 相符。
+4. 已登入 + 在 `/login` → 送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
 
 ## auth 變化 → redirect 重算的橋接
 
