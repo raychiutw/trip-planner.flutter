@@ -457,6 +457,64 @@ void main() {
     },
   );
 
+  test(
+    'fetchAccountNotificationPreferences：GET /account/notifications',
+    () async {
+      dioAdapter.onGet(
+        '/account/notifications',
+        (server) => server.reply(200, {
+          'preferences': {
+            'tripUpdates': true,
+            'invitations': false,
+            'system': true,
+            'updatedAt': '2026-07-09T00:00:00Z',
+          },
+        }),
+      );
+
+      final prefs = await tripRepository.fetchAccountNotificationPreferences();
+
+      expect(prefs.tripUpdates, isTrue);
+      expect(prefs.invitations, isFalse);
+      expect(prefs.system, isTrue);
+      expect(prefs.updatedAt, '2026-07-09T00:00:00Z');
+    },
+  );
+
+  test(
+    'updateAccountNotificationPreferences：PATCH /account/notifications',
+    () async {
+      dioAdapter.onPatch(
+        '/account/notifications',
+        (server) => server.reply(200, {
+          'preferences': {
+            'tripUpdates': true,
+            'invitations': false,
+            'system': false,
+            'updatedAt': '2026-07-09T01:00:00Z',
+          },
+        }),
+        data: {'invitations': false, 'system': false},
+      );
+
+      final prefs = await tripRepository.updateAccountNotificationPreferences(
+        invitations: false,
+        system: false,
+      );
+
+      expect(prefs.invitations, isFalse);
+      expect(prefs.system, isFalse);
+      expect(prefs.updatedAt, '2026-07-09T01:00:00Z');
+    },
+  );
+
+  test('updateAccountNotificationPreferences：空 patch 不打 API', () async {
+    await expectLater(
+      tripRepository.updateAccountNotificationPreferences(),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('revokeConnectedApp：DELETE /account/connected-apps/:clientId', () async {
     dioAdapter.onDelete(
       '/account/connected-apps/tp_alpha',

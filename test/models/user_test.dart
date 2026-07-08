@@ -68,4 +68,48 @@ void main() {
       expect(stats.collaboratorCount, 0);
     });
   });
+
+  group('AccountNotificationPreferences.fromJson', () {
+    test('解析 camelCase 欄位', () {
+      final prefs = AccountNotificationPreferences.fromJson({
+        'tripUpdates': true,
+        'invitations': false,
+        'system': true,
+        'updatedAt': '2026-07-09T00:00:00Z',
+      });
+
+      expect(prefs.tripUpdates, isTrue);
+      expect(prefs.invitations, isFalse);
+      expect(prefs.system, isTrue);
+      expect(prefs.updatedAt, '2026-07-09T00:00:00Z');
+    });
+
+    test('接受 snake_case / 0/1 flags 並在缺漏時預設開啟', () {
+      final prefs = AccountNotificationPreferences.fromJson({
+        'trip_updates': 0,
+        'updated_at': '2026-07-09T00:00:00Z',
+      });
+
+      expect(prefs.tripUpdates, isFalse);
+      expect(prefs.invitations, isTrue);
+      expect(prefs.system, isTrue);
+      expect(prefs.updatedAt, '2026-07-09T00:00:00Z');
+    });
+
+    test('copyWith 只覆寫指定欄位', () {
+      const prefs = AccountNotificationPreferences(
+        tripUpdates: true,
+        invitations: true,
+        system: true,
+        updatedAt: '2026-07-09T00:00:00Z',
+      );
+
+      final next = prefs.copyWith(invitations: false);
+
+      expect(next.tripUpdates, isTrue);
+      expect(next.invitations, isFalse);
+      expect(next.system, isTrue);
+      expect(next.updatedAt, '2026-07-09T00:00:00Z');
+    });
+  });
 }

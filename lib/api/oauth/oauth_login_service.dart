@@ -1,6 +1,6 @@
 /// OAuth PKCE 登入編排(RFC 8252 loopback):起本地 server → 開系統瀏覽器授權 →
 /// 收 redirect 的 code → 換 token → 存。**device 相依、未單測**;核心(pkce/exchange)
-/// 已於各自單元測試覆蓋。e2e 待 backend owner provision public client。
+/// 已於各自單元測試覆蓋。production public client 已 provision。
 library;
 
 import 'dart:async';

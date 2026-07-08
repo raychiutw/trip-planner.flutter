@@ -525,6 +525,42 @@ class TripRepository {
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// GET /account/notifications，讀取通知偏好。
+  Future<AccountNotificationPreferences>
+  fetchAccountNotificationPreferences() async {
+    final responseBody = await _client.get('/account/notifications');
+    final preferencesJson =
+        (responseBody as Map<String, dynamic>)['preferences']
+            as Map<String, dynamic>? ??
+        const <String, dynamic>{};
+    return AccountNotificationPreferences.fromJson(preferencesJson);
+  }
+
+  /// PATCH /account/notifications，更新單一或多個通知偏好。
+  Future<AccountNotificationPreferences> updateAccountNotificationPreferences({
+    bool? tripUpdates,
+    bool? invitations,
+    bool? system,
+  }) async {
+    final body = <String, bool>{
+      'tripUpdates': ?tripUpdates,
+      'invitations': ?invitations,
+      'system': ?system,
+    };
+    if (body.isEmpty) {
+      throw ArgumentError.value(body, 'body', '至少提供一個通知設定欄位');
+    }
+    final responseBody = await _client.patch(
+      '/account/notifications',
+      body: body,
+    );
+    final preferencesJson =
+        (responseBody as Map<String, dynamic>)['preferences']
+            as Map<String, dynamic>? ??
+        const <String, dynamic>{};
+    return AccountNotificationPreferences.fromJson(preferencesJson);
+  }
+
   /// GET /account/sessions，列出目前帳號登入裝置。
   Future<AccountSessionsPage> fetchAccountSessions() async {
     final responseBody = await _client.get('/account/sessions');
