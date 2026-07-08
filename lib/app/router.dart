@@ -6,19 +6,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
+import '../features/account/account_sessions_screen.dart';
 import '../features/account/account_screen.dart';
+import '../features/account/connected_apps_screen.dart';
+import '../features/account/developer_apps_screen.dart';
 import '../features/account/settings/appearance_screen.dart';
+import '../features/account/settings/notifications_screen.dart';
 import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/oauth_consent_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
 import '../features/map/global_map_screen.dart';
+import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
+import '../features/trip_detail/trip_print_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
 import '../features/trips/collab/collab_screen.dart';
 import '../features/trips/create/create_trip_screen.dart';
@@ -26,6 +33,7 @@ import '../features/trips/edit/edit_trip_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
+import '../models/oauth.dart';
 
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -46,8 +54,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
-      if (!isLoggedIn && !isOnLogin) return '/login';
-      if (isLoggedIn && isOnLogin) return '/trips';
+      final isPublicRoute = _isPublicShellOutsideRoute(state);
+      if (!isLoggedIn && !isOnLogin && !isPublicRoute) {
+        return _loginLocationWithRedirect(state);
+      }
+      if (isLoggedIn && isOnLogin) return _redirectAfterLogin(state);
       return null;
     },
     routes: [
@@ -80,6 +91,52 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/profile',
         builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/account/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/sessions',
+        builder: (context, state) => const AccountSessionsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/connected-apps',
+        builder: (context, state) => const ConnectedAppsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/developer-apps',
+        builder: (context, state) => const DeveloperAppsScreen(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const DeveloperAppNewScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/developer/apps',
+        builder: (context, state) => const DeveloperAppsScreen(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const DeveloperAppNewScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/oauth/consent',
+        builder: (context, state) =>
+            OAuthConsentScreen(request: OAuthConsentRequest.fromUri(state.uri)),
+      ),
+      GoRoute(
+        path: '/s/:token',
+        builder: (context, state) =>
+            PublicShareScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -114,6 +171,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'notes',
                         builder: (context, state) => TripNotesScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'print',
+                        builder: (context, state) => TripPrintScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),
@@ -175,3 +238,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(router.dispose);
   return router;
 });
+
+const _publicShellOutsideRoutes = {'/login', '/oauth/consent'};
+
+String _loginLocationWithRedirect(GoRouterState state) {
+  final requestedLocation = state.uri.toString();
+  if (requestedLocation == '/trips') return '/login';
+  return '/login?redirect_after=${Uri.encodeComponent(requestedLocation)}';
+}
+
+String _redirectAfterLogin(GoRouterState state) {
+  final rawRedirect = state.uri.queryParameters['redirect_after'];
+  if (rawRedirect == null) return '/trips';
+
+  final redirectUri = Uri.tryParse(rawRedirect);
+  if (redirectUri == null ||
+      redirectUri.hasScheme ||
+      redirectUri.hasAuthority ||
+      !rawRedirect.startsWith('/') ||
+      rawRedirect.startsWith('//') ||
+      redirectUri.path == '/login') {
+    return '/trips';
+  }
+  return redirectUri.toString();
+}
+
+bool _isPublicShellOutsideRoute(GoRouterState state) {
+  if (_publicShellOutsideRoutes.contains(state.matchedLocation)) return true;
+  final pathSegments = state.uri.pathSegments;
+  return pathSegments.length == 2 && pathSegments.first == 's';
+}

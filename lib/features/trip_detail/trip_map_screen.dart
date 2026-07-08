@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
+import '../map/map_adapter.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -22,14 +21,14 @@ const List<Color> kDayPinPalette = [
   Color(0xFFF43F5E), // rose
 ];
 
-/// 行程地圖：day tabs（總覽 + DAY NN）＋ flutter_map OSM ＋ 底部 entry cards。
+/// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
   const TripMapScreen({super.key, required this.tripId, this.tileProvider});
 
   final String tripId;
 
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -66,7 +65,7 @@ class _DayPin {
   /// 該日內 1-based 序號（圓形 marker 上的數字）。
   final int pinNumber;
   final TimelineEntry entry;
-  final LatLng point;
+  final TripMapPoint point;
 
   Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
 }
@@ -75,14 +74,14 @@ class _TripMapView extends StatefulWidget {
   const _TripMapView({required this.days, this.tileProvider});
 
   final List<TripDay> days;
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
 
   @override
   State<_TripMapView> createState() => _TripMapViewState();
 }
 
 class _TripMapViewState extends State<_TripMapView> {
-  final MapController _mapController = MapController();
+  final FlutterTripMapController _mapController = FlutterTripMapController();
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
@@ -116,7 +115,7 @@ class _TripMapViewState extends State<_TripMapView> {
           dayNum: day.dayNum,
           pinNumber: dayPins.length + 1,
           entry: entry,
-          point: LatLng(lat, lng),
+          point: TripMapPoint(lat, lng),
         ),
       );
     }
@@ -136,14 +135,12 @@ class _TripMapViewState extends State<_TripMapView> {
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
   }
 
-  void _fitToPoints(List<LatLng> points) {
+  void _fitToPoints(List<TripMapPoint> points) {
     if (!_mapIsReady || points.isEmpty) return;
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints(points),
-        padding: const EdgeInsets.all(TpSpacing.s10),
-        maxZoom: 16,
-      ),
+    _mapController.fitPoints(
+      points,
+      padding: const EdgeInsets.all(TpSpacing.s10),
+      maxZoom: 16,
     );
   }
 
@@ -250,41 +247,25 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints([
-            for (final pin in allPins) pin.point,
-          ]),
-          padding: const EdgeInsets.all(TpSpacing.s10),
-          maxZoom: 16,
-        ),
-        onMapReady: () => _mapIsReady = true,
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.raychiu.tripline',
-          tileProvider: widget.tileProvider,
-        ),
-        MarkerLayer(
-          markers: [for (final pin in visiblePins) _buildMarker(pin)],
-        ),
-        RichAttributionWidget(
-          attributions: [TextSourceAttribution('OpenStreetMap contributors')],
-        ),
-      ],
+    return FlutterMapCanvas(
+      controller: _mapController,
+      tilePreset: kTripMapTilePresets.first,
+      initialFitPoints: [for (final pin in allPins) pin.point],
+      initialPadding: const EdgeInsets.all(TpSpacing.s10),
+      initialMaxZoom: 16,
+      tileProvider: widget.tileProvider,
+      onMapReady: () => _mapIsReady = true,
+      markers: [for (final pin in visiblePins) _buildMarker(pin)],
     );
   }
 
-  Marker _buildMarker(_DayPin pin) {
-    return Marker(
-      key: ValueKey('map-pin-${pin.entry.id}'),
+  TripMapMarker _buildMarker(_DayPin pin) {
+    return TripMapMarker(
       point: pin.point,
       width: 32,
       height: 32,
       child: Container(
+        key: ValueKey('map-pin-${pin.entry.id}'),
         decoration: BoxDecoration(
           color: pin.color,
           shape: BoxShape.circle,

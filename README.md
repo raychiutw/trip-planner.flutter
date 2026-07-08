@@ -13,8 +13,8 @@
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
 - 帳號（profile、統計、登出）
 
-**P1（待辦）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
-**P2**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。
+**P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
+**P2（已完成到 client scope）**：分享/列印/匯入、設定子頁、OAuth PKCE Bearer 認證、離線快取。外部限制：OAuth e2e 需後端註冊 active public client；通知 toggle 需後端偏好 API。
 
 ## 開發
 

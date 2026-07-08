@@ -1,18 +1,17 @@
-/// 全域地圖:把所有收藏 POI(GET /poi-favorites,跨行程)畫在 flutter_map 上,
+/// 全域地圖:把所有收藏 POI(GET /poi-favorites,跨行程)畫在地圖 adapter 上,
 /// 依 poi_type 上色;點 marker → 顯示名稱/評分/所屬行程。
 /// (web 的 /map 實為 dead code 導回單行程地圖;此處實作真正的跨行程地圖。)
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../models/poi_favorite.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/poi_tone.dart';
 import '../../theme/tokens.dart';
 import '../favorites/favorites_providers.dart';
+import 'map_adapter.dart';
 
 bool _hasCoords(PoiFavorite f) =>
     f.poiLat != null && f.poiLng != null && f.poiLat != 0 && f.poiLng != 0;
@@ -21,14 +20,21 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
   const GlobalMapScreen({super.key, this.tileProvider});
 
   /// 測試注入(避免抓真 tile);prod 為 null → 走網路 OSM。
-  final TileProvider? tileProvider;
+  final TripMapTileProvider? tileProvider;
 
   @override
   ConsumerState<GlobalMapScreen> createState() => _GlobalMapScreenState();
 }
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
+  final FlutterTripMapController _mapController = FlutterTripMapController();
   int? _selectedId;
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,51 +82,38 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
 
   Widget _buildMap(BuildContext context, List<PoiFavorite> pins) {
     final tones = Theme.of(context).extension<TpTones>()!;
-    final points = [for (final f in pins) LatLng(f.poiLat!, f.poiLng!)];
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(points),
-          padding: const EdgeInsets.all(TpSpacing.s10),
-          maxZoom: 14,
-        ),
-        onTap: (_, _) => setState(() => _selectedId = null),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.raychiu.tripline',
-          tileProvider: widget.tileProvider,
-        ),
-        MarkerLayer(
-          markers: [
-            for (final f in pins)
-              Marker(
-                key: ValueKey('map-fav-${f.id}'),
-                point: LatLng(f.poiLat!, f.poiLng!),
-                width: 28,
-                height: 28,
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedId = f.id),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: resolvePoiTone(tones, f.poiType).base,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _selectedId == f.id
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Colors.white,
-                        width: 3,
-                      ),
-                    ),
+    final points = [for (final f in pins) TripMapPoint(f.poiLat!, f.poiLng!)];
+    return FlutterMapCanvas(
+      controller: _mapController,
+      tilePreset: kTripMapTilePresets.first,
+      initialFitPoints: points,
+      initialPadding: const EdgeInsets.all(TpSpacing.s10),
+      initialMaxZoom: 14,
+      tileProvider: widget.tileProvider,
+      onTap: (_) => setState(() => _selectedId = null),
+      markers: [
+        for (final f in pins)
+          TripMapMarker(
+            point: TripMapPoint(f.poiLat!, f.poiLng!),
+            width: 28,
+            height: 28,
+            child: GestureDetector(
+              key: ValueKey('map-fav-${f.id}'),
+              onTap: () => setState(() => _selectedId = f.id),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: resolvePoiTone(tones, f.poiType).base,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _selectedId == f.id
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Colors.white,
+                    width: 3,
                   ),
                 ),
               ),
-          ],
-        ),
-        const RichAttributionWidget(
-          attributions: [TextSourceAttribution('OpenStreetMap contributors')],
-        ),
+            ),
+          ),
       ],
     );
   }

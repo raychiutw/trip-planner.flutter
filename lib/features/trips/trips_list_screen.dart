@@ -1,11 +1,104 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
+
+const int _maxTripImportBytes = 512 * 1024;
+
+/// 匯入 JSON 檔案選擇器；widget test 以 provider override 注入假檔案。
+final tripImportFilePickerProvider = Provider<TripImportFilePicker>(
+  (ref) => const FileSelectorTripImportFilePicker(),
+);
+
+/// 匯出 JSON 檔案寫入器；widget test 以 provider override 避免原生 save dialog。
+final tripExportFileWriterProvider = Provider<TripExportFileWriter>(
+  (ref) => const FileSelectorTripExportFileWriter(),
+);
+
+class TripImportFile {
+  const TripImportFile({
+    required this.name,
+    required this.length,
+    required this.content,
+  });
+
+  final String name;
+  final int length;
+  final String content;
+}
+
+abstract class TripImportFilePicker {
+  const TripImportFilePicker();
+
+  Future<TripImportFile?> pick();
+}
+
+class FileSelectorTripImportFilePicker implements TripImportFilePicker {
+  const FileSelectorTripImportFilePicker();
+
+  @override
+  Future<TripImportFile?> pick() async {
+    final file = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'JSON',
+          extensions: ['json'],
+          mimeTypes: ['application/json'],
+        ),
+      ],
+    );
+    if (file == null) return null;
+    return TripImportFile(
+      name: file.name,
+      length: await file.length(),
+      content: await file.readAsString(),
+    );
+  }
+}
+
+abstract class TripExportFileWriter {
+  const TripExportFileWriter();
+
+  Future<bool> save({required String suggestedName, required String content});
+}
+
+class FileSelectorTripExportFileWriter implements TripExportFileWriter {
+  const FileSelectorTripExportFileWriter();
+
+  @override
+  Future<bool> save({
+    required String suggestedName,
+    required String content,
+  }) async {
+    final location = await getSaveLocation(
+      suggestedName: suggestedName,
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'JSON',
+          extensions: ['json'],
+          mimeTypes: ['application/json'],
+        ),
+      ],
+    );
+    if (location == null) return false;
+    final file = XFile.fromData(
+      Uint8List.fromList(utf8.encode(content)),
+      mimeType: 'application/json',
+      name: suggestedName,
+    );
+    await file.saveTo(location.path);
+    return true;
+  }
+}
 
 /// 行程清單排序方式。
 enum TripSortOrder {
@@ -53,6 +146,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   String _query = '';
   TripSortOrder _sortOrder = TripSortOrder.defaultOrder;
   TripFilter _filterTab = TripFilter.all;
+  bool _isImporting = false;
+  String? _exportingTripId;
 
   @override
   void initState() {
@@ -81,11 +176,15 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         return trips;
       case TripFilter.mine:
         return trips
-            .where((t) => t.ownerUserId != null && t.ownerUserId == currentUserId)
+            .where(
+              (t) => t.ownerUserId != null && t.ownerUserId == currentUserId,
+            )
             .toList();
       case TripFilter.shared:
         return trips
-            .where((t) => t.ownerUserId != null && t.ownerUserId != currentUserId)
+            .where(
+              (t) => t.ownerUserId != null && t.ownerUserId != currentUserId,
+            )
             .toList();
     }
   }
@@ -114,14 +213,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         sorted.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
       case TripSortOrder.updatedDesc:
         // updatedAt 由新到舊;缺漏(null/空)排最後。
-        sorted.sort(
-          (a, b) => _compareNullableDesc(a.updatedAt, b.updatedAt),
-        );
+        sorted.sort((a, b) => _compareNullableDesc(a.updatedAt, b.updatedAt));
       case TripSortOrder.startDateAsc:
         // startDate 由近到遠;缺漏(null/空)排最後。
-        sorted.sort(
-          (a, b) => _compareNullableAsc(a.startDate, b.startDate),
-        );
+        sorted.sort((a, b) => _compareNullableAsc(a.startDate, b.startDate));
     }
     return sorted;
   }
@@ -156,6 +251,17 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       appBar: AppBar(
         title: const Text('我的行程'),
         actions: [
+          IconButton(
+            key: const ValueKey('trips-list-import-trigger'),
+            tooltip: '匯入行程 JSON',
+            icon: _isImporting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            onPressed: _isImporting ? null : _importTripFromJson,
+          ),
           PopupMenuButton<TripSortOrder>(
             key: const ValueKey('trips-sort-button'),
             icon: const Icon(Icons.sort),
@@ -227,18 +333,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             child: SegmentedButton<TripFilter>(
               showSelectedIcon: false,
               segments: const [
-                ButtonSegment(
-                  value: TripFilter.all,
-                  label: Text('全部'),
-                ),
-                ButtonSegment(
-                  value: TripFilter.mine,
-                  label: Text('我的'),
-                ),
-                ButtonSegment(
-                  value: TripFilter.shared,
-                  label: Text('共編'),
-                ),
+                ButtonSegment(value: TripFilter.all, label: Text('全部')),
+                ButtonSegment(value: TripFilter.mine, label: Text('我的')),
+                ButtonSegment(value: TripFilter.shared, label: Text('共編')),
               ],
               selected: {_filterTab},
               onSelectionChanged: (selection) {
@@ -260,8 +357,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                   child: trips.isEmpty
                       ? const _EmptyHero()
                       : filtered.isEmpty
-                          ? _buildNoResults(theme)
-                          : _buildTripList(context, filtered, currentUserId),
+                      ? _buildNoResults(theme)
+                      : _buildTripList(context, filtered, currentUserId),
                 );
               },
               error: (error, stackTrace) =>
@@ -272,6 +369,73 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _importTripFromJson() async {
+    setState(() => _isImporting = true);
+    try {
+      final file = await ref.read(tripImportFilePickerProvider).pick();
+      if (!mounted || file == null) return;
+      if (file.length > _maxTripImportBytes) {
+        _showActionMessage('檔案過大（上限 512KB）');
+        return;
+      }
+
+      final decodedJson = jsonDecode(file.content);
+      if (decodedJson is! Map || decodedJson['schemaVersion'] != 1) {
+        _showActionMessage('不支援的匯出格式（需 schemaVersion 1）');
+        return;
+      }
+
+      final tripId = await ref
+          .read(tripRepositoryProvider)
+          .importTripJson(file.content);
+      if (!mounted) return;
+      ref.invalidate(myTripsProvider);
+      _showActionMessage('匯入成功');
+      context.go('/trips/$tripId');
+    } on FormatException {
+      if (!mounted) return;
+      _showActionMessage('不是有效的 JSON 檔');
+    } on ApiError catch (error) {
+      if (!mounted) return;
+      _showActionMessage(error.detail ?? error.message);
+    } on Exception {
+      if (!mounted) return;
+      _showActionMessage('匯入失敗，請稍後再試');
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
+  Future<void> _exportTripToJson(TripSummary trip) async {
+    if (_exportingTripId != null) return;
+    setState(() => _exportingTripId = trip.tripId);
+    try {
+      final export = await ref
+          .read(tripRepositoryProvider)
+          .exportTripJson(trip.tripId);
+      final saved = await ref
+          .read(tripExportFileWriterProvider)
+          .save(suggestedName: export.fileName, content: export.content);
+      if (!mounted) return;
+      _showActionMessage(saved ? '匯出成功' : '已取消匯出');
+    } on Exception {
+      if (!mounted) return;
+      _showActionMessage('匯出失敗，請稍後再試');
+    } finally {
+      if (mounted) {
+        setState(() => _exportingTripId = null);
+      }
+    }
+  }
+
+  void _showActionMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildNoResults(ThemeData theme) {
@@ -317,9 +481,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  /// 長按卡片 → bottom sheet（刪除行程）。
+  /// 長按卡片 → bottom sheet（分享/共編/匯出/刪除）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
-    final selectedDelete = await showModalBottomSheet<bool>(
+    final selectedAction = await showModalBottomSheet<_TripListAction>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
@@ -348,6 +512,21 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                 },
               ),
               ListTile(
+                key: ValueKey('trip-card-menu-export-${trip.tripId}'),
+                leading: _exportingTripId == trip.tripId
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_outlined),
+                title: const Text('匯出 JSON'),
+                onTap: _exportingTripId == null
+                    ? () => Navigator.of(
+                        sheetContext,
+                      ).pop(_TripListAction.exportJson)
+                    : null,
+              ),
+              ListTile(
                 leading: Icon(Icons.delete_outline, color: destructiveColor),
                 title: Text(
                   '刪除行程',
@@ -356,7 +535,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                onTap: () => Navigator.of(sheetContext).pop(true),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TripListAction.delete),
               ),
               const SizedBox(height: TpSpacing.s2),
             ],
@@ -364,8 +544,17 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         );
       },
     );
-    if (selectedDelete != true || !context.mounted) return;
-    await _confirmAndDeleteTrip(context, trip);
+    if (!context.mounted) return;
+    switch (selectedAction) {
+      case _TripListAction.exportJson:
+        await _exportTripToJson(trip);
+        return;
+      case _TripListAction.delete:
+        await _confirmAndDeleteTrip(context, trip);
+        return;
+      case null:
+        return;
+    }
   }
 
   /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。
@@ -415,6 +604,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     }
   }
 }
+
+enum _TripListAction { exportJson, delete }
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {

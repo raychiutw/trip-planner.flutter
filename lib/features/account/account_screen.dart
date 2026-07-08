@@ -265,7 +265,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「個人資料」「外觀」可進子頁;「通知」即將推出（disabled）。
+/// 設定群組：「個人資料」「外觀」「登入裝置」「OAuth app」「通知」可進子頁。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
 
@@ -315,38 +315,53 @@ class _SettingsGroup extends StatelessWidget {
                 thickness: 1,
                 color: theme.colorScheme.outlineVariant,
               ),
-              const _ComingSoonRow(
-                icon: Icons.notifications_outlined,
-                title: '通知',
+              ListTile(
+                key: const ValueKey('settings-sessions'),
+                leading: const Icon(Icons.devices_outlined),
+                title: const Text('登入裝置'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/sessions'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-connected-apps'),
+                leading: const Icon(Icons.extension_outlined),
+                title: const Text('已連結的應用程式'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/connected-apps'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-developer-apps'),
+                leading: const Icon(Icons.code_outlined),
+                title: const Text('開發者應用'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/developer-apps'),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              ListTile(
+                key: const ValueKey('settings-notifications'),
+                leading: const Icon(Icons.notifications_outlined),
+                title: const Text('通知'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/notifications'),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 即將推出設定 row（disabled 樣式）。
-class _ComingSoonRow extends StatelessWidget {
-  const _ComingSoonRow({required this.icon, required this.title});
-
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListTile(
-      enabled: false,
-      leading: Icon(icon, size: 20),
-      title: Text(title),
-      trailing: Text(
-        '即將推出',
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.disabledColor,
-        ),
-      ),
     );
   }
 }

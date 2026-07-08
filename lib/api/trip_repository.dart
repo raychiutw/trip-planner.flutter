@@ -1,19 +1,31 @@
 /// 行程資料 repository：my-trips / trips / days / notes / stats / profile。
 library;
 
+import 'dart:convert';
+
 import '../models/day.dart';
 import '../models/destination_input.dart';
 import '../models/entry.dart';
 import '../models/note_section.dart';
 import '../models/notes.dart';
+import '../models/oauth.dart';
 import '../models/poi_search_result.dart';
 import '../models/poi_type.dart';
 import '../models/segment.dart';
+import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'cache/cache_keys.dart';
 import 'cache/offline_op.dart';
+
+/// 行程 JSON 匯出結果，`content` 可直接寫入 `fileName`。
+class TripJsonExport {
+  const TripJsonExport({required this.fileName, required this.content});
+
+  final String fileName;
+  final String content;
+}
 
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
@@ -238,6 +250,37 @@ class TripRepository {
   /// DELETE /trips/:id（限 owner/admin）。
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
+
+  /// POST /trips/import，送出 web 匯出的 raw JSON text 並回傳新 tripId。
+  Future<String> importTripJson(String jsonText) async {
+    final responseBody = await _client.post('/trips/import', body: jsonText);
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
+  /// 匯出 web import 可吃的 schemaVersion 1 JSON。
+  Future<TripJsonExport> exportTripJson(String tripId, {DateTime? now}) async {
+    final encodedTripId = Uri.encodeComponent(tripId);
+    final meta = _copyJsonMap(await _client.get('/trips/$encodedTripId'));
+    final days = _asRecordList(
+      await _client.get('/trips/$encodedTripId/days', query: {'all': '1'}),
+    );
+    final segments = await _fetchOptionalRecordList(
+      '/trips/$encodedTripId/segments',
+    );
+    final notes = await _fetchOptionalMap('/trips/$encodedTripId/notes');
+    final output = _buildTripExportJson(
+      meta: meta,
+      days: days,
+      segments: segments,
+      notes: notes,
+    );
+
+    return TripJsonExport(
+      fileName:
+          '${_tripExportFileBase(meta, tripId, now ?? DateTime.now())}.json',
+      content: const JsonEncoder.withIndent('  ').convert(output),
+    );
+  }
 
   /// POST /trips/:id/days/:num/entries（direct add,body snake_case;後端自動 find-or-create POI）。
   Future<void> addEntryToDay({
@@ -481,4 +524,243 @@ class TripRepository {
     );
     return UserInfo.fromJson(responseBody as Map<String, dynamic>);
   }
+
+  /// GET /account/sessions，列出目前帳號登入裝置。
+  Future<AccountSessionsPage> fetchAccountSessions() async {
+    final responseBody = await _client.get('/account/sessions');
+    return AccountSessionsPage.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /account/sessions，登出其他裝置並回傳撤銷數量。
+  Future<int> revokeOtherAccountSessions() async {
+    final responseBody = await _client.delete('/account/sessions');
+    if (responseBody is Map<String, dynamic>) {
+      return (responseBody['revoked'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
+  /// DELETE /account/sessions/:sid，登出指定裝置。
+  Future<void> revokeAccountSession(String sid) {
+    return _client.delete('/account/sessions/${Uri.encodeComponent(sid)}');
+  }
+
+  /// GET /account/connected-apps，列出目前帳號授權過的 OAuth app。
+  Future<List<ConnectedApp>> fetchConnectedApps() async {
+    final responseBody = await _client.get('/account/connected-apps');
+    final appsJson =
+        (responseBody as Map<String, dynamic>)['apps'] as List<dynamic>? ??
+        const [];
+    return appsJson
+        .map(
+          (appJson) => ConnectedApp.fromJson(appJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// DELETE /account/connected-apps/:clientId，撤銷 app access/refresh token。
+  Future<void> revokeConnectedApp(String clientId) {
+    return _client.delete(
+      '/account/connected-apps/${Uri.encodeComponent(clientId)}',
+    );
+  }
+
+  /// GET /dev/apps，列出目前帳號建立的 OAuth client apps。
+  Future<List<DeveloperApp>> fetchDeveloperApps() async {
+    final responseBody = await _client.get('/dev/apps');
+    final appsJson =
+        (responseBody as Map<String, dynamic>)['apps'] as List<dynamic>? ??
+        const [];
+    return appsJson
+        .map(
+          (appJson) => DeveloperApp.fromJson(appJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// POST /dev/apps，建立 OAuth client app。
+  Future<CreatedDeveloperApp> createDeveloperApp({
+    required String appName,
+    String clientType = 'public',
+    required List<String> redirectUris,
+    List<String> allowedScopes = const ['openid', 'profile', 'email'],
+    String? appDescription,
+    String? homepageUrl,
+  }) async {
+    final responseBody = await _client.post(
+      '/dev/apps',
+      body: {
+        'app_name': appName.trim(),
+        'client_type': clientType == 'confidential' ? 'confidential' : 'public',
+        'redirect_uris': redirectUris
+            .map((uri) => uri.trim())
+            .where((uri) => uri.isNotEmpty)
+            .toList(),
+        'allowed_scopes': allowedScopes
+            .where(kDeveloperAllowedScopes.contains)
+            .toList(),
+        'app_description': _trimmedOrNull(appDescription),
+        'homepage_url': _trimmedOrNull(homepageUrl),
+      },
+    );
+    return CreatedDeveloperApp.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// GET /share/:token（公開分享頁,不需登入）。
+  Future<PublicTripShare> fetchPublicTripShare(String token) async {
+    final responseBody = await _client.get(
+      '/share/${Uri.encodeComponent(token)}',
+    );
+    return PublicTripShare.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /share/:token/clone，將公開行程複製到目前登入帳號。
+  Future<String> clonePublicTripShare(String token) async {
+    final responseBody = await _client.post(
+      '/share/${Uri.encodeComponent(token)}/clone',
+      body: <String, dynamic>{},
+    );
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchOptionalRecordList(
+    String path,
+  ) async {
+    try {
+      return _asRecordList(await _client.get(path));
+    } on Exception {
+      return const <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchOptionalMap(String path) async {
+    try {
+      return _copyJsonMap(await _client.get(path));
+    } on Exception {
+      return _emptyExportNotes();
+    }
+  }
+}
+
+Map<String, dynamic> _buildTripExportJson({
+  required Map<String, dynamic> meta,
+  required List<Map<String, dynamic>> days,
+  required List<Map<String, dynamic>> segments,
+  required Map<String, dynamic> notes,
+}) {
+  final entryIdToPosition = <int, int>{};
+  var entryPosition = 0;
+  final exportDays = days.map((day) {
+    final dayCopy = Map<String, dynamic>.from(day);
+    final timeline = _asRecordList(dayCopy['timeline']).map((entry) {
+      final entryCopy = Map<String, dynamic>.from(entry);
+      final id = _intOrNull(entryCopy['id']);
+      if (id != null) {
+        entryIdToPosition[id] = entryPosition;
+      }
+      entryCopy['entryPosition'] = entryPosition;
+      entryPosition++;
+      return entryCopy;
+    }).toList();
+    dayCopy['timeline'] = timeline;
+    return dayCopy;
+  }).toList();
+
+  final exportSegments = <Map<String, dynamic>>[];
+  for (final segment in segments) {
+    final fromEntryPosition =
+        entryIdToPosition[_intFromAnyKey(
+          segment,
+          'fromEntryId',
+          'from_entry_id',
+        )];
+    final toEntryPosition =
+        entryIdToPosition[_intFromAnyKey(segment, 'toEntryId', 'to_entry_id')];
+    if (fromEntryPosition == null || toEntryPosition == null) continue;
+    exportSegments.add({
+      'fromEntryIdx': fromEntryPosition,
+      'toEntryIdx': toEntryPosition,
+      'mode': _stringOrNull(segment['mode']) ?? '',
+      'min': _numberOrNull(segment['min']),
+      'distanceM': _numberFromAnyKey(segment, 'distanceM', 'distance_m'),
+      'source': _stringOrNull(segment['source']),
+    });
+  }
+
+  return {
+    'schemaVersion': 1,
+    'meta': meta,
+    'days': exportDays,
+    'notes': notes,
+    'segments': exportSegments,
+  };
+}
+
+List<Map<String, dynamic>> _asRecordList(Object? value) {
+  if (value is! List) return const <Map<String, dynamic>>[];
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+}
+
+Map<String, dynamic> _copyJsonMap(Object? value) {
+  if (value is Map) return Map<String, dynamic>.from(value);
+  return <String, dynamic>{};
+}
+
+Map<String, dynamic> _emptyExportNotes() {
+  return {
+    'flights': const <dynamic>[],
+    'lodgings': const <dynamic>[],
+    'reservations': const <dynamic>[],
+    'pretripNotes': const <dynamic>[],
+    'emergencyContacts': const <dynamic>[],
+  };
+}
+
+String _tripExportFileBase(
+  Map<String, dynamic> meta,
+  String fallbackTripId,
+  DateTime now,
+) {
+  final rawName = _stringOrNull(meta['name']) ?? fallbackTripId;
+  return _safeFileBase('$rawName-${_datePart(now)}');
+}
+
+String _safeFileBase(String raw) {
+  final stripped = raw.replaceAll(RegExp(r'[\\/\x00-\x1F<>:"|?*]'), '_').trim();
+  if (stripped.isEmpty) return 'trip';
+  return stripped.length > 80 ? stripped.substring(0, 80) : stripped;
+}
+
+String _datePart(DateTime date) {
+  final y = date.year.toString().padLeft(4, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final d = date.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+String? _stringOrNull(Object? value) => value is String ? value : null;
+
+int? _intFromAnyKey(Map<String, dynamic> json, String key, String fallbackKey) {
+  return _intOrNull(json[key]) ?? _intOrNull(json[fallbackKey]);
+}
+
+num? _numberFromAnyKey(
+  Map<String, dynamic> json,
+  String key,
+  String fallbackKey,
+) {
+  return _numberOrNull(json[key]) ?? _numberOrNull(json[fallbackKey]);
+}
+
+int? _intOrNull(Object? value) => (value as num?)?.toInt();
+
+num? _numberOrNull(Object? value) => value is num ? value : null;
+
+String? _trimmedOrNull(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+  return trimmed;
 }

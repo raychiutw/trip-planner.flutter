@@ -8,20 +8,24 @@ P1 全數完成 🎉(見 Completed)。
 
 ## P2
 
-- [~] 分享/列印/匯入:**分享(公開連結)已完成**(建立/清單/撤銷 + 複製 URL);列印/匯入未做。
-- [~] 設定子頁:**外觀(主題)+ 個人資料編輯 已完成**;sessions/connected-apps/通知 延後。
-- [~] OAuth PKCE + Bearer 認證:**client 端已完成 + 單測**(pkce/token/refresh/Bearer ApiClient/loopback 編排),預設關閉(`--dart-define` 啟用)。**e2e 待 backend owner provision active public client + loopback redirect**(見 `docs/howto-oauth-pkce.md`)。登入頁 OAuth 按鈕待接。
-- [ ] 離線快取
+- [x] 分享/列印/匯入:**公開分享頁 + 複製公開行程、列印/PDF 預覽、JSON 匯入/匯出 已完成**。
+- [x] 設定子頁:**外觀、個人資料、通知設定、登入裝置、已連結 OAuth app、開發者 OAuth app 已完成**。通知偏好 toggle 待後端 API 開放。
+- [~] OAuth PKCE + Bearer 認證:**client 端、登入按鈕、consent 頁、connected/developer app 管理已完成 + 單測**(pkce/token/refresh/Bearer ApiClient/loopback 編排),預設關閉(`--dart-define` 啟用)。**e2e 待 backend owner provision active public client + loopback redirect**(見 `docs/howto-oauth-pkce.md`)。
+- [x] 離線快取:讀取快取、離線寫入佇列、flush、OCC rebase/conflict UI 已完成。
 
 ## 技術債
 
 - [x] v0.1.0 PR merge 後在 master 補打 `git tag v0.1.0` 並 push(**Completed:** 2026-06-10)
 - [x] `--dart-define=TRIPLINE_API_ORIGIN` base URL 覆寫(**Completed:** 2026-06-10)
-- [ ] 地圖介面抽象化(PORTING_PLAN 決策:保留之後換 google_maps_flutter 的空間;目前 flutter_map 直接用在 TripMapScreen)
+- [x] 地圖介面抽象化(PORTING_PLAN 決策:保留之後換 google_maps_flutter 的空間;`TripMapScreen`/`GlobalMapScreen` 已改走 `features/map/map_adapter.dart`)
 
 ## Completed
 
 - [x] 建立/編輯行程:目的地優先 POI 建立(固定/彈性日期 + 每地天數)+ 編輯(PUT 欄位,明確儲存)(**Completed:** 2026-06-12)
+- [x] P2 分享/列印/匯入:公開分享頁 `/s/:token` + clone、行程列印/PDF 預覽、JSON import/export(**Completed:** 2026-07-08)
+- [x] P2 帳號安全與 OAuth 設定:登入裝置、connected apps、developer apps、OAuth consent shell route(**Completed:** 2026-07-08)
+- [x] P2 通知設定頁:web parity stub + `/settings/notifications`、`/account/notifications` route(**Completed:** 2026-07-08)
+- [x] 地圖 adapter:`TripMapPoint`/`FlutterMapCanvas` 抽象化,保留之後替換地圖 SDK 的空間(**Completed:** 2026-07-08)
 - [x] 全域地圖(map tab 轉正):收藏 POI 跨行程 flutter_map(依 poi_type 上色 + 點選資訊卡)(**Completed:** 2026-06-12)
 - [x] 共編邀請(成員管理):成員/角色/移除 + 待接受邀請撤銷 + email 邀請(`/permissions` + `/invitations`)(**Completed:** 2026-06-12)
 - [x] AI 聊天(chat tab 轉正):工單佇列(`POST /api/requests` + polling)+ markdown 回覆 + deep-link 映射 + 行程下拉(預設最近)+ 三方氣泡;completed 後 invalidate 行程 providers(**Completed:** 2026-06-11)

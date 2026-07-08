@@ -23,8 +23,32 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _fixedUser;
 }
 
-UserInfo _userWithId(String id) =>
-    UserInfo(id: id, email: '$id@example.com');
+class _FakeTripImportFilePicker implements TripImportFilePicker {
+  const _FakeTripImportFilePicker(this.file);
+
+  final TripImportFile? file;
+
+  @override
+  Future<TripImportFile?> pick() async => file;
+}
+
+class _FakeTripExportFileWriter implements TripExportFileWriter {
+  String? suggestedName;
+  String? content;
+  bool saved = true;
+
+  @override
+  Future<bool> save({
+    required String suggestedName,
+    required String content,
+  }) async {
+    this.suggestedName = suggestedName;
+    this.content = content;
+    return saved;
+  }
+}
+
+UserInfo _userWithId(String id) => UserInfo(id: id, email: '$id@example.com');
 
 void main() {
   const fakeTrips = [
@@ -271,7 +295,10 @@ void main() {
 
       final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
       expect(cards.length, 1);
-      expect(cards.first.tone, TripCardTone.accent); // filtered index 0 → accent
+      expect(
+        cards.first.tone,
+        TripCardTone.accent,
+      ); // filtered index 0 → accent
     });
   });
 
@@ -300,9 +327,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => Stream.value(unsortedTrips),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(unsortedTrips)),
           ],
           child: buildRouterApp(),
         ),
@@ -324,9 +349,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => Stream.value(unsortedTrips),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(unsortedTrips)),
           ],
           child: buildRouterApp(),
         ),
@@ -354,9 +377,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => Stream.value(unsortedTrips),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(unsortedTrips)),
           ],
           child: buildRouterApp(),
         ),
@@ -408,9 +429,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => Stream.value(moreTrips),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(moreTrips)),
           ],
           child: buildRouterApp(),
         ),
@@ -442,9 +461,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => Stream.value(unsortedTrips),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(unsortedTrips)),
           ],
           child: buildRouterApp(),
         ),
@@ -481,6 +498,81 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('detail:okinawa-trip-2026'), findsOneWidget);
+    });
+
+    testWidgets('AppBar 匯入 JSON → 呼叫 importTripJson 並導向新行程', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.importTripJson(any()),
+      ).thenAnswer((_) async => 'imported-trip');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              const _FakeTripImportFilePicker(
+                TripImportFile(
+                  name: 'trip.json',
+                  length: 31,
+                  content: '{"schemaVersion":1,"meta":{}}',
+                ),
+              ),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pumpAndSettle();
+
+      verify(
+        () =>
+            mockTripRepository.importTripJson('{"schemaVersion":1,"meta":{}}'),
+      ).called(1);
+      expect(find.text('detail:imported-trip'), findsOneWidget);
+    });
+
+    testWidgets('長按 → 匯出 JSON → 寫入 export 檔名與內容', (tester) async {
+      final mockTripRepository = MockTripRepository();
+      final writer = _FakeTripExportFileWriter();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(() => mockTripRepository.exportTripJson(any())).thenAnswer(
+        (_) async => const TripJsonExport(
+          fileName: 'okinawa.json',
+          content: '{"schemaVersion":1}',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripExportFileWriterProvider.overrideWithValue(writer),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('匯出 JSON'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockTripRepository.exportTripJson('okinawa-trip-2026'),
+      ).called(1);
+      expect(writer.suggestedName, 'okinawa.json');
+      expect(writer.content, '{"schemaVersion":1}');
+      expect(find.text('匯出成功'), findsOneWidget);
     });
 
     testWidgets(
@@ -746,9 +838,19 @@ void main() {
 
     testWidgets('缺 startDate 的行程排到最後（出發日排序）', (tester) async {
       const withMissing = [
-        TripSummary(tripId: 'x', name: 'x', title: 'X', startDate: '2026-06-01'),
+        TripSummary(
+          tripId: 'x',
+          name: 'x',
+          title: 'X',
+          startDate: '2026-06-01',
+        ),
         TripSummary(tripId: 'y', name: 'y', title: 'Y'),
-        TripSummary(tripId: 'z', name: 'z', title: 'Z', startDate: '2026-02-01'),
+        TripSummary(
+          tripId: 'z',
+          name: 'z',
+          title: 'Z',
+          startDate: '2026-02-01',
+        ),
       ];
       await tester.pumpWidget(
         ProviderScope(

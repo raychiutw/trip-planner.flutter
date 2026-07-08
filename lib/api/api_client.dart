@@ -21,6 +21,14 @@ const String kTriplineOrigin = String.fromEnvironment(
   defaultValue: 'https://trip-planner-dby.pages.dev',
 );
 
+/// Redirect-style API response where callers need the `Location` header.
+class ApiRedirectResponse {
+  const ApiRedirectResponse({required this.statusCode, required this.location});
+
+  final int statusCode;
+  final String? location;
+}
+
 /// 提供 Bearer access token 與 refresh 能力(OAuth 模式)。
 /// 注入 ApiClient 後,有 token 即走 Bearer(不送 Cookie/Origin);null/無 token → cookie 模式。
 abstract class BearerTokenSource {
@@ -72,7 +80,13 @@ class ApiClient {
     Map<String, dynamic>? query,
     CancelToken? cancelToken,
     bool writeCache = true,
-  }) => _send('GET', path, query: query, cancelToken: cancelToken, writeCache: writeCache);
+  }) => _send(
+    'GET',
+    path,
+    query: query,
+    cancelToken: cancelToken,
+    writeCache: writeCache,
+  );
 
   Future<dynamic> post(
     String path, {
@@ -88,6 +102,33 @@ class ApiClient {
 
   Future<dynamic> delete(String path, {Map<String, dynamic>? query}) =>
       _send('DELETE', path, query: query);
+
+  /// POST that preserves 3xx redirect response instead of following it.
+  Future<ApiRedirectResponse> postForRedirect(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) async {
+    final auth = await _authHeadersFor('POST');
+    final response = await _dio.request<dynamic>(
+      path,
+      queryParameters: query,
+      data: body,
+      options: Options(
+        method: 'POST',
+        headers: auth.headers,
+        followRedirects: false,
+      ),
+    );
+    final statusCode = response.statusCode ?? 0;
+    if (statusCode < 200 || statusCode >= 400) {
+      throw ApiError.fromResponse(statusCode, response.data);
+    }
+    return ApiRedirectResponse(
+      statusCode: statusCode,
+      location: response.headers.value('location'),
+    );
+  }
 
   /// SWR 讀取:先 emit 本機快取(stale),再抓網路;fresh 到達後套用尚未 flush 的
   /// 樂觀 patch(維持「快取 = server 真相 + pending patch」不變式)再 emit。
@@ -204,7 +245,9 @@ class ApiClient {
           await store.removeMutation(m.id);
           synced++;
         } on ApiError catch (e) {
-          if (e.status == 409 && e.code == 'STALE_ENTRY' && _rebasable(m.type)) {
+          if (e.status == 409 &&
+              e.code == 'STALE_ENTRY' &&
+              _rebasable(m.type)) {
             final outcome = await _tryRebase(m, refetchCache);
             if (outcome == _RebaseOutcome.synced) {
               await store.removeMutation(m.id);
@@ -428,24 +471,7 @@ class ApiClient {
     bool fallbackToCache = true,
     bool writeCache = true,
   }) async {
-    final requestHeaders = <String, dynamic>{};
-    final bearer = await _bearerSource?.accessToken();
-    final useBearer = bearer != null && bearer.isNotEmpty;
-    if (useBearer) {
-      // Bearer 模式:帶 token,不送 Cookie/Origin
-      //（後端對「有 Bearer 且無 Origin」的 request 跳過 CSRF 檢查）。
-      requestHeaders['Authorization'] = 'Bearer $bearer';
-    } else {
-      final sessionToken = await _sessionStore.read();
-      if (sessionToken != null && sessionToken.isNotEmpty) {
-        requestHeaders['Cookie'] = 'tripline_session=$sessionToken';
-      }
-      final isMutation = method != 'GET' && method != 'HEAD';
-      if (isMutation) {
-        // cookie 認證的 mutating request 必帶 Origin（後端 CSRF 檢查）
-        requestHeaders['Origin'] = _origin;
-      }
-    }
+    final auth = await _authHeadersFor(method);
 
     final Response<dynamic> response;
     try {
@@ -453,7 +479,7 @@ class ApiClient {
         path,
         queryParameters: query,
         data: body,
-        options: Options(method: method, headers: requestHeaders),
+        options: Options(method: method, headers: auth.headers),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -492,7 +518,7 @@ class ApiClient {
     }
     // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
     if (statusCode == 401 &&
-        useBearer &&
+        auth.useBearer &&
         !isRetryAttempt &&
         _bearerSource != null &&
         await _bearerSource.refresh()) {
@@ -525,6 +551,30 @@ class ApiClient {
   /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
   bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
 
+  Future<({Map<String, dynamic> headers, bool useBearer})> _authHeadersFor(
+    String method,
+  ) async {
+    final requestHeaders = <String, dynamic>{};
+    final bearer = await _bearerSource?.accessToken();
+    final useBearer = bearer != null && bearer.isNotEmpty;
+    if (useBearer) {
+      // Bearer 模式:帶 token,不送 Cookie/Origin
+      //（後端對「有 Bearer 且無 Origin」的 request 跳過 CSRF 檢查）。
+      requestHeaders['Authorization'] = 'Bearer $bearer';
+    } else {
+      final sessionToken = await _sessionStore.read();
+      if (sessionToken != null && sessionToken.isNotEmpty) {
+        requestHeaders['Cookie'] = 'tripline_session=$sessionToken';
+      }
+      final isMutation = method != 'GET' && method != 'HEAD';
+      if (isMutation) {
+        // cookie 認證的 mutating request 必帶 Origin（後端 CSRF 檢查）
+        requestHeaders['Origin'] = _origin;
+      }
+    }
+    return (headers: requestHeaders, useBearer: useBearer);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // 衝突解決 API(供 T10 衝突 UI 呼叫)
   // ─────────────────────────────────────────────────────────────────────────
@@ -535,14 +585,19 @@ class ApiClient {
   Future<void> resolveConflictKeepOurs(ConflictRecord c) async {
     final store = _cacheStore!;
     try {
-      await _send('PATCH', c.path,
-          body: _rebasedBody(c.base, c.ours, c.body, c.newVersion));
+      await _send(
+        'PATCH',
+        c.path,
+        body: _rebasedBody(c.base, c.ours, c.body, c.newVersion),
+      );
       await store.removeConflict(c.id);
     } on ApiError catch (e) {
       if (e.status == 409 && e.code == 'STALE_ENTRY') {
         await store.removeConflict(c.id);
-        final outcome =
-            await _tryRebase(_asQueued(c), <String, Future<Object?>>{});
+        final outcome = await _tryRebase(
+          _asQueued(c),
+          <String, Future<Object?>>{},
+        );
         // synced → 已解;conflict → _tryRebase 內已重新 appendConflict;
         // offline/retryLater → 重新入主佇列待下次 flush。
         if (outcome == _RebaseOutcome.offline ||

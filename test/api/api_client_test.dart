@@ -299,4 +299,40 @@ void main() {
       );
     });
   });
+
+  group('redirect response', () {
+    test('postForRedirect 不跟隨 302，並回傳 Location', () async {
+      await sessionStore.write('token123');
+      dioAdapter.onPost(
+        '/oauth/consent',
+        (server) => server.reply(
+          302,
+          '',
+          headers: {
+            'location': [
+              '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
+            ],
+          },
+        ),
+        data: {'client_id': 'tp_alpha', 'decision': 'allow'},
+      );
+
+      final response = await apiClient.postForRedirect(
+        '/oauth/consent',
+        body: {'client_id': 'tp_alpha', 'decision': 'allow'},
+      );
+
+      expect(response.statusCode, 302);
+      expect(
+        response.location,
+        '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
+      );
+      expect(recordedRequests.single.followRedirects, isFalse);
+      expect(
+        recordedRequests.single.headers['Cookie'],
+        'tripline_session=token123',
+      );
+      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
+    });
+  });
 }
