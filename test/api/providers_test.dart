@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
+import 'package:tripline/api/offline_cache.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -50,6 +51,16 @@ void main() {
     expect(
       defaultContainer.read(sessionStoreProvider),
       isA<SecureSessionStore>(),
+    );
+  });
+
+  test('offlineCacheProvider 預設為 FileOfflineCache', () {
+    final defaultContainer = ProviderContainer();
+    addTearDown(defaultContainer.dispose);
+
+    expect(
+      defaultContainer.read(offlineCacheProvider),
+      isA<FileOfflineCache>(),
     );
   });
 

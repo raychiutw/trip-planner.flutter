@@ -1,6 +1,6 @@
 # API 層參考(`lib/api/`)
 
-Tripline 的 API 層封裝對 Cloudflare Pages Functions 後端(`https://trip-planner-dby.pages.dev/api`)的所有 HTTP 存取。由四個部分組成:`ApiClient`(dio 封裝)、`ApiError`(錯誤型別)、`SessionStore`(token 儲存)、兩個 repository(`AuthRepository`、`TripRepository`),最後以 riverpod providers 串起來。
+Tripline 的 API 層封裝對 Cloudflare Pages Functions 後端(`https://trip-planner-dby.pages.dev/api`)的所有 HTTP 存取。由 `ApiClient`(dio 封裝)、`ApiError`(錯誤型別)、`SessionStore`(token 儲存)、`OfflineCache`(read-through JSON cache)、兩個 repository(`AuthRepository`、`TripRepository`),最後以 riverpod providers 串起來。
 
 > 想了解「為什麼這樣設計」(cookie 認證、CSRF Origin、429 retry 策略),請看[架構說明](explanation-architecture.md)。想新增 endpoint,請看 [How to 新增 API endpoint](howto-add-endpoint.md)。
 
@@ -97,6 +97,21 @@ abstract class SessionStore {
 | `SecureSessionStore` | 正式環境。flutter_secure_storage,key 固定 `tripline_session`(iOS Keychain / Android Keystore) |
 | `InMemorySessionStore` | 測試替身。純記憶體,測試結束即消失 |
 
+## OfflineCache(`offline_cache.dart`)
+
+```dart
+abstract class OfflineCache {
+  Future<dynamic> readJson(String key);
+  Future<void> writeJson(String key, Object? value);
+}
+
+class FileOfflineCache implements OfflineCache;      // 正式環境,Application Support/offline_cache
+class InMemoryOfflineCache implements OfflineCache;  // 測試替身
+class NoopOfflineCache implements OfflineCache;      // 不啟用快取
+```
+
+`TripRepository` 會對 read-only GET 使用 read-through cache:`/my-trips`、`/trips`、trip detail、days、segments、notes。成功拿到 fresh JSON 後 best-effort 寫入快取；遇到 Dio 網路錯誤、`ApiError.status == 0` 或 `>= 500` 時才回退最近快取。401/403/404 不使用舊資料遮蔽授權或不存在狀態。Mutation 不做離線佇列,也不回報假成功。
+
 ## AuthRepository(`auth_repository.dart`)
 
 對應 `/api/oauth/*` 認證 endpoints。
@@ -135,7 +150,7 @@ class AuthRepository {
 
 ```dart
 class TripRepository {
-  TripRepository({required ApiClient client});
+  TripRepository({required ApiClient client, OfflineCache offlineCache = const NoopOfflineCache()});
 
   Future<List<TripSummary>> fetchMyTrips();              // GET /my-trips
   Future<List<Trip>>        fetchTrips();                // GET /trips(published 清單)
@@ -388,7 +403,8 @@ final sessionStoreProvider   = Provider<SessionStore>((ref) => SecureSessionStor
 final apiEndpointProvider    = Provider<ApiEndpointConfig>(...); // 讀 TRIPLINE_API_URL
 final apiClientProvider      = Provider<ApiClient>(...);       // 注入 sessionStoreProvider + endpoint config
 final authRepositoryProvider = Provider<AuthRepository>(...);  // 注入 client + store
-final tripRepositoryProvider = Provider<TripRepository>(...);  // 注入 client
+final offlineCacheProvider   = Provider<OfflineCache>((ref) => FileOfflineCache());
+final tripRepositoryProvider = Provider<TripRepository>(...);  // 注入 client + offline cache
 
 class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> login(String email, String password);

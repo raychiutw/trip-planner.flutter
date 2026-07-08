@@ -8,7 +8,7 @@
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
 - 5-tab shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
 - 行程清單（三色 tone 卡片、pull-to-refresh、分類/搜尋/排序、action menu、filtered empty、尾端新增卡、JSON 匯入、分享連結管理）
-- 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
+- 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡、離線快取回退）
 - 行程地圖（map adapter + flutter_map/OSM、逐日 pin、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，新增/編輯/刪除與 AI 生成第一波）
 - AI 健檢（行程層級報告、severity 分組、pending polling）
@@ -16,7 +16,7 @@
 - 帳號（profile、displayName inline 編輯、外觀/通知設定第一波、統計、登出）
 
 **P1（進行中）**：收藏 + 探索 + 加入行程 fast-path（含 direct-mode）已完成第一波；建立/編輯行程已完成基本資料、目的地與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice、travel segments edit slice，並支援 `STALE_ENTRY` 重抓 retry；AI 聊天 request queue + polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告、Auth 補齊已完成第一波。
-**P2**：公開分享頁/列印/JSON 匯出、settings sessions / connected apps / developer apps、OAuth PKCE Bearer 認證、離線快取。
+**P2**：公開分享頁/列印/JSON 匯出、settings sessions / connected apps / developer apps、離線快取第一波已完成；OAuth PKCE Bearer 認證仍待後端 public client 設定。
 
 ## 開發
 
@@ -33,7 +33,7 @@ flutter run        # 連 prod API（注意：請用測試帳號）
 lib/
   theme/        # design tokens（對應 web css/tokens.css）+ ThemeData + TpTones 三色 ThemeExtension
   models/       # Trip/Day/Entry/Chat/Collab/Health/Notes/User —— camelCase wire fromJson
-  api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
+  api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ read-through offline cache + repositories + riverpod providers
   app/          # go_router（5-tab StatefulShellRoute + auth redirect）
   features/     # auth / chat / collab / invite / map / trips / trip_detail（timeline·map·notes）/ favorites / account / shell
 docs/

@@ -17,6 +17,7 @@
 - **P2 登入裝置管理**:新增 `/account/sessions` 與 `/settings/sessions`；帳號頁可進入登入裝置清單，支援 `GET /account/sessions` 顯示目前/其他裝置、單一登出與登出其他裝置。
 - **API endpoint override**:新增 `--dart-define=TRIPLINE_API_URL=...` 支援，可傳 origin 或完整 `/api` URL；`ApiClient` 會分別設定 base URL 與 mutating request 的 Origin header。
 - **地圖介面抽象化**:新增 `features/map/map_adapter.dart`，以 `TripMapPoint`、`TripMapRoute`、`TripMapMarker` 與 `FlutterMapCanvas` 集中 `flutter_map` 轉接；TripMap 與自訂景點 picker 不再直接依賴 raw `LatLng` / `MapController` / layer 型別。
+- **P2 離線快取第一波**:新增 `OfflineCache` / `FileOfflineCache`，`TripRepository` 對 `/my-trips`、published trips、trip detail、days、segments、notes 採 read-through JSON cache；GET 成功會寫入本機快取，Dio 網路錯誤或 5xx 時回退最近快取，401/403/404 不以快取遮蔽。
 - **P1 收藏/探索**:`/favorites` 改成真收藏清單,支援取消收藏、usage badge 與加入行程入口;新增 `/explore` 搜尋 POI、加入/取消收藏;新增 `/favorites/:id/add-to-trip` 以 4-field fast-path 將收藏排入行程;補上 `/add-to-trip?place_id=...` direct-mode,可不先收藏就從搜尋結果排入行程並觸發 travel recompute。
 - **P1 建立/編輯行程**:新增 `/trips/new` 與 `/trips/:tripId/edit`;TripsList AppBar/空狀態可建立行程,長按卡片可進入編輯行程,支援基本資料、目的地、日期、語言與發布狀態送出。編輯模式已接上 day management,可前/後新增行程日、補回缺漏日期、刪除 day 前顯示景點影響範圍,並以新的 Day 1 日期平移整段行程。
 - **P1 新增景點**:新增 `/trips/:tripId/add-entry`、`/trips/:tripId/add-stop` 與 `/add-custom-stop` 相容入口;時間軸 AppBar 可進入新增景點表單,支援搜尋 POI、收藏 POI 或自訂地圖座標加入指定 day,成功後觸發 travel recompute。

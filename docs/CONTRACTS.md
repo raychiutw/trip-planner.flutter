@@ -171,6 +171,12 @@ abstract class SessionStore { Future<String?> read(); Future<void> write(String 
 class SecureSessionStore implements SessionStore { /* flutter_secure_storage, key: 'tripline_session' */ }
 class InMemorySessionStore implements SessionStore { /* 測試用 */ }
 
+// offline_cache.dart — read-through JSON cache
+abstract class OfflineCache { Future<dynamic> readJson(String key); Future<void> writeJson(String key, Object? value); }
+class FileOfflineCache implements OfflineCache { /* Application Support/offline_cache */ }
+class InMemoryOfflineCache implements OfflineCache { /* 測試用 */ }
+class NoopOfflineCache implements OfflineCache { /* 停用快取 */ }
+
 // api_client.dart
 const String kTriplineOrigin = 'https://trip-planner-dby.pages.dev';
 class ApiClient {
@@ -207,7 +213,7 @@ class AuthRepository {
 
 // trip_repository.dart
 class TripRepository {
-  TripRepository({required ApiClient client});
+  TripRepository({required ApiClient client, OfflineCache offlineCache = const NoopOfflineCache()});
   Future<List<TripSummary>> fetchMyTrips();          // GET /my-trips
   Future<List<Trip>> fetchTrips();                   // GET /trips
   Future<Trip> fetchTrip(String id);                 // GET /trips/:id
@@ -401,7 +407,8 @@ final sessionStoreProvider = Provider<SessionStore>(...);     // 預設 SecureSe
 final apiEndpointProvider = Provider<ApiEndpointConfig>(...);  // 讀 --dart-define=TRIPLINE_API_URL，可接受 origin 或完整 /api URL
 final apiClientProvider = Provider<ApiClient>(...);
 final authRepositoryProvider = Provider<AuthRepository>(...);
-final tripRepositoryProvider = Provider<TripRepository>(...);
+final offlineCacheProvider = Provider<OfflineCache>(...);       // 預設 FileOfflineCache
+final tripRepositoryProvider = Provider<TripRepository>(...);   // 注入 ApiClient + OfflineCache
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(...); // app/app_preferences.dart
 final notificationPreferencesProvider = NotifierProvider<NotificationPreferencesNotifier, NotificationPreferences>(...);
 class AuthNotifier extends AsyncNotifier<UserInfo?> { Future<void> login(String email, String password); Future<SignupResult?> signup({required String email, required String password, String? displayName, String? invitationToken}); Future<void> logout(); Future<UserInfo> updateProfile({String? displayName}); }

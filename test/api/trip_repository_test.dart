@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/offline_cache.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/health.dart';
@@ -15,12 +17,13 @@ import 'package:tripline/models/trip.dart';
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
+  late ApiClient apiClient;
   late TripRepository tripRepository;
 
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
-    final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
+    apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
     tripRepository = TripRepository(client: apiClient);
   });
 
@@ -861,6 +864,82 @@ void main() {
     final kokusaiStreetEntry = firstDay.timeline.last;
     expect(kokusaiStreetEntry.master, isNull);
     expect(kokusaiStreetEntry.alternates, isEmpty);
+  });
+
+  test('offline cache：fetchDays 成功後寫入，500 時回退快取', () async {
+    final cache = InMemoryOfflineCache();
+    final cachedRepository = TripRepository(
+      client: apiClient,
+      offlineCache: cache,
+    );
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(200, [
+        {
+          'id': 11,
+          'dayNum': 1,
+          'date': '2026-10-01',
+          'title': '抵達',
+          'version': 1,
+          'timeline': [],
+        },
+      ]),
+      queryParameters: {'all': '1'},
+    );
+
+    final freshDays = await cachedRepository.fetchDays('okinawa-trip-2026-Ray');
+
+    expect(freshDays.single.dayNum, 1);
+
+    final failingDio = Dio();
+    final failingAdapter = DioAdapter(dio: failingDio);
+    final failingRepository = TripRepository(
+      client: ApiClient(sessionStore: InMemorySessionStore(), dio: failingDio),
+      offlineCache: cache,
+    );
+    failingAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(500, {
+        'error': {'code': 'HTTP_500', 'message': 'server down'},
+      }),
+      queryParameters: {'all': '1'},
+    );
+
+    final cachedDays = await failingRepository.fetchDays(
+      'okinawa-trip-2026-Ray',
+    );
+
+    expect(cachedDays.single.title, '抵達');
+  });
+
+  test('offline cache：401 不使用舊快取遮掉授權錯誤', () async {
+    final cache = InMemoryOfflineCache();
+    await cache.writeJson('trip-days:okinawa-trip-2026-Ray', [
+      {
+        'id': 11,
+        'dayNum': 1,
+        'date': '2026-10-01',
+        'title': '抵達',
+        'version': 1,
+        'timeline': [],
+      },
+    ]);
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(401, {
+        'error': {'code': 'AUTH_REQUIRED', 'message': 'login required'},
+      }),
+      queryParameters: {'all': '1'},
+    );
+    final cachedRepository = TripRepository(
+      client: apiClient,
+      offlineCache: cache,
+    );
+
+    expect(
+      () => cachedRepository.fetchDays('okinawa-trip-2026-Ray'),
+      throwsA(isA<ApiError>().having((error) => error.status, 'status', 401)),
+    );
   });
 
   test('createTripDay：POST /trips/:id/days 可從結尾新增一天', () async {

@@ -10,7 +10,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 
 1. **Primary tab parity debt**：`/favorites`、`/chat`、`/map` 已轉正第一波；後續仍需補更多 web parity 細節。
 2. **Trip action surface**：新增/編輯行程、景點 CRUD、共編邀請、健檢、分享連結管理、公開分享頁與列印/PDF 已有第一波；剩餘子流程仍待更完整 web parity。
-3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、外觀/通知設定、sessions、connected apps、developer apps 與 OAuth consent 已完成第一波；PKCE/Bearer 與離線快取仍待後續。
+3. **Auth/OAuth/設定生態**：註冊、忘記密碼、email 驗證、外觀/通知設定、sessions、connected apps、developer apps、OAuth consent 與離線快取第一波已完成；PKCE/Bearer 仍待後續。
 
 ## 現行 Route 對照
 
@@ -110,7 +110,7 @@ Flutter v0.1.0 已完成 P0「可登入並唯讀瀏覽行程」：登入、5-tab
 - 公開分享頁 `/s/:token` 與列印/PDF `/trips/:id/print` 第一波已完成。JSON 匯出已由 TripsList action menu 完成。
 - Account/settings 後續子頁：connected apps、developer apps、OAuth consent 第一波已完成。
 - OAuth PKCE Bearer 認證。
-- 離線快取與 web service worker 等價能力。
+- 離線快取第一波已完成 repository read-through cache；web service worker 等價能力仍可延後。
 - GlobalMap 進階：跨行程聚合、路線、多圖層、定位權限。
 
 ## 不建議照搬

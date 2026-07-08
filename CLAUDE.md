@@ -30,7 +30,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ### Provider 鏈(riverpod 3.x)
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`/`tripRepositoryProvider` → `authStateProvider`(全 app 認證 SoT)→ `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 用 `FutureProvider.family<_, String tripId>`(`lib/features/trip_detail/trip_providers.dart`)— timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch,對應 web 版 TripLayout。
+`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`/`tripRepositoryProvider`（另注入 `offlineCacheProvider`）→ `authStateProvider`(全 app 認證 SoT)→ `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 用 `FutureProvider.family<_, String tripId>`(`lib/features/trip_detail/trip_providers.dart`)— timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch,對應 web 版 TripLayout。
 
 注意:flutter_riverpod 3.x 未匯出 `Override` 型別,測試的 overrides 直接以 list literal 傳入 `ProviderScope`。
 
@@ -48,6 +48,10 @@ flutter run                                           # 連 prod API — 一律�
 2. 429 只 retry GET 一次(讀 `Retry-After`,cap 30s);mutation 絕不 retry
 3. 204/空 body → `null`
 4. 路徑參數 `Uri.encodeComponent`
+
+### 離線快取
+
+`TripRepository` 對 my-trips、published trips、trip detail、days、segments、notes 採 read-through JSON cache。GET 成功後 best-effort 寫入 `OfflineCache`;Dio 網路錯誤或 `ApiError.status >= 500` 時可回退快取；401/403/404 必須照常丟錯,不可用舊資料遮蔽授權或不存在狀態。Mutation 不做離線成功假象。
 
 ### Model 解析規則(所有 fromJson 一致)
 

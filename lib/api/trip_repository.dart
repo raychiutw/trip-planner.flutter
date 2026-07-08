@@ -3,6 +3,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
+
 import '../models/day.dart';
 import '../models/entry.dart';
 import '../models/chat.dart';
@@ -14,7 +16,9 @@ import '../models/poi.dart';
 import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/user.dart';
+import 'api_error.dart';
 import 'api_client.dart';
+import 'offline_cache.dart';
 
 /// 行程 JSON 匯出結果，`content` 可直接寫入 `fileName`。
 class TripJsonExport {
@@ -29,13 +33,21 @@ class TripJsonExport {
 
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
-  TripRepository({required ApiClient client}) : _client = client;
+  TripRepository({
+    required ApiClient client,
+    OfflineCache offlineCache = const NoopOfflineCache(),
+  }) : _client = client,
+       _offlineCache = offlineCache;
 
   final ApiClient _client;
+  final OfflineCache _offlineCache;
 
   /// GET /my-trips。
   Future<List<TripSummary>> fetchMyTrips() async {
-    final responseBody = await _client.get('/my-trips');
+    final responseBody = await _cachedGet(
+      'my-trips',
+      () => _client.get('/my-trips'),
+    );
     return (responseBody as List<dynamic>)
         .map(
           (tripJson) => TripSummary.fromJson(tripJson as Map<String, dynamic>),
@@ -45,7 +57,7 @@ class TripRepository {
 
   /// GET /trips（published 行程清單）。
   Future<List<Trip>> fetchTrips() async {
-    final responseBody = await _client.get('/trips');
+    final responseBody = await _cachedGet('trips', () => _client.get('/trips'));
     return (responseBody as List<dynamic>)
         .map((tripJson) => Trip.fromJson(tripJson as Map<String, dynamic>))
         .toList();
@@ -53,7 +65,10 @@ class TripRepository {
 
   /// GET /trips/:id。
   Future<Trip> fetchTrip(String id) async {
-    final responseBody = await _client.get('/trips/${Uri.encodeComponent(id)}');
+    final responseBody = await _cachedGet(
+      'trip:$id',
+      () => _client.get('/trips/${Uri.encodeComponent(id)}'),
+    );
     return Trip.fromJson(responseBody as Map<String, dynamic>);
   }
 
@@ -416,9 +431,12 @@ class TripRepository {
 
   /// GET /trips/:id/days?all=1（完整 timeline）。
   Future<List<TripDay>> fetchDays(String id) async {
-    final responseBody = await _client.get(
-      '/trips/${Uri.encodeComponent(id)}/days',
-      query: {'all': '1'},
+    final responseBody = await _cachedGet(
+      'trip-days:$id',
+      () => _client.get(
+        '/trips/${Uri.encodeComponent(id)}/days',
+        query: {'all': '1'},
+      ),
     );
     return (responseBody as List<dynamic>)
         .map((dayJson) => TripDay.fromJson(dayJson as Map<String, dynamic>))
@@ -470,8 +488,9 @@ class TripRepository {
 
   /// GET /trips/:id/segments（trip_segments source of truth）。
   Future<List<TripSegment>> fetchTripSegments(String tripId) async {
-    final responseBody = await _client.get(
-      '/trips/${Uri.encodeComponent(tripId)}/segments',
+    final responseBody = await _cachedGet(
+      'trip-segments:$tripId',
+      () => _client.get('/trips/${Uri.encodeComponent(tripId)}/segments'),
     );
     return (responseBody as List<dynamic>)
         .map(
@@ -657,8 +676,9 @@ class TripRepository {
 
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async {
-    final responseBody = await _client.get(
-      '/trips/${Uri.encodeComponent(id)}/notes',
+    final responseBody = await _cachedGet(
+      'trip-notes:$id',
+      () => _client.get('/trips/${Uri.encodeComponent(id)}/notes'),
     );
     return TripNotes.fromJson(responseBody as Map<String, dynamic>);
   }
@@ -1277,6 +1297,32 @@ class TripRepository {
     } on Exception {
       return _emptyExportNotes();
     }
+  }
+
+  Future<dynamic> _cachedGet(
+    String cacheKey,
+    Future<dynamic> Function() request,
+  ) async {
+    try {
+      final responseBody = await request();
+      try {
+        await _offlineCache.writeJson(cacheKey, responseBody);
+      } on Exception {
+        // Cache writes are best-effort; fresh network data must still win.
+      }
+      return responseBody;
+    } on Object catch (error) {
+      if (!_canUseOfflineCache(error)) rethrow;
+      final cached = await _offlineCache.readJson(cacheKey);
+      if (cached == null) rethrow;
+      return cached;
+    }
+  }
+
+  bool _canUseOfflineCache(Object error) {
+    if (error is DioException) return true;
+    if (error is ApiError) return error.status == 0 || error.status >= 500;
+    return false;
   }
 
   Future<T> _createNoteRow<T>({

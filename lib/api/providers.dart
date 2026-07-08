@@ -7,6 +7,7 @@ import '../models/auth.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
+import 'offline_cache.dart';
 import 'session_store.dart';
 import 'trip_repository.dart';
 
@@ -81,8 +82,15 @@ final authRepositoryProvider = Provider<AuthRepository>(
   ),
 );
 
+final offlineCacheProvider = Provider<OfflineCache>(
+  (ref) => FileOfflineCache(),
+);
+
 final tripRepositoryProvider = Provider<TripRepository>(
-  (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+  (ref) => TripRepository(
+    client: ref.watch(apiClientProvider),
+    offlineCache: ref.watch(offlineCacheProvider),
+  ),
 );
 
 /// 全域認證狀態：data(null)=未登入、data(user)=已登入、error=登入失敗。

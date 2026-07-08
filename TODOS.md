@@ -28,7 +28,7 @@
 - [x] 列印/PDF 第一波(`/trips/:id/print`;預覽 + 平台列印 + 分享 PDF,JSON 匯出已完成)(**Completed:** feature/favorites-explore)
 - [x] 設定子頁後續：connected apps、developer apps、OAuth consent（列出/撤銷已連結應用、developer app 清單/建立、consent allow/deny 第一波；外觀/通知與登入裝置 sessions 已完成）(**Completed:** feature/favorites-explore)
 - [ ] OAuth PKCE + Bearer 認證(需後端註冊 public client;取代 session cookie + 偽造 Origin 的過渡方案)
-- [ ] 離線快取
+- [x] 離線快取第一波（Repository read-through JSON cache：`/my-trips`、`/trips`、trip detail、days、segments、notes；5xx/網路錯誤時回退本機快取，401/403 不遮蔽）(**Completed:** feature/favorites-explore)
 
 ## 技術債
 

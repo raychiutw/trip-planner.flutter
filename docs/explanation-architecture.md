@@ -83,7 +83,9 @@ final tripDaysProvider = FutureProvider.family<List<TripDay>, String>((ref, trip
 });
 ```
 
-三個畫面 watch 同一個 family 實例(`tripDaysProvider(tripId)`),riverpod 自動快取:從 timeline 切到 map 不會重新打 API。family 以 `tripId` 為 key,跨行程不互相污染。這正是選 riverpod 而非 Provider/BLoC 的主因 — scoped 共用 fetch 是內建能力,不用自己搭 cache。
+三個畫面 watch 同一個 family 實例(`tripDaysProvider(tripId)`),riverpod 自動做記憶體層共用:從 timeline 切到 map 不會重新打 API。family 以 `tripId` 為 key,跨行程不互相污染。這正是選 riverpod 而非 Provider/BLoC 的主因 — scoped 共用 fetch 是內建能力。
+
+本機離線快取是另一層,放在 `TripRepository` 而不是 provider:repository 拿到後端 raw JSON 後 best-effort 寫入 `OfflineCache`,之後若遇到 Dio 網路錯誤或 5xx,可用最近快取回退。401/403/404 不回退,避免用舊資料遮蔽授權或不存在狀態;mutation 也不做離線佇列。
 
 ## 為什麼手寫 fromJson
 

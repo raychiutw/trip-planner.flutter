@@ -10,7 +10,7 @@
 |---|---|---|
 | State management | flutter_riverpod 3.x | scoped provider 天然對應 web 的 TripLayout 共用 fetch（規劃時為 2.x，實作採 3.x） |
 | Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
-| HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry；`--dart-define=TRIPLINE_API_URL` 可覆寫 API base |
+| HTTP | dio + repository cache | `ApiClient` 統一處理 session cookie、Origin header、錯誤轉換、429 retry；`--dart-define=TRIPLINE_API_URL` 可覆寫 API base；`TripRepository` 對核心 GET 提供 read-through offline cache |
 | 認證 | 密碼登入拿 session cookie | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE+Bearer 留待後續（需註冊 public client） |
 | 地圖 | map adapter + flutter_map / OSM tiles | 免 API key、零帳務設定；`features/map/map_adapter.dart` 集中套件轉接，之後可替換 google_maps_flutter |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
@@ -53,7 +53,7 @@
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
 P1（第二波）：TripsList P0 parity 已補分類/搜尋/排序/filtered empty/action menu/尾端新增卡/JSON 匯入/匯出/分享連結管理；TripTimelineScreen 已補 focus entry deep link、今日自動定位、scroll-spy active day、行程切換 dropdown、overflow actions（編輯/AI 健檢/共編/分享連結）、離線 banner 與缺/stale segment day-scoped 背景 recompute；TripMapScreen 已補 `stop/:entryId/map` focus route、overview pin → day 切換、pin-card selected sync、day route polyline、圖層切換與裝置定位；AccountScreen 已補 displayName inline edit、外觀/通知設定與登入裝置 sessions 第一波；收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料、目的地表單與 edit day management（新增/補缺日/刪除/平移日期）slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、timeline travel segments edit slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天 request queue + pending/polling、全域地圖 tab resolver、共編邀請/成員管理、行程筆記 CRUD + AI generate、AI 健檢報告與 Auth 補齊第一波已完成。
-P2：公開分享頁、列印/PDF 與 settings connected apps / developer apps / OAuth consent 第一波已完成；OAuth PKCE/Bearer 與離線快取仍待補。
+P2：公開分享頁、列印/PDF、settings connected apps / developer apps / OAuth consent 與離線快取第一波已完成；OAuth PKCE/Bearer 仍待補（需註冊 public client）。
 
 ## 目錄結構
 
@@ -66,6 +66,7 @@ lib/
   theme/app_theme.dart      # light/dark ThemeData + ThemeExtension（三色 4 階）
   models/                   # auth / trip / day / entry / poi / chat / collab / health / notes / oauth / user…（fromJson + 等值）
   api/api_client.dart       # dio 封裝：cookie、origin、錯誤、retry、204
+  api/offline_cache.dart    # read-through JSON offline cache
   api/api_error.dart        # ApiError（code/message/detail）
   api/auth_repository.dart  # login / signup / password reset / email verification / OAuth consent / session 持久化
   api/trip_repository.dart  # my-trips / trips / days / segments / requests / permissions / invitations / health / notes / stats / account sessions / connected apps / developer apps
