@@ -22,7 +22,17 @@ class TripsListScreen extends ConsumerWidget {
     final myTripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('我的行程')),
+      appBar: AppBar(
+        title: const Text('我的行程'),
+        actions: [
+          IconButton(
+            key: const ValueKey('trips-list-add-trip'),
+            tooltip: '新增行程',
+            icon: const Icon(Icons.add),
+            onPressed: () => context.go('/trips/new'),
+          ),
+        ],
+      ),
       body: myTripsAsync.when(
         data: (trips) => RefreshIndicator(
           onRefresh: () => ref.refresh(myTripsProvider.future),
@@ -30,9 +40,8 @@ class TripsListScreen extends ConsumerWidget {
               ? const _EmptyHero()
               : _buildTripList(context, ref, trips),
         ),
-        error: (error, stackTrace) => _ErrorState(
-          onRetry: () => ref.invalidate(myTripsProvider),
-        ),
+        error: (error, stackTrace) =>
+            _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
@@ -67,7 +76,7 @@ class TripsListScreen extends ConsumerWidget {
     WidgetRef ref,
     TripSummary trip,
   ) async {
-    final selectedDelete = await showModalBottomSheet<bool>(
+    final selectedAction = await showModalBottomSheet<String>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
@@ -80,6 +89,11 @@ class TripsListScreen extends ConsumerWidget {
             children: [
               const SizedBox(height: TpSpacing.s2),
               ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('編輯行程'),
+                onTap: () => Navigator.of(sheetContext).pop('edit'),
+              ),
+              ListTile(
                 leading: Icon(Icons.delete_outline, color: destructiveColor),
                 title: Text(
                   '刪除行程',
@@ -88,7 +102,7 @@ class TripsListScreen extends ConsumerWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                onTap: () => Navigator.of(sheetContext).pop(true),
+                onTap: () => Navigator.of(sheetContext).pop('delete'),
               ),
               const SizedBox(height: TpSpacing.s2),
             ],
@@ -96,7 +110,12 @@ class TripsListScreen extends ConsumerWidget {
         );
       },
     );
-    if (selectedDelete != true || !context.mounted) return;
+    if (!context.mounted) return;
+    if (selectedAction == 'edit') {
+      context.go('/trips/${trip.tripId}/edit');
+      return;
+    }
+    if (selectedAction != 'delete') return;
     await _confirmAndDeleteTrip(context, ref, trip);
   }
 
@@ -142,9 +161,9 @@ class TripsListScreen extends ConsumerWidget {
       ref.invalidate(myTripsProvider);
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('刪除失敗，請稍後再試')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
     }
   }
 }
@@ -173,6 +192,12 @@ class _EmptyHero extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: TpSpacing.s4),
+                FilledButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('新增行程'),
+                  onPressed: () => context.go('/trips/new'),
                 ),
               ],
             ),

@@ -5,6 +5,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/poi.dart';
+import 'package:tripline/models/trip.dart';
 
 void main() {
   late Dio dio;
@@ -76,6 +77,89 @@ void main() {
     expect(tripDetail.id, 'okinawa-trip-2026-Ray');
     expect(tripDetail.destinations.single.name, '那霸');
   });
+
+  test('createTrip：POST /trips 帶基本資料與目的地', () async {
+    dioAdapter.onPost(
+      '/trips',
+      (server) => server.reply(201, {
+        'ok': true,
+        'tripId': 'okinawa-trip-2026',
+        'daysCreated': 3,
+      }),
+      data: {
+        'id': 'okinawa-trip-2026',
+        'name': '沖繩',
+        'startDate': '2026-10-01',
+        'endDate': '2026-10-03',
+        'title': '沖繩家族旅行',
+        'description': '想放慢步調',
+        'countries': 'JP',
+        'published': 1,
+        'lang': 'zh-TW',
+        'data_source': 'manual',
+        'destinations': [
+          {'name': '那霸', 'lat': 26.2145, 'lng': 127.6812, 'day_quota': 3},
+        ],
+      },
+    );
+
+    final tripId = await tripRepository.createTrip(
+      id: 'okinawa-trip-2026',
+      name: '沖繩',
+      title: '沖繩家族旅行',
+      description: '想放慢步調',
+      startDate: '2026-10-01',
+      endDate: '2026-10-03',
+      countries: 'JP',
+      published: true,
+      lang: 'zh-TW',
+      destinations: const [
+        TripDestinationInput(
+          name: '那霸',
+          lat: 26.2145,
+          lng: 127.6812,
+          dayQuota: 3,
+        ),
+      ],
+    );
+
+    expect(tripId, 'okinawa-trip-2026');
+  });
+
+  test(
+    'updateTrip：PUT /trips/:id 帶 scalar 欄位與 destinations full replacement',
+    () async {
+      dioAdapter.onPut(
+        '/trips/okinawa-trip-2026',
+        (server) => server.reply(200, {'ok': true}),
+        data: {
+          'title': '沖繩慢旅行',
+          'description': null,
+          'published': 0,
+          'lang': 'ja',
+          'destinations': [
+            {'name': '那霸', 'lat': 26.2145, 'lng': 127.6812, 'day_quota': null},
+            {'name': '名護', 'lat': null, 'lng': null, 'day_quota': 1},
+          ],
+        },
+      );
+
+      await expectLater(
+        tripRepository.updateTrip(
+          id: 'okinawa-trip-2026',
+          title: '沖繩慢旅行',
+          description: null,
+          published: false,
+          lang: 'ja',
+          destinations: const [
+            TripDestinationInput(name: '那霸', lat: 26.2145, lng: 127.6812),
+            TripDestinationInput(name: '名護', dayQuota: 1),
+          ],
+        ),
+        completes,
+      );
+    },
+  );
 
   test('fetchDays：GET /trips/:id/days?all=1 解析巢狀 timeline', () async {
     dioAdapter.onGet(

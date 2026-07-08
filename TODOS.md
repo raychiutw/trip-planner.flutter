@@ -7,7 +7,7 @@
 - [x] 收藏 + 探索 + 收藏加入行程 fast-path(`/favorites`,`/explore`,`/favorites/:id/add-to-trip`;favorites tab 由 placeholder 轉正)(**Completed:** feature/favorites-explore)
 - [x] Explore direct-mode 加入行程(`/add-to-trip?place_id=...`;不需先收藏)(**Completed:** feature/favorites-explore)
 - [ ] Entry CRUD 表單群(`/trips/:id/add-entry`,`add-stop`,`add-custom-stop`,`stop/:entryId/edit/change-poi/copy/move`;已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice、edit screen 備選移除/排序 slice；edit/move 已帶 OCC `expectedVersion`,POI 變更已帶 `entryPoisVersion`,409 `STALE_ENTRY` 已重抓 entry 並 retry 一次；後續仍可補 segments edit 與更多 web parity 細節)
-- [ ] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料表單)
+- [x] 建立/編輯行程(`/trips/new`,`/trips/:id/edit`;行程基本資料、目的地、日期、語言與發布狀態表單)(**Completed:** feature/favorites-explore)
 - [ ] AI 聊天(`/chat`;chat tab 轉正;request queue + pending/polling)
 - [ ] 全域地圖(`/map`;map tab 轉正,跨行程 POI)
 - [ ] 共編邀請(`/trips/:id/collab`,`/invite`;成員管理 + invitation accept/revoke)
@@ -17,7 +17,7 @@
 
 ## P0 parity debt
 
-- [ ] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/匯入/新增行程入口/TripCardMenu/分享/filtered empty
+- [ ] TripsListScreen 補 web parity:分類 tabs/排序/搜尋/匯入/完整 TripCardMenu/分享/filtered empty
 - [ ] TripTimelineScreen 補 web parity:scroll-spy active day/今日自動定位/focus deep link/offline banner/segment 即時 refetch/overflow actions
 - [ ] TripMapScreen 補 web parity:`stop/:entryId/map` focus route/pin-card 雙向同步/overview 點 pin 切 day/polyline/定位 FAB
 - [ ] AccountScreen 補 web parity:displayName inline edit/外觀與通知 row 實際導航

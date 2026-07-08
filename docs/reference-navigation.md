@@ -9,7 +9,9 @@
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
 | `/chat` | `PlaceholderScreen('聊天')` | tab 1(P1 待實作) |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
+| `/trips/new` | `TripFormScreen.create` | tab 2 子路由；建立行程基本資料 |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
+| `/trips/:tripId/edit` | `TripFormScreen.edit` | tab 2 孫路由；編輯行程基本資料 |
 | `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/add-entry?day=N&tab=custom` | `AddEntryScreen` | tab 2 孫路由；新增景點 search/favorites/custom slice |

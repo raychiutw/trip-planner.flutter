@@ -34,6 +34,7 @@
 | 5-tab shell | GlobalBottomNav | — |
 | LoginScreen | LoginPage | `POST /oauth/login` |
 | TripsListScreen | TripsListPage | `GET /my-trips` + `GET /trips?all=1`、`DELETE /trips/:id` |
+| TripFormScreen | NewTripPage / EditTripPage（基本資料 slice） | `POST /trips`、`GET /trips/:id`、`PUT /trips/:id` |
 | TripTimelineScreen | TripPage（embedded） | `GET /trips/:id` + `GET /trips/:id/days?all=1` |
 | TripMapScreen | MapPage | 共用 trip scope 資料（不重抓） |
 | TripNotesScreen | TripNotesPage | `GET /trips/:id/notes` + 各 section CRUD |
@@ -45,7 +46,7 @@
 | ChangePoiScreen | ChangePoiPage（主景點置換/加備選 slice） | `PUT /trips/:id/entries/:entryId/poi-id`、`POST /trips/:id/entries/:entryId/alternates`、`GET /poi-search`、`GET /poi-favorites`、`POST /trips/:id/recompute-travel` |
 | EntryActionScreen | EntryActionPage（copy/move slice） | `POST /trips/:id/entries/:entryId/copy`、`PATCH /trips/:id/entries/:entryId`(`day_id` + `expectedVersion`)、`POST /trips/:id/recompute-travel` |
 
-P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice，並支援 409 `STALE_ENTRY` 重抓再套用；建立/編輯行程、聊天（request queue）、全域地圖、共編仍待辦。
+P1（第二波）：收藏 + Explore + 加入行程 fast-path 已完成第一波；建立/編輯行程已完成基本資料與目的地表單 slice；Entry CRUD 已完成 `/trips/:id/add-entry` 搜尋/收藏/自訂座標新增 slice、`/trips/:id/stop/:entryId/edit` 時間/描述/刪除與備選移除/排序 slice、`/trips/:id/stop/:entryId/change-poi` 主景點置換/加備選 slice、`/trips/:id/stop/:entryId/copy` 與 `/move` 跨日複製/移動 slice，並支援 409 `STALE_ENTRY` 重抓再套用；聊天（request queue）、全域地圖、共編仍待辦。
 P2：列印/分享/匯入、設定子頁、OAuth 生態、離線快取。
 
 ## 目錄結構
@@ -62,7 +63,7 @@ lib/
   api/auth_repository.dart  # login / logout / userinfo / session 持久化
   api/trip_repository.dart  # my-trips / trips / days / notes / stats
   features/auth/            # LoginScreen
-  features/trips/           # TripsListScreen + trip card
+  features/trips/           # TripsListScreen + TripFormScreen + trip card
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen + trip scope providers
   features/favorites/       # FavoritesScreen / ExploreScreen / AddPoiFavoriteToTripScreen
   features/account/         # AccountScreen

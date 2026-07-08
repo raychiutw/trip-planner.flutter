@@ -20,6 +20,7 @@ import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
 import '../models/poi.dart';
+import '../features/trips/trip_form_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
@@ -68,11 +69,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const TripsListScreen(),
                 routes: [
                   GoRoute(
+                    path: 'new',
+                    builder: (context, state) => const TripFormScreen.create(),
+                  ),
+                  GoRoute(
                     path: ':tripId',
                     builder: (context, state) => TripTimelineScreen(
                       tripId: state.pathParameters['tripId']!,
                     ),
                     routes: [
+                      GoRoute(
+                        path: 'edit',
+                        builder: (context, state) => TripFormScreen.edit(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
                       GoRoute(
                         path: 'map',
                         builder: (context, state) => TripMapScreen(

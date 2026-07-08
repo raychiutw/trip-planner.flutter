@@ -18,6 +18,7 @@ import 'package:tripline/features/trip_detail/add_entry_screen.dart';
 import 'package:tripline/features/trip_detail/change_poi_screen.dart';
 import 'package:tripline/features/trip_detail/edit_entry_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_screen.dart';
+import 'package:tripline/features/trips/trip_form_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
@@ -48,9 +49,19 @@ const _loggedInUser = UserInfo(
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
-  when(
-    () => mockTripRepository.fetchTrip(any()),
-  ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'Trip 1'));
+  when(() => mockTripRepository.fetchTrip(any())).thenAnswer(
+    (_) async => const Trip(
+      id: 'trip-1',
+      name: 'Trip 1',
+      title: '沖繩家族之旅',
+      description: '放慢步調',
+      published: true,
+      lang: 'zh-TW',
+      startDate: '2026-10-01',
+      endDate: '2026-10-03',
+      destinations: [TripDestination(name: '那霸', lat: 26.2145, lng: 127.6812)],
+    ),
+  );
   when(() => mockTripRepository.fetchDays(any())).thenAnswer(
     (_) async => const [TripDay(id: 11, dayNum: 2, title: '那霸', version: 1)],
   );
@@ -127,6 +138,51 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/new 進入新增行程表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripFormScreen), findsOneWidget);
+    expect(find.text('新增行程'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-form-destination-0')),
+      findsOneWidget,
+    );
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入時 /trips/:id/edit 進入編輯行程表單', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/edit');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripFormScreen), findsOneWidget);
+    expect(find.text('編輯行程'), findsOneWidget);
+    expect(find.text('沖繩家族之旅'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

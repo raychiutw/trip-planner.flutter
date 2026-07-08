@@ -115,6 +115,26 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();              // GET /my-trips
   Future<List<Trip>>        fetchTrips();                // GET /trips(published 清單)
   Future<Trip>              fetchTrip(String id);        // GET /trips/:id
+  Future<String>            createTrip({
+    required String id,
+    required String name,
+    required String? title,
+    required String? description,
+    required String startDate,
+    required String endDate,
+    String countries = 'JP',
+    bool published = true,
+    String lang = 'zh-TW',
+    List<TripDestinationInput> destinations = const [],
+  }); // POST /trips
+  Future<void>              updateTrip({
+    required String id,
+    required String? title,
+    required String? description,
+    required bool published,
+    required String lang,
+    required List<TripDestinationInput> destinations,
+  }); // PUT /trips/:id
   Future<List<TripDay>>     fetchDays(String id);        // GET /trips/:id/days?all=1
   Future<TimelineEntry>     fetchEntry(String tripId, int entryId); // GET /trips/:id/entries/:entryId
   Future<TimelineEntry>     updateEntry(
@@ -212,6 +232,7 @@ class TripRepository {
 ```
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
+`createTrip` 對齊 web `NewTripPage` 的 `POST /trips`:送 `id`、`name`、`startDate`、`endDate`、`countries`、`published`、`lang`、`data_source: manual` 與 `destinations`;成功回傳新 `tripId`。`updateTrip` 對齊 web `EditTripPage` 的 `PUT /trips/:id`:更新 `title`、`description`、`published`、`lang`,並以 full-replacement 語意送 `destinations`。
 `addPoiFavoriteToTrip` 只送後端現行 4-field contract:`tripId`、`dayNum`、`startTime`、`endTime`;不送已廢除的 `position` / `anchorEntryId`。
 `updateEntry` 目前暴露 entry 時間與 `description` 編輯:body 使用 `start_time`、`end_time`、`description` 與必填 OCC `expectedVersion`;不送 entry-level `note`。
 `copyEntry` 送 `POST /trips/:id/entries/:entryId/copy` 與 body `targetDayId`;`moveEntry` 復用 entry PATCH endpoint,body 使用 `day_id` 與必填 OCC `expectedVersion`。畫面成功後會對受影響 day 呼叫 `recomputeTravel`。

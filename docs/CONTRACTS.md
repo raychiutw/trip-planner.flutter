@@ -37,7 +37,8 @@ abstract final class AppTheme {
 ```dart
 // trip.dart
 class TripSummary { final String tripId; final String name; final String? title; final int? totalDays; }       // GET /my-trips
-class TripDestination { final int? destOrder; final String name; final double? lat; final double? lng; }
+class TripDestination { final int? destOrder; final String name; final double? lat; final double? lng; final int? dayQuota; final List<String> subAreas; }
+class TripDestinationInput { final String name; final double? lat; final double? lng; final int? dayQuota; final List<String> subAreas; Map<String, dynamic> toJson(); }
 class Trip {            // GET /trips (list item) 與 GET /trips/:id（detail）共用，寬鬆 nullable
   final String id;      // 來源 json['tripId'] ?? json['id']
   final String name; final String? owner; final String? ownerDisplayName; final String? title;
@@ -129,6 +130,26 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();          // GET /my-trips
   Future<List<Trip>> fetchTrips();                   // GET /trips
   Future<Trip> fetchTrip(String id);                 // GET /trips/:id
+  Future<String> createTrip({
+    required String id,
+    required String name,
+    required String? title,
+    required String? description,
+    required String startDate,
+    required String endDate,
+    String countries = 'JP',
+    bool published = true,
+    String lang = 'zh-TW',
+    List<TripDestinationInput> destinations = const [],
+  });                                                // POST /trips
+  Future<void> updateTrip({
+    required String id,
+    required String? title,
+    required String? description,
+    required bool published,
+    required String lang,
+    required List<TripDestinationInput> destinations,
+  });                                                // PUT /trips/:id
   Future<List<TripDay>> fetchDays(String id);        // GET /trips/:id/days?all=1
   Future<TimelineEntry> fetchEntry(String tripId, int entryId); // GET /trips/:id/entries/:entryId
   Future<TimelineEntry> updateEntry(
@@ -227,7 +248,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 // app/router.dart
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesScreen) /account(AccountScreen)
-// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
+// trips branch 子路由：/trips/new（TripFormScreen.create）、/trips/:tripId（TripTimelineScreen）、/trips/:tripId/edit（TripFormScreen.edit）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、/trips/:tripId/add-entry（AddEntryScreen）、/trips/:tripId/add-stop（AddEntryScreen 相容入口）、/trips/:tripId/add-custom-stop（AddEntryScreen 自訂座標入口）、/trips/:tripId/stop/:entryId/edit（EditEntryScreen）、/trips/:tripId/stop/:entryId/change-poi（ChangePoiScreen）、/trips/:tripId/stop/:entryId/copy 與 /move（EntryActionScreen）
 // favorites branch 子路由：/favorites/:favoriteId/add-to-trip（AddPoiFavoriteToTripScreen）；secondary route：/explore（ExploreScreen）、/add-to-trip（AddPoiFavoriteToTripScreen direct-mode）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
@@ -244,6 +265,7 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 // 各 screen class 名
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
+class TripFormScreen extends ConsumerStatefulWidget;   // features/trips/trip_form_screen.dart（create/edit named constructors）
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class AddEntryScreen extends ConsumerStatefulWidget;   // features/trip_detail/add_entry_screen.dart（接受 tripId, initialDayNum?, initialSource?）
 class EditEntryScreen extends ConsumerStatefulWidget;  // features/trip_detail/edit_entry_screen.dart（接受 tripId, entryId）

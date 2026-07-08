@@ -32,7 +32,11 @@
 
 ### TripDestination — 行程目的地(trip_destinations JOIN)
 
-`destOrder: int?`、`name: String`(必填)、`lat: double?`、`lng: double?`。
+`destOrder: int?`、`name: String`(必填)、`lat: double?`、`lng: double?`、`dayQuota: int?`、`subAreas: List<String>`。
+
+### TripDestinationInput — 建立/編輯行程 destinations payload
+
+`POST /trips` 與 `PUT /trips/:id` 使用。Dart 欄位為 `name`、`lat`、`lng`、`dayQuota`、`subAreas`;送出時轉成後端欄位 `name`、`lat`、`lng`、`day_quota`、`sub_areas`。空白 `name` 會在 repository payload 過濾掉。
 
 ### Trip — `GET /trips`(list item)與 `GET /trips/:id`(detail)共用
 

@@ -39,6 +39,59 @@ class TripRepository {
     return Trip.fromJson(responseBody as Map<String, dynamic>);
   }
 
+  /// POST /trips，建立行程、days、owner permission 與文件 stub。
+  Future<String> createTrip({
+    required String id,
+    required String name,
+    required String? title,
+    required String? description,
+    required String startDate,
+    required String endDate,
+    String countries = 'JP',
+    bool published = true,
+    String lang = 'zh-TW',
+    List<TripDestinationInput> destinations = const [],
+  }) async {
+    final responseBody = await _client.post(
+      '/trips',
+      body: {
+        'id': id.trim(),
+        'name': name.trim(),
+        'startDate': startDate.trim(),
+        'endDate': endDate.trim(),
+        'title': ?_trimmedOrNull(title),
+        'description': ?_trimmedOrNull(description),
+        'countries': countries.trim().isEmpty ? 'JP' : countries.trim(),
+        'published': published ? 1 : 0,
+        'lang': lang,
+        'data_source': 'manual',
+        'destinations': _destinationPayload(destinations),
+      },
+    );
+    return (responseBody as Map<String, dynamic>)['tripId'] as String;
+  }
+
+  /// PUT /trips/:id，更新 scalar 欄位並用 full-replacement 寫 destinations。
+  Future<void> updateTrip({
+    required String id,
+    required String? title,
+    required String? description,
+    required bool published,
+    required String lang,
+    required List<TripDestinationInput> destinations,
+  }) {
+    return _client.put(
+      '/trips/${Uri.encodeComponent(id)}',
+      body: {
+        'title': _trimmedOrNull(title),
+        'description': _trimmedOrNull(description),
+        'published': published ? 1 : 0,
+        'lang': lang,
+        'destinations': _destinationPayload(destinations),
+      },
+    );
+  }
+
   /// GET /trips/:id/days?all=1（完整 timeline）。
   Future<List<TripDay>> fetchDays(String id) async {
     final responseBody = await _client.get(
@@ -421,5 +474,20 @@ class TripRepository {
         .toList();
     if (entries.isEmpty) return path;
     return '$path?${entries.join('&')}';
+  }
+
+  List<Map<String, dynamic>> _destinationPayload(
+    List<TripDestinationInput> destinations,
+  ) {
+    return destinations
+        .where((destination) => destination.name.trim().isNotEmpty)
+        .map((destination) => destination.toJson())
+        .toList();
+  }
+
+  String? _trimmedOrNull(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return trimmed;
   }
 }

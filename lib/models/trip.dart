@@ -32,12 +32,16 @@ class TripDestination {
     required this.name,
     this.lat,
     this.lng,
+    this.dayQuota,
+    this.subAreas = const [],
   });
 
   final int? destOrder;
   final String name;
   final double? lat;
   final double? lng;
+  final int? dayQuota;
+  final List<String> subAreas;
 
   factory TripDestination.fromJson(Map<String, dynamic> json) {
     return TripDestination(
@@ -45,7 +49,50 @@ class TripDestination {
       name: json['name'] as String,
       lat: (json['lat'] as num?)?.toDouble(),
       lng: (json['lng'] as num?)?.toDouble(),
+      dayQuota: (json['dayQuota'] as num?)?.toInt(),
+      subAreas: (json['subAreas'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
     );
+  }
+}
+
+/// `POST /trips` 與 `PUT /trips/:id` 的 destinations payload。
+class TripDestinationInput {
+  const TripDestinationInput({
+    required this.name,
+    this.lat,
+    this.lng,
+    this.dayQuota,
+    this.subAreas = const [],
+  });
+
+  final String name;
+  final double? lat;
+  final double? lng;
+  final int? dayQuota;
+  final List<String> subAreas;
+
+  factory TripDestinationInput.fromTripDestination(
+    TripDestination destination,
+  ) {
+    return TripDestinationInput(
+      name: destination.name,
+      lat: destination.lat,
+      lng: destination.lng,
+      dayQuota: destination.dayQuota,
+      subAreas: destination.subAreas,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name.trim(),
+      'lat': lat,
+      'lng': lng,
+      'day_quota': dayQuota,
+      if (subAreas.isNotEmpty) 'sub_areas': subAreas,
+    };
   }
 }
 
@@ -100,8 +147,11 @@ class Trip {
       endDate: json['endDate'] as String?,
       memberCount: (json['memberCount'] as num?)?.toInt(),
       destinations: (json['destinations'] as List<dynamic>? ?? [])
-          .map((destinationJson) =>
-              TripDestination.fromJson(destinationJson as Map<String, dynamic>))
+          .map(
+            (destinationJson) => TripDestination.fromJson(
+              destinationJson as Map<String, dynamic>,
+            ),
+          )
           .toList(),
     );
   }
