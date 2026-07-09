@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
@@ -122,5 +123,84 @@ void main() {
     ).called(1);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('tp_new'), findsOneWidget);
+  });
+
+  testWidgets('confidential app 成功後顯示一次性 secret 提醒與複製操作', (tester) async {
+    String? clipboardText;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (
+      methodCall,
+    ) async {
+      switch (methodCall.method) {
+        case 'Clipboard.setData':
+          clipboardText =
+              (methodCall.arguments as Map<Object?, Object?>)['text']
+                  as String?;
+          return null;
+        case 'Clipboard.getData':
+          return <String, Object?>{'text': clipboardText};
+        default:
+          return null;
+      }
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    when(
+      () => mockTripRepository.createDeveloperApp(
+        appName: any(named: 'appName'),
+        clientType: any(named: 'clientType'),
+        redirectUris: any(named: 'redirectUris'),
+        allowedScopes: any(named: 'allowedScopes'),
+        appDescription: any(named: 'appDescription'),
+        homepageUrl: any(named: 'homepageUrl'),
+      ),
+    ).thenAnswer(
+      (_) async => const CreatedDeveloperApp(
+        clientId: 'tp_secret_client',
+        clientSecret: 'secret-once',
+        appName: 'Secret App',
+        clientType: 'confidential',
+        status: 'pending_review',
+        redirectUris: ['https://secret.example.com/callback'],
+        allowedScopes: ['openid', 'profile'],
+      ),
+    );
+    await pumpForm(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('developer-app-name')),
+      'Secret App',
+    );
+    await tester.enterText(
+      find.byKey(const Key('developer-app-redirect-uris')),
+      'https://secret.example.com/callback',
+    );
+    await tester.tap(find.text('Confidential'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('developer-app-create-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('請立即複製 client_secret'), findsOneWidget);
+    expect(find.textContaining('不會再顯示'), findsOneWidget);
+    expect(
+      find.byKey(const Key('developer-app-copy-client-id')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('developer-app-copy-client-secret')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('developer-app-secret-acknowledge')),
+      findsOneWidget,
+    );
+    expect(find.text('我已複製，繼續'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('developer-app-copy-client-secret')));
+    final copied = await Clipboard.getData('text/plain');
+    expect(copied?.text, 'secret-once');
   });
 }

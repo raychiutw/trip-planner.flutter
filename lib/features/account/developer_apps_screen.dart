@@ -2,9 +2,9 @@
 library;
 
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
@@ -312,17 +312,40 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
         ),
-        title: const Text('建立完成'),
+        title: const Text('應用建立成功'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              app.clientSecret == null
+                  ? 'Client ID 已產生'
+                  : '請立即複製 client_secret',
+            ),
+            const SizedBox(height: TpSpacing.s3),
             const Text('Client ID'),
-            SelectableText(app.clientId),
+            const SizedBox(height: TpSpacing.s1),
+            _SecretValueRow(
+              value: app.clientId,
+              copyKey: const Key('developer-app-copy-client-id'),
+              onCopy: () => unawaited(_copyToClipboard(app.clientId)),
+            ),
             if (app.clientSecret != null) ...[
               const SizedBox(height: TpSpacing.s3),
               const Text('Client Secret'),
-              SelectableText(app.clientSecret!),
+              const SizedBox(height: TpSpacing.s1),
+              _SecretValueRow(
+                value: app.clientSecret!,
+                copyKey: const Key('developer-app-copy-client-secret'),
+                onCopy: () => unawaited(_copyToClipboard(app.clientSecret!)),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                '此 secret 不會再顯示，請存到密碼管理器或環境變數。',
+                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(dialogContext).colorScheme.error,
+                ),
+              ),
             ],
             const SizedBox(height: TpSpacing.s3),
             Text(app.statusLabel),
@@ -334,11 +357,16 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
               Navigator.of(dialogContext).pop();
               GoRouter.maybeOf(context)?.go('/settings/developer-apps');
             },
-            child: const Text('完成'),
+            key: const Key('developer-app-secret-acknowledge'),
+            child: const Text('我已複製，繼續'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _copyToClipboard(String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
   }
 
   List<String> _redirectUris(String value) {
@@ -357,6 +385,54 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
   String _errorMessage(Object error) {
     if (error is ApiError) return error.detail ?? error.message;
     return '建立應用程式失敗，請稍後再試';
+  }
+}
+
+class _SecretValueRow extends StatelessWidget {
+  const _SecretValueRow({
+    required this.value,
+    required this.copyKey,
+    required this.onCopy,
+  });
+
+  final String value;
+  final Key copyKey;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TpSpacing.s3,
+          vertical: TpSpacing.s2,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SelectableText(
+                value,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            IconButton(
+              key: copyKey,
+              tooltip: '複製',
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy_outlined),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
