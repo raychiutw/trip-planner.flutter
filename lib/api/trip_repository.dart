@@ -209,10 +209,45 @@ class TripRepository {
     TripDay.fromJson,
   );
 
+  /// GET /trips/:id/days/:num（完整單日 timeline）。
+  Future<TripDay> fetchDay({
+    required String tripId,
+    required int dayNum,
+  }) async => _one(
+    await _client.get('/trips/${Uri.encodeComponent(tripId)}/days/$dayNum'),
+    TripDay.fromJson,
+  );
+
   /// GET /trips/:id/days?all=1（SWR stream）。
   Stream<List<TripDay>> watchDays(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}/days', query: {'all': '1'})
       .map((b) => _list(b, TripDay.fromJson));
+
+  /// PUT /trips/:id/days/:num（整天覆寫；timeline 必須是完整新狀態）。
+  Future<int> updateDay({
+    required String tripId,
+    required int dayNum,
+    required String date,
+    required String dayOfWeek,
+    required String label,
+    required List<Map<String, dynamic>> timeline,
+    Map<String, dynamic>? hotel,
+    int? expectedDayVersion,
+  }) async {
+    final body = await _client.put(
+      '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum',
+      body: {
+        'date': date,
+        'dayOfWeek': dayOfWeek,
+        'label': label,
+        'hotel': ?hotel,
+        'timeline': timeline,
+        'expectedDayVersion': ?expectedDayVersion,
+      },
+    );
+    final map = body as Map<String, dynamic>;
+    return (map['dayVersion'] as num?)?.toInt() ?? 0;
+  }
 
   /// POST /trips/:id/days（position=start/end/insert；insert 需 date）。
   Future<TripDay> createDay({

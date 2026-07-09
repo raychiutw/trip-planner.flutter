@@ -446,6 +446,62 @@ void main() {
     expect(days.single.timeline, isEmpty);
   });
 
+  test('fetchDay：GET /trips/:id/days/:num 解析完整單日', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days/1',
+      (server) => server.reply(200, {
+        'id': 11,
+        'dayNum': 1,
+        'date': '2026-04-23',
+        'dayOfWeek': '四',
+        'title': '抵達那霸',
+        'timeline': [
+          {'id': 101, 'dayId': 11, 'sortOrder': 0, 'title': '首里城'},
+        ],
+      }),
+    );
+
+    final day = await tripRepository.fetchDay(
+      tripId: 'okinawa-trip-2026-Ray',
+      dayNum: 1,
+    );
+
+    expect(day.dayNum, 1);
+    expect(day.timeline.single.title, '首里城');
+  });
+
+  test('updateDay：PUT /trips/:id/days/:num 回 dayVersion', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa-trip-2026-Ray/days/1',
+      (server) => server.reply(200, {'ok': true, 'dayVersion': 4}),
+      data: {
+        'date': '2026-04-23',
+        'dayOfWeek': '四',
+        'label': 'Day 1',
+        'hotel': {'name': '那霸飯店'},
+        'timeline': [
+          {'name': '首里城', 'description': '世界遺產'},
+        ],
+        'expectedDayVersion': 3,
+      },
+    );
+
+    final dayVersion = await tripRepository.updateDay(
+      tripId: 'okinawa-trip-2026-Ray',
+      dayNum: 1,
+      date: '2026-04-23',
+      dayOfWeek: '四',
+      label: 'Day 1',
+      hotel: {'name': '那霸飯店'},
+      timeline: [
+        {'name': '首里城', 'description': '世界遺產'},
+      ],
+      expectedDayVersion: 3,
+    );
+
+    expect(dayVersion, 4);
+  });
+
   test('createDay：POST /trips/:id/days position/date 回傳 day', () async {
     dioAdapter.onPost(
       '/trips/okinawa/days',
