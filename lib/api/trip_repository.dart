@@ -16,6 +16,7 @@ import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/trip_audit.dart';
 import '../models/trip_health.dart';
+import '../models/trip_poi_health.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'cache/cache_keys.dart';
@@ -165,6 +166,12 @@ class TripRepository {
       fallbackToCache: false,
     );
     return _optionalHealthReport(body);
+  }
+
+  /// GET /trips/:id/health（POI closed/missing 摘要）。
+  Future<TripPoiHealthReport> fetchPoiHealth(String id) async {
+    final body = await _client.get('/trips/${Uri.encodeComponent(id)}/health');
+    return TripPoiHealthReport.fromJson(body as Map<String, dynamic>);
   }
 
   /// POST /trips/:id/health-check（啟動 AI 健檢）。

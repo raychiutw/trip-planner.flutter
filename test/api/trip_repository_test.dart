@@ -16,6 +16,7 @@ import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_audit.dart';
+import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/user.dart';
 
 void main() {
@@ -134,6 +135,32 @@ void main() {
     expect(report?.requestId, 42);
     expect(report?.findings.single.dimension, TripHealthDimension.meals);
     expect(report?.findings.single.actionTarget?.day, 3);
+  });
+
+  test('fetchPoiHealth：GET /trips/:id/health 解析 closed/missing POI', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/health',
+      (server) => server.reply(200, {
+        'version': 1,
+        'closed': 1,
+        'missing': 0,
+        'items': [
+          {
+            'poi_id': 501,
+            'poi_name': '閉店餐廳',
+            'status': 'closed',
+            'reason': 'CLOSED_PERMANENTLY',
+          },
+        ],
+      }),
+    );
+
+    final report = await tripRepository.fetchPoiHealth('okinawa');
+
+    expect(report.closed, 1);
+    expect(report.missing, 0);
+    expect(report.hasIssues, isTrue);
+    expect(report.items.single.status, TripPoiHealthStatus.closed);
   });
 
   test(
