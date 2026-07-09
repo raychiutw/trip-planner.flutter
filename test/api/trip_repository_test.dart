@@ -1037,6 +1037,53 @@ void main() {
     );
   });
 
+  test('addEntryTripPoi：POST /trip-pois per-POI reservation fields', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/entries/11/trip-pois',
+      (server) => server.reply(201, {
+        'id': 70,
+        'entry_id': 11,
+        'poi_id': 999,
+        'sort_order': 2,
+      }),
+      data: {
+        'name': '晚餐候選',
+        'type': 'restaurant',
+        'description': '海景座位',
+        'note': '需要訂位',
+        'hours': '18:00-22:00',
+        'rating': 4.2,
+        'category': 'seafood_restaurant',
+        'lat': 26.2,
+        'lng': 127.6,
+        'price': 'PRICE_LEVEL_MODERATE',
+        'reservation': '已訂位 18:30',
+        'reservation_url': 'https://booking.example.com/r/1',
+      },
+    );
+
+    final result = await tripRepository.addEntryTripPoi(
+      tripId: 'okinawa',
+      entryId: 11,
+      name: '晚餐候選',
+      poiType: 'restaurant',
+      description: '海景座位',
+      note: '需要訂位',
+      hours: '18:00-22:00',
+      rating: 4.2,
+      category: 'seafood_restaurant',
+      lat: 26.2,
+      lng: 127.6,
+      price: 'PRICE_LEVEL_MODERATE',
+      reservation: '已訂位 18:30',
+      reservationUrl: 'https://booking.example.com/r/1',
+    );
+
+    expect(result.id, 70);
+    expect(result.poiId, 999);
+    expect(result.sortOrder, 2);
+  });
+
   test(
     'removeEntryAlternate：DELETE /alternates/:poiId?entryPoisVersion',
     () async {

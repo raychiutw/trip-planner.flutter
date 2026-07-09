@@ -567,6 +567,48 @@ class TripRepository {
     );
   }
 
+  /// POST /trips/:id/entries/:eid/trip-pois（往既有 entry 加 POI;支援 per-POI 訂位欄位）。
+  Future<({int id, int poiId, int sortOrder})> addEntryTripPoi({
+    required String tripId,
+    required int entryId,
+    required String name,
+    required String poiType,
+    String? description,
+    String? note,
+    String? hours,
+    double? rating,
+    String? category,
+    double? lat,
+    double? lng,
+    String? price,
+    String? reservation,
+    String? reservationUrl,
+  }) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/trip-pois',
+      body: {
+        'name': name,
+        'type': poiType,
+        'description': ?description,
+        'note': ?note,
+        'hours': ?hours,
+        'rating': ?rating,
+        'category': ?category,
+        'lat': ?lat,
+        'lng': ?lng,
+        'price': ?price,
+        'reservation': ?reservation,
+        'reservation_url': ?reservationUrl,
+      },
+    );
+    final map = body as Map<String, dynamic>;
+    return (
+      id: (map['id'] as num).toInt(),
+      poiId: (map['poi_id'] as num).toInt(),
+      sortOrder: (map['sort_order'] as num).toInt(),
+    );
+  }
+
   /// DELETE /trips/:id/entries/:eid/alternates/:poiId（OCC token 走 query）。
   Future<void> removeEntryAlternate({
     required String tripId,
