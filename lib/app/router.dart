@@ -32,6 +32,7 @@ import '../features/trip_detail/trip_timeline_screen.dart';
 import '../features/trips/collab/collab_screen.dart';
 import '../features/trips/create/create_trip_screen.dart';
 import '../features/trips/edit/edit_trip_screen.dart';
+import '../features/trips/health/trip_health_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
@@ -140,6 +141,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trip/:tripId/print',
         redirect: (context, state) => _tripAlias(state, '/print'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/health',
+        redirect: (context, state) => _tripAlias(state, '/health'),
       ),
       GoRoute(
         path: '/trip/:tripId/collab',
@@ -267,6 +272,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'print',
                         builder: (context, state) => TripPrintScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'health',
+                        builder: (context, state) => TripHealthScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),

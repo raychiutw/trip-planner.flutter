@@ -481,7 +481,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  /// 長按卡片 → bottom sheet（分享/共編/匯出/刪除）。
+  /// 長按卡片 → bottom sheet（分享/共編/健檢/匯出/刪除）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
     final selectedAction = await showModalBottomSheet<_TripListAction>(
       context: context,
@@ -509,6 +509,16 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                 onTap: () {
                   Navigator.of(sheetContext).pop();
                   context.push('/collab/${trip.tripId}');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.health_and_safety_outlined),
+                title: const Text('AI 健檢'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  context.push(
+                    '/trips/${Uri.encodeComponent(trip.tripId)}/health',
+                  );
                 },
               ),
               ListTile(

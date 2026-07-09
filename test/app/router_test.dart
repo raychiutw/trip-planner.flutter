@@ -23,12 +23,14 @@ import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
+import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
 
@@ -75,6 +77,12 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(
     () => mockTripRepository.fetchNotes(any()),
   ).thenAnswer((_) async => const TripNotes());
+  when(
+    () => mockTripRepository.fetchHealthReport(any()),
+  ).thenAnswer((_) async => null);
+  when(() => mockTripRepository.fetchPoiHealth(any())).thenAnswer(
+    (_) async => const TripPoiHealthReport(version: 1, closed: 0, missing: 0),
+  );
   when(() => mockCollabRepository.fetchInvitation(any())).thenAnswer(
     (_) async => const InvitationDetails(
       tripId: 'trip-1',
@@ -320,6 +328,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripPrintScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可進入 /trips/:tripId/health 與 web alias', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/health');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/trip/trip-1/health');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripHealthScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

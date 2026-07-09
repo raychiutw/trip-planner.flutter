@@ -87,6 +87,14 @@ void main() {
           path: '/trips/:tripId',
           builder: (context, state) =>
               Scaffold(body: Text('detail:${state.pathParameters['tripId']}')),
+          routes: [
+            GoRoute(
+              path: 'health',
+              builder: (context, state) => Scaffold(
+                body: Text('health:${state.pathParameters['tripId']}'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -573,6 +581,25 @@ void main() {
       expect(writer.suggestedName, 'okinawa.json');
       expect(writer.content, '{"schemaVersion":1}');
       expect(find.text('匯出成功'), findsOneWidget);
+    });
+
+    testWidgets('長按 → AI 健檢 → 導航到 health route', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('AI 健檢'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('health:okinawa-trip-2026'), findsOneWidget);
     });
 
     testWidgets(

@@ -105,7 +105,7 @@ Flutter 對應：`go_router` ShellRoute + `BottomNavigationBar`；trip 詳情在
 - ChatPage（tab 1 — AI 改行程，依賴後端 request queue）
 - GlobalMapPage（tab 3 全域地圖）
 - CollabPage 共編 + InvitePage
-- TripHealthCheckPage、Notes AI 生成（SSE polling）
+- Notes AI 生成（SSE polling）
 
 ### P2（可延後）
 - TripPrintPage / PDF·JSON 下載、匯入行程

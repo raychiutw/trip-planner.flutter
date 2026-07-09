@@ -1,0 +1,146 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/trips/health/trip_health_screen.dart';
+import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/trip_health.dart';
+import 'package:tripline/models/trip_poi_health.dart';
+import 'package:tripline/theme/app_theme.dart';
+
+class MockTripRepository extends Mock implements TripRepository {}
+
+void main() {
+  late MockTripRepository repository;
+
+  const trip = Trip(id: 'trip-1', name: 'okinawa-trip', title: '沖繩家族旅行');
+  const nonEmptyDays = [
+    TripDay(
+      id: 1,
+      dayNum: 1,
+      version: 0,
+      timeline: [
+        TimelineEntry(id: 101, sortOrder: 0, title: '首里城', version: 1),
+      ],
+    ),
+  ];
+  const noPoiIssues = TripPoiHealthReport(version: 1, closed: 0, missing: 0);
+
+  Future<void> pumpScreen(WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (retryCount, error) => null,
+        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const TripHealthScreen(tripId: 'trip-1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  setUp(() {
+    repository = MockTripRepository();
+    when(() => repository.fetchTrip('trip-1')).thenAnswer((_) async => trip);
+    when(
+      () => repository.fetchDays('trip-1'),
+    ).thenAnswer((_) async => nonEmptyDays);
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => repository.fetchPoiHealth('trip-1'),
+    ).thenAnswer((_) async => noPoiIssues);
+  });
+
+  testWidgets('顯示 completed report findings 與 POI health 摘要', (tester) async {
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.completed,
+        findings: [
+          TripHealthFinding(
+            severity: TripHealthSeverity.high,
+            title: 'Day 1 時間太滿',
+            description: '上午行程間隔過短。',
+            dimension: TripHealthDimension.timing,
+            suggestion: '刪減一個停留點。',
+            actionTarget: TripHealthActionTarget(day: 1, entryId: 101),
+          ),
+        ],
+        createdAt: '2026-07-09T10:00:00Z',
+        completedAt: '2026-07-09T10:01:00Z',
+      ),
+    );
+    when(() => repository.fetchPoiHealth('trip-1')).thenAnswer(
+      (_) async => const TripPoiHealthReport(
+        version: 2,
+        closed: 1,
+        missing: 0,
+        items: [
+          TripPoiHealthItem(
+            poiId: 501,
+            poiName: '已歇業餐廳',
+            status: TripPoiHealthStatus.closed,
+            reason: 'CLOSED_PERMANENTLY',
+          ),
+        ],
+      ),
+    );
+
+    await pumpScreen(tester);
+
+    expect(find.text('AI 健檢'), findsOneWidget);
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-health-results')), findsOneWidget);
+    expect(find.text('Day 1 時間太滿'), findsOneWidget);
+    expect(find.textContaining('刪減一個停留點。'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-health-poi-card')), findsOneWidget);
+    expect(find.text('已歇業餐廳'), findsOneWidget);
+  });
+
+  testWidgets('沒有既有 report 時可啟動 health check 並顯示 pending', (tester) async {
+    when(() => repository.startHealthCheck('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.pending,
+        requestId: 43,
+        createdAt: '2026-07-09T10:02:00Z',
+      ),
+    );
+    await pumpScreen(tester);
+
+    expect(find.byKey(const ValueKey('trip-health-empty')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('trip-health-start-button')));
+    await tester.pump();
+    await tester.pump();
+
+    verify(() => repository.startHealthCheck('trip-1')).called(1);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+  });
+
+  testWidgets('空行程顯示 guard 並停用開始健檢', (tester) async {
+    when(
+      () => repository.fetchDays('trip-1'),
+    ).thenAnswer((_) async => const [TripDay(id: 1, dayNum: 1, version: 0)]);
+    await pumpScreen(tester);
+
+    expect(
+      find.byKey(const ValueKey('trip-health-empty-trip')),
+      findsOneWidget,
+    );
+    final startButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('trip-health-start-button')),
+    );
+    expect(startButton.onPressed, isNull);
+    verifyNever(() => repository.startHealthCheck(any()));
+  });
+}
