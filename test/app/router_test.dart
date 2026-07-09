@@ -12,10 +12,15 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
+import 'package:tripline/features/account/account_sessions_screen.dart';
+import 'package:tripline/features/account/connected_apps_screen.dart';
+import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
+import 'package:tripline/features/favorites/explore/explore_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
+import 'package:tripline/features/trips/create/create_trip_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/day.dart';
@@ -283,6 +288,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(NotificationsScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可使用 web route aliases', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CreateTripScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/account/appearance');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppearanceScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/account/sessions');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/account/connected-apps');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ConnectedAppsScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/explore');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/trip/trip-1/print');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripPrintScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 }

@@ -65,6 +65,56 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       // 登入頁在 shell 外（無底部導航）
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // Web route aliases retained during Flutter porting.
+      GoRoute(path: '/trips/new', redirect: (context, state) => '/new-trip'),
+      GoRoute(
+        path: '/explore',
+        redirect: (context, state) => '/favorites/explore',
+      ),
+      GoRoute(
+        path: '/account/appearance',
+        redirect: (context, state) => '/settings/appearance',
+      ),
+      GoRoute(
+        path: '/account/sessions',
+        redirect: (context, state) => '/settings/sessions',
+      ),
+      GoRoute(
+        path: '/account/connected-apps',
+        redirect: (context, state) => '/settings/connected-apps',
+      ),
+      GoRoute(
+        path: '/trip/:tripId',
+        redirect: (context, state) => _tripAlias(state),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/map',
+        redirect: (context, state) => _tripAlias(state, '/map'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId',
+        redirect: (context, state) => _tripAlias(state),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId/map',
+        redirect: (context, state) => _tripAlias(state, '/map'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/notes',
+        redirect: (context, state) => _tripAlias(state, '/notes'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/print',
+        redirect: (context, state) => _tripAlias(state, '/print'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/collab',
+        redirect: (context, state) => _outsideTripAlias(state, '/collab'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/edit',
+        redirect: (context, state) => _outsideTripAlias(state, '/edit-trip'),
+      ),
       // 建立/編輯行程:shell 外全螢幕表單(避開 /trips/:tripId 衝突)
       GoRoute(
         path: '/new-trip',
@@ -246,6 +296,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 const _publicShellOutsideRoutes = {'/login', '/oauth/consent', '/invite'};
+
+String _tripAlias(GoRouterState state, [String suffix = '']) {
+  final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+  return '/trips/$tripId$suffix';
+}
+
+String _outsideTripAlias(GoRouterState state, String prefix) {
+  final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+  return '$prefix/$tripId';
+}
 
 String _loginLocationWithRedirect(GoRouterState state) {
   final requestedLocation = state.uri.toString();
