@@ -33,6 +33,27 @@ void main() {
     );
   });
 
+  group('public config', () {
+    test(
+      'fetchPublicConfig：GET /public-config → 解析 auth feature flags',
+      () async {
+        dioAdapter.onGet(
+          '/public-config',
+          (server) => server.reply(200, {
+            'providers': {'google': true},
+            'features': {'passwordSignup': true, 'emailVerification': true},
+          }),
+        );
+
+        final config = await authRepository.fetchPublicConfig();
+
+        expect(config.googleProviderEnabled, isTrue);
+        expect(config.passwordSignupEnabled, isTrue);
+        expect(config.emailVerificationEnabled, isTrue);
+      },
+    );
+  });
+
   group('login', () {
     test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo', () async {
       dioAdapter.onPost(

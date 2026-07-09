@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../models/user.dart';
 import '../models/oauth.dart';
+import '../models/public_config.dart';
 import 'api_client.dart';
 import 'api_error.dart';
 import 'session_store.dart';
@@ -65,6 +66,12 @@ class AuthRepository {
   static final _sessionCookiePattern = RegExp(
     r'(?:^|;\s*)tripline_session=([^;]+)',
   );
+
+  /// GET /public-config → login/signup feature flags available pre-auth.
+  Future<PublicConfig> fetchPublicConfig() async {
+    final body = await _client.get('/public-config');
+    return PublicConfig.fromJson(body as Map<String, dynamic>);
+  }
 
   /// POST /oauth/login → 解析 set-cookie 的 tripline_session 寫入 store →
   /// GET /oauth/userinfo 回 UserInfo。
