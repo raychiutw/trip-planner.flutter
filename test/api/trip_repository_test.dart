@@ -758,6 +758,40 @@ void main() {
     );
   });
 
+  test(
+    'copyEntry：POST /entries/:eid/copy camelCase body 回新 entry id',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa/entries/77/copy',
+        (server) => server.reply(200, {'id': 88}),
+        data: {'targetDayId': 12, 'sortOrder': 3, 'time': '10:00-11:00'},
+      );
+
+      final newEntryId = await tripRepository.copyEntry(
+        tripId: 'okinawa',
+        entryId: 77,
+        targetDayId: 12,
+        sortOrder: 3,
+        time: '10:00-11:00',
+      );
+
+      expect(newEntryId, 88);
+    },
+  );
+
+  test('moveEntry：PATCH /entries/:eid day_id body', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/77',
+      (server) => server.reply(200, {'id': 77}),
+      data: {'day_id': 12},
+    );
+
+    await expectLater(
+      tripRepository.moveEntry(tripId: 'okinawa', entryId: 77, targetDayId: 12),
+      completes,
+    );
+  });
+
   test('deleteEntry：DELETE /trips/:id/entries/:eid（200 {ok:true}）', () async {
     dioAdapter.onDelete(
       '/trips/okinawa/entries/11',

@@ -385,6 +385,38 @@ class TripRepository {
     );
   }
 
+  /// POST /trips/:id/entries/:eid/copy（複製到指定 day id;回傳新 entry id）。
+  Future<int> copyEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+    int? sortOrder,
+    String? time,
+  }) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/copy',
+      body: {
+        'targetDayId': targetDayId,
+        'sortOrder': ?sortOrder,
+        'time': ?time,
+      },
+    );
+    final map = body as Map<String, dynamic>;
+    return (map['id'] as num).toInt();
+  }
+
+  /// PATCH /trips/:id/entries/:eid day_id（跨日移動;不帶 OCC,對齊 web EntryActionPage）。
+  Future<void> moveEntry({
+    required String tripId,
+    required int entryId,
+    required int targetDayId,
+  }) {
+    return _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
+      body: {'day_id': targetDayId},
+    );
+  }
+
   /// DELETE /trips/:id/entries/:eid（後端回 200 {ok:true},忽略 body）。
   Future<void> deleteEntry({required String tripId, required int entryId}) {
     return _client.sendMutation(
