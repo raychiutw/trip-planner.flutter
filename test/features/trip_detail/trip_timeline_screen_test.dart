@@ -350,12 +350,18 @@ void main() {
     expect(find.widgetWithText(TextField, '美麗海水族館'), findsOneWidget);
   });
 
-  testWidgets('左滑 entry → 確認 → 呼叫 deleteEntry', (tester) async {
+  testWidgets('左滑 entry → 確認 → 刪除後重算交通', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.deleteEntry(
         tripId: any(named: 'tripId'),
         entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
@@ -369,6 +375,12 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+    verify(
+      () => repo.recomputeTravel(
+        tripId: _tripId,
+        day: any(named: 'day'),
+      ),
+    ).called(1);
   });
 
   testWidgets('點「新增停留點」開啟新增 sheet', (tester) async {

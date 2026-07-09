@@ -267,9 +267,12 @@ class _DaySection extends ConsumerWidget {
       context,
       title: '刪除停留點',
       message: '確定要刪除「${entry.title}」嗎？',
-      delete: () => ref
-          .read(tripRepositoryProvider)
-          .deleteEntry(tripId: tripId, entryId: entry.id),
+      delete: () async {
+        await ref
+            .read(tripRepositoryProvider)
+            .deleteEntry(tripId: tripId, entryId: entry.id);
+        await _recomputeAndRefresh(ref);
+      },
       onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
     );
   }
