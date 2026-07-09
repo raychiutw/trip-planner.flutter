@@ -13,11 +13,13 @@ sealed class EntryEditArgs {
   const EntryEditArgs();
 }
 
+/// 編輯既有停留點。
 class EntryEditExisting extends EntryEditArgs {
   const EntryEditExisting(this.entry);
   final TimelineEntry entry;
 }
 
+/// 在指定 day 新增一筆自訂停留點。
 class EntryEditNew extends EntryEditArgs {
   const EntryEditNew(this.dayNum);
   final int dayNum;
@@ -47,11 +49,18 @@ Future<void> showEntryEditSheet(
   );
 }
 
+/// 停留點新增/編輯表單；可作為 bottom sheet 或 full-page route 內容。
 class EntryEditSheet extends ConsumerStatefulWidget {
-  const EntryEditSheet({super.key, required this.tripId, required this.args});
+  const EntryEditSheet({
+    super.key,
+    required this.tripId,
+    required this.args,
+    this.onSaved,
+  });
 
   final String tripId;
   final EntryEditArgs args;
+  final VoidCallback? onSaved;
 
   @override
   ConsumerState<EntryEditSheet> createState() => _EntryEditSheetState();
@@ -151,10 +160,15 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_isEdit ? '已儲存' : '已新增')));
+      final onSaved = widget.onSaved;
+      if (onSaved != null) {
+        onSaved();
+      } else {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_isEdit ? '已儲存' : '已新增')));
+      }
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {

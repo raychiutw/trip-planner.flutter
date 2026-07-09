@@ -25,6 +25,7 @@ import '../features/map/global_map_screen.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/entry_action_route_screen.dart';
+import '../features/trip_detail/entry_add_route_screen.dart';
 import '../features/trip_detail/entry_edit_route_screen.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
@@ -127,6 +128,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trip/:tripId/map',
         redirect: (context, state) => _tripAlias(state, '/map'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/add-custom-stop',
+        redirect: (context, state) => _newEntryAlias(state),
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId',
@@ -316,6 +321,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         ),
                       ),
                       GoRoute(
+                        path: 'entries/new',
+                        builder: (context, state) => EntryAddRouteScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          initialDayNum: int.tryParse(
+                            state.uri.queryParameters['day'] ?? '',
+                          ),
+                        ),
+                      ),
+                      GoRoute(
                         path: 'entries/:eid/edit',
                         builder: (context, state) => EntryEditRouteScreen(
                           tripId: state.pathParameters['tripId']!,
@@ -427,6 +441,11 @@ String _tripAlias(GoRouterState state, [String suffix = '']) {
 String _outsideTripAlias(GoRouterState state, String prefix) {
   final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
   return '$prefix/$tripId';
+}
+
+String _newEntryAlias(GoRouterState state) {
+  final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+  return _withQuery('/trips/$tripId/entries/new', state);
 }
 
 String _withQuery(String path, GoRouterState state) {

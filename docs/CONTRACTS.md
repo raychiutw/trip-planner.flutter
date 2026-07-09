@@ -150,6 +150,7 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
 // /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesPlaceholderScreen) /account(AccountScreen)
 // trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、
+// /trips/:tripId/entries/new（EntryAddRouteScreen）、
 // /trips/:tripId/entries/:eid/edit（EntryEditRouteScreen）、/trips/:tripId/entries/:eid/copy|move（EntryActionRouteScreen）、
 // /trips/:tripId/entries/:eid/pois（EntryPoiScreen）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips

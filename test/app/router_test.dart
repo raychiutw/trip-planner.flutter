@@ -22,6 +22,7 @@ import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart'
 import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
+import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
@@ -390,6 +391,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryPoiScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可進入 add-custom-stop web alias', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trip/trip-1/add-custom-stop?day=1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryAddRouteScreen), findsOneWidget);
+    expect(find.text('新增停留點'), findsWidgets);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

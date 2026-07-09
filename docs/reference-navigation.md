@@ -19,6 +19,7 @@
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
+| `/trips/:tripId/entries/new?day=N` | `EntryAddRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/move` | `EntryActionRouteScreen` | tab 2 孫路由 |
@@ -41,7 +42,7 @@
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
-Web 相容 alias：`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到地點管理頁。
+Web 相容 alias：`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增頁；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到地點管理頁。
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 
