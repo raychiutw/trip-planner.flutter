@@ -15,6 +15,7 @@ import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip_health.dart';
+import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/models/user.dart';
 
 void main() {
@@ -488,6 +489,54 @@ void main() {
       expect(job.docType, 'flights');
     },
   );
+
+  test('fetchAuditLog：GET /trips/:id/audit 帶 limit/request_id', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/audit',
+      (server) => server.reply(200, [
+        {
+          'id': 99,
+          'trip_id': 'okinawa',
+          'table_name': 'trip_entries',
+          'record_id': 11,
+          'action': 'update',
+          'changed_by': 'ray@example.com',
+          'request_id': 42,
+          'diff_json': '{"title":{"old":"A","new":"B"}}',
+          'snapshot': null,
+          'created_at': '2026-07-09T10:00:00Z',
+        },
+      ]),
+      queryParameters: {'limit': '10', 'request_id': '42'},
+    );
+
+    final rows = await tripRepository.fetchAuditLog(
+      'okinawa',
+      limit: 10,
+      requestId: 42,
+    );
+
+    expect(rows, hasLength(1));
+    expect(rows.single.id, 99);
+    expect(rows.single.action, TripAuditAction.update);
+    expect(rows.single.diff?['title'], {'old': 'A', 'new': 'B'});
+  });
+
+  test('rollbackAudit：POST /trips/:id/audit/:aid/rollback 回 result', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/audit/99/rollback',
+      (server) =>
+          server.reply(200, {'ok': true, 'rolled_back': 'update->revert'}),
+    );
+
+    final result = await tripRepository.rollbackAudit(
+      tripId: 'okinawa',
+      auditId: 99,
+    );
+
+    expect(result.ok, isTrue);
+    expect(result.rolledBack, 'update->revert');
+  });
 
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));

@@ -14,6 +14,7 @@ import '../models/poi_type.dart';
 import '../models/segment.dart';
 import '../models/share.dart';
 import '../models/trip.dart';
+import '../models/trip_audit.dart';
 import '../models/trip_health.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -331,6 +332,33 @@ class TripRepository {
       tripId: map['tripId'] as String? ?? tripId,
       docType: map['docType'] as String? ?? section.name,
     );
+  }
+
+  /// GET /trips/:id/audit（依 trip 權限讀 audit log；requestId 可篩單次 AI/job）。
+  Future<List<TripAuditRow>> fetchAuditLog(
+    String id, {
+    int? limit,
+    int? requestId,
+  }) async => _list(
+    await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/audit',
+      query: {
+        'limit': ?limit?.toString(),
+        'request_id': ?requestId?.toString(),
+      },
+    ),
+    TripAuditRow.fromJson,
+  );
+
+  /// POST /trips/:id/audit/:aid/rollback（回滾指定 audit row）。
+  Future<TripAuditRollbackResult> rollbackAudit({
+    required String tripId,
+    required int auditId,
+  }) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/audit/$auditId/rollback',
+    );
+    return TripAuditRollbackResult.fromJson(body as Map<String, dynamic>);
   }
 
   /// DELETE /trips/:id（限 owner/admin）。
