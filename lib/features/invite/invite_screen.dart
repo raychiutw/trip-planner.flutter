@@ -370,31 +370,132 @@ class _MismatchPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ProblemPanel(
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tones = theme.extension<TpTones>()!;
+
+    return DecoratedBox(
       key: const ValueKey('invite-mismatch'),
-      title: '帳號不符',
-      message: '此邀請寄給 $invitedEmail，目前登入的是 $currentEmail。請改用對應帳號登入，或請邀請者重寄。',
-      action: OutlinedButton.icon(
-        key: const ValueKey('invite-switch-account'),
-        onPressed: onSwitchAccount,
-        icon: const Icon(Icons.switch_account_outlined),
-        label: const Text('切換帳號'),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.switch_account_outlined,
+                  color: tones.accentDeep,
+                  size: 22,
+                ),
+                const SizedBox(width: TpSpacing.s2),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '帳號不符',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: TpSpacing.s1),
+                      Text(
+                        '請切換到邀請信上的帳號後再加入。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: TpSpacing.s3),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: tones.accentSubtle.withValues(alpha: 0.48),
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TpRadius.sm),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TpSpacing.s3,
+                  vertical: TpSpacing.s2,
+                ),
+                child: Column(
+                  children: [
+                    _EmailMatchRow(label: '邀請帳號', email: invitedEmail),
+                    const SizedBox(height: TpSpacing.s2),
+                    _EmailMatchRow(label: '目前登入', email: currentEmail),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s3),
+            FilledButton.icon(
+              key: const ValueKey('invite-switch-account'),
+              onPressed: onSwitchAccount,
+              icon: const Icon(Icons.login_outlined),
+              label: const Text('切換帳號'),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
+class _EmailMatchRow extends StatelessWidget {
+  const _EmailMatchRow({required this.label, required this.email});
+
+  final String label;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: TpSpacing.s2),
+        Expanded(
+          child: Text(
+            email,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ProblemPanel extends StatelessWidget {
-  const _ProblemPanel({
-    super.key,
-    required this.title,
-    required this.message,
-    this.action,
-  });
+  const _ProblemPanel({super.key, required this.title, required this.message});
 
   final String title;
   final String message;
-  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -421,10 +522,6 @@ class _ProblemPanel extends StatelessWidget {
             ),
             const SizedBox(height: TpSpacing.s1),
             Text(message, style: theme.textTheme.bodyMedium),
-            if (action != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              action!,
-            ],
           ],
         ),
       ),
