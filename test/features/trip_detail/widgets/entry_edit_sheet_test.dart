@@ -148,6 +148,14 @@ void main() {
       find.byKey(const ValueKey('entry-edit-title')),
       '自由活動',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lat')),
+      '26.21',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lng')),
+      '127.68',
+    );
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
@@ -159,13 +167,44 @@ void main() {
         title: '自由活動',
         description: any(named: 'description'),
         poiType: 'attraction',
-        lat: null,
-        lng: null,
+        lat: 26.21,
+        lng: 127.68,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',
       ),
     ).called(1);
+  });
+
+  testWidgets('新增模式：未填座標不能送出自訂停留點', (tester) async {
+    final repo = _MockTripRepository();
+
+    await _open(tester, repo, const EntryEditNew(2));
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '自由活動',
+    );
+    await tester.pump();
+
+    expect(find.text('請填入緯度與經度'), findsOneWidget);
+    final button = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('entry-edit-submit')),
+    );
+    expect(button.onPressed, isNull);
+    verifyNever(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    );
   });
 
   testWidgets('新增模式：可帶 POI 分類與座標建立自訂停留點', (tester) async {

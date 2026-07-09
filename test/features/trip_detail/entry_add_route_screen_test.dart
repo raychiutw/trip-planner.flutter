@@ -144,6 +144,14 @@ void main() {
       find.byKey(const ValueKey('entry-edit-title')),
       '自由活動',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lat')),
+      '26.21',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lng')),
+      '127.68',
+    );
     await tester.pump();
     await tester.ensureVisible(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pump();
@@ -157,8 +165,8 @@ void main() {
         title: '自由活動',
         description: any(named: 'description'),
         poiType: 'attraction',
-        lat: null,
-        lng: null,
+        lat: 26.21,
+        lng: 127.68,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',
@@ -193,6 +201,14 @@ void main() {
       find.byKey(const ValueKey('entry-edit-title')),
       '晚餐',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lat')),
+      '26.22',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lng')),
+      '127.69',
+    );
     await tester.pump();
     await tester.ensureVisible(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pump();
@@ -206,8 +222,8 @@ void main() {
         title: '晚餐',
         description: any(named: 'description'),
         poiType: 'attraction',
-        lat: null,
-        lng: null,
+        lat: 26.22,
+        lng: 127.69,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',

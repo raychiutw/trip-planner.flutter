@@ -138,10 +138,21 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   bool get _coordsBlank => _lat.text.trim().isEmpty && _lng.text.trim().isEmpty;
 
+  bool get _coordsComplete =>
+      _lat.text.trim().isNotEmpty && _lng.text.trim().isNotEmpty;
+
   bool get _coordsValid {
-    if (_coordsBlank) return true;
+    if (_isEdit) return true;
+    if (_coordsBlank) return false;
     return _coordValue(_lat.text, min: -90, max: 90) != null &&
         _coordValue(_lng.text, min: -180, max: 180) != null;
+  }
+
+  String? get _coordErrorText {
+    if (_isEdit || _title.text.trim().isEmpty) return null;
+    if (!_coordsComplete) return '請填入緯度與經度';
+    if (!_coordsValid) return '座標需同時填入有效緯度與經度';
+    return null;
   }
 
   bool get _canSubmit =>
@@ -284,7 +295,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                         decimal: true,
                         signed: true,
                       ),
-                      decoration: const InputDecoration(labelText: '緯度（選填）'),
+                      decoration: const InputDecoration(labelText: '緯度（必填）'),
                     ),
                   ),
                   const SizedBox(width: TpSpacing.s2),
@@ -296,16 +307,16 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                         decimal: true,
                         signed: true,
                       ),
-                      decoration: const InputDecoration(labelText: '經度（選填）'),
+                      decoration: const InputDecoration(labelText: '經度（必填）'),
                     ),
                   ),
                 ],
               ),
-              if (!_coordsValid)
+              if (_coordErrorText != null)
                 Padding(
                   padding: const EdgeInsets.only(top: TpSpacing.s2),
                   child: Text(
-                    '座標需同時填入有效緯度與經度',
+                    _coordErrorText!,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                       fontSize: 12,
