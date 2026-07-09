@@ -65,6 +65,19 @@ void main() {
     verify(() => repo.revokeShare('t', 1)).called(1);
   });
 
+  testWidgets('刪除 → 確認 → 呼叫 delete', (tester) async {
+    when(() => repo.deleteShare(any(), any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-delete-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.deleteShare('t', 1)).called(1);
+  });
+
   testWidgets('重新產生連結 → 顯示新的完整 URL', (tester) async {
     when(() => repo.rotateShare(any(), any())).thenAnswer(
       (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),

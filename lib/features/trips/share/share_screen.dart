@@ -1,4 +1,4 @@
-/// 分享連結管理:列出/建立/重產生/撤銷公開唯讀連結。建立後顯示完整 URL + 複製
+/// 分享連結管理:列出/建立/重產生/撤銷/刪除公開唯讀連結。建立後顯示完整 URL + 複製
 /// (raw token 只回一次)。管理限有 write 權限者(否則提示)。
 library;
 
@@ -11,9 +11,11 @@ import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
 import 'share_controller.dart';
 
+/// 管理單一行程的公開分享連結。
 class ShareScreen extends ConsumerStatefulWidget {
   const ShareScreen({super.key, required this.tripId});
 
+  /// 目標行程 ID。
   final String tripId;
 
   @override
@@ -32,11 +34,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   ShareController get _ctrl =>
       ref.read(shareControllerProvider(widget.tripId).notifier);
 
-  Future<bool> _confirm(String message) async {
+  Future<bool> _confirm(
+    String message, {
+    required String title,
+    required String confirmText,
+  }) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('撤銷分享連結'),
+        title: Text(title),
         content: Text(message),
         actions: [
           TextButton(
@@ -45,7 +51,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('撤銷'),
+            child: Text(confirmText),
           ),
         ],
       ),
@@ -151,38 +157,57 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         : s.isExpired
         ? '已過期'
         : '有效';
+    final busy =
+        state.rotatingId == s.id ||
+        state.revokingId == s.id ||
+        state.deletingId == s.id;
     return ListTile(
       key: ValueKey('share-${s.id}'),
       contentPadding: EdgeInsets.zero,
       title: Text(s.label.isEmpty ? '(無標籤)' : s.label),
       subtitle: Text('$status · 已被檢視 ${s.viewCount} 次'),
-      trailing: s.isActive
-          ? Wrap(
-              spacing: TpSpacing.s1,
-              children: [
-                TextButton(
-                  key: ValueKey('share-rotate-${s.id}'),
-                  onPressed:
-                      state.rotatingId == s.id || state.revokingId == s.id
-                      ? null
-                      : () async => _ctrl.rotate(s.id),
-                  child: Text(state.rotatingId == s.id ? '更新中' : '重產生'),
-                ),
-                TextButton(
-                  key: ValueKey('share-revoke-${s.id}'),
-                  onPressed:
-                      state.revokingId == s.id || state.rotatingId == s.id
-                      ? null
-                      : () async {
-                          if (await _confirm('此連結將立即失效,無法復原。')) {
-                            await _ctrl.revoke(s.id);
-                          }
-                        },
-                  child: const Text('撤銷'),
-                ),
-              ],
-            )
-          : null,
+      trailing: Wrap(
+        spacing: TpSpacing.s1,
+        children: [
+          if (s.isActive)
+            TextButton(
+              key: ValueKey('share-rotate-${s.id}'),
+              onPressed: busy ? null : () async => _ctrl.rotate(s.id),
+              child: Text(state.rotatingId == s.id ? '更新中' : '重產生'),
+            ),
+          if (s.isActive)
+            TextButton(
+              key: ValueKey('share-revoke-${s.id}'),
+              onPressed: busy
+                  ? null
+                  : () async {
+                      if (await _confirm(
+                        '此連結將立即失效,無法復原。',
+                        title: '撤銷分享連結',
+                        confirmText: '撤銷',
+                      )) {
+                        await _ctrl.revoke(s.id);
+                      }
+                    },
+              child: const Text('撤銷'),
+            ),
+          TextButton(
+            key: ValueKey('share-delete-${s.id}'),
+            onPressed: busy
+                ? null
+                : () async {
+                    if (await _confirm(
+                      '此連結與瀏覽統計會永久刪除,無法復原。',
+                      title: '刪除分享連結',
+                      confirmText: '刪除',
+                    )) {
+                      await _ctrl.delete(s.id);
+                    }
+                  },
+            child: Text(state.deletingId == s.id ? '刪除中' : '刪除'),
+          ),
+        ],
+      ),
     );
   }
 }
