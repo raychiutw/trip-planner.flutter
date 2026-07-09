@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/trip_detail/day_weather.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -131,6 +132,7 @@ Future<void> _pumpTimeline(
   List<TripSegment> segments = const [],
   int? initialEntryId,
   int? initialDayNum,
+  DayWeatherFetcher? dayWeatherFetcher,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
@@ -188,6 +190,8 @@ Future<void> _pumpTimeline(
           _tripId,
         ).overrideWith((ref) => Stream.value(segments)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
+        if (dayWeatherFetcher != null)
+          dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     ),
@@ -286,6 +290,53 @@ void main() {
     );
     final hotelCardDecoration = hotelCardContainer.decoration! as BoxDecoration;
     expect(hotelCardDecoration.color, TpColorsLight.sageSubtle);
+  });
+
+  testWidgets('entry 有 POI 座標時顯示行程日天氣摘要', (tester) async {
+    final hourly = TripWeatherHourly(
+      temps: [for (var h = 0; h < 24; h++) 22.0 + h / 4],
+      rains: [for (var h = 0; h < 24; h++) h < 12 ? 10 : 60],
+      codes: [for (var h = 0; h < 24; h++) h < 12 ? 0 : 61],
+    );
+
+    await _pumpTimeline(
+      tester,
+      fetchDays: () => const [
+        TripDay(
+          id: 91,
+          dayNum: 1,
+          date: '2026-04-23',
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 911,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 901,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+              ),
+            ),
+          ],
+        ),
+      ],
+      dayWeatherFetcher: (request) async {
+        expect(request.dayDate, '2026-04-23');
+        expect(request.weatherDay.locations.single.name, '沖繩美麗海水族館');
+        return hourly;
+      },
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('天氣'), findsOneWidget);
+    expect(find.text('22~28°C'), findsOneWidget);
+    expect(find.text('降雨 10~60%'), findsOneWidget);
   });
 
   testWidgets('點 day pill 捲動至該日 section', (tester) async {

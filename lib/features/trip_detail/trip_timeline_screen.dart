@@ -9,6 +9,7 @@ import '../../models/segment.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'day_warnings.dart';
+import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
@@ -401,6 +402,10 @@ class _DaySection extends ConsumerWidget {
         const SizedBox(height: TpSpacing.s3),
         if (warnings.isNotEmpty) ...[
           _DayWarningsCard(warnings: warnings),
+          const SizedBox(height: TpSpacing.s3),
+        ],
+        if (hasWeatherDay(day)) ...[
+          DayWeatherCard(day: day),
           const SizedBox(height: TpSpacing.s3),
         ],
         if (day.hotel != null) ...[
