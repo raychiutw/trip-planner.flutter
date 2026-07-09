@@ -53,3 +53,54 @@ class TripInvite {
     isExpired: json['isExpired'] == 1 || json['isExpired'] == true,
   );
 }
+
+class InvitationDetails {
+  const InvitationDetails({
+    required this.tripId,
+    required this.tripTitle,
+    required this.invitedEmail,
+    this.inviterDisplayName,
+    required this.inviterEmail,
+    required this.expiresAt,
+  });
+
+  final String tripId;
+  final String tripTitle;
+  final String invitedEmail;
+  final String? inviterDisplayName;
+  final String inviterEmail;
+  final String expiresAt;
+
+  factory InvitationDetails.fromJson(Map<String, dynamic> json) =>
+      InvitationDetails(
+        tripId: _stringValue(json, 'tripId', 'trip_id'),
+        tripTitle: _stringValue(json, 'tripTitle', 'trip_title'),
+        invitedEmail: _stringValue(json, 'invitedEmail', 'invited_email'),
+        inviterDisplayName:
+            json['inviterDisplayName'] as String? ??
+            json['inviter_display_name'] as String?,
+        inviterEmail: _stringValue(json, 'inviterEmail', 'inviter_email'),
+        expiresAt: _stringValue(json, 'expiresAt', 'expires_at'),
+      );
+}
+
+class InvitationAcceptResult {
+  const InvitationAcceptResult({required this.tripId, required this.tripTitle});
+
+  final String tripId;
+  final String tripTitle;
+
+  factory InvitationAcceptResult.fromJson(Map<String, dynamic> json) =>
+      InvitationAcceptResult(
+        tripId: _stringValue(json, 'tripId', 'trip_id'),
+        tripTitle: _stringValue(json, 'tripTitle', 'trip_title'),
+      );
+}
+
+String _stringValue(
+  Map<String, dynamic> json,
+  String camelKey,
+  String snakeKey,
+) {
+  return json[camelKey]?.toString() ?? json[snakeKey]?.toString() ?? '';
+}

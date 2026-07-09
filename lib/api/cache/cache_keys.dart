@@ -19,6 +19,10 @@ bool cacheKeyMatchesPrefix(String key, String prefix) =>
 List<String> evictionPrefixesFor(String method, String path, [Object? body]) {
   if (method == 'GET' || method == 'HEAD') return const [];
 
+  if (path == '/invitations/accept') {
+    return const ['GET /my-trips', 'GET /trips', 'GET /invitations'];
+  }
+
   // add-to-trip:目標 tripId 在 body,需失效該 trip 的 days(tripId encode 對齊快取 key)。
   if (path.startsWith('/poi-favorites') && path.endsWith('/add-to-trip')) {
     final prefixes = <String>['GET /poi-favorites'];

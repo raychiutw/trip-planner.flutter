@@ -105,6 +105,33 @@ void main() {
     ]);
   });
 
+  test('GET fallbackToCache:false → 有快取也不回退', () async {
+    await cache.writeResponse(
+      cacheKeyFor('GET', '/invitations', {'token': 'raw-token'}),
+      {'tripId': 'stale-trip'},
+    );
+    adapter.onGet(
+      '/invitations',
+      (s) => s.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/invitations'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+      queryParameters: {'token': 'raw-token'},
+    );
+
+    await expectLater(
+      client.get(
+        '/invitations',
+        query: {'token': 'raw-token'},
+        fallbackToCache: false,
+      ),
+      throwsA(isA<DioException>()),
+    );
+  });
+
   test('GET 連線失敗 + 無快取 → rethrow', () async {
     adapter.onGet(
       '/trips/t/days',
@@ -224,6 +251,29 @@ void main() {
     );
     await client.post('/poi-favorites/42/add-to-trip', body: body);
     expect(await cache.readResponse(daysKey), isNull);
+  });
+
+  test('accept invitation 成功 → evict my trips 與 invitations 快取', () async {
+    final tripsKey = cacheKeyFor('GET', '/my-trips');
+    final invitesKey = cacheKeyFor('GET', '/invitations', {'tripId': 'trip-1'});
+    await cache.writeResponse(tripsKey, [
+      {'id': 'old-trip'},
+    ]);
+    await cache.writeResponse(invitesKey, {
+      'items': [
+        {'id': 'invite-1'},
+      ],
+    });
+    adapter.onPost(
+      '/invitations/accept',
+      (s) => s.reply(200, {'ok': true, 'tripId': 'trip-1'}),
+      data: {'token': 'raw-token'},
+    );
+
+    await client.post('/invitations/accept', body: {'token': 'raw-token'});
+
+    expect(await cache.readResponse(tripsKey), isNull);
+    expect(await cache.readResponse(invitesKey), isNull);
   });
 
   test('userinfo 離線 → 回退最後快取身分(離線保持登入)', () async {

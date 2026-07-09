@@ -29,6 +29,26 @@ class CollabRepository {
         .toList();
   }
 
+  /// GET /invitations?token= → public invitation preview for accept flow.
+  Future<InvitationDetails> fetchInvitation(String token) async {
+    final body = await _client.get(
+      '/invitations',
+      query: {'token': token.trim()},
+      writeCache: false,
+      fallbackToCache: false,
+    );
+    return InvitationDetails.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// POST /invitations/accept {token} → accepted trip summary.
+  Future<InvitationAcceptResult> acceptInvitation(String token) async {
+    final body = await _client.post(
+      '/invitations/accept',
+      body: {'token': token.trim()},
+    );
+    return InvitationAcceptResult.fromJson(body as Map<String, dynamic>);
+  }
+
   /// POST /permissions(camelCase body)。role 預設 member;201(去識別化,不分既有/新 email)。
   Future<void> invite({
     required String tripId,

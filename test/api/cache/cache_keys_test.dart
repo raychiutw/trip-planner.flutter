@@ -82,6 +82,16 @@ void main() {
         containsAll(<String>['GET /my-trips', 'GET /trips']),
       );
     });
+    test('接受邀請 → 行程清單與邀請清單', () {
+      expect(
+        evictionPrefixesFor('POST', '/invitations/accept'),
+        containsAll(<String>[
+          'GET /my-trips',
+          'GET /trips',
+          'GET /invitations',
+        ]),
+      );
+    });
     test('favorites → poi-favorites', () {
       expect(
         evictionPrefixesFor('POST', '/poi-favorites'),

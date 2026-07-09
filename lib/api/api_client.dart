@@ -80,12 +80,14 @@ class ApiClient {
     Map<String, dynamic>? query,
     CancelToken? cancelToken,
     bool writeCache = true,
+    bool fallbackToCache = true,
   }) => _send(
     'GET',
     path,
     query: query,
     cancelToken: cancelToken,
     writeCache: writeCache,
+    fallbackToCache: fallbackToCache,
   );
 
   Future<dynamic> post(

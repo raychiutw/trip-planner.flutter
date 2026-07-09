@@ -6,12 +6,14 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
+import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -20,6 +22,7 @@ import 'package:tripline/models/day.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
@@ -34,6 +37,8 @@ class _FakeAuthNotifier extends AuthNotifier {
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
+class _MockCollabRepository extends Mock implements CollabRepository {}
+
 const _loggedInUser = UserInfo(
   id: 'user-1',
   email: 'traveler@example.com',
@@ -43,6 +48,7 @@ const _loggedInUser = UserInfo(
 
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
+  final mockCollabRepository = _MockCollabRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
   when(
     () => mockTripRepository.fetchPublicTripShare(any()),
@@ -56,11 +62,22 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(
     () => mockTripRepository.fetchNotes(any()),
   ).thenAnswer((_) async => const TripNotes());
+  when(() => mockCollabRepository.fetchInvitation(any())).thenAnswer(
+    (_) async => const InvitationDetails(
+      tripId: 'trip-1',
+      tripTitle: '沖繩家庭旅行',
+      invitedEmail: 'traveler@example.com',
+      inviterDisplayName: 'Ray',
+      inviterEmail: 'ray@example.com',
+      expiresAt: '2026-07-16T00:00:00.000Z',
+    ),
+  );
 
   final container = ProviderContainer(
     overrides: [
       authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
+      collabRepositoryProvider.overrideWithValue(mockCollabRepository),
     ],
   );
   return container;
@@ -176,6 +193,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PublicShareScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入可進入邀請確認頁 /invite?token', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/invite?token=raw-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InviteScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

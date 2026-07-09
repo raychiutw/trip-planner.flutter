@@ -19,6 +19,7 @@ import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
+import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
@@ -134,6 +135,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             OAuthConsentScreen(request: OAuthConsentRequest.fromUri(state.uri)),
       ),
       GoRoute(
+        path: '/invite',
+        builder: (context, state) =>
+            InviteScreen(token: state.uri.queryParameters['token'] ?? ''),
+      ),
+      GoRoute(
         path: '/s/:token',
         builder: (context, state) =>
             PublicShareScreen(token: state.pathParameters['token']!),
@@ -239,7 +245,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
-const _publicShellOutsideRoutes = {'/login', '/oauth/consent'};
+const _publicShellOutsideRoutes = {'/login', '/oauth/consent', '/invite'};
 
 String _loginLocationWithRedirect(GoRouterState state) {
   final requestedLocation = state.uri.toString();
