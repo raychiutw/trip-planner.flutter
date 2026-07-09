@@ -13,6 +13,7 @@ import '../features/account/developer_apps_screen.dart';
 import '../features/account/settings/appearance_screen.dart';
 import '../features/account/settings/notifications_screen.dart';
 import '../features/account/settings/profile_edit_screen.dart';
+import '../features/auth/account_flow_screens.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/oauth_consent_screen.dart';
 import '../features/chat/chat_screen.dart';
@@ -65,6 +66,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       // 登入頁在 shell 外（無底部導航）
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => SignupScreen(
+          invitationToken: state.uri.queryParameters['invitation'],
+        ),
+      ),
+      GoRoute(
+        path: '/signup/check-email',
+        builder: (context, state) => EmailVerifyPendingScreen(
+          email: state.uri.queryParameters['email'] ?? '',
+          invitationError: state.uri.queryParameters['invitationError'],
+        ),
+      ),
+      GoRoute(
+        path: '/login/forgot',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/auth/password/reset',
+        builder: (context, state) => ResetPasswordScreen(
+          token: state.uri.queryParameters['token'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/auth/verify-email',
+        builder: (context, state) =>
+            VerifyEmailScreen(token: state.uri.queryParameters['token'] ?? ''),
+      ),
       // Web route aliases retained during Flutter porting.
       GoRoute(path: '/trips/new', redirect: (context, state) => '/new-trip'),
       GoRoute(
@@ -311,7 +340,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
-const _publicShellOutsideRoutes = {'/login', '/oauth/consent', '/invite'};
+const _publicShellOutsideRoutes = {
+  '/login',
+  '/signup',
+  '/signup/check-email',
+  '/login/forgot',
+  '/auth/password/reset',
+  '/auth/verify-email',
+  '/oauth/consent',
+  '/invite',
+};
 
 String _tripAlias(GoRouterState state, [String suffix = '']) {
   final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);

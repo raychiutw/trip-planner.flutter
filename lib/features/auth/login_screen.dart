@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/oauth/oauth_login_service.dart';
@@ -85,6 +86,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final textTheme = Theme.of(context).textTheme;
     final authState = ref.watch(authStateProvider);
     final isSubmitting = authState.isLoading;
+    final emailVerified =
+        GoRouterState.of(context).uri.queryParameters['verified'] == '1';
 
     return Scaffold(
       body: SafeArea(
@@ -119,6 +122,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: TpSpacing.s8),
+                    if (emailVerified) ...[
+                      Container(
+                        key: const ValueKey('login-verified-banner'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TpSpacing.s4,
+                          vertical: TpSpacing.s3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(TpRadius.md),
+                        ),
+                        child: Text(
+                          '信箱已驗證，請登入繼續。',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: TpSpacing.s4),
+                    ],
                     if (authState.hasError) ...[
                       Container(
                         key: const ValueKey('login-error-banner'),
@@ -218,6 +241,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : const Text('用 OAuth 登入'),
                       ),
                     ],
+                    const SizedBox(height: TpSpacing.s3),
+                    TextButton(
+                      key: const ValueKey('login-forgot-password-link'),
+                      onPressed: isSubmitting
+                          ? null
+                          : () => context.go('/login/forgot'),
+                      child: const Text('忘記密碼？'),
+                    ),
+                    TextButton(
+                      key: const ValueKey('login-signup-link'),
+                      onPressed: isSubmitting
+                          ? null
+                          : () => context.go('/signup'),
+                      child: const Text('沒有帳號，建立帳號'),
+                    ),
                   ],
                 ),
               ),

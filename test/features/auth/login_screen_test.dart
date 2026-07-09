@@ -31,11 +31,25 @@ void main() {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => null);
   });
 
-  /// 把 LoginScreen 包進簡單 GoRouter 假 route（導航目的地不在此驗證）。
-  Future<void> pumpLoginScreen(WidgetTester tester) async {
+  /// 把 LoginScreen 包進簡單 GoRouter 假 route。
+  Future<void> pumpLoginScreen(
+    WidgetTester tester, {
+    String initialLocation = '/',
+  }) async {
     final fakeRouter = GoRouter(
+      initialLocation: initialLocation,
       routes: [
         GoRoute(path: '/', builder: (context, state) => const LoginScreen()),
+        GoRoute(
+          path: '/login/forgot',
+          builder: (context, state) =>
+              const Scaffold(body: Text('forgot-destination')),
+        ),
+        GoRoute(
+          path: '/signup',
+          builder: (context, state) =>
+              const Scaffold(body: Text('signup-destination')),
+        ),
       ],
     );
     await tester.pumpWidget(
@@ -85,6 +99,40 @@ void main() {
 
       final passwordTextField = innerTextFieldOf(tester, passwordFieldKey);
       expect(passwordTextField.obscureText, isFalse);
+    });
+
+    testWidgets('verified query 顯示信箱已驗證提示', (tester) async {
+      await pumpLoginScreen(tester, initialLocation: '/?verified=1');
+
+      expect(
+        find.byKey(const ValueKey('login-verified-banner')),
+        findsOneWidget,
+      );
+      expect(find.text('信箱已驗證，請登入繼續。'), findsOneWidget);
+    });
+
+    testWidgets('可從登入頁前往忘記密碼流程', (tester) async {
+      await pumpLoginScreen(tester);
+
+      final forgotLink = find.byKey(
+        const ValueKey('login-forgot-password-link'),
+      );
+      await tester.ensureVisible(forgotLink);
+      await tester.tap(forgotLink);
+      await tester.pumpAndSettle();
+
+      expect(find.text('forgot-destination'), findsOneWidget);
+    });
+
+    testWidgets('可從登入頁前往建立帳號流程', (tester) async {
+      await pumpLoginScreen(tester);
+
+      final signupLink = find.byKey(const ValueKey('login-signup-link'));
+      await tester.ensureVisible(signupLink);
+      await tester.tap(signupLink);
+      await tester.pumpAndSettle();
+
+      expect(find.text('signup-destination'), findsOneWidget);
     });
   });
 

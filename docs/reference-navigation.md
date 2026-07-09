@@ -7,6 +7,11 @@
 | 路徑 | 畫面 | 位置 |
 |---|---|---|
 | `/login` | `LoginScreen` | **shell 外**(無底部導航) |
+| `/signup` | `SignupScreen` | shell 外公開 route |
+| `/signup/check-email` | `EmailVerifyPendingScreen` | shell 外公開 route |
+| `/login/forgot` | `ForgotPasswordScreen` | shell 外公開 route |
+| `/auth/password/reset` | `ResetPasswordScreen` | shell 外公開 route |
+| `/auth/verify-email` | `VerifyEmailScreen` | shell 外公開 route |
 | `/chat` | `ChatScreen` | tab 1 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
@@ -55,7 +60,7 @@ redirect: (context, state) {
 
 1. **認證狀態 loading 時不 redirect** — app 啟動瞬間 `currentUser()` 還在查,先停在原地,避免「閃進 login 又跳走」。
 2. 未登入 + 不在 `/login` 或公開 route → 踢去 `/login`,並用安全站內 `redirect_after` 保留原路徑。
-3. 未登入可進公開 route:`/s/:token`、`/oauth/consent`。
+3. 未登入可進公開 route:`/s/:token`、`/oauth/consent`、`/invite`、signup / forgot password / email verify 系列 route。
 4. 已登入 + 在 `/login` → 優先回到安全站內 `redirect_after`,否則送去 `/trips`(登入成功後的跳轉就是靠這條,`LoginScreen` 自己不導航)。
 
 ## auth 變化 → redirect 重算的橋接

@@ -10,6 +10,7 @@ import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
+import 'package:tripline/features/auth/account_flow_screens.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
@@ -224,6 +225,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(InviteScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('未登入可進入 signup、忘記密碼與 email 驗證 routes', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/signup?invitation=raw-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SignupScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container
+        .read(appRouterProvider)
+        .go('/signup/check-email?email=traveler%40example.com');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EmailVerifyPendingScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/login/forgot');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container
+        .read(appRouterProvider)
+        .go('/auth/password/reset?token=reset-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ResetPasswordScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container
+        .read(appRouterProvider)
+        .go('/auth/verify-email?token=verify-token');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(VerifyEmailScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
