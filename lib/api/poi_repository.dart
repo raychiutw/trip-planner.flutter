@@ -4,6 +4,7 @@ library;
 import 'package:dio/dio.dart';
 
 import '../models/place_details.dart';
+import '../models/place_prediction.dart';
 import '../models/poi_search_result.dart';
 import 'api_client.dart';
 
@@ -38,6 +39,33 @@ class PoiRepository {
         .map(
           (poiJson) =>
               PoiSearchResult.fromJson(poiJson as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  /// POST /places/autocomplete（body: q/sessionToken/regionCode）→ predictions。
+  Future<List<PlacePrediction>> autocompletePlaces({
+    required String q,
+    required String sessionToken,
+    String? regionCode,
+  }) async {
+    final body = <String, dynamic>{
+      'q': q.trim(),
+      'sessionToken': sessionToken.trim(),
+    };
+    final trimmedRegion = regionCode?.trim();
+    if (trimmedRegion != null && trimmedRegion.isNotEmpty) {
+      body['regionCode'] = trimmedRegion;
+    }
+    final responseBody = await _client.post('/places/autocomplete', body: body);
+    final predictions =
+        (responseBody as Map<String, dynamic>)['predictions']
+            as List<dynamic>? ??
+        const [];
+    return predictions
+        .map(
+          (predictionJson) =>
+              PlacePrediction.fromJson(predictionJson as Map<String, dynamic>),
         )
         .toList();
   }

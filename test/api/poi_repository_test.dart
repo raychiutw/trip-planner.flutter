@@ -63,6 +63,54 @@ void main() {
     expect(sent.queryParameters.containsKey('region'), isFalse);
   });
 
+  test(
+    'autocompletePlaces：POST q/sessionToken/regionCode → 解析 predictions',
+    () async {
+      dioAdapter.onPost(
+        '/places/autocomplete',
+        (server) => server.reply(200, {
+          'predictions': [
+            {
+              'placeId': 'ChIJ123',
+              'primaryText': '高雄市左營區',
+              'secondaryText': 'Kaohsiung City, Taiwan',
+            },
+          ],
+        }),
+        data: {'q': '左營', 'sessionToken': 'session-1', 'regionCode': 'TW'},
+      );
+
+      final predictions = await poiRepository.autocompletePlaces(
+        q: ' 左營 ',
+        sessionToken: ' session-1 ',
+        regionCode: 'TW',
+      );
+
+      expect(predictions.single.placeId, 'ChIJ123');
+      expect(predictions.single.primaryText, '高雄市左營區');
+    },
+  );
+
+  test('autocompletePlaces：regionCode 空白時省略', () async {
+    dioAdapter.onPost(
+      '/places/autocomplete',
+      (server) => server.reply(200, {'predictions': []}),
+      data: {'q': '首里', 'sessionToken': 'session-2'},
+    );
+
+    await poiRepository.autocompletePlaces(
+      q: '首里',
+      sessionToken: 'session-2',
+      regionCode: ' ',
+    );
+
+    final sent = recordedRequests.single;
+    expect(
+      (sent.data as Map<String, dynamic>).containsKey('regionCode'),
+      false,
+    );
+  });
+
   test('findOrCreatePoi：POST snake_case body → 回 poiId', () async {
     dioAdapter.onPost(
       '/pois/find-or-create',
