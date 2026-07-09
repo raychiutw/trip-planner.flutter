@@ -36,7 +36,14 @@ const _entry = TimelineEntry(
     note: '世界遺產',
   ),
   alternates: [
-    EntryPoiInfo(poiId: 502, name: '玉陵', type: 'attraction', sortOrder: 2),
+    EntryPoiInfo(
+      poiId: 502,
+      name: '玉陵',
+      type: 'restaurant',
+      sortOrder: 2,
+      reservation: '已訂位 18:00',
+      reservationUrl: 'https://book.example/abc',
+    ),
     EntryPoiInfo(poiId: 503, name: '識名園', type: 'attraction', sortOrder: 3),
   ],
 );
@@ -56,6 +63,7 @@ Future<void> _pump(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
   _MockFavoritesRepository? favoritesRepo,
+  ReservationUrlLauncher reservationUrlLauncher = launchReservationUrl,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -74,7 +82,11 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
-        home: const EntryPoiScreen(tripId: 't1', entryId: 11),
+        home: EntryPoiScreen(
+          tripId: 't1',
+          entryId: 11,
+          reservationUrlLauncher: reservationUrlLauncher,
+        ),
       ),
     ),
   );
@@ -92,6 +104,25 @@ void main() {
     expect(find.text('玉陵'), findsOneWidget);
     expect(find.text('識名園'), findsOneWidget);
     expect(find.byKey(const ValueKey('add-alternate')), findsOneWidget);
+  });
+
+  testWidgets('訂位資訊有連結時可外開 reservationUrl', (tester) async {
+    final opened = <Uri>[];
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      reservationUrlLauncher: (url) async => opened.add(url),
+    );
+
+    expect(find.text('訂位:已訂位 18:00'), findsOneWidget);
+
+    final link = find.byKey(const ValueKey('poi-reservation-link-502'));
+    expect(link, findsOneWidget);
+
+    await tester.tap(link);
+    await tester.pump();
+
+    expect(opened.single.toString(), 'https://book.example/abc');
   });
 
   testWidgets('設為正選 → setEntryMaster(poiId, entryPoisVersion)', (tester) async {

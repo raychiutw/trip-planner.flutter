@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
@@ -14,6 +15,16 @@ import '../favorites/explore/explore_controller.dart'
 import '../favorites/favorites_providers.dart';
 import 'trip_providers.dart';
 
+/// 開啟 POI 訂位連結的注入點，讓測試可替換外部瀏覽器呼叫。
+typedef ReservationUrlLauncher = Future<void> Function(Uri url);
+
+/// 用系統外部瀏覽器 / app 開啟訂位連結。
+Future<void> launchReservationUrl(Uri url) async {
+  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    throw Exception('Unable to open reservation URL: $url');
+  }
+}
+
 /// 地點管理全頁：正選切換、備選增刪、per-POI 備註/分類/訂位。
 /// OCC = entryPoisVersion（string）;每次操作後重抓 entryDetail 取最新 token。
 class EntryPoiScreen extends ConsumerWidget {
@@ -21,10 +32,14 @@ class EntryPoiScreen extends ConsumerWidget {
     super.key,
     required this.tripId,
     required this.entryId,
+    this.reservationUrlLauncher = launchReservationUrl,
   });
 
   final String tripId;
   final int entryId;
+
+  /// 訂位連結開啟器；production 用 `url_launcher`，測試可注入 fake。
+  final ReservationUrlLauncher reservationUrlLauncher;
 
   ({String tripId, int entryId}) get _key => (tripId: tripId, entryId: entryId);
 
@@ -91,6 +106,7 @@ class EntryPoiScreen extends ConsumerWidget {
           _PoiCard(
             poi: entry.master!,
             isMaster: true,
+            reservationUrlLauncher: reservationUrlLauncher,
             trailing: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -141,6 +157,7 @@ class EntryPoiScreen extends ConsumerWidget {
             _PoiCard(
               poi: alt,
               isMaster: false,
+              reservationUrlLauncher: reservationUrlLauncher,
               trailing: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -347,17 +364,20 @@ class _PoiCard extends StatelessWidget {
   const _PoiCard({
     required this.poi,
     required this.isMaster,
+    required this.reservationUrlLauncher,
     required this.trailing,
   });
 
   final EntryPoiInfo poi;
   final bool isMaster;
+  final ReservationUrlLauncher reservationUrlLauncher;
   final Widget trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
+    final reservationUri = _safeReservationUri(poi.reservationUrl);
     return Container(
       key: ValueKey('poi-card-${poi.poiId}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s2),
@@ -399,9 +419,38 @@ class _PoiCard extends StatelessWidget {
                 if (poi.reservation != null && poi.reservation!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(
-                      '訂位:${poi.reservation!}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '訂位:${poi.reservation!}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: muted,
+                            ),
+                          ),
+                        ),
+                        if (reservationUri != null) ...[
+                          const SizedBox(width: TpSpacing.s1),
+                          IconButton(
+                            key: ValueKey('poi-reservation-link-${poi.poiId}'),
+                            tooltip: '開啟訂位連結',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 32,
+                              height: 32,
+                            ),
+                            iconSize: 18,
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            onPressed: () => _openReservationUrl(
+                              context,
+                              reservationUrlLauncher,
+                              reservationUri,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
               ],
@@ -411,6 +460,32 @@ class _PoiCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+Uri? _safeReservationUri(String? rawUrl) {
+  final value = rawUrl?.trim();
+  if (value == null || value.isEmpty) return null;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return null;
+  return switch (uri.scheme.toLowerCase()) {
+    'http' || 'https' => uri,
+    _ => null,
+  };
+}
+
+Future<void> _openReservationUrl(
+  BuildContext context,
+  ReservationUrlLauncher launcher,
+  Uri url,
+) async {
+  try {
+    await launcher(url);
+  } on Exception {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('無法開啟訂位連結')));
   }
 }
 
