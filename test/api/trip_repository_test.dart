@@ -462,6 +462,33 @@ void main() {
     expect(tripNotes.lodgings, isEmpty);
   });
 
+  test(
+    'generateNotes：POST /trips/:id/notes/:section/generate 回 AI job',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa/notes/flights/generate',
+        (server) => server.reply(202, {
+          'jobId': 12,
+          'requestId': 34,
+          'status': 'pending',
+          'tripId': 'okinawa',
+          'docType': 'flights',
+        }),
+      );
+
+      final job = await tripRepository.generateNotes(
+        NoteSection.flights,
+        tripId: 'okinawa',
+      );
+
+      expect(job.jobId, 12);
+      expect(job.requestId, 34);
+      expect(job.status, 'pending');
+      expect(job.tripId, 'okinawa');
+      expect(job.docType, 'flights');
+    },
+  );
+
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 

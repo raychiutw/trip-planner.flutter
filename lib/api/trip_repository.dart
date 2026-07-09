@@ -315,6 +315,24 @@ class TripRepository {
     );
   }
 
+  /// POST /trips/:id/notes/:section/generate（啟動 AI 產生筆記 job）。
+  Future<
+    ({int jobId, int requestId, String status, String tripId, String docType})
+  >
+  generateNotes(NoteSection section, {required String tripId}) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/generate',
+    );
+    final map = body as Map<String, dynamic>;
+    return (
+      jobId: (map['jobId'] as num).toInt(),
+      requestId: (map['requestId'] as num).toInt(),
+      status: map['status'] as String? ?? 'pending',
+      tripId: map['tripId'] as String? ?? tripId,
+      docType: map['docType'] as String? ?? section.name,
+    );
+  }
+
   /// DELETE /trips/:id（限 owner/admin）。
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
