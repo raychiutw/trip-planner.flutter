@@ -3,6 +3,7 @@ library;
 
 import 'package:dio/dio.dart';
 
+import '../models/place_details.dart';
 import '../models/poi_search_result.dart';
 import 'api_client.dart';
 
@@ -39,6 +40,15 @@ class PoiRepository {
               PoiSearchResult.fromJson(poiJson as Map<String, dynamic>),
         )
         .toList();
+  }
+
+  /// GET /places/resolve?placeId=... → Place Details enrichment data.
+  Future<PlaceDetails> resolvePlace(String placeId) async {
+    final responseBody = await _client.get(
+      '/places/resolve',
+      query: {'placeId': placeId.trim()},
+    );
+    return PlaceDetails.fromJson(responseBody as Map<String, dynamic>);
   }
 
   /// POST /pois/find-or-create（body 全 snake_case）→ 後端 pois PK。

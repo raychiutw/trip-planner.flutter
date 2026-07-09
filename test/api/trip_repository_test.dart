@@ -1271,7 +1271,15 @@ void main() {
         data: Matchers.any,
       );
 
-      await repo.addEntryToDay(tripId: 'okinawa', dayNum: 1, title: '新景點');
+      await repo.addEntryToDay(
+        tripId: 'okinawa',
+        dayNum: 1,
+        title: '新景點',
+        note: '營業 09:00-18:00',
+        poiType: 'attraction',
+        lat: 26.1,
+        lng: 127.6,
+      );
 
       final q = await cache.readQueue();
       expect(q.single.type, 'entry.add');
@@ -1280,6 +1288,10 @@ void main() {
       final timeline = (days.first as Map)['timeline'] as List;
       expect(timeline, hasLength(1));
       expect((timeline.first as Map)['title'], '新景點');
+      expect(
+        ((timeline.first as Map)['master'] as Map)['note'],
+        '營業 09:00-18:00',
+      );
     });
 
     test('deleteEntry 離線 → 入佇列(entry.delete)+ days 快取移除', () async {
