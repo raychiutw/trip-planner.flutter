@@ -11,6 +11,22 @@ import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
 import 'share_controller.dart';
 
+const _shareSectionOrder = [
+  'flights',
+  'lodgings',
+  'reservations',
+  'pretrip',
+  'emergency',
+];
+const _shareSectionLabels = {
+  'flights': '航班',
+  'lodgings': '住宿',
+  'reservations': '預訂',
+  'pretrip': '行前須知',
+  'emergency': '緊急聯絡',
+};
+const _defaultShareSections = {'flights', 'lodgings', 'pretrip'};
+
 /// 管理單一行程的公開分享連結。
 class ShareScreen extends ConsumerStatefulWidget {
   const ShareScreen({super.key, required this.tripId});
@@ -24,6 +40,8 @@ class ShareScreen extends ConsumerStatefulWidget {
 
 class _ShareScreenState extends ConsumerState<ShareScreen> {
   final _label = TextEditingController();
+  final Set<String> _sections = {..._defaultShareSections};
+  bool _anonymous = false;
 
   @override
   void dispose() {
@@ -33,6 +51,19 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   ShareController get _ctrl =>
       ref.read(shareControllerProvider(widget.tripId).notifier);
+
+  List<String> get _visibleSections =>
+      _shareSectionOrder.where(_sections.contains).toList();
+
+  void _toggleSection(String key, bool selected) {
+    setState(() {
+      if (selected) {
+        _sections.add(key);
+      } else {
+        _sections.remove(key);
+      }
+    });
+  }
 
   Future<bool> _confirm(
     String message, {
@@ -128,6 +159,34 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     isDense: true,
                   ),
                 ),
+                const SizedBox(height: TpSpacing.s3),
+                Text('公開區塊', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: TpSpacing.s1),
+                Wrap(
+                  spacing: TpSpacing.s1,
+                  runSpacing: TpSpacing.s1,
+                  children: [
+                    for (final section in _shareSectionOrder)
+                      FilterChip(
+                        key: ValueKey('share-section-$section'),
+                        label: Text(_shareSectionLabels[section] ?? section),
+                        selected: _sections.contains(section),
+                        onSelected: (selected) =>
+                            _toggleSection(section, selected),
+                      ),
+                  ],
+                ),
+                CheckboxListTile(
+                  key: const ValueKey('share-anonymous'),
+                  value: _anonymous,
+                  onChanged: (value) =>
+                      setState(() => _anonymous = value ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  title: const Text('匿名分享'),
+                ),
                 const SizedBox(height: TpSpacing.s2),
                 if (state.error != null)
                   Padding(
@@ -144,7 +203,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                   onPressed: state.creating
                       ? null
                       : () {
-                          _ctrl.create(_label.text);
+                          _ctrl.create(
+                            _label.text,
+                            visibleSections: _visibleSections,
+                            anonymous: _anonymous,
+                          );
                           _label.clear();
                         },
                   child: state.creating

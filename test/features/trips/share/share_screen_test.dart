@@ -36,7 +36,14 @@ void main() {
   });
 
   testWidgets('建立 → 顯示完整 URL + 複製鈕', (tester) async {
-    when(() => repo.createShare(any(), label: any(named: 'label'))).thenAnswer(
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
       (_) async =>
           const ShareLink(id: 7, token: 'tok', url: '/s/tok', label: 'x'),
     );
@@ -47,9 +54,53 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('share-create')));
     await tester.pumpAndSettle();
 
-    verify(() => repo.createShare('t', label: 'x')).called(1);
+    final captured =
+        verify(
+              () => repo.createShare(
+                't',
+                label: 'x',
+                visibleSections: captureAny(named: 'visibleSections'),
+                anonymous: false,
+              ),
+            ).captured.single
+            as List<String>;
+    expect(captured, ['flights', 'lodgings', 'pretrip']);
     expect(find.textContaining('/s/tok'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
+  });
+
+  testWidgets('建立選項 → 切換公開區塊與匿名設定', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ShareLink(id: 8, token: 'tok2', url: '/s/tok2', label: 'x'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), 'x');
+    await tester.tap(find.byKey(const ValueKey('share-section-reservations')));
+    await tester.tap(find.byKey(const ValueKey('share-anonymous')));
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+
+    final captured =
+        verify(
+              () => repo.createShare(
+                't',
+                label: 'x',
+                visibleSections: captureAny(named: 'visibleSections'),
+                anonymous: true,
+              ),
+            ).captured.single
+            as List<String>;
+    expect(captured, ['flights', 'lodgings', 'reservations', 'pretrip']);
   });
 
   testWidgets('撤銷 → 確認 → 呼叫 revoke', (tester) async {

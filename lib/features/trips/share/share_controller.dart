@@ -127,11 +127,28 @@ class ShareController extends Notifier<ShareState> {
   }
 
   /// 建立分享連結;成功後 lastCreated 帶 ShareLink(供顯示/複製)。
-  Future<void> create(String label) async {
-    if (state.creating) return;
+  Future<void> create(
+    String label, {
+    List<String>? visibleSections,
+    int? expiresAt,
+    bool? anonymous,
+  }) async {
+    if (state.creating ||
+        state.updatingId != null ||
+        state.revokingId != null ||
+        state.rotatingId != null ||
+        state.deletingId != null) {
+      return;
+    }
     state = state.copyWith(creating: true, error: null, lastCreated: null);
     try {
-      final link = await _repo.createShare(tripId, label: label.trim());
+      final link = await _repo.createShare(
+        tripId,
+        label: label.trim(),
+        visibleSections: visibleSections,
+        expiresAt: expiresAt,
+        anonymous: anonymous,
+      );
       await _reload();
       if (_disposed) return;
       state = state.copyWith(creating: false, lastCreated: link);

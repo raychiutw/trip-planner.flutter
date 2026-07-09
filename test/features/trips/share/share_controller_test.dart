@@ -74,6 +74,39 @@ void main() {
     expect(s.creating, isFalse);
   });
 
+  test('create options → 傳公開區塊與匿名設定', () async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ShareLink(id: 8, token: 'tok2', url: '/s/tok2', label: 'B'),
+    );
+    final c = makeC();
+    final ctrl = await loaded(c);
+    await ctrl.create(
+      'B',
+      visibleSections: ['flights', 'pretrip'],
+      anonymous: true,
+    );
+
+    final captured =
+        verify(
+              () => repo.createShare(
+                't',
+                label: 'B',
+                visibleSections: captureAny(named: 'visibleSections'),
+                anonymous: true,
+              ),
+            ).captured.single
+            as List<String>;
+    expect(captured, ['flights', 'pretrip']);
+  });
+
   test('revoke → 呼叫 + reload', () async {
     when(() => repo.revokeShare(any(), any())).thenAnswer((_) async {});
     final c = makeC();
