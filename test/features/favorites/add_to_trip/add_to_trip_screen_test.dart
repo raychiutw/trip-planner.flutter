@@ -14,6 +14,7 @@ import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/models/add_to_trip.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/place_details.dart';
+import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -74,19 +75,77 @@ void main() {
 
   // 統一 override tripRepositoryProvider（myTripsProvider/tripDaysProvider 皆走它,
   // 避免 family instance override 語法不確定）。
-  Widget buildApp(AddToTripArgs args) {
+  Widget buildScoped(Widget home) {
     return ProviderScope(
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
         favoritesRepositoryProvider.overrideWithValue(favRepo),
         poiRepositoryProvider.overrideWithValue(poiRepo),
       ],
-      child: MaterialApp(
-        theme: AppTheme.light(),
-        home: AddToTripScreen(args: args),
-      ),
+      child: MaterialApp(theme: AppTheme.light(), home: home),
     );
   }
+
+  Widget buildApp(AddToTripArgs args) =>
+      buildScoped(AddToTripScreen(args: args));
+
+  testWidgets('route loader：favorite id 深連結會從收藏清單還原 args', (tester) async {
+    when(favRepo.fetchFavorites).thenAnswer(
+      (_) async => const [
+        PoiFavorite(
+          id: 7,
+          userId: 'user-1',
+          poiId: 700,
+          favoritedAt: '2026-07-09T10:00:00Z',
+          poiName: '首里城',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      buildScoped(
+        AddToTripRouteScreen(
+          favoriteMode: true,
+          favoriteId: 7,
+          uri: Uri.parse('/favorites/7/add-to-trip'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('加入行程：首里城'), findsOneWidget);
+    verify(favRepo.fetchFavorites).called(1);
+  });
+
+  testWidgets('route loader：direct query 會建立 direct mode args', (tester) async {
+    final uri = Uri(
+      path: '/favorites/add-to-trip',
+      queryParameters: const {
+        'place_id': 'p1',
+        'name': '美麗海水族館',
+        'lat': '26.69',
+        'lng': '127.87',
+        'address': '沖繩縣本部町石川424',
+        'category': 'aquarium',
+      },
+    );
+
+    await tester.pumpWidget(buildScoped(AddToTripRouteScreen(uri: uri)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('加入行程：美麗海水族館'), findsOneWidget);
+  });
+
+  testWidgets('route loader：direct query 缺資料時顯示明確錯誤', (tester) async {
+    await tester.pumpWidget(
+      buildScoped(
+        AddToTripRouteScreen(uri: Uri.parse('/favorites/add-to-trip')),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('景點資料缺漏，請從探索頁重新進入'), findsOneWidget);
+  });
 
   testWidgets('favorite mode：選 trip/day(預設)→ 送出呼叫 addFavoriteToTrip', (
     tester,

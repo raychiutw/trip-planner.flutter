@@ -6,6 +6,7 @@ import '../../../api/providers.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../models/day.dart';
 import '../../../models/poi_note.dart';
+import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
@@ -18,6 +19,63 @@ import '../favorites_providers.dart';
 /// 時間區間有效性：結束須晚於開始。抽為頂層純函式以利單元測試。
 bool isAddToTripTimeValid(TimeOfDay start, TimeOfDay end) =>
     end.hour * 60 + end.minute > start.hour * 60 + start.minute;
+
+final addToTripFavoriteArgsProvider =
+    FutureProvider.family<AddToTripFavorite, int>((ref, favoriteId) async {
+      final favorites = await ref
+          .read(favoritesRepositoryProvider)
+          .fetchFavorites();
+      for (final favorite in favorites) {
+        if (favorite.id == favoriteId) {
+          return AddToTripFavorite(
+            favoriteId: favorite.id,
+            displayName: favorite.displayName,
+          );
+        }
+      }
+      throw StateError('找不到該收藏（可能已被刪除）');
+    });
+
+/// 加入行程 route loader：支援 extra、favorite id 深連結與 direct query。
+class AddToTripRouteScreen extends ConsumerWidget {
+  const AddToTripRouteScreen({
+    super.key,
+    this.args,
+    this.favoriteId,
+    this.favoriteMode = false,
+    required this.uri,
+  });
+
+  final AddToTripArgs? args;
+  final int? favoriteId;
+  final bool favoriteMode;
+  final Uri uri;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final providedArgs = args;
+    if (providedArgs != null) return AddToTripScreen(args: providedArgs);
+
+    if (favoriteMode) {
+      final id = favoriteId;
+      if (id == null || id <= 0) {
+        return const _AddToTripRouteState(message: '收藏 ID 無效');
+      }
+      final favoriteArgs = ref.watch(addToTripFavoriteArgsProvider(id));
+      return favoriteArgs.when(
+        loading: () => const _AddToTripRouteState(loading: true),
+        error: (error, _) =>
+            _AddToTripRouteState(message: _routeErrorMessage(error)),
+        data: (value) => AddToTripScreen(args: value),
+      );
+    }
+
+    final directArgs = _directArgsFromUri(uri);
+    if (directArgs != null) return AddToTripScreen(args: directArgs);
+
+    return const _AddToTripRouteState(message: '景點資料缺漏，請從探索頁重新進入');
+  }
+}
 
 /// 加入行程（fullpage）：選 trip/day/時間 → 送出（favorite / direct mode）。
 class AddToTripScreen extends ConsumerStatefulWidget {
@@ -250,4 +308,62 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       ],
     );
   }
+}
+
+class _AddToTripRouteState extends StatelessWidget {
+  const _AddToTripRouteState({this.message, this.loading = false});
+
+  final String? message;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('加入行程')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s6),
+          child: loading
+              ? const CircularProgressIndicator()
+              : Text(message ?? '載入失敗', textAlign: TextAlign.center),
+        ),
+      ),
+    );
+  }
+}
+
+AddToTripDirect? _directArgsFromUri(Uri uri) {
+  final query = uri.queryParameters;
+  final placeId =
+      _queryValue(query, 'place_id') ?? _queryValue(query, 'placeId');
+  final name = _queryValue(query, 'name');
+  final lat = double.tryParse(query['lat'] ?? '');
+  final lng = double.tryParse(query['lng'] ?? '');
+  if (placeId == null || name == null || lat == null || lng == null) {
+    return null;
+  }
+  return AddToTripDirect(
+    poi: PoiSearchResult(
+      placeId: placeId,
+      name: name,
+      address: _queryValue(query, 'address'),
+      lat: lat,
+      lng: lng,
+      category: _queryValue(query, 'category'),
+    ),
+  );
+}
+
+String? _queryValue(Map<String, String> query, String key) {
+  final value = query[key]?.trim();
+  if (value == null || value.isEmpty) return null;
+  return value;
+}
+
+String _routeErrorMessage(Object error) {
+  final message = error.toString();
+  const prefix = 'Bad state: ';
+  return message.startsWith(prefix)
+      ? message.substring(prefix.length)
+      : message;
 }

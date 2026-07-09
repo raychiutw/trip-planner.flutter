@@ -17,6 +17,7 @@ import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/features/favorites/explore/explore_screen.dart';
+import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
@@ -64,6 +65,12 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(
     () => mockTripRepository.fetchDays(any()),
   ).thenAnswer((_) async => <TripDay>[]);
+  when(mockTripRepository.watchMyTrips).thenAnswer(
+    (_) => Stream.value(const [TripSummary(tripId: 'trip-1', name: '沖繩')]),
+  );
+  when(() => mockTripRepository.watchDays(any())).thenAnswer(
+    (_) => Stream.value(const [TripDay(id: 1, dayNum: 1, version: 0)]),
+  );
   when(
     () => mockTripRepository.fetchNotes(any()),
   ).thenAnswer((_) async => const TripNotes());
@@ -332,6 +339,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container
+        .read(appRouterProvider)
+        .go('/add-to-trip?place_id=p1&name=美麗海水族館&lat=26.69&lng=127.87');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddToTripScreen), findsOneWidget);
+    expect(find.text('加入行程：美麗海水族館'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
     container.read(appRouterProvider).go('/trip/trip-1/print');

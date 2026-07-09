@@ -72,6 +72,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => '/favorites/explore',
       ),
       GoRoute(
+        path: '/add-to-trip',
+        redirect: (context, state) =>
+            _withQuery('/favorites/add-to-trip', state),
+      ),
+      GoRoute(
         path: '/account/appearance',
         redirect: (context, state) => '/settings/appearance',
       ),
@@ -268,12 +273,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ExploreScreen(),
                   ),
                   GoRoute(
+                    path: ':favoriteId/add-to-trip',
+                    builder: (context, state) => AddToTripRouteScreen(
+                      favoriteMode: true,
+                      favoriteId: int.tryParse(
+                        state.pathParameters['favoriteId'] ?? '',
+                      ),
+                      uri: state.uri,
+                    ),
+                  ),
+                  GoRoute(
                     path: 'add-to-trip',
-                    // 深連結／重整後 extra 遺失時不 crash：導回收藏頁。
-                    redirect: (context, state) =>
-                        state.extra is AddToTripArgs ? null : '/favorites',
-                    builder: (context, state) =>
-                        AddToTripScreen(args: state.extra! as AddToTripArgs),
+                    builder: (context, state) => AddToTripRouteScreen(
+                      args: state.extra is AddToTripArgs
+                          ? state.extra! as AddToTripArgs
+                          : null,
+                      uri: state.uri,
+                    ),
                   ),
                 ],
               ),
@@ -305,6 +321,11 @@ String _tripAlias(GoRouterState state, [String suffix = '']) {
 String _outsideTripAlias(GoRouterState state, String prefix) {
   final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
   return '$prefix/$tripId';
+}
+
+String _withQuery(String path, GoRouterState state) {
+  final query = state.uri.query;
+  return query.isEmpty ? path : '$path?$query';
 }
 
 String _loginLocationWithRedirect(GoRouterState state) {
