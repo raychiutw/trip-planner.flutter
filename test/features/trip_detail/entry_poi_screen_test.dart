@@ -278,6 +278,52 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('加入備選 → 自訂地點 → addEntryAlternate(customPoi)', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.addEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        customPoi: any(named: 'customPoi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-name')),
+      '秘密觀景台',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '26.2',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lng')),
+      '127.6',
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+
+    final customPoi =
+        verify(
+              () => repo.addEntryAlternate(
+                tripId: 't1',
+                entryId: 11,
+                customPoi: captureAny(named: 'customPoi'),
+                entryPoisVersion: '4',
+              ),
+            ).captured.single
+            as CustomEntryPoi;
+    expect(customPoi.name, '秘密觀景台');
+    expect(customPoi.lat, 26.2);
+    expect(customPoi.lng, 127.6);
+  });
+
   testWidgets('置換正選 → 搜尋選結果 → changeEntryPoi', (tester) async {
     final repo = _MockTripRepository();
     final poiRepo = _MockPoiRepository();
@@ -353,5 +399,52 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('置換正選 → 自訂地點 → changeEntryPoi(customPoi)', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.changeEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        customPoi: any(named: 'customPoi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async => 801);
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('change-master')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-name')),
+      '海邊拍照點',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lat')),
+      '26.21',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-lng')),
+      '127.68',
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-picker-custom-submit')));
+    await tester.pumpAndSettle();
+
+    final customPoi =
+        verify(
+              () => repo.changeEntryPoi(
+                tripId: 't1',
+                entryId: 11,
+                customPoi: captureAny(named: 'customPoi'),
+                entryPoisVersion: '4',
+              ),
+            ).captured.single
+            as CustomEntryPoi;
+    expect(customPoi.name, '海邊拍照點');
+    expect(customPoi.lat, 26.21);
+    expect(customPoi.lng, 127.68);
+    expect(customPoi.poiType, 'attraction');
   });
 }

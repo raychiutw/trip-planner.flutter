@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../api/trip_repository.dart' show CustomEntryPoi;
 import '../../models/entry.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
@@ -291,6 +292,7 @@ class EntryPoiScreen extends ConsumerWidget {
             entryId: entryId,
             poiId: selected.poiId,
             poi: selected.poi,
+            customPoi: selected.customPoi,
             entryPoisVersion: entry.entryPoisVersion,
           ),
       success: '已加入備選',
@@ -321,6 +323,7 @@ class EntryPoiScreen extends ConsumerWidget {
             entryId: entryId,
             poiId: selected.poiId,
             poi: selected.poi,
+            customPoi: selected.customPoi,
             entryPoisVersion: entry.entryPoisVersion,
           );
     }, success: '已置換正選');
@@ -328,12 +331,15 @@ class EntryPoiScreen extends ConsumerWidget {
 }
 
 class _EntryPoiPick {
-  const _EntryPoiPick.search(this.poi) : poiId = null;
+  const _EntryPoiPick.search(this.poi) : poiId = null, customPoi = null;
 
-  const _EntryPoiPick.favorite(this.poiId) : poi = null;
+  const _EntryPoiPick.favorite(this.poiId) : poi = null, customPoi = null;
+
+  const _EntryPoiPick.custom(this.customPoi) : poi = null, poiId = null;
 
   final PoiSearchResult? poi;
   final int? poiId;
+  final CustomEntryPoi? customPoi;
 }
 
 /// 正選/備選共用卡：名稱 + 分類 label + 評分 + 備註/訂位 + 尾端操作。
@@ -512,10 +518,13 @@ class _AlternateSearchSheet extends ConsumerStatefulWidget {
       _AlternateSearchSheetState();
 }
 
-enum _PoiPickerTab { search, favorites }
+enum _PoiPickerTab { search, favorites, custom }
 
 class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   final _ctrl = TextEditingController();
+  final _customNameCtrl = TextEditingController();
+  final _customLatCtrl = TextEditingController();
+  final _customLngCtrl = TextEditingController();
   _PoiPickerTab _tab = _PoiPickerTab.search;
   List<PoiSearchResult> _results = const [];
   List<PoiFavorite> _favorites = const [];
@@ -523,10 +532,15 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
   String? _favoritesError;
+  String _customPoiType = 'attraction';
+  String? _customError;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _customNameCtrl.dispose();
+    _customLatCtrl.dispose();
+    _customLngCtrl.dispose();
     super.dispose();
   }
 
@@ -603,6 +617,21 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
     );
   }
 
+  void _submitCustom() {
+    final name = _customNameCtrl.text.trim();
+    final lat = double.tryParse(_customLatCtrl.text.trim());
+    final lng = double.tryParse(_customLngCtrl.text.trim());
+    if (name.isEmpty || lat == null || lng == null) {
+      setState(() => _customError = '請輸入名稱與有效座標');
+      return;
+    }
+    Navigator.of(context).pop(
+      _EntryPoiPick.custom(
+        CustomEntryPoi(name: name, lat: lat, lng: lng, poiType: _customPoiType),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -623,6 +652,12 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                   tab: _PoiPickerTab.favorites,
                   label: '收藏',
                   key: const ValueKey('poi-picker-tab-favorites'),
+                ),
+                const SizedBox(width: TpSpacing.s2),
+                _tabButton(
+                  tab: _PoiPickerTab.custom,
+                  label: '自訂',
+                  key: const ValueKey('poi-picker-tab-custom'),
                 ),
               ],
             ),
@@ -668,7 +703,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                   ],
                 ),
               ),
-            ] else ...[
+            ] else if (_tab == _PoiPickerTab.favorites) ...[
               if (_favoritesLoading)
                 const Padding(
                   padding: EdgeInsets.all(TpSpacing.s4),
@@ -704,6 +739,98 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                     ],
                   ),
                 ),
+            ] else ...[
+              TextField(
+                key: const ValueKey('poi-picker-custom-name'),
+                controller: _customNameCtrl,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: '名稱',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  if (_customError != null) setState(() => _customError = null);
+                },
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('poi-picker-custom-type'),
+                initialValue: _customPoiType,
+                decoration: const InputDecoration(
+                  labelText: '類型',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  for (final entry in kPoiTypeLabels.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: (value) =>
+                    setState(() => _customPoiType = value ?? _customPoiType),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('poi-picker-custom-lat'),
+                      controller: _customLatCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: '緯度',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) {
+                        if (_customError != null) {
+                          setState(() => _customError = null);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('poi-picker-custom-lng'),
+                      controller: _customLngCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: '經度',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) {
+                        if (_customError != null) {
+                          setState(() => _customError = null);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (_customError != null) ...[
+                const SizedBox(height: TpSpacing.s2),
+                Text(
+                  _customError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: TpSpacing.s3),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey('poi-picker-custom-submit'),
+                  onPressed: _submitCustom,
+                  child: const Text('使用自訂地點'),
+                ),
+              ),
             ],
           ],
         ),

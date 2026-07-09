@@ -1502,6 +1502,36 @@ void main() {
     expect(poiId, 33);
   });
 
+  test('changeEntryPoi：PUT /entries/:eid/poi-id with custom payload', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa/entries/77/poi-id',
+      (server) => server.reply(200, {'ok': true, 'poiId': 44}),
+      data: {
+        'name': '海邊拍照點',
+        'lat': 26.21,
+        'lng': 127.68,
+        'type': 'attraction',
+        'category': 'attraction',
+        'source': 'custom',
+        'entryPoisVersion': 'v4',
+      },
+    );
+
+    final poiId = await tripRepository.changeEntryPoi(
+      tripId: 'okinawa',
+      entryId: 77,
+      customPoi: const CustomEntryPoi(
+        name: '海邊拍照點',
+        lat: 26.21,
+        lng: 127.68,
+        poiType: 'attraction',
+      ),
+      entryPoisVersion: 'v4',
+    );
+
+    expect(poiId, 44);
+  });
+
   test('addEntryAlternate：POST /alternates find-or-create（type 映射）', () async {
     dioAdapter.onPost(
       '/trips/okinawa/entries/11/alternates',
@@ -1531,6 +1561,37 @@ void main() {
           lat: 26.2,
           lng: 127.6,
           rating: 4.1,
+        ),
+        entryPoisVersion: '4',
+      ),
+      completes,
+    );
+  });
+
+  test('addEntryAlternate：POST /alternates with custom payload', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/entries/11/alternates',
+      (server) => server.reply(201, {'entryId': 11, 'poiId': 888}),
+      data: {
+        'name': '秘密觀景台',
+        'lat': 26.2,
+        'lng': 127.6,
+        'type': 'attraction',
+        'category': 'attraction',
+        'source': 'custom',
+        'entryPoisVersion': '4',
+      },
+    );
+
+    await expectLater(
+      tripRepository.addEntryAlternate(
+        tripId: 'okinawa',
+        entryId: 11,
+        customPoi: const CustomEntryPoi(
+          name: '秘密觀景台',
+          lat: 26.2,
+          lng: 127.6,
+          poiType: 'attraction',
         ),
         entryPoisVersion: '4',
       ),

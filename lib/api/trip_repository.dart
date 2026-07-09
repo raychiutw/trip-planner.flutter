@@ -31,6 +31,36 @@ class TripJsonExport {
   final String content;
 }
 
+/// 置換正選或加入備選時使用的自訂 POI payload。
+class CustomEntryPoi {
+  const CustomEntryPoi({
+    required this.name,
+    required this.lat,
+    required this.lng,
+    this.poiType = 'attraction',
+    this.category,
+    this.address,
+  });
+
+  /// 顯示名稱。
+  final String name;
+
+  /// 緯度。
+  final double lat;
+
+  /// 經度。
+  final double lng;
+
+  /// 後端 `pois.type` 白名單值。
+  final String poiType;
+
+  /// 原始分類；未提供時沿用 [poiType]。
+  final String? category;
+
+  /// 地址或補充位置文字。
+  final String? address;
+}
+
 /// 對應 `/api/my-trips`、`/api/trips/*`、`/api/account/*`。
 class TripRepository {
   TripRepository({required ApiClient client}) : _client = client;
@@ -705,25 +735,16 @@ class TripRepository {
     required int entryId,
     int? poiId,
     PoiSearchResult? poi,
+    CustomEntryPoi? customPoi,
     String? entryPoisVersion,
   }) async {
-    if ((poiId == null) == (poi == null)) {
-      throw ArgumentError('Provide exactly one of poiId or poi');
-    }
-    final payload = poiId != null
-        ? {'poiId': poiId}
-        : {
-            'name': poi!.name,
-            'lat': poi.lat,
-            'lng': poi.lng,
-            'type': mapGooglePrimaryTypeToPoiType(poi.category),
-            'category': poi.category,
-            'address': poi.address,
-            'rating': poi.rating,
-            'country': poi.country,
-            'place_id': poi.placeId,
-            'source': 'search',
-          };
+    final payload = _entryPoiPayload(
+      poiId: poiId,
+      poi: poi,
+      customPoi: customPoi,
+      includeCountry: true,
+      includePlaceId: true,
+    );
     final body = await _client.put(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/poi-id',
       body: {...payload, 'entryPoisVersion': ?entryPoisVersion},
@@ -738,23 +759,14 @@ class TripRepository {
     required int entryId,
     int? poiId,
     PoiSearchResult? poi,
+    CustomEntryPoi? customPoi,
     String? entryPoisVersion,
   }) {
-    if ((poiId == null) == (poi == null)) {
-      throw ArgumentError('Provide exactly one of poiId or poi');
-    }
-    final payload = poiId != null
-        ? {'poiId': poiId}
-        : {
-            'name': poi!.name,
-            'lat': poi.lat,
-            'lng': poi.lng,
-            'type': mapGooglePrimaryTypeToPoiType(poi.category),
-            'category': poi.category,
-            'address': poi.address,
-            'rating': poi.rating,
-            'source': 'search',
-          };
+    final payload = _entryPoiPayload(
+      poiId: poiId,
+      poi: poi,
+      customPoi: customPoi,
+    );
     return _client.post(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates',
       body: {...payload, 'entryPoisVersion': ?entryPoisVersion},
@@ -801,6 +813,47 @@ class TripRepository {
       poiId: (map['poi_id'] as num).toInt(),
       sortOrder: (map['sort_order'] as num).toInt(),
     );
+  }
+
+  static Map<String, dynamic> _entryPoiPayload({
+    int? poiId,
+    PoiSearchResult? poi,
+    CustomEntryPoi? customPoi,
+    bool includeCountry = false,
+    bool includePlaceId = false,
+  }) {
+    final count = [
+      poiId != null,
+      poi != null,
+      customPoi != null,
+    ].where((v) => v).length;
+    if (count != 1) {
+      throw ArgumentError('Provide exactly one of poiId, poi, or customPoi');
+    }
+    if (poiId != null) return {'poiId': poiId};
+    if (customPoi != null) {
+      return {
+        'name': customPoi.name,
+        'lat': customPoi.lat,
+        'lng': customPoi.lng,
+        'type': customPoi.poiType,
+        'category': customPoi.category ?? customPoi.poiType,
+        'address': ?customPoi.address,
+        'source': 'custom',
+      };
+    }
+    return {
+      'name': poi!.name,
+      'lat': poi.lat,
+      'lng': poi.lng,
+      'type': mapGooglePrimaryTypeToPoiType(poi.category),
+      'category': poi.category,
+      'address': poi.address,
+      'rating': poi.rating,
+      if (includeCountry) 'country': poi.country,
+      if (includePlaceId) 'place_id': poi.placeId,
+      'source': 'search',
+    };
   }
 
   /// DELETE /trips/:id/entries/:eid/alternates/:poiId（OCC token 走 query）。
