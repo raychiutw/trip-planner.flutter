@@ -177,7 +177,13 @@ void main() {
 
   testWidgets('編輯名稱 → 儲存 → 呼叫 updateShare', (tester) async {
     when(
-      () => repo.updateShare(any(), any(), label: any(named: 'label')),
+      () => repo.updateShare(
+        any(),
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
     ).thenAnswer((_) async {});
 
     await tester.pumpWidget(buildApp());
@@ -191,7 +197,64 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '儲存'));
     await tester.pumpAndSettle();
 
-    verify(() => repo.updateShare('t', 1, label: '旅伴')).called(1);
+    final sections =
+        verify(
+              () => repo.updateShare(
+                't',
+                1,
+                label: '旅伴',
+                visibleSections: captureAny(named: 'visibleSections'),
+                anonymous: false,
+              ),
+            ).captured.single
+            as List<String>;
+    expect(sections, isEmpty);
+  });
+
+  testWidgets('編輯設定 → 公開區塊與匿名一起更新', (tester) async {
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(
+          id: 1,
+          label: '給爸媽',
+          visibleSections: ['flights', 'lodgings'],
+          anonymous: false,
+        ),
+      ],
+    );
+    when(
+      () => repo.updateShare(
+        any(),
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('share-edit-section-reservations')),
+    );
+    await tester.tap(find.byKey(const ValueKey('share-edit-anonymous')));
+    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pumpAndSettle();
+
+    final sections =
+        verify(
+              () => repo.updateShare(
+                't',
+                1,
+                label: '給爸媽',
+                visibleSections: captureAny(named: 'visibleSections'),
+                anonymous: true,
+              ),
+            ).captured.single
+            as List<String>;
+    expect(sections, ['flights', 'lodgings', 'reservations']);
   });
 
   testWidgets('重新產生連結 → 顯示新的完整 URL', (tester) async {

@@ -110,13 +110,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     return ok ?? false;
   }
 
-  Future<void> _editShareLabel(TripShare share) async {
-    final nextLabel = await showDialog<String>(
+  Future<void> _editShare(TripShare share) async {
+    final next = await showDialog<_ShareEditSettings>(
       context: context,
-      builder: (ctx) => _EditShareLabelDialog(initialLabel: share.label),
+      builder: (ctx) => _EditShareDialog(share: share),
     );
-    if (!mounted || nextLabel == null) return;
-    await _ctrl.update(share.id, label: nextLabel);
+    if (!mounted || next == null) return;
+    await _ctrl.update(
+      share.id,
+      label: next.label,
+      visibleSections: next.visibleSections,
+      anonymous: next.anonymous,
+    );
   }
 
   Future<void> _copy(String url) async {
@@ -286,7 +291,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               key: ValueKey('share-edit-btn-${s.id}'),
               tooltip: '編輯',
               icon: Icons.edit_outlined,
-              onPressed: busy ? null : () async => _editShareLabel(s),
+              onPressed: busy ? null : () async => _editShare(s),
             ),
           if (s.isActive)
             _rowIconButton(
@@ -387,22 +392,38 @@ class _CreatedCard extends StatelessWidget {
   }
 }
 
-class _EditShareLabelDialog extends StatefulWidget {
-  const _EditShareLabelDialog({required this.initialLabel});
+class _ShareEditSettings {
+  const _ShareEditSettings({
+    required this.label,
+    required this.visibleSections,
+    required this.anonymous,
+  });
 
-  final String initialLabel;
-
-  @override
-  State<_EditShareLabelDialog> createState() => _EditShareLabelDialogState();
+  final String label;
+  final List<String> visibleSections;
+  final bool anonymous;
 }
 
-class _EditShareLabelDialogState extends State<_EditShareLabelDialog> {
+class _EditShareDialog extends StatefulWidget {
+  const _EditShareDialog({required this.share});
+
+  final TripShare share;
+
+  @override
+  State<_EditShareDialog> createState() => _EditShareDialogState();
+}
+
+class _EditShareDialogState extends State<_EditShareDialog> {
   late final TextEditingController _label;
+  late final Set<String> _sections;
+  late bool _anonymous;
 
   @override
   void initState() {
     super.initState();
-    _label = TextEditingController(text: widget.initialLabel);
+    _label = TextEditingController(text: widget.share.label);
+    _sections = widget.share.visibleSections.toSet();
+    _anonymous = widget.share.anonymous;
   }
 
   @override
@@ -411,19 +432,66 @@ class _EditShareLabelDialogState extends State<_EditShareLabelDialog> {
     super.dispose();
   }
 
+  List<String> get _visibleSections =>
+      _shareSectionOrder.where(_sections.contains).toList();
+
+  void _toggleSection(String key, bool selected) {
+    setState(() {
+      if (selected) {
+        _sections.add(key);
+      } else {
+        _sections.remove(key);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('編輯分享連結'),
-      content: TextField(
-        key: const ValueKey('share-edit-label'),
-        controller: _label,
-        autofocus: true,
-        maxLength: 80,
-        decoration: const InputDecoration(
-          labelText: '連結名稱',
-          border: OutlineInputBorder(),
-          isDense: true,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const ValueKey('share-edit-label'),
+              controller: _label,
+              autofocus: true,
+              maxLength: 80,
+              decoration: const InputDecoration(
+                labelText: '連結名稱',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s2),
+            Text('公開區塊', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: TpSpacing.s1),
+            Wrap(
+              spacing: TpSpacing.s1,
+              runSpacing: TpSpacing.s1,
+              children: [
+                for (final section in _shareSectionOrder)
+                  FilterChip(
+                    key: ValueKey('share-edit-section-$section'),
+                    label: Text(_shareSectionLabels[section] ?? section),
+                    selected: _sections.contains(section),
+                    onSelected: (selected) => _toggleSection(section, selected),
+                  ),
+              ],
+            ),
+            CheckboxListTile(
+              key: const ValueKey('share-edit-anonymous'),
+              value: _anonymous,
+              onChanged: (value) => setState(() => _anonymous = value ?? false),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              title: const Text('匿名分享'),
+            ),
+          ],
         ),
       ),
       actions: [
@@ -432,7 +500,13 @@ class _EditShareLabelDialogState extends State<_EditShareLabelDialog> {
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(_label.text),
+          onPressed: () => Navigator.of(context).pop(
+            _ShareEditSettings(
+              label: _label.text,
+              visibleSections: _visibleSections,
+              anonymous: _anonymous,
+            ),
+          ),
           child: const Text('儲存'),
         ),
       ],
