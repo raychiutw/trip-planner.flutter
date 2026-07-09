@@ -161,4 +161,30 @@ void main() {
     expect(details.hours, '星期一: 09:00-18:00');
     expect(details.priceLevel, 'PRICE_LEVEL_MODERATE');
   });
+
+  test('enrichPoi：POST /pois/:id/enrich?tripId=... → 解析 refresh 結果', () async {
+    dioAdapter.onPost(
+      '/pois/42/enrich',
+      (server) => server.reply(200, {
+        'poi_id': 42,
+        'name': '暖暮拉麵',
+        'place_id': 'ChIJ123',
+        'status': 'closed',
+        'status_reason': '永久歇業',
+        'rating': 4.1,
+        'refreshed_at': '2026-07-09T10:00:00Z',
+      }),
+      queryParameters: {'tripId': 'okinawa'},
+    );
+
+    final result = await poiRepository.enrichPoi(
+      poiId: 42,
+      tripId: ' okinawa ',
+    );
+
+    expect(result.poiId, 42);
+    expect(result.status.name, 'closed');
+    expect(result.statusReason, '永久歇業');
+    expect(result.rating, 4.1);
+  });
 }

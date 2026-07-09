@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../models/place_details.dart';
 import '../models/place_prediction.dart';
+import '../models/poi_enrichment.dart';
 import '../models/poi_search_result.dart';
 import 'api_client.dart';
 
@@ -77,6 +78,23 @@ class PoiRepository {
       query: {'placeId': placeId.trim()},
     );
     return PlaceDetails.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// POST /pois/:id/enrich?tripId=... → refreshed POI status/details summary.
+  Future<PoiEnrichmentResult> enrichPoi({
+    required int poiId,
+    String? tripId,
+  }) async {
+    final query = <String, dynamic>{};
+    final trimmedTripId = tripId?.trim();
+    if (trimmedTripId != null && trimmedTripId.isNotEmpty) {
+      query['tripId'] = trimmedTripId;
+    }
+    final responseBody = await _client.post(
+      '/pois/$poiId/enrich',
+      query: query.isEmpty ? null : query,
+    );
+    return PoiEnrichmentResult.fromJson(responseBody as Map<String, dynamic>);
   }
 
   /// POST /pois/find-or-create（body 全 snake_case）→ 後端 pois PK。
