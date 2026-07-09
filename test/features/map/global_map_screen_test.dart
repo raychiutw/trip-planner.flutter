@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
+import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -44,6 +45,14 @@ void main() {
     );
   }
 
+  String? tileUrl(WidgetTester tester) {
+    return tester
+        .widget<TileLayer>(
+          find.byKey(const ValueKey('trip-map-canvas-tile-layer')),
+        )
+        .urlTemplate;
+  }
+
   testWidgets('有座標的收藏 → 顯示 marker(無座標者跳過)', (tester) async {
     await tester.pumpWidget(buildApp(const [_withCoords, _noCoords]));
     await tester.pumpAndSettle();
@@ -61,6 +70,21 @@ void main() {
 
     expect(find.text('首里城'), findsOneWidget);
     expect(find.textContaining('沖繩'), findsOneWidget);
+  });
+
+  testWidgets('圖層選單：可從路線圖切換為衛星圖', (tester) async {
+    await tester.pumpWidget(buildApp(const [_withCoords]));
+    await tester.pumpAndSettle();
+
+    expect(tileUrl(tester), kTripMapTilePresets.first.urlTemplate);
+
+    await tester.tap(find.byKey(const ValueKey('global-map-layer-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('global-map-layer-satellite')));
+    await tester.pumpAndSettle();
+
+    expect(tileUrl(tester), kTripMapTilePresets[2].urlTemplate);
+    expect(find.text('衛星'), findsOneWidget);
   });
 
   testWidgets('無可顯示座標 → 提示', (tester) async {

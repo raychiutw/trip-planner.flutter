@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
@@ -85,6 +86,14 @@ Widget _buildScreen(List<TripDay> days, {int? initialEntryId}) {
   );
 }
 
+String? _tileUrl(WidgetTester tester) {
+  return tester
+      .widget<TileLayer>(
+        find.byKey(const ValueKey('trip-map-canvas-tile-layer')),
+      )
+      .urlTemplate;
+}
+
 void main() {
   testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
     tester,
@@ -148,6 +157,21 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
+  });
+
+  testWidgets('圖層選單：可從路線圖切換為衛星圖', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(_tileUrl(tester), kTripMapTilePresets.first.urlTemplate);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-layer-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-layer-satellite')));
+    await tester.pumpAndSettle();
+
+    expect(_tileUrl(tester), kTripMapTilePresets[2].urlTemplate);
+    expect(find.text('衛星'), findsOneWidget);
   });
 
   testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {

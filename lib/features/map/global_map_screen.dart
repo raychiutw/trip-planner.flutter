@@ -12,6 +12,7 @@ import '../../theme/poi_tone.dart';
 import '../../theme/tokens.dart';
 import '../favorites/favorites_providers.dart';
 import 'map_adapter.dart';
+import 'map_layer_menu.dart';
 
 bool _hasCoords(PoiFavorite f) =>
     f.poiLat != null && f.poiLng != null && f.poiLat != 0 && f.poiLng != 0;
@@ -28,6 +29,7 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   final FlutterTripMapController _mapController = FlutterTripMapController();
+  TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
   int? _selectedId;
 
   @override
@@ -63,6 +65,15 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
           return Stack(
             children: [
               _buildMap(context, pins),
+              Positioned(
+                top: TpSpacing.s4,
+                right: TpSpacing.s4,
+                child: TripMapLayerMenu(
+                  keyPrefix: 'global-map',
+                  selectedPreset: _tilePreset,
+                  onSelected: (preset) => setState(() => _tilePreset = preset),
+                ),
+              ),
               if (selected != null)
                 Positioned(
                   left: TpSpacing.s4,
@@ -85,7 +96,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     final points = [for (final f in pins) TripMapPoint(f.poiLat!, f.poiLng!)];
     return FlutterMapCanvas(
       controller: _mapController,
-      tilePreset: kTripMapTilePresets.first,
+      tilePreset: _tilePreset,
       initialFitPoints: points,
       initialPadding: const EdgeInsets.all(TpSpacing.s10),
       initialMaxZoom: 14,

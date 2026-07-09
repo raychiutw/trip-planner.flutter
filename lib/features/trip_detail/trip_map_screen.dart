@@ -5,6 +5,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
 import '../map/map_adapter.dart';
+import '../map/map_layer_menu.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -99,6 +100,7 @@ class _TripMapView extends StatefulWidget {
 
 class _TripMapViewState extends State<_TripMapView> {
   final FlutterTripMapController _mapController = FlutterTripMapController();
+  TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
@@ -323,15 +325,30 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
-    return FlutterMapCanvas(
-      controller: _mapController,
-      tilePreset: kTripMapTilePresets.first,
-      initialFitPoints: [for (final pin in allPins) pin.point],
-      initialPadding: const EdgeInsets.all(TpSpacing.s10),
-      initialMaxZoom: 16,
-      tileProvider: widget.tileProvider,
-      onMapReady: _handleMapReady,
-      markers: [for (final pin in visiblePins) _buildMarker(pin)],
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FlutterMapCanvas(
+            controller: _mapController,
+            tilePreset: _tilePreset,
+            initialFitPoints: [for (final pin in allPins) pin.point],
+            initialPadding: const EdgeInsets.all(TpSpacing.s10),
+            initialMaxZoom: 16,
+            tileProvider: widget.tileProvider,
+            onMapReady: _handleMapReady,
+            markers: [for (final pin in visiblePins) _buildMarker(pin)],
+          ),
+        ),
+        Positioned(
+          top: TpSpacing.s4,
+          right: TpSpacing.s4,
+          child: TripMapLayerMenu(
+            keyPrefix: 'trip-map',
+            selectedPreset: _tilePreset,
+            onSelected: (preset) => setState(() => _tilePreset = preset),
+          ),
+        ),
+      ],
     );
   }
 
