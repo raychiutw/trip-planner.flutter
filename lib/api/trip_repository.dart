@@ -15,6 +15,7 @@ import '../models/segment.dart';
 import '../models/share.dart';
 import '../models/trip.dart';
 import '../models/trip_audit.dart';
+import '../models/trip_doc.dart';
 import '../models/trip_health.dart';
 import '../models/trip_poi_health.dart';
 import '../models/user.dart';
@@ -253,6 +254,39 @@ class TripRepository {
   Stream<TripNotes> watchNotes(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}/notes')
       .map((b) => _one(b, TripNotes.fromJson));
+
+  /// GET /trips/:id/docs（batch 讀取全部 trip_docs；缺的 doc type 為 null）。
+  Future<TripDocs> fetchTripDocs(String id) async {
+    final body = await _client.get('/trips/${Uri.encodeComponent(id)}/docs');
+    return TripDocs.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// GET /trips/:id/docs/:type。
+  Future<TripDoc> fetchTripDoc({
+    required String tripId,
+    required TripDocType type,
+  }) async {
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/docs/${tripDocTypeKey(type)}',
+    );
+    return TripDoc.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// PUT /trips/:id/docs/:type（title + entries 全量覆寫）。
+  Future<void> saveTripDoc({
+    required String tripId,
+    required TripDocType type,
+    required String title,
+    required List<TripDocEntry> entries,
+  }) {
+    return _client.put(
+      '/trips/${Uri.encodeComponent(tripId)}/docs/${tripDocTypeKey(type)}',
+      body: {
+        'title': title,
+        'entries': [for (final entry in entries) entry.toJson()],
+      },
+    );
+  }
 
   /// POST /trips/:id/notes/{section}（建立筆記;body snake_case 欄位,5 區共用）。
   Future<void> createNote(

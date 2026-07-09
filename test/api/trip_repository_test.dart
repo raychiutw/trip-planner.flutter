@@ -14,8 +14,9 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
-import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_audit.dart';
+import 'package:tripline/models/trip_doc.dart';
+import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/user.dart';
 
@@ -488,6 +489,96 @@ void main() {
 
     expect(tripNotes.flights.single.flightNo, 'IT232');
     expect(tripNotes.lodgings, isEmpty);
+  });
+
+  test('fetchTripDocs：GET /trips/:id/docs 解析 batch docs', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/docs',
+      (server) => server.reply(200, {
+        'docs': {
+          'flights': {
+            'doc_type': 'flights',
+            'title': '航班資訊',
+            'updated_at': '2026-07-09T01:00:00Z',
+            'entries': [
+              {
+                'id': 1,
+                'sort_order': 0,
+                'section': '去程',
+                'title': 'BR112',
+                'content': 'TPE -> OKA',
+              },
+            ],
+          },
+          'checklist': null,
+          'backup': null,
+          'suggestions': null,
+          'emergency': null,
+        },
+      }),
+    );
+
+    final docs = await tripRepository.fetchTripDocs('okinawa');
+
+    expect(docs[TripDocType.flights]?.title, '航班資訊');
+    expect(docs[TripDocType.flights]?.entries.single.section, '去程');
+    expect(docs[TripDocType.checklist], isNull);
+  });
+
+  test('fetchTripDoc：GET /trips/:id/docs/:type 解析單一 doc', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/docs/emergency',
+      (server) => server.reply(200, {
+        'doc_type': 'emergency',
+        'title': '緊急聯絡',
+        'updated_at': '2026-07-09T02:00:00Z',
+        'entries': [
+          {
+            'id': 7,
+            'sort_order': 0,
+            'section': '',
+            'title': '保險公司',
+            'content': '0800-000-000',
+          },
+        ],
+      }),
+    );
+
+    final doc = await tripRepository.fetchTripDoc(
+      tripId: 'okinawa',
+      type: TripDocType.emergency,
+    );
+
+    expect(doc.type, TripDocType.emergency);
+    expect(doc.entries.single.content, '0800-000-000');
+  });
+
+  test('saveTripDoc：PUT /trips/:id/docs/:type title + entries', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa/docs/checklist',
+      (server) => server.reply(200, {'ok': true}),
+      data: {
+        'title': '打包清單',
+        'entries': [
+          {'sort_order': 0, 'section': '證件', 'title': '護照', 'content': '確認效期'},
+        ],
+      },
+    );
+
+    await tripRepository.saveTripDoc(
+      tripId: 'okinawa',
+      type: TripDocType.checklist,
+      title: '打包清單',
+      entries: const [
+        TripDocEntry(
+          id: 1,
+          sortOrder: 0,
+          section: '證件',
+          title: '護照',
+          content: '確認效期',
+        ),
+      ],
+    );
   });
 
   test(
