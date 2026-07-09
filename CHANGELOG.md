@@ -17,6 +17,7 @@
 - **行程筆記 AI 生成**:`TripNotesScreen` 補齊行前須知（一般/住宿）與緊急聯絡 AI 生成入口,改打 web/backend 支援的 `tips`、`lodging-tips`、`emergency` doc type,並透過 `/requests/:id/events` SSE 完成後自動刷新筆記。
 - **停留點 web route 相容**:新增 `/trips/:tripId/entries/:eid/edit|copy|move` 全頁入口,並支援 web alias `/trip/:tripId/stop/:entryId/edit|change-poi|copy|move`。
 - **新增停留點 deep link**:新增 `/trips/:tripId/entries/new?day=N` 全頁新增入口,支援搜尋 POI 或自訂停留點；web alias `/trip/:tripId/add-entry|add-stop|add-custom-stop?day=N` 會進對應模式。
+- **Legacy route redirects**:支援 web 保留路徑 `/admin` → `/trips`、`/manage` → `/chat`。
 
 ### 修正
 

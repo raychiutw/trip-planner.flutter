@@ -99,6 +99,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             VerifyEmailScreen(token: state.uri.queryParameters['token'] ?? ''),
       ),
       // Web route aliases retained during Flutter porting.
+      GoRoute(path: '/admin', redirect: (context, state) => '/trips'),
+      GoRoute(path: '/manage', redirect: (context, state) => '/chat'),
       GoRoute(path: '/trips/new', redirect: (context, state) => '/new-trip'),
       GoRoute(
         path: '/explore',

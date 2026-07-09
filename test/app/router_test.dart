@@ -17,6 +17,7 @@ import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
+import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/favorites/explore/explore_screen.dart';
 import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
@@ -341,6 +342,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripPrintScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可使用 admin/manage legacy redirects', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/admin');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+
+    container.read(appRouterProvider).go('/manage');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

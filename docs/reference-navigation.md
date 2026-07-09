@@ -44,6 +44,8 @@
 
 Web 相容 alias：`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到地點管理頁。
 
+Legacy redirect：`/admin` 會導到 `/trips`，`/manage` 會導到 `/chat`。
+
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 
 ## 認證 redirect 規則
