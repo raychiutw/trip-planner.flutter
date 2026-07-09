@@ -136,12 +136,23 @@ void main() {
   });
 
   testWidgets('登入帳號不符時顯示 C 版 checklist 並提供切換帳號', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await pumpInvite(tester, user: _otherUser);
 
     expect(find.byKey(const ValueKey('invite-mismatch')), findsOneWidget);
-    expect(find.text('帳號需要切換'), findsOneWidget);
-    expect(find.textContaining('切換至 traveler@example.com'), findsOneWidget);
-    expect(find.textContaining('目前登入 other@example.com'), findsOneWidget);
+    expect(find.text('使用對應帳號接受邀請'), findsOneWidget);
+    expect(find.text('請切換到受邀帳號後再加入此行程。'), findsOneWidget);
+    expect(find.byKey(const ValueKey('invite-account-pair')), findsOneWidget);
+    expect(find.text('邀請帳號'), findsOneWidget);
+    expect(find.text('目前帳號'), findsOneWidget);
+    expect(find.text('traveler@example.com'), findsOneWidget);
+    expect(find.text('other@example.com'), findsOneWidget);
+    expect(find.textContaining('此邀請寄給'), findsNothing);
+    expect(find.textContaining('但目前登入的是'), findsNothing);
     expect(find.byKey(const ValueKey('invite-accept')), findsNothing);
 
     final switchButton = find.byKey(const ValueKey('invite-switch-account'));

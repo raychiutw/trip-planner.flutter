@@ -241,11 +241,10 @@ class _ChecklistCard extends StatelessWidget {
               tone: _SummaryTone.success,
             ),
             divider,
-            _SummaryRow(
-              title: _accountTitle(status),
-              body: _accountBody(status, invitation, user),
-              trailing: _accountIcon(status),
-              tone: _accountTone(status),
+            _AccountStatusBlock(
+              invitation: invitation,
+              user: user,
+              status: status,
             ),
             const SizedBox(height: TpSpacing.s4),
             _PrimaryAction(
@@ -302,6 +301,156 @@ class _SummaryRow extends StatelessWidget {
           ),
           const SizedBox(width: TpSpacing.s3),
           Icon(trailing, color: color, size: 22),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountStatusBlock extends StatelessWidget {
+  const _AccountStatusBlock({
+    required this.invitation,
+    required this.user,
+    required this.status,
+  });
+
+  final InvitationDetails invitation;
+  final UserInfo? user;
+  final InviteAccountStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status != InviteAccountStatus.mismatch) {
+      return _SummaryRow(
+        title: _accountTitle(status),
+        body: _accountBody(status, invitation, user),
+        trailing: _accountIcon(status),
+        tone: _accountTone(status),
+      );
+    }
+
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tone = _toneColor(context, _accountTone(status));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: TpSpacing.s3),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.manage_accounts_outlined, color: tone, size: 22),
+                  const SizedBox(width: TpSpacing.s3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('使用對應帳號接受邀請', style: theme.textTheme.titleSmall),
+                        const SizedBox(height: TpSpacing.s1),
+                        Text(
+                          '請切換到受邀帳號後再加入此行程。',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TpSpacing.s3),
+              _AccountEmailPair(
+                invitedEmail: invitation.invitedEmail,
+                currentEmail: user?.email ?? '未知',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountEmailPair extends StatelessWidget {
+  const _AccountEmailPair({
+    required this.invitedEmail,
+    required this.currentEmail,
+  });
+
+  final String invitedEmail;
+  final String currentEmail;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      key: const ValueKey('invite-account-pair'),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.sm)),
+      ),
+      child: Column(
+        children: [
+          _AccountEmailLine(label: '邀請帳號', email: invitedEmail),
+          Divider(height: 1, thickness: 1, color: colors.outlineVariant),
+          _AccountEmailLine(label: '目前帳號', email: currentEmail),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountEmailLine extends StatelessWidget {
+  const _AccountEmailLine({required this.label, required this.email});
+
+  final String label;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s3,
+        vertical: TpSpacing.s2,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 68,
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Text(
+              email,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
