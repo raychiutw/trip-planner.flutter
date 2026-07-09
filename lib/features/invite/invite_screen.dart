@@ -133,16 +133,9 @@ class _InviteBody extends StatelessWidget {
           status: accountStatus,
           accepting: state.accepting,
           onLogin: onLogin,
+          onSwitchAccount: onSwitchAccount,
           onAccept: onAccept,
         ),
-        if (accountStatus == InviteAccountStatus.mismatch) ...[
-          const SizedBox(height: TpSpacing.s3),
-          _MismatchPanel(
-            invitedEmail: invitation.invitedEmail,
-            currentEmail: user?.email ?? '',
-            onSwitchAccount: onSwitchAccount,
-          ),
-        ],
         if (state.acceptError != null) ...[
           const SizedBox(height: TpSpacing.s3),
           _ProblemPanel(
@@ -210,6 +203,7 @@ class _ChecklistCard extends StatelessWidget {
     required this.status,
     required this.accepting,
     required this.onLogin,
+    required this.onSwitchAccount,
     required this.onAccept,
   });
 
@@ -218,6 +212,7 @@ class _ChecklistCard extends StatelessWidget {
   final InviteAccountStatus status;
   final bool accepting;
   final VoidCallback onLogin;
+  final VoidCallback onSwitchAccount;
   final VoidCallback? onAccept;
 
   @override
@@ -230,6 +225,9 @@ class _ChecklistCard extends StatelessWidget {
     );
 
     return Card(
+      key: status == InviteAccountStatus.mismatch
+          ? const ValueKey('invite-mismatch')
+          : null,
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(TpSpacing.s4),
@@ -249,15 +247,14 @@ class _ChecklistCard extends StatelessWidget {
               trailing: _accountIcon(status),
               tone: _accountTone(status),
             ),
-            if (status != InviteAccountStatus.mismatch) ...[
-              const SizedBox(height: TpSpacing.s4),
-              _PrimaryAction(
-                status: status,
-                accepting: accepting,
-                onLogin: onLogin,
-                onAccept: onAccept,
-              ),
-            ],
+            const SizedBox(height: TpSpacing.s4),
+            _PrimaryAction(
+              status: status,
+              accepting: accepting,
+              onLogin: onLogin,
+              onSwitchAccount: onSwitchAccount,
+              onAccept: onAccept,
+            ),
           ],
         ),
       ),
@@ -316,12 +313,14 @@ class _PrimaryAction extends StatelessWidget {
     required this.status,
     required this.accepting,
     required this.onLogin,
+    required this.onSwitchAccount,
     required this.onAccept,
   });
 
   final InviteAccountStatus status;
   final bool accepting;
   final VoidCallback onLogin;
+  final VoidCallback onSwitchAccount;
   final VoidCallback? onAccept;
 
   @override
@@ -344,7 +343,12 @@ class _PrimaryAction extends StatelessWidget {
             : const Icon(Icons.check_circle_outline),
         label: Text(accepting ? '接受中...' : '接受邀請'),
       ),
-      InviteAccountStatus.mismatch => const SizedBox.shrink(),
+      InviteAccountStatus.mismatch => FilledButton.icon(
+        key: const ValueKey('invite-switch-account'),
+        onPressed: onSwitchAccount,
+        icon: const Icon(Icons.switch_account_outlined),
+        label: const Text('切換帳號'),
+      ),
       InviteAccountStatus.checking => OutlinedButton.icon(
         onPressed: null,
         icon: const SizedBox.square(
@@ -354,140 +358,6 @@ class _PrimaryAction extends StatelessWidget {
         label: const Text('確認帳號中...'),
       ),
     };
-  }
-}
-
-class _MismatchPanel extends StatelessWidget {
-  const _MismatchPanel({
-    required this.invitedEmail,
-    required this.currentEmail,
-    required this.onSwitchAccount,
-  });
-
-  final String invitedEmail;
-  final String currentEmail;
-  final VoidCallback onSwitchAccount;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final tones = theme.extension<TpTones>()!;
-
-    return DecoratedBox(
-      key: const ValueKey('invite-mismatch'),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.switch_account_outlined,
-                  color: tones.accentDeep,
-                  size: 22,
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '帳號不符',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: TpSpacing.s1),
-                      Text(
-                        '請切換到邀請信上的帳號後再加入。',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: tones.accentSubtle.withValues(alpha: 0.48),
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(TpRadius.sm),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TpSpacing.s3,
-                  vertical: TpSpacing.s2,
-                ),
-                child: Column(
-                  children: [
-                    _EmailMatchRow(label: '邀請帳號', email: invitedEmail),
-                    const SizedBox(height: TpSpacing.s2),
-                    _EmailMatchRow(label: '目前登入', email: currentEmail),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            FilledButton.icon(
-              key: const ValueKey('invite-switch-account'),
-              onPressed: onSwitchAccount,
-              icon: const Icon(Icons.login_outlined),
-              label: const Text('切換帳號'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmailMatchRow extends StatelessWidget {
-  const _EmailMatchRow({required this.label, required this.email});
-
-  final String label;
-  final String email;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 72,
-          child: Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colors.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: TpSpacing.s2),
-        Expanded(
-          child: Text(
-            email,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -614,7 +484,8 @@ String _accountBody(
     InviteAccountStatus.anonymous => '登入 ${invitation.invitedEmail} 後即可加入',
     InviteAccountStatus.matching =>
       '目前登入 ${user?.email ?? invitation.invitedEmail}',
-    InviteAccountStatus.mismatch => '請改用邀請信上的帳號登入',
+    InviteAccountStatus.mismatch =>
+      '切換至 ${invitation.invitedEmail}；目前登入 ${user?.email ?? '未知'}',
   };
 }
 
@@ -623,7 +494,7 @@ IconData _accountIcon(InviteAccountStatus status) {
     InviteAccountStatus.checking => Icons.more_horiz,
     InviteAccountStatus.anonymous => Icons.arrow_forward_rounded,
     InviteAccountStatus.matching => Icons.check_rounded,
-    InviteAccountStatus.mismatch => Icons.priority_high_rounded,
+    InviteAccountStatus.mismatch => Icons.arrow_forward_rounded,
   };
 }
 
@@ -632,7 +503,7 @@ _SummaryTone _accountTone(InviteAccountStatus status) {
     InviteAccountStatus.checking => _SummaryTone.muted,
     InviteAccountStatus.anonymous => _SummaryTone.pending,
     InviteAccountStatus.matching => _SummaryTone.success,
-    InviteAccountStatus.mismatch => _SummaryTone.error,
+    InviteAccountStatus.mismatch => _SummaryTone.pending,
   };
 }
 

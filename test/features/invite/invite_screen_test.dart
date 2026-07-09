@@ -135,12 +135,13 @@ void main() {
     expect(find.text('trip trip-1'), findsOneWidget);
   });
 
-  testWidgets('登入帳號不符時顯示持續錯誤並提供切換帳號', (tester) async {
+  testWidgets('登入帳號不符時顯示 C 版 checklist 並提供切換帳號', (tester) async {
     await pumpInvite(tester, user: _otherUser);
 
     expect(find.byKey(const ValueKey('invite-mismatch')), findsOneWidget);
-    expect(find.text('帳號不符'), findsOneWidget);
-    expect(find.textContaining('other@example.com'), findsOneWidget);
+    expect(find.text('帳號需要切換'), findsOneWidget);
+    expect(find.textContaining('切換至 traveler@example.com'), findsOneWidget);
+    expect(find.textContaining('目前登入 other@example.com'), findsOneWidget);
     expect(find.byKey(const ValueKey('invite-accept')), findsNothing);
 
     final switchButton = find.byKey(const ValueKey('invite-switch-account'));
