@@ -40,6 +40,8 @@ const _entry = TimelineEntry(
       poiId: 502,
       name: '玉陵',
       type: 'restaurant',
+      lat: 35.6812,
+      lng: 139.7671,
       sortOrder: 2,
       reservation: '已訂位 18:00',
       reservationUrl: 'https://book.example/abc',
@@ -47,6 +49,35 @@ const _entry = TimelineEntry(
     EntryPoiInfo(poiId: 503, name: '識名園', type: 'attraction', sortOrder: 3),
   ],
 );
+
+const _sameDayWithOkinawaSibling = [
+  TripDay(
+    id: 1,
+    dayNum: 1,
+    version: 1,
+    timeline: [
+      TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        title: '首里城',
+        version: 2,
+        master: EntryPoiInfo(poiId: 501, name: '首里城公園'),
+      ),
+      TimelineEntry(
+        id: 12,
+        sortOrder: 1,
+        title: '國際通',
+        version: 1,
+        master: EntryPoiInfo(
+          poiId: 601,
+          name: '國際通',
+          lat: 26.2148,
+          lng: 127.6792,
+        ),
+      ),
+    ],
+  ),
+];
 
 const _favorite = PoiFavorite(
   id: 7,
@@ -63,6 +94,7 @@ Future<void> _pump(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
   _MockFavoritesRepository? favoritesRepo,
+  List<TripDay> tripDays = const <TripDay>[],
   ReservationUrlLauncher reservationUrlLauncher = launchReservationUrl,
 }) async {
   await tester.pumpWidget(
@@ -73,9 +105,7 @@ Future<void> _pump(
           tripId: 't1',
           entryId: 11,
         )).overrideWith((ref) => Stream.value(_entry)),
-        tripDaysProvider(
-          't1',
-        ).overrideWith((ref) => Stream.value(const <TripDay>[])),
+        tripDaysProvider('t1').overrideWith((ref) => Stream.value(tripDays)),
         if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
         if (favoritesRepo != null)
           favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
@@ -164,6 +194,20 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('設為正選跨區域時顯示距離警示', (tester) async {
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      tripDays: _sameDayWithOkinawaSibling,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('alt-setmaster-502')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('新正選距離本日其他點約'), findsOneWidget);
+    expect(find.textContaining('可能跨區，前後車程會誤算'), findsOneWidget);
   });
 
   testWidgets('移除備選 → removeEntryAlternate', (tester) async {

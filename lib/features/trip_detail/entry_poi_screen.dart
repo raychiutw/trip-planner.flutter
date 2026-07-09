@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -5,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../api/trip_repository.dart' show CustomEntryPoi;
+import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
@@ -96,6 +99,10 @@ class EntryPoiScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final repo = ref.read(tripRepositoryProvider);
     final version = entry.entryPoisVersion;
+    final sameDayEntries = switch (ref.watch(tripDaysProvider(tripId))) {
+      AsyncData(:final value) => _sameDayEntries(value, entry.id),
+      _ => const <TimelineEntry>[],
+    };
 
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -208,8 +215,13 @@ class EntryPoiScreen extends ConsumerWidget {
                   ),
                   TextButton(
                     key: ValueKey('alt-setmaster-${alt.poiId}'),
-                    onPressed: () =>
-                        _confirmSetMaster(context, ref, entry, alt),
+                    onPressed: () => _confirmSetMaster(
+                      context,
+                      ref,
+                      entry,
+                      alt,
+                      sameDayEntries,
+                    ),
                     child: const Text('設為正選'),
                   ),
                 ],
@@ -224,12 +236,29 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
     EntryPoiInfo alternate,
+    List<TimelineEntry> sameDayEntries,
   ) async {
+    final warning = _crossRegionWarning(alternate, sameDayEntries, entry.id);
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('設為正選？'),
-        content: Text('要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'),
+            if (warning != null) ...[
+              const SizedBox(height: TpSpacing.s3),
+              Text(
+                warning,
+                style: TextStyle(
+                  color: Theme.of(dialogContext).colorScheme.error,
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -492,6 +521,75 @@ class _PoiCard extends StatelessWidget {
     );
   }
 }
+
+typedef _LatLng = ({double lat, double lng});
+
+const _crossRegionThresholdM = 50000.0;
+const _earthRadiusM = 6371000.0;
+
+List<TimelineEntry> _sameDayEntries(List<TripDay> days, int entryId) {
+  for (final day in days) {
+    for (final entry in day.timeline) {
+      if (entry.id == entryId) return day.timeline;
+    }
+  }
+  return const <TimelineEntry>[];
+}
+
+String? _crossRegionWarning(
+  EntryPoiInfo alternate,
+  List<TimelineEntry> sameDayEntries,
+  int entryId,
+) {
+  final lat = alternate.lat;
+  final lng = alternate.lng;
+  if (lat == null || lng == null) return null;
+
+  final siblingCoords = <_LatLng>[
+    for (final entry in sameDayEntries)
+      if (entry.id != entryId &&
+          entry.master?.lat != null &&
+          entry.master?.lng != null)
+        (lat: entry.master!.lat!, lng: entry.master!.lng!),
+  ];
+  final center = _avgLatLng(siblingCoords);
+  if (center == null) return null;
+
+  final distance = _haversineMeters((lat: lat, lng: lng), center);
+  if (distance <= _crossRegionThresholdM) return null;
+
+  final km = distance >= 100000
+      ? (distance / 1000).round().toString()
+      : (distance / 1000).toStringAsFixed(1);
+  return '新正選距離本日其他點約 $km km，可能跨區，前後車程會誤算。確定要設為正選？';
+}
+
+_LatLng? _avgLatLng(List<_LatLng> points) {
+  if (points.isEmpty) return null;
+  var lat = 0.0;
+  var lng = 0.0;
+  for (final point in points) {
+    lat += point.lat;
+    lng += point.lng;
+  }
+  return (lat: lat / points.length, lng: lng / points.length);
+}
+
+double _haversineMeters(_LatLng a, _LatLng b) {
+  final phi1 = _toRadians(a.lat);
+  final phi2 = _toRadians(b.lat);
+  final dPhi = _toRadians(b.lat - a.lat);
+  final dLambda = _toRadians(b.lng - a.lng);
+  final h =
+      math.sin(dPhi / 2) * math.sin(dPhi / 2) +
+      math.cos(phi1) *
+          math.cos(phi2) *
+          math.sin(dLambda / 2) *
+          math.sin(dLambda / 2);
+  return 2 * _earthRadiusM * math.atan2(math.sqrt(h), math.sqrt(1 - h));
+}
+
+double _toRadians(double degrees) => degrees * math.pi / 180;
 
 Uri? _safeReservationUri(String? rawUrl) {
   final value = rawUrl?.trim();
