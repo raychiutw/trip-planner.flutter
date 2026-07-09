@@ -24,6 +24,7 @@ import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/trip_detail/entry_action_route_screen.dart';
 import '../features/trip_detail/entry_edit_route_screen.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
@@ -149,6 +150,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
           final entryId = Uri.encodeComponent(state.pathParameters['entryId']!);
           return '/trips/$tripId/entries/$entryId/pois';
+        },
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId/copy',
+        redirect: (context, state) {
+          final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+          final entryId = Uri.encodeComponent(state.pathParameters['entryId']!);
+          return '/trips/$tripId/entries/$entryId/copy';
+        },
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId/move',
+        redirect: (context, state) {
+          final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+          final entryId = Uri.encodeComponent(state.pathParameters['entryId']!);
+          return '/trips/$tripId/entries/$entryId/move';
         },
       ),
       GoRoute(
@@ -303,6 +320,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         builder: (context, state) => EntryEditRouteScreen(
                           tripId: state.pathParameters['tripId']!,
                           entryId: int.parse(state.pathParameters['eid']!),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'entries/:eid/copy',
+                        builder: (context, state) => EntryActionRouteScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId: int.parse(state.pathParameters['eid']!),
+                          action: EntryRouteAction.copy,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'entries/:eid/move',
+                        builder: (context, state) => EntryActionRouteScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId: int.parse(state.pathParameters['eid']!),
+                          action: EntryRouteAction.move,
                         ),
                       ),
                       GoRoute(
