@@ -52,6 +52,7 @@ class DeveloperApp {
     required this.clientType,
     required this.appName,
     this.appDescription,
+    this.appLogoUrl,
     this.homepageUrl,
     required this.redirectUris,
     required this.allowedScopes,
@@ -64,6 +65,7 @@ class DeveloperApp {
   final String clientType;
   final String appName;
   final String? appDescription;
+  final String? appLogoUrl;
   final String? homepageUrl;
   final List<String> redirectUris;
   final List<String> allowedScopes;
@@ -81,6 +83,7 @@ class DeveloperApp {
         'app_description',
         'appDescription',
       ),
+      appLogoUrl: _stringFromAnyKey(json, 'app_logo_url', 'appLogoUrl'),
       homepageUrl: _stringFromAnyKey(json, 'homepage_url', 'homepageUrl'),
       redirectUris: _stringList(json['redirect_uris'] ?? json['redirectUris']),
       allowedScopes: _stringList(
@@ -263,6 +266,7 @@ String oauthClientStatusLabel(String status) {
     'active' => '已啟用',
     'pending_review' => '待審核',
     'disabled' => '已停用',
+    'suspended' => '已停用',
     'revoked' => '已撤銷',
     _ => status.isEmpty ? '未知' : status,
   };

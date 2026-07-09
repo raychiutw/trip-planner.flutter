@@ -838,6 +838,14 @@ class TripRepository {
         .toList();
   }
 
+  /// GET /dev/apps/:clientId，讀取單一 OAuth client app。
+  Future<DeveloperApp> fetchDeveloperApp(String clientId) async {
+    final responseBody = await _client.get(
+      '/dev/apps/${Uri.encodeComponent(clientId)}',
+    );
+    return DeveloperApp.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// POST /dev/apps，建立 OAuth client app。
   Future<CreatedDeveloperApp> createDeveloperApp({
     required String appName,
@@ -864,6 +872,60 @@ class TripRepository {
       },
     );
     return CreatedDeveloperApp.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// PATCH /dev/apps/:clientId，更新 OAuth client app metadata。
+  Future<DeveloperApp> updateDeveloperApp({
+    required String clientId,
+    String? appName,
+    String? appDescription,
+    bool clearAppDescription = false,
+    String? appLogoUrl,
+    bool clearAppLogoUrl = false,
+    String? homepageUrl,
+    bool clearHomepageUrl = false,
+    List<String>? redirectUris,
+    List<String>? allowedScopes,
+  }) async {
+    final body = <String, dynamic>{
+      'app_name': ?_trimmedOrNull(appName),
+      if (appDescription != null || clearAppDescription)
+        'app_description': clearAppDescription
+            ? null
+            : _trimmedOrNull(appDescription),
+      if (appLogoUrl != null || clearAppLogoUrl)
+        'app_logo_url': clearAppLogoUrl ? null : _trimmedOrNull(appLogoUrl),
+      if (homepageUrl != null || clearHomepageUrl)
+        'homepage_url': clearHomepageUrl ? null : _trimmedOrNull(homepageUrl),
+      if (redirectUris != null)
+        'redirect_uris': redirectUris
+            .map((uri) => uri.trim())
+            .where((uri) => uri.isNotEmpty)
+            .toList(),
+      if (allowedScopes != null)
+        'allowed_scopes': allowedScopes
+            .where(kDeveloperAllowedScopes.contains)
+            .toList(),
+    };
+    if (body.isEmpty) {
+      throw ArgumentError.value(body, 'body', '至少提供一個應用更新欄位');
+    }
+    final responseBody = await _client.patch(
+      '/dev/apps/${Uri.encodeComponent(clientId)}',
+      body: body,
+    );
+    return DeveloperApp.fromJson(responseBody as Map<String, dynamic>);
+  }
+
+  /// DELETE /dev/apps/:clientId，soft-delete 為 suspended。
+  Future<String> suspendDeveloperApp(String clientId) async {
+    final responseBody = await _client.delete(
+      '/dev/apps/${Uri.encodeComponent(clientId)}',
+    );
+    if (responseBody is Map<String, dynamic>) {
+      return responseBody['suspended_client_id'] as String? ?? clientId;
+    }
+    return clientId;
   }
 
   /// GET /share/:token（公開分享頁,不需登入）。

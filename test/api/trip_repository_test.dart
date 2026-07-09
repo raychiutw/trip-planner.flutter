@@ -766,6 +766,30 @@ void main() {
     expect(apps.single.statusLabel, '待審核');
   });
 
+  test('fetchDeveloperApp：GET /dev/apps/:clientId 解析 app detail', () async {
+    dioAdapter.onGet(
+      '/dev/apps/tp_alpha',
+      (server) => server.reply(200, {
+        'client_id': 'tp_alpha',
+        'client_type': 'public',
+        'app_name': 'Alpha App',
+        'app_logo_url': 'https://alpha.example.com/logo.png',
+        'homepage_url': 'https://alpha.example.com',
+        'redirect_uris': ['https://alpha.example.com/callback'],
+        'allowed_scopes': ['openid', 'email'],
+        'status': 'active',
+        'created_at': '2026-07-09T01:00:00Z',
+        'updated_at': '2026-07-09T02:00:00Z',
+      }),
+    );
+
+    final app = await tripRepository.fetchDeveloperApp('tp_alpha');
+
+    expect(app.clientId, 'tp_alpha');
+    expect(app.appLogoUrl, 'https://alpha.example.com/logo.png');
+    expect(app.redirectUris, ['https://alpha.example.com/callback']);
+  });
+
   test('createDeveloperApp：POST /dev/apps 建立 OAuth app', () async {
     dioAdapter.onPost(
       '/dev/apps',
@@ -798,6 +822,72 @@ void main() {
     expect(created.clientId, 'tp_new');
     expect(created.clientSecret, isNull);
   });
+
+  test(
+    'updateDeveloperApp：PATCH /dev/apps/:clientId 支援清空 nullable 欄位',
+    () async {
+      dioAdapter.onPatch(
+        '/dev/apps/tp_alpha',
+        (server) => server.reply(200, {
+          'client_id': 'tp_alpha',
+          'client_type': 'public',
+          'app_name': 'Alpha App 2',
+          'app_description': null,
+          'app_logo_url': null,
+          'homepage_url': 'https://alpha.example.com',
+          'redirect_uris': ['https://alpha.example.com/callback'],
+          'allowed_scopes': ['openid', 'profile'],
+          'status': 'active',
+          'created_at': '2026-07-09T01:00:00Z',
+          'updated_at': '2026-07-09T03:00:00Z',
+        }),
+        data: {
+          'app_name': 'Alpha App 2',
+          'app_description': null,
+          'app_logo_url': null,
+          'homepage_url': 'https://alpha.example.com',
+          'redirect_uris': ['https://alpha.example.com/callback'],
+          'allowed_scopes': ['openid', 'profile'],
+        },
+      );
+
+      final app = await tripRepository.updateDeveloperApp(
+        clientId: 'tp_alpha',
+        appName: ' Alpha App 2 ',
+        clearAppDescription: true,
+        clearAppLogoUrl: true,
+        homepageUrl: 'https://alpha.example.com',
+        redirectUris: [' https://alpha.example.com/callback '],
+        allowedScopes: ['openid', 'profile', 'ops:*'],
+      );
+
+      expect(app.appName, 'Alpha App 2');
+      expect(app.appDescription, isNull);
+      expect(app.allowedScopes, ['openid', 'profile']);
+    },
+  );
+
+  test('updateDeveloperApp：空 patch 不打 API', () async {
+    await expectLater(
+      tripRepository.updateDeveloperApp(clientId: 'tp_alpha'),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
+  test(
+    'suspendDeveloperApp：DELETE /dev/apps/:clientId 回 suspended id',
+    () async {
+      dioAdapter.onDelete(
+        '/dev/apps/tp_alpha',
+        (server) =>
+            server.reply(200, {'ok': true, 'suspended_client_id': 'tp_alpha'}),
+      );
+
+      final clientId = await tripRepository.suspendDeveloperApp('tp_alpha');
+
+      expect(clientId, 'tp_alpha');
+    },
+  );
 
   test(
     'addEntryToDay：POST /trips/:id/days/:num/entries snake_case body',

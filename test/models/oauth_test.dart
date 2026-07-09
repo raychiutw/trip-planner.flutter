@@ -27,19 +27,21 @@ void main() {
       'client_type': 'confidential',
       'app_name': 'Dev App',
       'app_description': null,
+      'app_logo_url': 'https://dev.example.com/logo.png',
       'homepage_url': 'https://dev.example.com',
       'redirect_uris': '["https://dev.example.com/callback"]',
       'allowed_scopes': ['openid', 'profile', 'offline_access'],
-      'status': 'pending_review',
+      'status': 'suspended',
       'created_at': '2026-07-08T10:00:00Z',
       'updated_at': '2026-07-08T10:00:00Z',
     });
 
     expect(app.clientId, 'tp_dev');
     expect(app.clientType, 'confidential');
+    expect(app.appLogoUrl, 'https://dev.example.com/logo.png');
     expect(app.redirectUris, ['https://dev.example.com/callback']);
     expect(app.allowedScopes, ['openid', 'profile', 'offline_access']);
-    expect(app.statusLabel, '待審核');
+    expect(app.statusLabel, '已停用');
   });
 
   test('CreatedDeveloperApp.fromJson 保存一次性 client_secret', () {
