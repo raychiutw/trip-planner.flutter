@@ -1238,10 +1238,11 @@ void main() {
       (server) => server.reply(200, [
         {
           'id': 5,
-          'fromEntryId': 11,
-          'toEntryId': 12,
+          'from_entry_id': 11,
+          'to_entry_id': 12,
           'mode': 'transit',
           'min': 20,
+          'distance_m': 4200,
           'version': 3,
         },
       ]),
@@ -1249,14 +1250,60 @@ void main() {
 
     final segs = await tripRepository.fetchSegments(tripId: 'okinawa');
     expect(segs.single.id, 5);
+    expect(segs.single.fromEntryId, 11);
+    expect(segs.single.toEntryId, 12);
+    expect(segs.single.distanceM, 4200);
     expect(segs.single.version, 3);
     expect(segs.single, isA<TripSegment>());
+  });
+
+  test('createSegment：POST /segments snake_case body 回 TripSegment', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/segments',
+      (server) => server.reply(201, {
+        'id': 6,
+        'trip_id': 'okinawa',
+        'from_entry_id': 11,
+        'to_entry_id': 12,
+        'mode': 'transit',
+        'min': 35,
+        'distance_m': null,
+        'source': 'manual',
+        'version': 1,
+      }),
+      data: {
+        'from_entry_id': 11,
+        'to_entry_id': 12,
+        'mode': 'transit',
+        'min': 35,
+      },
+    );
+
+    final seg = await tripRepository.createSegment(
+      tripId: 'okinawa',
+      fromEntryId: 11,
+      toEntryId: 12,
+      mode: 'transit',
+      min: 35,
+    );
+
+    expect(seg.id, 6);
+    expect(seg.fromEntryId, 11);
+    expect(seg.toEntryId, 12);
+    expect(seg.min, 35);
+    expect(seg.source, 'manual');
   });
 
   test('updateSegment：PATCH /segments/:sid 回 TripSegment', () async {
     dioAdapter.onPatch(
       '/trips/okinawa/segments/5',
-      (server) => server.reply(200, {'id': 5, 'mode': 'transit', 'version': 4}),
+      (server) => server.reply(200, {
+        'id': 5,
+        'from_entry_id': 11,
+        'to_entry_id': 12,
+        'mode': 'transit',
+        'version': 4,
+      }),
       data: {'mode': 'transit', 'min': 20, 'expectedVersion': 1},
     );
 
@@ -1268,6 +1315,7 @@ void main() {
       expectedVersion: 1,
     );
     expect(seg.version, 4);
+    expect(seg.fromEntryId, 11);
   });
 
   test('updateSegment：409 → 拋 ApiError(409)', () async {

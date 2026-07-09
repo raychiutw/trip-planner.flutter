@@ -33,5 +33,21 @@ void main() {
       expect(seg.source, isNull);
       expect(seg.version, 0);
     });
+
+    test('解析後端 snake_case 欄位', () {
+      final seg = TripSegment.fromJson({
+        'id': 6,
+        'from_entry_id': 21,
+        'to_entry_id': 22,
+        'mode': 'walking',
+        'distance_m': 950,
+        'version': 4,
+      });
+
+      expect(seg.fromEntryId, 21);
+      expect(seg.toEntryId, 22);
+      expect(seg.distanceM, 950);
+      expect(seg.version, 4);
+    });
   });
 }

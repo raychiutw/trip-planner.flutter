@@ -593,6 +593,26 @@ class TripRepository {
         TripSegment.fromJson,
       );
 
+  /// POST /trips/:id/segments（from/to entry pair upsert；transit 必帶 min）。
+  Future<TripSegment> createSegment({
+    required String tripId,
+    required int fromEntryId,
+    required int toEntryId,
+    required String mode,
+    int? min,
+  }) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/segments',
+      body: {
+        'from_entry_id': fromEntryId,
+        'to_entry_id': toEntryId,
+        'mode': mode,
+        'min': ?min,
+      },
+    );
+    return TripSegment.fromJson(body as Map<String, dynamic>);
+  }
+
   /// GET /trips/:id/segments（SWR stream）。
   Stream<List<TripSegment>> watchSegments({required String tripId}) => _client
       .getStream('/trips/${Uri.encodeComponent(tripId)}/segments')

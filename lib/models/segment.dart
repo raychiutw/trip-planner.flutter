@@ -32,11 +32,12 @@ class TripSegment {
   factory TripSegment.fromJson(Map<String, dynamic> json) {
     return TripSegment(
       id: (json['id'] as num).toInt(),
-      fromEntryId: (json['fromEntryId'] as num?)?.toInt(),
-      toEntryId: (json['toEntryId'] as num?)?.toInt(),
+      fromEntryId: ((json['fromEntryId'] ?? json['from_entry_id']) as num?)
+          ?.toInt(),
+      toEntryId: ((json['toEntryId'] ?? json['to_entry_id']) as num?)?.toInt(),
       mode: json['mode'] as String? ?? 'driving',
       min: (json['min'] as num?)?.toInt(),
-      distanceM: (json['distanceM'] as num?)?.toInt(),
+      distanceM: ((json['distanceM'] ?? json['distance_m']) as num?)?.toInt(),
       source: json['source'] as String?,
       version: (json['version'] as num?)?.toInt() ?? 0,
     );
