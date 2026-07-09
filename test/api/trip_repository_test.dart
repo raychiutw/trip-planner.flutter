@@ -948,6 +948,59 @@ void main() {
     },
   );
 
+  test('changeEntryPoi：PUT /entries/:eid/poi-id with existing poiId', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa/entries/77/poi-id',
+      (server) => server.reply(200, {'ok': true, 'poiId': 22}),
+      data: {'poiId': 22, 'entryPoisVersion': 'v3'},
+    );
+
+    final poiId = await tripRepository.changeEntryPoi(
+      tripId: 'okinawa',
+      entryId: 77,
+      poiId: 22,
+      entryPoisVersion: 'v3',
+    );
+
+    expect(poiId, 22);
+  });
+
+  test('changeEntryPoi：PUT /entries/:eid/poi-id with search payload', () async {
+    dioAdapter.onPut(
+      '/trips/okinawa/entries/77/poi-id',
+      (server) => server.reply(200, {'ok': true, 'poiId': 33}),
+      data: {
+        'name': '美麗海水族館',
+        'lat': 26.69,
+        'lng': 127.87,
+        'type': 'activity',
+        'category': 'aquarium',
+        'address': '沖繩縣本部町石川424',
+        'rating': 4.6,
+        'country': 'JP',
+        'place_id': 'place-1',
+        'source': 'search',
+      },
+    );
+
+    final poiId = await tripRepository.changeEntryPoi(
+      tripId: 'okinawa',
+      entryId: 77,
+      poi: const PoiSearchResult(
+        placeId: 'place-1',
+        name: '美麗海水族館',
+        address: '沖繩縣本部町石川424',
+        lat: 26.69,
+        lng: 127.87,
+        category: 'aquarium',
+        country: 'JP',
+        rating: 4.6,
+      ),
+    );
+
+    expect(poiId, 33);
+  });
+
   test('addEntryAlternate：POST /alternates find-or-create（type 映射）', () async {
     dioAdapter.onPost(
       '/trips/okinawa/entries/11/alternates',

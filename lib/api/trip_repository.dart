@@ -511,6 +511,39 @@ class TripRepository {
     );
   }
 
+  /// PUT /trips/:id/entries/:eid/poi-id（更換正選 POI;支援既有 poiId 或搜尋結果 find-or-create）。
+  Future<int> changeEntryPoi({
+    required String tripId,
+    required int entryId,
+    int? poiId,
+    PoiSearchResult? poi,
+    String? entryPoisVersion,
+  }) async {
+    if ((poiId == null) == (poi == null)) {
+      throw ArgumentError('Provide exactly one of poiId or poi');
+    }
+    final payload = poiId != null
+        ? {'poiId': poiId}
+        : {
+            'name': poi!.name,
+            'lat': poi.lat,
+            'lng': poi.lng,
+            'type': mapGooglePrimaryTypeToPoiType(poi.category),
+            'category': poi.category,
+            'address': poi.address,
+            'rating': poi.rating,
+            'country': poi.country,
+            'place_id': poi.placeId,
+            'source': 'search',
+          };
+    final body = await _client.put(
+      '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/poi-id',
+      body: {...payload, 'entryPoisVersion': ?entryPoisVersion},
+    );
+    final map = body as Map<String, dynamic>;
+    return (map['poiId'] as num).toInt();
+  }
+
   /// POST /trips/:id/entries/:eid/alternates（find-or-create 變體;POI 分類欄用 `type`）。
   Future<void> addEntryAlternate({
     required String tripId,
