@@ -61,6 +61,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   String _expiryKey = 'never';
   DateTime? _customExpiryDate;
   bool _anonymous = false;
+  bool _showRevoked = false;
 
   @override
   void dispose() {
@@ -176,6 +177,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shareControllerProvider(widget.tripId));
+    final activeShares = state.shares.where((s) => !s.isRevoked).toList();
+    final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('分享連結')),
@@ -197,21 +200,37 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     onCopy: _copy,
                   ),
                 Text(
-                  '現有連結（${state.shares.length}）',
+                  '使用中的連結（${activeShares.length}）',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: TpSpacing.s2),
-                if (state.shares.isEmpty)
+                if (activeShares.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
                     child: Text(
-                      '還沒有分享連結。',
+                      '目前沒有使用中的分享連結。',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                for (final s in state.shares) _shareTile(s, state),
+                for (final s in activeShares) _shareTile(s, state),
+                if (revokedShares.isNotEmpty) ...[
+                  const SizedBox(height: TpSpacing.s2),
+                  TextButton.icon(
+                    key: const ValueKey('share-revoked-toggle'),
+                    onPressed: () =>
+                        setState(() => _showRevoked = !_showRevoked),
+                    icon: Icon(
+                      _showRevoked
+                          ? Icons.expand_less_outlined
+                          : Icons.expand_more_outlined,
+                    ),
+                    label: Text('已關閉的連結（${revokedShares.length}）'),
+                  ),
+                  if (_showRevoked)
+                    for (final s in revokedShares) _shareTile(s, state),
+                ],
                 const SizedBox(height: TpSpacing.s5),
                 Text('建立新連結', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: TpSpacing.s2),

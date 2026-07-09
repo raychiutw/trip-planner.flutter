@@ -250,6 +250,35 @@ void main() {
     verify(() => repo.deleteShare('t', 1)).called(1);
   });
 
+  testWidgets('已關閉連結預設折疊，展開後顯示', (tester) async {
+    when(() => repo.fetchShares(any())).thenAnswer(
+      (_) async => const [
+        TripShare(id: 1, label: '使用中', viewCount: 2),
+        TripShare(
+          id: 2,
+          label: '給同事',
+          viewCount: 3,
+          revokedAt: '2026-07-01T00:00:00Z',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('使用中的連結（1）'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-2')), findsNothing);
+    expect(find.byKey(const ValueKey('share-revoked-toggle')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('share-revoked-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-2')), findsOneWidget);
+    expect(find.text('給同事'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-delete-2')), findsOneWidget);
+  });
+
   testWidgets('編輯名稱 → 儲存 → 呼叫 updateShare', (tester) async {
     when(
       () => repo.updateShare(
