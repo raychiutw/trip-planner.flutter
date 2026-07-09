@@ -17,8 +17,16 @@ const List<(String, String)> _modes = [
 Future<void> showTravelEditSheet(
   BuildContext context, {
   required String tripId,
-  required TripSegment segment,
+  TripSegment? segment,
+  int? fromEntryId,
+  int? toEntryId,
+  String? initialMode,
+  int? initialMin,
 }) {
+  assert(
+    segment != null || (fromEntryId != null && toEntryId != null),
+    'Missing segment creation requires fromEntryId and toEntryId.',
+  );
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -26,22 +34,40 @@ Future<void> showTravelEditSheet(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
       ),
-      child: TravelEditSheet(tripId: tripId, segment: segment),
+      child: TravelEditSheet(
+        tripId: tripId,
+        segment: segment,
+        fromEntryId: fromEntryId,
+        toEntryId: toEntryId,
+        initialMode: initialMode,
+        initialMin: initialMin,
+      ),
     ),
   );
 }
 
 /// 交通方式編輯：開車/步行（後端打 Google 重算）、大眾運輸（手動填分鐘）。
-/// OCC = segment.version（expectedVersion）。
+/// 有 segment 時走 OCC PATCH；缺 segment row 時以 from/to entry pair 建立。
 class TravelEditSheet extends ConsumerStatefulWidget {
   const TravelEditSheet({
     super.key,
     required this.tripId,
-    required this.segment,
-  });
+    this.segment,
+    this.fromEntryId,
+    this.toEntryId,
+    this.initialMode,
+    this.initialMin,
+  }) : assert(
+         segment != null || (fromEntryId != null && toEntryId != null),
+         'Missing segment creation requires fromEntryId and toEntryId.',
+       );
 
   final String tripId;
-  final TripSegment segment;
+  final TripSegment? segment;
+  final int? fromEntryId;
+  final int? toEntryId;
+  final String? initialMode;
+  final int? initialMin;
 
   @override
   ConsumerState<TravelEditSheet> createState() => _TravelEditSheetState();
@@ -55,11 +81,10 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   @override
   void initState() {
     super.initState();
-    _mode =
-        const {'driving', 'walking', 'transit'}.contains(widget.segment.mode)
-        ? widget.segment.mode
-        : 'driving';
-    _min = TextEditingController(text: widget.segment.min?.toString() ?? '');
+    _mode = _normalizeTravelMode(widget.segment?.mode ?? widget.initialMode);
+    _min = TextEditingController(
+      text: (widget.segment?.min ?? widget.initialMin)?.toString() ?? '',
+    );
     _min.addListener(() => setState(() {}));
   }
 
@@ -83,13 +108,29 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     setState(() => _submitting = true);
     final repo = ref.read(tripRepositoryProvider);
     try {
-      await repo.updateSegment(
-        tripId: widget.tripId,
-        segmentId: widget.segment.id,
-        mode: _mode,
-        min: min,
-        expectedVersion: widget.segment.version,
-      );
+      final segment = widget.segment;
+      if (segment != null) {
+        await repo.updateSegment(
+          tripId: widget.tripId,
+          segmentId: segment.id,
+          mode: _mode,
+          min: min,
+          expectedVersion: segment.version,
+        );
+      } else {
+        final fromEntryId = widget.fromEntryId;
+        final toEntryId = widget.toEntryId;
+        if (fromEntryId == null || toEntryId == null) {
+          throw StateError('Missing segment endpoints.');
+        }
+        await repo.createSegment(
+          tripId: widget.tripId,
+          fromEntryId: fromEntryId,
+          toEntryId: toEntryId,
+          mode: _mode,
+          min: min,
+        );
+      }
       ref.invalidate(tripDaysProvider(widget.tripId));
       ref.invalidate(tripSegmentsProvider(widget.tripId));
       if (!mounted) return;
@@ -173,4 +214,18 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       ),
     );
   }
+}
+
+String _normalizeTravelMode(String? value) {
+  return switch (value) {
+    'driving' || 'drive' || 'car' || 'taxi' => 'driving',
+    'walking' || 'walk' => 'walking',
+    'transit' ||
+    'bus' ||
+    'train' ||
+    'monorail' ||
+    'tram' ||
+    'ferry' => 'transit',
+    _ => 'driving',
+  };
 }

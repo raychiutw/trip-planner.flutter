@@ -524,4 +524,56 @@ void main() {
       ),
     ).called(1);
   });
+
+  testWidgets('沒有 segment row 時仍可點 travel pill 建立交通設定', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.createSegment(
+        tripId: any(named: 'tripId'),
+        fromEntryId: any(named: 'fromEntryId'),
+        toEntryId: any(named: 'toEntryId'),
+        mode: any(named: 'mode'),
+        min: any(named: 'min'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 51,
+        fromEntryId: 11,
+        toEntryId: 12,
+        mode: 'transit',
+        min: 25,
+        version: 1,
+      ),
+    );
+    await _pumpTimeline(tester, repo: repo);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-create-11-12')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-mode-transit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('travel-min')), '25');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.createSegment(
+        tripId: _tripId,
+        fromEntryId: 11,
+        toEntryId: 12,
+        mode: 'transit',
+        min: 25,
+      ),
+    ).called(1);
+    verifyNever(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        min: any(named: 'min'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    );
+  });
 }

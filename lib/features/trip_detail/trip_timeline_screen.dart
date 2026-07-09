@@ -410,6 +410,8 @@ class _DaySection extends ConsumerWidget {
                           entry.id,
                         ),
                         tripId: tripId,
+                        fromEntryId: timeline[i - 1].id,
+                        toEntryId: entry.id,
                       ),
                     SwipeToDelete(
                       dismissKey: ValueKey('entry-dismiss-${entry.id}'),
@@ -541,7 +543,7 @@ class _EntryTrailing extends StatelessWidget {
   }
 }
 
-/// 依相鄰兩端 entry id 比對 travel pill 對應的 segment（找不到回 null,pill 不可點）。
+/// 依相鄰兩端 entry id 比對 travel pill 對應的 segment。
 TripSegment? _findSegment(List<TripSegment> segments, int fromId, int toId) {
   for (final s in segments) {
     if (s.fromEntryId == fromId && s.toEntryId == toId) return s;
@@ -549,11 +551,19 @@ TripSegment? _findSegment(List<TripSegment> segments, int fromId, int toId) {
   return null;
 }
 
-/// travel pill 列：沿用 tile 的時間欄 + rail 縮排。有對應 segment 時可點擊編輯交通。
+/// travel pill 列：沿用 tile 的時間欄 + rail 縮排，可編輯或補建交通 segment。
 class _TravelRow extends StatelessWidget {
-  const _TravelRow({required this.travel, this.segment, this.tripId});
+  const _TravelRow({
+    required this.travel,
+    required this.fromEntryId,
+    required this.toEntryId,
+    this.segment,
+    this.tripId,
+  });
 
   final Travel travel;
+  final int fromEntryId;
+  final int toEntryId;
   final TripSegment? segment;
   final String? tripId;
 
@@ -562,11 +572,21 @@ class _TravelRow extends StatelessWidget {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
     Widget pill = TravelPill(travel: travel);
-    if (seg != null && tripId != null) {
+    final id = tripId;
+    if (id != null) {
       pill = InkWell(
-        key: ValueKey('travel-edit-${seg.id}'),
-        onTap: () =>
-            showTravelEditSheet(context, tripId: tripId!, segment: seg),
+        key: seg != null
+            ? ValueKey('travel-edit-${seg.id}')
+            : ValueKey('travel-create-$fromEntryId-$toEntryId'),
+        onTap: () => showTravelEditSheet(
+          context,
+          tripId: id,
+          segment: seg,
+          fromEntryId: fromEntryId,
+          toEntryId: toEntryId,
+          initialMode: travel.type,
+          initialMin: travel.min,
+        ),
         borderRadius: BorderRadius.circular(TpRadius.md),
         child: pill,
       );
