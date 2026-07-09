@@ -12,6 +12,7 @@ import '../../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 
 const _hotDestinations = ['沖繩', '東京', '京都', '首爾', '曼谷', '台北'];
+const _maxRecentDestinations = 6;
 
 class DestinationPicker extends ConsumerStatefulWidget {
   const DestinationPicker({
@@ -34,6 +35,7 @@ class DestinationPicker extends ConsumerStatefulWidget {
 class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   final _search = TextEditingController();
   List<PoiSearchResult> _results = const [];
+  List<DestinationInput> _recentDestinations = const [];
   bool _searching = false;
 
   @override
@@ -59,9 +61,16 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   }
 
   void _pick(PoiSearchResult p) {
-    widget.onAdd(DestinationInput.fromPoi(p));
+    final destination = DestinationInput.fromPoi(p);
+    widget.onAdd(destination);
     _search.clear();
-    setState(() => _results = const []);
+    setState(() {
+      _results = const [];
+      _recentDestinations = _pushRecentDestination(
+        _recentDestinations,
+        destination,
+      );
+    });
   }
 
   @override
@@ -102,14 +111,43 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
-          child: Wrap(
-            spacing: TpSpacing.s2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final h in _hotDestinations)
-                ActionChip(
-                  label: Text(h),
-                  onPressed: () => widget.onAdd(DestinationInput(name: h)),
+              Wrap(
+                spacing: TpSpacing.s2,
+                runSpacing: TpSpacing.s2,
+                children: [
+                  for (final h in _hotDestinations)
+                    ActionChip(
+                      label: Text(h),
+                      onPressed: () => widget.onAdd(DestinationInput(name: h)),
+                    ),
+                ],
+              ),
+              if (_recentDestinations.isNotEmpty) ...[
+                const SizedBox(height: TpSpacing.s2),
+                Text(
+                  '最近搜尋',
+                  key: const ValueKey('dest-recent-dests'),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
+                const SizedBox(height: TpSpacing.s1),
+                Wrap(
+                  spacing: TpSpacing.s2,
+                  runSpacing: TpSpacing.s2,
+                  children: [
+                    for (final destination in _recentDestinations)
+                      ActionChip(
+                        key: ValueKey('dest-recent-${destination.name}'),
+                        label: Text(destination.name),
+                        onPressed: () => widget.onAdd(destination),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -157,4 +195,17 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
       ],
     );
   }
+}
+
+List<DestinationInput> _pushRecentDestination(
+  List<DestinationInput> current,
+  DestinationInput destination,
+) {
+  final name = destination.name.trim();
+  if (name.isEmpty) return current;
+  return [
+    destination,
+    for (final item in current)
+      if (item.name.trim() != name) item,
+  ].take(_maxRecentDestinations).toList(growable: false);
 }

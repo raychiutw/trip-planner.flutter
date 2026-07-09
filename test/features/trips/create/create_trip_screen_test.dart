@@ -87,6 +87,20 @@ void main() {
     expect(find.text('東京'), findsWidgets);
   });
 
+  testWidgets('POI 搜尋 → 點結果 → 出現在最近搜尋 chips', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
+    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-result-p1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('dest-recent-dests')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dest-recent-東京')), findsOneWidget);
+  });
+
   testWidgets('切到彈性模式 → 顯示天數 stepper', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
