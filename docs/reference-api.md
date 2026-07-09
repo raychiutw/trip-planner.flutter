@@ -117,6 +117,8 @@ class TripRepository {
   Future<Trip>              fetchTrip(String id);        // GET /trips/:id
   Future<List<TripDay>>     fetchDays(String id);        // GET /trips/:id/days?all=1
   Future<TripNotes>         fetchNotes(String id);       // GET /trips/:id/notes
+  Future<({int jobId, int requestId, String status, String tripId, String docType})>
+                           generateNotes(NoteGenerationType type, {required String tripId}); // POST /trips/:id/notes/:type/generate
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
   Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
@@ -128,6 +130,7 @@ class TripRepository {
 
 `updateProfile` 的 `displayName` 傳 `null` 表示清除顯示名稱(body 仍會帶 `{'displayName': null}`)。
 `updateAccountNotificationPreferences` 至少要傳一個欄位；空 patch 會在 client 端丟 `ArgumentError`，避免打到後端 400。
+`generateNotes` 的 `type` 只使用後端 AI doc type：`tips`、`lodging-tips`、`emergency`；不是筆記 CRUD section 名稱。
 
 ## FavoritesRepository(`favorites_repository.dart`)
 

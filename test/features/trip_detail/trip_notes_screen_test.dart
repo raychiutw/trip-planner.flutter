@@ -1,17 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
+import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
+
+class _MockRequestsRepository extends Mock implements RequestsRepository {}
 
 TripNotes _sampleNotes() {
   return const TripNotes(
@@ -70,7 +76,12 @@ TripNotes _sampleNotes() {
   );
 }
 
-Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
+Widget _buildScreen(
+  TripNotes notes, {
+  _MockTripRepository? repo,
+  _MockRequestsRepository? requestsRepo,
+  Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
+}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -81,8 +92,12 @@ Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
   );
   return ProviderScope(
     overrides: [
-      tripNotesProvider.overrideWith((ref, tripId) => Stream.value(notes)),
+      tripNotesProvider.overrideWith(
+        notesBuilder ?? (ref, tripId) => Stream.value(notes),
+      ),
       if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
+      if (requestsRepo != null)
+        requestsRepositoryProvider.overrideWithValue(requestsRepo),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
@@ -253,5 +268,121 @@ void main() {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('note-drag-flights-1')), findsOneWidget);
+  });
+
+  testWidgets('展開行前須知後可觸發一般 AI 生成並顯示 pending 狀態', (tester) async {
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenAnswer(
+      (_) async => (
+        jobId: 7,
+        requestId: 99,
+        status: 'pending',
+        tripId: 'trip-1',
+        docType: 'tips',
+      ),
+    );
+    when(
+      () => requestsRepo.watchRequestEvents(99),
+    ).thenAnswer((_) => const Stream<TripRequestEvent>.empty());
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, requestsRepo: requestsRepo),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    final aiButton = find.byKey(const ValueKey('note-ai-tips'));
+    expect(aiButton, findsOneWidget);
+
+    await tester.ensureVisible(aiButton);
+    await tester.tap(aiButton);
+    await tester.pump();
+    await tester.pump();
+
+    verify(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).called(1);
+    await tester.drag(find.byType(ListView), const Offset(0, 800));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
+    expect(find.textContaining('AI 正在生成行前須知'), findsOneWidget);
+  });
+
+  testWidgets('沒有住宿時住宿 AI 生成保持 disabled 並說明原因', (tester) async {
+    await tester.pumpWidget(_buildScreen(const TripNotes()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    final lodgingAiButton = find.byKey(const ValueKey('note-ai-lodging-tips'));
+    expect(lodgingAiButton, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(lodgingAiButton).onPressed, isNull);
+    expect(find.text('需先新增住宿'), findsOneWidget);
+  });
+
+  testWidgets('緊急聯絡 AI 生成完成後清掉 pending 並重新載入筆記', (tester) async {
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    final controller = StreamController<TripRequestEvent>(sync: true);
+    addTearDown(() {
+      controller.close();
+    });
+    var loadCount = 0;
+    when(
+      () => repo.generateNotes(NoteGenerationType.emergency, tripId: 'trip-1'),
+    ).thenAnswer(
+      (_) async => (
+        jobId: 8,
+        requestId: 100,
+        status: 'pending',
+        tripId: 'trip-1',
+        docType: 'emergency',
+      ),
+    );
+    when(
+      () => requestsRepo.watchRequestEvents(100),
+    ).thenAnswer((_) => controller.stream);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: repo,
+        requestsRepo: requestsRepo,
+        notesBuilder: (ref, tripId) {
+          loadCount += 1;
+          return Stream.value(_sampleNotes());
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('緊急聯絡'));
+    await tester.pumpAndSettle();
+    final aiButton = find.byKey(const ValueKey('note-ai-emergency'));
+    await tester.ensureVisible(aiButton);
+    await tester.drag(find.byType(ListView), const Offset(0, -160));
+    await tester.pump();
+    await tester.tap(aiButton);
+    await tester.pump();
+    await tester.pump();
+
+    await tester.drag(find.byType(ListView), const Offset(0, 800));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
+    controller.add(const TripRequestEvent(status: RequestStatus.completed));
+    await tester.pump();
+    await tester.pump();
+
+    verify(
+      () => repo.generateNotes(NoteGenerationType.emergency, tripId: 'trip-1'),
+    ).called(1);
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+    expect(loadCount, greaterThan(1));
   });
 }

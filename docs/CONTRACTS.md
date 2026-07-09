@@ -166,7 +166,7 @@ class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_sc
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
 class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
 class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
-class TripNotesScreen extends ConsumerWidget;          // features/trip_detail/trip_notes_screen.dart
+class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 ```
 

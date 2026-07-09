@@ -130,6 +130,12 @@ class TripNotes {
 }
 ```
 
+```dart
+enum NoteGenerationType { tips, lodgingTips, emergency }
+```
+
+`NoteGenerationType` 對應 AI 生成 doc type：`tips`、`lodging-tips`、`emergency`。筆記 CRUD 仍使用 `NoteSection` 的 5 區名稱。
+
 ## user.dart
 
 ### UserInfo — `GET /oauth/userinfo` 回應

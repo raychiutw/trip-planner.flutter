@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
+import '../../models/trip_request.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'notes/note_edit_sheet.dart';
@@ -11,15 +14,31 @@ import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/reorderable_row.dart';
 
-/// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡），MVP 唯讀。
-class TripNotesScreen extends ConsumerWidget {
+/// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡）。
+class TripNotesScreen extends ConsumerStatefulWidget {
   const TripNotesScreen({super.key, required this.tripId});
 
   final String tripId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notesAsync = ref.watch(tripNotesProvider(tripId));
+  ConsumerState<TripNotesScreen> createState() => _TripNotesScreenState();
+}
+
+class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
+  ({int requestId, int jobId, NoteGenerationType type})? _aiJob;
+  StreamSubscription<TripRequestEvent>? _aiSubscription;
+  bool _aiSubmitting = false;
+  String? _aiError;
+
+  @override
+  void dispose() {
+    _aiSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notesAsync = ref.watch(tripNotesProvider(widget.tripId));
     return Scaffold(
       appBar: AppBar(title: const Text('行程筆記')),
       body: notesAsync.when(
@@ -30,18 +49,26 @@ class TripNotesScreen extends ConsumerWidget {
             child: Text('載入失敗：$error', textAlign: TextAlign.center),
           ),
         ),
-        data: (notes) => _buildSections(context, ref, notes),
+        data: (notes) => _buildSections(context, notes),
       ),
     );
   }
 
-  Widget _buildSections(BuildContext context, WidgetRef ref, TripNotes notes) {
+  Widget _buildSections(BuildContext context, TripNotes notes) {
     final tones = Theme.of(context).extension<TpTones>()!;
+    final aiBusy = _aiSubmitting || _aiJob != null;
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
+        if (_aiError != null)
+          _NotesAiErrorPanel(
+            message: _aiError!,
+            onDismiss: () => setState(() => _aiError = null),
+          ),
+        if (_aiJob != null)
+          _NotesAiPendingPanel(label: _aiJob!.type.pendingLabel),
         _NotesSection(
-          tripId: tripId,
+          tripId: widget.tripId,
           section: NoteSection.flights,
           icon: Icons.flight_takeoff,
           iconColor: tones.sageDeep,
@@ -59,7 +86,7 @@ class TripNotesScreen extends ConsumerWidget {
           ],
         ),
         _NotesSection(
-          tripId: tripId,
+          tripId: widget.tripId,
           section: NoteSection.lodgings,
           icon: Icons.hotel_outlined,
           iconColor: tones.sageDeep,
@@ -75,7 +102,7 @@ class TripNotesScreen extends ConsumerWidget {
           ],
         ),
         _NotesSection(
-          tripId: tripId,
+          tripId: widget.tripId,
           section: NoteSection.reservations,
           icon: Icons.confirmation_number_outlined,
           iconColor: tones.pinkDeep,
@@ -91,11 +118,23 @@ class TripNotesScreen extends ConsumerWidget {
           ],
         ),
         _NotesSection(
-          tripId: tripId,
+          tripId: widget.tripId,
           section: NoteSection.pretrip,
           icon: Icons.checklist_outlined,
           iconColor: tones.accentDeep,
           title: '行前須知',
+          aiActions: [
+            const _NoteAiAction(type: NoteGenerationType.tips, label: '一般'),
+            _NoteAiAction(
+              type: NoteGenerationType.lodgingTips,
+              label: '住宿',
+              enabled: notes.lodgings.isNotEmpty,
+              disabledText: '需先新增住宿',
+            ),
+          ],
+          aiBusy: aiBusy,
+          activeAiType: _aiJob?.type,
+          onGenerateNotes: _startAiGeneration,
           rows: [
             for (final p in notes.pretripNotes)
               _NoteRowData(
@@ -107,11 +146,17 @@ class TripNotesScreen extends ConsumerWidget {
           ],
         ),
         _NotesSection(
-          tripId: tripId,
+          tripId: widget.tripId,
           section: NoteSection.emergency,
           icon: Icons.support_agent_outlined,
           iconColor: tones.accentDeep,
           title: '緊急聯絡',
+          aiActions: const [
+            _NoteAiAction(type: NoteGenerationType.emergency, label: 'AI'),
+          ],
+          aiBusy: aiBusy,
+          activeAiType: _aiJob?.type,
+          onGenerateNotes: _startAiGeneration,
           rows: [
             for (final c in notes.emergencyContacts)
               _NoteRowData(
@@ -124,6 +169,73 @@ class TripNotesScreen extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _startAiGeneration(NoteGenerationType type) async {
+    if (_aiSubmitting || _aiJob != null) return;
+    setState(() {
+      _aiSubmitting = true;
+      _aiError = null;
+    });
+
+    try {
+      final job = await ref
+          .read(tripRepositoryProvider)
+          .generateNotes(type, tripId: widget.tripId);
+      if (!mounted) return;
+      setState(() {
+        _aiSubmitting = false;
+        _aiJob = (requestId: job.requestId, jobId: job.jobId, type: type);
+      });
+      _watchAiJob(job.requestId, type);
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _aiSubmitting = false;
+        _aiError = _notesAiErrorMessage(error);
+      });
+    }
+  }
+
+  void _watchAiJob(int requestId, NoteGenerationType type) {
+    _aiSubscription?.cancel();
+    _aiSubscription = ref
+        .read(requestsRepositoryProvider)
+        .watchRequestEvents(requestId)
+        .listen(
+          (event) {
+            if (!event.isTerminal) return;
+            _handleAiTerminal(event, type);
+          },
+          onError: (Object error) {
+            if (!mounted) return;
+            setState(() {
+              _aiJob = null;
+              _aiError = _notesAiErrorMessage(error);
+            });
+          },
+        );
+  }
+
+  void _handleAiTerminal(TripRequestEvent event, NoteGenerationType type) {
+    final subscription = _aiSubscription;
+    _aiSubscription = null;
+    subscription?.cancel();
+    if (!mounted) return;
+
+    if (event.status == RequestStatus.completed && event.error == null) {
+      setState(() => _aiJob = null);
+      ref.invalidate(tripNotesProvider(widget.tripId));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI 生成完成（${type.pendingLabel}）')));
+      return;
+    }
+
+    setState(() {
+      _aiJob = null;
+      _aiError = event.error ?? 'AI 生成失敗';
+    });
   }
 }
 
@@ -142,6 +254,126 @@ class _NoteRowData {
   final Widget display;
 }
 
+/// AI 生成按鈕資料；只在可生成的 section 展開後顯示。
+class _NoteAiAction {
+  const _NoteAiAction({
+    required this.type,
+    required this.label,
+    this.enabled = true,
+    this.disabledText,
+  });
+
+  final NoteGenerationType type;
+  final String label;
+  final bool enabled;
+  final String? disabledText;
+}
+
+class _NotesAiPendingPanel extends StatelessWidget {
+  const _NotesAiPendingPanel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    return Container(
+      key: const ValueKey('notes-ai-pending'),
+      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: tones.accentSubtle,
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        border: Border.all(color: tones.accent),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: tones.accentDeep,
+            ),
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Text(
+              'AI 正在生成$label，完成後會自動更新。通常需 3-7 分鐘。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: tones.accentDeep,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotesAiErrorPanel extends StatelessWidget {
+  const _NotesAiErrorPanel({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      key: const ValueKey('notes-ai-error'),
+      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        border: Border.all(color: colors.error),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: colors.onErrorContainer),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI 生成失敗',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colors.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s1),
+                Text(
+                  '$message。可重試或手動填寫。',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onDismiss, child: const Text('關閉')),
+        ],
+      ),
+    );
+  }
+}
+
+String _notesAiErrorMessage(Object error) {
+  final text = error.toString();
+  const exceptionPrefix = 'Exception: ';
+  if (text.startsWith(exceptionPrefix)) {
+    return text.substring(exceptionPrefix.length);
+  }
+  return text;
+}
+
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
 class _NotesSection extends ConsumerWidget {
@@ -153,6 +385,10 @@ class _NotesSection extends ConsumerWidget {
     required this.title,
     required this.rows,
     this.initiallyExpanded = false,
+    this.aiActions = const [],
+    this.aiBusy = false,
+    this.activeAiType,
+    this.onGenerateNotes,
   });
 
   final String tripId;
@@ -162,6 +398,10 @@ class _NotesSection extends ConsumerWidget {
   final String title;
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
+  final List<_NoteAiAction> aiActions;
+  final bool aiBusy;
+  final NoteGenerationType? activeAiType;
+  final void Function(NoteGenerationType type)? onGenerateNotes;
 
   Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
     return confirmAndDelete(
@@ -256,6 +496,43 @@ class _NotesSection extends ConsumerWidget {
           ],
         ),
         children: [
+          if (aiActions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: TpSpacing.s2,
+                  runSpacing: TpSpacing.s2,
+                  children: [
+                    for (final action in aiActions) ...[
+                      OutlinedButton.icon(
+                        key: ValueKey('note-ai-${action.type.pathSegment}'),
+                        onPressed:
+                            aiBusy || !action.enabled || onGenerateNotes == null
+                            ? null
+                            : () => onGenerateNotes!(action.type),
+                        icon: const Icon(Icons.auto_awesome_outlined),
+                        label: Text(
+                          activeAiType == action.type ? '生成中...' : action.label,
+                        ),
+                      ),
+                      if (!action.enabled && action.disabledText != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: TpSpacing.s2),
+                          child: Text(
+                            action.disabledText!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           if (rows.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: TpSpacing.s2),

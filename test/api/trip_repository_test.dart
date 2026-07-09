@@ -681,32 +681,38 @@ void main() {
     );
   });
 
-  test(
-    'generateNotes：POST /trips/:id/notes/:section/generate 回 AI job',
-    () async {
-      dioAdapter.onPost(
-        '/trips/okinawa/notes/flights/generate',
-        (server) => server.reply(202, {
-          'jobId': 12,
-          'requestId': 34,
-          'status': 'pending',
-          'tripId': 'okinawa',
-          'docType': 'flights',
-        }),
-      );
+  for (final c in const [
+    (type: NoteGenerationType.tips, path: 'tips'),
+    (type: NoteGenerationType.lodgingTips, path: 'lodging-tips'),
+    (type: NoteGenerationType.emergency, path: 'emergency'),
+  ]) {
+    test(
+      'generateNotes：POST /trips/:id/notes/${c.path}/generate 回 AI job',
+      () async {
+        dioAdapter.onPost(
+          '/trips/okinawa/notes/${c.path}/generate',
+          (server) => server.reply(202, {
+            'jobId': 12,
+            'requestId': 34,
+            'status': 'pending',
+            'tripId': 'okinawa',
+            'docType': c.path,
+          }),
+        );
 
-      final job = await tripRepository.generateNotes(
-        NoteSection.flights,
-        tripId: 'okinawa',
-      );
+        final job = await tripRepository.generateNotes(
+          c.type,
+          tripId: 'okinawa',
+        );
 
-      expect(job.jobId, 12);
-      expect(job.requestId, 34);
-      expect(job.status, 'pending');
-      expect(job.tripId, 'okinawa');
-      expect(job.docType, 'flights');
-    },
-  );
+        expect(job.jobId, 12);
+        expect(job.requestId, 34);
+        expect(job.status, 'pending');
+        expect(job.tripId, 'okinawa');
+        expect(job.docType, c.path);
+      },
+    );
+  }
 
   test('fetchAuditLog：GET /trips/:id/audit 帶 limit/request_id', () async {
     dioAdapter.onGet(

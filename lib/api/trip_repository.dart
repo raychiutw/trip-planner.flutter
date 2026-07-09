@@ -400,13 +400,13 @@ class TripRepository {
     );
   }
 
-  /// POST /trips/:id/notes/:section/generate（啟動 AI 產生筆記 job）。
+  /// POST /trips/:id/notes/:type/generate（啟動 AI 產生筆記 job）。
   Future<
     ({int jobId, int requestId, String status, String tripId, String docType})
   >
-  generateNotes(NoteSection section, {required String tripId}) async {
+  generateNotes(NoteGenerationType type, {required String tripId}) async {
     final body = await _client.post(
-      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/generate',
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${type.pathSegment}/generate',
     );
     final map = body as Map<String, dynamic>;
     return (
@@ -414,7 +414,7 @@ class TripRepository {
       requestId: (map['requestId'] as num).toInt(),
       status: map['status'] as String? ?? 'pending',
       tripId: map['tripId'] as String? ?? tripId,
-      docType: map['docType'] as String? ?? section.name,
+      docType: map['docType'] as String? ?? type.pathSegment,
     );
   }
 
