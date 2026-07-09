@@ -300,6 +300,56 @@ void main() {
     });
   });
 
+  group('streaming GET', () {
+    test('getTextStream 帶 Cookie/Accept，並解出文字 chunk', () async {
+      await sessionStore.write('token123');
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          'data: {"status":"completed"}\n\n',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/event-stream'],
+          },
+        ),
+      ]);
+      final streamDio = Dio()..httpClientAdapter = adapter;
+      final client = ApiClient(sessionStore: sessionStore, dio: streamDio);
+
+      final text = await client.getTextStream('/requests/7/events').join();
+
+      expect(text, 'data: {"status":"completed"}\n\n');
+      final request = adapter.recordedRequests.single;
+      expect(request.responseType, ResponseType.stream);
+      expect(request.headers['Cookie'], 'tripline_session=token123');
+      expect(request.headers[Headers.acceptHeader], 'text/event-stream');
+    });
+
+    test('getTextStream 非 2xx 仍轉 ApiError', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          jsonEncode({
+            'error': {'code': 'AUTH_REQUIRED', 'message': 'login'},
+          }),
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+      ]);
+      final streamDio = Dio()..httpClientAdapter = adapter;
+      final client = ApiClient(sessionStore: sessionStore, dio: streamDio);
+
+      await expectLater(
+        client.getTextStream('/requests/7/events').drain<void>(),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.status, 'status', 401)
+              .having((e) => e.code, 'code', 'AUTH_REQUIRED'),
+        ),
+      );
+    });
+  });
+
   group('redirect response', () {
     test('postForRedirect 不跟隨 302，並回傳 Location', () async {
       await sessionStore.write('token123');

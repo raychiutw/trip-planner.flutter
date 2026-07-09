@@ -59,3 +59,30 @@ class TripRequest {
     updatedAt: json['updatedAt'] as String?,
   );
 }
+
+/// SSE event from `GET /requests/:id/events`.
+class TripRequestEvent {
+  const TripRequestEvent({
+    this.status,
+    this.processedBy,
+    this.updatedAt,
+    this.error,
+  });
+
+  final RequestStatus? status;
+  final String? processedBy;
+  final String? updatedAt;
+  final String? error;
+
+  bool get isTerminal => error != null || status?.isTerminal == true;
+
+  factory TripRequestEvent.fromJson(Map<String, dynamic> json) =>
+      TripRequestEvent(
+        status: json['status'] is String
+            ? parseRequestStatus(json['status'] as String)
+            : null,
+        processedBy: json['processedBy'] as String?,
+        updatedAt: json['updatedAt'] as String?,
+        error: json['error'] as String?,
+      );
+}

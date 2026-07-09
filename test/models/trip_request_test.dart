@@ -49,4 +49,27 @@ void main() {
       expect(r.status.isTerminal, isFalse);
     });
   });
+
+  group('TripRequestEvent.fromJson', () {
+    test('解析 SSE status event', () {
+      final event = TripRequestEvent.fromJson({
+        'status': 'completed',
+        'processedBy': 'worker',
+        'updatedAt': '2026-07-09T01:01:00Z',
+      });
+
+      expect(event.status, RequestStatus.completed);
+      expect(event.processedBy, 'worker');
+      expect(event.updatedAt, '2026-07-09T01:01:00Z');
+      expect(event.isTerminal, isTrue);
+    });
+
+    test('解析 not_found error event', () {
+      final event = TripRequestEvent.fromJson({'error': 'not_found'});
+
+      expect(event.status, isNull);
+      expect(event.error, 'not_found');
+      expect(event.isTerminal, isTrue);
+    });
+  });
 }

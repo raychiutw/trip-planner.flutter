@@ -1,6 +1,8 @@
 /// AI 聊天工單 repository（`/api/requests*`）。獨立於 TripRepository。
 library;
 
+import 'dart:convert';
+
 import '../models/trip_request.dart';
 import 'api_client.dart';
 
@@ -52,4 +54,51 @@ class RequestsRepository {
     final body = await _client.get('/requests/$id');
     return TripRequest.fromJson(body as Map<String, dynamic>);
   }
+
+  /// GET /requests/:id/events（SSE）→ status/progress events.
+  Stream<TripRequestEvent> watchRequestEvents(int id) =>
+      parseTripRequestEventStream(
+        _client.getTextStream('/requests/$id/events'),
+      );
+}
+
+Stream<TripRequestEvent> parseTripRequestEventStream(
+  Stream<String> chunks,
+) async* {
+  var buffer = '';
+  await for (final chunk in chunks) {
+    buffer = (buffer + chunk).replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    while (true) {
+      final boundary = buffer.indexOf('\n\n');
+      if (boundary == -1) break;
+      final frame = buffer.substring(0, boundary);
+      buffer = buffer.substring(boundary + 2);
+      final event = _parseTripRequestEventFrame(frame);
+      if (event != null) yield event;
+    }
+  }
+
+  final trailing = buffer.trim();
+  if (trailing.isNotEmpty) {
+    final event = _parseTripRequestEventFrame(trailing);
+    if (event != null) yield event;
+  }
+}
+
+TripRequestEvent? _parseTripRequestEventFrame(String frame) {
+  final dataLines = <String>[];
+  for (final rawLine in frame.split('\n')) {
+    final line = rawLine.trimRight();
+    if (line.isEmpty || line.startsWith(':')) continue;
+    if (!line.startsWith('data:')) continue;
+    var data = line.substring(5);
+    if (data.startsWith(' ')) data = data.substring(1);
+    dataLines.add(data);
+  }
+
+  if (dataLines.isEmpty) return null;
+  final payload = dataLines.join('\n').trim();
+  if (payload.isEmpty) return null;
+  final decoded = jsonDecode(payload);
+  return TripRequestEvent.fromJson((decoded as Map).cast<String, dynamic>());
 }

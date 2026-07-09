@@ -103,6 +103,38 @@ void main() {
     expect(r.reply, '改好了');
   });
 
+  test(
+    'watchRequestEvents：解析 SSE data frame、忽略 keepalive、支援 chunk split',
+    () async {
+      final events = await parseTripRequestEventStream(
+        Stream<String>.fromIterable([
+          ': ping\n\n',
+          'data: {"status":"processing","processedBy":"worker"',
+          ',"updatedAt":"2026-07-09T01:00:00Z"}\n\n',
+          'data: {"status":"completed","updatedAt":"2026-07-09T01:01:00Z"}',
+          '\n\n',
+        ]),
+      ).toList();
+
+      expect(events, hasLength(2));
+      expect(events.first.status, RequestStatus.processing);
+      expect(events.first.processedBy, 'worker');
+      expect(events.first.isTerminal, isFalse);
+      expect(events.last.status, RequestStatus.completed);
+      expect(events.last.isTerminal, isTrue);
+    },
+  );
+
+  test('watchRequestEvents：not_found event 視為終態錯誤事件', () async {
+    final events = await parseTripRequestEventStream(
+      Stream.value('data: {"error":"not_found"}\n\n'),
+    ).toList();
+
+    expect(events.single.error, 'not_found');
+    expect(events.single.status, isNull);
+    expect(events.single.isTerminal, isTrue);
+  });
+
   test('fetchRequest：401 → ApiError(401)', () async {
     dioAdapter.onGet(
       '/requests/7',

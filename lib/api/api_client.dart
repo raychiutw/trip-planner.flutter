@@ -1,6 +1,7 @@
 /// dio 封裝：cookie 認證、CSRF Origin、錯誤轉換、429 retry、204 處理。
 library;
 
+import 'dart:convert';
 import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
@@ -169,6 +170,11 @@ class ApiClient {
       if (!_isOfflineError(e) || !yieldedStale) rethrow;
     }
   }
+
+  /// Authenticated streaming GET for text-based long-lived responses such as
+  /// `text/event-stream`. This intentionally bypasses cache/SWR handling.
+  Stream<String> getTextStream(String path, {Map<String, dynamic>? query}) =>
+      _getTextStream(path, query: query);
 
   /// 寫入:線上直送(成功即依失效表 evict);離線且帶 [optimistic] → 入持久化佇列
   /// + 對 op.cacheKey 套樂觀 patch + 回 null(樂觀成功)。無 optimistic 或非離線 → rethrow。
@@ -548,6 +554,63 @@ class ApiClient {
       await _evictForMutation(method, path, body);
     }
     return isEmpty ? null : responseData;
+  }
+
+  Stream<String> _getTextStream(
+    String path, {
+    Map<String, dynamic>? query,
+    bool isRetryAttempt = false,
+  }) async* {
+    final auth = await _authHeadersFor('GET');
+    final response = await _dio.request<ResponseBody>(
+      path,
+      queryParameters: query,
+      options: Options(
+        method: 'GET',
+        responseType: ResponseType.stream,
+        headers: {...auth.headers, Headers.acceptHeader: 'text/event-stream'},
+      ),
+    );
+
+    final statusCode = response.statusCode ?? 0;
+    if (statusCode == 429 && !isRetryAttempt) {
+      final waitSeconds = parseRetryAfterSeconds(
+        response.headers.value('retry-after'),
+      );
+      await response.data?.stream.drain<void>();
+      await Future<void>.delayed(Duration(seconds: waitSeconds));
+      yield* _getTextStream(path, query: query, isRetryAttempt: true);
+      return;
+    }
+    if (statusCode == 401 &&
+        auth.useBearer &&
+        !isRetryAttempt &&
+        _bearerSource != null &&
+        await _bearerSource.refresh()) {
+      await response.data?.stream.drain<void>();
+      yield* _getTextStream(path, query: query, isRetryAttempt: true);
+      return;
+    }
+    if (statusCode < 200 || statusCode >= 300) {
+      final body = await _decodeStreamBody(response.data);
+      throw ApiError.fromResponse(statusCode, body);
+    }
+
+    final body = response.data;
+    if (body == null) return;
+    yield* body.stream.cast<List<int>>().transform(utf8.decoder);
+  }
+
+  Future<Object?> _decodeStreamBody(ResponseBody? body) async {
+    final text =
+        await body?.stream.cast<List<int>>().transform(utf8.decoder).join() ??
+        '';
+    if (text.isEmpty) return null;
+    try {
+      return jsonDecode(text);
+    } on FormatException {
+      return text;
+    }
   }
 
   /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
