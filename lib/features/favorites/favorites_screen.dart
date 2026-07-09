@@ -17,6 +17,16 @@ const _typeFilterOptions = [
   _TypeFilterOption(key: 'hotel', label: '住宿'),
 ];
 
+final _regionRules = [
+  MapEntry(RegExp('沖縄|沖繩', caseSensitive: false), '沖繩'),
+  MapEntry(RegExp('京都'), '京都'),
+  MapEntry(RegExp('大阪'), '大阪'),
+  MapEntry(RegExp('東京'), '東京'),
+  MapEntry(RegExp('釜山|부산', caseSensitive: false), '釜山'),
+  MapEntry(RegExp('首爾|서울', caseSensitive: false), '首爾'),
+  MapEntry(RegExp('台北', caseSensitive: false), '台北'),
+];
+
 /// 收藏清單（5-tab「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
 class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
@@ -29,6 +39,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _typeFilter = 'all';
+  String _regionFilter = 'all';
 
   @override
   void dispose() {
@@ -71,7 +82,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       favorites,
       _searchQuery,
       _typeFilter,
+      _regionFilter,
     );
+    final regionCounts = _regionCountsFor(favorites);
+    final regionOptions = _regionOptionsFor(regionCounts);
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -83,6 +97,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
         ),
         const SizedBox(height: TpSpacing.s3),
+        if (regionOptions.length >= 2) ...[
+          _RegionFilterRow(
+            selected: _regionFilter,
+            counts: regionCounts,
+            options: regionOptions,
+            onSelected: (value) => setState(() => _regionFilter = value),
+          ),
+          const SizedBox(height: TpSpacing.s3),
+        ],
         _TypeFilterRow(
           selected: _typeFilter,
           onSelected: (value) => setState(() => _typeFilter = value),
@@ -119,6 +142,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     setState(() {
       _searchQuery = '';
       _typeFilter = 'all';
+      _regionFilter = 'all';
     });
   }
 
@@ -162,12 +186,17 @@ List<PoiFavorite> _filterFavorites(
   List<PoiFavorite> favorites,
   String rawQuery,
   String typeFilter,
+  String regionFilter,
 ) {
   final query = rawQuery.trim().toLowerCase();
 
   return favorites.where((favorite) {
     if (typeFilter != 'all' &&
         mapGooglePrimaryTypeToPoiType(favorite.poiType) != typeFilter) {
+      return false;
+    }
+    if (regionFilter != 'all' &&
+        _deriveRegion(favorite.poiAddress) != regionFilter) {
       return false;
     }
     if (query.isEmpty) return true;
@@ -179,6 +208,33 @@ List<PoiFavorite> _filterFavorites(
     ].whereType<String>().join(' ').toLowerCase();
     return haystack.contains(query);
   }).toList();
+}
+
+Map<String, int> _regionCountsFor(List<PoiFavorite> favorites) {
+  final counts = <String, int>{'all': favorites.length};
+  for (final favorite in favorites) {
+    final region = _deriveRegion(favorite.poiAddress);
+    counts[region] = (counts[region] ?? 0) + 1;
+  }
+  return counts;
+}
+
+List<String> _regionOptionsFor(Map<String, int> counts) {
+  final options = counts.keys.where((key) => key != 'all').toList();
+  options.sort((a, b) {
+    final byCount = (counts[b] ?? 0).compareTo(counts[a] ?? 0);
+    if (byCount != 0) return byCount;
+    return a.compareTo(b);
+  });
+  return options;
+}
+
+String _deriveRegion(String? address) {
+  if (address == null || address.isEmpty) return '其他';
+  for (final rule in _regionRules) {
+    if (rule.key.hasMatch(address)) return rule.value;
+  }
+  return '其他';
 }
 
 class _TypeFilterOption {
@@ -242,6 +298,43 @@ class _TypeFilterRow extends StatelessWidget {
             label: Text(option.label),
             selected: selected == option.key,
             onSelected: (_) => onSelected(option.key),
+          ),
+      ],
+    );
+  }
+}
+
+class _RegionFilterRow extends StatelessWidget {
+  const _RegionFilterRow({
+    required this.selected,
+    required this.counts,
+    required this.options,
+    required this.onSelected,
+  });
+
+  final String selected;
+  final Map<String, int> counts;
+  final List<String> options;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: TpSpacing.s2,
+      runSpacing: TpSpacing.s2,
+      children: [
+        FilterChip(
+          key: const ValueKey('favorites-region-all'),
+          label: Text('全部 ${counts['all'] ?? 0}'),
+          selected: selected == 'all',
+          onSelected: (_) => onSelected('all'),
+        ),
+        for (final region in options)
+          FilterChip(
+            key: ValueKey('favorites-region-$region'),
+            label: Text('$region ${counts[region] ?? 0}'),
+            selected: selected == region,
+            onSelected: (_) => onSelected(region),
           ),
       ],
     );
