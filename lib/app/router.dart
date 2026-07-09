@@ -24,6 +24,7 @@ import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/trip_detail/entry_edit_route_screen.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
 import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
@@ -133,6 +134,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trip/:tripId/stop/:entryId/map',
         redirect: (context, state) => _tripAlias(state, '/map'),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId/edit',
+        redirect: (context, state) {
+          final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+          final entryId = Uri.encodeComponent(state.pathParameters['entryId']!);
+          return '/trips/$tripId/entries/$entryId/edit';
+        },
+      ),
+      GoRoute(
+        path: '/trip/:tripId/stop/:entryId/change-poi',
+        redirect: (context, state) {
+          final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+          final entryId = Uri.encodeComponent(state.pathParameters['entryId']!);
+          return '/trips/$tripId/entries/$entryId/pois';
+        },
       ),
       GoRoute(
         path: '/trip/:tripId/notes',
@@ -279,6 +296,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         path: 'health',
                         builder: (context, state) => TripHealthScreen(
                           tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'entries/:eid/edit',
+                        builder: (context, state) => EntryEditRouteScreen(
+                          tripId: state.pathParameters['tripId']!,
+                          entryId: int.parse(state.pathParameters['eid']!),
                         ),
                       ),
                       GoRoute(

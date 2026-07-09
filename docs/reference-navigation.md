@@ -19,6 +19,8 @@
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
+| `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
+| `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由 |
 | `/map` | `GlobalMapScreen` | tab 3 |
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |
@@ -36,6 +38,8 @@
 | `/developer/apps/new` | `DeveloperAppNewScreen` | shell 外 web 相容 alias |
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
+
+Web 相容 alias：`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/stop/:entryId/edit` 會導到停留點編輯頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到地點管理頁。
 
 shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
 

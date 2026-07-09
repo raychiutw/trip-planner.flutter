@@ -21,12 +21,15 @@ import 'package:tripline/features/favorites/explore/explore_screen.dart';
 import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
+import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
+import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/trip.dart';
@@ -55,6 +58,8 @@ const _loggedInUser = UserInfo(
   displayName: 'Ray',
 );
 
+const _entry = TimelineEntry(id: 11, sortOrder: 0, title: '首里城', version: 2);
+
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
@@ -74,6 +79,12 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   when(() => mockTripRepository.watchDays(any())).thenAnswer(
     (_) => Stream.value(const [TripDay(id: 1, dayNum: 1, version: 0)]),
   );
+  when(
+    () => mockTripRepository.watchEntry(
+      tripId: any(named: 'tripId'),
+      entryId: any(named: 'entryId'),
+    ),
+  ).thenAnswer((_) => Stream.value(_entry));
   when(
     () => mockTripRepository.fetchNotes(any()),
   ).thenAnswer((_) async => const TripNotes());
@@ -353,6 +364,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可進入 entry edit/change-poi web aliases', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trip/trip-1/stop/11/edit');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/trip/trip-1/stop/11/change-poi');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryPoiScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
