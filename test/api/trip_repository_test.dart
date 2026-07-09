@@ -1538,6 +1538,24 @@ void main() {
     );
   });
 
+  test('addEntryAlternate：POST /alternates with existing poiId', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/entries/11/alternates',
+      (server) => server.reply(201, {'entryId': 11, 'poiId': 501}),
+      data: {'poiId': 501, 'entryPoisVersion': '4'},
+    );
+
+    await expectLater(
+      tripRepository.addEntryAlternate(
+        tripId: 'okinawa',
+        entryId: 11,
+        poiId: 501,
+        entryPoisVersion: '4',
+      ),
+      completes,
+    );
+  });
+
   test('addEntryTripPoi：POST /trip-pois per-POI reservation fields', () async {
     dioAdapter.onPost(
       '/trips/okinawa/entries/11/trip-pois',

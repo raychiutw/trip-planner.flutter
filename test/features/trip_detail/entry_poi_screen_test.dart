@@ -2,20 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart';
+import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
 class _MockPoiRepository extends Mock implements PoiRepository {}
+
+class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
 const _entry = TimelineEntry(
   id: 11,
@@ -36,10 +41,21 @@ const _entry = TimelineEntry(
   ],
 );
 
+const _favorite = PoiFavorite(
+  id: 7,
+  userId: 'u1',
+  poiId: 701,
+  favoritedAt: '2026-07-09T00:00:00Z',
+  poiName: '波上宮',
+  poiAddress: '那霸市若狹',
+  poiType: 'attraction',
+);
+
 Future<void> _pump(
   WidgetTester tester,
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
+  _MockFavoritesRepository? favoritesRepo,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -53,6 +69,8 @@ Future<void> _pump(
           't1',
         ).overrideWith((ref) => Stream.value(const <TripDay>[])),
         if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
+        if (favoritesRepo != null)
+          favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
@@ -202,6 +220,39 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('加入備選 → 收藏選結果 → addEntryAlternate(poiId)', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    when(
+      () => repo.addEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      favoritesRepo.fetchFavorites,
+    ).thenAnswer((_) async => const [_favorite]);
+    await _pump(tester, repo, favoritesRepo: favoritesRepo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-favorites')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-favorite-7')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryAlternate(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 701,
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+  });
+
   testWidgets('置換正選 → 搜尋選結果 → changeEntryPoi', (tester) async {
     final repo = _MockTripRepository();
     final poiRepo = _MockPoiRepository();
@@ -241,6 +292,39 @@ void main() {
         tripId: 't1',
         entryId: 11,
         poi: any(named: 'poi'),
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('置換正選 → 收藏選結果 → changeEntryPoi(poiId)', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    when(
+      () => repo.changeEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async => 701);
+    when(
+      favoritesRepo.fetchFavorites,
+    ).thenAnswer((_) async => const [_favorite]);
+    await _pump(tester, repo, favoritesRepo: favoritesRepo);
+
+    await tester.tap(find.byKey(const ValueKey('change-master')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-favorites')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-favorite-7')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.changeEntryPoi(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 701,
         entryPoisVersion: '4',
       ),
     ).called(1);

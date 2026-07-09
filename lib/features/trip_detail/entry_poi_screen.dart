@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/entry.dart';
+import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
+import '../favorites/favorites_providers.dart';
 import 'trip_providers.dart';
 
 /// 地點管理全頁：正選切換、備選增刪、per-POI 備註/分類/訂位。
@@ -212,7 +214,7 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showModalBottomSheet<PoiSearchResult>(
+    final selected = await showModalBottomSheet<_EntryPoiPick>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => Padding(
@@ -231,7 +233,8 @@ class EntryPoiScreen extends ConsumerWidget {
           .addEntryAlternate(
             tripId: tripId,
             entryId: entryId,
-            poi: selected,
+            poiId: selected.poiId,
+            poi: selected.poi,
             entryPoisVersion: entry.entryPoisVersion,
           ),
       success: '已加入備選',
@@ -243,7 +246,7 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showModalBottomSheet<PoiSearchResult>(
+    final selected = await showModalBottomSheet<_EntryPoiPick>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => Padding(
@@ -260,11 +263,21 @@ class EntryPoiScreen extends ConsumerWidget {
           .changeEntryPoi(
             tripId: tripId,
             entryId: entryId,
-            poi: selected,
+            poiId: selected.poiId,
+            poi: selected.poi,
             entryPoisVersion: entry.entryPoisVersion,
           );
     }, success: '已置換正選');
   }
+}
+
+class _EntryPoiPick {
+  const _EntryPoiPick.search(this.poi) : poiId = null;
+
+  const _EntryPoiPick.favorite(this.poiId) : poi = null;
+
+  final PoiSearchResult? poi;
+  final int? poiId;
 }
 
 /// 正選/備選共用卡：名稱 + 分類 label + 評分 + 備註/訂位 + 尾端操作。
@@ -443,10 +456,17 @@ class _AlternateSearchSheet extends ConsumerStatefulWidget {
       _AlternateSearchSheetState();
 }
 
+enum _PoiPickerTab { search, favorites }
+
 class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   final _ctrl = TextEditingController();
+  _PoiPickerTab _tab = _PoiPickerTab.search;
   List<PoiSearchResult> _results = const [];
+  List<PoiFavorite> _favorites = const [];
   bool _searching = false;
+  bool _favoritesLoaded = false;
+  bool _favoritesLoading = false;
+  String? _favoritesError;
 
   @override
   void dispose() {
@@ -471,6 +491,62 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
     }
   }
 
+  Future<void> _selectTab(_PoiPickerTab tab) async {
+    if (_tab != tab) {
+      setState(() => _tab = tab);
+    }
+    if (tab == _PoiPickerTab.favorites &&
+        !_favoritesLoaded &&
+        !_favoritesLoading) {
+      await _loadFavorites();
+    }
+  }
+
+  Future<void> _loadFavorites() async {
+    setState(() {
+      _favoritesLoading = true;
+      _favoritesError = null;
+    });
+    try {
+      final favorites = await ref
+          .read(favoritesRepositoryProvider)
+          .fetchFavorites();
+      if (!mounted) return;
+      setState(() {
+        _favorites = favorites;
+        _favoritesLoaded = true;
+        _favoritesLoading = false;
+      });
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _favoritesLoading = false;
+        _favoritesError = '載入收藏失敗，請稍後再試';
+      });
+    }
+  }
+
+  Widget _tabButton({
+    required _PoiPickerTab tab,
+    required String label,
+    required Key key,
+  }) {
+    final selected = _tab == tab;
+    return Expanded(
+      child: selected
+          ? FilledButton(
+              key: key,
+              onPressed: () => _selectTab(tab),
+              child: Text(label),
+            )
+          : OutlinedButton(
+              key: key,
+              onPressed: () => _selectTab(tab),
+              child: Text(label),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -481,40 +557,98 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('alt-search-field'),
-                    controller: _ctrl,
-                    autofocus: true,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _search(),
-                    decoration: InputDecoration(hintText: widget.hintText),
-                  ),
+                _tabButton(
+                  tab: _PoiPickerTab.search,
+                  label: '搜尋',
+                  key: const ValueKey('poi-picker-tab-search'),
                 ),
                 const SizedBox(width: TpSpacing.s2),
-                FilledButton(
-                  key: const ValueKey('alt-search-button'),
-                  onPressed: _searching ? null : _search,
-                  child: Text(_searching ? '搜尋中…' : '搜尋'),
+                _tabButton(
+                  tab: _PoiPickerTab.favorites,
+                  label: '收藏',
+                  key: const ValueKey('poi-picker-tab-favorites'),
                 ),
               ],
             ),
             const SizedBox(height: TpSpacing.s3),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: ListView(
-                shrinkWrap: true,
+            if (_tab == _PoiPickerTab.search) ...[
+              Row(
                 children: [
-                  for (final poi in _results)
-                    ListTile(
-                      key: ValueKey('alt-result-${poi.placeId}'),
-                      title: Text(poi.name),
-                      subtitle: poi.address == null ? null : Text(poi.address!),
-                      onTap: () => Navigator.of(context).pop(poi),
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('alt-search-field'),
+                      controller: _ctrl,
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _search(),
+                      decoration: InputDecoration(hintText: widget.hintText),
                     ),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                  FilledButton(
+                    key: const ValueKey('alt-search-button'),
+                    onPressed: _searching ? null : _search,
+                    child: Text(_searching ? '搜尋中…' : '搜尋'),
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: TpSpacing.s3),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final poi in _results)
+                      ListTile(
+                        key: ValueKey('alt-result-${poi.placeId}'),
+                        title: Text(poi.name),
+                        subtitle: poi.address == null
+                            ? null
+                            : Text(poi.address!),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).pop(_EntryPoiPick.search(poi)),
+                      ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              if (_favoritesLoading)
+                const Padding(
+                  padding: EdgeInsets.all(TpSpacing.s4),
+                  child: CircularProgressIndicator(),
+                )
+              else if (_favoritesError != null)
+                Padding(
+                  padding: const EdgeInsets.all(TpSpacing.s4),
+                  child: Text(_favoritesError!),
+                )
+              else if (_favoritesLoaded && _favorites.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(TpSpacing.s4),
+                  child: Text('還沒有收藏景點'),
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final favorite in _favorites)
+                        ListTile(
+                          key: ValueKey('poi-picker-favorite-${favorite.id}'),
+                          title: Text(favorite.displayName),
+                          subtitle: favorite.poiAddress == null
+                              ? null
+                              : Text(favorite.poiAddress!),
+                          onTap: () => Navigator.of(
+                            context,
+                          ).pop(_EntryPoiPick.favorite(favorite.poiId)),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
           ],
         ),
       ),

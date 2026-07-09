@@ -732,26 +732,32 @@ class TripRepository {
     return (map['poiId'] as num).toInt();
   }
 
-  /// POST /trips/:id/entries/:eid/alternates（find-or-create 變體;POI 分類欄用 `type`）。
+  /// POST /trips/:id/entries/:eid/alternates（既有 poiId 或 find-or-create 變體;POI 分類欄用 `type`）。
   Future<void> addEntryAlternate({
     required String tripId,
     required int entryId,
-    required PoiSearchResult poi,
+    int? poiId,
+    PoiSearchResult? poi,
     String? entryPoisVersion,
   }) {
+    if ((poiId == null) == (poi == null)) {
+      throw ArgumentError('Provide exactly one of poiId or poi');
+    }
+    final payload = poiId != null
+        ? {'poiId': poiId}
+        : {
+            'name': poi!.name,
+            'lat': poi.lat,
+            'lng': poi.lng,
+            'type': mapGooglePrimaryTypeToPoiType(poi.category),
+            'category': poi.category,
+            'address': poi.address,
+            'rating': poi.rating,
+            'source': 'search',
+          };
     return _client.post(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/alternates',
-      body: {
-        'name': poi.name,
-        'lat': poi.lat,
-        'lng': poi.lng,
-        'type': mapGooglePrimaryTypeToPoiType(poi.category),
-        'category': poi.category,
-        'address': poi.address,
-        'rating': poi.rating,
-        'source': 'search',
-        'entryPoisVersion': ?entryPoisVersion,
-      },
+      body: {...payload, 'entryPoisVersion': ?entryPoisVersion},
     );
   }
 
