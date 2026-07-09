@@ -13,15 +13,19 @@ import '../../theme/tokens.dart';
 import '../favorites/favorites_providers.dart';
 import 'map_adapter.dart';
 import 'map_layer_menu.dart';
+import 'map_location.dart';
 
 bool _hasCoords(PoiFavorite f) =>
     f.poiLat != null && f.poiLng != null && f.poiLat != 0 && f.poiLng != 0;
 
 class GlobalMapScreen extends ConsumerStatefulWidget {
-  const GlobalMapScreen({super.key, this.tileProvider});
+  const GlobalMapScreen({super.key, this.tileProvider, this.locationService});
 
   /// 測試注入(避免抓真 tile);prod 為 null → 走網路 OSM。
   final TripMapTileProvider? tileProvider;
+
+  /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
+  final TripMapLocationService? locationService;
 
   @override
   ConsumerState<GlobalMapScreen> createState() => _GlobalMapScreenState();
@@ -30,6 +34,8 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   final FlutterTripMapController _mapController = FlutterTripMapController();
   TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
+  TripMapPoint? _userLocation;
+  bool _locating = false;
   int? _selectedId;
 
   @override
@@ -72,6 +78,15 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
                   keyPrefix: 'global-map',
                   selectedPreset: _tilePreset,
                   onSelected: (preset) => setState(() => _tilePreset = preset),
+                ),
+              ),
+              Positioned(
+                top: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
+                right: TpSpacing.s4,
+                child: TripMapLocateButton(
+                  key: const ValueKey('global-map-locate-button'),
+                  locating: _locating,
+                  onPressed: _locateMe,
                 ),
               ),
               if (selected != null)
@@ -125,8 +140,43 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
               ),
             ),
           ),
+        if (_userLocation != null)
+          buildTripMapUserLocationMarker(
+            point: _userLocation!,
+            key: const ValueKey('global-map-user-location'),
+          ),
       ],
     );
+  }
+
+  Future<void> _locateMe() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final service =
+          widget.locationService ?? const GeolocatorTripMapLocationService();
+      final point = await service.currentLocation();
+      if (!mounted) return;
+      setState(() {
+        _userLocation = point;
+        _selectedId = null;
+      });
+      _mapController.move(point, 15);
+    } on TripMapLocationException catch (error) {
+      if (!mounted) return;
+      _showLocationError(error.message);
+    } on Exception {
+      if (!mounted) return;
+      _showLocationError('無法取得目前位置');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _showLocationError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

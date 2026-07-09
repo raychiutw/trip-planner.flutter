@@ -6,6 +6,7 @@ import '../../models/entry.dart';
 import '../../theme/tokens.dart';
 import '../map/map_adapter.dart';
 import '../map/map_layer_menu.dart';
+import '../map/map_location.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -29,6 +30,7 @@ class TripMapScreen extends ConsumerWidget {
     required this.tripId,
     this.initialEntryId,
     this.tileProvider,
+    this.locationService,
   });
 
   final String tripId;
@@ -38,6 +40,9 @@ class TripMapScreen extends ConsumerWidget {
 
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
   final TripMapTileProvider? tileProvider;
+
+  /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
+  final TripMapLocationService? locationService;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,6 +61,7 @@ class TripMapScreen extends ConsumerWidget {
           days: days,
           initialEntryId: initialEntryId,
           tileProvider: tileProvider,
+          locationService: locationService,
         ),
       ),
     );
@@ -88,11 +94,13 @@ class _TripMapView extends StatefulWidget {
     required this.days,
     this.initialEntryId,
     this.tileProvider,
+    this.locationService,
   });
 
   final List<TripDay> days;
   final int? initialEntryId;
   final TripMapTileProvider? tileProvider;
+  final TripMapLocationService? locationService;
 
   @override
   State<_TripMapView> createState() => _TripMapViewState();
@@ -101,6 +109,8 @@ class _TripMapView extends StatefulWidget {
 class _TripMapViewState extends State<_TripMapView> {
   final FlutterTripMapController _mapController = FlutterTripMapController();
   TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
+  TripMapPoint? _userLocation;
+  bool _locating = false;
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
@@ -212,6 +222,33 @@ class _TripMapViewState extends State<_TripMapView> {
   void _focusPin(_DayPin pin) {
     if (!_mapIsReady) return;
     _mapController.move(pin.point, 16);
+  }
+
+  Future<void> _locateMe() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final service =
+          widget.locationService ?? const GeolocatorTripMapLocationService();
+      final point = await service.currentLocation();
+      if (!mounted) return;
+      setState(() => _userLocation = point);
+      _mapController.move(point, 15);
+    } on TripMapLocationException catch (error) {
+      if (!mounted) return;
+      _showLocationError(error.message);
+    } on Exception {
+      if (!mounted) return;
+      _showLocationError('無法取得目前位置');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _showLocationError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _handleMapReady() {
@@ -336,7 +373,14 @@ class _TripMapViewState extends State<_TripMapView> {
             initialMaxZoom: 16,
             tileProvider: widget.tileProvider,
             onMapReady: _handleMapReady,
-            markers: [for (final pin in visiblePins) _buildMarker(pin)],
+            markers: [
+              for (final pin in visiblePins) _buildMarker(pin),
+              if (_userLocation != null)
+                buildTripMapUserLocationMarker(
+                  point: _userLocation!,
+                  key: const ValueKey('trip-map-user-location'),
+                ),
+            ],
           ),
         ),
         Positioned(
@@ -346,6 +390,15 @@ class _TripMapViewState extends State<_TripMapView> {
             keyPrefix: 'trip-map',
             selectedPreset: _tilePreset,
             onSelected: (preset) => setState(() => _tilePreset = preset),
+          ),
+        ),
+        Positioned(
+          top: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
+          right: TpSpacing.s4,
+          child: TripMapLocateButton(
+            key: const ValueKey('trip-map-locate-button'),
+            locating: _locating,
+            onPressed: _locateMe,
           ),
         ),
       ],

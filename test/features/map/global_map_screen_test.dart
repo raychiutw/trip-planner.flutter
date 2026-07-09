@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/map/map_adapter.dart';
+import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -12,6 +13,16 @@ class _TransparentTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
       MemoryImage(TileProvider.transparentImage);
+}
+
+class _FakeLocationService implements TripMapLocationService {
+  int calls = 0;
+
+  @override
+  Future<TripMapPoint> currentLocation() async {
+    calls++;
+    return const TripMapPoint(26.215, 127.72);
+  }
 }
 
 const _withCoords = PoiFavorite(
@@ -35,12 +46,18 @@ const _noCoords = PoiFavorite(
 );
 
 void main() {
-  Widget buildApp(List<PoiFavorite> favs) {
+  Widget buildApp(
+    List<PoiFavorite> favs, {
+    TripMapLocationService? locationService,
+  }) {
     return ProviderScope(
       overrides: [favoritesProvider.overrideWith((ref) => Stream.value(favs))],
       child: MaterialApp(
         theme: AppTheme.light(),
-        home: GlobalMapScreen(tileProvider: _TransparentTileProvider()),
+        home: GlobalMapScreen(
+          tileProvider: _TransparentTileProvider(),
+          locationService: locationService,
+        ),
       ),
     );
   }
@@ -85,6 +102,23 @@ void main() {
 
     expect(tileUrl(tester), kTripMapTilePresets[2].urlTemplate);
     expect(find.text('衛星'), findsOneWidget);
+  });
+
+  testWidgets('定位按鈕：取得目前位置後顯示 user marker', (tester) async {
+    final locationService = _FakeLocationService();
+    await tester.pumpWidget(
+      buildApp(const [_withCoords], locationService: locationService),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('global-map-locate-button')));
+    await tester.pumpAndSettle();
+
+    expect(locationService.calls, 1);
+    expect(
+      find.byKey(const ValueKey('global-map-user-location')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('無可顯示座標 → 提示', (tester) async {

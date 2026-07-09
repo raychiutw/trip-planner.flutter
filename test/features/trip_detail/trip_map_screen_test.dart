@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tripline/features/map/map_adapter.dart';
+import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
@@ -15,6 +16,16 @@ class _TransparentTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
       MemoryImage(TileProvider.transparentImage);
+}
+
+class _FakeLocationService implements TripMapLocationService {
+  int calls = 0;
+
+  @override
+  Future<TripMapPoint> currentLocation() async {
+    calls++;
+    return const TripMapPoint(26.215, 127.72);
+  }
 }
 
 TimelineEntry _entry({
@@ -65,7 +76,11 @@ final _dayTwo = TripDay(
   ],
 );
 
-Widget _buildScreen(List<TripDay> days, {int? initialEntryId}) {
+Widget _buildScreen(
+  List<TripDay> days, {
+  int? initialEntryId,
+  TripMapLocationService? locationService,
+}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -74,6 +89,7 @@ Widget _buildScreen(List<TripDay> days, {int? initialEntryId}) {
           tripId: 'trip-1',
           initialEntryId: initialEntryId,
           tileProvider: _TransparentTileProvider(),
+          locationService: locationService,
         ),
       ),
     ],
@@ -172,6 +188,23 @@ void main() {
 
     expect(_tileUrl(tester), kTripMapTilePresets[2].urlTemplate);
     expect(find.text('衛星'), findsOneWidget);
+  });
+
+  testWidgets('定位按鈕：取得目前位置後顯示 user marker', (tester) async {
+    final locationService = _FakeLocationService();
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], locationService: locationService),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-locate-button')));
+    await tester.pumpAndSettle();
+
+    expect(locationService.calls, 1);
+    expect(
+      find.byKey(const ValueKey('trip-map-user-location')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {
