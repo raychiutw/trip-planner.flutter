@@ -158,6 +158,63 @@ void main() {
         dayNum: 2,
         title: '自由活動',
         description: any(named: 'description'),
+        poiType: 'attraction',
+        lat: null,
+        lng: null,
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: 'custom',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('新增模式：可帶 POI 分類與座標建立自訂停留點', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _open(tester, repo, const EntryEditNew(2));
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '日落觀景點',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lat')),
+      '26.21',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lng')),
+      '127.68',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-poi-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('活動').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 't1',
+        dayNum: 2,
+        title: '日落觀景點',
+        description: any(named: 'description'),
+        poiType: 'activity',
+        lat: 26.21,
+        lng: 127.68,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',

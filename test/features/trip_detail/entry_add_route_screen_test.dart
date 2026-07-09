@@ -145,6 +145,8 @@ void main() {
       '自由活動',
     );
     await tester.pump();
+    await tester.ensureVisible(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
 
@@ -154,6 +156,9 @@ void main() {
         dayNum: 2,
         title: '自由活動',
         description: any(named: 'description'),
+        poiType: 'attraction',
+        lat: null,
+        lng: null,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',
@@ -189,6 +194,8 @@ void main() {
       '晚餐',
     );
     await tester.pump();
+    await tester.ensureVisible(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
 
@@ -198,6 +205,9 @@ void main() {
         dayNum: 2,
         title: '晚餐',
         description: any(named: 'description'),
+        poiType: 'attraction',
+        lat: null,
+        lng: null,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: 'custom',
