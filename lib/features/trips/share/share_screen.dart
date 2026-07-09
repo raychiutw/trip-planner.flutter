@@ -155,6 +155,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       share.id,
       label: next.label,
       visibleSections: next.visibleSections,
+      expiresAt: next.expiresAt,
+      clearExpiresAt: next.clearExpiresAt,
       anonymous: next.anonymous,
     );
   }
@@ -442,11 +444,15 @@ class _ShareEditSettings {
   const _ShareEditSettings({
     required this.label,
     required this.visibleSections,
+    required this.expiresAt,
+    required this.clearExpiresAt,
     required this.anonymous,
   });
 
   final String label;
   final List<String> visibleSections;
+  final int? expiresAt;
+  final bool clearExpiresAt;
   final bool anonymous;
 }
 
@@ -462,6 +468,8 @@ class _EditShareDialog extends StatefulWidget {
 class _EditShareDialogState extends State<_EditShareDialog> {
   late final TextEditingController _label;
   late final Set<String> _sections;
+  late String _expiryKey;
+  DateTime? _customExpiryDate;
   late bool _anonymous;
 
   @override
@@ -469,6 +477,10 @@ class _EditShareDialogState extends State<_EditShareDialog> {
     super.initState();
     _label = TextEditingController(text: widget.share.label);
     _sections = widget.share.visibleSections.toSet();
+    _expiryKey = widget.share.expiresAt == null ? 'never' : 'custom';
+    _customExpiryDate = widget.share.expiresAt == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(widget.share.expiresAt!);
     _anonymous = widget.share.anonymous;
   }
 
@@ -481,6 +493,36 @@ class _EditShareDialogState extends State<_EditShareDialog> {
   List<String> get _visibleSections =>
       _shareSectionOrder.where(_sections.contains).toList();
 
+  int? get _expiresAt {
+    if (_expiryKey == 'custom') {
+      final date = _customExpiryDate;
+      return date == null
+          ? null
+          : DateTime(
+              date.year,
+              date.month,
+              date.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch;
+    }
+    final duration = _expiryPresets[_expiryKey];
+    return duration == null
+        ? null
+        : DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds;
+  }
+
+  bool get _clearExpiresAt =>
+      _expiryKey == 'never' && widget.share.expiresAt != null;
+
+  String get _customExpiryLabel {
+    final date = _customExpiryDate;
+    return date == null
+        ? '選擇日期'
+        : '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}';
+  }
+
   void _toggleSection(String key, bool selected) {
     setState(() {
       if (selected) {
@@ -489,6 +531,18 @@ class _EditShareDialogState extends State<_EditShareDialog> {
         _sections.remove(key);
       }
     });
+  }
+
+  Future<void> _pickCustomExpiryDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _customExpiryDate ?? now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5, 12, 31),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _customExpiryDate = selected);
   }
 
   @override
@@ -527,6 +581,37 @@ class _EditShareDialogState extends State<_EditShareDialog> {
                   ),
               ],
             ),
+            const SizedBox(height: TpSpacing.s2),
+            Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: TpSpacing.s1),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<String>(
+                showSelectedIcon: false,
+                selected: {_expiryKey},
+                onSelectionChanged: (next) =>
+                    setState(() => _expiryKey = next.single),
+                segments: [
+                  for (final key in _expiryPresets.keys)
+                    ButtonSegment(
+                      value: key,
+                      label: Text(
+                        _expiryLabels[key] ?? key,
+                        key: ValueKey('share-edit-expiry-$key'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (_expiryKey == 'custom') ...[
+              const SizedBox(height: TpSpacing.s2),
+              OutlinedButton.icon(
+                key: const ValueKey('share-edit-custom-expiry-date'),
+                onPressed: _pickCustomExpiryDate,
+                icon: const Icon(Icons.event_outlined, size: 18),
+                label: Text(_customExpiryLabel),
+              ),
+            ],
             CheckboxListTile(
               key: const ValueKey('share-edit-anonymous'),
               value: _anonymous,
@@ -550,6 +635,8 @@ class _EditShareDialogState extends State<_EditShareDialog> {
             _ShareEditSettings(
               label: _label.text,
               visibleSections: _visibleSections,
+              expiresAt: _expiresAt,
+              clearExpiresAt: _clearExpiresAt,
               anonymous: _anonymous,
             ),
           ),

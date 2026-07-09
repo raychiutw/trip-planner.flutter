@@ -307,6 +307,52 @@ void main() {
     expect(sections, ['flights', 'lodgings', 'reservations']);
   });
 
+  testWidgets('編輯期限 → 7 天 preset 送 expiresAt', (tester) async {
+    when(
+      () => repo.updateShare(
+        any(),
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        expiresAt: any(named: 'expiresAt'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer((_) async {});
+
+    final before = DateTime.now().millisecondsSinceEpoch;
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-expiry-7d')));
+    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pumpAndSettle();
+    final after = DateTime.now().millisecondsSinceEpoch;
+
+    final expiresAt =
+        verify(
+              () => repo.updateShare(
+                't',
+                1,
+                label: '給爸媽',
+                visibleSections: any(named: 'visibleSections'),
+                expiresAt: captureAny(named: 'expiresAt'),
+                anonymous: false,
+              ),
+            ).captured.single
+            as int;
+    expect(
+      expiresAt,
+      greaterThanOrEqualTo(
+        before + const Duration(days: 7).inMilliseconds - 1000,
+      ),
+    );
+    expect(
+      expiresAt,
+      lessThanOrEqualTo(after + const Duration(days: 7).inMilliseconds + 1000),
+    );
+  });
+
   testWidgets('重新產生連結 → 顯示新的完整 URL', (tester) async {
     when(() => repo.rotateShare(any(), any())).thenAnswer(
       (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),
