@@ -72,6 +72,26 @@ void main() {
     expect(publishedTrips.single.published, isTrue);
   });
 
+  test('fetchTrips(all:true)：GET /trips?all=1', () async {
+    dioAdapter.onGet(
+      '/trips',
+      (server) => server.reply(200, [
+        {
+          'tripId': 'draft-trip',
+          'name': 'Draft',
+          'owner': 'Ray',
+          'published': 0,
+        },
+      ]),
+      queryParameters: {'all': '1'},
+    );
+
+    final allTrips = await tripRepository.fetchTrips(all: true);
+
+    expect(allTrips.single.id, 'draft-trip');
+    expect(allTrips.single.published, isFalse);
+  });
+
   test('fetchTrip：GET /trips/:id 解析 Trip detail（含 destinations）', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray',
@@ -400,6 +420,30 @@ void main() {
     final kokusaiStreetEntry = firstDay.timeline.last;
     expect(kokusaiStreetEntry.master, isNull);
     expect(kokusaiStreetEntry.alternates, isEmpty);
+  });
+
+  test('fetchDaySummaries：GET /trips/:id/days 不帶 all query', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa-trip-2026-Ray/days',
+      (server) => server.reply(200, [
+        {
+          'id': 11,
+          'day_num': 1,
+          'date': '2026-04-23',
+          'day_of_week': '四',
+          'label': 'Day 1',
+          'title': '抵達那霸',
+        },
+      ]),
+    );
+
+    final days = await tripRepository.fetchDaySummaries(
+      'okinawa-trip-2026-Ray',
+    );
+
+    expect(days.single.dayNum, 1);
+    expect(days.single.displayTitle, '抵達那霸');
+    expect(days.single.timeline, isEmpty);
   });
 
   test('createDay：POST /trips/:id/days position/date 回傳 day', () async {

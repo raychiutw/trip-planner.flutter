@@ -149,9 +149,11 @@ class TripRepository {
     );
   }
 
-  /// GET /trips（published 行程清單）。
-  Future<List<Trip>> fetchTrips() async =>
-      _list(await _client.get('/trips'), Trip.fromJson);
+  /// GET /trips（published 行程清單；service token 可用 all=1 取全列表）。
+  Future<List<Trip>> fetchTrips({bool all = false}) async => _list(
+    await _client.get('/trips', query: {if (all) 'all': '1'}),
+    Trip.fromJson,
+  );
 
   /// GET /trips/:id。
   Future<Trip> fetchTrip(String id) async => _one(
@@ -198,6 +200,12 @@ class TripRepository {
       '/trips/${Uri.encodeComponent(id)}/days',
       query: {'all': '1'},
     ),
+    TripDay.fromJson,
+  );
+
+  /// GET /trips/:id/days（僅 day 摘要，不含 timeline）。
+  Future<List<TripDay>> fetchDaySummaries(String id) async => _list(
+    await _client.get('/trips/${Uri.encodeComponent(id)}/days'),
     TripDay.fromJson,
   );
 
