@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/edit/edit_trip_controller.dart';
+import 'package:tripline/models/day.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/trip.dart';
 
@@ -18,6 +19,11 @@ const _trip = Trip(
   published: true,
   destinations: [TripDestination(name: '那霸', lat: 26.2, lng: 127.6)],
 );
+
+const _days = [
+  TripDay(id: 11, dayNum: 1, date: '2026-04-23', title: '抵達日', version: 1),
+  TripDay(id: 12, dayNum: 2, date: '2026-04-24', title: '北部', version: 1),
+];
 
 Future<void> _flush() async {
   for (var i = 0; i < 6; i++) {
@@ -34,6 +40,7 @@ void main() {
   ProviderContainer makeC([Trip trip = _trip]) {
     // 表單種子走一次性 fetchTrip(非 SWR stream)。
     when(() => repo.fetchTrip(any())).thenAnswer((_) async => trip);
+    when(() => repo.fetchDaySummaries(any())).thenAnswer((_) async => _days);
     final c = ProviderContainer(
       overrides: [tripRepositoryProvider.overrideWithValue(repo)],
     );
@@ -58,6 +65,7 @@ void main() {
     expect(s.description, '原描述');
     expect(s.published, isTrue);
     expect(s.destinations.single.name, '那霸');
+    expect(s.days.map((d) => d.displayTitle), ['抵達日', '北部']);
   });
 
   test('改 title → save 送 diff(只 title)', () async {

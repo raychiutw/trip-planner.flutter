@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/providers.dart';
 import '../../../api/trip_repository.dart';
+import '../../../models/day.dart';
 import '../../../models/destination_input.dart';
 import '../../trip_detail/trip_providers.dart';
 import '../trips_list_screen.dart';
@@ -22,9 +23,11 @@ class EditTripState {
     this.published = false,
     this.startDate,
     this.endDate,
+    this.days = const [],
     this.destinations = const [],
     this.saving = false,
     this.shifting = false,
+    this.daysMutating = false,
     this.error,
     this.saved = false,
   });
@@ -36,9 +39,11 @@ class EditTripState {
   final bool published;
   final String? startDate;
   final String? endDate;
+  final List<TripDay> days;
   final List<DestinationInput> destinations;
   final bool saving;
   final bool shifting;
+  final bool daysMutating;
   final String? error;
   final bool saved;
 
@@ -50,9 +55,11 @@ class EditTripState {
     bool? published,
     Object? startDate = _sentinel,
     Object? endDate = _sentinel,
+    List<TripDay>? days,
     List<DestinationInput>? destinations,
     bool? saving,
     bool? shifting,
+    bool? daysMutating,
     Object? error = _sentinel,
     bool? saved,
   }) {
@@ -64,9 +71,11 @@ class EditTripState {
       published: published ?? this.published,
       startDate: startDate == _sentinel ? this.startDate : startDate as String?,
       endDate: endDate == _sentinel ? this.endDate : endDate as String?,
+      days: days ?? this.days,
       destinations: destinations ?? this.destinations,
       saving: saving ?? this.saving,
       shifting: shifting ?? this.shifting,
+      daysMutating: daysMutating ?? this.daysMutating,
       error: error == _sentinel ? this.error : error as String?,
       saved: saved ?? this.saved,
     );
@@ -103,6 +112,7 @@ class EditTripController extends Notifier<EditTripState> {
       // tripDetailProvider.future(無 listener 時 stream 未 emit 即被回收)。
       // 仍享 ApiClient 透明快取/離線回退。
       final trip = await _repo.fetchTrip(tripId);
+      final days = await _repo.fetchDaySummaries(tripId);
       if (_disposed) return;
       _origTitle = trip.title ?? '';
       _origDescription = trip.description ?? '';
@@ -119,8 +129,9 @@ class EditTripController extends Notifier<EditTripState> {
         description: _origDescription,
         lang: _origLang,
         published: _origPublished,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
+        startDate: trip.startDate ?? _firstDate(days),
+        endDate: trip.endDate ?? _lastDate(days),
+        days: days,
         destinations: dests,
       );
     } on Exception {
@@ -202,12 +213,14 @@ class EditTripController extends Notifier<EditTripState> {
         tripId: tripId,
         startDate: nextStartDate,
       );
+      final days = await _repo.fetchDaySummaries(tripId);
       if (_disposed) return false;
       ref.invalidate(myTripsProvider);
       ref.invalidate(tripDetailProvider(tripId));
       ref.invalidate(tripDaysProvider(tripId));
       state = state.copyWith(
         shifting: false,
+        days: days,
         startDate: result.newStartDate,
         endDate: result.newEndDate,
         error: null,
@@ -219,9 +232,80 @@ class EditTripController extends Notifier<EditTripState> {
       return false;
     }
   }
+
+  /// POST /trips/:id/days，在最前或最後新增一天。
+  Future<bool> addDay(String position) async {
+    if (state.loading || state.daysMutating || state.shifting) return false;
+    if (position != 'start' && position != 'end') return false;
+    state = state.copyWith(daysMutating: true, error: null);
+    try {
+      await _repo.createDay(tripId: tripId, position: position);
+      final days = await _repo.fetchDaySummaries(tripId);
+      if (_disposed) return false;
+      _invalidateTripDays();
+      state = state.copyWith(
+        daysMutating: false,
+        days: days,
+        startDate: _firstDate(days) ?? state.startDate,
+        endDate: _lastDate(days) ?? state.endDate,
+        error: null,
+      );
+      return true;
+    } on Exception {
+      if (_disposed) return false;
+      state = state.copyWith(daysMutating: false, error: '新增天數失敗,請稍後再試');
+      return false;
+    }
+  }
+
+  /// DELETE /trips/:id/days/:num，刪除一天並刷新 day 摘要。
+  Future<int?> deleteDay(int dayNum) async {
+    if (state.loading || state.daysMutating || state.shifting) return null;
+    state = state.copyWith(daysMutating: true, error: null);
+    try {
+      final removed = await _repo.deleteDay(tripId: tripId, dayNum: dayNum);
+      final days = await _repo.fetchDaySummaries(tripId);
+      if (_disposed) return null;
+      _invalidateTripDays();
+      state = state.copyWith(
+        daysMutating: false,
+        days: days,
+        startDate: _firstDate(days) ?? state.startDate,
+        endDate: _lastDate(days) ?? state.endDate,
+        error: null,
+      );
+      return removed;
+    } on Exception {
+      if (_disposed) return null;
+      state = state.copyWith(daysMutating: false, error: '刪除天數失敗,請稍後再試');
+      return null;
+    }
+  }
+
+  void _invalidateTripDays() {
+    ref.invalidate(myTripsProvider);
+    ref.invalidate(tripDetailProvider(tripId));
+    ref.invalidate(tripDaysProvider(tripId));
+  }
 }
 
 final editTripControllerProvider = NotifierProvider.autoDispose
     .family<EditTripController, EditTripState, String>(EditTripController.new);
 
 bool _isIsoDate(String value) => RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value);
+
+String? _firstDate(List<TripDay> days) {
+  for (final day in days) {
+    final date = day.date;
+    if (date != null && date.isNotEmpty) return date;
+  }
+  return null;
+}
+
+String? _lastDate(List<TripDay> days) {
+  for (final day in days.reversed) {
+    final date = day.date;
+    if (date != null && date.isNotEmpty) return date;
+  }
+  return null;
+}

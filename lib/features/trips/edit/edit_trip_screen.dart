@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
 import '../widgets/destination_picker.dart';
 import 'edit_trip_controller.dart';
@@ -60,9 +61,7 @@ class EditTripScreen extends ConsumerWidget {
                           if (nextDate == null) return;
                           final ok = await ctrl.shiftStartDate(nextDate);
                           if (context.mounted && ok) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('出發日期已變更')),
-                            );
+                            _showSnackBar(context, '出發日期已變更');
                           }
                         },
                       ),
@@ -78,6 +77,38 @@ class EditTripScreen extends ConsumerWidget {
                         onChanged: ctrl.setTitle,
                       ),
                       const SizedBox(height: TpSpacing.s4),
+                      _title(context, '行程天數'),
+                      _DayManagementSection(
+                        days: state.days,
+                        mutating: state.daysMutating,
+                        onAddStart: () async {
+                          final ok = await ctrl.addDay('start');
+                          if (context.mounted && ok) {
+                            _showSnackBar(context, '已在最前加入一天');
+                          }
+                        },
+                        onAddEnd: () async {
+                          final ok = await ctrl.addDay('end');
+                          if (context.mounted && ok) {
+                            _showSnackBar(context, '已在最後加入一天');
+                          }
+                        },
+                        onDelete: (day) async {
+                          final confirmed = await _confirmDeleteDay(
+                            context,
+                            day,
+                          );
+                          if (!confirmed) return;
+                          final removed = await ctrl.deleteDay(day.dayNum);
+                          if (context.mounted && removed != null) {
+                            final message = removed > 0
+                                ? 'Day ${day.dayNum} 已刪除（連同 $removed 個景點）'
+                                : 'Day ${day.dayNum} 已刪除';
+                            _showSnackBar(context, message);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: TpSpacing.s5),
                       _title(context, '描述（用於 SEO,選填）'),
                       TextFormField(
                         key: const ValueKey('edit-desc'),
@@ -134,6 +165,131 @@ class EditTripScreen extends ConsumerWidget {
     padding: const EdgeInsets.only(bottom: TpSpacing.s2),
     child: Text(t, style: Theme.of(context).textTheme.titleMedium),
   );
+}
+
+class _DayManagementSection extends StatelessWidget {
+  const _DayManagementSection({
+    required this.days,
+    required this.mutating,
+    required this.onAddStart,
+    required this.onAddEnd,
+    required this.onDelete,
+  });
+
+  final List<TripDay> days;
+  final bool mutating;
+  final VoidCallback onAddStart;
+  final VoidCallback onAddEnd;
+  final ValueChanged<TripDay> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(TpRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: TpSpacing.s2,
+            runSpacing: TpSpacing.s2,
+            children: [
+              OutlinedButton.icon(
+                key: const ValueKey('edit-add-day-start'),
+                onPressed: mutating ? null : onAddStart,
+                icon: const Icon(Icons.first_page_outlined),
+                label: const Text('加到最前'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('edit-add-day-end'),
+                onPressed: mutating ? null : onAddEnd,
+                icon: const Icon(Icons.last_page_outlined),
+                label: const Text('加到最後'),
+              ),
+            ],
+          ),
+          const SizedBox(height: TpSpacing.s3),
+          if (days.isEmpty)
+            Text(
+              '尚無日程資料',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (final day in days) ...[
+                  _DaySummaryRow(
+                    day: day,
+                    mutating: mutating,
+                    onDelete: () => onDelete(day),
+                  ),
+                  if (day != days.last) const Divider(height: TpSpacing.s4),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DaySummaryRow extends StatelessWidget {
+  const _DaySummaryRow({
+    required this.day,
+    required this.mutating,
+    required this.onDelete,
+  });
+
+  final TripDay day;
+  final bool mutating;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'DAY ${day.dayNum}',
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s1),
+              Text(day.displayTitle, style: textTheme.bodyLarge),
+              if (day.date != null && day.date!.isNotEmpty) ...[
+                const SizedBox(height: TpSpacing.s1),
+                Text(
+                  _dayDateLabel(day),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        IconButton(
+          key: ValueKey('edit-delete-day-${day.dayNum}'),
+          tooltip: '刪除 Day ${day.dayNum}',
+          onPressed: mutating ? null : onDelete,
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
+    );
+  }
 }
 
 class _ShiftDateSection extends StatelessWidget {
@@ -255,6 +411,40 @@ String _dateRangeLabel(String? startDate, String? endDate) {
     return startDate;
   }
   return '$startDate → $endDate';
+}
+
+String _dayDateLabel(TripDay day) {
+  final weekday = day.dayOfWeek;
+  if (weekday == null || weekday.isEmpty) return day.date ?? '';
+  return '${day.date} ($weekday)';
+}
+
+Future<bool> _confirmDeleteDay(BuildContext context, TripDay day) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('刪除 Day ${day.dayNum}'),
+      content: const Text('這會刪除當天日程並重新編號後續天數。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('刪除'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+void _showSnackBar(BuildContext context, String message) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..removeCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }
 
 class _SaveBar extends StatelessWidget {

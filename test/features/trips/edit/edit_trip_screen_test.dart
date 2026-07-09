@@ -9,6 +9,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'package:tripline/features/trips/edit/edit_trip_screen.dart';
+import 'package:tripline/models/day.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -30,6 +31,25 @@ const _trip = Trip(
   destinations: [TripDestination(name: '那霸', lat: 26.2, lng: 127.6)],
 );
 
+const _days = [
+  TripDay(
+    id: 11,
+    dayNum: 1,
+    date: '2026-04-23',
+    dayOfWeek: '四',
+    title: '抵達那霸',
+    version: 1,
+  ),
+  TripDay(
+    id: 12,
+    dayNum: 2,
+    date: '2026-04-24',
+    dayOfWeek: '五',
+    title: '北部景點',
+    version: 1,
+  ),
+];
+
 void main() {
   setUpAll(() => registerFallbackValue(<DestinationInput>[]));
 
@@ -40,6 +60,9 @@ void main() {
     tripRepo = _MockTripRepo();
     poiRepo = _MockPoiRepo();
     when(() => tripRepo.fetchTrip(any())).thenAnswer((_) async => _trip);
+    when(
+      () => tripRepo.fetchDaySummaries(any()),
+    ).thenAnswer((_) async => _days);
     when(
       () => tripRepo.updateTrip(
         any(),
@@ -155,5 +178,73 @@ void main() {
     ).called(1);
     expect(find.text('2026-05-01 → 2026-05-05'), findsOneWidget);
     expect(find.text('出發日期已變更'), findsOneWidget);
+  });
+
+  testWidgets('新增/刪除天數 → createDay/deleteDay 並刷新摘要', (tester) async {
+    var summaries = _days;
+    const addedDay = TripDay(
+      id: 13,
+      dayNum: 3,
+      date: '2026-04-25',
+      dayOfWeek: '六',
+      title: '返回日',
+      version: 1,
+    );
+    when(
+      () => tripRepo.fetchDaySummaries(any()),
+    ).thenAnswer((_) async => summaries);
+    when(
+      () => tripRepo.createDay(
+        tripId: any(named: 'tripId'),
+        position: any(named: 'position'),
+        date: any(named: 'date'),
+      ),
+    ).thenAnswer((_) async {
+      summaries = [...summaries, addedDay];
+      return addedDay;
+    });
+    when(
+      () => tripRepo.deleteDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+      ),
+    ).thenAnswer((_) async {
+      summaries = _days;
+      return 0;
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-add-day-end')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('抵達那霸'), findsOneWidget);
+    expect(find.text('北部景點'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('edit-add-day-end')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-add-day-end')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => tripRepo.createDay(tripId: 'okinawa', position: 'end', date: null),
+    ).called(1);
+    expect(find.text('返回日'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('edit-delete-day-3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(() => tripRepo.deleteDay(tripId: 'okinawa', dayNum: 3)).called(1);
+    expect(find.text('返回日'), findsNothing);
+    expect(find.text('Day 3 已刪除'), findsOneWidget);
   });
 }
