@@ -69,6 +69,31 @@ void main() {
     expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
   });
 
+  testWidgets('建立 → 可展開 QR code', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ShareLink(id: 11, token: 'tokqr', url: '/s/tokqr', label: 'x'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), 'x');
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('share-qr-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('share-qr-code')), findsOneWidget);
+  });
+
   testWidgets('建立選項 → 切換公開區塊與匿名設定', (tester) async {
     when(
       () => repo.createShare(

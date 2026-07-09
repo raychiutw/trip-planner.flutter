@@ -52,6 +52,7 @@ dependencies:
   pdf: ^3.12.0
   printing: ^5.14.3
   file_selector: ^1.1.0
+  qr: ^3.0.2
 
 dev_dependencies:
   flutter_test:

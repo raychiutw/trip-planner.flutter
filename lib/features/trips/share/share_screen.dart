@@ -1,10 +1,13 @@
-/// 分享連結管理:列出/建立/重產生/撤銷/刪除公開唯讀連結。建立後顯示完整 URL + 複製
-/// (raw token 只回一次)。管理限有 write 權限者(否則提示)。
+/// 分享連結管理:列出/建立/重產生/撤銷/刪除公開唯讀連結。建立後顯示完整 URL、
+/// QR code + 複製(raw token 只回一次)。管理限有 write 權限者(否則提示)。
 library;
+
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr/qr.dart';
 
 import '../../../api/api_client.dart' show kTriplineOrigin;
 import '../../../models/trip_share.dart';
@@ -404,11 +407,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
 String _pad2(int value) => value.toString().padLeft(2, '0');
 
-class _CreatedCard extends StatelessWidget {
+class _CreatedCard extends StatefulWidget {
   const _CreatedCard({required this.url, required this.onCopy});
 
   final String url;
   final Future<void> Function(String) onCopy;
+
+  @override
+  State<_CreatedCard> createState() => _CreatedCardState();
+}
+
+class _CreatedCardState extends State<_CreatedCard> {
+  bool _showQr = false;
 
   @override
   Widget build(BuildContext context) {
@@ -422,21 +432,128 @@ class _CreatedCard extends StatelessWidget {
           children: [
             Text('連結已建立(只顯示這一次)', style: theme.textTheme.titleSmall),
             const SizedBox(height: TpSpacing.s2),
-            SelectableText(url, style: theme.textTheme.bodySmall),
+            SelectableText(widget.url, style: theme.textTheme.bodySmall),
             const SizedBox(height: TpSpacing.s2),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.tonalIcon(
-                key: const ValueKey('share-copy'),
-                onPressed: () => onCopy(url),
-                icon: const Icon(Icons.copy, size: 18),
-                label: const Text('複製連結'),
-              ),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: TpSpacing.s1,
+              runSpacing: TpSpacing.s1,
+              children: [
+                OutlinedButton.icon(
+                  key: const ValueKey('share-qr-toggle'),
+                  onPressed: () => setState(() => _showQr = !_showQr),
+                  icon: Icon(
+                    _showQr ? Icons.visibility_off_outlined : Icons.qr_code_2,
+                    size: 18,
+                  ),
+                  label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
+                ),
+                FilledButton.tonalIcon(
+                  key: const ValueKey('share-copy'),
+                  onPressed: () => widget.onCopy(widget.url),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('複製連結'),
+                ),
+              ],
             ),
+            if (_showQr) ...[
+              const SizedBox(height: TpSpacing.s3),
+              Center(child: _ShareQrCode(url: widget.url)),
+            ],
           ],
         ),
       ),
     );
+  }
+}
+
+class _ShareQrCode extends StatelessWidget {
+  const _ShareQrCode({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final qrImage = QrImage(
+      QrCode.fromData(data: url, errorCorrectLevel: QrErrorCorrectLevel.M),
+    );
+    return Semantics(
+      label: '分享連結 QR code',
+      child: DecoratedBox(
+        key: const ValueKey('share-qr-code'),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s2),
+          child: CustomPaint(
+            size: const Size.square(220),
+            painter: _ShareQrPainter(
+              image: qrImage,
+              url: url,
+              foreground: const Color(0xFF1D1813),
+              background: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareQrPainter extends CustomPainter {
+  const _ShareQrPainter({
+    required this.image,
+    required this.url,
+    required this.foreground,
+    required this.background,
+  });
+
+  static const _quietZoneModules = 1;
+
+  final QrImage image;
+  final String url;
+  final Color foreground;
+  final Color background;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final side = math.min(size.width, size.height);
+    final fullModuleCount = image.moduleCount + (_quietZoneModules * 2);
+    final moduleSize = side / fullModuleCount;
+    final qrSide = moduleSize * fullModuleCount;
+    final left = (size.width - qrSide) / 2;
+    final top = (size.height - qrSide) / 2;
+
+    canvas.drawRect(
+      Rect.fromLTWH(left, top, qrSide, qrSide),
+      Paint()..color = background,
+    );
+
+    final darkPaint = Paint()..color = foreground;
+    for (var row = 0; row < image.moduleCount; row++) {
+      for (var col = 0; col < image.moduleCount; col++) {
+        if (!image.isDark(row, col)) continue;
+        canvas.drawRect(
+          Rect.fromLTWH(
+            left + (col + _quietZoneModules) * moduleSize,
+            top + (row + _quietZoneModules) * moduleSize,
+            moduleSize,
+            moduleSize,
+          ),
+          darkPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShareQrPainter oldDelegate) {
+    return oldDelegate.url != url ||
+        oldDelegate.foreground != foreground ||
+        oldDelegate.background != background;
   }
 }
 
