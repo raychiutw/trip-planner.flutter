@@ -80,6 +80,24 @@ void main() {
     expect(t.refreshToken, 'RT2');
   });
 
+  test('revokeToken：POST /oauth/revoke form', () async {
+    adapter.onPost(
+      '/oauth/revoke',
+      (server) => server.reply(200, ''),
+      data: {
+        'token': 'RT',
+        'client_id': 'cid',
+        'token_type_hint': 'refresh_token',
+      },
+    );
+
+    await repo.revokeToken(
+      token: 'RT',
+      clientId: 'cid',
+      tokenTypeHint: 'refresh_token',
+    );
+  });
+
   test('token 端點 400 → ApiError', () async {
     adapter.onPost(
       '/oauth/token',
@@ -104,6 +122,22 @@ void main() {
         redirectUri: 'http://127.0.0.1:8765',
       ),
       throwsA(isA<ApiError>().having((e) => e.status, 'status', 400)),
+    );
+  });
+
+  test('revokeToken 401 → ApiError', () async {
+    adapter.onPost(
+      '/oauth/revoke',
+      (server) => server.reply(401, {
+        'error': 'invalid_client',
+        'error_description': 'Missing client_id',
+      }),
+      data: {'token': 'RT', 'client_id': 'cid'},
+    );
+
+    await expectLater(
+      repo.revokeToken(token: 'RT', clientId: 'cid'),
+      throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
     );
   });
 }

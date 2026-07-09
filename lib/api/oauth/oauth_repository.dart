@@ -67,6 +67,29 @@ class OAuthRepository {
     'client_id': clientId,
   });
 
+  /// RFC 7009 token revocation. Unknown/already revoked tokens still return 200.
+  Future<void> revokeToken({
+    required String token,
+    required String clientId,
+    String? tokenTypeHint,
+    String? clientSecret,
+  }) async {
+    final res = await _dio.post<dynamic>(
+      '/oauth/revoke',
+      data: {
+        'token': token,
+        'client_id': clientId,
+        'token_type_hint': ?tokenTypeHint,
+        'client_secret': ?clientSecret,
+      },
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    final status = res.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      throw ApiError.fromResponse(status, res.data);
+    }
+  }
+
   Future<OAuthTokens> _token(Map<String, dynamic> form) async {
     final res = await _dio.post<dynamic>(
       '/oauth/token',
