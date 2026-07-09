@@ -7,8 +7,10 @@ import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 /// 測試用 tile provider：回傳套件內建透明圖，避免 widget test 對 OSM 發網路請求。
@@ -80,6 +82,9 @@ Widget _buildScreen(
   List<TripDay> days, {
   int? initialEntryId,
   TripMapLocationService? locationService,
+  List<TripSummary> trips = const [
+    TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
+  ],
 }) {
   final router = GoRouter(
     routes: [
@@ -92,11 +97,18 @@ Widget _buildScreen(
           locationService: locationService,
         ),
       ),
+      GoRoute(
+        path: '/trips/:tripId/map',
+        builder: (context, state) => Scaffold(
+          body: Text('trip-map-route-${state.pathParameters['tripId']}'),
+        ),
+      ),
     ],
   );
   return ProviderScope(
     overrides: [
       tripDaysProvider.overrideWith((ref, tripId) => Stream.value(days)),
+      myTripsProvider.overrideWith((ref) => Stream.value(trips)),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
@@ -205,6 +217,26 @@ void main() {
       find.byKey(const ValueKey('trip-map-user-location')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('行程切換選單：可從地圖切到另一個行程', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        trips: const [
+          TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
+          TripSummary(tripId: 'trip-2', name: 'tokyo', title: '東京週末'),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-pick-trip-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('trip-map-route-trip-2'), findsOneWidget);
   });
 
   testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {

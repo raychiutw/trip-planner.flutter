@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/day.dart';
 import '../../models/entry.dart';
+import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../map/map_adapter.dart';
 import '../map/map_layer_menu.dart';
 import '../map/map_location.dart';
+import '../trips/trip_card.dart';
+import '../trips/trips_list_screen.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -47,8 +51,19 @@ class TripMapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final daysAsync = ref.watch(tripDaysProvider(tripId));
+    final trips = switch (ref.watch(myTripsProvider)) {
+      AsyncData(:final value) => value,
+      _ => const <TripSummary>[],
+    };
+    final currentTrip = _findTripSummary(trips, tripId);
     return Scaffold(
-      appBar: AppBar(title: const Text('行程地圖')),
+      appBar: AppBar(
+        title: Text(currentTrip?.displayTitle ?? '行程地圖'),
+        actions: [
+          if (trips.length > 1)
+            _TripMapTripPicker(currentTripId: tripId, trips: trips),
+        ],
+      ),
       body: daysAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -66,6 +81,103 @@ class TripMapScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+TripSummary? _findTripSummary(List<TripSummary> trips, String tripId) {
+  for (final trip in trips) {
+    if (trip.tripId == tripId) return trip;
+  }
+  return null;
+}
+
+class _TripMapTripPicker extends StatelessWidget {
+  const _TripMapTripPicker({required this.currentTripId, required this.trips});
+
+  final String currentTripId;
+  final List<TripSummary> trips;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      key: const ValueKey('trip-map-trip-picker'),
+      tooltip: '切換行程',
+      icon: const Icon(Icons.swap_horiz),
+      onSelected: (tripId) {
+        if (tripId == currentTripId) return;
+        context.go('/trips/${Uri.encodeComponent(tripId)}/map');
+      },
+      itemBuilder: (context) {
+        return [
+          for (final trip in trips)
+            PopupMenuItem<String>(
+              key: ValueKey('trip-map-trip-pick-${trip.tripId}'),
+              value: trip.tripId,
+              child: _TripMapTripMenuItem(
+                trip: trip,
+                isActive: trip.tripId == currentTripId,
+              ),
+            ),
+        ];
+      },
+    );
+  }
+}
+
+class _TripMapTripMenuItem extends StatelessWidget {
+  const _TripMapTripMenuItem({required this.trip, required this.isActive});
+
+  final TripSummary trip;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final meta = _tripMeta(trip);
+    return Row(
+      children: [
+        Icon(
+          isActive ? Icons.check : Icons.trip_origin,
+          size: 18,
+          color: isActive
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: TpSpacing.s3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                trip.displayTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (meta != null)
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String? _tripMeta(TripSummary trip) {
+  final parts = <String>[
+    if (trip.countries != null && trip.countries!.trim().isNotEmpty)
+      trip.countries!.trim(),
+    if (trip.totalDays != null) '${trip.totalDays} 天',
+  ];
+  if (parts.isEmpty) return null;
+  return parts.join(' · ');
 }
 
 /// 單一 pin：entry master 座標 + 所屬日 index（決定輪替色）與該日內序號。
