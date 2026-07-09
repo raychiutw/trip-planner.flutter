@@ -23,7 +23,7 @@
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/move` | `EntryActionRouteScreen` | tab 2 孫路由 |
-| `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由(用搜尋/收藏置換正選 POI、加入/移除/設為正選備選、編輯 per-POI 備註/分類/訂位) |
+| `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由(用搜尋/收藏置換正選 POI、加入/移除/排序/設為正選備選、編輯 per-POI 備註/分類/訂位) |
 | `/map` | `GlobalMapScreen` | tab 3 |
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |

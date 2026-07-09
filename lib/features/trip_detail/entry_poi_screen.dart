@@ -136,13 +136,58 @@ class EntryPoiScreen extends ConsumerWidget {
             ),
           )
         else
-          for (final alt in entry.alternates)
+          for (final (index, alt) in entry.alternates.indexed)
             _PoiCard(
               poi: alt,
               isMaster: false,
-              trailing: Row(
+              trailing: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        key: ValueKey('alt-move-up-${alt.poiId}'),
+                        tooltip: '上移',
+                        icon: const Icon(Icons.keyboard_arrow_up),
+                        onPressed: index == 0
+                            ? null
+                            : () => _moveAlternate(
+                                context,
+                                ref,
+                                entry,
+                                index,
+                                -1,
+                              ),
+                      ),
+                      IconButton(
+                        key: ValueKey('alt-move-down-${alt.poiId}'),
+                        tooltip: '下移',
+                        icon: const Icon(Icons.keyboard_arrow_down),
+                        onPressed: index == entry.alternates.length - 1
+                            ? null
+                            : () =>
+                                  _moveAlternate(context, ref, entry, index, 1),
+                      ),
+                      IconButton(
+                        key: ValueKey('alt-remove-${alt.poiId}'),
+                        tooltip: '移除',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _run(
+                          context,
+                          ref,
+                          () => repo.removeEntryAlternate(
+                            tripId: tripId,
+                            entryId: entryId,
+                            poiId: alt.poiId,
+                            entryPoisVersion: version,
+                          ),
+                          success: '已移除備選',
+                        ),
+                      ),
+                    ],
+                  ),
                   TextButton(
                     key: ValueKey('alt-setmaster-${alt.poiId}'),
                     onPressed: () => _run(
@@ -157,22 +202,6 @@ class EntryPoiScreen extends ConsumerWidget {
                       success: '已設為正選',
                     ),
                     child: const Text('設為正選'),
-                  ),
-                  IconButton(
-                    key: ValueKey('alt-remove-${alt.poiId}'),
-                    tooltip: '移除',
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _run(
-                      context,
-                      ref,
-                      () => repo.removeEntryAlternate(
-                        tripId: tripId,
-                        entryId: entryId,
-                        poiId: alt.poiId,
-                        entryPoisVersion: version,
-                      ),
-                      success: '已移除備選',
-                    ),
                   ),
                 ],
               ),
@@ -206,6 +235,33 @@ class EntryPoiScreen extends ConsumerWidget {
             reservation: result.reservation,
           ),
       success: '已儲存',
+    );
+  }
+
+  Future<void> _moveAlternate(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+    int fromIndex,
+    int delta,
+  ) async {
+    final toIndex = fromIndex + delta;
+    if (toIndex < 0 || toIndex >= entry.alternates.length) return;
+    final alternates = entry.alternates.toList();
+    final moved = alternates.removeAt(fromIndex);
+    alternates.insert(toIndex, moved);
+    await _run(
+      context,
+      ref,
+      () => ref
+          .read(tripRepositoryProvider)
+          .reorderEntryAlternates(
+            tripId: tripId,
+            entryId: entryId,
+            order: [for (final alternate in alternates) alternate.poiId],
+            entryPoisVersion: entry.entryPoisVersion,
+          ),
+      success: '已更新備選順序',
     );
   }
 

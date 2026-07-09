@@ -144,6 +144,31 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('下移備選 → reorderEntryAlternates', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntryAlternates(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        order: any(named: 'order'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('alt-move-down-502')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntryAlternates(
+        tripId: 't1',
+        entryId: 11,
+        order: [503, 502],
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+  });
+
   testWidgets('編輯資訊 → 改備註 → 儲存呼叫 updateEntryPoi', (tester) async {
     final repo = _MockTripRepository();
     when(
