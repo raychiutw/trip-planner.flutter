@@ -5,11 +5,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
+import 'settings/theme_mode_controller.dart';
 
 /// 登入裝置清單 provider（GET /account/sessions）。
 final accountSessionsProvider = FutureProvider<AccountSessionsPage>((ref) {
@@ -33,6 +35,8 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(accountSessionsProvider);
+    final currentUser = ref.watch(authStateProvider).value;
+    final themeMode = ref.watch(themeModeProvider);
     final sessionsPage = sessionsAsync.value;
     final canRevokeOthers =
         sessionsPage?.sessions.any((session) => !session.isCurrent) ?? false;
@@ -67,10 +71,18 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
         ),
         data: (page) => _SessionsList(
           sessions: page.sessions,
+          currentUserEmail: currentUser?.email,
+          themeMode: themeMode,
           busySessionSid: _busySessionSid,
           mutationError: _mutationError,
           onRetry: () => ref.invalidate(accountSessionsProvider),
           onRevoke: _revokeSession,
+          onThemeModeChanged: (mode) =>
+              ref.read(themeModeProvider.notifier).setMode(mode),
+          onOpenConnectedApps: () {
+            GoRouter.maybeOf(context)?.push('/settings/connected-apps');
+          },
+          onLogout: () => _confirmLogout(context, ref),
         ),
       ),
     );
@@ -162,6 +174,44 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
     }
   }
 
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
+          ),
+          title: const Text('登出帳號'),
+          content: const Text('確定要登出嗎？'),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                shape: const StadiumBorder(),
+                foregroundColor: colorScheme.onSurface,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+                shape: const StadiumBorder(),
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('登出'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldLogout == true && mounted) {
+      await ref.read(authStateProvider.notifier).logout();
+    }
+  }
+
   String _errorMessage(Object error) {
     if (error is ApiError) return error.detail ?? error.message;
     return '登出裝置失敗，請稍後再試';
@@ -171,17 +221,27 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
 class _SessionsList extends StatelessWidget {
   const _SessionsList({
     required this.sessions,
+    required this.currentUserEmail,
+    required this.themeMode,
     required this.busySessionSid,
     required this.mutationError,
     required this.onRetry,
     required this.onRevoke,
+    required this.onThemeModeChanged,
+    required this.onOpenConnectedApps,
+    required this.onLogout,
   });
 
   final List<AccountSession> sessions;
+  final String? currentUserEmail;
+  final ThemeMode themeMode;
   final String? busySessionSid;
   final String? mutationError;
   final VoidCallback onRetry;
   final Future<void> Function(String sid) onRevoke;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final VoidCallback onOpenConnectedApps;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +251,10 @@ class _SessionsList extends StatelessWidget {
         padding: const EdgeInsets.all(TpSpacing.s4),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
+          if (currentUserEmail != null) ...[
+            _SessionAccountHeader(email: currentUserEmail!),
+            const SizedBox(height: TpSpacing.s4),
+          ],
           if (mutationError != null) ...[
             _InlineErrorPanel(message: mutationError!, onRetry: onRetry),
             const SizedBox(height: TpSpacing.s4),
@@ -218,9 +282,182 @@ class _SessionsList extends StatelessWidget {
                 ],
               ),
             ),
+          const SizedBox(height: TpSpacing.s4),
+          _SessionsInfoPanel(onOpenConnectedApps: onOpenConnectedApps),
+          const SizedBox(height: TpSpacing.s4),
+          _SessionsFooter(
+            themeMode: themeMode,
+            onThemeModeChanged: onThemeModeChanged,
+            onLogout: onLogout,
+          ),
         ],
       ),
     );
+  }
+}
+
+class _SessionAccountHeader extends StatelessWidget {
+  const _SessionAccountHeader({required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '帳號',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: TpSpacing.s1),
+          Text(
+            email,
+            key: const Key('account-sessions-user-email'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionsInfoPanel extends StatelessWidget {
+  const _SessionsInfoPanel({required this.onOpenConnectedApps});
+
+  final VoidCallback onOpenConnectedApps;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      key: const Key('account-sessions-oauth-note'),
+      padding: const EdgeInsets.all(TpSpacing.s4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('OAuth 已連結應用不受影響', style: theme.textTheme.titleSmall),
+                const SizedBox(height: TpSpacing.s1),
+                Text(
+                  '登出裝置只會移除瀏覽器或手機的登入狀態；第三方應用請到已連結的應用程式管理。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s2),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('account-sessions-connected-apps'),
+                    onPressed: onOpenConnectedApps,
+                    icon: const Icon(Icons.extension_outlined, size: 18),
+                    label: const Text('管理已連結應用'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionsFooter extends StatelessWidget {
+  const _SessionsFooter({
+    required this.themeMode,
+    required this.onThemeModeChanged,
+    required this.onLogout,
+  });
+
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ListTile(
+            key: const Key('account-sessions-theme-footer'),
+            leading: const Icon(Icons.brightness_6_outlined),
+            title: const Text('深淺模式'),
+            subtitle: Text(_themeModeLabel(themeMode)),
+            trailing: PopupMenuButton<ThemeMode>(
+              key: const Key('account-sessions-theme-menu'),
+              tooltip: '變更深淺模式',
+              initialValue: themeMode,
+              onSelected: onThemeModeChanged,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  key: Key('account-sessions-theme-system'),
+                  value: ThemeMode.system,
+                  child: Text('跟隨系統'),
+                ),
+                PopupMenuItem(
+                  key: Key('account-sessions-theme-light'),
+                  value: ThemeMode.light,
+                  child: Text('淺色'),
+                ),
+                PopupMenuItem(
+                  key: Key('account-sessions-theme-dark'),
+                  value: ThemeMode.dark,
+                  child: Text('深色'),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
+          ListTile(
+            key: const Key('account-sessions-logout'),
+            leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
+            title: Text(
+              '登出此帳號',
+              style: TextStyle(
+                color: colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onTap: onLogout,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _themeModeLabel(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.system => '跟隨系統',
+      ThemeMode.light => '淺色',
+      ThemeMode.dark => '深色',
+    };
   }
 }
 

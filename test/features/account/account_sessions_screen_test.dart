@@ -3,15 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
+import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
+class _FakeAuthNotifier extends AuthNotifier {
+  _FakeAuthNotifier(this._user, this.logoutCalls);
+
+  final UserInfo? _user;
+  final List<void> logoutCalls;
+
+  @override
+  Future<UserInfo?> build() async => _user;
+
+  @override
+  Future<void> logout() async {
+    logoutCalls.add(null);
+    state = const AsyncData(null);
+  }
+}
+
 void main() {
   late MockTripRepository mockTripRepository;
+  late List<void> logoutCalls;
 
   const currentSession = AccountSession(
     sid: 'sid-current',
@@ -28,13 +47,28 @@ void main() {
     lastSeenAt: '2026-07-08T08:00:00Z',
     isCurrent: false,
   );
+  const loggedInUser = UserInfo(
+    id: 'user-1',
+    email: 'traveler@example.com',
+    emailVerified: true,
+    displayName: 'Ray',
+  );
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<ProviderContainer> pumpScreen(WidgetTester tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        authStateProvider.overrideWith(
+          () => _FakeAuthNotifier(loggedInUser, logoutCalls),
+        ),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           theme: AppTheme.light(),
           home: const AccountSessionsScreen(),
@@ -42,10 +76,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return container;
   }
 
   setUp(() {
     mockTripRepository = MockTripRepository();
+    logoutCalls = <void>[];
     when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
       (_) async => const AccountSessionsPage(
         currentSid: 'sid-current',
@@ -107,5 +143,46 @@ void main() {
 
     verify(() => mockTripRepository.revokeOtherAccountSessions()).called(1);
     expect(find.text('已登出其他裝置'), findsOneWidget);
+  });
+
+  testWidgets('顯示帳號 email、OAuth 提醒與頁尾深淺模式/登出', (tester) async {
+    await pumpScreen(tester);
+
+    expect(
+      find.byKey(const Key('account-sessions-user-email')),
+      findsOneWidget,
+    );
+    expect(find.text('traveler@example.com'), findsOneWidget);
+    expect(
+      find.byKey(const Key('account-sessions-oauth-note')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('OAuth 已連結應用不受影響'), findsOneWidget);
+    expect(
+      find.byKey(const Key('account-sessions-theme-footer')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('account-sessions-logout')), findsOneWidget);
+  });
+
+  testWidgets('頁尾可切換深色模式並登出帳號', (tester) async {
+    final container = await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('account-sessions-theme-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('account-sessions-theme-dark')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(themeModeProvider), ThemeMode.dark);
+
+    await tester.tap(find.byKey(const Key('account-sessions-logout')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('登出帳號'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.pumpAndSettle();
+
+    expect(logoutCalls, hasLength(1));
   });
 }
