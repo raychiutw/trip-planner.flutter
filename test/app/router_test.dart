@@ -414,6 +414,32 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
+  testWidgets('已登入可進入 add-entry/add-stop web aliases', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trip/trip-1/add-entry?day=1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryAddRouteScreen), findsOneWidget);
+    expect(find.text('搜尋景點'), findsWidgets);
+
+    container.read(appRouterProvider).go('/trip/trip-1/add-stop?day=1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryAddRouteScreen), findsOneWidget);
+    expect(find.text('搜尋景點'), findsWidgets);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
   testWidgets('已登入可進入 entry copy/move web aliases', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);

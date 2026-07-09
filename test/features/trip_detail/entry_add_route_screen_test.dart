@@ -3,27 +3,41 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/favorites/explore/explore_controller.dart'
+    show poiRepositoryProvider;
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
+
+class _MockPoiRepository extends Mock implements PoiRepository {}
 
 const _days = [
   TripDay(id: 1, dayNum: 1, title: '抵達', version: 0),
   TripDay(id: 2, dayNum: 2, title: '市區', version: 0),
 ];
 
-Widget _buildScreen(_MockTripRepository repo, {int initialDayNum = 2}) {
+Widget _buildScreen(
+  _MockTripRepository repo, {
+  _MockPoiRepository? poiRepo,
+  int initialDayNum = 2,
+  EntryAddMode initialMode = EntryAddMode.custom,
+}) {
   final router = GoRouter(
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) =>
-            EntryAddRouteScreen(tripId: 'trip-1', initialDayNum: initialDayNum),
+        builder: (context, state) => EntryAddRouteScreen(
+          tripId: 'trip-1',
+          initialDayNum: initialDayNum,
+          initialMode: initialMode,
+        ),
       ),
       GoRoute(
         path: '/trips/:tripId',
@@ -35,6 +49,7 @@ Widget _buildScreen(_MockTripRepository repo, {int initialDayNum = 2}) {
   return ProviderScope(
     overrides: [
       tripRepositoryProvider.overrideWithValue(repo),
+      if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
       tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -42,6 +57,10 @@ Widget _buildScreen(_MockTripRepository repo, {int initialDayNum = 2}) {
 }
 
 void main() {
+  setUpAll(
+    () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
+  );
+
   testWidgets('送出自訂停留點會使用 query day 並回行程頁', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -128,5 +147,75 @@ void main() {
         source: 'custom',
       ),
     ).called(1);
+  });
+
+  testWidgets('搜尋 POI 後可加入指定 day', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(
+          placeId: 'p1',
+          name: '美麗海水族館',
+          address: '沖繩縣國頭郡本部町',
+          lat: 26.694,
+          lng: 127.878,
+          category: 'aquarium',
+        ),
+      ],
+    );
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '水族館',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => poiRepo.searchPois(q: '水族館', limit: 20, region: null),
+    ).called(1);
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '美麗海水族館',
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: 26.694,
+        lng: 127.878,
+        source: 'google',
+      ),
+    ).called(1);
+    expect(find.text('trip trip-1'), findsOneWidget);
   });
 }

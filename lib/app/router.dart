@@ -130,8 +130,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => _tripAlias(state, '/map'),
       ),
       GoRoute(
+        path: '/trip/:tripId/add-entry',
+        redirect: (context, state) =>
+            _newEntryAlias(state, mode: EntryAddMode.search),
+      ),
+      GoRoute(
+        path: '/trip/:tripId/add-stop',
+        redirect: (context, state) =>
+            _newEntryAlias(state, mode: EntryAddMode.search),
+      ),
+      GoRoute(
         path: '/trip/:tripId/add-custom-stop',
-        redirect: (context, state) => _newEntryAlias(state),
+        redirect: (context, state) =>
+            _newEntryAlias(state, mode: EntryAddMode.custom),
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId',
@@ -327,6 +338,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                           initialDayNum: int.tryParse(
                             state.uri.queryParameters['day'] ?? '',
                           ),
+                          initialMode: _entryAddModeFromQuery(
+                            state.uri.queryParameters['mode'],
+                          ),
                         ),
                       ),
                       GoRoute(
@@ -443,9 +457,20 @@ String _outsideTripAlias(GoRouterState state, String prefix) {
   return '$prefix/$tripId';
 }
 
-String _newEntryAlias(GoRouterState state) {
+String _newEntryAlias(GoRouterState state, {required EntryAddMode mode}) {
   final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
-  return _withQuery('/trips/$tripId/entries/new', state);
+  final query = Map<String, String>.from(state.uri.queryParameters);
+  query['mode'] = mode.name;
+  return Uri(
+    path: '/trips/$tripId/entries/new',
+    queryParameters: query,
+  ).toString();
+}
+
+EntryAddMode _entryAddModeFromQuery(String? value) {
+  return value == EntryAddMode.search.name
+      ? EntryAddMode.search
+      : EntryAddMode.custom;
 }
 
 String _withQuery(String path, GoRouterState state) {
