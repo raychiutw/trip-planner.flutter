@@ -106,6 +106,153 @@ void main() {
     });
   });
 
+  group('signup', () {
+    test('201 解析 set-cookie 寫入 store 並回 signup 結果', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(
+          201,
+          {
+            'ok': true,
+            'userId': 'u2hex',
+            'email': 'traveler@example.com',
+            'requiresVerification': true,
+            'joinedTrip': {'id': 'trip-1', 'title': '沖繩家庭旅行'},
+            'invitationError': null,
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'set-cookie': [
+              'tripline_session=signup.session; Path=/; HttpOnly; Secure',
+            ],
+          },
+        ),
+        data: {
+          'email': 'traveler@example.com',
+          'password': 'secret123',
+          'displayName': 'Ray',
+          'invitationToken': 'invite-token',
+        },
+      );
+
+      final result = await authRepository.signup(
+        email: ' traveler@example.com ',
+        password: 'secret123',
+        displayName: ' Ray ',
+        invitationToken: ' invite-token ',
+      );
+
+      expect(await sessionStore.read(), 'signup.session');
+      expect(result.userId, 'u2hex');
+      expect(result.email, 'traveler@example.com');
+      expect(result.requiresVerification, isTrue);
+      expect(result.joinedTrip?.id, 'trip-1');
+      expect(result.joinedTrip?.title, '沖繩家庭旅行');
+      expect(result.invitationError, isNull);
+    });
+
+    test('SIGNUP_EMAIL_TAKEN → 丟 ApiError、store 不寫入', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(409, {
+          'error': {'code': 'SIGNUP_EMAIL_TAKEN', 'message': '已註冊'},
+        }),
+        data: {'email': 'ray@example.com', 'password': 'secret123'},
+      );
+
+      await expectLater(
+        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        throwsA(
+          isA<ApiError>().having(
+            (error) => error.code,
+            'code',
+            'SIGNUP_EMAIL_TAKEN',
+          ),
+        ),
+      );
+      expect(await sessionStore.read(), isNull);
+    });
+
+    test('201 但無 tripline_session cookie → 丟 ApiError', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(201, {
+          'ok': true,
+          'userId': 'u2hex',
+          'email': 'ray@example.com',
+          'requiresVerification': true,
+        }),
+        data: {'email': 'ray@example.com', 'password': 'secret123'},
+      );
+
+      await expectLater(
+        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        throwsA(isA<ApiError>()),
+      );
+      expect(await sessionStore.read(), isNull);
+    });
+  });
+
+  group('account recovery and verification', () {
+    test('requestPasswordReset：POST /oauth/forgot-password {email}', () async {
+      dioAdapter.onPost(
+        '/oauth/forgot-password',
+        (server) =>
+            server.reply(200, {'ok': true, 'message': '若 email 已註冊，重設連結將寄至信箱'}),
+        data: {'email': 'ray@example.com'},
+      );
+
+      final message = await authRepository.requestPasswordReset(
+        ' ray@example.com ',
+      );
+
+      expect(message, '若 email 已註冊，重設連結將寄至信箱');
+    });
+
+    test('resetPassword：POST /oauth/reset-password {token,password}', () async {
+      dioAdapter.onPost(
+        '/oauth/reset-password',
+        (server) => server.reply(200, {'ok': true, 'message': '密碼已更新，請用新密碼登入'}),
+        data: {'token': 'reset-token', 'password': 'newSecret123'},
+      );
+
+      final message = await authRepository.resetPassword(
+        token: ' reset-token ',
+        password: 'newSecret123',
+      );
+
+      expect(message, '密碼已更新，請用新密碼登入');
+    });
+
+    test('verifyEmail：POST /oauth/verify {token} → true', () async {
+      dioAdapter.onPost(
+        '/oauth/verify',
+        (server) => server.reply(200, {'ok': true}),
+        data: {'token': 'verify-token'},
+      );
+
+      expect(await authRepository.verifyEmail(' verify-token '), isTrue);
+    });
+
+    test(
+      'sendVerificationEmail：POST /oauth/send-verification {email}',
+      () async {
+        dioAdapter.onPost(
+          '/oauth/send-verification',
+          (server) =>
+              server.reply(200, {'ok': true, 'message': '若帳號需要驗證，驗證信會寄至信箱'}),
+          data: {'email': 'ray@example.com'},
+        );
+
+        final message = await authRepository.sendVerificationEmail(
+          ' ray@example.com ',
+        );
+
+        expect(message, '若帳號需要驗證，驗證信會寄至信箱');
+      },
+    );
+  });
+
   group('currentUser', () {
     test('200 → 回 UserInfo', () async {
       dioAdapter.onGet(
