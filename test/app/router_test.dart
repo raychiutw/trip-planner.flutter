@@ -28,6 +28,7 @@ import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
+import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -412,6 +413,28 @@ void main() {
     await tester.pumpAndSettle();
 
     final screen = tester.widget<TripMapScreen>(find.byType(TripMapScreen));
+    expect(screen.initialEntryId, 11);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可從 stop web alias 聚焦 timeline entry', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trip/trip-1/stop/11');
+    await tester.pumpAndSettle();
+
+    final screen = tester.widget<TripTimelineScreen>(
+      find.byType(TripTimelineScreen),
+    );
     expect(screen.initialEntryId, 11);
     expect(find.byType(LoginScreen), findsNothing);
   });

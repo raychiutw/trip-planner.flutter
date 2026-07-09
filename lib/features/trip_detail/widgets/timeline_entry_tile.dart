@@ -22,6 +22,7 @@ class TimelineEntryTile extends StatelessWidget {
     required this.number,
     this.isFirst = false,
     this.isLast = false,
+    this.isFocused = false,
     this.onTap,
     this.trailing,
   });
@@ -36,6 +37,9 @@ class TimelineEntryTile extends StatelessWidget {
 
   /// 當日最後一個 entry：rail 不畫圓點下方連線。
   final bool isLast;
+
+  /// deep link 或搜尋結果指定的目前聚焦停留點。
+  final bool isFocused;
 
   /// 點內容卡的回呼（null 則不可點）。
   final VoidCallback? onTap;
@@ -115,7 +119,11 @@ class TimelineEntryTile extends StatelessWidget {
               child: InkWell(
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(TpRadius.md),
-                child: _EntryCard(entry: entry, tone: tone),
+                child: _EntryCard(
+                  entry: entry,
+                  tone: tone,
+                  isFocused: isFocused,
+                ),
               ),
             ),
           ),
@@ -128,10 +136,15 @@ class TimelineEntryTile extends StatelessWidget {
 
 /// 內容卡：tone 色階梯（卡底 subtle、hairline bg、分類字 deep）。
 class _EntryCard extends StatelessWidget {
-  const _EntryCard({required this.entry, required this.tone});
+  const _EntryCard({
+    required this.entry,
+    required this.tone,
+    required this.isFocused,
+  });
 
   final TimelineEntry entry;
   final PoiToneColors tone;
+  final bool isFocused;
 
   @override
   Widget build(BuildContext context) {
@@ -204,12 +217,16 @@ class _EntryCard extends StatelessWidget {
     }
 
     return Container(
+      key: ValueKey('entry-card-${entry.id}'),
       width: double.infinity,
       padding: const EdgeInsets.all(TpSpacing.s3),
       decoration: BoxDecoration(
         color: tone.subtle,
         borderRadius: BorderRadius.circular(TpRadius.md),
-        border: Border.all(color: tone.bg),
+        border: Border.all(
+          color: isFocused ? tone.deep : tone.bg,
+          width: isFocused ? 2 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

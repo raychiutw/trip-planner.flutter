@@ -129,14 +129,17 @@ Future<void> _pumpTimeline(
   FutureOr<List<TripDay>> Function()? fetchDays,
   _MockTripRepository? repo,
   List<TripSegment> segments = const [],
+  int? initialEntryId,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
     routes: [
       GoRoute(
         path: '/trips/:tripId',
-        builder: (context, state) =>
-            TripTimelineScreen(tripId: state.pathParameters['tripId']!),
+        builder: (context, state) => TripTimelineScreen(
+          tripId: state.pathParameters['tripId']!,
+          initialEntryId: initialEntryId,
+        ),
         routes: [
           GoRoute(
             path: 'map',
@@ -279,6 +282,20 @@ void main() {
 
     final day2TitleTopAfterTap = tester.getTopLeft(find.text('南部文化')).dy;
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
+  });
+
+  testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
+    await _pumpTimeline(tester, initialEntryId: 22);
+    await tester.pumpAndSettle();
+
+    final focusedCard = tester.widget<Container>(
+      find.byKey(const ValueKey('entry-card-22')),
+    );
+    final decoration = focusedCard.decoration! as BoxDecoration;
+    final border = decoration.border! as Border;
+
+    expect(border.top.color, TpColorsLight.accentDeep);
+    expect(border.top.width, 2);
   });
 
   testWidgets('loading 顯示 skeleton 條列', (tester) async {

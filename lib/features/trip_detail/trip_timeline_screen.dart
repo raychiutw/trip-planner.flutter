@@ -23,9 +23,16 @@ import 'widgets/travel_pill.dart';
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerWidget {
-  const TripTimelineScreen({super.key, required this.tripId});
+  const TripTimelineScreen({
+    super.key,
+    required this.tripId,
+    this.initialEntryId,
+  });
 
   final String tripId;
+
+  /// 初始聚焦的停留點 id，用於 `/trip/:tripId/stop/:entryId` deep link。
+  final int? initialEntryId;
 
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
@@ -68,7 +75,11 @@ class TripTimelineScreen extends ConsumerWidget {
       body: daysAsync.when(
         data: (days) => days.isEmpty
             ? const _EmptyTimeline()
-            : _TimelineBody(days: days, tripId: tripId),
+            : _TimelineBody(
+                days: days,
+                tripId: tripId,
+                initialEntryId: initialEntryId,
+              ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -83,36 +94,84 @@ class TripTimelineScreen extends ConsumerWidget {
 
 /// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
 class _TimelineBody extends StatefulWidget {
-  const _TimelineBody({required this.days, required this.tripId});
+  const _TimelineBody({
+    required this.days,
+    required this.tripId,
+    this.initialEntryId,
+  });
 
   final List<TripDay> days;
   final String tripId;
+  final int? initialEntryId;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
-  late Map<int, GlobalKey> _daySectionKeys;
+  Map<int, GlobalKey> _daySectionKeys = {};
+  Map<int, GlobalKey> _entryKeys = {};
   late int _activeDayNum;
 
   @override
   void initState() {
     super.initState();
-    _rebuildDaySectionKeys();
-    _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
+    _rebuildKeys();
+    _activeDayNum =
+        _initialDayNum() ??
+        (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
+    _scheduleInitialEntryScroll();
   }
 
   @override
   void didUpdateWidget(covariant _TimelineBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.days, widget.days)) {
-      _rebuildDaySectionKeys();
+    if (!identical(oldWidget.days, widget.days) ||
+        oldWidget.initialEntryId != widget.initialEntryId) {
+      _rebuildKeys();
+      final initialDayNum = _initialDayNum();
+      if (initialDayNum != null) {
+        _activeDayNum = initialDayNum;
+      } else if (!widget.days.any((day) => day.dayNum == _activeDayNum)) {
+        _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
+      }
+      _scheduleInitialEntryScroll();
     }
   }
 
-  void _rebuildDaySectionKeys() {
+  void _rebuildKeys() {
+    final oldEntryKeys = _entryKeys;
     _daySectionKeys = {for (final day in widget.days) day.dayNum: GlobalKey()};
+    _entryKeys = {
+      for (final day in widget.days)
+        for (final entry in day.timeline)
+          entry.id: oldEntryKeys[entry.id] ?? GlobalKey(),
+    };
+  }
+
+  int? _initialDayNum() {
+    final entryId = widget.initialEntryId;
+    if (entryId == null) return null;
+    for (final day in widget.days) {
+      if (day.timeline.any((entry) => entry.id == entryId)) {
+        return day.dayNum;
+      }
+    }
+    return null;
+  }
+
+  void _scheduleInitialEntryScroll() {
+    if (widget.initialEntryId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final entryContext = _entryKeys[widget.initialEntryId]?.currentContext;
+      if (entryContext == null) return;
+      Scrollable.ensureVisible(
+        entryContext,
+        duration: TpMotion.normal,
+        curve: TpMotion.appleEase,
+      );
+    });
   }
 
   void _scrollToDay(int dayNum) {
@@ -153,6 +212,8 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     day: day,
                     allDays: widget.days,
                     tripId: widget.tripId,
+                    entryKeys: _entryKeys,
+                    focusedEntryId: widget.initialEntryId,
                   ),
               ],
             ),
@@ -182,11 +243,15 @@ class _DaySection extends ConsumerWidget {
     required this.tripId,
     required this.day,
     required this.allDays,
+    required this.entryKeys,
+    this.focusedEntryId,
   });
 
   final String tripId;
   final TripDay day;
   final List<TripDay> allDays;
+  final Map<int, GlobalKey> entryKeys;
+  final int? focusedEntryId;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -324,41 +389,47 @@ class _DaySection extends ConsumerWidget {
               _reorder(context, ref, oldIndex, newIndex),
           itemBuilder: (context, i) {
             final entry = timeline[i];
-            return Column(
+            return KeyedSubtree(
               key: ValueKey('entry-${entry.id}'),
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (i > 0 && entry.travel != null)
-                  _TravelRow(
-                    travel: entry.travel!,
-                    segment: _findSegment(
-                      segments,
-                      timeline[i - 1].id,
-                      entry.id,
+              child: Container(
+                key: entryKeys[entry.id],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (i > 0 && entry.travel != null)
+                      _TravelRow(
+                        travel: entry.travel!,
+                        segment: _findSegment(
+                          segments,
+                          timeline[i - 1].id,
+                          entry.id,
+                        ),
+                        tripId: tripId,
+                      ),
+                    SwipeToDelete(
+                      dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                      onDelete: () => _confirmDelete(context, ref, entry),
+                      child: TimelineEntryTile(
+                        entry: entry,
+                        number: i + 1,
+                        isFirst: i == 0,
+                        isLast: i == timeline.length - 1,
+                        isFocused: entry.id == focusedEntryId,
+                        onTap: () => showEntryEditSheet(
+                          context,
+                          tripId: tripId,
+                          args: EntryEditExisting(entry),
+                        ),
+                        trailing: _EntryTrailing(
+                          entryId: entry.id,
+                          index: i,
+                          onMove: () => _moveToDay(context, ref, entry),
+                        ),
+                      ),
                     ),
-                    tripId: tripId,
-                  ),
-                SwipeToDelete(
-                  dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                  onDelete: () => _confirmDelete(context, ref, entry),
-                  child: TimelineEntryTile(
-                    entry: entry,
-                    number: i + 1,
-                    isFirst: i == 0,
-                    isLast: i == timeline.length - 1,
-                    onTap: () => showEntryEditSheet(
-                      context,
-                      tripId: tripId,
-                      args: EntryEditExisting(entry),
-                    ),
-                    trailing: _EntryTrailing(
-                      entryId: entry.id,
-                      index: i,
-                      onMove: () => _moveToDay(context, ref, entry),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         ),

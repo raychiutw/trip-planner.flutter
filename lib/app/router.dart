@@ -148,7 +148,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId',
-        redirect: (context, state) => _tripAlias(state),
+        redirect: (context, state) => _entryTimelineAlias(state),
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId/map',
@@ -307,6 +307,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: ':tripId',
                     builder: (context, state) => TripTimelineScreen(
                       tripId: state.pathParameters['tripId']!,
+                      initialEntryId: _entryFocusFromQuery(state.uri),
                     ),
                     routes: [
                       GoRoute(
@@ -475,6 +476,13 @@ String _entryMapAlias(GoRouterState state) {
   final query = Map<String, String>.from(state.uri.queryParameters);
   query['entry'] = state.pathParameters['entryId']!;
   return Uri(path: '/trips/$tripId/map', queryParameters: query).toString();
+}
+
+String _entryTimelineAlias(GoRouterState state) {
+  final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+  final query = Map<String, String>.from(state.uri.queryParameters);
+  query['entry'] = state.pathParameters['entryId']!;
+  return Uri(path: '/trips/$tripId', queryParameters: query).toString();
 }
 
 int? _entryFocusFromQuery(Uri uri) {

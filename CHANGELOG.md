@@ -19,6 +19,7 @@
 - **新增停留點 deep link**:新增 `/trips/:tripId/entries/new?day=N` 全頁新增入口,支援搜尋 POI 或自訂停留點；web alias `/trip/:tripId/add-entry|add-stop|add-custom-stop?day=N` 會進對應模式。
 - **Legacy route redirects**:支援 web 保留路徑 `/admin` → `/trips`、`/manage` → `/chat`。
 - **地圖停留點 deep link**:`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並在地圖初始顯示該停留點所在日。
+- **時間軸停留點 deep link**:`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並在時間軸初始捲動與標示該停留點。
 
 ### 修正
 
