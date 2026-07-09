@@ -103,6 +103,52 @@ void main() {
     expect(captured, ['flights', 'lodgings', 'reservations', 'pretrip']);
   });
 
+  testWidgets('建立期限 → 7 天 preset 送 expiresAt', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        expiresAt: any(named: 'expiresAt'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ShareLink(id: 9, token: 'tok3', url: '/s/tok3', label: 'x'),
+    );
+
+    final before = DateTime.now().millisecondsSinceEpoch;
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), 'x');
+    await tester.tap(find.text('7 天'));
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+    final after = DateTime.now().millisecondsSinceEpoch;
+
+    final expiresAt =
+        verify(
+              () => repo.createShare(
+                't',
+                label: 'x',
+                visibleSections: any(named: 'visibleSections'),
+                expiresAt: captureAny(named: 'expiresAt'),
+                anonymous: false,
+              ),
+            ).captured.single
+            as int;
+    expect(
+      expiresAt,
+      greaterThanOrEqualTo(
+        before + const Duration(days: 7).inMilliseconds - 1000,
+      ),
+    );
+    expect(
+      expiresAt,
+      lessThanOrEqualTo(after + const Duration(days: 7).inMilliseconds + 1000),
+    );
+  });
+
   testWidgets('撤銷 → 確認 → 呼叫 revoke', (tester) async {
     when(() => repo.revokeShare(any(), any())).thenAnswer((_) async {});
 

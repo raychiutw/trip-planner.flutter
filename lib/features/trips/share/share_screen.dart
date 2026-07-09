@@ -26,6 +26,18 @@ const _shareSectionLabels = {
   'emergency': '緊急聯絡',
 };
 const _defaultShareSections = {'flights', 'lodgings', 'pretrip'};
+const _expiryPresets = {
+  'never': null,
+  '24h': Duration(hours: 24),
+  '7d': Duration(days: 7),
+  '30d': Duration(days: 30),
+};
+const _expiryLabels = {
+  'never': '永久',
+  '24h': '24 小時',
+  '7d': '7 天',
+  '30d': '30 天',
+};
 
 /// 管理單一行程的公開分享連結。
 class ShareScreen extends ConsumerStatefulWidget {
@@ -41,6 +53,7 @@ class ShareScreen extends ConsumerStatefulWidget {
 class _ShareScreenState extends ConsumerState<ShareScreen> {
   final _label = TextEditingController();
   final Set<String> _sections = {..._defaultShareSections};
+  String _expiryKey = 'never';
   bool _anonymous = false;
 
   @override
@@ -54,6 +67,13 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   List<String> get _visibleSections =>
       _shareSectionOrder.where(_sections.contains).toList();
+
+  int? get _expiresAt {
+    final duration = _expiryPresets[_expiryKey];
+    return duration == null
+        ? null
+        : DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds;
+  }
 
   void _toggleSection(String key, bool selected) {
     setState(() {
@@ -176,6 +196,25 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       ),
                   ],
                 ),
+                const SizedBox(height: TpSpacing.s3),
+                Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: TpSpacing.s1),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    selected: {_expiryKey},
+                    onSelectionChanged: (next) =>
+                        setState(() => _expiryKey = next.single),
+                    segments: [
+                      for (final key in _expiryPresets.keys)
+                        ButtonSegment(
+                          value: key,
+                          label: Text(_expiryLabels[key] ?? key),
+                        ),
+                    ],
+                  ),
+                ),
                 CheckboxListTile(
                   key: const ValueKey('share-anonymous'),
                   value: _anonymous,
@@ -206,6 +245,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                           _ctrl.create(
                             _label.text,
                             visibleSections: _visibleSections,
+                            expiresAt: _expiresAt,
                             anonymous: _anonymous,
                           );
                           _label.clear();
