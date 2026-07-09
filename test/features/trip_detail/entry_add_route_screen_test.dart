@@ -244,6 +244,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.pump();
+    expect(find.text('trip trip-1'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
     await tester.pumpAndSettle();
 
     verify(
@@ -258,6 +262,99 @@ void main() {
         poiType: any(named: 'poiType'),
         lat: 26.694,
         lng: 127.878,
+        source: 'google',
+      ),
+    ).called(1);
+    expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('搜尋模式可多選後一次加入指定 day', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(
+          placeId: 'p1',
+          name: '美麗海水族館',
+          address: '沖繩縣國頭郡本部町',
+          lat: 26.694,
+          lng: 127.878,
+          category: 'aquarium',
+        ),
+        PoiSearchResult(
+          placeId: 'p2',
+          name: '牧志市場',
+          address: '沖繩縣那霸市松尾',
+          lat: 26.215,
+          lng: 127.687,
+          category: 'restaurant',
+        ),
+      ],
+    );
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '沖繩',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p2')));
+    await tester.pump();
+
+    expect(find.text('已選 2 個'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '美麗海水族館',
+        note: '沖繩縣國頭郡本部町',
+        poiType: any(named: 'poiType'),
+        lat: 26.694,
+        lng: 127.878,
+        source: 'google',
+      ),
+    ).called(1);
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '牧志市場',
+        note: '沖繩縣那霸市松尾',
+        poiType: any(named: 'poiType'),
+        lat: 26.215,
+        lng: 127.687,
         source: 'google',
       ),
     ).called(1);
@@ -364,6 +461,8 @@ void main() {
     expect(find.text('那霸飯店'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-food-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
     await tester.pumpAndSettle();
 
     verify(
@@ -415,6 +514,10 @@ void main() {
     expect(find.text('收藏景點'), findsWidgets);
     expect(find.text('首里城'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
+    await tester.pump();
+    expect(find.text('trip trip-1'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
     await tester.pumpAndSettle();
 
     verify(favoritesRepo.fetchFavorites).called(1);
@@ -427,6 +530,67 @@ void main() {
         poiType: 'attraction',
         lat: 26.217,
         lng: 127.719,
+        source: 'favorite',
+      ),
+    ).called(1);
+    expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('收藏模式可多選後一次加入指定 day', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    when(favoritesRepo.fetchFavorites).thenAnswer((_) async => _mixedFavorites);
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        favoritesRepo: favoritesRepo,
+        initialMode: EntryAddMode.favorites,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-favorite-10')));
+    await tester.tap(find.byKey(const ValueKey('entry-add-favorite-11')));
+    await tester.pump();
+
+    expect(find.text('已選 2 個'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '牧志市場',
+        note: '沖繩縣那霸市松尾',
+        poiType: 'restaurant',
+        source: 'favorite',
+      ),
+    ).called(1);
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '那霸飯店',
+        note: '沖繩縣那霸市',
+        poiType: 'hotel',
         source: 'favorite',
       ),
     ).called(1);

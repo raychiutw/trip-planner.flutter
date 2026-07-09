@@ -58,13 +58,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   int? _selectedDayNum;
   List<PoiSearchResult> _results = const [];
   bool _searching = false;
-  String? _addingPlaceId;
   String? _searchError;
+  final Set<String> _selectedPlaceIds = <String>{};
   List<PoiFavorite> _favorites = const [];
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
-  int? _addingFavoriteId;
   String? _favoritesError;
+  final Set<int> _selectedFavoriteIds = <int>{};
+  bool _submittingSelected = false;
   late String _region;
   _EntryAddCategory _category = _EntryAddCategory.all;
 
@@ -121,36 +122,6 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     }
   }
 
-  Future<void> _addPoi(PoiSearchResult poi, int dayNum) async {
-    setState(() {
-      _addingPlaceId = poi.placeId;
-      _searchError = null;
-    });
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .addEntryToDay(
-            tripId: widget.tripId,
-            dayNum: dayNum,
-            title: poi.name,
-            note: poi.address,
-            poiType: mapGooglePrimaryTypeToPoiType(poi.category),
-            lat: poi.lat,
-            lng: poi.lng,
-            source: 'google',
-          );
-      ref.invalidate(tripDaysProvider(widget.tripId));
-      if (!mounted) return;
-      context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
-    } on Exception {
-      if (!mounted) return;
-      setState(() {
-        _addingPlaceId = null;
-        _searchError = '加入行程失敗，請稍後再試';
-      });
-    }
-  }
-
   Future<void> _loadFavorites({bool force = false}) async {
     if (_favoritesLoading || (_favoritesLoaded && !force)) return;
     setState(() {
@@ -177,15 +148,77 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     }
   }
 
-  Future<void> _addFavorite(PoiFavorite favorite, int dayNum) async {
+  void _togglePoiSelection(PoiSearchResult poi) {
     setState(() {
-      _addingFavoriteId = favorite.id;
+      if (_selectedPlaceIds.contains(poi.placeId)) {
+        _selectedPlaceIds.remove(poi.placeId);
+      } else {
+        _selectedPlaceIds.add(poi.placeId);
+      }
+    });
+  }
+
+  void _toggleFavoriteSelection(PoiFavorite favorite) {
+    setState(() {
+      if (_selectedFavoriteIds.contains(favorite.id)) {
+        _selectedFavoriteIds.remove(favorite.id);
+      } else {
+        _selectedFavoriteIds.add(favorite.id);
+      }
+    });
+  }
+
+  int get _selectedCount => switch (_mode) {
+    EntryAddMode.search => _selectedPlaceIds.length,
+    EntryAddMode.favorites => _selectedFavoriteIds.length,
+    EntryAddMode.custom => 0,
+  };
+
+  Future<void> _submitSelected(int dayNum) async {
+    if (_submittingSelected) return;
+    final selectedPois = _mode == EntryAddMode.search
+        ? _results
+              .where((poi) => _selectedPlaceIds.contains(poi.placeId))
+              .toList(growable: false)
+        : const <PoiSearchResult>[];
+    final selectedFavorites = _mode == EntryAddMode.favorites
+        ? _favorites
+              .where((favorite) => _selectedFavoriteIds.contains(favorite.id))
+              .toList(growable: false)
+        : const <PoiFavorite>[];
+
+    if (_mode == EntryAddMode.search && selectedPois.isEmpty) {
+      setState(() => _searchError = '請先選擇要加入的景點');
+      return;
+    }
+    if (_mode == EntryAddMode.favorites && selectedFavorites.isEmpty) {
+      setState(() => _favoritesError = '請先選擇要加入的收藏');
+      return;
+    }
+
+    setState(() {
+      _submittingSelected = true;
+      _searchError = null;
       _favoritesError = null;
     });
     try {
-      await ref
-          .read(tripRepositoryProvider)
-          .addEntryToDay(
+      final repo = ref.read(tripRepositoryProvider);
+      if (_mode == EntryAddMode.search) {
+        for (final poi in selectedPois) {
+          await repo.addEntryToDay(
+            tripId: widget.tripId,
+            dayNum: dayNum,
+            title: poi.name,
+            note: poi.address,
+            poiType: mapGooglePrimaryTypeToPoiType(poi.category),
+            lat: poi.lat,
+            lng: poi.lng,
+            source: 'google',
+          );
+        }
+      } else {
+        for (final favorite in selectedFavorites) {
+          await repo.addEntryToDay(
             tripId: widget.tripId,
             dayNum: dayNum,
             title: favorite.displayName,
@@ -195,15 +228,26 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             lng: favorite.poiLng,
             source: 'favorite',
           );
+        }
+      }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
       context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
       if (!mounted) return;
-      setState(() {
-        _addingFavoriteId = null;
-        _favoritesError = '加入行程失敗，請稍後再試';
-      });
+      setState(() => _setSubmitError('加入行程失敗，請稍後再試'));
+    } finally {
+      if (mounted) {
+        setState(() => _submittingSelected = false);
+      }
+    }
+  }
+
+  void _setSubmitError(String message) {
+    if (_mode == EntryAddMode.search) {
+      _searchError = message;
+    } else if (_mode == EntryAddMode.favorites) {
+      _favoritesError = message;
     }
   }
 
@@ -302,7 +346,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                           controller: _searchController,
                           results: filteredResults,
                           searching: _searching,
-                          addingPlaceId: _addingPlaceId,
+                          selectedPlaceIds: _selectedPlaceIds,
+                          submitting: _submittingSelected,
+                          selectedCount: _selectedCount,
                           error: _searchError,
                           emptyMessage:
                               _results.isNotEmpty && filteredResults.isEmpty
@@ -312,20 +358,24 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                           onRegionChanged: (region) =>
                               setState(() => _region = region),
                           onSearch: () => _searchPois(),
-                          onAdd: (poi) => _addPoi(poi, dayNum),
+                          onToggle: _togglePoiSelection,
+                          onSubmit: () => _submitSelected(dayNum),
                         )
                       else if (_mode == EntryAddMode.favorites)
                         _FavoritePoiPanel(
                           favorites: filteredFavorites,
                           loading: _favoritesLoading && !_favoritesLoaded,
-                          addingFavoriteId: _addingFavoriteId,
+                          selectedFavoriteIds: _selectedFavoriteIds,
+                          submitting: _submittingSelected,
+                          selectedCount: _selectedCount,
                           error: _favoritesError,
                           emptyMessage:
                               _favorites.isNotEmpty && filteredFavorites.isEmpty
                               ? '沒有符合分類的收藏'
                               : '還沒有收藏的地點',
                           onRetry: () => _loadFavorites(force: true),
-                          onAdd: (favorite) => _addFavorite(favorite, dayNum),
+                          onToggle: _toggleFavoriteSelection,
+                          onSubmit: () => _submitSelected(dayNum),
                         )
                       else
                         EntryEditSheet(
@@ -351,20 +401,26 @@ class _FavoritePoiPanel extends StatelessWidget {
   const _FavoritePoiPanel({
     required this.favorites,
     required this.loading,
-    required this.addingFavoriteId,
+    required this.selectedFavoriteIds,
+    required this.submitting,
+    required this.selectedCount,
     required this.error,
     required this.emptyMessage,
     required this.onRetry,
-    required this.onAdd,
+    required this.onToggle,
+    required this.onSubmit,
   });
 
   final List<PoiFavorite> favorites;
   final bool loading;
-  final int? addingFavoriteId;
+  final Set<int> selectedFavoriteIds;
+  final bool submitting;
+  final int selectedCount;
   final String? error;
   final String emptyMessage;
   final VoidCallback onRetry;
-  final ValueChanged<PoiFavorite> onAdd;
+  final ValueChanged<PoiFavorite> onToggle;
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -418,15 +474,18 @@ class _FavoritePoiPanel extends StatelessWidget {
               subtitle: favorite.poiAddress == null
                   ? null
                   : Text(favorite.poiAddress!),
-              trailing: addingFavoriteId == favorite.id
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add_location_alt_outlined),
-              onTap: addingFavoriteId == null ? () => onAdd(favorite) : null,
+              trailing: Checkbox(
+                value: selectedFavoriteIds.contains(favorite.id),
+                onChanged: submitting ? null : (_) => onToggle(favorite),
+              ),
+              onTap: submitting ? null : () => onToggle(favorite),
             ),
           ),
+        _EntryAddSubmitBar(
+          selectedCount: selectedCount,
+          submitting: submitting,
+          onSubmit: onSubmit,
+        ),
       ],
     );
   }
@@ -437,25 +496,31 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.controller,
     required this.results,
     required this.searching,
-    required this.addingPlaceId,
+    required this.selectedPlaceIds,
+    required this.submitting,
+    required this.selectedCount,
     required this.error,
     required this.emptyMessage,
     required this.region,
     required this.onRegionChanged,
     required this.onSearch,
-    required this.onAdd,
+    required this.onToggle,
+    required this.onSubmit,
   });
 
   final TextEditingController controller;
   final List<PoiSearchResult> results;
   final bool searching;
-  final String? addingPlaceId;
+  final Set<String> selectedPlaceIds;
+  final bool submitting;
+  final int selectedCount;
   final String? error;
   final String? emptyMessage;
   final String region;
   final ValueChanged<String> onRegionChanged;
   final VoidCallback onSearch;
-  final ValueChanged<PoiSearchResult> onAdd;
+  final ValueChanged<PoiSearchResult> onToggle;
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -530,16 +595,48 @@ class _SearchPoiPanel extends StatelessWidget {
               key: ValueKey('entry-add-poi-${poi.placeId}'),
               title: Text(poi.name),
               subtitle: poi.address == null ? null : Text(poi.address!),
-              trailing: addingPlaceId == poi.placeId
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add_location_alt_outlined),
-              onTap: addingPlaceId == null ? () => onAdd(poi) : null,
+              trailing: Checkbox(
+                value: selectedPlaceIds.contains(poi.placeId),
+                onChanged: submitting ? null : (_) => onToggle(poi),
+              ),
+              onTap: submitting ? null : () => onToggle(poi),
             ),
           ),
+        _EntryAddSubmitBar(
+          selectedCount: selectedCount,
+          submitting: submitting,
+          onSubmit: onSubmit,
+        ),
       ],
+    );
+  }
+}
+
+class _EntryAddSubmitBar extends StatelessWidget {
+  const _EntryAddSubmitBar({
+    required this.selectedCount,
+    required this.submitting,
+    required this.onSubmit,
+  });
+
+  final int selectedCount;
+  final bool submitting;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: TpSpacing.s3),
+      child: Row(
+        children: [
+          Expanded(child: Text('已選 $selectedCount 個')),
+          FilledButton(
+            key: const ValueKey('entry-add-confirm'),
+            onPressed: selectedCount > 0 && !submitting ? onSubmit : null,
+            child: Text(submitting ? '加入中…' : '完成'),
+          ),
+        ],
+      ),
     );
   }
 }
