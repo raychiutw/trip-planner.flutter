@@ -81,9 +81,9 @@ class TripDay {
   factory TripDay.fromJson(Map<String, dynamic> json) {
     return TripDay(
       id: (json['id'] as num).toInt(),
-      dayNum: (json['dayNum'] as num).toInt(),
+      dayNum: ((json['dayNum'] ?? json['day_num']) as num).toInt(),
       date: json['date'] as String?,
-      dayOfWeek: json['dayOfWeek'] as String?,
+      dayOfWeek: (json['dayOfWeek'] ?? json['day_of_week']) as String?,
       label: json['label'] as String?,
       title: json['title'] as String?,
       version: (json['version'] as num?)?.toInt() ?? 0,

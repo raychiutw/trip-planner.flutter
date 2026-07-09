@@ -197,6 +197,44 @@ class TripRepository {
       .getStream('/trips/${Uri.encodeComponent(id)}/days', query: {'all': '1'})
       .map((b) => _list(b, TripDay.fromJson));
 
+  /// POST /trips/:id/days（position=start/end/insert；insert 需 date）。
+  Future<TripDay> createDay({
+    required String tripId,
+    required String position,
+    String? date,
+  }) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days',
+      body: {'position': position, 'date': ?date},
+    );
+    final map = body as Map<String, dynamic>;
+    return TripDay.fromJson(Map<String, dynamic>.from(map['day'] as Map));
+  }
+
+  /// DELETE /trips/:id/days/:num（刪除一天並重新編號後續 day_num）。
+  Future<int> deleteDay({required String tripId, required int dayNum}) async {
+    final body = await _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum',
+    );
+    final map = body as Map<String, dynamic>;
+    return (map['removedEntryCount'] as num?)?.toInt() ?? 0;
+  }
+
+  /// POST /trips/:id/days/shift（整體平移日期，startDate 為新 Day 1 日期）。
+  Future<({String newStartDate, String? newEndDate, int daysShifted})>
+  shiftDays({required String tripId, required String startDate}) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(tripId)}/days/shift',
+      body: {'startDate': startDate},
+    );
+    final map = body as Map<String, dynamic>;
+    return (
+      newStartDate: map['newStartDate'] as String? ?? startDate,
+      newEndDate: map['newEndDate'] as String?,
+      daysShifted: (map['daysShifted'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   /// GET /trips/:id/notes（5 區聚合）。
   Future<TripNotes> fetchNotes(String id) async => _one(
     await _client.get('/trips/${Uri.encodeComponent(id)}/notes'),

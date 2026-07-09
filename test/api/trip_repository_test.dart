@@ -373,6 +373,69 @@ void main() {
     expect(kokusaiStreetEntry.alternates, isEmpty);
   });
 
+  test('createDay：POST /trips/:id/days position/date 回傳 day', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/days',
+      (server) => server.reply(200, {
+        'day': {
+          'id': 14,
+          'day_num': 2,
+          'date': '2026-04-24',
+          'day_of_week': '五',
+          'label': '',
+          'title': null,
+        },
+      }),
+      data: {'position': 'insert', 'date': '2026-04-24'},
+    );
+
+    final day = await tripRepository.createDay(
+      tripId: 'okinawa',
+      position: 'insert',
+      date: '2026-04-24',
+    );
+
+    expect(day.id, 14);
+    expect(day.dayNum, 2);
+    expect(day.dayOfWeek, '五');
+  });
+
+  test('deleteDay：DELETE /trips/:id/days/:num 回 removedEntryCount', () async {
+    dioAdapter.onDelete(
+      '/trips/okinawa/days/2',
+      (server) => server.reply(200, {'ok': true, 'removedEntryCount': 3}),
+    );
+
+    final removed = await tripRepository.deleteDay(
+      tripId: 'okinawa',
+      dayNum: 2,
+    );
+
+    expect(removed, 3);
+  });
+
+  test('shiftDays：POST /trips/:id/days/shift 回平移摘要', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/days/shift',
+      (server) => server.reply(200, {
+        'ok': true,
+        'newStartDate': '2026-05-01',
+        'newEndDate': '2026-05-05',
+        'daysShifted': 5,
+      }),
+      data: {'startDate': '2026-05-01'},
+    );
+
+    final result = await tripRepository.shiftDays(
+      tripId: 'okinawa',
+      startDate: '2026-05-01',
+    );
+
+    expect(result.newStartDate, '2026-05-01');
+    expect(result.newEndDate, '2026-05-05');
+    expect(result.daysShifted, 5);
+  });
+
   test('fetchNotes：GET /trips/:id/notes 解析 5 區聚合', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/notes',

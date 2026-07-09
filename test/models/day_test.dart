@@ -101,6 +101,21 @@ void main() {
       expect(day.timeline, isEmpty);
     });
 
+    test('接受 create-day API 的 snake_case 欄位', () {
+      final day = TripDay.fromJson({
+        'id': 103,
+        'day_num': 4,
+        'date': '2026-04-26',
+        'day_of_week': '日',
+        'label': '',
+        'title': null,
+      });
+
+      expect(day.dayNum, 4);
+      expect(day.dayOfWeek, '日');
+      expect(day.version, 0);
+    });
+
     test('displayTitle fallback：title → label → Day N', () {
       final dayWithTitle = TripDay.fromJson({
         'id': 1,
