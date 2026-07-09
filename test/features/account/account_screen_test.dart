@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
+class MockTripRepository extends Mock implements TripRepository {}
+
 void main() {
   late MockAuthRepository mockAuthRepository;
+  late MockTripRepository mockTripRepository;
 
   const verifiedUser = UserInfo(
     id: 'user-1',
@@ -28,6 +33,7 @@ void main() {
 
   setUp(() {
     mockAuthRepository = MockAuthRepository();
+    mockTripRepository = MockTripRepository();
     when(() => mockAuthRepository.logout()).thenAnswer((_) async {});
   });
 
@@ -47,6 +53,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          tripRepositoryProvider.overrideWithValue(mockTripRepository),
           accountStatsProvider.overrideWith((ref) => Future.value(stats)),
         ],
         child: MaterialApp(
@@ -101,6 +108,82 @@ void main() {
     await pumpAccountScreen(tester);
 
     expect(find.text('Email 未驗證'), findsNothing);
+  });
+
+  testWidgets('點名稱編輯按鈕可 inline 改名並靜默儲存', (tester) async {
+    when(
+      () => mockTripRepository.updateProfile(
+        displayName: any(named: 'displayName'),
+      ),
+    ).thenAnswer(
+      (_) async => const UserInfo(
+        id: 'user-1',
+        email: 'ray@example.com',
+        emailVerified: true,
+        displayName: 'Ray Chiu',
+      ),
+    );
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-edit-name-btn')));
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const ValueKey('account-edit-name-input'));
+    expect(input, findsOneWidget);
+    expect(find.text('Ray'), findsOneWidget);
+
+    await tester.enterText(input, 'Ray Chiu');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockTripRepository.updateProfile(displayName: 'Ray Chiu'),
+    ).called(1);
+    expect(input, findsNothing);
+    expect(find.text('Ray Chiu'), findsOneWidget);
+  });
+
+  testWidgets('inline 改名按 Escape 取消且不呼叫 API', (tester) async {
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-edit-name-btn')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('account-edit-name-input')),
+      'Draft Name',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('account-edit-name-input')), findsNothing);
+    expect(find.text('Ray'), findsOneWidget);
+    verifyNever(
+      () => mockTripRepository.updateProfile(
+        displayName: any(named: 'displayName'),
+      ),
+    );
+  });
+
+  testWidgets('inline 改名清空時送出 null displayName', (tester) async {
+    when(() => mockTripRepository.updateProfile(displayName: null)).thenAnswer(
+      (_) async => const UserInfo(
+        id: 'user-1',
+        email: 'ray@example.com',
+        emailVerified: true,
+      ),
+    );
+    await pumpAccountScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-edit-name-btn')));
+    await tester.pumpAndSettle();
+    final input = find.byKey(const ValueKey('account-edit-name-input'));
+    await tester.enterText(input, '   ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    verify(() => mockTripRepository.updateProfile(displayName: null)).called(1);
+    expect(input, findsNothing);
+    expect(find.text('ray'), findsOneWidget);
   });
 
   testWidgets('帳號設定 rows 可進子頁；通知 row 已轉正', (tester) async {

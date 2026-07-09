@@ -1,8 +1,11 @@
 /// 帳號 hub 畫面（tab 5）：profile hero、統計、設定 rows、登出。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
@@ -16,16 +19,46 @@ final accountStatsProvider = FutureProvider<AccountStats>(
 );
 
 /// 帳號 hub。
-class AccountScreen extends ConsumerWidget {
+class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends ConsumerState<AccountScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  late final FocusNode _nameFocusNode;
+  bool _editingName = false;
+  bool _savingName = false;
+  String _nameBaseline = '';
+  String? _nameError;
+  UserInfo? _profileOverride;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameFocusNode = FocusNode(onKeyEvent: _handleNameKeyEvent)
+      ..addListener(_handleNameFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _nameFocusNode
+      ..removeListener(_handleNameFocusChange)
+      ..dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(authStateProvider).value;
     // 未登入（含登出後）由 router redirect 導向 /login，這裡不渲染內容。
     if (currentUser == null) {
       return const Scaffold(body: SizedBox.shrink());
     }
+    final effectiveUser = _effectiveUser(currentUser);
 
     final accountStats = ref.watch(accountStatsProvider).value;
 
@@ -35,7 +68,15 @@ class AccountScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [
           const SizedBox(height: TpSpacing.s4),
-          _ProfileHero(user: currentUser),
+          _ProfileHero(
+            user: effectiveUser,
+            editingName: _editingName,
+            savingName: _savingName,
+            nameError: _nameError,
+            nameController: _nameController,
+            nameFocusNode: _nameFocusNode,
+            onEditName: () => _startEditName(effectiveUser),
+          ),
           const SizedBox(height: TpSpacing.s6),
           _StatsRow(stats: accountStats),
           const SizedBox(height: TpSpacing.s6),
@@ -45,6 +86,87 @@ class AccountScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  UserInfo _effectiveUser(UserInfo currentUser) {
+    final updated = _profileOverride;
+    if (updated == null) return currentUser;
+    if (updated.id == currentUser.id && updated.email == currentUser.email) {
+      return updated;
+    }
+    return currentUser;
+  }
+
+  KeyEventResult _handleNameKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape &&
+        _editingName) {
+      _cancelEditName();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _handleNameFocusChange() {
+    if (_editingName && !_nameFocusNode.hasFocus && !_savingName) {
+      unawaited(_commitEditName());
+    }
+  }
+
+  void _startEditName(UserInfo user) {
+    final currentName = user.displayName ?? '';
+    _nameController.text = currentName;
+    _nameBaseline = currentName;
+    setState(() {
+      _editingName = true;
+      _nameError = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_editingName) return;
+      _nameFocusNode.requestFocus();
+      _nameController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _nameController.text.length,
+      );
+    });
+  }
+
+  void _cancelEditName() {
+    _nameController.text = _nameBaseline;
+    setState(() {
+      _editingName = false;
+      _nameError = null;
+    });
+    _nameFocusNode.unfocus();
+  }
+
+  Future<void> _commitEditName() async {
+    if (!_editingName || _savingName) return;
+    final trimmed = _nameController.text.trim();
+    if (trimmed == _nameBaseline.trim()) {
+      if (mounted) setState(() => _editingName = false);
+      return;
+    }
+    setState(() {
+      _savingName = true;
+      _nameError = null;
+    });
+    try {
+      final updatedUser = await ref
+          .read(tripRepositoryProvider)
+          .updateProfile(displayName: trimmed.isEmpty ? null : trimmed);
+      if (!mounted) return;
+      setState(() {
+        _profileOverride = updatedUser;
+        _nameBaseline = updatedUser.displayName ?? '';
+        _editingName = false;
+      });
+      ref.invalidate(authStateProvider);
+    } on Exception {
+      if (mounted) setState(() => _nameError = '儲存失敗，請稍後再試');
+    } finally {
+      if (mounted) setState(() => _savingName = false);
+    }
   }
 
   /// 登出前 AlertDialog 確認，確認才呼叫 authStateProvider.logout()。
@@ -98,9 +220,23 @@ String _resolveDisplayName(UserInfo user) {
 
 /// 圓形 avatar（首字母大寫）+ 名稱 + email + 未驗證警示。
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.user});
+  const _ProfileHero({
+    required this.user,
+    required this.editingName,
+    required this.savingName,
+    required this.nameController,
+    required this.nameFocusNode,
+    required this.onEditName,
+    this.nameError,
+  });
 
   final UserInfo user;
+  final bool editingName;
+  final bool savingName;
+  final String? nameError;
+  final TextEditingController nameController;
+  final FocusNode nameFocusNode;
+  final VoidCallback onEditName;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +257,72 @@ class _ProfileHero extends StatelessWidget {
           ),
         ),
         const SizedBox(height: TpSpacing.s3),
-        Text(resolvedName, style: theme.textTheme.titleLarge),
+        if (editingName)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: TextField(
+              key: const ValueKey('account-edit-name-input'),
+              controller: nameController,
+              focusNode: nameFocusNode,
+              enabled: !savingName,
+              textAlign: TextAlign.center,
+              textInputAction: TextInputAction.done,
+              maxLength: 50,
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: user.email.split('@').first,
+                suffixIcon: savingName
+                    ? const Padding(
+                        padding: EdgeInsets.all(TpSpacing.s3),
+                        child: SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+              onSubmitted: (_) => nameFocusNode.unfocus(),
+            ),
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(TpRadius.sm),
+                  onTap: onEditName,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s1,
+                      vertical: TpSpacing.s1,
+                    ),
+                    child: Text(
+                      resolvedName,
+                      style: theme.textTheme.titleLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('account-edit-name-btn'),
+                tooltip: '編輯名稱',
+                onPressed: onEditName,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
+          ),
+        if (nameError != null) ...[
+          const SizedBox(height: TpSpacing.s1),
+          Text(
+            nameError!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
         const SizedBox(height: TpSpacing.s1),
         Text(
           user.email,
