@@ -20,6 +20,7 @@
 - **Legacy route redirects**:支援 web 保留路徑 `/admin` → `/trips`、`/manage` → `/chat`。
 - **地圖停留點 deep link**:`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並在地圖初始顯示該停留點所在日。
 - **時間軸停留點 deep link**:`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並在時間軸初始捲動與標示該停留點。
+- **Web selected/focus deep link**:支援 `/trips?selected=:tripId&focus=:entryId`,會導到 Flutter canonical `/trips/:tripId?entry=:entryId`。
 
 ### 修正
 

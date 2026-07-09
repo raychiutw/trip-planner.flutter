@@ -364,7 +364,19 @@ void main() {
 
     expect(find.byType(TripsListScreen), findsOneWidget);
 
+    container.read(appRouterProvider).go('/admin/');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+
     container.read(appRouterProvider).go('/manage');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(ChatScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/manage/');
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -430,6 +442,33 @@ void main() {
     await tester.pumpAndSettle();
 
     container.read(appRouterProvider).go('/trip/trip-1/stop/11');
+    await tester.pumpAndSettle();
+
+    final screen = tester.widget<TripTimelineScreen>(
+      find.byType(TripTimelineScreen),
+    );
+    expect(screen.initialEntryId, 11);
+    expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('已登入可使用 /trips selected/focus query deep link', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips?selected=trip-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+
+    container.read(appRouterProvider).go('/trips?selected=trip-1&focus=11');
     await tester.pumpAndSettle();
 
     final screen = tester.widget<TripTimelineScreen>(
