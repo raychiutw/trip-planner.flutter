@@ -13,6 +13,7 @@ import 'package:tripline/features/favorites/explore/explore_controller.dart'
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/place_details.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -99,6 +100,16 @@ Widget _buildScreen(
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
+}
+
+void _stubResolvePlace(
+  _MockPoiRepository poiRepo, {
+  PlaceDetails Function(String placeId)? detailsFor,
+}) {
+  when(() => poiRepo.resolvePlace(any())).thenAnswer((invocation) async {
+    final placeId = invocation.positionalArguments.first as String;
+    return detailsFor?.call(placeId) ?? PlaceDetails(placeId: placeId);
+  });
 }
 
 void main() {
@@ -216,6 +227,15 @@ void main() {
         ),
       ],
     );
+    _stubResolvePlace(
+      poiRepo,
+      detailsFor: (placeId) => PlaceDetails(
+        placeId: placeId,
+        hours:
+            '星期一: 08:30-18:30 星期二: 08:30-18:30 星期三: 08:30-18:30 星期四: 08:30-18:30 星期五: 08:30-18:30 星期六: 08:30-18:30 星期日: 08:30-18:30',
+        priceLevel: 'PRICE_LEVEL_MODERATE',
+      ),
+    );
     when(
       () => repo.addEntryToDay(
         tripId: any(named: 'tripId'),
@@ -253,12 +273,87 @@ void main() {
     verify(
       () => poiRepo.searchPois(q: '水族館', limit: 20, region: null),
     ).called(1);
+    verify(() => poiRepo.resolvePlace('p1')).called(1);
     verify(
       () => repo.addEntryToDay(
         tripId: 'trip-1',
         dayNum: 2,
         title: '美麗海水族館',
+        note: '營業 08:30-18:30\n消費 ￥￥\n沖繩縣國頭郡本部町',
+        poiType: any(named: 'poiType'),
+        lat: 26.694,
+        lng: 127.878,
+        source: 'google',
+      ),
+    ).called(1);
+    expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('搜尋 POI 加入時 resolve 失敗會保留地址備註', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(
+          placeId: 'p1',
+          name: '美麗海水族館',
+          address: '沖繩縣國頭郡本部町',
+          lat: 26.694,
+          lng: 127.878,
+          category: 'aquarium',
+        ),
+      ],
+    );
+    when(
+      () => poiRepo.resolvePlace('p1'),
+    ).thenThrow(Exception('resolve failed'));
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
         note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '水族館',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
+    await tester.pumpAndSettle();
+
+    verify(() => poiRepo.resolvePlace('p1')).called(1);
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '美麗海水族館',
+        note: '沖繩縣國頭郡本部町',
         poiType: any(named: 'poiType'),
         lat: 26.694,
         lng: 127.878,
@@ -298,6 +393,7 @@ void main() {
         ),
       ],
     );
+    _stubResolvePlace(poiRepo);
     when(
       () => repo.addEntryToDay(
         tripId: any(named: 'tripId'),
@@ -423,6 +519,7 @@ void main() {
         ),
       ],
     );
+    _stubResolvePlace(poiRepo);
     when(
       () => repo.addEntryToDay(
         tripId: any(named: 'tripId'),

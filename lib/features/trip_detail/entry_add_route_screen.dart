@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/day.dart';
+import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
@@ -205,11 +206,12 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       final repo = ref.read(tripRepositoryProvider);
       if (_mode == EntryAddMode.search) {
         for (final poi in selectedPois) {
+          final note = await _buildSearchPoiNote(poi);
           await repo.addEntryToDay(
             tripId: widget.tripId,
             dayNum: dayNum,
             title: poi.name,
-            note: poi.address,
+            note: note,
             poiType: mapGooglePrimaryTypeToPoiType(poi.category),
             lat: poi.lat,
             lng: poi.lng,
@@ -240,6 +242,21 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       if (mounted) {
         setState(() => _submittingSelected = false);
       }
+    }
+  }
+
+  Future<String?> _buildSearchPoiNote(PoiSearchResult poi) async {
+    try {
+      final details = await ref
+          .read(poiRepositoryProvider)
+          .resolvePlace(poi.placeId);
+      return buildPoiNote(
+        hoursRaw: details.hours,
+        priceLevel: details.priceLevel,
+        address: poi.address,
+      );
+    } on Exception {
+      return buildPoiNote(address: poi.address);
     }
   }
 
