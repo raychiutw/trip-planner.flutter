@@ -23,7 +23,7 @@
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/move` | `EntryActionRouteScreen` | tab 2 孫路由 |
-| `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由 |
+| `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由(搜尋置換正選 POI、加入/移除/設為正選備選、編輯 per-POI 備註/分類/訂位) |
 | `/map` | `GlobalMapScreen` | tab 3 |
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |
@@ -42,7 +42,7 @@
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
-Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到地點管理頁。
+Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到可搜尋置換正選 POI 的地點管理頁。
 
 Legacy redirect：`/admin`、`/admin/` 會導到 `/trips`，`/manage`、`/manage/` 會導到 `/chat`。
 

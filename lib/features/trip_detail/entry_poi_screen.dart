@@ -88,10 +88,21 @@ class EntryPoiScreen extends ConsumerWidget {
           _PoiCard(
             poi: entry.master!,
             isMaster: true,
-            trailing: TextButton(
-              key: const ValueKey('poi-edit-master'),
-              onPressed: () => _editPoiInfo(context, ref, entry.master!),
-              child: const Text('編輯資訊'),
+            trailing: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                TextButton(
+                  key: const ValueKey('change-master'),
+                  onPressed: () => _changeMaster(context, ref, entry),
+                  child: const Text('置換正選'),
+                ),
+                TextButton(
+                  key: const ValueKey('poi-edit-master'),
+                  onPressed: () => _editPoiInfo(context, ref, entry.master!),
+                  child: const Text('編輯資訊'),
+                ),
+              ],
             ),
           )
         else
@@ -225,6 +236,34 @@ class EntryPoiScreen extends ConsumerWidget {
           ),
       success: '已加入備選',
     );
+  }
+
+  Future<void> _changeMaster(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+  ) async {
+    final selected = await showModalBottomSheet<PoiSearchResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: const _AlternateSearchSheet(hintText: '搜尋地點置換正選'),
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    await _run(context, ref, () async {
+      await ref
+          .read(tripRepositoryProvider)
+          .changeEntryPoi(
+            tripId: tripId,
+            entryId: entryId,
+            poi: selected,
+            entryPoisVersion: entry.entryPoisVersion,
+          );
+    }, success: '已置換正選');
   }
 }
 
@@ -393,9 +432,11 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
   }
 }
 
-/// 加入備選的 POI 搜尋 sheet（複用探索的 poiRepositoryProvider.searchPois）。
+/// Entry POI 操作共用搜尋 sheet（複用探索的 poiRepositoryProvider.searchPois）。
 class _AlternateSearchSheet extends ConsumerStatefulWidget {
-  const _AlternateSearchSheet();
+  const _AlternateSearchSheet({this.hintText = '搜尋地點加入備選'});
+
+  final String hintText;
 
   @override
   ConsumerState<_AlternateSearchSheet> createState() =>
@@ -447,7 +488,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                     autofocus: true,
                     textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _search(),
-                    decoration: const InputDecoration(hintText: '搜尋地點加入備選'),
+                    decoration: InputDecoration(hintText: widget.hintText),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),

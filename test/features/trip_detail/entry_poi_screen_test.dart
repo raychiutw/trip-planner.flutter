@@ -201,4 +201,48 @@ void main() {
       ),
     ).called(1);
   });
+
+  testWidgets('置換正選 → 搜尋選結果 → changeEntryPoi', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => repo.changeEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poi: any(named: 'poi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async => 701);
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [PoiSearchResult(placeId: 'p8', name: '波上宮')],
+    );
+    await _pump(tester, repo, poiRepo: poiRepo);
+
+    await tester.tap(find.byKey(const ValueKey('change-master')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('alt-search-field')),
+      '波上',
+    );
+    await tester.tap(find.byKey(const ValueKey('alt-search-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('alt-result-p8')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.changeEntryPoi(
+        tripId: 't1',
+        entryId: 11,
+        poi: any(named: 'poi'),
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+  });
 }
