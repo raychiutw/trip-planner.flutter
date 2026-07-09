@@ -4,9 +4,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
+import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
+
+const _typeFilterOptions = [
+  _TypeFilterOption(key: 'all', label: '全部'),
+  _TypeFilterOption(key: 'restaurant', label: '餐廳'),
+  _TypeFilterOption(key: 'attraction', label: '景點'),
+  _TypeFilterOption(key: 'shopping', label: '購物'),
+  _TypeFilterOption(key: 'hotel', label: '住宿'),
+];
 
 /// 收藏清單（5-tab「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
 class FavoritesScreen extends ConsumerStatefulWidget {
@@ -19,6 +28,7 @@ class FavoritesScreen extends ConsumerStatefulWidget {
 class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _typeFilter = 'all';
 
   @override
   void dispose() {
@@ -57,7 +67,11 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   }
 
   Widget _buildList(BuildContext context, List<PoiFavorite> favorites) {
-    final filteredFavorites = _filterFavorites(favorites, _searchQuery);
+    final filteredFavorites = _filterFavorites(
+      favorites,
+      _searchQuery,
+      _typeFilter,
+    );
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -66,21 +80,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         _SearchField(
           controller: _searchController,
           onChanged: (value) => setState(() => _searchQuery = value),
-          onClear: _searchQuery.trim().isEmpty
-              ? null
-              : () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
+          onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        _TypeFilterRow(
+          selected: _typeFilter,
+          onSelected: (value) => setState(() => _typeFilter = value),
         ),
         const SizedBox(height: TpSpacing.s3),
         if (filteredFavorites.isEmpty)
-          _NoSearchResult(
-            onClear: () {
-              _searchController.clear();
-              setState(() => _searchQuery = '');
-            },
-          )
+          _NoSearchResult(onClear: _clearAllFilters)
         else
           for (final favorite in filteredFavorites) ...[
             PoiFavoriteCard(
@@ -98,6 +107,19 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           ],
       ],
     );
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+  }
+
+  void _clearAllFilters() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _typeFilter = 'all';
+    });
   }
 
   Future<void> _confirmRemove(
@@ -139,11 +161,17 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 List<PoiFavorite> _filterFavorites(
   List<PoiFavorite> favorites,
   String rawQuery,
+  String typeFilter,
 ) {
   final query = rawQuery.trim().toLowerCase();
-  if (query.isEmpty) return favorites;
 
   return favorites.where((favorite) {
+    if (typeFilter != 'all' &&
+        mapGooglePrimaryTypeToPoiType(favorite.poiType) != typeFilter) {
+      return false;
+    }
+    if (query.isEmpty) return true;
+
     final haystack = [
       favorite.displayName,
       favorite.poiAddress,
@@ -151,6 +179,13 @@ List<PoiFavorite> _filterFavorites(
     ].whereType<String>().join(' ').toLowerCase();
     return haystack.contains(query);
   }).toList();
+}
+
+class _TypeFilterOption {
+  const _TypeFilterOption({required this.key, required this.label});
+
+  final String key;
+  final String label;
 }
 
 class _SearchField extends StatelessWidget {
@@ -189,6 +224,30 @@ class _SearchField extends StatelessWidget {
   }
 }
 
+class _TypeFilterRow extends StatelessWidget {
+  const _TypeFilterRow({required this.selected, required this.onSelected});
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: TpSpacing.s2,
+      runSpacing: TpSpacing.s2,
+      children: [
+        for (final option in _typeFilterOptions)
+          FilterChip(
+            key: ValueKey('favorites-type-${option.key}'),
+            label: Text(option.label),
+            selected: selected == option.key,
+            onSelected: (_) => onSelected(option.key),
+          ),
+      ],
+    );
+  }
+}
+
 class _NoSearchResult extends StatelessWidget {
   const _NoSearchResult({required this.onClear});
 
@@ -203,12 +262,12 @@ class _NoSearchResult extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('目前的搜尋沒有符合的收藏', style: theme.textTheme.titleMedium),
+            Text('目前的篩選沒有符合的收藏', style: theme.textTheme.titleMedium),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
               key: const ValueKey('favorites-search-no-match-clear'),
               onPressed: onClear,
-              child: const Text('清除搜尋'),
+              child: const Text('清除篩選'),
             ),
           ],
         ),

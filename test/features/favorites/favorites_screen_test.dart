@@ -87,6 +87,30 @@ void main() {
       expect(find.text('暖暮拉麵'), findsNothing);
     });
 
+    testWidgets('類型篩選只保留指定類型並可切回全部', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorites-type-restaurant')));
+      await tester.pump();
+
+      expect(find.byType(PoiFavoriteCard), findsOneWidget);
+      expect(find.text('暖暮拉麵'), findsOneWidget);
+      expect(find.text('美麗海水族館'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-type-all')));
+      await tester.pump();
+
+      expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
+    });
+
     testWidgets('empty → 還沒有收藏 hero', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
