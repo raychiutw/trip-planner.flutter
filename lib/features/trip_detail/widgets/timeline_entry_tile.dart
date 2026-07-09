@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
+import '../../../models/poi_type.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 import '../../../theme/poi_tone.dart';
@@ -167,10 +168,11 @@ class _EntryCard extends StatelessWidget {
           Text(masterName, style: TextStyle(fontSize: 13, color: mutedColor)),
         );
       }
-      if (master.category != null) {
+      final categoryLabel = poiCategoryLabel(master.category);
+      if (categoryLabel != null) {
         metaItems.add(
           Text(
-            master.category!,
+            categoryLabel,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,

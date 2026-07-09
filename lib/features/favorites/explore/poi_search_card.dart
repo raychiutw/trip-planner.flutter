@@ -29,6 +29,8 @@ class PoiSearchCard extends StatelessWidget {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
     final poiType = mapGooglePrimaryTypeToPoiType(poi.category);
+    final categoryLabel =
+        poiCategoryLabel(poi.category) ?? kPoiTypeLabels[poiType] ?? 'POI';
     final tone = resolvePoiTone(tones, poiType);
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
@@ -79,7 +81,7 @@ class PoiSearchCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    kPoiTypeLabels[poiType] ?? 'POI',
+                    categoryLabel,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
