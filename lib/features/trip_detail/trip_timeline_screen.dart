@@ -21,6 +21,8 @@ import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
+enum _TripMoreAction { share, collab, health }
+
 /// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerWidget {
@@ -80,6 +82,47 @@ class TripTimelineScreen extends ConsumerWidget {
             icon: const Icon(Icons.history_outlined),
             onPressed: () => _goTo(context, '/trips/$tripId/audit'),
           ),
+          PopupMenuButton<_TripMoreAction>(
+            key: const ValueKey('trip-actions-menu'),
+            tooltip: '更多',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (action) {
+              switch (action) {
+                case _TripMoreAction.share:
+                  _goTo(context, '/share-trip/$tripId');
+                case _TripMoreAction.collab:
+                  _goTo(context, '/collab/$tripId');
+                case _TripMoreAction.health:
+                  _goTo(context, '/trips/$tripId/health');
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                key: ValueKey('trip-action-share'),
+                value: _TripMoreAction.share,
+                child: _TripActionMenuItem(
+                  icon: Icons.ios_share_outlined,
+                  label: '分享連結',
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('trip-action-collab'),
+                value: _TripMoreAction.collab,
+                child: _TripActionMenuItem(
+                  icon: Icons.group_outlined,
+                  label: '共編設定',
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('trip-action-health'),
+                value: _TripMoreAction.health,
+                child: _TripActionMenuItem(
+                  icon: Icons.health_and_safety_outlined,
+                  label: 'AI 健檢',
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: daysAsync.when(
@@ -99,6 +142,25 @@ class TripTimelineScreen extends ConsumerWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _TripActionMenuItem extends StatelessWidget {
+  const _TripActionMenuItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: TpSpacing.s3),
+        Text(label),
+      ],
     );
   }
 }

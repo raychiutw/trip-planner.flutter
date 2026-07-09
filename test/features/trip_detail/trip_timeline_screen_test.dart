@@ -164,7 +164,20 @@ Future<void> _pumpTimeline(
             builder: (context, state) =>
                 const Scaffold(body: Text('audit-page')),
           ),
+          GoRoute(
+            path: 'health',
+            builder: (context, state) =>
+                const Scaffold(body: Text('health-page')),
+          ),
         ],
+      ),
+      GoRoute(
+        path: '/collab/:tripId',
+        builder: (context, state) => const Scaffold(body: Text('collab-page')),
+      ),
+      GoRoute(
+        path: '/share-trip/:tripId',
+        builder: (context, state) => const Scaffold(body: Text('share-page')),
       ),
     ],
   );
@@ -247,6 +260,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('audit-page'), findsOneWidget);
+  });
+
+  testWidgets('更多選單提供分享、共編與 AI 健檢入口', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-action-share')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-action-collab')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-action-health')), findsOneWidget);
+  });
+
+  testWidgets('更多選單可導向分享連結頁', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-share')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('share-page'), findsOneWidget);
+  });
+
+  testWidgets('更多選單可導向共編設定頁', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-collab')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('collab-page'), findsOneWidget);
+  });
+
+  testWidgets('更多選單可導向 AI 健檢頁', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-health')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('health-page'), findsOneWidget);
   });
 
   testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (
