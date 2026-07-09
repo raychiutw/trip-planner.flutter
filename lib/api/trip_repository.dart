@@ -14,6 +14,7 @@ import '../models/poi_type.dart';
 import '../models/segment.dart';
 import '../models/share.dart';
 import '../models/trip.dart';
+import '../models/trip_health.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 import 'cache/cache_keys.dart';
@@ -60,6 +61,13 @@ class TripRepository {
   ) => (body as List<dynamic>)
       .map((e) => fromJson(e as Map<String, dynamic>))
       .toList();
+
+  static TripHealthReport? _optionalHealthReport(Object? body) {
+    final map = body as Map<String, dynamic>;
+    final report = map['report'];
+    if (report == null) return null;
+    return TripHealthReport.fromJson(Map<String, dynamic>.from(report as Map));
+  }
 
   /// GET /my-trips。
   Future<List<TripSummary>> fetchMyTrips() async =>
@@ -147,6 +155,28 @@ class TripRepository {
     await _client.get('/trips/${Uri.encodeComponent(id)}'),
     Trip.fromJson,
   );
+
+  /// GET /trips/:id/health-check（AI 健檢 report;不走離線 cache）。
+  Future<TripHealthReport?> fetchHealthReport(String id) async {
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/health-check',
+      writeCache: false,
+      fallbackToCache: false,
+    );
+    return _optionalHealthReport(body);
+  }
+
+  /// POST /trips/:id/health-check（啟動 AI 健檢）。
+  Future<TripHealthReport> startHealthCheck(String id) async {
+    final body = await _client.post(
+      '/trips/${Uri.encodeComponent(id)}/health-check',
+    );
+    final report = _optionalHealthReport(body);
+    if (report == null) {
+      throw const FormatException('Missing health-check report');
+    }
+    return report;
+  }
 
   /// GET /trips/:id（SWR stream）。
   Stream<Trip> watchTrip(String id) => _client

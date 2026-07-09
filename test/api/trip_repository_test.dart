@@ -14,6 +14,7 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
+import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/user.dart';
 
 void main() {
@@ -86,6 +87,79 @@ void main() {
     expect(tripDetail.id, 'okinawa-trip-2026-Ray');
     expect(tripDetail.destinations.single.name, '那霸');
   });
+
+  test(
+    'fetchHealthReport：GET /trips/:id/health-check 可回 report null',
+    () async {
+      dioAdapter.onGet(
+        '/trips/okinawa/health-check',
+        (server) => server.reply(200, {'report': null}),
+      );
+
+      final report = await tripRepository.fetchHealthReport('okinawa');
+
+      expect(report, isNull);
+    },
+  );
+
+  test('fetchHealthReport：解析 completed report 與 findings', () async {
+    dioAdapter.onGet(
+      '/trips/okinawa/health-check',
+      (server) => server.reply(200, {
+        'report': {
+          'tripId': 'okinawa',
+          'userId': 'user-1',
+          'status': 'completed',
+          'requestId': 42,
+          'findings': [
+            {
+              'severity': 'medium',
+              'title': 'Day 3 餐飲空窗',
+              'description': '下午沒有安排用餐。',
+              'dimension': 'meals',
+              'suggestion': '在國際通附近加入晚餐。',
+              'actionTarget': {'day': 3},
+            },
+          ],
+          'createdAt': '2026-07-09T10:00:00Z',
+          'completedAt': '2026-07-09T10:01:00Z',
+        },
+      }),
+    );
+
+    final report = await tripRepository.fetchHealthReport('okinawa');
+
+    expect(report?.status, TripHealthStatus.completed);
+    expect(report?.requestId, 42);
+    expect(report?.findings.single.dimension, TripHealthDimension.meals);
+    expect(report?.findings.single.actionTarget?.day, 3);
+  });
+
+  test(
+    'startHealthCheck：POST /trips/:id/health-check 回傳 pending report',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa/health-check',
+        (server) => server.reply(202, {
+          'report': {
+            'tripId': 'okinawa',
+            'userId': 'user-1',
+            'status': 'pending',
+            'requestId': 43,
+            'findings': const [],
+            'createdAt': '2026-07-09T10:02:00Z',
+          },
+        }),
+      );
+
+      final report = await tripRepository.startHealthCheck('okinawa');
+
+      expect(report.status, TripHealthStatus.pending);
+      expect(report.status.isTerminal, isFalse);
+      expect(report.requestId, 43);
+      expect(report.findings, isEmpty);
+    },
+  );
 
   test('fetchPublicTripShare：GET /share/:token 解析公開分享 payload', () async {
     dioAdapter.onGet(
