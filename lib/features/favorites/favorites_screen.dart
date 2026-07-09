@@ -40,6 +40,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _searchQuery = '';
   String _typeFilter = 'all';
   String _regionFilter = 'all';
+  Set<int> _selectedIds = {};
+  bool _deletingSelected = false;
 
   @override
   void dispose() {
@@ -111,12 +113,26 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           onSelected: (value) => setState(() => _typeFilter = value),
         ),
         const SizedBox(height: TpSpacing.s3),
+        if (_selectedIds.isNotEmpty) ...[
+          _BulkToolbar(
+            selectedCount: _selectedIds.length,
+            deleting: _deletingSelected,
+            onSelectAll: () => _selectAllVisible(filteredFavorites),
+            onClear: _clearSelection,
+            onDelete: _confirmDeleteSelected,
+          ),
+          const SizedBox(height: TpSpacing.s3),
+        ],
         if (filteredFavorites.isEmpty)
           _NoSearchResult(onClear: _clearAllFilters)
         else
           for (final favorite in filteredFavorites) ...[
             PoiFavoriteCard(
               favorite: favorite,
+              selected: _selectedIds.contains(favorite.id),
+              onSelectedChanged: _deletingSelected
+                  ? null
+                  : (_) => _toggleFavoriteSelection(favorite.id),
               onRemove: () => _confirmRemove(context, ref, favorite),
               onAddToTrip: () => context.go(
                 '/favorites/add-to-trip',
@@ -143,7 +159,82 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       _searchQuery = '';
       _typeFilter = 'all';
       _regionFilter = 'all';
+      _selectedIds = {};
     });
+  }
+
+  void _toggleFavoriteSelection(int id) {
+    setState(() {
+      final next = Set<int>.from(_selectedIds);
+      if (next.contains(id)) {
+        next.remove(id);
+      } else {
+        next.add(id);
+      }
+      _selectedIds = next;
+    });
+  }
+
+  void _selectAllVisible(List<PoiFavorite> favorites) {
+    setState(
+      () => _selectedIds = favorites.map((favorite) => favorite.id).toSet(),
+    );
+  }
+
+  void _clearSelection() {
+    setState(() => _selectedIds = {});
+  }
+
+  Future<void> _confirmDeleteSelected() async {
+    final ids = _selectedIds.toList();
+    if (ids.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('確定刪除收藏？'),
+        content: Text('即將刪除 ${ids.length} 個收藏景點，此操作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('保留'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingSelected = true);
+    final repository = ref.read(favoritesRepositoryProvider);
+    final results = await Future.wait(
+      ids.map(
+        (id) => repository
+            .deleteFavorite(id)
+            .then((_) => true)
+            .catchError((_) => false),
+      ),
+    );
+    final failed = results.where((ok) => !ok).length;
+
+    ref.invalidate(favoritesProvider);
+    if (!mounted) return;
+    setState(() {
+      _selectedIds = {};
+      _deletingSelected = false;
+    });
+
+    final message = failed == 0
+        ? '已刪除 ${ids.length} 個收藏'
+        : failed < ids.length
+        ? '已刪除 ${ids.length - failed} 個，$failed 個失敗'
+        : '刪除失敗，請稍後再試';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmRemove(
@@ -337,6 +428,69 @@ class _RegionFilterRow extends StatelessWidget {
             onSelected: (_) => onSelected(region),
           ),
       ],
+    );
+  }
+}
+
+class _BulkToolbar extends StatelessWidget {
+  const _BulkToolbar({
+    required this.selectedCount,
+    required this.deleting,
+    required this.onSelectAll,
+    required this.onClear,
+    required this.onDelete,
+  });
+
+  final int selectedCount;
+  final bool deleting;
+  final VoidCallback onSelectAll;
+  final VoidCallback onClear;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      key: const ValueKey('favorites-toolbar'),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(TpRadius.sm),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s3),
+        child: Wrap(
+          spacing: TpSpacing.s2,
+          runSpacing: TpSpacing.s2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
+              child: Text('已選 $selectedCount 個'),
+            ),
+            TextButton(
+              key: const ValueKey('favorites-select-all'),
+              onPressed: deleting ? null : onSelectAll,
+              child: const Text('全選'),
+            ),
+            TextButton(
+              key: const ValueKey('favorites-clear-selection'),
+              onPressed: deleting ? null : onClear,
+              child: const Text('取消'),
+            ),
+            FilledButton.tonalIcon(
+              key: const ValueKey('favorites-delete-selected'),
+              onPressed: deleting ? null : onDelete,
+              icon: deleting
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              label: Text(deleting ? '刪除中' : '刪除'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

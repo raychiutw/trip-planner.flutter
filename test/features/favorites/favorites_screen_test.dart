@@ -230,6 +230,52 @@ void main() {
       verifyNever(() => mockRepo.deleteFavorite(any()));
     });
 
+    testWidgets('選取多個收藏 → 確認批次刪除 → 逐筆 deleteFavorite + refresh', (
+      tester,
+    ) async {
+      final mockRepo = MockFavoritesRepository();
+      var fetchCount = 0;
+      when(mockRepo.watchFavorites).thenAnswer((_) {
+        fetchCount++;
+        return Stream.value(_favorites);
+      });
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-select-7')));
+      await tester.tap(find.byKey(const ValueKey('favorite-select-8')));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('favorites-toolbar')), findsOneWidget);
+      expect(find.text('已選 2 個'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-delete-selected')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('確定刪除收藏？'), findsOneWidget);
+      expect(find.text('即將刪除 2 個收藏景點，此操作無法復原。'), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('刪除'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.deleteFavorite(7)).called(1);
+      verify(() => mockRepo.deleteFavorite(8)).called(1);
+      expect(fetchCount, 2); // 初載 + 批次刪除後 invalidate refresh
+    });
+
     testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(const []));

@@ -13,11 +13,15 @@ class PoiFavoriteCard extends StatelessWidget {
     required this.favorite,
     required this.onRemove,
     this.onAddToTrip,
+    this.selected = false,
+    this.onSelectedChanged,
   });
 
   final PoiFavorite favorite;
   final VoidCallback onRemove;
   final VoidCallback? onAddToTrip;
+  final bool selected;
+  final ValueChanged<bool>? onSelectedChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +36,22 @@ class PoiFavoriteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: tone.subtle,
         borderRadius: BorderRadius.circular(TpRadius.md),
-        border: Border.all(color: tone.bg),
+        border: Border.all(
+          color: selected ? theme.colorScheme.primary : tone.bg,
+          width: selected ? 2 : 1,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (onSelectedChanged != null) ...[
+            Checkbox(
+              key: ValueKey('favorite-select-${favorite.id}'),
+              value: selected,
+              onChanged: (value) => onSelectedChanged!(value ?? false),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+          ],
           Container(
             width: 40,
             height: 40,
