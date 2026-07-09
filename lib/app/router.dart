@@ -32,6 +32,7 @@ import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_print_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
+import '../features/trips/audit/trip_audit_screen.dart';
 import '../features/trips/collab/collab_screen.dart';
 import '../features/trips/create/create_trip_screen.dart';
 import '../features/trips/edit/edit_trip_screen.dart';
@@ -204,6 +205,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) => _tripAlias(state, '/health'),
       ),
       GoRoute(
+        path: '/trip/:tripId/audit',
+        redirect: (context, state) => _tripAlias(state, '/audit'),
+      ),
+      GoRoute(
         path: '/trip/:tripId/collab',
         redirect: (context, state) => _outsideTripAlias(state, '/collab'),
       ),
@@ -338,6 +343,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'health',
                         builder: (context, state) => TripHealthScreen(
+                          tripId: state.pathParameters['tripId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'audit',
+                        builder: (context, state) => TripAuditScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),

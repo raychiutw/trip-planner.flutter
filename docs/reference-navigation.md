@@ -19,6 +19,7 @@
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
+| `/trips/:tripId/audit` | `TripAuditScreen` | tab 2 孫路由(查看 audit log 摘要、diff 欄位與確認式 rollback) |
 | `/trips/:tripId/entries/new?day=N&mode=search|favorites|custom&region=沖繩` | `EntryAddRouteScreen` | tab 2 孫路由(搜尋 POI / 收藏景點 / 自訂停留點；搜尋模式可帶 region,加入前 resolve Place Details 產生營業/消費/地址備註,選取後可覆寫單筆 POI 分類；自訂模式可設定分類與座標；搜尋/收藏可分類篩選與多選批次加入) |
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
@@ -42,7 +43,7 @@
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
-Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到可用搜尋或收藏置換正選 POI 的地點管理頁。
+Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|audit|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到可用搜尋或收藏置換正選 POI 的地點管理頁。
 
 Legacy redirect：`/admin`、`/admin/` 會導到 `/trips`，`/manage`、`/manage/` 會導到 `/chat`。
 

@@ -155,6 +155,11 @@ Future<void> _pumpTimeline(
             builder: (context, state) =>
                 const Scaffold(body: Text('print-page')),
           ),
+          GoRoute(
+            path: 'audit',
+            builder: (context, state) =>
+                const Scaffold(body: Text('audit-page')),
+          ),
         ],
       ),
     ],
@@ -201,13 +206,14 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 顯示行程標題與地圖/筆記/列印 actions', (tester) async {
+  testWidgets('AppBar 顯示行程標題與地圖/筆記/列印/異動紀錄 actions', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
     expect(find.byIcon(Icons.map_outlined), findsOneWidget);
     expect(find.byIcon(Icons.sticky_note_2_outlined), findsOneWidget);
     expect(find.byIcon(Icons.print_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.history_outlined), findsOneWidget);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
@@ -226,6 +232,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('print-page'), findsOneWidget);
+  });
+
+  testWidgets('點異動紀錄 icon 以 go_router 導向 audit 頁', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('audit-page'), findsOneWidget);
   });
 
   testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (
