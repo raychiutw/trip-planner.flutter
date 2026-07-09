@@ -6,6 +6,7 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/reports_repository.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 
@@ -43,6 +44,7 @@ void main() {
     expect(container.read(authRepositoryProvider), isA<AuthRepository>());
     expect(container.read(tripRepositoryProvider), isA<TripRepository>());
     expect(container.read(mapRepositoryProvider), isA<MapRepository>());
+    expect(container.read(reportsRepositoryProvider), isA<ReportsRepository>());
   });
 
   test('sessionStoreProvider 預設為 SecureSessionStore', () {

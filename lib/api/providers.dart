@@ -13,6 +13,7 @@ import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
 import 'oauth/oauth_providers.dart';
 import 'requests_repository.dart';
+import 'reports_repository.dart';
 import 'session_store.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
@@ -54,6 +55,10 @@ final tripRepositoryProvider = Provider<TripRepository>(
 
 final requestsRepositoryProvider = Provider<RequestsRepository>(
   (ref) => RequestsRepository(client: ref.watch(apiClientProvider)),
+);
+
+final reportsRepositoryProvider = Provider<ReportsRepository>(
+  (ref) => ReportsRepository(client: ref.watch(apiClientProvider)),
 );
 
 final collabRepositoryProvider = Provider<CollabRepository>(
