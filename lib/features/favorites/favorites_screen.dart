@@ -17,6 +17,9 @@ const _typeFilterOptions = [
   _TypeFilterOption(key: 'hotel', label: '住宿'),
 ];
 
+const _favoritesPageSize = 24;
+const _favoritesPaginationThreshold = 200;
+
 final _regionRules = [
   MapEntry(RegExp('沖縄|沖繩', caseSensitive: false), '沖繩'),
   MapEntry(RegExp('京都'), '京都'),
@@ -42,6 +45,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _regionFilter = 'all';
   Set<int> _selectedIds = {};
   bool _deletingSelected = false;
+  int _page = 1;
 
   @override
   void dispose() {
@@ -88,6 +92,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
     final regionCounts = _regionCountsFor(favorites);
     final regionOptions = _regionOptionsFor(regionCounts);
+    final usePagination = favorites.length >= _favoritesPaginationThreshold;
+    final totalPages = usePagination && filteredFavorites.isNotEmpty
+        ? (filteredFavorites.length / _favoritesPageSize).ceil()
+        : 1;
+    final page = _page.clamp(1, totalPages).toInt();
+    if (page != _page) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _page = page);
+      });
+    }
+    final visibleFavorites = usePagination
+        ? filteredFavorites
+              .skip((page - 1) * _favoritesPageSize)
+              .take(_favoritesPageSize)
+              .toList()
+        : filteredFavorites;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -95,7 +115,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       children: [
         _SearchField(
           controller: _searchController,
-          onChanged: (value) => setState(() => _searchQuery = value),
+          onChanged: (value) => setState(() {
+            _searchQuery = value;
+            _page = 1;
+          }),
           onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
         ),
         const SizedBox(height: TpSpacing.s3),
@@ -104,20 +127,26 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             selected: _regionFilter,
             counts: regionCounts,
             options: regionOptions,
-            onSelected: (value) => setState(() => _regionFilter = value),
+            onSelected: (value) => setState(() {
+              _regionFilter = value;
+              _page = 1;
+            }),
           ),
           const SizedBox(height: TpSpacing.s3),
         ],
         _TypeFilterRow(
           selected: _typeFilter,
-          onSelected: (value) => setState(() => _typeFilter = value),
+          onSelected: (value) => setState(() {
+            _typeFilter = value;
+            _page = 1;
+          }),
         ),
         const SizedBox(height: TpSpacing.s3),
         if (_selectedIds.isNotEmpty) ...[
           _BulkToolbar(
             selectedCount: _selectedIds.length,
             deleting: _deletingSelected,
-            onSelectAll: () => _selectAllVisible(filteredFavorites),
+            onSelectAll: () => _selectAllVisible(visibleFavorites),
             onClear: _clearSelection,
             onDelete: _confirmDeleteSelected,
           ),
@@ -126,7 +155,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         if (filteredFavorites.isEmpty)
           _NoSearchResult(onClear: _clearAllFilters)
         else
-          for (final favorite in filteredFavorites) ...[
+          for (final favorite in visibleFavorites) ...[
             PoiFavoriteCard(
               favorite: favorite,
               selected: _selectedIds.contains(favorite.id),
@@ -144,13 +173,30 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             ),
             const SizedBox(height: TpSpacing.s3),
           ],
+        if (usePagination && filteredFavorites.isNotEmpty)
+          _PaginationControls(
+            page: page,
+            totalPages: totalPages,
+            start: (page - 1) * _favoritesPageSize + 1,
+            end: ((page - 1) * _favoritesPageSize + visibleFavorites.length),
+            total: filteredFavorites.length,
+            onPrevious: page <= 1
+                ? null
+                : () => setState(() => _page = page - 1),
+            onNext: page >= totalPages
+                ? null
+                : () => setState(() => _page = page + 1),
+          ),
       ],
     );
   }
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() => _searchQuery = '');
+    setState(() {
+      _searchQuery = '';
+      _page = 1;
+    });
   }
 
   void _clearAllFilters() {
@@ -160,6 +206,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       _typeFilter = 'all';
       _regionFilter = 'all';
       _selectedIds = {};
+      _page = 1;
     });
   }
 
@@ -490,6 +537,59 @@ class _BulkToolbar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PaginationControls extends StatelessWidget {
+  const _PaginationControls({
+    required this.page,
+    required this.totalPages,
+    required this.start,
+    required this.end,
+    required this.total,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int page;
+  final int totalPages;
+  final int start;
+  final int end;
+  final int total;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey('favorites-pagination'),
+      padding: const EdgeInsets.only(top: TpSpacing.s2),
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('favorites-page-prev'),
+            tooltip: '上一頁',
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$start-$end / $total'),
+                Text('第 $page / $totalPages 頁'),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('favorites-page-next'),
+            tooltip: '下一頁',
+            onPressed: onNext,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
       ),
     );
   }

@@ -36,6 +36,19 @@ const _favorites = [
   ),
 ];
 
+List<PoiFavorite> _manyFavorites() => [
+  for (var i = 1; i <= 200; i++)
+    PoiFavorite(
+      id: i,
+      userId: 'u-1',
+      poiId: 1000 + i,
+      favoritedAt: '2026-06-${(i % 28) + 1}T10:00:00Z',
+      poiName: '收藏地點 $i',
+      poiAddress: i.isEven ? '東京千代田區' : '沖繩縣那霸市',
+      poiType: i.isEven ? 'restaurant' : 'attraction',
+    ),
+];
+
 Widget buildApp() =>
     MaterialApp(theme: AppTheme.light(), home: const FavoritesScreen());
 
@@ -274,6 +287,52 @@ void main() {
       verify(() => mockRepo.deleteFavorite(7)).called(1);
       verify(() => mockRepo.deleteFavorite(8)).called(1);
       expect(fetchCount, 2); // 初載 + 批次刪除後 invalidate refresh
+    });
+
+    testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {
+      final favorites = _manyFavorites();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('收藏地點 1'), findsOneWidget);
+      expect(find.text('收藏地點 25'), findsNothing);
+
+      final pagination = find.byKey(const ValueKey('favorites-pagination'));
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(find.byType(ListView), const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(pagination, findsOneWidget);
+      expect(find.text('1-24 / 200'), findsOneWidget);
+      expect(find.text('第 1 / 9 頁'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+      await tester.pump();
+
+      expect(find.text('25-48 / 200'), findsOneWidget);
+      expect(find.text('第 2 / 9 頁'), findsOneWidget);
+
+      await tester.fling(find.byType(ListView), const Offset(0, 5000), 10000);
+      await tester.pumpAndSettle();
+
+      final searchInput = find.byKey(const ValueKey('favorites-search-input'));
+      await tester.enterText(searchInput, '收藏地點 1');
+      await tester.pump();
+
+      expect(find.text('收藏地點 1', skipOffstage: false), findsWidgets);
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(find.byType(ListView), const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(find.text('第 1 / 5 頁'), findsOneWidget);
+      expect(find.byType(PoiFavoriteCard), findsWidgets);
     });
 
     testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
