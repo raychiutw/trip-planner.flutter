@@ -288,6 +288,7 @@ class TripRepository {
     required int dayNum,
     required String title,
     String? description,
+    String? note,
     String? poiType,
     double? lat,
     double? lng,
@@ -301,6 +302,7 @@ class TripRepository {
       body: {
         'title': title,
         'description': description,
+        'note': note,
         'poi_type': poiType,
         'lat': lat,
         'lng': lng,
@@ -312,6 +314,7 @@ class TripRepository {
         'dayNum': dayNum,
         'title': title,
         'description': description,
+        'note': note,
         'startTime': startTime,
         'endTime': endTime,
         'poiType': poiType,

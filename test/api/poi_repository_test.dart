@@ -91,4 +91,26 @@ void main() {
 
     expect(poiId, 501);
   });
+
+  test('resolvePlace：GET /places/resolve?placeId=... → 解析 details', () async {
+    dioAdapter.onGet(
+      '/places/resolve',
+      (server) => server.reply(200, {
+        'placeId': 'p1',
+        'name': '美麗海水族館',
+        'address': '沖繩縣本部町石川424',
+        'lat': 26.694,
+        'lng': 127.878,
+        'hours': '星期一: 09:00-18:00',
+        'priceLevel': 'PRICE_LEVEL_MODERATE',
+      }),
+      queryParameters: {'placeId': 'p1'},
+    );
+
+    final details = await poiRepository.resolvePlace('p1');
+
+    expect(details.placeId, 'p1');
+    expect(details.hours, '星期一: 09:00-18:00');
+    expect(details.priceLevel, 'PRICE_LEVEL_MODERATE');
+  });
 }

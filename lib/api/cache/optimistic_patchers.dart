@@ -124,6 +124,7 @@ Map<String, dynamic> _buildOptimisticEntry(Map<String, dynamic> args) {
             'lat': lat,
             'lng': lng,
             'type': args['poiType'],
+            'note': args['note'],
             'sortOrder': 0,
           }
         : null,

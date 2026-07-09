@@ -5,12 +5,14 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../models/day.dart';
+import '../../../models/poi_note.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
 import '../../trip_detail/trip_providers.dart';
 import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
+import '../explore/explore_controller.dart' show poiRepositoryProvider;
 import '../favorites_providers.dart';
 
 /// 時間區間有效性：結束須晚於開始。抽為頂層純函式以利單元測試。
@@ -70,17 +72,32 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                 endTime: _fmt(_end),
               );
         case AddToTripDirect(:final poi):
+          String? note;
+          try {
+            final details = await ref
+                .read(poiRepositoryProvider)
+                .resolvePlace(poi.placeId);
+            note = buildPoiNote(
+              hoursRaw: details.hours,
+              priceLevel: details.priceLevel,
+              address: poi.address ?? details.address,
+            );
+          } on Exception {
+            note = buildPoiNote(address: poi.address);
+          }
           await ref
               .read(tripRepositoryProvider)
               .addEntryToDay(
                 tripId: tripId,
                 dayNum: dayNum,
                 title: poi.name,
+                note: note,
                 poiType: mapGooglePrimaryTypeToPoiType(poi.category),
                 lat: poi.lat,
                 lng: poi.lng,
                 startTime: _fmt(_start),
                 endTime: _fmt(_end),
+                source: 'google',
               );
       }
       if (!mounted) return;

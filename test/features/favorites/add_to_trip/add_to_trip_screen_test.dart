@@ -4,12 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
+import 'package:tripline/features/favorites/explore/explore_controller.dart'
+    show poiRepositoryProvider;
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/models/add_to_trip.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/place_details.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -18,16 +22,20 @@ class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
+class _MockPoiRepository extends Mock implements PoiRepository {}
+
 const _trips = [TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩')];
 const _days = [TripDay(id: 1, dayNum: 1, title: '第一天', version: 0)];
 
 void main() {
   late _MockFavoritesRepository favRepo;
   late _MockTripRepository tripRepo;
+  late _MockPoiRepository poiRepo;
 
   setUp(() {
     favRepo = _MockFavoritesRepository();
     tripRepo = _MockTripRepository();
+    poiRepo = _MockPoiRepository();
     when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(_trips));
     when(
       () => tripRepo.watchDays('okinawa'),
@@ -71,6 +79,7 @@ void main() {
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
         favoritesRepositoryProvider.overrideWithValue(favRepo),
+        poiRepositoryProvider.overrideWithValue(poiRepo),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
@@ -111,16 +120,26 @@ void main() {
   });
 
   testWidgets('direct mode：送出呼叫 addEntryToDay(poiType 經映射)', (tester) async {
+    when(() => poiRepo.resolvePlace('p1')).thenAnswer(
+      (_) async => const PlaceDetails(
+        placeId: 'p1',
+        hours:
+            '星期一: 09:00-18:00 星期二: 09:00-18:00 星期三: 09:00-18:00 星期四: 09:00-18:00 星期五: 09:00-18:00 星期六: 09:00-18:00 星期日: 09:00-18:00',
+        priceLevel: 'PRICE_LEVEL_MODERATE',
+      ),
+    );
     when(
       () => tripRepo.addEntryToDay(
         tripId: any(named: 'tripId'),
         dayNum: any(named: 'dayNum'),
         title: any(named: 'title'),
+        note: any(named: 'note'),
         poiType: any(named: 'poiType'),
         lat: any(named: 'lat'),
         lng: any(named: 'lng'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
       ),
     ).thenAnswer((_) async {});
 
@@ -131,6 +150,7 @@ void main() {
             placeId: 'p1',
             name: '美麗海水族館',
             category: 'aquarium',
+            address: '沖繩縣本部町石川424',
             lat: 26.69,
             lng: 127.87,
           ),
@@ -146,12 +166,14 @@ void main() {
         tripId: 'okinawa',
         dayNum: 1,
         title: '美麗海水族館',
+        note: '營業 09:00-18:00\n消費 ￥￥\n沖繩縣本部町石川424',
         poiType:
             'activity', // aquarium → activity（mapGooglePrimaryTypeToPoiType）
         lat: 26.69,
         lng: 127.87,
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
+        source: 'google',
       ),
     ).called(1);
   });
