@@ -15,6 +15,7 @@
 
 ### 修正
 
+- POI 分類顯示對齊 web:純中文/假名 curated 分類（如「沖繩麵」「すし」）保留原樣,英文 Google primaryType 顯示為 8 類中文 label,避免探索卡與時間軸誤顯「景點」或外露 `tourist_attraction`。
 - 更新 reorder callback 參數名稱,對齊目前 Flutter SDK 的 `onReorder` API。
 - 登入 return-to flow 會消費安全的站內 `redirect_after`,公開分享頁登入後可回到原分享頁；外部 redirect 會被忽略。
 

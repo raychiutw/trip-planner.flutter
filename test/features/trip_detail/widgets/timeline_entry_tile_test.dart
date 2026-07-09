@@ -64,6 +64,44 @@ void main() {
       expect(find.text('世界最大級水槽'), findsOneWidget);
     });
 
+    testWidgets('英文 master.category 顯示中文 label，不外露 primaryType', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 8,
+          sortOrder: 0,
+          version: 0,
+          title: '首里城',
+          master: EntryPoiInfo(
+            poiId: 101,
+            type: 'attraction',
+            category: 'tourist_attraction',
+          ),
+        ),
+      );
+
+      expect(find.text('景點'), findsOneWidget);
+      expect(find.text('tourist_attraction'), findsNothing);
+    });
+
+    testWidgets('純中文 master.category 顯示原樣', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 9,
+          sortOrder: 0,
+          version: 0,
+          title: '岸本食堂',
+          master: EntryPoiInfo(poiId: 102, type: 'restaurant', category: '沖繩麵'),
+        ),
+      );
+
+      expect(find.text('沖繩麵'), findsOneWidget);
+      expect(find.text('景點'), findsNothing);
+    });
+
     testWidgets('圓點色依 tone:restaurant → pinkDeep', (tester) async {
       await pumpTile(
         tester,
@@ -99,12 +137,7 @@ void main() {
       await pumpTile(
         tester,
         number: 3,
-        const TimelineEntry(
-          id: 7,
-          sortOrder: 0,
-          version: 0,
-          title: '首里城',
-        ),
+        const TimelineEntry(id: 7, sortOrder: 0, version: 0, title: '首里城'),
       );
       final badge = find.byKey(const ValueKey('entry-dot-7'));
       expect(badge, findsOneWidget);

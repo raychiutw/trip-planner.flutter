@@ -7,6 +7,13 @@ import 'package:tripline/theme/app_theme.dart';
 Future<void> pumpCard(
   WidgetTester tester, {
   required bool isSaved,
+  PoiSearchResult poi = const PoiSearchResult(
+    placeId: 'p1',
+    name: '暖暮拉麵',
+    address: '那霸市',
+    category: 'ramen_restaurant',
+    rating: 4.5,
+  ),
   VoidCallback? onToggle,
   VoidCallback? onAddToTrip,
 }) {
@@ -15,13 +22,7 @@ Future<void> pumpCard(
       theme: AppTheme.light(),
       home: Scaffold(
         body: PoiSearchCard(
-          poi: const PoiSearchResult(
-            placeId: 'p1',
-            name: '暖暮拉麵',
-            address: '那霸市',
-            category: 'ramen_restaurant',
-            rating: 4.5,
-          ),
+          poi: poi,
           isSaved: isSaved,
           isSaving: false,
           onToggleFavorite: onToggle ?? () {},
@@ -43,6 +44,22 @@ void main() {
     expect(find.text('4.5'), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border), findsOneWidget);
     expect(find.byKey(const ValueKey('poi-card-p1')), findsOneWidget);
+  });
+
+  testWidgets('純中文 curated category 顯示原樣，不誤顯成景點', (tester) async {
+    await pumpCard(
+      tester,
+      isSaved: false,
+      poi: const PoiSearchResult(
+        placeId: 'p2',
+        name: '岸本食堂',
+        address: '本部町',
+        category: '沖繩麵',
+      ),
+    );
+
+    expect(find.text('沖繩麵'), findsOneWidget);
+    expect(find.text('景點'), findsNothing);
   });
 
   testWidgets('已收藏 = filled heart', (tester) async {
