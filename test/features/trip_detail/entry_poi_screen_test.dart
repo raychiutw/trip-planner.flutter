@@ -125,7 +125,9 @@ void main() {
     expect(opened.single.toString(), 'https://book.example/abc');
   });
 
-  testWidgets('設為正選 → setEntryMaster(poiId, entryPoisVersion)', (tester) async {
+  testWidgets('設為正選 → 確認後 setEntryMaster(poiId, entryPoisVersion)', (
+    tester,
+  ) async {
     final repo = _MockTripRepository();
     when(
       () => repo.setEntryMaster(
@@ -138,6 +140,20 @@ void main() {
     await _pump(tester, repo);
 
     await tester.tap(find.byKey(const ValueKey('alt-setmaster-502')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('設為正選？'), findsOneWidget);
+    expect(find.text('要將「玉陵」設為此停留點的正選嗎？'), findsOneWidget);
+    verifyNever(
+      () => repo.setEntryMaster(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, '設為正選'));
     await tester.pumpAndSettle();
 
     verify(

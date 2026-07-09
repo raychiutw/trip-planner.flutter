@@ -208,23 +208,53 @@ class EntryPoiScreen extends ConsumerWidget {
                   ),
                   TextButton(
                     key: ValueKey('alt-setmaster-${alt.poiId}'),
-                    onPressed: () => _run(
-                      context,
-                      ref,
-                      () => repo.setEntryMaster(
-                        tripId: tripId,
-                        entryId: entryId,
-                        poiId: alt.poiId,
-                        entryPoisVersion: version,
-                      ),
-                      success: '已設為正選',
-                    ),
+                    onPressed: () =>
+                        _confirmSetMaster(context, ref, entry, alt),
                     child: const Text('設為正選'),
                   ),
                 ],
               ),
             ),
       ],
+    );
+  }
+
+  Future<void> _confirmSetMaster(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+    EntryPoiInfo alternate,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('設為正選？'),
+        content: Text('要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('設為正選'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await _run(
+      context,
+      ref,
+      () => ref
+          .read(tripRepositoryProvider)
+          .setEntryMaster(
+            tripId: tripId,
+            entryId: entryId,
+            poiId: alternate.poiId,
+            entryPoisVersion: entry.entryPoisVersion,
+          ),
+      success: '已設為正選',
     );
   }
 
