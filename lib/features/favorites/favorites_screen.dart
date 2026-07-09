@@ -9,11 +9,25 @@ import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
 
 /// 收藏清單（5-tab「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
-class FavoritesScreen extends ConsumerWidget {
+class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
@@ -33,7 +47,7 @@ class FavoritesScreen extends ConsumerWidget {
           onRefresh: () => ref.refresh(favoritesProvider.future),
           child: favorites.isEmpty
               ? const _EmptyHero()
-              : _buildList(context, ref, favorites),
+              : _buildList(context, favorites),
         ),
         error: (error, stackTrace) =>
             _ErrorState(onRetry: () => ref.invalidate(favoritesProvider)),
@@ -42,31 +56,47 @@ class FavoritesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildList(
-    BuildContext context,
-    WidgetRef ref,
-    List<PoiFavorite> favorites,
-  ) {
-    return ListView.separated(
+  Widget _buildList(BuildContext context, List<PoiFavorite> favorites) {
+    final filteredFavorites = _filterFavorites(favorites, _searchQuery);
+
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(TpSpacing.s4),
-      itemCount: favorites.length,
-      separatorBuilder: (context, index) =>
-          const SizedBox(height: TpSpacing.s3),
-      itemBuilder: (context, index) {
-        final favorite = favorites[index];
-        return PoiFavoriteCard(
-          favorite: favorite,
-          onRemove: () => _confirmRemove(context, ref, favorite),
-          onAddToTrip: () => context.go(
-            '/favorites/add-to-trip',
-            extra: AddToTripFavorite(
-              favoriteId: favorite.id,
-              displayName: favorite.displayName,
+      children: [
+        _SearchField(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onClear: _searchQuery.trim().isEmpty
+              ? null
+              : () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        if (filteredFavorites.isEmpty)
+          _NoSearchResult(
+            onClear: () {
+              _searchController.clear();
+              setState(() => _searchQuery = '');
+            },
+          )
+        else
+          for (final favorite in filteredFavorites) ...[
+            PoiFavoriteCard(
+              favorite: favorite,
+              onRemove: () => _confirmRemove(context, ref, favorite),
+              onAddToTrip: () => context.go(
+                '/favorites/add-to-trip',
+                extra: AddToTripFavorite(
+                  favoriteId: favorite.id,
+                  displayName: favorite.displayName,
+                ),
+              ),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: TpSpacing.s3),
+          ],
+      ],
     );
   }
 
@@ -103,6 +133,87 @@ class FavoritesScreen extends ConsumerWidget {
         context,
       ).showSnackBar(const SnackBar(content: Text('取消收藏失敗，請稍後再試')));
     }
+  }
+}
+
+List<PoiFavorite> _filterFavorites(
+  List<PoiFavorite> favorites,
+  String rawQuery,
+) {
+  final query = rawQuery.trim().toLowerCase();
+  if (query.isEmpty) return favorites;
+
+  return favorites.where((favorite) {
+    final haystack = [
+      favorite.displayName,
+      favorite.poiAddress,
+      favorite.note,
+    ].whereType<String>().join(' ').toLowerCase();
+    return haystack.contains(query);
+  }).toList();
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const ValueKey('favorites-search-input'),
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: '搜尋收藏',
+        hintText: '名稱 / 地址 / 備註',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: onClear == null
+            ? null
+            : IconButton(
+                key: const ValueKey('favorites-search-clear'),
+                tooltip: '清除搜尋',
+                icon: const Icon(Icons.close),
+                onPressed: onClear,
+              ),
+        border: const OutlineInputBorder(),
+      ),
+      textInputAction: TextInputAction.search,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _NoSearchResult extends StatelessWidget {
+  const _NoSearchResult({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: TpSpacing.s6),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('目前的搜尋沒有符合的收藏', style: theme.textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s3),
+            TextButton(
+              key: const ValueKey('favorites-search-no-match-clear'),
+              onPressed: onClear,
+              child: const Text('清除搜尋'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

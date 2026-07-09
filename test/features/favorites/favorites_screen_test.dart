@@ -19,7 +19,9 @@ const _favorites = [
     poiId: 501,
     favoritedAt: '2026-06-01T10:00:00Z',
     poiName: '美麗海水族館',
+    poiAddress: '沖繩縣國頭郡本部町石川424',
     poiType: 'attraction',
+    note: '雨天備案',
     poiRating: 4.6,
   ),
   PoiFavorite(
@@ -28,7 +30,9 @@ const _favorites = [
     poiId: 502,
     favoritedAt: '2026-06-02T10:00:00Z',
     poiName: '暖暮拉麵',
+    poiAddress: '那霸市牧志2-16-10',
     poiType: 'restaurant',
+    note: '晚餐候補',
   ),
 ];
 
@@ -52,6 +56,35 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
+    });
+
+    testWidgets('搜尋收藏會比對名稱、地址與備註', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      final searchInput = find.byKey(const ValueKey('favorites-search-input'));
+      expect(searchInput, findsOneWidget);
+
+      await tester.enterText(searchInput, '牧志');
+      await tester.pump();
+
+      expect(find.byType(PoiFavoriteCard), findsOneWidget);
+      expect(find.text('暖暮拉麵'), findsOneWidget);
+      expect(find.text('美麗海水族館'), findsNothing);
+
+      await tester.enterText(searchInput, '雨天');
+      await tester.pump();
+
+      expect(find.byType(PoiFavoriteCard), findsOneWidget);
+      expect(find.text('美麗海水族館'), findsOneWidget);
+      expect(find.text('暖暮拉麵'), findsNothing);
     });
 
     testWidgets('empty → 還沒有收藏 hero', (tester) async {
