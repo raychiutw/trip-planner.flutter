@@ -1,19 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../models/poi_favorite.dart';
 import '../../models/day.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
 
 /// 新增停留點頁的初始模式。
-enum EntryAddMode { search, custom }
+enum EntryAddMode { search, favorites, custom }
 
 /// Web 相容的停留點新增頁，支援搜尋 POI 或新增自訂停留點。
 class EntryAddRouteScreen extends ConsumerStatefulWidget {
@@ -41,11 +45,19 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   bool _searching = false;
   String? _addingPlaceId;
   String? _searchError;
+  List<PoiFavorite> _favorites = const [];
+  bool _favoritesLoaded = false;
+  bool _favoritesLoading = false;
+  int? _addingFavoriteId;
+  String? _favoritesError;
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initialMode;
+    if (_mode == EntryAddMode.favorites) {
+      unawaited(_loadFavorites());
+    }
   }
 
   @override
@@ -121,6 +133,69 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     }
   }
 
+  Future<void> _loadFavorites({bool force = false}) async {
+    if (_favoritesLoading || (_favoritesLoaded && !force)) return;
+    setState(() {
+      _favoritesLoading = true;
+      _favoritesError = null;
+    });
+    try {
+      final favorites = await ref
+          .read(favoritesRepositoryProvider)
+          .fetchFavorites();
+      if (!mounted) return;
+      setState(() {
+        _favorites = favorites;
+        _favoritesLoaded = true;
+        _favoritesLoading = false;
+        _favoritesError = null;
+      });
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _favoritesLoading = false;
+        _favoritesError = '載入收藏失敗，請稍後再試';
+      });
+    }
+  }
+
+  Future<void> _addFavorite(PoiFavorite favorite, int dayNum) async {
+    setState(() {
+      _addingFavoriteId = favorite.id;
+      _favoritesError = null;
+    });
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .addEntryToDay(
+            tripId: widget.tripId,
+            dayNum: dayNum,
+            title: favorite.displayName,
+            note: favorite.poiAddress,
+            poiType: mapGooglePrimaryTypeToPoiType(favorite.poiType),
+            lat: favorite.poiLat,
+            lng: favorite.poiLng,
+            source: 'favorite',
+          );
+      ref.invalidate(tripDaysProvider(widget.tripId));
+      if (!mounted) return;
+      context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _addingFavoriteId = null;
+        _favoritesError = '加入行程失敗，請稍後再試';
+      });
+    }
+  }
+
+  void _setMode(EntryAddMode mode) {
+    setState(() => _mode = mode);
+    if (mode == EntryAddMode.favorites) {
+      unawaited(_loadFavorites());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
@@ -173,14 +248,18 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                             label: Text('搜尋景點'),
                           ),
                           ButtonSegment(
+                            value: EntryAddMode.favorites,
+                            icon: Icon(Icons.favorite_border),
+                            label: Text('收藏景點'),
+                          ),
+                          ButtonSegment(
                             value: EntryAddMode.custom,
                             icon: Icon(Icons.edit_location_alt_outlined),
                             label: Text('自訂'),
                           ),
                         ],
                         selected: {_mode},
-                        onSelectionChanged: (values) =>
-                            setState(() => _mode = values.first),
+                        onSelectionChanged: (values) => _setMode(values.first),
                       ),
                       const SizedBox(height: TpSpacing.s2),
                       if (_mode == EntryAddMode.search)
@@ -192,6 +271,15 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                           error: _searchError,
                           onSearch: () => _searchPois(),
                           onAdd: (poi) => _addPoi(poi, dayNum),
+                        )
+                      else if (_mode == EntryAddMode.favorites)
+                        _FavoritePoiPanel(
+                          favorites: _favorites,
+                          loading: _favoritesLoading && !_favoritesLoaded,
+                          addingFavoriteId: _addingFavoriteId,
+                          error: _favoritesError,
+                          onRetry: () => _loadFavorites(force: true),
+                          onAdd: (favorite) => _addFavorite(favorite, dayNum),
                         )
                       else
                         EntryEditSheet(
@@ -209,6 +297,89 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _FavoritePoiPanel extends StatelessWidget {
+  const _FavoritePoiPanel({
+    required this.favorites,
+    required this.loading,
+    required this.addingFavoriteId,
+    required this.error,
+    required this.onRetry,
+    required this.onAdd,
+  });
+
+  final List<PoiFavorite> favorites;
+  final bool loading;
+  final int? addingFavoriteId;
+  final String? error;
+  final VoidCallback onRetry;
+  final ValueChanged<PoiFavorite> onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: TpSpacing.s6),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (favorites.isEmpty && error == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: TpSpacing.s6),
+        child: Text(
+          '還沒有收藏的地點',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    error!,
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                ),
+                TextButton(onPressed: onRetry, child: const Text('重試')),
+              ],
+            ),
+          ),
+        for (final favorite in favorites)
+          Card(
+            margin: const EdgeInsets.only(bottom: TpSpacing.s2),
+            child: ListTile(
+              key: ValueKey('entry-add-favorite-${favorite.id}'),
+              title: Text(favorite.displayName),
+              subtitle: favorite.poiAddress == null
+                  ? null
+                  : Text(favorite.poiAddress!),
+              trailing: addingFavoriteId == favorite.id
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_location_alt_outlined),
+              onTap: addingFavoriteId == null ? () => onAdd(favorite) : null,
+            ),
+          ),
+      ],
     );
   }
 }

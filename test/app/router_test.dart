@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/collab_repository.dart';
+import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
+import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
@@ -56,6 +58,8 @@ class _MockTripRepository extends Mock implements TripRepository {}
 
 class _MockCollabRepository extends Mock implements CollabRepository {}
 
+class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
+
 const _loggedInUser = UserInfo(
   id: 'user-1',
   email: 'traveler@example.com',
@@ -68,6 +72,7 @@ const _entry = TimelineEntry(id: 11, sortOrder: 0, title: '首里城', version: 
 ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
+  final mockFavoritesRepository = _MockFavoritesRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
   when(
     () => mockTripRepository.fetchPublicTripShare(any()),
@@ -109,12 +114,16 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       expiresAt: '2026-07-16T00:00:00.000Z',
     ),
   );
+  when(
+    mockFavoritesRepository.fetchFavorites,
+  ).thenAnswer((_) async => const []);
 
   final container = ProviderContainer(
     overrides: [
       authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
+      favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
     ],
   );
   return container;
@@ -546,6 +555,14 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('搜尋景點'), findsWidgets);
+
+    container
+        .read(appRouterProvider)
+        .go('/trip/trip-1/add-stop?tab=favorites&day=1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EntryAddRouteScreen), findsOneWidget);
+    expect(find.text('收藏景點'), findsWidgets);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

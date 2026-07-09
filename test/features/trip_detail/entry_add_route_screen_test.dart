@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -18,14 +21,31 @@ class _MockTripRepository extends Mock implements TripRepository {}
 
 class _MockPoiRepository extends Mock implements PoiRepository {}
 
+class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
+
 const _days = [
   TripDay(id: 1, dayNum: 1, title: '抵達', version: 0),
   TripDay(id: 2, dayNum: 2, title: '市區', version: 0),
 ];
 
+const _favorites = [
+  PoiFavorite(
+    id: 9,
+    userId: 'user-1',
+    poiId: 91,
+    favoritedAt: '2026-07-01T00:00:00.000Z',
+    poiName: '首里城',
+    poiAddress: '沖繩縣那霸市首里金城町',
+    poiType: 'tourist_attraction',
+    poiLat: 26.217,
+    poiLng: 127.719,
+  ),
+];
+
 Widget _buildScreen(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
+  _MockFavoritesRepository? favoritesRepo,
   int initialDayNum = 2,
   EntryAddMode initialMode = EntryAddMode.custom,
 }) {
@@ -50,6 +70,8 @@ Widget _buildScreen(
     overrides: [
       tripRepositoryProvider.overrideWithValue(repo),
       if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
+      if (favoritesRepo != null)
+        favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
       tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
@@ -214,6 +236,56 @@ void main() {
         lat: 26.694,
         lng: 127.878,
         source: 'google',
+      ),
+    ).called(1);
+    expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('收藏模式可把已收藏景點加入指定 day', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    when(favoritesRepo.fetchFavorites).thenAnswer((_) async => _favorites);
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        favoritesRepo: favoritesRepo,
+        initialMode: EntryAddMode.favorites,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('收藏景點'), findsWidgets);
+    expect(find.text('首里城'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
+    await tester.pumpAndSettle();
+
+    verify(favoritesRepo.fetchFavorites).called(1);
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '首里城',
+        note: '沖繩縣那霸市首里金城町',
+        poiType: 'attraction',
+        lat: 26.217,
+        lng: 127.719,
+        source: 'favorite',
       ),
     ).called(1);
     expect(find.text('trip trip-1'), findsOneWidget);

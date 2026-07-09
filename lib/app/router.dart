@@ -138,8 +138,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/trip/:tripId/add-stop',
-        redirect: (context, state) =>
-            _newEntryAlias(state, mode: EntryAddMode.search),
+        redirect: (context, state) => _newEntryAlias(
+          state,
+          mode: _entryAddModeFromQuery(
+            state.uri.queryParameters['tab'],
+            fallback: EntryAddMode.search,
+          ),
+        ),
       ),
       GoRoute(
         path: '/trip/:tripId/add-custom-stop',
@@ -464,7 +469,8 @@ String _outsideTripAlias(GoRouterState state, String prefix) {
 
 String _newEntryAlias(GoRouterState state, {required EntryAddMode mode}) {
   final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
-  final query = Map<String, String>.from(state.uri.queryParameters);
+  final query = Map<String, String>.from(state.uri.queryParameters)
+    ..remove('tab');
   query['mode'] = mode.name;
   return Uri(
     path: '/trips/$tripId/entries/new',
@@ -507,10 +513,14 @@ int? _entryFocusFromQuery(Uri uri) {
   return int.tryParse(uri.queryParameters['entry'] ?? '');
 }
 
-EntryAddMode _entryAddModeFromQuery(String? value) {
-  return value == EntryAddMode.search.name
-      ? EntryAddMode.search
-      : EntryAddMode.custom;
+EntryAddMode _entryAddModeFromQuery(
+  String? value, {
+  EntryAddMode fallback = EntryAddMode.custom,
+}) {
+  for (final mode in EntryAddMode.values) {
+    if (value == mode.name) return mode;
+  }
+  return fallback;
 }
 
 String _withQuery(String path, GoRouterState state) {
