@@ -152,7 +152,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId/map',
-        redirect: (context, state) => _tripAlias(state, '/map'),
+        redirect: (context, state) => _entryMapAlias(state),
       ),
       GoRoute(
         path: '/trip/:tripId/stop/:entryId/edit',
@@ -313,6 +313,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         path: 'map',
                         builder: (context, state) => TripMapScreen(
                           tripId: state.pathParameters['tripId']!,
+                          initialEntryId: _entryFocusFromQuery(state.uri),
                         ),
                       ),
                       GoRoute(
@@ -467,6 +468,17 @@ String _newEntryAlias(GoRouterState state, {required EntryAddMode mode}) {
     path: '/trips/$tripId/entries/new',
     queryParameters: query,
   ).toString();
+}
+
+String _entryMapAlias(GoRouterState state) {
+  final tripId = Uri.encodeComponent(state.pathParameters['tripId']!);
+  final query = Map<String, String>.from(state.uri.queryParameters);
+  query['entry'] = state.pathParameters['entryId']!;
+  return Uri(path: '/trips/$tripId/map', queryParameters: query).toString();
+}
+
+int? _entryFocusFromQuery(Uri uri) {
+  return int.tryParse(uri.queryParameters['entry'] ?? '');
 }
 
 EntryAddMode _entryAddModeFromQuery(String? value) {

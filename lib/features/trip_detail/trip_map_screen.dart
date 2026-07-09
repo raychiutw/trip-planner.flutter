@@ -23,9 +23,17 @@ const List<Color> kDayPinPalette = [
 
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
-  const TripMapScreen({super.key, required this.tripId, this.tileProvider});
+  const TripMapScreen({
+    super.key,
+    required this.tripId,
+    this.initialEntryId,
+    this.tileProvider,
+  });
 
   final String tripId;
+
+  /// 初始聚焦的停留點 id，用於 `/trip/:tripId/stop/:entryId/map` deep link。
+  final int? initialEntryId;
 
   /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
   final TripMapTileProvider? tileProvider;
@@ -43,7 +51,11 @@ class TripMapScreen extends ConsumerWidget {
             child: Text('載入失敗：$error', textAlign: TextAlign.center),
           ),
         ),
-        data: (days) => _TripMapView(days: days, tileProvider: tileProvider),
+        data: (days) => _TripMapView(
+          days: days,
+          initialEntryId: initialEntryId,
+          tileProvider: tileProvider,
+        ),
       ),
     );
   }
@@ -71,9 +83,14 @@ class _DayPin {
 }
 
 class _TripMapView extends StatefulWidget {
-  const _TripMapView({required this.days, this.tileProvider});
+  const _TripMapView({
+    required this.days,
+    this.initialEntryId,
+    this.tileProvider,
+  });
 
   final List<TripDay> days;
+  final int? initialEntryId;
   final TripMapTileProvider? tileProvider;
 
   @override
@@ -88,6 +105,29 @@ class _TripMapViewState extends State<_TripMapView> {
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
   bool _mapIsReady = false;
+
+  bool _initialFocusApplied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTabIndex = _initialTabIndex();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TripMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialEntryId != widget.initialEntryId ||
+        !identical(oldWidget.days, widget.days)) {
+      _selectedTabIndex = _initialTabIndex();
+      _initialFocusApplied = false;
+      if (_mapIsReady) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _applyInitialFocus();
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -130,6 +170,29 @@ class _TripMapViewState extends State<_TripMapView> {
     return pinsByDay[tabIndex - 1];
   }
 
+  int _initialTabIndex() {
+    final entryId = widget.initialEntryId;
+    if (entryId == null) return 0;
+    final pinsByDay = _pinsByDay;
+    for (final (dayIndex, dayPins) in pinsByDay.indexed) {
+      if (dayPins.any((pin) => pin.entry.id == entryId)) {
+        return dayIndex + 1;
+      }
+    }
+    return 0;
+  }
+
+  _DayPin? _initialPin() {
+    final entryId = widget.initialEntryId;
+    if (entryId == null) return null;
+    for (final dayPins in _pinsByDay) {
+      for (final pin in dayPins) {
+        if (pin.entry.id == entryId) return pin;
+      }
+    }
+    return null;
+  }
+
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
@@ -147,6 +210,19 @@ class _TripMapViewState extends State<_TripMapView> {
   void _focusPin(_DayPin pin) {
     if (!_mapIsReady) return;
     _mapController.move(pin.point, 16);
+  }
+
+  void _handleMapReady() {
+    _mapIsReady = true;
+    _applyInitialFocus();
+  }
+
+  void _applyInitialFocus() {
+    if (_initialFocusApplied || !_mapIsReady) return;
+    _initialFocusApplied = true;
+    final pin = _initialPin();
+    if (pin == null) return;
+    _focusPin(pin);
   }
 
   @override
@@ -254,7 +330,7 @@ class _TripMapViewState extends State<_TripMapView> {
       initialPadding: const EdgeInsets.all(TpSpacing.s10),
       initialMaxZoom: 16,
       tileProvider: widget.tileProvider,
-      onMapReady: () => _mapIsReady = true,
+      onMapReady: _handleMapReady,
       markers: [for (final pin in visiblePins) _buildMarker(pin)],
     );
   }

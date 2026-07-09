@@ -64,13 +64,14 @@ final _dayTwo = TripDay(
   ],
 );
 
-Widget _buildScreen(List<TripDay> days) {
+Widget _buildScreen(List<TripDay> days, {int? initialEntryId}) {
   final router = GoRouter(
     routes: [
       GoRoute(
         path: '/',
         builder: (context, state) => TripMapScreen(
           tripId: 'trip-1',
+          initialEntryId: initialEntryId,
           tileProvider: _TransparentTileProvider(),
         ),
       ),
@@ -121,6 +122,19 @@ void main() {
 
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.text('首里城'), findsNothing);
+  });
+
+  testWidgets('指定 initialEntryId：初始顯示該停留點所在天', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], initialEntryId: 21),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-12')), findsNothing);
     expect(find.text('美麗海水族館'), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
   });
