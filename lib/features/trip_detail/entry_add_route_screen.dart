@@ -19,6 +19,8 @@ import 'widgets/entry_edit_sheet.dart';
 /// 新增停留點頁的初始模式。
 enum EntryAddMode { search, favorites, custom }
 
+const _entryAddRegionOptions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
+
 /// Web 相容的停留點新增頁，支援搜尋 POI 或新增自訂停留點。
 class EntryAddRouteScreen extends ConsumerStatefulWidget {
   const EntryAddRouteScreen({
@@ -26,11 +28,15 @@ class EntryAddRouteScreen extends ConsumerStatefulWidget {
     required this.tripId,
     this.initialDayNum,
     this.initialMode = EntryAddMode.custom,
+    this.initialRegion,
   });
 
   final String tripId;
   final int? initialDayNum;
   final EntryAddMode initialMode;
+
+  /// 搜尋 POI 的初始地區；`null` 或空字串代表全部地區。
+  final String? initialRegion;
 
   @override
   ConsumerState<EntryAddRouteScreen> createState() =>
@@ -50,11 +56,13 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   bool _favoritesLoading = false;
   int? _addingFavoriteId;
   String? _favoritesError;
+  late String _region;
 
   @override
   void initState() {
     super.initState();
     _mode = widget.initialMode;
+    _region = _normaliseRegion(widget.initialRegion);
     if (_mode == EntryAddMode.favorites) {
       unawaited(_loadFavorites());
     }
@@ -87,7 +95,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     try {
       final results = await ref
           .read(poiRepositoryProvider)
-          .searchPois(q: q, limit: 20, region: null);
+          .searchPois(q: q, limit: 20, region: _regionForSearch(_region));
       if (!mounted) return;
       setState(() {
         _results = results;
@@ -269,6 +277,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                           searching: _searching,
                           addingPlaceId: _addingPlaceId,
                           error: _searchError,
+                          region: _region,
+                          onRegionChanged: (region) =>
+                              setState(() => _region = region),
                           onSearch: () => _searchPois(),
                           onAdd: (poi) => _addPoi(poi, dayNum),
                         )
@@ -391,6 +402,8 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.searching,
     required this.addingPlaceId,
     required this.error,
+    required this.region,
+    required this.onRegionChanged,
     required this.onSearch,
     required this.onAdd,
   });
@@ -400,6 +413,8 @@ class _SearchPoiPanel extends StatelessWidget {
   final bool searching;
   final String? addingPlaceId;
   final String? error;
+  final String region;
+  final ValueChanged<String> onRegionChanged;
   final VoidCallback onSearch;
   final ValueChanged<PoiSearchResult> onAdd;
 
@@ -409,6 +424,22 @@ class _SearchPoiPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PopupMenuButton<String>(
+            tooltip: '切換搜尋地區',
+            onSelected: onRegionChanged,
+            itemBuilder: (context) => [
+              for (final option in _regionOptionsFor(region))
+                PopupMenuItem(value: option, child: Text(option)),
+            ],
+            child: Chip(
+              avatar: const Icon(Icons.location_on_outlined, size: 16),
+              label: Text(region),
+            ),
+          ),
+        ),
+        const SizedBox(height: TpSpacing.s2),
         Row(
           children: [
             Expanded(
@@ -497,4 +528,24 @@ String _dayLabel(TripDay day) {
   final title = day.displayTitle;
   if (title == 'Day ${day.dayNum}') return 'DAY ${day.dayNum}';
   return 'DAY ${day.dayNum} · $title';
+}
+
+String _normaliseRegion(String? region) {
+  final trimmed = region?.trim();
+  if (trimmed == null || trimmed.isEmpty) return '全部地區';
+  return trimmed;
+}
+
+String? _regionForSearch(String region) {
+  final trimmed = region.trim();
+  if (trimmed.isEmpty || trimmed == '全部地區') return null;
+  return trimmed;
+}
+
+List<String> _regionOptionsFor(String region) {
+  final normalised = _normaliseRegion(region);
+  if (_entryAddRegionOptions.contains(normalised)) {
+    return _entryAddRegionOptions;
+  }
+  return [normalised, ..._entryAddRegionOptions];
 }

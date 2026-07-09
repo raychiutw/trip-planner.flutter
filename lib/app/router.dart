@@ -351,6 +351,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                           initialMode: _entryAddModeFromQuery(
                             state.uri.queryParameters['mode'],
                           ),
+                          initialRegion: state.uri.queryParameters['region'],
                         ),
                       ),
                       GoRoute(

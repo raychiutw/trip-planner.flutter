@@ -48,6 +48,7 @@ Widget _buildScreen(
   _MockFavoritesRepository? favoritesRepo,
   int initialDayNum = 2,
   EntryAddMode initialMode = EntryAddMode.custom,
+  String? initialRegion,
 }) {
   final router = GoRouter(
     routes: [
@@ -57,6 +58,7 @@ Widget _buildScreen(
           tripId: 'trip-1',
           initialDayNum: initialDayNum,
           initialMode: initialMode,
+          initialRegion: initialRegion,
         ),
       ),
       GoRoute(
@@ -239,6 +241,42 @@ void main() {
       ),
     ).called(1);
     expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('搜尋 POI 時會沿用初始地區', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        initialMode: EntryAddMode.search,
+        initialRegion: '沖繩',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '水族館',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => poiRepo.searchPois(q: '水族館', limit: 20, region: '沖繩'),
+    ).called(1);
   });
 
   testWidgets('收藏模式可把已收藏景點加入指定 day', (tester) async {

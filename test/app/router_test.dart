@@ -558,6 +558,16 @@ void main() {
 
     container
         .read(appRouterProvider)
+        .go('/trip/trip-1/add-stop?day=1&region=%E6%B2%96%E7%B9%A9');
+    await tester.pumpAndSettle();
+
+    final regionalAddStop = tester.widget<EntryAddRouteScreen>(
+      find.byType(EntryAddRouteScreen),
+    );
+    expect(regionalAddStop.initialRegion, '沖繩');
+
+    container
+        .read(appRouterProvider)
         .go('/trip/trip-1/add-stop?tab=favorites&day=1');
     await tester.pumpAndSettle();
 
