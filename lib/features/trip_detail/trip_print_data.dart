@@ -3,6 +3,7 @@ library;
 
 import '../../models/day.dart';
 import '../../models/notes.dart';
+import '../../models/share.dart';
 import '../../models/trip.dart';
 
 /// Aggregated trip, days, and notes used to render print/PDF documents.
@@ -12,6 +13,23 @@ class TripPrintData {
     required this.days,
     required this.notes,
   });
+
+  factory TripPrintData.fromPublicShare(PublicTripShare share) {
+    return TripPrintData(
+      trip: Trip(
+        id: 'public-share',
+        name: share.name,
+        title: share.title,
+        countries: share.countries,
+        destinations: [
+          for (final destination in share.destinations)
+            TripDestination(name: destination),
+        ],
+      ),
+      days: share.days,
+      notes: share.notes,
+    );
+  }
 
   final Trip trip;
   final List<TripDay> days;

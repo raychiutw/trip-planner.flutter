@@ -13,6 +13,8 @@ import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../models/share.dart';
 import '../../theme/tokens.dart';
+import '../trip_detail/trip_pdf_service.dart';
+import '../trip_detail/trip_print_data.dart';
 
 /// 公開分享頁資料 provider。
 final publicTripShareProvider = FutureProvider.family<PublicTripShare, String>((
@@ -31,9 +33,12 @@ class PublicShareScreen extends ConsumerStatefulWidget {
   ConsumerState<PublicShareScreen> createState() => _PublicShareScreenState();
 }
 
+enum _PublicShareAction { print, pdf }
+
 class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
   bool _cloning = false;
   String? _cloneError;
+  _PublicShareAction? _busyAction;
 
   String get _token => widget.token.trim();
 
@@ -57,7 +62,12 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
             share: share,
             cloning: _cloning,
             cloneError: _cloneError,
+            busyAction: _busyAction,
             isLoggedIn: currentUser != null,
+            onPrint: () =>
+                unawaited(_runPrintAction(_PublicShareAction.print, share)),
+            onPdf: () =>
+                unawaited(_runPrintAction(_PublicShareAction.pdf, share)),
             onClone: () => unawaited(_cloneOrLogin()),
           ),
         ),
@@ -91,6 +101,43 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       });
     }
   }
+
+  Future<void> _runPrintAction(
+    _PublicShareAction action,
+    PublicTripShare share,
+  ) async {
+    if (_busyAction != null) return;
+    setState(() => _busyAction = action);
+    try {
+      final data = TripPrintData.fromPublicShare(share);
+      final actions = ref.read(tripPrintActionsProvider);
+      switch (action) {
+        case _PublicShareAction.print:
+          await actions.print(data);
+          if (!mounted) return;
+          _showMessage('已送出列印');
+          return;
+        case _PublicShareAction.pdf:
+          await actions.sharePdf(data);
+          if (!mounted) return;
+          _showMessage('PDF 已建立');
+          return;
+      }
+    } on Exception {
+      if (!mounted) return;
+      _showMessage(
+        action == _PublicShareAction.print ? '列印失敗，請稍後再試' : 'PDF 建立失敗，請稍後再試',
+      );
+    } finally {
+      if (mounted) setState(() => _busyAction = null);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
 
 class _ShareContent extends StatelessWidget {
@@ -98,18 +145,25 @@ class _ShareContent extends StatelessWidget {
     required this.share,
     required this.cloning,
     required this.cloneError,
+    required this.busyAction,
     required this.isLoggedIn,
+    required this.onPrint,
+    required this.onPdf,
     required this.onClone,
   });
 
   final PublicTripShare share;
   final bool cloning;
   final String? cloneError;
+  final _PublicShareAction? busyAction;
   final bool isLoggedIn;
+  final VoidCallback onPrint;
+  final VoidCallback onPdf;
   final VoidCallback onClone;
 
   @override
   Widget build(BuildContext context) {
+    final actionBusy = busyAction != null;
     return ListView(
       key: const ValueKey('public-share-page'),
       padding: const EdgeInsets.fromLTRB(
@@ -121,22 +175,52 @@ class _ShareContent extends StatelessWidget {
       children: [
         _ShareHero(share: share),
         const SizedBox(height: TpSpacing.s4),
-        FilledButton.icon(
-          key: const ValueKey('public-share-clone'),
-          onPressed: cloning ? null : onClone,
-          icon: cloning
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.copy_outlined),
-          label: Text(
-            cloning
-                ? '複製中…'
-                : isLoggedIn
-                ? '複製到我的行程'
-                : '登入後複製行程',
-          ),
+        Row(
+          children: [
+            IconButton.filledTonal(
+              key: const ValueKey('public-share-print'),
+              tooltip: '列印',
+              onPressed: actionBusy ? null : onPrint,
+              icon: busyAction == _PublicShareAction.print
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print_outlined),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            IconButton.filledTonal(
+              key: const ValueKey('public-share-pdf'),
+              tooltip: '匯出 PDF',
+              onPressed: actionBusy ? null : onPdf,
+              icon: busyAction == _PublicShareAction.pdf
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.picture_as_pdf_outlined),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            Expanded(
+              child: FilledButton.icon(
+                key: const ValueKey('public-share-clone'),
+                onPressed: cloning ? null : onClone,
+                icon: cloning
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.copy_outlined),
+                label: Text(
+                  cloning
+                      ? '複製中…'
+                      : isLoggedIn
+                      ? '複製到我的行程'
+                      : '登入後複製行程',
+                ),
+              ),
+            ),
+          ],
         ),
         if (cloneError != null) ...[
           const SizedBox(height: TpSpacing.s3),

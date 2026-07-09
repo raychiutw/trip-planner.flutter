@@ -6,6 +6,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
+import 'package:tripline/features/trip_detail/trip_pdf_service.dart';
+import 'package:tripline/features/trip_detail/trip_print_data.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/notes.dart';
@@ -14,6 +16,21 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+class FakeTripPrintActions implements TripPrintActions {
+  final printed = <TripPrintData>[];
+  final shared = <TripPrintData>[];
+
+  @override
+  Future<void> print(TripPrintData data) async {
+    printed.add(data);
+  }
+
+  @override
+  Future<void> sharePdf(TripPrintData data) async {
+    shared.add(data);
+  }
+}
 
 class FakeAuthNotifier extends AuthNotifier {
   FakeAuthNotifier(this.user);
@@ -26,6 +43,7 @@ class FakeAuthNotifier extends AuthNotifier {
 
 void main() {
   late MockTripRepository repository;
+  late FakeTripPrintActions printActions;
 
   const sharedTrip = PublicTripShare(
     name: 'okinawa-trip-2026',
@@ -87,6 +105,7 @@ void main() {
       ProviderScope(
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
+          tripPrintActionsProvider.overrideWithValue(printActions),
           authStateProvider.overrideWith(() => FakeAuthNotifier(user)),
         ],
         child: MaterialApp.router(
@@ -100,6 +119,7 @@ void main() {
 
   setUp(() {
     repository = MockTripRepository();
+    printActions = FakeTripPrintActions();
     when(
       () => repository.fetchPublicTripShare(any()),
     ).thenAnswer((_) async => sharedTrip);
@@ -140,6 +160,30 @@ void main() {
 
     verify(() => repository.clonePublicTripShare('s1')).called(1);
     expect(find.text('trip cln-trip-1'), findsOneWidget);
+  });
+
+  testWidgets('點列印會用公開分享資料建立列印文件', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+
+    expect(printActions.printed, hasLength(1));
+    expect(printActions.printed.single.displayTitle, '沖繩家族旅行');
+    expect(
+      printActions.printed.single.days.single.timeline.single.title,
+      '首里城公園',
+    );
+  });
+
+  testWidgets('點 PDF 會用公開分享資料分享 PDF', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('public-share-pdf')));
+    await tester.pumpAndSettle();
+
+    expect(printActions.shared, hasLength(1));
+    expect(printActions.shared.single.destinationsLabel, '那霸');
   });
 
   testWidgets('分享連結失效時顯示 notfound 狀態', (tester) async {
