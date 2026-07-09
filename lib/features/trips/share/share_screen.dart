@@ -31,12 +31,14 @@ const _expiryPresets = {
   '24h': Duration(hours: 24),
   '7d': Duration(days: 7),
   '30d': Duration(days: 30),
+  'custom': null,
 };
 const _expiryLabels = {
   'never': '永久',
   '24h': '24 小時',
   '7d': '7 天',
   '30d': '30 天',
+  'custom': '自訂',
 };
 
 /// 管理單一行程的公開分享連結。
@@ -54,6 +56,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   final _label = TextEditingController();
   final Set<String> _sections = {..._defaultShareSections};
   String _expiryKey = 'never';
+  DateTime? _customExpiryDate;
   bool _anonymous = false;
 
   @override
@@ -69,10 +72,30 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       _shareSectionOrder.where(_sections.contains).toList();
 
   int? get _expiresAt {
+    if (_expiryKey == 'custom') {
+      final date = _customExpiryDate;
+      return date == null
+          ? null
+          : DateTime(
+              date.year,
+              date.month,
+              date.day,
+              23,
+              59,
+              59,
+            ).millisecondsSinceEpoch;
+    }
     final duration = _expiryPresets[_expiryKey];
     return duration == null
         ? null
         : DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds;
+  }
+
+  String get _customExpiryLabel {
+    final date = _customExpiryDate;
+    return date == null
+        ? '選擇日期'
+        : '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}';
   }
 
   void _toggleSection(String key, bool selected) {
@@ -83,6 +106,18 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         _sections.remove(key);
       }
     });
+  }
+
+  Future<void> _pickCustomExpiryDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _customExpiryDate ?? now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5, 12, 31),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _customExpiryDate = selected);
   }
 
   Future<bool> _confirm(
@@ -220,6 +255,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     ],
                   ),
                 ),
+                if (_expiryKey == 'custom') ...[
+                  const SizedBox(height: TpSpacing.s2),
+                  OutlinedButton.icon(
+                    key: const ValueKey('share-custom-expiry-date'),
+                    onPressed: _pickCustomExpiryDate,
+                    icon: const Icon(Icons.event_outlined, size: 18),
+                    label: Text(_customExpiryLabel),
+                  ),
+                ],
                 CheckboxListTile(
                   key: const ValueKey('share-anonymous'),
                   value: _anonymous,
@@ -355,6 +399,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     );
   }
 }
+
+String _pad2(int value) => value.toString().padLeft(2, '0');
 
 class _CreatedCard extends StatelessWidget {
   const _CreatedCard({required this.url, required this.onCopy});

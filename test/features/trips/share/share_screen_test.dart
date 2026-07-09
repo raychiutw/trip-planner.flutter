@@ -149,6 +149,56 @@ void main() {
     );
   });
 
+  testWidgets('建立期限 → 自訂日期送當日 23:59:59', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        expiresAt: any(named: 'expiresAt'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const ShareLink(id: 10, token: 'tok4', url: '/s/tok4', label: 'x'),
+    );
+
+    final selected = DateTime.now();
+    final expected = DateTime(
+      selected.year,
+      selected.month,
+      selected.day,
+      23,
+      59,
+      59,
+    ).millisecondsSinceEpoch;
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), 'x');
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-custom-expiry-date')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+
+    final expiresAt =
+        verify(
+              () => repo.createShare(
+                't',
+                label: 'x',
+                visibleSections: any(named: 'visibleSections'),
+                expiresAt: captureAny(named: 'expiresAt'),
+                anonymous: false,
+              ),
+            ).captured.single
+            as int;
+    expect(expiresAt, expected);
+  });
+
   testWidgets('撤銷 → 確認 → 呼叫 revoke', (tester) async {
     when(() => repo.revokeShare(any(), any())).thenAnswer((_) async {});
 
