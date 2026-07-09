@@ -59,6 +59,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     return ok ?? false;
   }
 
+  Future<void> _editShareLabel(TripShare share) async {
+    final nextLabel = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _EditShareLabelDialog(initialLabel: share.label),
+    );
+    if (!mounted || nextLabel == null) return;
+    await _ctrl.update(share.id, label: nextLabel);
+  }
+
   Future<void> _copy(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (mounted) {
@@ -170,14 +179,24 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         spacing: TpSpacing.s1,
         children: [
           if (s.isActive)
-            TextButton(
-              key: ValueKey('share-rotate-${s.id}'),
-              onPressed: busy ? null : () async => _ctrl.rotate(s.id),
-              child: Text(state.rotatingId == s.id ? '更新中' : '重產生'),
+            _rowIconButton(
+              key: ValueKey('share-edit-btn-${s.id}'),
+              tooltip: '編輯',
+              icon: Icons.edit_outlined,
+              onPressed: busy ? null : () async => _editShareLabel(s),
             ),
           if (s.isActive)
-            TextButton(
+            _rowIconButton(
+              key: ValueKey('share-rotate-${s.id}'),
+              tooltip: state.rotatingId == s.id ? '更新中' : '重產生',
+              icon: Icons.refresh,
+              onPressed: busy ? null : () async => _ctrl.rotate(s.id),
+            ),
+          if (s.isActive)
+            _rowIconButton(
               key: ValueKey('share-revoke-${s.id}'),
+              tooltip: '撤銷',
+              icon: Icons.link_off_outlined,
               onPressed: busy
                   ? null
                   : () async {
@@ -189,10 +208,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         await _ctrl.revoke(s.id);
                       }
                     },
-              child: const Text('撤銷'),
             ),
-          TextButton(
+          _rowIconButton(
             key: ValueKey('share-delete-${s.id}'),
+            tooltip: state.deletingId == s.id ? '刪除中' : '刪除',
+            icon: Icons.delete_outline,
             onPressed: busy
                 ? null
                 : () async {
@@ -204,10 +224,26 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       await _ctrl.delete(s.id);
                     }
                   },
-            child: Text(state.deletingId == s.id ? '刪除中' : '刪除'),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _rowIconButton({
+    required Key key,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      padding: EdgeInsets.zero,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
     );
   }
 }
@@ -244,6 +280,59 @@ class _CreatedCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EditShareLabelDialog extends StatefulWidget {
+  const _EditShareLabelDialog({required this.initialLabel});
+
+  final String initialLabel;
+
+  @override
+  State<_EditShareLabelDialog> createState() => _EditShareLabelDialogState();
+}
+
+class _EditShareLabelDialogState extends State<_EditShareLabelDialog> {
+  late final TextEditingController _label;
+
+  @override
+  void initState() {
+    super.initState();
+    _label = TextEditingController(text: widget.initialLabel);
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('編輯分享連結'),
+      content: TextField(
+        key: const ValueKey('share-edit-label'),
+        controller: _label,
+        autofocus: true,
+        maxLength: 80,
+        decoration: const InputDecoration(
+          labelText: '連結名稱',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_label.text),
+          child: const Text('儲存'),
+        ),
+      ],
     );
   }
 }

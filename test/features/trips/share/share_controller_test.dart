@@ -93,6 +93,19 @@ void main() {
     verify(() => repo.fetchShares('t')).called(2);
   });
 
+  test('update label → 呼叫 + reload', () async {
+    when(
+      () => repo.updateShare(any(), any(), label: any(named: 'label')),
+    ).thenAnswer((_) async {});
+    final c = makeC();
+    final ctrl = await loaded(c);
+    await ctrl.update(1, label: '  旅伴  ');
+
+    verify(() => repo.updateShare('t', 1, label: '旅伴')).called(1);
+    verify(() => repo.fetchShares('t')).called(2);
+    expect(c.read(shareControllerProvider('t')).updatingId, isNull);
+  });
+
   test('rotate → 呼叫 + reload + lastCreated 顯示新連結', () async {
     when(() => repo.rotateShare(any(), any())).thenAnswer(
       (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),

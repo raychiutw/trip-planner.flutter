@@ -78,6 +78,25 @@ void main() {
     verify(() => repo.deleteShare('t', 1)).called(1);
   });
 
+  testWidgets('編輯名稱 → 儲存 → 呼叫 updateShare', (tester) async {
+    when(
+      () => repo.updateShare(any(), any(), label: any(named: 'label')),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('share-edit-label')),
+      '旅伴',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.updateShare('t', 1, label: '旅伴')).called(1);
+  });
+
   testWidgets('重新產生連結 → 顯示新的完整 URL', (tester) async {
     when(() => repo.rotateShare(any(), any())).thenAnswer(
       (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),
