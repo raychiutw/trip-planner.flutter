@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -44,6 +45,55 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> pumpScreenWithRouter(WidgetTester tester) async {
+    final router = GoRouter(
+      initialLocation: '/health',
+      routes: [
+        GoRoute(
+          path: '/health',
+          builder: (context, state) => const TripHealthScreen(tripId: 'trip-1'),
+        ),
+        GoRoute(
+          path: '/trips/:tripId',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'trip ${state.pathParameters['tripId']} day ${state.uri.queryParameters['day']}',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/entries/:entryId/edit',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'edit ${state.pathParameters['tripId']} ${state.pathParameters['entryId']}',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/trips/:tripId/entries/:entryId/pois',
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'pois ${state.pathParameters['tripId']} ${state.pathParameters['entryId']}',
+            ),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (retryCount, error) => null,
+        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   setUp(() {
     repository = MockTripRepository();
     when(() => repository.fetchTrip('trip-1')).thenAnswer((_) async => trip);
@@ -64,6 +114,7 @@ void main() {
         tripId: 'trip-1',
         userId: 'user-1',
         status: TripHealthStatus.completed,
+        createdAt: '2026-07-09T10:00:00Z',
         findings: [
           TripHealthFinding(
             severity: TripHealthSeverity.high,
@@ -74,7 +125,6 @@ void main() {
             actionTarget: TripHealthActionTarget(day: 1, entryId: 101),
           ),
         ],
-        createdAt: '2026-07-09T10:00:00Z',
         completedAt: '2026-07-09T10:01:00Z',
       ),
     );
@@ -103,6 +153,57 @@ void main() {
     expect(find.textContaining('刪減一個停留點。'), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-health-poi-card')), findsOneWidget);
     expect(find.text('已歇業餐廳'), findsOneWidget);
+  });
+
+  testWidgets('finding entry target 導向停留點編輯頁', (tester) async {
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.completed,
+        createdAt: '2026-07-09T10:00:00Z',
+        findings: [
+          TripHealthFinding(
+            severity: TripHealthSeverity.high,
+            title: 'Day 1 時間太滿',
+            description: '上午行程間隔過短。',
+            actionTarget: TripHealthActionTarget(day: 1, entryId: 101),
+          ),
+        ],
+      ),
+    );
+
+    await pumpScreenWithRouter(tester);
+    await tester.tap(find.text('前往景點'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('edit trip-1 101'), findsOneWidget);
+    expect(find.text('pois trip-1 101'), findsNothing);
+  });
+
+  testWidgets('finding day target 保留 day query 導回行程', (tester) async {
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
+      (_) async => const TripHealthReport(
+        tripId: 'trip-1',
+        userId: 'user-1',
+        status: TripHealthStatus.completed,
+        createdAt: '2026-07-09T10:00:00Z',
+        findings: [
+          TripHealthFinding(
+            severity: TripHealthSeverity.medium,
+            title: 'Day 2 午餐空窗',
+            description: '中午沒有安排餐廳。',
+            actionTarget: TripHealthActionTarget(day: 2),
+          ),
+        ],
+      ),
+    );
+
+    await pumpScreenWithRouter(tester);
+    await tester.tap(find.text('前往 Day 2'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('trip trip-1 day 2'), findsOneWidget);
   });
 
   testWidgets('沒有既有 report 時可啟動 health check 並顯示 pending', (tester) async {

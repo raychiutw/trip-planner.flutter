@@ -130,6 +130,7 @@ Future<void> _pumpTimeline(
   _MockTripRepository? repo,
   List<TripSegment> segments = const [],
   int? initialEntryId,
+  int? initialDayNum,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$_tripId',
@@ -139,6 +140,7 @@ Future<void> _pumpTimeline(
         builder: (context, state) => TripTimelineScreen(
           tripId: state.pathParameters['tripId']!,
           initialEntryId: initialEntryId,
+          initialDayNum: initialDayNum,
         ),
         routes: [
           GoRoute(
@@ -297,6 +299,14 @@ void main() {
 
     final day2TitleTopAfterTap = tester.getTopLeft(find.text('南部文化')).dy;
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
+  });
+
+  testWidgets('指定 initialDayNum：初始啟用該日 pill', (tester) async {
+    await _pumpTimeline(tester, initialDayNum: 2);
+    await tester.pumpAndSettle();
+
+    final day2PillLabel = tester.widget<Text>(find.text('DAY 02').first);
+    expect(day2PillLabel.style?.color, TpColorsLight.accentDeep);
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {

@@ -514,10 +514,19 @@ class _FindingCard extends StatelessWidget {
                     final entryId = target?.entryId;
                     if (entryId != null) {
                       final encodedTripId = Uri.encodeComponent(tripId);
-                      context.go('/trips/$encodedTripId/entries/$entryId/pois');
+                      context.go('/trips/$encodedTripId/entries/$entryId/edit');
                       return;
                     }
-                    context.go('/trips/${Uri.encodeComponent(tripId)}');
+                    final day = target?.day;
+                    final encodedTripId = Uri.encodeComponent(tripId);
+                    context.go(
+                      Uri(
+                        path: '/trips/$encodedTripId',
+                        queryParameters: day == null
+                            ? null
+                            : {'day': day.toString()},
+                      ).toString(),
+                    );
                   },
                   icon: const Icon(Icons.arrow_forward),
                   label: Text(_entryTargetLabel(target)),

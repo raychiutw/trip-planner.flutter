@@ -27,12 +27,16 @@ class TripTimelineScreen extends ConsumerWidget {
     super.key,
     required this.tripId,
     this.initialEntryId,
+    this.initialDayNum,
   });
 
   final String tripId;
 
   /// 初始聚焦的停留點 id，用於 `/trip/:tripId/stop/:entryId` deep link。
   final int? initialEntryId;
+
+  /// 初始聚焦的天數，用於 `/trips/:tripId?day=N` deep link。
+  final int? initialDayNum;
 
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
@@ -84,6 +88,7 @@ class TripTimelineScreen extends ConsumerWidget {
                 days: days,
                 tripId: tripId,
                 initialEntryId: initialEntryId,
+                initialDayNum: initialDayNum,
               ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
@@ -103,11 +108,13 @@ class _TimelineBody extends StatefulWidget {
     required this.days,
     required this.tripId,
     this.initialEntryId,
+    this.initialDayNum,
   });
 
   final List<TripDay> days;
   final String tripId;
   final int? initialEntryId;
+  final int? initialDayNum;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
@@ -125,14 +132,15 @@ class _TimelineBodyState extends State<_TimelineBody> {
     _activeDayNum =
         _initialDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
-    _scheduleInitialEntryScroll();
+    _scheduleInitialFocusScroll();
   }
 
   @override
   void didUpdateWidget(covariant _TimelineBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.days, widget.days) ||
-        oldWidget.initialEntryId != widget.initialEntryId) {
+        oldWidget.initialEntryId != widget.initialEntryId ||
+        oldWidget.initialDayNum != widget.initialDayNum) {
       _rebuildKeys();
       final initialDayNum = _initialDayNum();
       if (initialDayNum != null) {
@@ -140,7 +148,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
       } else if (!widget.days.any((day) => day.dayNum == _activeDayNum)) {
         _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
       }
-      _scheduleInitialEntryScroll();
+      _scheduleInitialFocusScroll();
     }
   }
 
@@ -156,23 +164,34 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
   int? _initialDayNum() {
     final entryId = widget.initialEntryId;
-    if (entryId == null) return null;
-    for (final day in widget.days) {
-      if (day.timeline.any((entry) => entry.id == entryId)) {
-        return day.dayNum;
+    if (entryId != null) {
+      for (final day in widget.days) {
+        if (day.timeline.any((entry) => entry.id == entryId)) {
+          return day.dayNum;
+        }
       }
+    }
+    final dayNum = widget.initialDayNum;
+    if (dayNum != null && widget.days.any((day) => day.dayNum == dayNum)) {
+      return dayNum;
     }
     return null;
   }
 
-  void _scheduleInitialEntryScroll() {
-    if (widget.initialEntryId == null) return;
+  void _scheduleInitialFocusScroll() {
+    final entryId = widget.initialEntryId;
+    final dayNum = entryId == null ? widget.initialDayNum : null;
+    if (entryId == null && dayNum == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final entryContext = _entryKeys[widget.initialEntryId]?.currentContext;
-      if (entryContext == null) return;
+      final targetContext = entryId != null
+          ? _entryKeys[entryId]?.currentContext
+          : _daySectionKeys[dayNum]?.currentContext;
+      if (targetContext == null) return;
+      final renderObject = targetContext.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
       Scrollable.ensureVisible(
-        entryContext,
+        targetContext,
         duration: TpMotion.normal,
         curve: TpMotion.appleEase,
       );

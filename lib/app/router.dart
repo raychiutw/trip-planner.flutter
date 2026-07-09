@@ -319,6 +319,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => TripTimelineScreen(
                       tripId: state.pathParameters['tripId']!,
                       initialEntryId: _entryFocusFromQuery(state.uri),
+                      initialDayNum: _dayFocusFromQuery(state.uri),
                     ),
                     routes: [
                       GoRoute(
@@ -523,6 +524,10 @@ String? _selectedTripAlias(GoRouterState state) {
 
 int? _entryFocusFromQuery(Uri uri) {
   return int.tryParse(uri.queryParameters['entry'] ?? '');
+}
+
+int? _dayFocusFromQuery(Uri uri) {
+  return int.tryParse(uri.queryParameters['day'] ?? '');
 }
 
 EntryAddMode _entryAddModeFromQuery(
