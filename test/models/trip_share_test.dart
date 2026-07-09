@@ -43,4 +43,17 @@ void main() {
       'https://trip-planner-dby.pages.dev/s/tok123',
     );
   });
+
+  test('RotatedShareLink.fromJson + fullUrl', () {
+    final l = RotatedShareLink.fromJson(const {
+      'token': 'tok456',
+      'url': '/s/tok456',
+    });
+
+    expect(l.token, 'tok456');
+    expect(
+      l.fullUrl('https://trip-planner-dby.pages.dev'),
+      'https://trip-planner-dby.pages.dev/s/tok456',
+    );
+  });
 }

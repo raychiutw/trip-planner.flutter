@@ -70,3 +70,22 @@ class ShareLink {
     label: json['label'] as String? ?? '',
   );
 }
+
+/// 更新 token 的回應(raw token 只回一次)。
+class RotatedShareLink {
+  const RotatedShareLink({required this.token, required this.url});
+
+  final String token;
+
+  /// 相對路徑,如 `/s/<token>`。
+  final String url;
+
+  /// 完整可分享 URL = origin + url。
+  String fullUrl(String origin) => '$origin$url';
+
+  factory RotatedShareLink.fromJson(Map<String, dynamic> json) =>
+      RotatedShareLink(
+        token: json['token'] as String? ?? '',
+        url: json['url'] as String? ?? '',
+      );
+}

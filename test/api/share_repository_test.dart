@@ -48,6 +48,103 @@ void main() {
     expect(link.url, '/s/tok');
   });
 
+  test('createShare：送出可見區段、期限與匿名設定', () async {
+    adapter.onPost(
+      '/trips/okinawa/shares',
+      (server) => server.reply(200, {
+        'id': 8,
+        'token': 'tok2',
+        'url': '/s/tok2',
+        'label': '旅伴',
+      }),
+      data: {
+        'label': '旅伴',
+        'visibleSections': ['flights', 'emergency'],
+        'expiresAt': 1800000000000,
+        'anonymous': true,
+      },
+    );
+
+    final link = await repo.createShare(
+      'okinawa',
+      label: '旅伴',
+      visibleSections: ['flights', 'emergency'],
+      expiresAt: 1800000000000,
+      anonymous: true,
+    );
+
+    expect(link.id, 8);
+    expect(link.token, 'tok2');
+  });
+
+  test('updateShare：PATCH {action:update,...patch}', () async {
+    adapter.onPatch(
+      '/trips/okinawa/shares/7',
+      (server) => server.reply(200, {'ok': true, 'updated': true}),
+      data: {
+        'action': 'update',
+        'label': '新名稱',
+        'visibleSections': ['checklist'],
+        'expiresAt': 1900000000000,
+        'anonymous': false,
+      },
+    );
+
+    await expectLater(
+      repo.updateShare(
+        'okinawa',
+        7,
+        label: '新名稱',
+        visibleSections: ['checklist'],
+        expiresAt: 1900000000000,
+        anonymous: false,
+      ),
+      completes,
+    );
+  });
+
+  test('updateShare：clearExpiresAt 送出 null', () async {
+    adapter.onPatch(
+      '/trips/okinawa/shares/7',
+      (server) => server.reply(200, {'ok': true, 'updated': true}),
+      data: {'action': 'update', 'expiresAt': null},
+    );
+
+    await expectLater(
+      repo.updateShare('okinawa', 7, clearExpiresAt: true),
+      completes,
+    );
+  });
+
+  test('updateShare：expiresAt 與 clearExpiresAt 互斥', () {
+    expect(
+      () => repo.updateShare(
+        'okinawa',
+        7,
+        expiresAt: 1900000000000,
+        clearExpiresAt: true,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('rotateShare：PATCH {action:rotate} → token/url', () async {
+    adapter.onPatch(
+      '/trips/okinawa/shares/7',
+      (server) => server.reply(200, {
+        'ok': true,
+        'token': 'newtok',
+        'url': '/s/newtok',
+      }),
+      data: {'action': 'rotate'},
+    );
+
+    final link = await repo.rotateShare('okinawa', 7);
+
+    expect(link.token, 'newtok');
+    expect(link.url, '/s/newtok');
+  });
+
   test('revokeShare：PATCH {action:revoke}', () async {
     adapter.onPatch(
       '/trips/okinawa/shares/7',
@@ -55,5 +152,14 @@ void main() {
       data: {'action': 'revoke'},
     );
     await expectLater(repo.revokeShare('okinawa', 7), completes);
+  });
+
+  test('deleteShare：DELETE /trips/:id/shares/:shareId', () async {
+    adapter.onDelete(
+      '/trips/okinawa/shares/7',
+      (server) => server.reply(200, {'ok': true, 'deleted': true}),
+    );
+
+    await expectLater(repo.deleteShare('okinawa', 7), completes);
   });
 }
