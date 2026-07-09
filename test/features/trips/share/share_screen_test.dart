@@ -65,6 +65,21 @@ void main() {
     verify(() => repo.revokeShare('t', 1)).called(1);
   });
 
+  testWidgets('重新產生連結 → 顯示新的完整 URL', (tester) async {
+    when(() => repo.rotateShare(any(), any())).thenAnswer(
+      (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.rotateShare('t', 1)).called(1);
+    expect(find.textContaining('/s/newtok'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-copy')), findsOneWidget);
+  });
+
   testWidgets('非 write 權限(403)→ 提示', (tester) async {
     when(() => repo.fetchShares(any())).thenAnswer(
       (_) async =>

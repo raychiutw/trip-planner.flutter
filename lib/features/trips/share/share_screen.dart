@@ -1,4 +1,4 @@
-/// 分享連結管理:列出/建立/撤銷公開唯讀連結。建立後顯示完整 URL + 複製
+/// 分享連結管理:列出/建立/重產生/撤銷公開唯讀連結。建立後顯示完整 URL + 複製
 /// (raw token 只回一次)。管理限有 write 權限者(否則提示)。
 library;
 
@@ -157,16 +157,30 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       title: Text(s.label.isEmpty ? '(無標籤)' : s.label),
       subtitle: Text('$status · 已被檢視 ${s.viewCount} 次'),
       trailing: s.isActive
-          ? TextButton(
-              key: ValueKey('share-revoke-${s.id}'),
-              onPressed: state.revokingId == s.id
-                  ? null
-                  : () async {
-                      if (await _confirm('此連結將立即失效,無法復原。')) {
-                        await _ctrl.revoke(s.id);
-                      }
-                    },
-              child: const Text('撤銷'),
+          ? Wrap(
+              spacing: TpSpacing.s1,
+              children: [
+                TextButton(
+                  key: ValueKey('share-rotate-${s.id}'),
+                  onPressed:
+                      state.rotatingId == s.id || state.revokingId == s.id
+                      ? null
+                      : () async => _ctrl.rotate(s.id),
+                  child: Text(state.rotatingId == s.id ? '更新中' : '重產生'),
+                ),
+                TextButton(
+                  key: ValueKey('share-revoke-${s.id}'),
+                  onPressed:
+                      state.revokingId == s.id || state.rotatingId == s.id
+                      ? null
+                      : () async {
+                          if (await _confirm('此連結將立即失效,無法復原。')) {
+                            await _ctrl.revoke(s.id);
+                          }
+                        },
+                  child: const Text('撤銷'),
+                ),
+              ],
             )
           : null,
     );

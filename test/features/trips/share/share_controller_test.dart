@@ -82,4 +82,19 @@ void main() {
     verify(() => repo.revokeShare('t', 1)).called(1);
     verify(() => repo.fetchShares('t')).called(2);
   });
+
+  test('rotate → 呼叫 + reload + lastCreated 顯示新連結', () async {
+    when(() => repo.rotateShare(any(), any())).thenAnswer(
+      (_) async => const RotatedShareLink(token: 'newtok', url: '/s/newtok'),
+    );
+    final c = makeC();
+    final ctrl = await loaded(c);
+    await ctrl.rotate(1);
+
+    verify(() => repo.rotateShare('t', 1)).called(1);
+    verify(() => repo.fetchShares('t')).called(2);
+    final s = c.read(shareControllerProvider('t'));
+    expect(s.lastCreated!.token, 'newtok');
+    expect(s.lastCreated!.url, '/s/newtok');
+  });
 }

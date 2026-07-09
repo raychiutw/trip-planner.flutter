@@ -1,5 +1,6 @@
-/// 分享連結狀態機:載入清單(write 權限,403→canManage false)+ 建立(回 ShareLink
-/// 供畫面顯示 URL)+ 撤銷;每動作後 reload。沿用 collab 的 _disposed/重入守門。
+/// 分享連結狀態機:載入清單(write 權限,403→canManage false)+ 建立/旋轉
+/// (回 ShareLink 供畫面顯示 URL)+ 撤銷;每動作後 reload。
+/// 沿用 collab 的 _disposed/重入守門。
 library;
 
 import 'dart:async';
@@ -11,6 +12,7 @@ import '../../../api/providers.dart';
 import '../../../api/share_repository.dart';
 import '../../../models/trip_share.dart';
 
+/// 分享連結管理畫面的狀態。
 class ShareState {
   const ShareState({
     this.loading = true,
@@ -19,6 +21,7 @@ class ShareState {
     this.error,
     this.creating = false,
     this.revokingId,
+    this.rotatingId,
     this.lastCreated,
   });
 
@@ -28,8 +31,9 @@ class ShareState {
   final String? error;
   final bool creating;
   final int? revokingId;
+  final int? rotatingId;
 
-  /// 最近一次建立的連結(raw token 只回一次)→ 畫面顯示 + 複製。
+  /// 最近一次取得 raw token 的連結(建立或重產生)→ 畫面顯示 + 複製。
   final ShareLink? lastCreated;
 
   ShareState copyWith({
@@ -39,6 +43,7 @@ class ShareState {
     Object? error = _sentinel,
     bool? creating,
     Object? revokingId = _sentinel,
+    Object? rotatingId = _sentinel,
     Object? lastCreated = _sentinel,
   }) {
     return ShareState(
@@ -50,6 +55,9 @@ class ShareState {
       revokingId: revokingId == _sentinel
           ? this.revokingId
           : revokingId as int?,
+      rotatingId: rotatingId == _sentinel
+          ? this.rotatingId
+          : rotatingId as int?,
       lastCreated: lastCreated == _sentinel
           ? this.lastCreated
           : lastCreated as ShareLink?,
@@ -59,6 +67,7 @@ class ShareState {
   static const _sentinel = Object();
 }
 
+/// 管理單一行程的公開分享連結清單與連結異動。
 class ShareController extends Notifier<ShareState> {
   ShareController(this.tripId);
 
@@ -137,6 +146,28 @@ class ShareController extends Notifier<ShareState> {
     } on Exception {
       if (_disposed) return;
       state = state.copyWith(revokingId: null, error: '撤銷失敗,請稍後再試');
+    }
+  }
+
+  /// 重新產生分享連結 token;成功後 lastCreated 帶新 URL(只顯示一次)。
+  Future<void> rotate(int shareId) async {
+    if (state.rotatingId != null || state.revokingId != null) return;
+    state = state.copyWith(rotatingId: shareId, error: null, lastCreated: null);
+    try {
+      final rotated = await _repo.rotateShare(tripId, shareId);
+      await _reload();
+      if (_disposed) return;
+      state = state.copyWith(
+        rotatingId: null,
+        lastCreated: ShareLink(
+          id: shareId,
+          token: rotated.token,
+          url: rotated.url,
+        ),
+      );
+    } on Exception {
+      if (_disposed) return;
+      state = state.copyWith(rotatingId: null, error: '重新產生失敗,請稍後再試');
     }
   }
 }
