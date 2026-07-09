@@ -29,6 +29,8 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       '/invite?token=${Uri.encodeQueryComponent(_token)}';
   String get _loginLocation =>
       '/login?redirect_after=${Uri.encodeComponent(_inviteLocation)}';
+  String get _signupLocation =>
+      '/signup?invitation=${Uri.encodeQueryComponent(_token)}';
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
                   user: user,
                   authLoading: authLoading,
                   onLogin: _goLogin,
+                  onSignup: _goSignup,
                   onSwitchAccount: () => unawaited(_switchAccount()),
                   onAccept:
                       inviteState.canAccept(user, authLoading: authLoading)
@@ -74,6 +77,11 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
   void _goLogin() {
     if (_token.isEmpty) return;
     context.go(_loginLocation);
+  }
+
+  void _goSignup() {
+    if (_token.isEmpty) return;
+    context.go(_signupLocation);
   }
 
   Future<void> _switchAccount() async {
@@ -98,6 +106,7 @@ class _InviteBody extends StatelessWidget {
     required this.user,
     required this.authLoading,
     required this.onLogin,
+    required this.onSignup,
     required this.onSwitchAccount,
     required this.onAccept,
   });
@@ -106,6 +115,7 @@ class _InviteBody extends StatelessWidget {
   final UserInfo? user;
   final bool authLoading;
   final VoidCallback onLogin;
+  final VoidCallback onSignup;
   final VoidCallback onSwitchAccount;
   final VoidCallback? onAccept;
 
@@ -133,6 +143,7 @@ class _InviteBody extends StatelessWidget {
           status: accountStatus,
           accepting: state.accepting,
           onLogin: onLogin,
+          onSignup: onSignup,
           onSwitchAccount: onSwitchAccount,
           onAccept: onAccept,
         ),
@@ -203,6 +214,7 @@ class _ChecklistCard extends StatelessWidget {
     required this.status,
     required this.accepting,
     required this.onLogin,
+    required this.onSignup,
     required this.onSwitchAccount,
     required this.onAccept,
   });
@@ -212,6 +224,7 @@ class _ChecklistCard extends StatelessWidget {
   final InviteAccountStatus status;
   final bool accepting;
   final VoidCallback onLogin;
+  final VoidCallback onSignup;
   final VoidCallback onSwitchAccount;
   final VoidCallback? onAccept;
 
@@ -251,6 +264,7 @@ class _ChecklistCard extends StatelessWidget {
               status: status,
               accepting: accepting,
               onLogin: onLogin,
+              onSignup: onSignup,
               onSwitchAccount: onSwitchAccount,
               onAccept: onAccept,
             ),
@@ -462,6 +476,7 @@ class _PrimaryAction extends StatelessWidget {
     required this.status,
     required this.accepting,
     required this.onLogin,
+    required this.onSignup,
     required this.onSwitchAccount,
     required this.onAccept,
   });
@@ -469,17 +484,30 @@ class _PrimaryAction extends StatelessWidget {
   final InviteAccountStatus status;
   final bool accepting;
   final VoidCallback onLogin;
+  final VoidCallback onSignup;
   final VoidCallback onSwitchAccount;
   final VoidCallback? onAccept;
 
   @override
   Widget build(BuildContext context) {
     return switch (status) {
-      InviteAccountStatus.anonymous => FilledButton.icon(
-        key: const ValueKey('invite-login'),
-        onPressed: onLogin,
-        icon: const Icon(Icons.login_outlined),
-        label: const Text('登入後加入'),
+      InviteAccountStatus.anonymous => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            key: const ValueKey('invite-signup'),
+            onPressed: onSignup,
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            label: const Text('註冊並加入'),
+          ),
+          const SizedBox(height: TpSpacing.s2),
+          OutlinedButton.icon(
+            key: const ValueKey('invite-login'),
+            onPressed: onLogin,
+            icon: const Icon(Icons.login_outlined),
+            label: const Text('登入並加入'),
+          ),
+        ],
       ),
       InviteAccountStatus.matching => FilledButton.icon(
         key: const ValueKey('invite-accept'),

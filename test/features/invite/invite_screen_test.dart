@@ -71,6 +71,12 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/signup',
+          builder: (context, state) => Scaffold(
+            body: Text('signup ${state.uri.queryParameters['invitation']}'),
+          ),
+        ),
+        GoRoute(
           path: '/trips/:tripId',
           builder: (context, state) =>
               Scaffold(body: Text('trip ${state.pathParameters['tripId']}')),
@@ -114,6 +120,18 @@ void main() {
     expect(find.text('邀請連結有效'), findsOneWidget);
     expect(find.text('帳號待確認'), findsOneWidget);
     expect(find.text('登入 traveler@example.com 後即可加入'), findsOneWidget);
+    expect(find.byKey(const ValueKey('invite-signup')), findsOneWidget);
+    expect(find.byKey(const ValueKey('invite-login')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('invite-signup')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('signup raw-token'), findsOneWidget);
+    verifyNever(() => repo.acceptInvitation(any()));
+  });
+
+  testWidgets('未登入點登入會帶回 invite redirect', (tester) async {
+    await pumpInvite(tester);
 
     await tester.tap(find.byKey(const ValueKey('invite-login')));
     await tester.pumpAndSettle();
