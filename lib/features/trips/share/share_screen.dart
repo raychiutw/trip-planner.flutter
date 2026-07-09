@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr/qr.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../api/api_client.dart' show kTriplineOrigin;
 import '../../../models/trip_share.dart';
@@ -44,12 +45,28 @@ const _expiryLabels = {
   'custom': '自訂',
 };
 
+/// 分享公開行程連結的 callback。
+typedef ShareLinkInvoker = Future<void> Function(String url);
+
+/// 呼叫系統分享面板分享公開行程連結。
+Future<void> shareTripLink(String url) async {
+  final uri = Uri.tryParse(url);
+  await SharePlus.instance.share(
+    uri != null && uri.hasScheme
+        ? ShareParams(title: '行程分享', uri: uri)
+        : ShareParams(title: '行程分享', text: url),
+  );
+}
+
 /// 管理單一行程的公開分享連結。
 class ShareScreen extends ConsumerStatefulWidget {
-  const ShareScreen({super.key, required this.tripId});
+  const ShareScreen({super.key, required this.tripId, this.shareLink});
 
   /// 目標行程 ID。
   final String tripId;
+
+  /// 分享新建立/重產生連結的 handler；預設呼叫系統分享面板。
+  final ShareLinkInvoker? shareLink;
 
   @override
   ConsumerState<ShareScreen> createState() => _ShareScreenState();
@@ -174,6 +191,17 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     }
   }
 
+  Future<void> _share(String url) async {
+    try {
+      await (widget.shareLink ?? shareTripLink)(url);
+    } on Exception {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('分享失敗，請改用複製連結')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(shareControllerProvider(widget.tripId));
@@ -198,6 +226,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                   _CreatedCard(
                     url: state.lastCreated!.fullUrl(kTriplineOrigin),
                     onCopy: _copy,
+                    onShare: _share,
                   ),
                 Text(
                   '使用中的連結（${activeShares.length}）',
@@ -427,10 +456,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 String _pad2(int value) => value.toString().padLeft(2, '0');
 
 class _CreatedCard extends StatefulWidget {
-  const _CreatedCard({required this.url, required this.onCopy});
+  const _CreatedCard({
+    required this.url,
+    required this.onCopy,
+    required this.onShare,
+  });
 
   final String url;
   final Future<void> Function(String) onCopy;
+  final Future<void> Function(String) onShare;
 
   @override
   State<_CreatedCard> createState() => _CreatedCardState();
@@ -466,6 +500,12 @@ class _CreatedCardState extends State<_CreatedCard> {
                     size: 18,
                   ),
                   label: Text(_showQr ? '隱藏 QR' : '顯示 QR'),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('share-native'),
+                  onPressed: () => widget.onShare(widget.url),
+                  icon: const Icon(Icons.ios_share_outlined, size: 18),
+                  label: const Text('分享'),
                 ),
                 FilledButton.tonalIcon(
                   key: const ValueKey('share-copy'),

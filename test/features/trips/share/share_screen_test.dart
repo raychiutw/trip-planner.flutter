@@ -20,13 +20,14 @@ void main() {
     when(() => repo.fetchShares(any())).thenAnswer((_) async => _shares);
   });
 
-  Widget buildApp() => ProviderScope(
-    overrides: [shareRepositoryProvider.overrideWithValue(repo)],
-    child: MaterialApp(
-      theme: AppTheme.light(),
-      home: const ShareScreen(tripId: 't'),
-    ),
-  );
+  Widget buildApp({Future<void> Function(String url)? shareLink}) =>
+      ProviderScope(
+        overrides: [shareRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: ShareScreen(tripId: 't', shareLink: shareLink),
+        ),
+      );
 
   testWidgets('渲染現有連結', (tester) async {
     await tester.pumpWidget(buildApp());
@@ -92,6 +93,39 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('share-qr-code')), findsOneWidget);
+  });
+
+  testWidgets('建立 → 可用系統分享完整 URL', (tester) async {
+    final sharedUrls = <String>[];
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer(
+      (_) async => const ShareLink(
+        id: 12,
+        token: 'tokshare',
+        url: '/s/tokshare',
+        label: 'x',
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(shareLink: (url) async => sharedUrls.add(url)),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), 'x');
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('share-native')));
+    await tester.pumpAndSettle();
+
+    expect(sharedUrls, hasLength(1));
+    expect(sharedUrls.single, contains('/s/tokshare'));
   });
 
   testWidgets('建立選項 → 切換公開區塊與匿名設定', (tester) async {
