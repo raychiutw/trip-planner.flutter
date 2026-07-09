@@ -42,6 +42,27 @@ const _favorites = [
   ),
 ];
 
+const _mixedFavorites = [
+  PoiFavorite(
+    id: 10,
+    userId: 'user-1',
+    poiId: 101,
+    favoritedAt: '2026-07-01T00:00:00.000Z',
+    poiName: '牧志市場',
+    poiAddress: '沖繩縣那霸市松尾',
+    poiType: 'restaurant',
+  ),
+  PoiFavorite(
+    id: 11,
+    userId: 'user-1',
+    poiId: 102,
+    favoritedAt: '2026-07-02T00:00:00.000Z',
+    poiName: '那霸飯店',
+    poiAddress: '沖繩縣那霸市',
+    poiType: 'hotel',
+  ),
+];
+
 Widget _buildScreen(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
@@ -279,6 +300,89 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('搜尋模式可用類別篩選結果', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(
+          placeId: 'food-1',
+          name: '牧志市場',
+          address: '沖繩縣那霸市松尾',
+          category: 'restaurant',
+        ),
+        PoiSearchResult(
+          placeId: 'hotel-1',
+          name: '那霸飯店',
+          address: '沖繩縣那霸市',
+          category: 'hotel',
+        ),
+      ],
+    );
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '沖繩',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('牧志市場'), findsOneWidget);
+    expect(find.text('那霸飯店'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilterChip, '美食'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('牧志市場'), findsOneWidget);
+    expect(find.text('那霸飯店'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-food-1')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 'trip-1',
+        dayNum: 2,
+        title: '牧志市場',
+        description: any(named: 'description'),
+        note: '沖繩縣那霸市松尾',
+        poiType: 'restaurant',
+        lat: 0.0,
+        lng: 0.0,
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: 'google',
+      ),
+    ).called(1);
+  });
+
   testWidgets('收藏模式可把已收藏景點加入指定 day', (tester) async {
     final repo = _MockTripRepository();
     final favoritesRepo = _MockFavoritesRepository();
@@ -327,5 +431,29 @@ void main() {
       ),
     ).called(1);
     expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('收藏模式可用類別篩選清單', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    when(favoritesRepo.fetchFavorites).thenAnswer((_) async => _mixedFavorites);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        favoritesRepo: favoritesRepo,
+        initialMode: EntryAddMode.favorites,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('牧志市場'), findsOneWidget);
+    expect(find.text('那霸飯店'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilterChip, '住宿'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('牧志市場'), findsNothing);
+    expect(find.text('那霸飯店'), findsOneWidget);
   });
 }

@@ -19,7 +19,16 @@ import 'widgets/entry_edit_sheet.dart';
 /// 新增停留點頁的初始模式。
 enum EntryAddMode { search, favorites, custom }
 
+enum _EntryAddCategory { all, attraction, food, hotel, shopping }
+
 const _entryAddRegionOptions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
+const _entryAddCategoryChips = [
+  (_EntryAddCategory.all, '為你推薦'),
+  (_EntryAddCategory.attraction, '景點'),
+  (_EntryAddCategory.food, '美食'),
+  (_EntryAddCategory.hotel, '住宿'),
+  (_EntryAddCategory.shopping, '購物'),
+];
 
 /// Web 相容的停留點新增頁，支援搜尋 POI 或新增自訂停留點。
 class EntryAddRouteScreen extends ConsumerStatefulWidget {
@@ -57,6 +66,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   int? _addingFavoriteId;
   String? _favoritesError;
   late String _region;
+  _EntryAddCategory _category = _EntryAddCategory.all;
 
   @override
   void initState() {
@@ -227,6 +237,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             );
           }
           final dayNum = _dayNumFor(days);
+          final filteredResults = _results
+              .where((poi) => _matchesCategory(poi.category, _category))
+              .toList(growable: false);
+          final filteredFavorites = _favorites
+              .where(
+                (favorite) => _matchesCategory(favorite.poiType, _category),
+              )
+              .toList(growable: false);
           return ListView(
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
@@ -270,13 +288,26 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                         onSelectionChanged: (values) => _setMode(values.first),
                       ),
                       const SizedBox(height: TpSpacing.s2),
+                      if (_mode == EntryAddMode.search ||
+                          _mode == EntryAddMode.favorites) ...[
+                        _EntryAddCategoryFilter(
+                          selected: _category,
+                          onSelected: (category) =>
+                              setState(() => _category = category),
+                        ),
+                        const SizedBox(height: TpSpacing.s2),
+                      ],
                       if (_mode == EntryAddMode.search)
                         _SearchPoiPanel(
                           controller: _searchController,
-                          results: _results,
+                          results: filteredResults,
                           searching: _searching,
                           addingPlaceId: _addingPlaceId,
                           error: _searchError,
+                          emptyMessage:
+                              _results.isNotEmpty && filteredResults.isEmpty
+                              ? '沒有符合分類的搜尋結果'
+                              : null,
                           region: _region,
                           onRegionChanged: (region) =>
                               setState(() => _region = region),
@@ -285,10 +316,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                         )
                       else if (_mode == EntryAddMode.favorites)
                         _FavoritePoiPanel(
-                          favorites: _favorites,
+                          favorites: filteredFavorites,
                           loading: _favoritesLoading && !_favoritesLoaded,
                           addingFavoriteId: _addingFavoriteId,
                           error: _favoritesError,
+                          emptyMessage:
+                              _favorites.isNotEmpty && filteredFavorites.isEmpty
+                              ? '沒有符合分類的收藏'
+                              : '還沒有收藏的地點',
                           onRetry: () => _loadFavorites(force: true),
                           onAdd: (favorite) => _addFavorite(favorite, dayNum),
                         )
@@ -318,6 +353,7 @@ class _FavoritePoiPanel extends StatelessWidget {
     required this.loading,
     required this.addingFavoriteId,
     required this.error,
+    required this.emptyMessage,
     required this.onRetry,
     required this.onAdd,
   });
@@ -326,6 +362,7 @@ class _FavoritePoiPanel extends StatelessWidget {
   final bool loading;
   final int? addingFavoriteId;
   final String? error;
+  final String emptyMessage;
   final VoidCallback onRetry;
   final ValueChanged<PoiFavorite> onAdd;
 
@@ -344,7 +381,7 @@ class _FavoritePoiPanel extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: TpSpacing.s6),
         child: Text(
-          '還沒有收藏的地點',
+          emptyMessage,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -402,6 +439,7 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.searching,
     required this.addingPlaceId,
     required this.error,
+    required this.emptyMessage,
     required this.region,
     required this.onRegionChanged,
     required this.onSearch,
@@ -413,6 +451,7 @@ class _SearchPoiPanel extends StatelessWidget {
   final bool searching;
   final String? addingPlaceId;
   final String? error;
+  final String? emptyMessage;
   final String region;
   final ValueChanged<String> onRegionChanged;
   final VoidCallback onSearch;
@@ -473,6 +512,16 @@ class _SearchPoiPanel extends StatelessWidget {
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
+        if (error == null && emptyMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s2),
+            child: Text(
+              emptyMessage!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         const SizedBox(height: TpSpacing.s3),
         for (final poi in results)
           Card(
@@ -489,6 +538,33 @@ class _SearchPoiPanel extends StatelessWidget {
                   : const Icon(Icons.add_location_alt_outlined),
               onTap: addingPlaceId == null ? () => onAdd(poi) : null,
             ),
+          ),
+      ],
+    );
+  }
+}
+
+class _EntryAddCategoryFilter extends StatelessWidget {
+  const _EntryAddCategoryFilter({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final _EntryAddCategory selected;
+  final ValueChanged<_EntryAddCategory> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: TpSpacing.s2,
+      runSpacing: TpSpacing.s2,
+      children: [
+        for (final (category, label) in _entryAddCategoryChips)
+          FilterChip(
+            key: ValueKey('entry-add-category-${category.name}'),
+            selected: selected == category,
+            onSelected: (_) => onSelected(category),
+            label: Text(label),
           ),
       ],
     );
@@ -548,4 +624,24 @@ List<String> _regionOptionsFor(String region) {
     return _entryAddRegionOptions;
   }
   return [normalised, ..._entryAddRegionOptions];
+}
+
+bool _matchesCategory(String? rawCategory, _EntryAddCategory target) {
+  if (target == _EntryAddCategory.all) return true;
+  final category = rawCategory?.toLowerCase() ?? '';
+  return switch (target) {
+    _EntryAddCategory.food => RegExp(
+      r'restaurant|cafe|food|bar|bakery|餐|食',
+    ).hasMatch(category),
+    _EntryAddCategory.hotel => RegExp(
+      r'hotel|hostel|guest|inn|住宿|飯店',
+    ).hasMatch(category),
+    _EntryAddCategory.shopping => RegExp(
+      r'shop|mall|market|購物',
+    ).hasMatch(category),
+    _EntryAddCategory.attraction => RegExp(
+      r'attract|museum|park|temple|景點|公園',
+    ).hasMatch(category),
+    _EntryAddCategory.all => true,
+  };
 }

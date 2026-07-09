@@ -19,7 +19,7 @@
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
-| `/trips/:tripId/entries/new?day=N&mode=search|favorites|custom&region=沖繩` | `EntryAddRouteScreen` | tab 2 孫路由(搜尋 POI / 收藏景點 / 自訂停留點；搜尋模式可帶 region) |
+| `/trips/:tripId/entries/new?day=N&mode=search|favorites|custom&region=沖繩` | `EntryAddRouteScreen` | tab 2 孫路由(搜尋 POI / 收藏景點 / 自訂停留點；搜尋模式可帶 region；搜尋/收藏可分類篩選) |
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/move` | `EntryActionRouteScreen` | tab 2 孫路由 |
