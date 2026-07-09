@@ -247,4 +247,85 @@ void main() {
     expect(find.text('返回日'), findsNothing);
     expect(find.text('Day 3 已刪除'), findsOneWidget);
   });
+
+  testWidgets('日期中間有缺口 → createDay(insert,date) 加回該日', (tester) async {
+    var summaries = const [
+      TripDay(
+        id: 11,
+        dayNum: 1,
+        date: '2026-04-23',
+        dayOfWeek: '四',
+        title: '抵達那霸',
+        version: 1,
+      ),
+      TripDay(
+        id: 12,
+        dayNum: 2,
+        date: '2026-04-25',
+        dayOfWeek: '六',
+        title: '返回日',
+        version: 1,
+      ),
+    ];
+    const restoredDay = TripDay(
+      id: 13,
+      dayNum: 2,
+      date: '2026-04-24',
+      dayOfWeek: '五',
+      title: 'Day 2',
+      version: 1,
+    );
+    when(
+      () => tripRepo.fetchDaySummaries(any()),
+    ).thenAnswer((_) async => summaries);
+    when(
+      () => tripRepo.createDay(
+        tripId: any(named: 'tripId'),
+        position: any(named: 'position'),
+        date: any(named: 'date'),
+      ),
+    ).thenAnswer((_) async {
+      summaries = const [
+        TripDay(
+          id: 11,
+          dayNum: 1,
+          date: '2026-04-23',
+          dayOfWeek: '四',
+          title: '抵達那霸',
+          version: 1,
+        ),
+        restoredDay,
+        TripDay(
+          id: 12,
+          dayNum: 3,
+          date: '2026-04-25',
+          dayOfWeek: '六',
+          title: '返回日',
+          version: 1,
+        ),
+      ];
+      return restoredDay;
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-restore-day-2026-04-24')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('edit-restore-day-2026-04-24')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => tripRepo.createDay(
+        tripId: 'okinawa',
+        position: 'insert',
+        date: '2026-04-24',
+      ),
+    ).called(1);
+    expect(find.text('已加回 2026-04-24'), findsOneWidget);
+  });
 }

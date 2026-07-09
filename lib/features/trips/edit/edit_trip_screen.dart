@@ -93,6 +93,12 @@ class EditTripScreen extends ConsumerWidget {
                             _showSnackBar(context, '已在最後加入一天');
                           }
                         },
+                        onRestore: (date) async {
+                          final ok = await ctrl.restoreDay(date);
+                          if (context.mounted && ok) {
+                            _showSnackBar(context, '已加回 $date');
+                          }
+                        },
                         onDelete: (day) async {
                           final confirmed = await _confirmDeleteDay(
                             context,
@@ -173,6 +179,7 @@ class _DayManagementSection extends StatelessWidget {
     required this.mutating,
     required this.onAddStart,
     required this.onAddEnd,
+    required this.onRestore,
     required this.onDelete,
   });
 
@@ -180,6 +187,7 @@ class _DayManagementSection extends StatelessWidget {
   final bool mutating;
   final VoidCallback onAddStart;
   final VoidCallback onAddEnd;
+  final ValueChanged<String> onRestore;
   final ValueChanged<TripDay> onDelete;
 
   @override
@@ -224,16 +232,64 @@ class _DayManagementSection extends StatelessWidget {
           else
             Column(
               children: [
-                for (final day in days) ...[
+                for (var index = 0; index < days.length; index++) ...[
                   _DaySummaryRow(
-                    day: day,
+                    day: days[index],
                     mutating: mutating,
-                    onDelete: () => onDelete(day),
+                    onDelete: () => onDelete(days[index]),
                   ),
-                  if (day != days.last) const Divider(height: TpSpacing.s4),
+                  for (final missingDate in _missingDatesAfter(days, index))
+                    _MissingDayRow(
+                      date: missingDate,
+                      mutating: mutating,
+                      onRestore: () => onRestore(missingDate),
+                    ),
+                  if (index != days.length - 1)
+                    const Divider(height: TpSpacing.s4),
                 ],
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MissingDayRow extends StatelessWidget {
+  const _MissingDayRow({
+    required this.date,
+    required this.mutating,
+    required this.onRestore,
+  });
+
+  final String date;
+  final bool mutating;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: TpSpacing.s2),
+      child: Row(
+        children: [
+          Icon(Icons.more_horiz, color: colorScheme.onSurfaceVariant, size: 18),
+          const SizedBox(width: TpSpacing.s2),
+          Expanded(
+            child: Text(
+              '缺少 $date',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          TextButton.icon(
+            key: ValueKey('edit-restore-day-$date'),
+            onPressed: mutating ? null : onRestore,
+            icon: const Icon(Icons.add),
+            label: const Text('加回'),
+          ),
         ],
       ),
     );
@@ -417,6 +473,46 @@ String _dayDateLabel(TripDay day) {
   final weekday = day.dayOfWeek;
   if (weekday == null || weekday.isEmpty) return day.date ?? '';
   return '${day.date} ($weekday)';
+}
+
+List<String> _missingDatesAfter(List<TripDay> days, int index) {
+  if (index >= days.length - 1) return const [];
+  final current = _parseIsoDate(days[index].date);
+  final next = _parseIsoDate(days[index + 1].date);
+  if (current == null || next == null) return const [];
+  final result = <String>[];
+  var cursor = current.add(const Duration(days: 1));
+  while (cursor.isBefore(next)) {
+    result.add(_formatIsoDate(cursor));
+    cursor = cursor.add(const Duration(days: 1));
+  }
+  return result;
+}
+
+DateTime? _parseIsoDate(String? value) {
+  if (value == null || value.length != 10) return null;
+  final parts = value.split('-');
+  if (parts.length != 3) return null;
+  final year = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  final day = int.tryParse(parts[2]);
+  if (year == null || month == null || day == null) return null;
+  try {
+    final parsed = DateTime.utc(year, month, day);
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      return null;
+    }
+    return parsed;
+  } on ArgumentError {
+    return null;
+  }
+}
+
+String _formatIsoDate(DateTime date) {
+  final year = date.year.toString().padLeft(4, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
 }
 
 Future<bool> _confirmDeleteDay(BuildContext context, TripDay day) async {

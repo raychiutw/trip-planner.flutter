@@ -258,6 +258,39 @@ class EditTripController extends Notifier<EditTripState> {
     }
   }
 
+  /// POST /trips/:id/days，以 insert/date 補回中間缺漏日期。
+  Future<bool> restoreDay(String date) async {
+    if (state.loading || state.daysMutating || state.shifting) return false;
+    final restoreDate = date.trim();
+    if (!_isIsoDate(restoreDate)) {
+      state = state.copyWith(error: '請輸入 YYYY-MM-DD 日期');
+      return false;
+    }
+    state = state.copyWith(daysMutating: true, error: null);
+    try {
+      await _repo.createDay(
+        tripId: tripId,
+        position: 'insert',
+        date: restoreDate,
+      );
+      final days = await _repo.fetchDaySummaries(tripId);
+      if (_disposed) return false;
+      _invalidateTripDays();
+      state = state.copyWith(
+        daysMutating: false,
+        days: days,
+        startDate: _firstDate(days) ?? state.startDate,
+        endDate: _lastDate(days) ?? state.endDate,
+        error: null,
+      );
+      return true;
+    } on Exception {
+      if (_disposed) return false;
+      state = state.copyWith(daysMutating: false, error: '加回天數失敗,請稍後再試');
+      return false;
+    }
+  }
+
   /// DELETE /trips/:id/days/:num，刪除一天並刷新 day 摘要。
   Future<int?> deleteDay(int dayNum) async {
     if (state.loading || state.daysMutating || state.shifting) return null;
