@@ -61,6 +61,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   bool _searching = false;
   String? _searchError;
   final Set<String> _selectedPlaceIds = <String>{};
+  final Map<String, String> _searchPoiTypeOverrides = <String, String>{};
   List<PoiFavorite> _favorites = const [];
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
@@ -153,6 +154,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     setState(() {
       if (_selectedPlaceIds.contains(poi.placeId)) {
         _selectedPlaceIds.remove(poi.placeId);
+        _searchPoiTypeOverrides.remove(poi.placeId);
       } else {
         _selectedPlaceIds.add(poi.placeId);
       }
@@ -212,7 +214,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             dayNum: dayNum,
             title: poi.name,
             note: note,
-            poiType: mapGooglePrimaryTypeToPoiType(poi.category),
+            poiType:
+                _searchPoiTypeOverrides[poi.placeId] ??
+                mapGooglePrimaryTypeToPoiType(poi.category),
             lat: poi.lat,
             lng: poi.lng,
             source: 'google',
@@ -364,6 +368,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                           results: filteredResults,
                           searching: _searching,
                           selectedPlaceIds: _selectedPlaceIds,
+                          poiTypeOverrides: _searchPoiTypeOverrides,
                           submitting: _submittingSelected,
                           selectedCount: _selectedCount,
                           error: _searchError,
@@ -376,6 +381,10 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                               setState(() => _region = region),
                           onSearch: () => _searchPois(),
                           onToggle: _togglePoiSelection,
+                          onPoiTypeChanged: (poi, poiType) => setState(
+                            () =>
+                                _searchPoiTypeOverrides[poi.placeId] = poiType,
+                          ),
                           onSubmit: () => _submitSelected(dayNum),
                         )
                       else if (_mode == EntryAddMode.favorites)
@@ -514,6 +523,7 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.results,
     required this.searching,
     required this.selectedPlaceIds,
+    required this.poiTypeOverrides,
     required this.submitting,
     required this.selectedCount,
     required this.error,
@@ -522,6 +532,7 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.onRegionChanged,
     required this.onSearch,
     required this.onToggle,
+    required this.onPoiTypeChanged,
     required this.onSubmit,
   });
 
@@ -529,6 +540,7 @@ class _SearchPoiPanel extends StatelessWidget {
   final List<PoiSearchResult> results;
   final bool searching;
   final Set<String> selectedPlaceIds;
+  final Map<String, String> poiTypeOverrides;
   final bool submitting;
   final int selectedCount;
   final String? error;
@@ -537,6 +549,7 @@ class _SearchPoiPanel extends StatelessWidget {
   final ValueChanged<String> onRegionChanged;
   final VoidCallback onSearch;
   final ValueChanged<PoiSearchResult> onToggle;
+  final void Function(PoiSearchResult poi, String poiType) onPoiTypeChanged;
   final VoidCallback onSubmit;
 
   @override
@@ -605,26 +618,107 @@ class _SearchPoiPanel extends StatelessWidget {
             ),
           ),
         const SizedBox(height: TpSpacing.s3),
-        for (final poi in results)
-          Card(
-            margin: const EdgeInsets.only(bottom: TpSpacing.s2),
-            child: ListTile(
-              key: ValueKey('entry-add-poi-${poi.placeId}'),
-              title: Text(poi.name),
-              subtitle: poi.address == null ? null : Text(poi.address!),
-              trailing: Checkbox(
-                value: selectedPlaceIds.contains(poi.placeId),
-                onChanged: submitting ? null : (_) => onToggle(poi),
-              ),
-              onTap: submitting ? null : () => onToggle(poi),
-            ),
+        for (final poi in results) ...[
+          Builder(
+            builder: (context) {
+              final selected = selectedPlaceIds.contains(poi.placeId);
+              final poiType =
+                  poiTypeOverrides[poi.placeId] ??
+                  mapGooglePrimaryTypeToPoiType(poi.category);
+              return Card(
+                margin: const EdgeInsets.only(bottom: TpSpacing.s2),
+                child: ListTile(
+                  key: ValueKey('entry-add-poi-${poi.placeId}'),
+                  title: Text(poi.name),
+                  subtitle: _SearchPoiSubtitle(
+                    poi: poi,
+                    selected: selected,
+                    poiType: poiType,
+                    enabled: !submitting,
+                    onPoiTypeChanged: (nextType) =>
+                        onPoiTypeChanged(poi, nextType),
+                  ),
+                  trailing: Checkbox(
+                    value: selected,
+                    onChanged: submitting ? null : (_) => onToggle(poi),
+                  ),
+                  onTap: submitting ? null : () => onToggle(poi),
+                ),
+              );
+            },
           ),
+        ],
         _EntryAddSubmitBar(
           selectedCount: selectedCount,
           submitting: submitting,
           onSubmit: onSubmit,
         ),
       ],
+    );
+  }
+}
+
+class _SearchPoiSubtitle extends StatelessWidget {
+  const _SearchPoiSubtitle({
+    required this.poi,
+    required this.selected,
+    required this.poiType,
+    required this.enabled,
+    required this.onPoiTypeChanged,
+  });
+
+  final PoiSearchResult poi;
+  final bool selected;
+  final String poiType;
+  final bool enabled;
+  final ValueChanged<String> onPoiTypeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = poi.address?.trim();
+    final children = <Widget>[
+      if (address != null && address.isNotEmpty) Text(address),
+      if (selected)
+        Padding(
+          padding: const EdgeInsets.only(top: TpSpacing.s1),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '分類',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: TpSpacing.s2),
+              DropdownButton<String>(
+                key: ValueKey('entry-add-poi-type-${poi.placeId}'),
+                value: poiType,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                onChanged: enabled
+                    ? (value) {
+                        if (value != null) onPoiTypeChanged(value);
+                      }
+                    : null,
+                items: [
+                  for (final entry in kPoiTypeLabels.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+    ];
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
     );
   }
 }
