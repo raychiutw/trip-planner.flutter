@@ -1,5 +1,5 @@
 /// 編輯行程狀態機:一次性 fetchTrip 帶入初值 → 使用者改 → diff-only PUT。
-/// 不動日期/name;destinations 載入自 GET(無 country)→ 不重算 countries(避免誤判)。
+/// destinations 載入自 GET(無 country)→ 不重算 countries(避免誤判)。
 library;
 
 import 'dart:async';
@@ -20,8 +20,11 @@ class EditTripState {
     this.description = '',
     this.lang = 'zh-TW',
     this.published = false,
+    this.startDate,
+    this.endDate,
     this.destinations = const [],
     this.saving = false,
+    this.shifting = false,
     this.error,
     this.saved = false,
   });
@@ -31,8 +34,11 @@ class EditTripState {
   final String description;
   final String lang;
   final bool published;
+  final String? startDate;
+  final String? endDate;
   final List<DestinationInput> destinations;
   final bool saving;
+  final bool shifting;
   final String? error;
   final bool saved;
 
@@ -42,8 +48,11 @@ class EditTripState {
     String? description,
     String? lang,
     bool? published,
+    Object? startDate = _sentinel,
+    Object? endDate = _sentinel,
     List<DestinationInput>? destinations,
     bool? saving,
+    bool? shifting,
     Object? error = _sentinel,
     bool? saved,
   }) {
@@ -53,8 +62,11 @@ class EditTripState {
       description: description ?? this.description,
       lang: lang ?? this.lang,
       published: published ?? this.published,
+      startDate: startDate == _sentinel ? this.startDate : startDate as String?,
+      endDate: endDate == _sentinel ? this.endDate : endDate as String?,
       destinations: destinations ?? this.destinations,
       saving: saving ?? this.saving,
+      shifting: shifting ?? this.shifting,
       error: error == _sentinel ? this.error : error as String?,
       saved: saved ?? this.saved,
     );
@@ -107,6 +119,8 @@ class EditTripController extends Notifier<EditTripState> {
         description: _origDescription,
         lang: _origLang,
         published: _origPublished,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
         destinations: dests,
       );
     } on Exception {
@@ -173,7 +187,41 @@ class EditTripController extends Notifier<EditTripState> {
       state = state.copyWith(saving: false, error: '儲存失敗,請稍後再試');
     }
   }
+
+  /// POST /trips/:id/days/shift，整體平移所有 day/date。
+  Future<bool> shiftStartDate(String startDate) async {
+    if (state.loading || state.shifting) return false;
+    final nextStartDate = startDate.trim();
+    if (!_isIsoDate(nextStartDate)) {
+      state = state.copyWith(error: '請輸入 YYYY-MM-DD 日期');
+      return false;
+    }
+    state = state.copyWith(shifting: true, error: null);
+    try {
+      final result = await _repo.shiftDays(
+        tripId: tripId,
+        startDate: nextStartDate,
+      );
+      if (_disposed) return false;
+      ref.invalidate(myTripsProvider);
+      ref.invalidate(tripDetailProvider(tripId));
+      ref.invalidate(tripDaysProvider(tripId));
+      state = state.copyWith(
+        shifting: false,
+        startDate: result.newStartDate,
+        endDate: result.newEndDate,
+        error: null,
+      );
+      return true;
+    } on Exception {
+      if (_disposed) return false;
+      state = state.copyWith(shifting: false, error: '平移失敗,請稍後再試');
+      return false;
+    }
+  }
 }
 
 final editTripControllerProvider = NotifierProvider.autoDispose
     .family<EditTripController, EditTripState, String>(EditTripController.new);
+
+bool _isIsoDate(String value) => RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value);

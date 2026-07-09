@@ -24,6 +24,9 @@ const _trip = Trip(
   description: '原描述',
   lang: 'zh-TW',
   published: true,
+  dayCount: 5,
+  startDate: '2026-04-23',
+  endDate: '2026-04-27',
   destinations: [TripDestination(name: '那霸', lat: 26.2, lng: 127.6)],
 );
 
@@ -118,5 +121,39 @@ void main() {
         destinations: any(named: 'destinations'),
       ),
     ).called(1);
+  });
+
+  testWidgets('平移出發日期 → shiftDays 並更新日期摘要', (tester) async {
+    when(
+      () => tripRepo.shiftDays(
+        tripId: any(named: 'tripId'),
+        startDate: any(named: 'startDate'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        newStartDate: '2026-05-01',
+        newEndDate: '2026-05-05',
+        daysShifted: 8,
+      ),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('2026-04-23 → 2026-04-27'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('edit-shift-days')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-shift-start-date')),
+      '2026-05-01',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, '套用'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => tripRepo.shiftDays(tripId: 'okinawa', startDate: '2026-05-01'),
+    ).called(1);
+    expect(find.text('2026-05-01 → 2026-05-05'), findsOneWidget);
+    expect(find.text('出發日期已變更'), findsOneWidget);
   });
 }

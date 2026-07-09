@@ -13,6 +13,7 @@
 - **通知設定頁接上偏好 API**:Account「通知」row 轉正,`/settings/notifications` 與 web 相容 `/account/notifications` route 會讀寫 backend `/account/notifications` preferences,可分別切換行程更新、旅伴邀請、系統通知。
 - **地圖 adapter**:新增 `features/map/map_adapter.dart`,集中 `flutter_map` 轉接層;`TripMapScreen` 與 `GlobalMapScreen` 改走 adapter,保留日後替換地圖 SDK 的空間。
 - **帳號建立與復原流程**:補齊 web 相容 `/signup`、`/signup/check-email`、`/login/forgot`、`/auth/password/reset`、`/auth/verify-email` route,支援註冊、重寄驗證信、忘記密碼、重設密碼與 email 驗證。
+- **編輯行程日期平移**:`EditTripScreen` 補齊 web 相容出發日期平移,呼叫 `/trips/:tripId/days/shift` 並刷新行程詳情、清單與日程快取。
 - **AI 行程健檢頁**:新增 `/trips/:tripId/health` 與 web alias `/trip/:tripId/health`,可查看既有 AI findings、POI closed/missing 摘要、啟動/重新生成健檢,並在空行程時阻擋送出。
 - **行程異動紀錄頁**:新增 `/trips/:tripId/audit` 與 web alias `/trip/:tripId/audit`,可查看 audit log 摘要、diff 欄位並對非錯誤記錄執行確認式 rollback。
 - **行程筆記 AI 生成**:`TripNotesScreen` 補齊行前須知（一般/住宿）與緊急聯絡 AI 生成入口,改打 web/backend 支援的 `tips`、`lodging-tips`、`emergency` doc type,並透過 `/requests/:id/events` SSE 完成後自動刷新筆記。

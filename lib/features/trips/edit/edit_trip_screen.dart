@@ -1,5 +1,5 @@
-/// 編輯行程:目的地(可加/排序/移除)+ 標題 + 描述 + 語言 + 發布 + 明確儲存。
-/// 不含日期/天數(日管理另案)。儲存成功 → pop。
+/// 編輯行程:目的地(可加/排序/移除)+ 整體平移日期 + 標題 + 描述 + 語言 + 發布。
+/// 儲存成功 → pop。
 library;
 
 import 'package:flutter/material.dart';
@@ -45,6 +45,26 @@ class EditTripScreen extends ConsumerWidget {
                         onAdd: ctrl.addDestination,
                         onRemove: ctrl.removeDestination,
                         onReorder: ctrl.reorderDestination,
+                      ),
+                      const SizedBox(height: TpSpacing.s5),
+                      _title(context, '出發日期'),
+                      _ShiftDateSection(
+                        startDate: state.startDate,
+                        endDate: state.endDate,
+                        shifting: state.shifting,
+                        onShift: () async {
+                          final nextDate = await _showShiftDateDialog(
+                            context,
+                            state.startDate,
+                          );
+                          if (nextDate == null) return;
+                          final ok = await ctrl.shiftStartDate(nextDate);
+                          if (context.mounted && ok) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('出發日期已變更')),
+                            );
+                          }
+                        },
                       ),
                       const SizedBox(height: TpSpacing.s5),
                       _title(context, '行程標題'),
@@ -114,6 +134,127 @@ class EditTripScreen extends ConsumerWidget {
     padding: const EdgeInsets.only(bottom: TpSpacing.s2),
     child: Text(t, style: Theme.of(context).textTheme.titleMedium),
   );
+}
+
+class _ShiftDateSection extends StatelessWidget {
+  const _ShiftDateSection({
+    required this.startDate,
+    required this.endDate,
+    required this.shifting,
+    required this.onShift,
+  });
+
+  final String? startDate;
+  final String? endDate;
+  final bool shifting;
+  final VoidCallback onShift;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(TpRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_dateRangeLabel(startDate, endDate), style: textTheme.bodyLarge),
+          const SizedBox(height: TpSpacing.s1),
+          Text(
+            '整體平移所有日程日期，停留點順序不變。',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: TpSpacing.s3),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('edit-shift-days'),
+              onPressed: shifting ? null : onShift,
+              icon: shifting
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.event_repeat_outlined),
+              label: const Text('平移日期'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<String?> _showShiftDateDialog(BuildContext context, String? startDate) =>
+    showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _ShiftDateDialog(startDate: startDate),
+    );
+
+class _ShiftDateDialog extends StatefulWidget {
+  const _ShiftDateDialog({this.startDate});
+
+  final String? startDate;
+
+  @override
+  State<_ShiftDateDialog> createState() => _ShiftDateDialogState();
+}
+
+class _ShiftDateDialogState extends State<_ShiftDateDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.startDate ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('平移出發日期'),
+      content: TextField(
+        key: const ValueKey('edit-shift-start-date'),
+        controller: _controller,
+        keyboardType: TextInputType.datetime,
+        decoration: const InputDecoration(
+          labelText: '新的 Day 1 日期',
+          hintText: 'YYYY-MM-DD',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('套用'),
+        ),
+      ],
+    );
+  }
+}
+
+String _dateRangeLabel(String? startDate, String? endDate) {
+  if (startDate == null || startDate.isEmpty) return '尚無日期資料';
+  if (endDate == null || endDate.isEmpty || endDate == startDate) {
+    return startDate;
+  }
+  return '$startDate → $endDate';
 }
 
 class _SaveBar extends StatelessWidget {
