@@ -8,6 +8,7 @@ import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
 import 'collab_repository.dart';
+import 'map_repository.dart';
 import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
 import 'oauth/oauth_providers.dart';
@@ -57,6 +58,10 @@ final requestsRepositoryProvider = Provider<RequestsRepository>(
 
 final collabRepositoryProvider = Provider<CollabRepository>(
   (ref) => CollabRepository(client: ref.watch(apiClientProvider)),
+);
+
+final mapRepositoryProvider = Provider<MapRepository>(
+  (ref) => MapRepository(client: ref.watch(apiClientProvider)),
 );
 
 final shareRepositoryProvider = Provider<ShareRepository>(

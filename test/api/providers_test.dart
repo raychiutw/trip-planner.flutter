@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/auth_repository.dart';
+import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -41,6 +42,7 @@ void main() {
   test('providers 串接：auth / trip repository 由 apiClient 組成', () {
     expect(container.read(authRepositoryProvider), isA<AuthRepository>());
     expect(container.read(tripRepositoryProvider), isA<TripRepository>());
+    expect(container.read(mapRepositoryProvider), isA<MapRepository>());
   });
 
   test('sessionStoreProvider 預設為 SecureSessionStore', () {
