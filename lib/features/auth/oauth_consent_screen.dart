@@ -110,7 +110,9 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
                   icon: _isSubmitting
                       ? const SizedBox.square(
                           dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Icon(Icons.check),
                   label: const Text('同意'),

@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
@@ -38,7 +39,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       appBar: AppBar(title: const Text('通知設定')),
       body: prefsAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(
+          child: CircularProgressIndicator.adaptive(
             key: ValueKey('notifications-loading'),
           ),
         ),
@@ -206,18 +207,23 @@ class _NotificationSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       key: ValueKey('notif-switch-${setting.key}'),
       secondary: isBusy
           ? const SizedBox.square(
               dimension: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             )
           : Icon(setting.icon, size: 22),
       title: Text(setting.title),
       subtitle: Text(setting.subtitle),
       value: value,
-      onChanged: isDisabled ? null : onChanged,
+      onChanged: isDisabled
+          ? null
+          : (nextValue) {
+              HapticFeedback.selectionClick();
+              onChanged(nextValue);
+            },
     );
   }
 }

@@ -74,7 +74,7 @@ class EntryPoiScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('地點管理')),
       body: entryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -187,7 +187,7 @@ class EntryPoiScreen extends ConsumerWidget {
     EntryPoiInfo poi,
   ) async {
     final result =
-        await showDialog<({String? note, String type, String? reservation})>(
+        await showAdaptiveDialog<({String? note, String type, String? reservation})>(
           context: context,
           builder: (_) => _PoiInfoDialog(poi: poi),
         );
@@ -217,6 +217,7 @@ class EntryPoiScreen extends ConsumerWidget {
     final selected = await showModalBottomSheet<PoiSearchResult>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -346,7 +347,7 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('編輯地點資訊'),
       content: SingleChildScrollView(
         child: Column(

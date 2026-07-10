@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/adaptive.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../theme/tokens.dart';
@@ -37,7 +39,7 @@ class FavoritesScreen extends ConsumerWidget {
         ),
         error: (error, stackTrace) =>
             _ErrorState(onRetry: () => ref.invalidate(favoritesProvider)),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
       ),
     );
   }
@@ -75,28 +77,20 @@ class FavoritesScreen extends ConsumerWidget {
     WidgetRef ref,
     PoiFavorite favorite,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('取消收藏'),
-        content: Text('確定要移除「${favorite.displayName}」嗎?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('保留'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('移除'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirm(
+      context,
+      title: '取消收藏',
+      message: '確定要移除「${favorite.displayName}」嗎?',
+      confirmLabel: '移除',
+      cancelLabel: '保留',
+      isDestructive: true,
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     try {
       await ref.read(favoritesRepositoryProvider).deleteFavorite(favorite.id);
       ref.invalidate(favoritesProvider);
+      HapticFeedback.selectionClick();
     } on Exception {
       if (!context.mounted) return;
       ScaffoldMessenger.of(

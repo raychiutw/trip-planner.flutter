@@ -97,9 +97,9 @@ class _Bar extends StatelessWidget {
                 SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(
+                  child: CircularProgressIndicator.adaptive(
                     strokeWidth: 2,
-                    color: foreground,
+                    valueColor: AlwaysStoppedAnimation<Color>(foreground),
                   ),
                 )
               else if (actionLabel != null)

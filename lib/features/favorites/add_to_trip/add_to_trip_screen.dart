@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
@@ -112,6 +113,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       }
       await _recomputeDay(tripId, dayNum);
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('已加入行程')));
@@ -136,9 +138,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
 
   Future<void> _showConflict(TripEntryConflict conflict) {
     final timeLabel = conflict.time == null ? '' : '（${conflict.time}）';
-    return showDialog<void>(
+    return showAdaptiveDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         title: const Text('時段衝突'),
         content: Text('該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。'),
         actions: [
@@ -158,7 +160,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('加入行程：$_title')),
       body: tripsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

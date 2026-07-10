@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
 
@@ -50,7 +51,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
             icon: _isRevokingOthers
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(Icons.logout_outlined),
           ),
@@ -58,7 +59,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       ),
       body: sessionsAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(
+          child: CircularProgressIndicator.adaptive(
             key: Key('account-sessions-loading'),
           ),
         ),
@@ -77,39 +78,14 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmRevokeOtherSessions() async {
-    final shouldRevoke = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('登出其他裝置'),
-          content: const Text('這會保留目前裝置，並登出其他所有登入裝置。'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: const StadiumBorder(),
-                foregroundColor: colorScheme.onSurface,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('登出'),
-            ),
-          ],
-        );
-      },
+    final shouldRevoke = await showAppConfirm(
+      context,
+      title: '登出其他裝置',
+      message: '這會保留目前裝置，並登出其他所有登入裝置。',
+      confirmLabel: '登出',
+      isDestructive: true,
     );
-    if (shouldRevoke != true || !mounted) return;
+    if (!shouldRevoke || !mounted) return;
 
     setState(() {
       _isRevokingOthers = true;
@@ -258,7 +234,9 @@ class _SessionTile extends StatelessWidget {
               child: isBusy
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Text('登出'),
             ),

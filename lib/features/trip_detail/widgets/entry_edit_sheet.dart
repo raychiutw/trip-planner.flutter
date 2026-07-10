@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -40,6 +41,7 @@ Future<void> showEntryEditSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -173,6 +175,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop();
       ScaffoldMessenger.of(
         context,

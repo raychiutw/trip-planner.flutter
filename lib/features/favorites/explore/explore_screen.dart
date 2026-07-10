@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -56,9 +57,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   Future<void> _openCustomRegion() async {
     final textController = TextEditingController();
     try {
-      final result = await showDialog<String>(
+      final result = await showAdaptiveDialog<String>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AlertDialog.adaptive(
           title: const Text('自訂地區'),
           content: TextField(
             controller: textController,
@@ -200,7 +201,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
     if (state.results.isEmpty) {
       if (state.searching) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: CircularProgressIndicator.adaptive());
       }
       if (state.query.trim().length >= 2 && state.hasSearched) {
         return Center(
@@ -210,7 +211,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         );
       }
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator.adaptive());
     }
 
     final filtered = state.filteredResults;
@@ -251,8 +252,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           poi: poi,
           isSaved: state.isSaved(poi),
           isSaving: state.savingPlaceIds.contains(poi.placeId),
-          onToggleFavorite: () =>
-              ref.read(exploreControllerProvider.notifier).toggleFavorite(poi),
+          onToggleFavorite: () {
+            HapticFeedback.selectionClick();
+            ref.read(exploreControllerProvider.notifier).toggleFavorite(poi);
+          },
           onAddToTrip: () => context.go(
             '/favorites/add-to-trip',
             extra: AddToTripDirect(poi: poi),

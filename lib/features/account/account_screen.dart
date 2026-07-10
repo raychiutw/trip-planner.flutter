@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -47,41 +48,16 @@ class AccountScreen extends ConsumerWidget {
     );
   }
 
-  /// 登出前 AlertDialog 確認，確認才呼叫 authStateProvider.logout()。
+  /// 登出前確認，確認才呼叫 authStateProvider.logout()。
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('登出帳號'),
-          content: const Text('確定要登出嗎？'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: const StadiumBorder(),
-                foregroundColor: colorScheme.onSurface,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('登出'),
-            ),
-          ],
-        );
-      },
+    final ok = await showAppConfirm(
+      context,
+      title: '登出帳號',
+      message: '確定要登出嗎？',
+      confirmLabel: '登出',
+      isDestructive: true,
     );
-    if (shouldLogout == true) {
+    if (ok) {
       await ref.read(authStateProvider.notifier).logout();
     }
   }

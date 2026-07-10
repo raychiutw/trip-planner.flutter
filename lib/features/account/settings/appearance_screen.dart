@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'theme_mode_controller.dart';
@@ -27,7 +28,10 @@ class AppearanceScreen extends ConsumerWidget {
               key: ValueKey('theme-${themeModeToString(m)}'),
               title: Text(label),
               trailing: mode == m ? const Icon(Icons.check) : null,
-              onTap: () => ref.read(themeModeProvider.notifier).setMode(m),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                ref.read(themeModeProvider.notifier).setMode(m);
+              },
             ),
         ],
       ),

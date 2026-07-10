@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -46,7 +47,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       body: SafeArea(
         child: shareAsync.when(
           loading: () => const Center(
-            child: CircularProgressIndicator(
+            child: CircularProgressIndicator.adaptive(
               key: ValueKey('public-share-loading'),
             ),
           ),
@@ -82,6 +83,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
           .read(tripRepositoryProvider)
           .clonePublicTripShare(_token);
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       context.go('/trips/${Uri.encodeComponent(tripId)}');
     } catch (_) {
       if (!mounted) return;
@@ -127,7 +129,7 @@ class _ShareContent extends StatelessWidget {
           icon: cloning
               ? const SizedBox.square(
                   dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 )
               : const Icon(Icons.copy_outlined),
           label: Text(

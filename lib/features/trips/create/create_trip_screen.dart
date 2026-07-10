@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,6 +34,7 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
   Future<void> _submit() async {
     final id = await _ctrl.submit();
     if (id != null && mounted) {
+      HapticFeedback.lightImpact();
       ref.invalidate(myTripsProvider);
       context.go('/trips/$id');
     }
@@ -296,7 +298,9 @@ class _SubmitBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text('建立行程'),
               ),

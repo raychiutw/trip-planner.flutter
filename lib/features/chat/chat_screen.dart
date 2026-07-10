@@ -5,6 +5,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -50,7 +51,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('AI 助手')),
       body: tripsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) =>
             const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
         data: (trips) {
@@ -148,6 +149,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     final text = _input.text;
     if (text.trim().isEmpty) return;
     _input.clear();
+    HapticFeedback.lightImpact();
     unawaited(
       ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
     );
@@ -175,7 +177,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
         Expanded(
           child: state.initialLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator.adaptive())
               : (state.error != null && msgs.isEmpty)
               ? _CenteredHint(
                   title: '載入失敗',
@@ -265,7 +267,7 @@ class _MessageBubble extends StatelessWidget {
           const SizedBox(
             width: 14,
             height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CircularProgressIndicator.adaptive(strokeWidth: 2),
           ),
           const SizedBox(width: TpSpacing.s2),
           Text(message.text),
@@ -435,7 +437,9 @@ class _ComposerState extends ConsumerState<_Composer> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Icon(Icons.send),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
@@ -23,6 +24,7 @@ Future<void> showTravelEditSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -108,6 +110,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       ref.invalidate(tripDaysProvider(widget.tripId));
       ref.invalidate(tripSegmentsProvider(widget.tripId));
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop();
       ScaffoldMessenger.of(
         context,

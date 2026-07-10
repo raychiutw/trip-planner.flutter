@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../offline/offline_status_banner.dart';
@@ -24,11 +25,14 @@ class AppShell extends StatelessWidget {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (selectedIndex) => navigationShell.goBranch(
-          selectedIndex,
-          // 點擊目前 tab 時回到該 branch 的初始路徑
-          initialLocation: selectedIndex == navigationShell.currentIndex,
-        ),
+        onDestinationSelected: (selectedIndex) {
+          HapticFeedback.selectionClick();
+          navigationShell.goBranch(
+            selectedIndex,
+            // 點擊目前 tab 時回到該 branch 的初始路徑
+            initialLocation: selectedIndex == navigationShell.currentIndex,
+          );
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),

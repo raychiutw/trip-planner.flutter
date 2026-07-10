@@ -1,13 +1,14 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
@@ -257,7 +258,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             icon: _isImporting
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(Icons.upload_file_outlined),
             onPressed: _isImporting ? null : _importTripFromJson,
@@ -363,7 +364,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               },
               error: (error, stackTrace) =>
                   _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator.adaptive()),
             ),
           ),
         ],
@@ -485,6 +487,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
     final selectedAction = await showModalBottomSheet<_TripListAction>(
       context: context,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
       ),
@@ -516,7 +519,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                 leading: _exportingTripId == trip.tripId
                     ? const SizedBox.square(
                         dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Icon(Icons.download_outlined),
                 title: const Text('匯出 JSON'),
@@ -562,40 +567,19 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     BuildContext context,
     TripSummary trip,
   ) async {
-    final confirmedDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final dialogColorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('刪除行程'),
-          content: Text('確定要刪除「${trip.displayTitle}」嗎？此動作無法復原。'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(shape: const StadiumBorder()),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: dialogColorScheme.error,
-                foregroundColor: dialogColorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('刪除'),
-            ),
-          ],
-        );
-      },
+    final confirmedDelete = await showAppConfirm(
+      context,
+      title: '刪除行程',
+      message: '確定要刪除「${trip.displayTitle}」嗎？此動作無法復原。',
+      confirmLabel: '刪除',
+      isDestructive: true,
     );
-    if (confirmedDelete != true || !context.mounted) return;
+    if (!confirmedDelete || !context.mounted) return;
 
     try {
       await ref.read(tripRepositoryProvider).deleteTrip(trip.tripId);
       ref.invalidate(myTripsProvider);
+      HapticFeedback.mediumImpact();
     } on Exception {
       if (!context.mounted) return;
       ScaffoldMessenger.of(

@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,7 +38,7 @@ class DeveloperAppsScreen extends ConsumerWidget {
         ],
       ),
       body: appsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => _DeveloperAppsLoadError(
           onRetry: () => ref.invalidate(developerAppsProvider),
         ),
@@ -247,7 +248,9 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
               icon: _isSubmitting
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Icon(Icons.add),
               label: const Text('建立應用程式'),
@@ -287,6 +290,7 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
           );
       if (!mounted) return;
       ref.invalidate(developerAppsProvider);
+      HapticFeedback.lightImpact();
       setState(() {
         _isSubmitting = false;
       });
@@ -306,9 +310,9 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
   }
 
   Future<void> _showCreatedDialog(CreatedDeveloperApp app) async {
-    await showDialog<void>(
+    await showAdaptiveDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
         ),

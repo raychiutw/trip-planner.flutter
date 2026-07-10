@@ -327,6 +327,7 @@ class _DaySection extends ConsumerWidget {
     if (targets.isEmpty) return;
     final targetDayId = await showModalBottomSheet<int>(
       context: context,
+      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

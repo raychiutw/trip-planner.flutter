@@ -68,7 +68,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
             icon: _busyAction == _PrintAction.print
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(Icons.print_outlined),
             onPressed: data == null || busy
@@ -81,7 +81,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
             icon: _busyAction == _PrintAction.pdf
                 ? const SizedBox.square(
                     dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_outlined),
             onPressed: data == null || busy
@@ -93,7 +93,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
       body: SafeArea(
         child: dataAsync.when(
           loading: () => const Center(
-            child: CircularProgressIndicator(
+            child: CircularProgressIndicator.adaptive(
               key: ValueKey('trip-print-loading'),
             ),
           ),

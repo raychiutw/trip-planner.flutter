@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -228,7 +229,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
+    // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
+    expect(
+      find.byWidgetPredicate((w) => w is AlertDialog || w is CupertinoAlertDialog),
+      findsOneWidget,
+    );
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
   });
 
