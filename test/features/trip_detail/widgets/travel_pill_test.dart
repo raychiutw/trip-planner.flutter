@@ -8,13 +8,22 @@ Future<void> pumpPill(
   WidgetTester tester,
   Travel travel, {
   String? statusLabel,
+  TextScaler textScaler = TextScaler.noScaling,
+  double? width,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
       home: Scaffold(
         body: Center(
-          child: TravelPill(travel: travel, statusLabel: statusLabel),
+          child: SizedBox(
+            width: width,
+            child: TravelPill(travel: travel, statusLabel: statusLabel),
+          ),
         ),
       ),
     ),
@@ -42,6 +51,18 @@ void main() {
   });
 
   group('TravelPill 渲染', () {
+    testWidgets('AXXXL 窄欄位文字換行且不溢位', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'car'),
+        statusLabel: '正在重新計算路線',
+        textScaler: const TextScaler.linear(3.2),
+        width: 268,
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('有 min → 「N 分鐘」', (tester) async {
       await pumpPill(tester, const Travel(type: 'walk', min: 12));
       expect(find.text('12 分鐘'), findsOneWidget);
