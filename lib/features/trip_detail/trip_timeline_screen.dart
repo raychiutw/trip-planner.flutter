@@ -249,7 +249,9 @@ class _DaySection extends ConsumerWidget {
             .deleteEntry(tripId: tripId, entryId: entry.id);
         await _recomputeAndRefresh(ref);
       },
-      onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
+      onSuccess: () {
+        if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
+      },
     );
   }
 
@@ -271,10 +273,10 @@ class _DaySection extends ConsumerWidget {
       if (context.mounted) {
         showAppNotice(context, '排序失敗，請稍後再試');
       }
-      ref.invalidate(tripDaysProvider(tripId));
+      if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
       return;
     }
-    ref.invalidate(tripDaysProvider(tripId));
+    if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
     await _recomputeAndRefresh(ref);
   }
 
@@ -301,10 +303,10 @@ class _DaySection extends ConsumerWidget {
       if (context.mounted) {
         showAppNotice(context, '搬移失敗，請稍後再試');
       }
-      ref.invalidate(tripDaysProvider(tripId));
+      if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
       return;
     }
-    ref.invalidate(tripDaysProvider(tripId));
+    if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
     await _recomputeDay(ref, sourceDayNum);
     if (target.dayNum != sourceDayNum) {
       await _recomputeDay(ref, target.dayNum);
@@ -363,6 +365,8 @@ class _DaySection extends ConsumerWidget {
     bool auto = false,
   }) async {
     final scope = '$tripId:$dayNum';
+    // 前一個 await（delete/reorder/move）期間若已離開頁面，連進入時的 ref.read 都會擲錯。
+    if (!ref.context.mounted) return;
     try {
       await ref
           .read(tripRepositoryProvider)
