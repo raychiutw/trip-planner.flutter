@@ -86,6 +86,7 @@ void main() {
       find.byKey(const ValueKey('trip-map-canvas-tile-layer')),
     );
     expect(tileLayer.urlTemplate, contains('opentopomap'));
+    expect(kTripMapUserAgentPackageName, 'com.raychiu.tripline');
 
     final routeLayer = tester.widget<PolylineLayer<Object>>(
       find.byKey(const ValueKey('trip-map-canvas-routes')),

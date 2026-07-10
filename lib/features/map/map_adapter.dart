@@ -42,6 +42,8 @@ class TripMapTilePreset {
   final String attribution;
 }
 
+const String kTripMapUserAgentPackageName = 'com.raychiu.tripline';
+
 const List<TripMapTilePreset> kTripMapTilePresets = [
   TripMapTilePreset(
     style: TripMapTileStyle.roadmap,
@@ -169,7 +171,7 @@ class FlutterMapCanvas extends StatelessWidget {
         TileLayer(
           key: tileLayerKey,
           urlTemplate: tilePreset.urlTemplate,
-          userAgentPackageName: 'com.raychiu.tripline',
+          userAgentPackageName: kTripMapUserAgentPackageName,
           tileProvider: tileProvider,
         ),
         if (routes.isNotEmpty)

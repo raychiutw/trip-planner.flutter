@@ -45,11 +45,25 @@ void main() {
   }
 
   testWidgets('有座標的收藏 → 顯示 marker(無座標者跳過)', (tester) async {
+    final semantics = tester.ensureSemantics();
     await tester.pumpWidget(buildApp(const [_withCoords, _noCoords]));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('map-fav-1')), findsOneWidget);
+    final marker = find.byKey(const ValueKey('map-fav-1'));
+    expect(marker, findsOneWidget);
     expect(find.byKey(const ValueKey('map-fav-2')), findsNothing);
+    expect(tester.getSize(marker), const Size.square(44));
+    expect(
+      tester.getSemantics(marker),
+      matchesSemantics(
+        label: '收藏地點，首里城',
+        isSelected: false,
+        hasSelectedState: true,
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    semantics.dispose();
   });
 
   testWidgets('點 marker → 顯示選中卡(名稱 + 所屬行程)', (tester) async {

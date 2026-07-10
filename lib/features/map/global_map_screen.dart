@@ -97,20 +97,33 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         for (final f in pins)
           TripMapMarker(
             point: TripMapPoint(f.poiLat!, f.poiLng!),
-            width: 28,
-            height: 28,
-            child: GestureDetector(
+            width: TpSpacing.tapMin,
+            height: TpSpacing.tapMin,
+            child: Semantics(
               key: ValueKey('map-fav-${f.id}'),
+              label: '收藏地點，${f.poiName ?? '未命名地點'}',
+              button: true,
+              selected: _selectedId == f.id,
               onTap: () => setState(() => _selectedId = f.id),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: resolvePoiTone(tones, f.poiType).base,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _selectedId == f.id
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Colors.white,
-                    width: 3,
+              child: ExcludeSemantics(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _selectedId = f.id),
+                  child: Center(
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: resolvePoiTone(tones, f.poiType).base,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedId == f.id
+                              ? Theme.of(context).colorScheme.onSurface
+                              : Colors.white,
+                          width: 3,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

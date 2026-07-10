@@ -274,22 +274,24 @@ class _TripMapViewState extends State<_TripMapView> {
       point: pin.point,
       width: 32,
       height: 32,
-      child: Container(
-        key: ValueKey('map-pin-${pin.entry.id}'),
-        decoration: BoxDecoration(
-          color: pin.color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          '${pin.pinNumber}',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            fontFeatures: [FontFeature.tabularFigures()],
-            color: Colors.white,
+      child: ExcludeSemantics(
+        child: Container(
+          key: ValueKey('map-pin-${pin.entry.id}'),
+          decoration: BoxDecoration(
+            color: pin.color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '${pin.pinNumber}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+              fontFeatures: [FontFeature.tabularFigures()],
+              color: Colors.white,
+            ),
           ),
         ),
       ),

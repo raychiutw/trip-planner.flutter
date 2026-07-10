@@ -112,6 +112,7 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-13')), findsNothing);
+    expect(find.bySemanticsLabel(RegExp(r'^[123]$')), findsNothing);
 
     // 底部 entry cards（時間 + 標題）；無座標 entry 不出卡片
     expect(find.byKey(const ValueKey('entry-card-11')), findsOneWidget);
