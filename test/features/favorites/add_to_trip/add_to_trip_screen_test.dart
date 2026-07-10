@@ -100,6 +100,12 @@ void main() {
         endTime: any(named: 'endTime'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
@@ -116,6 +122,9 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
       ),
+    ).called(1);
+    verify(
+      () => tripRepo.recomputeTravel(tripId: 'okinawa', day: '1'),
     ).called(1);
   });
 
@@ -140,6 +149,12 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
       ),
     ).thenAnswer((_) async {});
 
@@ -175,6 +190,9 @@ void main() {
         endTime: any(named: 'endTime'),
         source: 'google',
       ),
+    ).called(1);
+    verify(
+      () => tripRepo.recomputeTravel(tripId: 'okinawa', day: '1'),
     ).called(1);
   });
 

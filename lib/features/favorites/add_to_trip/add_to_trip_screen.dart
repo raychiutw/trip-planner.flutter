@@ -47,6 +47,16 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   /// 結束須晚於開始（避免零長度或負區間 entry）。
   bool get _timeValid => isAddToTripTimeValid(_start, _end);
 
+  Future<void> _recomputeDay(String tripId, int dayNum) async {
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .recomputeTravel(tripId: tripId, day: '$dayNum');
+    } on Exception {
+      // 交通重算失敗不影響加入行程結果。
+    }
+  }
+
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
       context: context,
@@ -100,6 +110,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                 source: 'google',
               );
       }
+      await _recomputeDay(tripId, dayNum);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
