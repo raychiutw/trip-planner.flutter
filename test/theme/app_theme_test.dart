@@ -3,6 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
+double contrastRatio(Color foreground, Color background) {
+  final lighter = foreground.computeLuminance() > background.computeLuminance()
+      ? foreground
+      : background;
+  final darker = identical(lighter, foreground) ? background : foreground;
+  return (lighter.computeLuminance() + 0.05) /
+      (darker.computeLuminance() + 0.05);
+}
+
 void main() {
   group('AppTheme.light', () {
     test('可建構且使用 Material 3', () {
@@ -35,6 +44,24 @@ void main() {
       expect(tones.pinkBg, TpColorsLight.pinkBg);
       expect(tones.success, TpColorsLight.success);
       expect(tones.warning, TpColorsLight.warning);
+    });
+
+    test('accent/sage/pink deep 在 bg 與 subtle 上皆達 4.5:1', () {
+      final tones = AppTheme.light().extension<TpTones>()!;
+      final pairs = [
+        (tones.accentDeep, tones.accentBg),
+        (tones.accentDeep, tones.accentSubtle),
+        (tones.sageDeep, tones.sageBg),
+        (tones.sageDeep, tones.sageSubtle),
+        (tones.pinkDeep, tones.pinkBg),
+        (tones.pinkDeep, tones.pinkSubtle),
+      ];
+      for (final (foreground, background) in pairs) {
+        expect(
+          contrastRatio(foreground, background),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
     });
   });
 
@@ -88,10 +115,10 @@ void main() {
   });
 
   group('元件 theme 規格', () {
-    test('NavigationBar：active=accent、indicator=accentSubtle、label 11', () {
+    test('NavigationBar：active=accent、無 Material pill、label 11', () {
       final lightTheme = AppTheme.light();
       final navigationBarTheme = lightTheme.navigationBarTheme;
-      expect(navigationBarTheme.indicatorColor, TpColorsLight.accentSubtle);
+      expect(navigationBarTheme.indicatorColor, Colors.transparent);
       final selectedLabelStyle = navigationBarTheme.labelTextStyle!.resolve({
         WidgetState.selected,
       });

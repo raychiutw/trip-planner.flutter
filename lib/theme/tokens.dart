@@ -4,19 +4,19 @@ import 'package:flutter/material.dart';
 abstract final class TpColorsLight {
   // accent 柔褐（玩/看/買）
   static const accent = Color(0xFFA97A4A);
-  static const accentDeep = Color(0xFF8A6038);
+  static const accentDeep = Color(0xFF805126);
   static const accentSubtle = Color(0xFFF4EDE3);
   static const accentBg = Color(0xFFE9DBC8);
 
   // sage 綠（住/移動）
   static const sage = Color(0xFFA8BAAA);
-  static const sageDeep = Color(0xFF7E9580);
+  static const sageDeep = Color(0xFF4F6652);
   static const sageSubtle = Color(0xFFECF0ED);
   static const sageBg = Color(0xFFD4DDD5);
 
   // 玫瑰粉（吃）
   static const pink = Color(0xFFE78C99);
-  static const pinkDeep = Color(0xFFC66B78);
+  static const pinkDeep = Color(0xFF8A3947);
   static const pinkSubtle = Color(0xFFFAF1F3);
   static const pinkBg = Color(0xFFF2DBE0);
 

@@ -308,7 +308,7 @@ abstract final class AppTheme {
         height: TpSpacing.navHeight,
         elevation: 0,
         backgroundColor: colorScheme.surface,
-        indicatorColor: tones.accentSubtle,
+        indicatorColor: Colors.transparent,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return IconThemeData(
