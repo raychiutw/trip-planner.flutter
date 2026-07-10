@@ -39,11 +39,12 @@ class DeveloperAppsScreen extends ConsumerWidget {
         ],
       ),
       body: appsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => _DeveloperAppsLoadError(
           onRetry: () => ref.invalidate(developerAppsProvider),
         ),
-        data: (apps) => RefreshIndicator(
+        data: (apps) => RefreshIndicator.adaptive(
           onRefresh: () async => ref.invalidate(developerAppsProvider),
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
@@ -249,9 +250,7 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
               icon: _isSubmitting
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator.adaptive(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Icon(CupertinoIcons.add),
               label: const Text('建立應用程式'),
@@ -375,7 +374,10 @@ class _DeveloperAppTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       key: Key('developer-app-row-${app.clientId}'),
-      leading: const Icon(CupertinoIcons.chevron_left_slash_chevron_right, size: 22),
+      leading: const Icon(
+        CupertinoIcons.chevron_left_slash_chevron_right,
+        size: 22,
+      ),
       title: Text(app.appName),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: TpSpacing.s1),
@@ -466,7 +468,10 @@ class _InlineErrorPanel extends StatelessWidget {
         padding: const EdgeInsets.all(TpSpacing.s4),
         child: Row(
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

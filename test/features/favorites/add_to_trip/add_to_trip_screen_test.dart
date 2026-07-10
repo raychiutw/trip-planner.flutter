@@ -231,7 +231,9 @@ void main() {
 
     // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
     expect(
-      find.byWidgetPredicate((w) => w is AlertDialog || w is CupertinoAlertDialog),
+      find.byWidgetPredicate(
+        (w) => w is AlertDialog || w is CupertinoAlertDialog,
+      ),
       findsOneWidget,
     );
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題

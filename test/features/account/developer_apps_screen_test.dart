@@ -123,7 +123,9 @@ void main() {
     ).called(1);
     // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
     expect(
-      find.byWidgetPredicate((w) => w is AlertDialog || w is CupertinoAlertDialog),
+      find.byWidgetPredicate(
+        (w) => w is AlertDialog || w is CupertinoAlertDialog,
+      ),
       findsOneWidget,
     );
     expect(find.text('tp_new'), findsOneWidget);

@@ -213,9 +213,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator.adaptive(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Text('新增'),
             ),

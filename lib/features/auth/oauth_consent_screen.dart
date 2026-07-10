@@ -208,7 +208,10 @@ class _ConsentErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

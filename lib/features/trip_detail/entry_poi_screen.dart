@@ -71,7 +71,8 @@ class EntryPoiScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('地點管理')),
       body: entryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -184,7 +185,9 @@ class EntryPoiScreen extends ConsumerWidget {
     EntryPoiInfo poi,
   ) async {
     final result =
-        await showAdaptiveDialog<({String? note, String type, String? reservation})>(
+        await showAdaptiveDialog<
+          ({String? note, String type, String? reservation})
+        >(
           context: context,
           builder: (_) => _PoiInfoDialog(poi: poi),
         );
@@ -452,13 +455,12 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    key: const ValueKey('alt-search-field'),
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('alt-search-field'),
                     controller: _ctrl,
+                    placeholder: '搜尋地點加入備選',
                     autofocus: true,
-                    textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _search(),
-                    decoration: const InputDecoration(hintText: '搜尋地點加入備選'),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),

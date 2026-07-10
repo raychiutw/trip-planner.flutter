@@ -129,12 +129,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    key: const ValueKey('explore-search-field'),
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('explore-search-field'),
                     controller: _searchController,
-                    textInputAction: TextInputAction.search,
+                    placeholder: '搜尋地點',
                     onSubmitted: (_) => _submitSearch(),
-                    decoration: const InputDecoration(hintText: '搜尋地點'),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),

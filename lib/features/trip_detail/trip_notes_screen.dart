@@ -25,7 +25,8 @@ class TripNotesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('行程筆記')),
       body: notesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

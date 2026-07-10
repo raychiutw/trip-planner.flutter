@@ -160,10 +160,7 @@ Future<T?> showAppActionSheet<T>(
                 title: Text(
                   action.label,
                   style: action.isDestructive
-                      ? TextStyle(
-                          color: error,
-                          fontWeight: FontWeight.w600,
-                        )
+                      ? TextStyle(color: error, fontWeight: FontWeight.w600)
                       : null,
                 ),
                 onTap: () => Navigator.of(sheetContext).pop(action.value),
@@ -173,6 +170,103 @@ Future<T?> showAppActionSheet<T>(
       );
     },
   );
+}
+
+/// 平台自適應搜尋輸入列。
+///
+/// - iOS/macOS → [CupertinoSearchTextField](灰底圓角、內建放大鏡與清除鈕)。
+/// - 其餘平台 → Material [TextField](放大鏡 prefix;有字時顯示清除鈕)。
+///
+/// [fieldKey] 直接掛在底層欄位上,widget test 以 `find.byKey` + `enterText` 操作
+/// 兩種平台皆通。
+class AppSearchField extends StatefulWidget {
+  const AppSearchField({
+    super.key,
+    this.fieldKey,
+    required this.controller,
+    required this.placeholder,
+    this.onChanged,
+    this.onSubmitted,
+    this.autofocus = false,
+    this.enabled = true,
+  });
+
+  /// 掛在底層 TextField/CupertinoSearchTextField 上的 key(供測試定位)。
+  final Key? fieldKey;
+  final TextEditingController controller;
+  final String placeholder;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final bool autofocus;
+  final bool enabled;
+
+  @override
+  State<AppSearchField> createState() => _AppSearchFieldState();
+}
+
+class _AppSearchFieldState extends State<AppSearchField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  /// 僅為 Material branch「有字才顯示清除鈕」重繪;iOS 自帶清除鈕。
+  void _onTextChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _clear() {
+    widget.controller.clear();
+    widget.onChanged?.call('');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final platform = Theme.of(context).platform;
+    final isApple =
+        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+    if (isApple) {
+      return CupertinoSearchTextField(
+        key: widget.fieldKey,
+        controller: widget.controller,
+        placeholder: widget.placeholder,
+        onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
+        autofocus: widget.autofocus,
+        enabled: widget.enabled,
+      );
+    }
+
+    return TextField(
+      key: widget.fieldKey,
+      controller: widget.controller,
+      autofocus: widget.autofocus,
+      enabled: widget.enabled,
+      textInputAction: TextInputAction.search,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
+      decoration: InputDecoration(
+        hintText: widget.placeholder,
+        isDense: true,
+        prefixIcon: const Icon(CupertinoIcons.search),
+        suffixIcon: widget.controller.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(CupertinoIcons.clear),
+                onPressed: _clear,
+              ),
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
 }
 
 /// 顯示短暫通知(取代 Material SnackBar 的跨平台一致 API)。
@@ -268,7 +362,9 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
               opacity: _visible ? 1 : 0,
               child: Material(
                 color: theme.colorScheme.inverseSurface,
-                borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TpRadius.lg),
+                ),
                 elevation: 6,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(

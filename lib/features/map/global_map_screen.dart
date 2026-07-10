@@ -44,7 +44,8 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('地圖')),
       body: favsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) => const _Hint(title: '載入失敗', body: '無法取得收藏地點,請稍後再試。'),
         data: (favs) {
           final pins = favs.where(_hasCoords).toList();

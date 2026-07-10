@@ -41,10 +41,7 @@ class AppShell extends StatelessWidget {
           ),
           NavigationDestination(icon: Icon(CupertinoIcons.house), label: '行程'),
           NavigationDestination(icon: Icon(CupertinoIcons.map), label: '地圖'),
-          NavigationDestination(
-            icon: Icon(CupertinoIcons.heart),
-            label: '收藏',
-          ),
+          NavigationDestination(icon: Icon(CupertinoIcons.heart), label: '收藏'),
           NavigationDestination(icon: Icon(CupertinoIcons.person), label: '帳號'),
         ],
       ),

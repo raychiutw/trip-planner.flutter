@@ -20,7 +20,7 @@ class FavoritesScreen extends ConsumerWidget {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
-      body: RefreshIndicator(
+      body: RefreshIndicator.adaptive(
         onRefresh: () => ref.refresh(favoritesProvider.future),
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

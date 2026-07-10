@@ -51,11 +51,7 @@ void main() {
     late Future<bool> future;
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
-        future = showAppConfirm(
-          context,
-          title: '登出帳號',
-          confirmLabel: '登出',
-        );
+        future = showAppConfirm(context, title: '登出帳號', confirmLabel: '登出');
       }),
     );
     await tester.tap(find.text('open'));
@@ -91,7 +87,9 @@ void main() {
     expect(await future, 'delete');
   });
 
-  testWidgets('Android → bottom sheet(ListTile);取消(點外部)回傳 null', (tester) async {
+  testWidgets('Android → bottom sheet(ListTile);取消(點外部)回傳 null', (
+    tester,
+  ) async {
     late Future<String?> future;
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
@@ -114,9 +112,7 @@ void main() {
     expect(await future, isNull);
   });
 
-  testWidgets('iOS → 頂部橫幅顯示訊息(非 SnackBar);結束不留 pending timer', (
-    tester,
-  ) async {
+  testWidgets('iOS → 頂部橫幅顯示訊息(非 SnackBar);結束不留 pending timer', (tester) async {
     await tester.pumpWidget(
       host(TargetPlatform.iOS, (context) {
         showAppNotice(context, '已登出該裝置');
@@ -142,5 +138,53 @@ void main() {
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('已刪除'), findsOneWidget);
+  });
+
+  Widget searchHost(TargetPlatform platform, TextEditingController controller) {
+    return MaterialApp(
+      theme: ThemeData(platform: platform),
+      home: Scaffold(
+        body: AppSearchField(
+          fieldKey: const ValueKey('search'),
+          controller: controller,
+          placeholder: '搜尋',
+        ),
+      ),
+    );
+  }
+
+  testWidgets('AppSearchField iOS → CupertinoSearchTextField;enterText 生效', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(searchHost(TargetPlatform.iOS, controller));
+
+    expect(find.byType(CupertinoSearchTextField), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('search')), '沖繩');
+    expect(controller.text, '沖繩');
+  });
+
+  testWidgets('AppSearchField Android → TextField;有字才顯示清除鈕,點擊清空', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(searchHost(TargetPlatform.android, controller));
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(CupertinoSearchTextField), findsNothing);
+    // 空 → 無清除鈕
+    expect(find.byIcon(CupertinoIcons.clear), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('search')), '釜山');
+    await tester.pump();
+    expect(find.byIcon(CupertinoIcons.clear), findsOneWidget);
+
+    await tester.tap(find.byIcon(CupertinoIcons.clear));
+    await tester.pump();
+    expect(controller.text, isEmpty);
   });
 }

@@ -157,7 +157,8 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('加入行程：$_title')),
       body: tripsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

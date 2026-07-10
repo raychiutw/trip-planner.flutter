@@ -256,7 +256,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         onPressed: () => context.push('/new-trip'),
         child: const Icon(CupertinoIcons.add),
       ),
-      body: RefreshIndicator(
+      body: RefreshIndicator.adaptive(
         onRefresh: () => ref.refresh(myTripsProvider.future),
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -320,20 +320,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       TpSpacing.s4,
                       TpSpacing.s2,
                     ),
-                    child: TextField(
-                      key: const ValueKey('trips-search-field'),
+                    child: AppSearchField(
+                      fieldKey: const ValueKey('trips-search-field'),
                       controller: _searchController,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: '搜尋行程',
-                        prefixIcon: const Icon(CupertinoIcons.search),
-                        suffixIcon: _query.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(CupertinoIcons.clear),
-                                onPressed: () => _searchController.clear(),
-                              )
-                            : null,
-                      ),
+                      placeholder: '搜尋行程',
                     ),
                   ),
                   Padding(
@@ -347,7 +337,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       showSelectedIcon: false,
                       segments: const [
                         ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                        ButtonSegment(value: TripFilter.mine, label: Text('我的')),
+                        ButtonSegment(
+                          value: TripFilter.mine,
+                          label: Text('我的'),
+                        ),
                         ButtonSegment(
                           value: TripFilter.shared,
                           label: Text('共編'),

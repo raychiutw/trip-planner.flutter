@@ -140,7 +140,11 @@ class _UnverifiedChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(CupertinoIcons.exclamationmark_circle, size: 14, color: warningColor),
+          Icon(
+            CupertinoIcons.exclamationmark_circle,
+            size: 14,
+            color: warningColor,
+          ),
           const SizedBox(width: TpSpacing.s1),
           Text(
             'Email 未驗證',
@@ -393,7 +397,11 @@ class _LogoutRow extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        leading: Icon(CupertinoIcons.square_arrow_right, size: 20, color: colorScheme.error),
+        leading: Icon(
+          CupertinoIcons.square_arrow_right,
+          size: 20,
+          color: colorScheme.error,
+        ),
         title: Text(
           '登出',
           style: TextStyle(

@@ -158,7 +158,7 @@ class _SessionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
+    return RefreshIndicator.adaptive(
       onRefresh: () async => onRetry(),
       child: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
@@ -233,9 +233,7 @@ class _SessionTile extends StatelessWidget {
               child: isBusy
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator.adaptive(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Text('登出'),
             ),
@@ -307,7 +305,10 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

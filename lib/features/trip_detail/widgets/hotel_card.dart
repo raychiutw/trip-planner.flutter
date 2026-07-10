@@ -33,7 +33,11 @@ class HotelCard extends StatelessWidget {
               color: tones.sageBg,
               borderRadius: BorderRadius.circular(TpRadius.md),
             ),
-            child: Icon(CupertinoIcons.bed_double, size: 20, color: tones.sageDeep),
+            child: Icon(
+              CupertinoIcons.bed_double,
+              size: 20,
+              color: tones.sageDeep,
+            ),
           ),
           const SizedBox(width: TpSpacing.s3),
           Expanded(

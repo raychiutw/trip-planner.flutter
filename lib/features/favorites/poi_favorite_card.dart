@@ -45,7 +45,11 @@ class PoiFavoriteCard extends StatelessWidget {
               color: tone.bg,
               borderRadius: BorderRadius.circular(TpRadius.md),
             ),
-            child: Icon(CupertinoIcons.location_solid, size: 20, color: tone.deep),
+            child: Icon(
+              CupertinoIcons.location_solid,
+              size: 20,
+              color: tone.deep,
+            ),
           ),
           const SizedBox(width: TpSpacing.s3),
           Expanded(

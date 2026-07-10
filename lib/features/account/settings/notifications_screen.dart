@@ -48,7 +48,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         error: (error, stackTrace) => _LoadError(
           onRetry: () => ref.invalidate(accountNotificationPreferencesProvider),
         ),
-        data: (preferences) => RefreshIndicator(
+        data: (preferences) => RefreshIndicator.adaptive(
           onRefresh: () =>
               ref.refresh(accountNotificationPreferencesProvider.future),
           child: _NotificationsList(
@@ -258,7 +258,10 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

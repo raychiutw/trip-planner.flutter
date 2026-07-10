@@ -57,9 +57,7 @@ class PoiSearchCard extends StatelessWidget {
                   tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
                   onPressed: isSaving ? null : onToggleFavorite,
                   icon: Icon(
-                    isSaved
-                        ? CupertinoIcons.heart_fill
-                        : CupertinoIcons.heart,
+                    isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
                     color: tones.pink,
                   ),
                 ),

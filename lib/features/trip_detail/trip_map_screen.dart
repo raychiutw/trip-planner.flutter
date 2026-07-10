@@ -36,7 +36,8 @@ class TripMapScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('行程地圖')),
       body: daysAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

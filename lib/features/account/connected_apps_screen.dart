@@ -37,11 +37,12 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('已連結的應用程式')),
       body: appsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => _ConnectedAppsLoadError(
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),
-        data: (apps) => RefreshIndicator(
+        data: (apps) => RefreshIndicator.adaptive(
           onRefresh: () async => ref.invalidate(connectedAppsProvider),
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
@@ -218,7 +219,10 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

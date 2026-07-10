@@ -603,7 +603,7 @@ void main() {
     testWidgets(
       '長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
       (tester) async {
-      await _useWideSurface(tester);
+        await _useWideSurface(tester);
         final mockTripRepository = MockTripRepository();
         when(
           () => mockTripRepository.watchMyTrips(),

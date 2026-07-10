@@ -30,6 +30,12 @@ const List<String> _suggestedPrompts = [
   '加入適合親子的水族館行程',
 ];
 
+/// chat composer 的 iMessage 風格圓角膠囊外框(無邊、各狀態一致)。
+const _composerPillBorder = OutlineInputBorder(
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+  borderSide: BorderSide.none,
+);
+
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
@@ -53,7 +59,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('AI 助手')),
       body: tripsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) =>
             const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
         data: (trips) {
@@ -414,10 +421,19 @@ class _ComposerState extends ConsumerState<_Composer> {
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => widget.onSend(),
-                decoration: const InputDecoration(
+                // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                decoration: InputDecoration(
                   hintText: '輸入訊息或語音指令',
-                  border: OutlineInputBorder(),
                   isDense: true,
+                  filled: true,
+                  fillColor: scheme.surfaceContainerHighest,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: TpSpacing.s4,
+                    vertical: TpSpacing.s3,
+                  ),
+                  border: _composerPillBorder,
+                  enabledBorder: _composerPillBorder,
+                  focusedBorder: _composerPillBorder,
                 ),
               ),
             ),
@@ -439,9 +455,7 @@ class _ComposerState extends ConsumerState<_Composer> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator.adaptive(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Icon(CupertinoIcons.arrow_up_circle_fill),
             ),
@@ -454,10 +468,7 @@ class _ComposerState extends ConsumerState<_Composer> {
 
 /// 空對話引導:標題 + 說明 + 4 個建議 prompt 快捷鈕。
 class _EmptyStatePrompts extends StatelessWidget {
-  const _EmptyStatePrompts({
-    required this.sending,
-    required this.onSelect,
-  });
+  const _EmptyStatePrompts({required this.sending, required this.onSelect});
 
   final bool sending;
   final void Function(String prompt) onSelect;
@@ -490,7 +501,9 @@ class _EmptyStatePrompts extends StatelessWidget {
                   ActionChip(
                     key: ValueKey('chat-suggestion-$i'),
                     label: Text(_suggestedPrompts[i]),
-                    onPressed: sending ? null : () => onSelect(_suggestedPrompts[i]),
+                    onPressed: sending
+                        ? null
+                        : () => onSelect(_suggestedPrompts[i]),
                   ),
               ],
             ),
@@ -557,7 +570,11 @@ class _Banner extends StatelessWidget {
         padding: const EdgeInsets.all(TpSpacing.s3),
         child: Row(
           children: [
-            Icon(CupertinoIcons.exclamationmark_circle, color: scheme.onErrorContainer, size: 18),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: scheme.onErrorContainer,
+              size: 18,
+            ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
               child: Text(

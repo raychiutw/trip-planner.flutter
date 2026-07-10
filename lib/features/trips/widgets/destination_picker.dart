@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../models/destination_input.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
@@ -74,17 +75,11 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
         Row(
           children: [
             Expanded(
-              child: TextField(
-                key: const ValueKey('dest-poi-search'),
+              child: AppSearchField(
+                fieldKey: const ValueKey('dest-poi-search'),
                 controller: _search,
-                textInputAction: TextInputAction.search,
+                placeholder: '搜尋地點（城市、景點）',
                 onSubmitted: (_) => _run(),
-                decoration: const InputDecoration(
-                  hintText: '搜尋地點（城市、景點）',
-                  prefixIcon: Icon(CupertinoIcons.search),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
               ),
             ),
             const SizedBox(width: TpSpacing.s2),
@@ -95,9 +90,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator.adaptive(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Icon(CupertinoIcons.search),
             ),
