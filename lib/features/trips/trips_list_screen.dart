@@ -249,6 +249,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final myTripsAsync = ref.watch(myTripsProvider);
     final currentUserId = ref.watch(authStateProvider).value?.id;
     final theme = Theme.of(context);
+    final useVerticalFilters = MediaQuery.textScalerOf(context).scale(17) >= 24;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -334,6 +335,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       TpSpacing.s2,
                     ),
                     child: SegmentedButton<TripFilter>(
+                      direction: useVerticalFilters
+                          ? Axis.vertical
+                          : Axis.horizontal,
                       showSelectedIcon: false,
                       segments: const [
                         ButtonSegment(value: TripFilter.all, label: Text('全部')),

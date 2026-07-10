@@ -229,13 +229,15 @@ class _NotesSection extends ConsumerWidget {
         iconColor: theme.colorScheme.onSurfaceVariant,
         collapsedIconColor: theme.colorScheme.onSurfaceVariant,
         leading: Icon(icon, size: 20, color: iconColor),
-        title: Row(
+        title: Wrap(
+          spacing: TpSpacing.s2,
+          runSpacing: TpSpacing.s1,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
             ),
-            const SizedBox(width: TpSpacing.s2),
             Container(
               key: ValueKey('notes-count-${section.name}'),
               padding: const EdgeInsets.symmetric(

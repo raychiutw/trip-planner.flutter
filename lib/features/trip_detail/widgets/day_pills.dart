@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../models/day.dart';
@@ -31,9 +33,13 @@ class DayPills extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final height = math.max(
+      60.0,
+      MediaQuery.textScalerOf(context).scale(32) + 28,
+    );
 
     return Container(
-      height: 60,
+      height: height,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),

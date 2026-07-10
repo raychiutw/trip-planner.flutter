@@ -47,5 +47,28 @@ void main() {
       await tester.tap(find.text('DAY 02'));
       expect(selectedDayNum, 2);
     });
+
+    testWidgets('AXXXL 下維持 44pt 以上且不 overflow', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(
+              body: DayPills(
+                days: _days,
+                activeDayNum: 1,
+                onDaySelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.text('DAY 01')).height, greaterThan(22));
+    });
   });
 }

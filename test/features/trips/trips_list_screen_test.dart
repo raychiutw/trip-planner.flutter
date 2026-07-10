@@ -83,7 +83,7 @@ void main() {
   /// 把畫面包進假 GoRouter：/trips 是清單頁、/trips/:tripId 是導航目的地探針。
   /// （flutter_riverpod 3.x 未匯出 Override 型別，overrides 由各測試
   /// 直接在 ProviderScope 建構處以 list literal 傳入。）
-  Widget buildRouterApp() {
+  Widget buildRouterApp({TextScaler textScaler = TextScaler.noScaling}) {
     final fakeRouter = GoRouter(
       initialLocation: '/trips',
       routes: [
@@ -101,10 +101,34 @@ void main() {
     return MaterialApp.router(
       theme: AppTheme.light(),
       routerConfig: fakeRouter,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
     );
   }
 
   group('TripsListScreen 清單渲染', () {
+    testWidgets('AXXXL 下篩選控制改為垂直排列', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(textScaler: const TextScaler.linear(2)),
+        ),
+      );
+      await tester.pump();
+
+      final control = tester.widget<SegmentedButton<TripFilter>>(
+        find.byType(SegmentedButton<TripFilter>),
+      );
+      expect(control.direction, Axis.vertical);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(

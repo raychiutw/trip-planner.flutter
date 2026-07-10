@@ -70,7 +70,11 @@ TripNotes _sampleNotes() {
   );
 }
 
-Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
+Widget _buildScreen(
+  TripNotes notes, {
+  _MockTripRepository? repo,
+  TextScaler textScaler = TextScaler.noScaling,
+}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -84,7 +88,14 @@ Widget _buildScreen(TripNotes notes, {_MockTripRepository? repo}) {
       tripNotesProvider.overrideWith((ref, tripId) => Stream.value(notes)),
       if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.light(),
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
+    ),
   );
 }
 
@@ -122,6 +133,27 @@ void main() {
         reason: 'section $sectionSuffix 的 count badge 應為 $count',
       );
     });
+  });
+
+  testWidgets('AXXXL 下 section header 與 count badge 不 overflow', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), textScaler: const TextScaler.linear(3.2)),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('緊急聯絡'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('notes-count-emergency')), findsOneWidget);
   });
 
   testWidgets('航班預設展開顯示 row；展開住宿、預訂顯示各自欄位', (tester) async {
