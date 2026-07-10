@@ -643,7 +643,6 @@ class _EntryTrailing extends StatelessWidget {
           key: ValueKey('entry-menu-$entryId'),
           icon: const Icon(CupertinoIcons.folder),
           tooltip: '移到其他天',
-          visualDensity: VisualDensity.compact,
           onPressed: onMove,
         ),
         ReorderDragHandle(

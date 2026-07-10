@@ -88,6 +88,7 @@ void main() {
   testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -95,6 +96,16 @@ void main() {
     expect(find.text('總覽'), findsOneWidget);
     expect(find.text('DAY 01'), findsOneWidget);
     expect(find.text('DAY 02'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('trip-map-tab-0'))),
+      matchesSemantics(
+        label: '總覽',
+        isSelected: true,
+        hasSelectedState: true,
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
 
     // pins：只有 master 座標非 null 的 3 筆
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
@@ -110,6 +121,7 @@ void main() {
 
     // OSM attribution 必須顯示
     expect(find.byType(RichAttributionWidget), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {

@@ -202,45 +202,54 @@ class _TripMapViewState extends State<_TripMapView> {
         ? colorScheme.primary
         : kDayPinPalette[(tabIndex - 1) % kDayPinPalette.length];
 
-    return Material(
-      color: isSelected ? pillColor : Colors.transparent,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: isSelected ? pillColor : colorScheme.outlineVariant,
-        ),
-      ),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: () => _selectTab(tabIndex),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
-          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isOverview) ...[
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : pillColor,
-                    shape: BoxShape.circle,
+    return Semantics(
+      key: ValueKey('trip-map-tab-$tabIndex'),
+      label: label,
+      button: true,
+      selected: isSelected,
+      onTap: () => _selectTab(tabIndex),
+      child: ExcludeSemantics(
+        child: Material(
+          color: isSelected ? pillColor : Colors.transparent,
+          shape: StadiumBorder(
+            side: BorderSide(
+              color: isSelected ? pillColor : colorScheme.outlineVariant,
+            ),
+          ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: () => _selectTab(tabIndex),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
+              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isOverview) ...[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : pillColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: TpSpacing.s2),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: isSelected ? Colors.white : colorScheme.onSurface,
+                    ),
                   ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: isSelected ? Colors.white : colorScheme.onSurface,
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -144,6 +144,7 @@ void main() {
       // SliverAppBar.large 標題會雙渲染(展開 + 收合),故用 findsWidgets。
       expect(find.text('我的行程'), findsWidgets);
       expect(find.byType(TripCard), findsNWidgets(3));
+      expect(find.byTooltip('建立新行程'), findsOneWidget);
 
       // title 優先顯示，無 title 退回 name
       expect(find.text('沖繩家族之旅'), findsOneWidget);

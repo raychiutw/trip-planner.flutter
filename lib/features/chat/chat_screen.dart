@@ -450,6 +450,7 @@ class _ComposerState extends ConsumerState<_Composer> {
             const SizedBox(width: TpSpacing.s1),
             IconButton.filled(
               key: const ValueKey('chat-send'),
+              tooltip: '傳送訊息',
               onPressed: widget.sending ? null : widget.onSend,
               icon: widget.sending
                   ? const SizedBox(

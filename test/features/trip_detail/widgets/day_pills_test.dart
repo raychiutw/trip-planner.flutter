@@ -70,5 +70,29 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(tester.getSize(find.text('DAY 01')).height, greaterThan(22));
     });
+
+    testWidgets('VoiceOver 讀出按鈕與選取狀態', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: DayPills(days: _days, activeDayNum: 1, onDaySelected: (_) {}),
+          ),
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.byKey(const ValueKey('day-pill-1'))),
+        matchesSemantics(
+          label: 'DAY 01，6/10',
+          isSelected: true,
+          hasSelectedState: true,
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
   });
 }

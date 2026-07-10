@@ -254,6 +254,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         key: const ValueKey('trips-create-fab'),
+        tooltip: '建立新行程',
         onPressed: () => context.push('/new-trip'),
         child: const Icon(CupertinoIcons.add),
       ),

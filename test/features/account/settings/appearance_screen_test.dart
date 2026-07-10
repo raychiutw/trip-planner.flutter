@@ -9,6 +9,7 @@ import 'package:tripline/theme/app_theme.dart';
 
 void main() {
   testWidgets('點「深色」→ themeMode 變 dark + 打勾', (tester) async {
+    final semantics = tester.ensureSemantics();
     final container = ProviderContainer(
       overrides: [
         settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
@@ -36,5 +37,16 @@ void main() {
       find.byKey(const ValueKey('theme-dark')),
     );
     expect(darkTile.trailing, isA<Icon>());
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('theme-dark-semantics'))),
+      matchesSemantics(
+        label: '深色',
+        isSelected: true,
+        hasSelectedState: true,
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    semantics.dispose();
   });
 }

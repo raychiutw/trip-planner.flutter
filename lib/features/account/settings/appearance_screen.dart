@@ -25,14 +25,28 @@ class AppearanceScreen extends ConsumerWidget {
       body: ListView(
         children: [
           for (final (m, label) in _options)
-            ListTile(
-              key: ValueKey('theme-${themeModeToString(m)}'),
-              title: Text(label),
-              trailing: mode == m ? const Icon(CupertinoIcons.checkmark) : null,
+            Semantics(
+              key: ValueKey('theme-${themeModeToString(m)}-semantics'),
+              label: label,
+              button: true,
+              selected: mode == m,
               onTap: () {
                 HapticFeedback.selectionClick();
                 ref.read(themeModeProvider.notifier).setMode(m);
               },
+              child: ExcludeSemantics(
+                child: ListTile(
+                  key: ValueKey('theme-${themeModeToString(m)}'),
+                  title: Text(label),
+                  trailing: mode == m
+                      ? const Icon(CupertinoIcons.checkmark)
+                      : null,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(themeModeProvider.notifier).setMode(m);
+                  },
+                ),
+              ),
             ),
         ],
       ),

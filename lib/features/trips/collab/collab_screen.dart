@@ -131,6 +131,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 ),
                 IconButton(
                   key: ValueKey('member-remove-${m.id}'),
+                  tooltip: '移除 ${m.displayName ?? m.email}',
                   icon: const Icon(CupertinoIcons.person_badge_minus),
                   onPressed: state.removingId == m.id
                       ? null

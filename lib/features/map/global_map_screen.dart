@@ -148,7 +148,7 @@ class _SelectedCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  visualDensity: VisualDensity.compact,
+                  tooltip: '關閉地點資訊',
                   icon: const Icon(CupertinoIcons.xmark),
                   onPressed: onClose,
                 ),

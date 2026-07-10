@@ -70,6 +70,7 @@ void main() {
       find.byKey(const ValueKey('create-submit')),
     );
     expect(btn.onPressed, isNull);
+    expect(find.byTooltip('搜尋地點'), findsOneWidget);
   });
 
   testWidgets('POI 搜尋 → 點結果 → 加入目的地', (tester) async {

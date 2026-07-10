@@ -260,6 +260,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
         suffixIcon: widget.controller.text.isEmpty
             ? null
             : IconButton(
+                tooltip: '清除搜尋',
                 icon: const Icon(CupertinoIcons.clear),
                 onPressed: _clear,
               ),

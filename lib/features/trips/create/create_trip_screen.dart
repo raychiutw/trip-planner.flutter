@@ -192,6 +192,7 @@ class _FlexibleDate extends StatelessWidget {
             const Spacer(),
             IconButton(
               key: const ValueKey('create-flex-minus'),
+              tooltip: '減少行程天數',
               onPressed: () => ctrl.setFlexDayCount(state.flexDayCount - 1),
               icon: const Icon(CupertinoIcons.minus_circle),
             ),
@@ -202,6 +203,7 @@ class _FlexibleDate extends StatelessWidget {
             ),
             IconButton(
               key: const ValueKey('create-flex-plus'),
+              tooltip: '增加行程天數',
               onPressed: () => ctrl.setFlexDayCount(state.flexDayCount + 1),
               icon: const Icon(CupertinoIcons.add_circled),
             ),
@@ -239,12 +241,14 @@ class _DayQuotaSection extends StatelessWidget {
             children: [
               Expanded(child: Text(state.destinations[i].name)),
               IconButton(
+                tooltip: '減少 ${state.destinations[i].name} 天數',
                 onPressed: () =>
                     ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) - 1),
                 icon: const Icon(CupertinoIcons.minus_circle),
               ),
               Text('${state.destinations[i].dayQuota ?? 1}'),
               IconButton(
+                tooltip: '增加 ${state.destinations[i].name} 天數',
                 onPressed: () =>
                     ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) + 1),
                 icon: const Icon(CupertinoIcons.add_circled),
