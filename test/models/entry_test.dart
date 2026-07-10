@@ -119,7 +119,7 @@ void main() {
       expect(entry.time, '12:00');
       expect(entry.startTime, '12:00');
       expect(entry.endTime, '13:30');
-      expect(entry.title, '午餐：暖暮拉麵');
+      expect(entry.title, '暖暮拉麵');
       expect(entry.description, '人氣排隊店');
       expect(entry.note, '備案在隔壁');
       expect(entry.version, 2);
@@ -150,6 +150,18 @@ void main() {
       expect(entry.travel, isNull);
       expect(entry.master, isNull);
       expect(entry.alternates, isEmpty);
+    });
+
+    test('新後端無 title 時用 displayTitle / master.name 當顯示標題', () {
+      final entry = TimelineEntry.fromJson({
+        'id': 9003,
+        'sortOrder': 5,
+        'displayTitle': '暖暮拉麵',
+        'version': 1,
+        'master': {'poiId': 555, 'name': '暖暮拉麵'},
+      });
+
+      expect(entry.title, '暖暮拉麵');
     });
   });
 }

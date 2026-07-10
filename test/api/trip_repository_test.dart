@@ -288,7 +288,7 @@ void main() {
     expect(firstDay.timeline, hasLength(2));
 
     final shuriCastleEntry = firstDay.timeline.first;
-    expect(shuriCastleEntry.title, '首里城');
+    expect(shuriCastleEntry.title, '首里城公園');
     expect(shuriCastleEntry.travel!.min, 20);
     expect(shuriCastleEntry.master!.poiId, 501);
     expect(shuriCastleEntry.master!.rating, 4.4);
@@ -587,13 +587,13 @@ void main() {
   });
 
   test(
-    'addEntryToDay：POST /trips/:id/days/:num/entries snake_case body',
+    'addEntryToDay：POST /trips/:id/days/:num/entries 用 name 建 POI',
     () async {
       dioAdapter.onPost(
         '/trips/okinawa/days/1/entries',
         (server) => server.reply(201, {'id': 99}),
         data: {
-          'title': '美麗海水族館',
+          'name': '美麗海水族館',
           'description': '海景第一排',
           'poi_type': 'attraction',
           'lat': 26.69,

@@ -300,7 +300,7 @@ class TripRepository {
       'POST',
       '/trips/${Uri.encodeComponent(tripId)}/days/$dayNum/entries',
       body: {
-        'title': title,
+        'name': title,
         'description': description,
         'note': note,
         'poi_type': poiType,
