@@ -212,6 +212,9 @@ class _EntryDragPayload {
   final int sourceDayNum;
 }
 
+// ponytail: process-local auto signature guard; move to repo helper if retry/failure UI is needed.
+final _requestedTravelGapRecomputes = <String>{};
+
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -361,6 +364,7 @@ class _DaySection extends ConsumerWidget {
           .read(tripRepositoryProvider)
           .recomputeTravel(tripId: tripId, day: '$dayNum');
       ref.invalidate(tripDaysProvider(tripId));
+      ref.invalidate(tripSegmentsProvider(tripId));
     } on Exception {
       // 交通重算失敗忽略
     }
@@ -369,10 +373,15 @@ class _DaySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
-    final segments = switch (ref.watch(tripSegmentsProvider(tripId))) {
+    final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
+    final segments = switch (segmentsAsync) {
       AsyncData(:final value) => value,
       _ => const <TripSegment>[],
     };
+    final segmentsReady = segmentsAsync is AsyncData<List<TripSegment>>;
+    if (segmentsReady) {
+      _requestMissingSegmentRecompute(ref, timeline, segments);
+    }
 
     return DragTarget<_EntryDragPayload>(
       key: ValueKey('day-drop-${day.id}'),
@@ -416,6 +425,9 @@ class _DaySection extends ConsumerWidget {
                     _reorder(context, ref, oldIndex, newIndex),
                 itemBuilder: (context, i) {
                   final entry = timeline[i];
+                  final travelSegment = i > 0 && entry.travel != null
+                      ? _findSegment(segments, timeline[i - 1].id, entry.id)
+                      : null;
                   final tile = TimelineEntryTile(
                     entry: entry,
                     number: i + 1,
@@ -484,12 +496,10 @@ class _DaySection extends ConsumerWidget {
                       if (i > 0 && entry.travel != null)
                         _TravelRow(
                           travel: entry.travel!,
-                          segment: _findSegment(
-                            segments,
-                            timeline[i - 1].id,
-                            entry.id,
-                          ),
+                          segment: travelSegment,
                           tripId: tripId,
+                          missingSegment:
+                              segmentsReady && travelSegment == null,
                           missingCoords: _missingTravelCoords(
                             timeline[i - 1],
                             entry,
@@ -520,6 +530,29 @@ class _DaySection extends ConsumerWidget {
         );
       },
     );
+  }
+
+  void _requestMissingSegmentRecompute(
+    WidgetRef ref,
+    List<TimelineEntry> timeline,
+    List<TripSegment> segments,
+  ) {
+    final gapIds = <String>[];
+    for (var i = 1; i < timeline.length; i++) {
+      final entry = timeline[i];
+      if (entry.travel == null) continue;
+      final previous = timeline[i - 1];
+      if (_missingTravelCoords(previous, entry)) continue;
+      final segment = _findSegment(segments, previous.id, entry.id);
+      if (segment == null || segment.isStale) {
+        gapIds.add('${previous.id}-${entry.id}');
+      }
+    }
+    if (gapIds.isEmpty) return;
+
+    final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
+    if (!_requestedTravelGapRecomputes.add(key)) return;
+    unawaited(_recomputeDay(ref, day.dayNum));
   }
 
   void _autoScrollDuringDrag(BuildContext context, Offset globalPosition) {
@@ -601,21 +634,24 @@ class _TravelRow extends StatelessWidget {
     required this.travel,
     this.segment,
     this.tripId,
+    this.missingSegment = false,
     this.missingCoords = false,
   });
 
   final Travel travel;
   final TripSegment? segment;
   final String? tripId;
+  final bool missingSegment;
   final bool missingCoords;
 
   @override
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
+    final needsStatus = missingSegment || seg?.isStale == true;
     Widget pill = TravelPill(
       travel: travel,
-      statusLabel: seg?.isStale == true
+      statusLabel: needsStatus
           ? (missingCoords ? '缺座標，無法計算車程' : '車程重新計算中')
           : null,
     );

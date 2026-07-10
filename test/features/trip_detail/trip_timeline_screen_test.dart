@@ -43,8 +43,6 @@ const _fakeDays = [
         master: EntryPoiInfo(
           poiId: 101,
           name: '沖繩美麗海水族館',
-          lat: 26.6942,
-          lng: 127.8778,
           type: 'attraction',
           category: '景點',
           rating: 4.6,
@@ -60,8 +58,6 @@ const _fakeDays = [
         master: EntryPoiInfo(
           poiId: 102,
           name: '海人食堂',
-          lat: 26.6501,
-          lng: 127.9294,
           type: 'restaurant',
           category: '美食',
           rating: 4.2,
@@ -126,6 +122,46 @@ const _fakeDays = [
   ),
 ];
 
+const _computableTravelGapDays = [
+  TripDay(
+    id: 1,
+    dayNum: 1,
+    title: '北部海岸線',
+    version: 1,
+    timeline: [
+      TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        startTime: '09:00',
+        title: '美麗海水族館',
+        version: 1,
+        master: EntryPoiInfo(
+          poiId: 101,
+          name: '沖繩美麗海水族館',
+          lat: 26.6942,
+          lng: 127.8778,
+          type: 'attraction',
+        ),
+      ),
+      TimelineEntry(
+        id: 12,
+        sortOrder: 1,
+        startTime: '12:30',
+        title: '海人食堂',
+        version: 1,
+        travel: Travel(type: 'car', min: 15),
+        master: EntryPoiInfo(
+          poiId: 102,
+          name: '海人食堂',
+          lat: 26.6501,
+          lng: 127.9294,
+          type: 'restaurant',
+        ),
+      ),
+    ],
+  ),
+];
+
 /// 以 create callback 注入假資料（flutter_riverpod 3.x 未匯出 Override 型別，
 /// 故在此 helper 內 inline 組 overrides，型別交由推斷）。
 Future<void> _pumpTimeline(
@@ -134,10 +170,11 @@ Future<void> _pumpTimeline(
   FutureOr<List<TripDay>> Function()? fetchDays,
   Stream<List<TripDay>>? daysStream,
   _MockTripRepository? repo,
+  String tripId = _tripId,
   List<TripSegment> segments = const [],
 }) async {
   final router = GoRouter(
-    initialLocation: '/trips/$_tripId',
+    initialLocation: '/trips/$tripId',
     routes: [
       GoRoute(
         path: '/trips/:tripId',
@@ -170,12 +207,12 @@ Future<void> _pumpTimeline(
       overrides: [
         // StreamProvider override 需回 Stream；以 Stream.fromFuture(Future.sync(...))
         // 包裝 helper 的 FutureOr callback，同時保留同步 throw / 永不完成的語意。
-        tripDetailProvider(_tripId).overrideWith(
+        tripDetailProvider(tripId).overrideWith(
           (ref) => Stream.fromFuture(
             Future.sync(() => (fetchTrip ?? () => _fakeTrip)()),
           ),
         ),
-        tripDaysProvider(_tripId).overrideWith(
+        tripDaysProvider(tripId).overrideWith(
           (ref) =>
               daysStream ??
               Stream.fromFuture(
@@ -183,7 +220,7 @@ Future<void> _pumpTimeline(
               ),
         ),
         tripSegmentsProvider(
-          _tripId,
+          tripId,
         ).overrideWith((ref) => Stream.value(segments)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
       ],
@@ -281,7 +318,32 @@ void main() {
   });
 
   testWidgets('travel pill 顯示移動分鐘數與 type icon', (tester) async {
-    await _pumpTimeline(tester);
+    await _pumpTimeline(
+      tester,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          version: 1,
+        ),
+        TripSegment(
+          id: 51,
+          fromEntryId: 12,
+          toEntryId: 13,
+          mode: 'walking',
+          version: 1,
+        ),
+        TripSegment(
+          id: 52,
+          fromEntryId: 13,
+          toEntryId: 14,
+          mode: 'driving',
+          version: 1,
+        ),
+      ],
+    );
 
     expect(find.text('15 分鐘'), findsOneWidget);
     expect(find.text('10 分鐘'), findsOneWidget);
@@ -290,8 +352,20 @@ void main() {
   });
 
   testWidgets('stale travel segment 顯示重算中並隱藏舊分鐘數', (tester) async {
+    final repo = _MockTripRepository();
+    const staleTripId = 'trip-stale-segment';
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
     await _pumpTimeline(
       tester,
+      repo: repo,
+      tripId: staleTripId,
+      fetchDays: () => _computableTravelGapDays,
       segments: [
         TripSegment.fromJson({
           'id': 50,
@@ -309,6 +383,7 @@ void main() {
 
     expect(find.text('車程重新計算中'), findsOneWidget);
     expect(find.text('15 分鐘'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: staleTripId, day: '1')).called(1);
   });
 
   testWidgets('stale travel segment 缺座標 → 顯示無法計算', (tester) async {
@@ -369,6 +444,89 @@ void main() {
     expect(find.text('缺座標，無法計算車程'), findsOneWidget);
     expect(find.text('車程重新計算中'), findsNothing);
     expect(find.text('15 分鐘'), findsNothing);
+  });
+
+  testWidgets('缺 travel segment 且兩端有座標 → 自動重算該日', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump();
+
+    expect(find.text('車程重新計算中'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+  });
+
+  testWidgets('缺 travel segment 但缺座標 → 不自動重算', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+                type: 'attraction',
+              ),
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              startTime: '12:30',
+              title: '海人食堂',
+              version: 1,
+              travel: Travel(type: 'car', min: 15),
+              master: EntryPoiInfo(
+                poiId: 102,
+                name: '海人食堂',
+                type: 'restaurant',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: _tripId,
+        day: any(named: 'day'),
+      ),
+    );
   });
 
   testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {
