@@ -110,6 +110,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('行程筆記'), findsOneWidget);
+    expect(
+      tester
+          .widget<ReorderableListView>(find.byType(ReorderableListView))
+          .onReorderItem,
+      isNotNull,
+    );
     expect(find.text('航班'), findsOneWidget);
     expect(find.text('住宿'), findsOneWidget);
     expect(find.text('預訂'), findsOneWidget);

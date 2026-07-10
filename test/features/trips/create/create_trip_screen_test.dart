@@ -86,6 +86,12 @@ void main() {
     // 已加入目的地清單(「至少選 1 個」提示消失)
     expect(find.text('至少選 1 個目的地'), findsNothing);
     expect(find.text('東京'), findsWidgets);
+    expect(
+      tester
+          .widget<ReorderableListView>(find.byType(ReorderableListView))
+          .onReorderItem,
+      isNotNull,
+    );
   });
 
   testWidgets('切到彈性模式 → 顯示天數 stepper', (tester) async {
