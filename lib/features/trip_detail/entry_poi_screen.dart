@@ -31,9 +31,13 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     Future<void> Function() op, {
     required String success,
+    bool recomputeTravel = false,
   }) async {
     try {
       await op();
+      if (recomputeTravel) {
+        await _recomputeTravel(ref);
+      }
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
       if (!context.mounted) return;
@@ -53,6 +57,14 @@ class EntryPoiScreen extends ConsumerWidget {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('操作失敗，請稍後再試')));
+    }
+  }
+
+  Future<void> _recomputeTravel(WidgetRef ref) async {
+    try {
+      await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
+    } on Exception {
+      // 交通重算失敗不影響地點管理結果。
     }
   }
 
@@ -142,6 +154,7 @@ class EntryPoiScreen extends ConsumerWidget {
                         entryPoisVersion: version,
                       ),
                       success: '已設為正選',
+                      recomputeTravel: true,
                     ),
                     child: const Text('設為正選'),
                   ),
