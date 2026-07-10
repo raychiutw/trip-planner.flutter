@@ -70,6 +70,13 @@ void main() {
       expect(msgs.first.text, '已觸發 AI 行程健檢');
     });
 
+    test('內部 request 編號不顯示在 user 氣泡', () {
+      final msgs = rowToMessages(
+        _req(message: '旅伴請求加入收藏 (req #184)', status: RequestStatus.processing),
+      );
+      expect(msgs.first.text, '旅伴請求加入收藏');
+    });
+
     test('亂碼 reply → placeholder + 不渲染 markdown', () {
       final msgs = rowToMessages(
         _req(reply: 'good \uFFFD\uFFFD bad', status: RequestStatus.completed),

@@ -158,7 +158,7 @@ class _UnverifiedChip extends StatelessWidget {
   }
 }
 
-/// 3 統計卡橫排；帳號頁分區 categorical 用色（accent/sage/pink）。
+/// 3 個統計值共用一個 iOS grouped 容器；大字級時改為垂直排列。
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.stats});
 
@@ -167,68 +167,86 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tones = Theme.of(context).extension<TpTones>()!;
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: '行程數',
-            value: _formatCount(stats?.tripCount),
-            cardColor: tones.accentSubtle,
-            borderColor: tones.accentBg,
+    final theme = Theme.of(context);
+    final values = [
+      (label: '行程數', value: _formatCount(stats?.tripCount)),
+      (label: '旅程天數', value: _formatCount(stats?.totalDays)),
+      (label: '旅伴數', value: _formatCount(stats?.collaboratorCount)),
+    ];
+    final useVerticalLayout = MediaQuery.textScalerOf(context).scale(14) >= 24;
+    final dividerColor = theme.colorScheme.outlineVariant;
+    final content = useVerticalLayout
+        ? Column(
+            children: [
+              _StatItem(label: values[0].label, value: values[0].value),
+              Divider(height: 1, thickness: 1, color: dividerColor),
+              _StatItem(label: values[1].label, value: values[1].value),
+              Divider(height: 1, thickness: 1, color: dividerColor),
+              _StatItem(label: values[2].label, value: values[2].value),
+            ],
+          )
+        : IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _StatItem(
+                    label: values[0].label,
+                    value: values[0].value,
+                  ),
+                ),
+                VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                Expanded(
+                  child: _StatItem(
+                    label: values[1].label,
+                    value: values[1].value,
+                  ),
+                ),
+                VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                Expanded(
+                  child: _StatItem(
+                    label: values[2].label,
+                    value: values[2].value,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+    return Semantics(
+      key: const ValueKey('account-stats-group'),
+      container: true,
+      label: values.map((item) => '${item.label} ${item.value}').join('，'),
+      child: ExcludeSemantics(
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
+            border: Border.all(color: dividerColor),
           ),
+          clipBehavior: Clip.antiAlias,
+          child: content,
         ),
-        const SizedBox(width: TpSpacing.s3),
-        Expanded(
-          child: _StatCard(
-            label: '旅程天數',
-            value: _formatCount(stats?.totalDays),
-            cardColor: tones.sageSubtle,
-            borderColor: tones.sageBg,
-          ),
-        ),
-        const SizedBox(width: TpSpacing.s3),
-        Expanded(
-          child: _StatCard(
-            label: '旅伴數',
-            value: _formatCount(stats?.collaboratorCount),
-            cardColor: tones.pinkSubtle,
-            borderColor: tones.pinkBg,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   String _formatCount(int? count) => count == null ? '—' : '$count';
 }
 
-/// 單一統計卡：tone subtle 底 + tone bg hairline、數字 tabular figures。
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.cardColor,
-    required this.borderColor,
-  });
+/// grouped 容器中的單一統計值。
+class _StatItem extends StatelessWidget {
+  const _StatItem({required this.label, required this.value});
 
   final String label;
   final String value;
-  final Color cardColor;
-  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(
         vertical: TpSpacing.s4,
         horizontal: TpSpacing.s2,
-      ),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: [

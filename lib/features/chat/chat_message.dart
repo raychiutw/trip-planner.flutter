@@ -59,7 +59,7 @@ String _displayUserText(String message) {
   for (final e in _prefixSummaries.entries) {
     if (message.startsWith(e.key)) return e.value;
   }
-  return message;
+  return message.replaceFirst(RegExp(r'\s*\(req\s*#\d+\)\s*$'), '').trim();
 }
 
 /// 一筆 row → 1~2 個氣泡（message 非空 → user 氣泡;依 status → assistant 氣泡）。

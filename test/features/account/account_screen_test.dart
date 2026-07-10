@@ -36,6 +36,7 @@ void main() {
     WidgetTester tester, {
     UserInfo user = verifiedUser,
     AccountStats stats = defaultStats,
+    TextScaler textScaler = TextScaler.noScaling,
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
@@ -51,6 +52,10 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+            child: child!,
+          ),
           home: const AccountScreen(),
         ),
       ),
@@ -71,6 +76,35 @@ void main() {
     expect(find.text('5'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
+  });
+
+  testWidgets('三個統計值使用單一 grouped 容器與合併語意', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpAccountScreen(tester);
+
+    final group = find.byKey(const ValueKey('account-stats-group'));
+    expect(group, findsOneWidget);
+    expect(
+      find.descendant(of: group, matching: find.byType(VerticalDivider)),
+      findsNWidgets(2),
+    );
+    expect(
+      tester.getSemantics(group),
+      matchesSemantics(label: '行程數 5，旅程天數 12，旅伴數 3'),
+    );
+
+    semantics.dispose();
+  });
+
+  testWidgets('AXXXL 統計值改為垂直排列且不溢位', (tester) async {
+    await pumpAccountScreen(tester, textScaler: const TextScaler.linear(3.2));
+
+    final group = find.byKey(const ValueKey('account-stats-group'));
+    expect(
+      find.descendant(of: group, matching: find.byType(Divider)),
+      findsNWidgets(2),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('無 displayName 時顯示 email local part 與其首字母大寫', (tester) async {
