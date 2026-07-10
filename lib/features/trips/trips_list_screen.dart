@@ -483,74 +483,42 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  /// 長按卡片 → bottom sheet（分享/共編/匯出/刪除）。
+  /// 長按卡片 → 自適應 action sheet（分享/共編/匯出/刪除）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
-    final selectedAction = await showModalBottomSheet<_TripListAction>(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
-      ),
-      builder: (sheetContext) {
-        final destructiveColor = Theme.of(sheetContext).colorScheme.error;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: TpSpacing.s2),
-              ListTile(
-                leading: const Icon(Icons.ios_share),
-                title: const Text('分享'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  context.push('/share-trip/${trip.tripId}');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_outlined),
-                title: const Text('共編設定'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  context.push('/collab/${trip.tripId}');
-                },
-              ),
-              ListTile(
-                key: ValueKey('trip-card-menu-export-${trip.tripId}'),
-                leading: _exportingTripId == trip.tripId
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.download_outlined),
-                title: const Text('匯出 JSON'),
-                onTap: _exportingTripId == null
-                    ? () => Navigator.of(
-                        sheetContext,
-                      ).pop(_TripListAction.exportJson)
-                    : null,
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline, color: destructiveColor),
-                title: Text(
-                  '刪除行程',
-                  style: TextStyle(
-                    color: destructiveColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_TripListAction.delete),
-              ),
-              const SizedBox(height: TpSpacing.s2),
-            ],
-          ),
-        );
-      },
+    final selectedAction = await showAppActionSheet<_TripListAction>(
+      context,
+      actions: [
+        AppSheetAction(
+          label: '分享',
+          value: _TripListAction.share,
+          icon: Icons.ios_share,
+        ),
+        AppSheetAction(
+          label: '共編設定',
+          value: _TripListAction.collab,
+          icon: Icons.group_outlined,
+        ),
+        AppSheetAction(
+          label: '匯出 JSON',
+          value: _TripListAction.exportJson,
+          icon: Icons.download_outlined,
+        ),
+        AppSheetAction(
+          label: '刪除行程',
+          value: _TripListAction.delete,
+          isDestructive: true,
+          icon: Icons.delete_outline,
+        ),
+      ],
     );
     if (!context.mounted) return;
     switch (selectedAction) {
+      case _TripListAction.share:
+        context.push('/share-trip/${trip.tripId}');
+        return;
+      case _TripListAction.collab:
+        context.push('/collab/${trip.tripId}');
+        return;
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
         return;
@@ -589,7 +557,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }
 }
 
-enum _TripListAction { exportJson, delete }
+enum _TripListAction { share, collab, exportJson, delete }
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {

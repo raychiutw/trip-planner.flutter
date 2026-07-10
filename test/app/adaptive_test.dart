@@ -68,4 +68,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(await future, isFalse);
   });
+
+  testWidgets('iOS → CupertinoActionSheet;選破壞性動作回傳其值', (tester) async {
+    late Future<String?> future;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        future = showAppActionSheet<String>(
+          context,
+          actions: const [
+            AppSheetAction(label: '分享', value: 'share'),
+            AppSheetAction(label: '刪除', value: 'delete', isDestructive: true),
+          ],
+        );
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
+    await tester.pumpAndSettle();
+    expect(await future, 'delete');
+  });
+
+  testWidgets('Android → bottom sheet(ListTile);取消(點外部)回傳 null', (tester) async {
+    late Future<String?> future;
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        future = showAppActionSheet<String>(
+          context,
+          actions: const [
+            AppSheetAction(label: '分享', value: 'share', icon: Icons.share),
+          ],
+        );
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsNothing);
+    expect(find.widgetWithText(ListTile, '分享'), findsOneWidget);
+    // 點 barrier 關閉 → null
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(await future, isNull);
+  });
 }
