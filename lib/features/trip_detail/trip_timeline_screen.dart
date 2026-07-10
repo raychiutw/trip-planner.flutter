@@ -368,11 +368,14 @@ class _DaySection extends ConsumerWidget {
           .read(tripRepositoryProvider)
           .recomputeTravel(tripId: tripId, day: '$dayNum');
       _stalledTravelRecomputeScopes.remove(scope);
+      // await 後 widget 可能已 unmount（如使用者離開頁面），此時碰 ref 會擲 StateError。
+      if (!ref.context.mounted) return;
       ref.invalidate(tripDaysProvider(tripId));
       ref.invalidate(tripSegmentsProvider(tripId));
     } on Exception {
       if (auto) {
         _stalledTravelRecomputeScopes.add(scope);
+        if (!ref.context.mounted) return;
         ref.invalidate(tripSegmentsProvider(tripId));
       }
       // 交通重算失敗忽略

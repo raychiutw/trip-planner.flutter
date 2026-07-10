@@ -492,6 +492,41 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: tripId, day: '1')).called(1);
   });
 
+  testWidgets('auto 重算 in-flight 時離開頁面 → 不因 ref use-after-dispose 崩潰', (
+    tester,
+  ) async {
+    final repo = _MockTripRepository();
+    // 獨立 tripId：_requestMissingSegmentRecompute 的 gap key 為模組級 set，
+    // 用共用 _tripId 會與其他 auto 重算測試撞 key 而不觸發。
+    const tripId = 'trip-unmount-crash';
+    final recompute = Completer<void>();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) => recompute.future);
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      tripId: tripId,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump(); // build 觸發 unawaited(_recomputeDay(..., auto:true))，卡在 Completer
+
+    // 使用者在重算 in-flight 時離開行程頁 → _DaySection unmount
+    await tester.pumpWidget(const SizedBox());
+
+    // 重算此刻才回來，_recomputeDay await 後執行 ref.invalidate
+    recompute.complete();
+    await tester.pump();
+
+    // 修好前：ref.invalidate 對已 unmount 的 element 擲 StateError（非 Exception，
+    // 未被 on Exception 攔截）→ 未捕捉例外。修好後：mounted 守衛提前 return。
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('缺 travel segment 但缺座標 → 不自動重算', (tester) async {
     final repo = _MockTripRepository();
     when(
