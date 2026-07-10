@@ -402,7 +402,7 @@ void main() {
     expect(captured.single.dayId, 2);
   });
 
-  testWidgets('entry 早於營業時間 → 顯示「注意事項」卡', (tester) async {
+  testWidgets('entry 早於營業時間 → 不顯示「注意事項」卡', (tester) async {
     await _pumpTimeline(
       tester,
       fetchDays: () => const [
@@ -430,12 +430,8 @@ void main() {
       ],
     );
 
-    expect(find.text('注意事項'), findsOneWidget);
-    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-    expect(
-      find.text('美麗海水族館（08:00)可能早於 沖繩美麗海水族館 營業時間（09:00-18:00)'),
-      findsOneWidget,
-    );
+    expect(find.text('注意事項'), findsNothing);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
   });
 
   testWidgets('無早於營業時間問題 → 不顯示「注意事項」卡', (tester) async {
