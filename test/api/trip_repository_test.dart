@@ -1296,6 +1296,7 @@ void main() {
       final days = (await cache.readResponse(daysKey))!.data as List;
       final timeline = (days.first as Map)['timeline'] as List;
       expect(timeline, hasLength(1));
+      expect((timeline.first as Map)['displayTitle'], '新景點');
       expect((timeline.first as Map)['title'], '新景點');
       expect(
         ((timeline.first as Map)['master'] as Map)['note'],

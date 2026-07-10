@@ -110,6 +110,7 @@ Map<String, dynamic> _buildOptimisticEntry(Map<String, dynamic> args) {
   return {
     'id': tempId,
     'sortOrder': _kOptimisticSortOrder,
+    'displayTitle': args['title'],
     'title': args['title'],
     'description': args['description'],
     'startTime': args['startTime'],
