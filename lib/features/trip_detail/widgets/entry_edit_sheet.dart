@@ -132,6 +132,16 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     }
   }
 
+  Future<void> _recomputeDay(int dayNum) async {
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .recomputeTravel(tripId: widget.tripId, day: '$dayNum');
+    } on Exception {
+      // 交通重算失敗不影響停留點新增結果。
+    }
+  }
+
   Future<void> _submit() async {
     final title = _title.text.trim();
     final description = _desc.text.trim().isEmpty ? null : _desc.text.trim();
@@ -149,15 +159,17 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             endTime: _fmt(_end),
           );
         case final EntryEditNew args:
+          final dayNum = _selectedDayNum(args);
           await repo.addEntryToDay(
             tripId: widget.tripId,
-            dayNum: _selectedDayNum(args),
+            dayNum: dayNum,
             title: title,
             description: description,
             startTime: _fmt(_start),
             endTime: _fmt(_end),
             source: 'custom',
           );
+          await _recomputeDay(dayNum);
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;

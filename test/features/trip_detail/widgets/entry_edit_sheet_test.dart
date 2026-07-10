@@ -161,6 +161,12 @@ void main() {
         source: any(named: 'source'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
 
     await _open(tester, repo, const EntryEditNew(2));
     await tester.enterText(
@@ -182,6 +188,7 @@ void main() {
         source: 'custom',
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '2')).called(1);
   });
 
   testWidgets('新增模式：可切換加入日期', (tester) async {
@@ -198,6 +205,12 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
       ),
     ).thenAnswer((_) async {});
 
@@ -228,6 +241,7 @@ void main() {
         source: 'custom',
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '3')).called(1);
   });
 
   testWidgets('標題清空 → 送出鈕 disabled', (tester) async {

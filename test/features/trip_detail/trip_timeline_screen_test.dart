@@ -399,6 +399,12 @@ void main() {
         entryId: any(named: 'entryId'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
 
     await tester.drag(
@@ -410,6 +416,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
   testWidgets('點「新增停留點」開啟新增 sheet', (tester) async {

@@ -195,9 +195,12 @@ class _DaySection extends ConsumerWidget {
       context,
       title: '刪除停留點',
       message: '確定要刪除「${entry.title}」嗎？',
-      delete: () => ref
-          .read(tripRepositoryProvider)
-          .deleteEntry(tripId: tripId, entryId: entry.id),
+      delete: () async {
+        await ref
+            .read(tripRepositoryProvider)
+            .deleteEntry(tripId: tripId, entryId: entry.id);
+        await _recomputeAndRefresh(ref);
+      },
       onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
     );
   }
@@ -284,7 +287,9 @@ class _DaySection extends ConsumerWidget {
   /// reorder/move 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
   Future<void> _recomputeAndRefresh(WidgetRef ref) async {
     try {
-      await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
+      await ref
+          .read(tripRepositoryProvider)
+          .recomputeTravel(tripId: tripId, day: '${day.dayNum}');
       ref.invalidate(tripDaysProvider(tripId));
     } on Exception {
       // 交通重算失敗忽略
