@@ -202,7 +202,12 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                   key: const ValueKey('chat-list'),
                   controller: _scroll,
                   reverse: true,
-                  padding: const EdgeInsets.all(TpSpacing.s4),
+                  padding: const EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    TpSpacing.s5,
+                    TpSpacing.s4,
+                    TpSpacing.s4,
+                  ),
                   itemCount: msgs.length,
                   itemBuilder: (context, i) {
                     final m = msgs[msgs.length - 1 - i];

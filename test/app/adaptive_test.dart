@@ -7,9 +7,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
 
 void main() {
-  Widget host(TargetPlatform platform, void Function(BuildContext) onTap) {
+  Widget host(
+    TargetPlatform platform,
+    void Function(BuildContext) onTap, {
+    bool disableAnimations = false,
+  }) {
     return MaterialApp(
       theme: ThemeData(platform: platform),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(disableAnimations: disableAnimations),
+        child: child!,
+      ),
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(
@@ -125,6 +135,27 @@ void main() {
     expect(find.text('已登出該裝置'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
     // 不推進到 2.5s;測試結束時 tree 拆除須取消 timer,否則框架報 pending timer。
+  });
+
+  testWidgets('iOS Reduce Motion → 頂部橫幅停用轉場動畫', (tester) async {
+    await tester.pumpWidget(
+      host(
+        TargetPlatform.iOS,
+        (context) => showAppNotice(context, '已儲存'),
+        disableAnimations: true,
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pump();
+
+    expect(
+      tester.widget<AnimatedSlide>(find.byType(AnimatedSlide)).duration,
+      Duration.zero,
+    );
+    expect(
+      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).duration,
+      Duration.zero,
+    );
   });
 
   testWidgets('Android → Material SnackBar 顯示訊息', (tester) async {

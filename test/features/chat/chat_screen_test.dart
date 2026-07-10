@@ -143,6 +143,10 @@ void main() {
 
     final md = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
     expect(md.data, contains('已完成'));
+    expect(
+      tester.widget<ListView>(find.byKey(const ValueKey('chat-list'))).padding,
+      const EdgeInsets.fromLTRB(16, 20, 16, 16),
+    );
   });
 
   testWidgets('思考中態顯示', (tester) async {

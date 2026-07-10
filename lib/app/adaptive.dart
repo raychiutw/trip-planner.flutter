@@ -345,6 +345,7 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Positioned(
       top: 0,
       left: 0,
@@ -354,12 +355,12 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
         child: Padding(
           padding: const EdgeInsets.all(TpSpacing.s3),
           child: AnimatedSlide(
-            duration: TpMotion.normal,
+            duration: reduceMotion ? Duration.zero : TpMotion.normal,
             curve: TpMotion.appleEase,
             offset: _visible ? Offset.zero : const Offset(0, -1.6),
             onEnd: _handleAnimationEnd,
             child: AnimatedOpacity(
-              duration: TpMotion.fast,
+              duration: reduceMotion ? Duration.zero : TpMotion.fast,
               opacity: _visible ? 1 : 0,
               child: Material(
                 color: theme.colorScheme.inverseSurface,
