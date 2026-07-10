@@ -163,5 +163,16 @@ void main() {
 
       expect(entry.title, '暖暮拉麵');
     });
+
+    test('legacy title 不再當作顯示標題 fallback', () {
+      final entry = TimelineEntry.fromJson({
+        'id': 9004,
+        'sortOrder': 6,
+        'title': '舊 trip_entries.title',
+        'version': 1,
+      });
+
+      expect(entry.title, '（未選擇景點）');
+    });
   });
 }

@@ -129,7 +129,6 @@ class TimelineEntry {
     final displayTitle =
         _clean(json['displayTitle'] as String?) ??
         _clean(master?.name) ??
-        _clean(json['title'] as String?) ??
         '（未選擇景點）';
     return TimelineEntry(
       id: (json['id'] as num).toInt(),

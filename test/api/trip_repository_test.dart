@@ -1148,7 +1148,12 @@ void main() {
             'dayNum': 1,
             'title': '抵達那霸',
             'timeline': [
-              {'id': 101, 'sortOrder': 0, 'title': '首里城', 'alternates': []},
+              {
+                'id': 101,
+                'sortOrder': 0,
+                'displayTitle': '首里城',
+                'alternates': [],
+              },
             ],
           },
         ]),
