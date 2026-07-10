@@ -1,4 +1,4 @@
-/// 編輯行程:目的地(可加/排序/移除)+ 標題 + 描述 + 語言 + 發布 + 明確儲存。
+/// 編輯行程:標題 + 目的地(可加/排序/移除)+ 描述 + 語言 + 發布 + 明確儲存。
 /// 不含日期/天數(日管理另案)。儲存成功 → pop。
 library;
 
@@ -39,14 +39,6 @@ class EditTripScreen extends ConsumerWidget {
                   child: ListView(
                     padding: const EdgeInsets.all(TpSpacing.s4),
                     children: [
-                      _title(context, '目的地'),
-                      DestinationPicker(
-                        destinations: state.destinations,
-                        onAdd: ctrl.addDestination,
-                        onRemove: ctrl.removeDestination,
-                        onReorder: ctrl.reorderDestination,
-                      ),
-                      const SizedBox(height: TpSpacing.s5),
                       _title(context, '行程標題'),
                       TextFormField(
                         key: const ValueKey('edit-title'),
@@ -57,7 +49,15 @@ class EditTripScreen extends ConsumerWidget {
                         ),
                         onChanged: ctrl.setTitle,
                       ),
-                      const SizedBox(height: TpSpacing.s4),
+                      const SizedBox(height: TpSpacing.s5),
+                      _title(context, '目的地'),
+                      DestinationPicker(
+                        destinations: state.destinations,
+                        onAdd: ctrl.addDestination,
+                        onRemove: ctrl.removeDestination,
+                        onReorder: ctrl.reorderDestination,
+                      ),
+                      const SizedBox(height: TpSpacing.s5),
                       _title(context, '描述（用於 SEO,選填）'),
                       TextFormField(
                         key: const ValueKey('edit-desc'),

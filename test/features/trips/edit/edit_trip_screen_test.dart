@@ -79,6 +79,16 @@ void main() {
     expect(find.text('那霸'), findsWidgets);
   });
 
+  testWidgets('行程標題欄位在目的地上方', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final titleTop = tester.getTopLeft(find.text('行程標題')).dy;
+    final destinationTop = tester.getTopLeft(find.text('目的地')).dy;
+
+    expect(titleTop, lessThan(destinationTop));
+  });
+
   testWidgets('改標題 + 儲存 → updateTrip(title)', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
