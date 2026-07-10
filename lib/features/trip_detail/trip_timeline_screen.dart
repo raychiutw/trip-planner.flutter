@@ -214,6 +214,7 @@ class _EntryDragPayload {
 
 // ponytail: process-local auto signature guard; move to repo helper if retry/failure UI is needed.
 final _requestedTravelGapRecomputes = <String>{};
+double? _capturedCrossDayDragScrollOffset;
 
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
@@ -452,8 +453,13 @@ class _DaySection extends ConsumerWidget {
                       sourceDayNum: day.dayNum,
                     ),
                     dragAnchorStrategy: pointerDragAnchorStrategy,
+                    onDragStarted: _captureDragScroll,
                     onDragUpdate: (details) =>
                         _autoScrollDuringDrag(context, details.globalPosition),
+                    onDragEnd: (_) => _restoreDragScroll(),
+                    onDraggableCanceled: (velocity, offset) =>
+                        _restoreDragScroll(),
+                    onDragCompleted: _restoreDragScroll,
                     feedback: Material(
                       elevation: 4,
                       borderRadius: BorderRadius.circular(TpRadius.md),
@@ -553,6 +559,25 @@ class _DaySection extends ConsumerWidget {
     final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
     if (!_requestedTravelGapRecomputes.add(key)) return;
     unawaited(_recomputeDay(ref, day.dayNum));
+  }
+
+  void _captureDragScroll() {
+    if (!scrollController.hasClients) return;
+    _capturedCrossDayDragScrollOffset = scrollController.offset;
+  }
+
+  void _restoreDragScroll() {
+    final offset = _capturedCrossDayDragScrollOffset;
+    _capturedCrossDayDragScrollOffset = null;
+    if (offset == null || !scrollController.hasClients) return;
+    final position = scrollController.position;
+    final target = offset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      scrollController.jumpTo(target);
+    }
   }
 
   void _autoScrollDuringDrag(BuildContext context, Offset globalPosition) {

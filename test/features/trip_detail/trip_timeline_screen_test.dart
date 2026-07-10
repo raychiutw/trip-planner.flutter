@@ -577,6 +577,29 @@ void main() {
     expect(tester.getTopLeft(find.text('長列表 after')).dy, before);
   });
 
+  testWidgets('cross-day drag auto-scroll restores original offset on cancel', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester, fetchDays: () => _longDays('drag'));
+
+    final titleFinder = find.text('長列表 drag');
+    final before = tester.getTopLeft(titleFinder).dy;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('景點 drag-0')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(0, 90));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.getTopLeft(titleFinder).dy, lessThan(before));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(titleFinder).dy, before);
+  });
+
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
