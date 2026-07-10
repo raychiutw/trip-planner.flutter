@@ -302,7 +302,7 @@ class _DaySection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DayHeader(day: day),
+        DayHeader(day: day, segments: segments),
         const SizedBox(height: TpSpacing.s3),
         if (day.hotel != null) ...[
           HotelCard(hotel: day.hotel!),

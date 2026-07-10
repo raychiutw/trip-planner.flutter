@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/day.dart';
+import '../../../models/segment.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
@@ -25,11 +26,30 @@ String? dayTimeRange(TripDay day) {
   return '$min–$max';
 }
 
+int dayTotalDistanceM(TripDay day, List<TripSegment> segments) {
+  final segmentByPair = <String, TripSegment>{
+    for (final segment in segments)
+      if (segment.fromEntryId != null && segment.toEntryId != null)
+        '${segment.fromEntryId}-${segment.toEntryId}': segment,
+  };
+  var total = 0;
+  for (var i = 1; i < day.timeline.length; i++) {
+    final prev = day.timeline[i - 1];
+    final curr = day.timeline[i];
+    total +=
+        segmentByPair['${prev.id}-${curr.id}']?.distanceM ??
+        curr.travel?.distanceM ??
+        0;
+  }
+  return total;
+}
+
 /// 逐日 section 標頭：eyebrow「DAY NN」+ 日期（tabular）+ displayTitle。
 class DayHeader extends StatelessWidget {
-  const DayHeader({super.key, required this.day});
+  const DayHeader({super.key, required this.day, this.segments = const []});
 
   final TripDay day;
+  final List<TripSegment> segments;
 
   @override
   Widget build(BuildContext context) {
@@ -42,10 +62,7 @@ class DayHeader extends StatelessWidget {
 
     final timeRange = dayTimeRange(day);
     final stopCount = day.timeline.length;
-    final totalM = day.timeline.fold<int>(
-      0,
-      (sum, e) => sum + (e.travel?.distanceM ?? 0),
-    );
+    final totalM = dayTotalDistanceM(day, segments);
     final summary = totalM == 0
         ? '$stopCount 個停留點'
         : '$stopCount 個停留點 · ${(totalM / 1000).round()} km';

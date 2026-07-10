@@ -127,6 +127,7 @@ Future<void> _pumpTimeline(
   WidgetTester tester, {
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
+  Stream<List<TripDay>>? daysStream,
   _MockTripRepository? repo,
   List<TripSegment> segments = const [],
 }) async {
@@ -170,9 +171,11 @@ Future<void> _pumpTimeline(
           ),
         ),
         tripDaysProvider(_tripId).overrideWith(
-          (ref) => Stream.fromFuture(
-            Future.sync(() => (fetchDays ?? () => _fakeDays)()),
-          ),
+          (ref) =>
+              daysStream ??
+              Stream.fromFuture(
+                Future.sync(() => (fetchDays ?? () => _fakeDays)()),
+              ),
         ),
         tripSegmentsProvider(
           _tripId,
@@ -183,6 +186,32 @@ Future<void> _pumpTimeline(
     ),
   );
   await tester.pump();
+}
+
+List<TripDay> _longDays(String label) {
+  return [
+    TripDay(
+      id: 1,
+      dayNum: 1,
+      title: '長列表 $label',
+      version: 1,
+      timeline: [
+        for (var i = 0; i < 30; i++)
+          TimelineEntry(
+            id: 100 + i,
+            sortOrder: i,
+            startTime: '${(8 + (i ~/ 2)).toString().padLeft(2, '0')}:00',
+            title: '景點 $label-$i',
+            version: 1,
+            master: EntryPoiInfo(
+              poiId: 1000 + i,
+              name: '景點 $label-$i',
+              type: i.isEven ? 'attraction' : 'restaurant',
+            ),
+          ),
+      ],
+    ),
+  ];
 }
 
 Color _entryDotColor(WidgetTester tester, int entryId) {
@@ -279,6 +308,28 @@ void main() {
 
     final day2TitleTopAfterTap = tester.getTopLeft(find.text('南部文化')).dy;
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
+  });
+
+  testWidgets('days refresh preserves current scroll offset', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_longDays('before'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('景點 before-29'),
+      find.byType(SingleChildScrollView),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.text('長列表 before')).dy;
+    expect(before, lessThan(0));
+
+    days.add(_longDays('after'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('長列表 after')).dy, before);
   });
 
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
