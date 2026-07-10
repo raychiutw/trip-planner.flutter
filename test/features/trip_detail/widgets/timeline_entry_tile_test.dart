@@ -86,7 +86,7 @@ void main() {
       expect(find.text('tourist_attraction'), findsNothing);
     });
 
-    testWidgets('純中文 master.category 收斂成 8 類 label', (tester) async {
+    testWidgets('純中文 master.category 顯示原樣', (tester) async {
       await pumpTile(
         tester,
         const TimelineEntry(
@@ -98,8 +98,8 @@ void main() {
         ),
       );
 
-      expect(find.text('景點'), findsOneWidget);
-      expect(find.text('沖繩麵'), findsNothing);
+      expect(find.text('沖繩麵'), findsOneWidget);
+      expect(find.text('景點'), findsNothing);
     });
 
     testWidgets('圓點色依 tone:restaurant → pinkDeep', (tester) async {

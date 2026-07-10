@@ -72,10 +72,13 @@ void main() {
       expect(poiCategoryLabel('other'), '其他');
     });
 
-    test('純 CJK / 假名 / 未知字串 → 8 類中文 label，不外露原字串', () {
-      for (final category in ['拉麵', '浮潛', '當地特色', '沖繩麵', '居酒屋', 'すし']) {
-        expect(poiCategoryLabel(category), '景點');
-      }
+    test('純 CJK / 假名 curated label → 原樣顯示', () {
+      expect(poiCategoryLabel('拉麵'), '拉麵');
+      expect(poiCategoryLabel('浮潛'), '浮潛');
+      expect(poiCategoryLabel('當地特色'), '當地特色');
+      expect(poiCategoryLabel('沖繩麵'), '沖繩麵');
+      expect(poiCategoryLabel('居酒屋'), '居酒屋');
+      expect(poiCategoryLabel('すし'), 'すし');
     });
 
     test('含 ASCII 拉丁字母或非 curated 雜訊 → 映射成乾淨 label', () {

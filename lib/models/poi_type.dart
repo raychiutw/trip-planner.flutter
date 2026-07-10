@@ -48,6 +48,8 @@ final _shoppingRe = RegExp(
 final _attractionRe = RegExp(
   r'museum|gallery|temple|shrine|church|mosque|synagogue|worship|monument|landmark|tourist|historic|garden|castle|palace|memorial|park|attraction|sightseeing|scenic',
 );
+final _cjkOrKanaRe = RegExp(r'[\u3040-\u30ff\u4e00-\u9fff]');
+final _asciiLatinRe = RegExp(r'[a-zA-Z]');
 
 String mapGooglePrimaryTypeToPoiType(String? category) {
   if (category == null) return 'attraction';
@@ -68,10 +70,13 @@ String mapGooglePrimaryTypeToPoiType(String? category) {
 
 /// POI category 的顯示 label。
 ///
-/// `pois.category` 可能是 Google primaryType（英文 snake_case）或任意原始字串；
-/// 顯示時一律收斂到 8 類中文 label，避免 UI 外露 `tourist_attraction` 等原始值。
+/// `pois.category` 可能是 Google primaryType（英文 snake_case），也可能是
+/// 後端/人工 curated 的本地分類（例如「拉麵」「沖繩麵」「すし」）。純 CJK/假名
+/// 分類視為可直接顯示；含 ASCII 拉丁字母或雜訊則收斂到 8 類中文 label，避免 UI
+/// 外露 `tourist_attraction` 或把「拉麵」誤顯成「景點」。
 String? poiCategoryLabel(String? category) {
   final c = category?.trim();
   if (c == null || c.isEmpty) return null;
+  if (_cjkOrKanaRe.hasMatch(c) && !_asciiLatinRe.hasMatch(c)) return c;
   return kPoiTypeLabels[mapGooglePrimaryTypeToPoiType(c)];
 }

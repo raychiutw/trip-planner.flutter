@@ -46,7 +46,7 @@ void main() {
     expect(find.byKey(const ValueKey('poi-card-p1')), findsOneWidget);
   });
 
-  testWidgets('純中文 category 收斂成 8 類 label，不顯示原字串', (tester) async {
+  testWidgets('純中文 curated category 顯示原樣，不誤顯成景點', (tester) async {
     await pumpCard(
       tester,
       isSaved: false,
@@ -58,8 +58,8 @@ void main() {
       ),
     );
 
-    expect(find.text('景點'), findsOneWidget);
-    expect(find.text('沖繩麵'), findsNothing);
+    expect(find.text('沖繩麵'), findsOneWidget);
+    expect(find.text('景點'), findsNothing);
   });
 
   testWidgets('已收藏 = filled heart', (tester) async {
