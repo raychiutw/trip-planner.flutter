@@ -363,7 +363,7 @@ class _DaySection extends ConsumerWidget {
             onPressed: () => showEntryEditSheet(
               context,
               tripId: tripId,
-              args: EntryEditNew(day.dayNum),
+              args: EntryEditNew(day.dayNum, days: allDays),
             ),
             icon: const Icon(Icons.add),
             label: const Text('新增停留點'),

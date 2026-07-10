@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../models/day.dart';
 import '../../../models/entry.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -19,8 +20,9 @@ class EntryEditExisting extends EntryEditArgs {
 }
 
 class EntryEditNew extends EntryEditArgs {
-  const EntryEditNew(this.dayNum);
+  const EntryEditNew(this.dayNum, {this.days = const []});
   final int dayNum;
+  final List<TripDay> days;
 }
 
 /// 時間區間有效性：start/end 皆設時 end 須晚於 start;任一未設視為有效（時間選填）。
@@ -62,6 +64,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   late final TextEditingController _desc;
   TimeOfDay? _start;
   TimeOfDay? _end;
+  int? _newDayNum;
   bool _submitting = false;
 
   bool get _isEdit => widget.args is EntryEditExisting;
@@ -78,6 +81,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     } else {
       _title = TextEditingController();
       _desc = TextEditingController();
+      _newDayNum = (args as EntryEditNew).dayNum;
     }
     _title.addListener(_onChanged);
   }
@@ -110,6 +114,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _title.text.trim().isNotEmpty &&
       entryTimeRangeValid(_start, _end);
 
+  int _selectedDayNum(EntryEditNew args) {
+    final dayNum = _newDayNum ?? args.dayNum;
+    return args.days.isEmpty || args.days.any((d) => d.dayNum == dayNum)
+        ? dayNum
+        : args.dayNum;
+  }
+
   Future<void> _pick(bool isStart) async {
     final picked = await showTimePicker(
       context: context,
@@ -138,10 +149,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             startTime: _fmt(_start),
             endTime: _fmt(_end),
           );
-        case EntryEditNew(:final dayNum):
+        case final EntryEditNew args:
           await repo.addEntryToDay(
             tripId: widget.tripId,
-            dayNum: dayNum,
+            dayNum: _selectedDayNum(args),
             title: title,
             description: description,
             startTime: _fmt(_start),
@@ -181,6 +192,12 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   @override
   Widget build(BuildContext context) {
     final timeValid = entryTimeRangeValid(_start, _end);
+    final args = widget.args;
+    final dayOptions = args is EntryEditNew ? args.days : const <TripDay>[];
+    final selectedDayNum = args is EntryEditNew ? _selectedDayNum(args) : null;
+    final showDayPicker =
+        dayOptions.length > 1 &&
+        dayOptions.any((d) => d.dayNum == selectedDayNum);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(TpSpacing.s4),
@@ -199,6 +216,24 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               decoration: const InputDecoration(labelText: '標題'),
               textInputAction: TextInputAction.next,
             ),
+            if (showDayPicker) ...[
+              const SizedBox(height: TpSpacing.s3),
+              DropdownButtonFormField<int>(
+                key: const ValueKey('entry-edit-day'),
+                initialValue: selectedDayNum,
+                decoration: const InputDecoration(labelText: '日期'),
+                items: [
+                  for (final day in dayOptions)
+                    DropdownMenuItem(
+                      value: day.dayNum,
+                      child: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _newDayNum = value);
+                },
+              ),
+            ],
             const SizedBox(height: TpSpacing.s3),
             _timeField(true),
             const SizedBox(height: TpSpacing.s2),

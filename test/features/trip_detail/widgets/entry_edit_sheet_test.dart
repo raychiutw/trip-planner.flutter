@@ -22,6 +22,9 @@ const _entry = TimelineEntry(
   version: 2,
 );
 
+TripDay _day(int dayNum, String title) =>
+    TripDay(id: dayNum, dayNum: dayNum, title: title, version: 0);
+
 Future<void> _open(
   WidgetTester tester,
   _MockTripRepository repo,
@@ -130,15 +133,15 @@ void main() {
     final repo = _MockTripRepository();
     await _open(tester, repo, const EntryEditExisting(_entry));
 
-    final startTop = tester.getTopLeft(
-      find.byKey(const ValueKey('entry-edit-start')),
-    ).dy;
-    final endTop = tester.getTopLeft(
-      find.byKey(const ValueKey('entry-edit-end')),
-    ).dy;
-    final descTop = tester.getTopLeft(
-      find.byKey(const ValueKey('entry-edit-desc')),
-    ).dy;
+    final startTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-start')))
+        .dy;
+    final endTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-end')))
+        .dy;
+    final descTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-desc')))
+        .dy;
 
     expect(startTop, lessThan(descTop));
     expect(endTop, lessThan(descTop));
@@ -174,6 +177,52 @@ void main() {
       () => repo.addEntryToDay(
         tripId: 't1',
         dayNum: 2,
+        title: '自由活動',
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: 'custom',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('新增模式：可切換加入日期', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _open(
+      tester,
+      repo,
+      EntryEditNew(1, days: [_day(1, '第一天'), _day(3, '第三天')]),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '自由活動',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 3 · 第三天').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 't1',
+        dayNum: 3,
         title: '自由活動',
         description: any(named: 'description'),
         startTime: any(named: 'startTime'),

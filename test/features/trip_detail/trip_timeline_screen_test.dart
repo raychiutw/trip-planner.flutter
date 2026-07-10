@@ -398,6 +398,10 @@ void main() {
     await tester.tap(addBtn);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-day')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
+    await tester.pumpAndSettle();
+    expect(find.text('DAY 2 · 南部文化'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
   });
 
