@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-10
+
+### 修正
+
+- **時間軸崩潰(use-after-dispose)**:交通自動重算,或手動 reorder / 搬移 / 刪除停留點的過程中,若在網路請求回來前離開行程頁(或背景刷新 days 導致該日 section remount),對已 unmount 的 widget 讀取 provider(`ref.read` / `ref.invalidate`)會擲例外,導致整個 App 崩潰(VM 斷線)。於 `_recomputeDay` 開頭與所有 await 後的 provider 讀寫前補上 `mounted` 守衛,刪除路徑改為在 mounted 時先取得 repo;附兩支重現 widget 測試(重算 in-flight 離開頁面、確認框開著時 section remount 後按刪除)。
+
 ## [0.5.0] - 2026-07-10
 
 ### 新增
