@@ -330,7 +330,6 @@ class TripRepository {
     required String tripId,
     required int entryId,
     required int expectedVersion,
-    required String title,
     String? description,
     String? startTime,
     String? endTime,
@@ -339,7 +338,6 @@ class TripRepository {
       'PATCH',
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
       body: {
-        'title': title,
         'description': description,
         'start_time': startTime,
         'end_time': endTime,
@@ -347,7 +345,6 @@ class TripRepository {
       },
       optimistic: OfflineOp('entry.update', _daysKey(tripId), {
         'entryId': entryId,
-        'title': title,
         'description': description,
         'startTime': startTime,
         'endTime': endTime,

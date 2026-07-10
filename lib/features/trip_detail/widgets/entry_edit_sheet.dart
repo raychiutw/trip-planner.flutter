@@ -111,7 +111,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   bool get _canSubmit =>
       !_submitting &&
-      _title.text.trim().isNotEmpty &&
+      (_isEdit || _title.text.trim().isNotEmpty) &&
       entryTimeRangeValid(_start, _end);
 
   int _selectedDayNum(EntryEditNew args) {
@@ -144,7 +144,6 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             tripId: widget.tripId,
             entryId: entry.id,
             expectedVersion: entry.version,
-            title: title,
             description: description,
             startTime: _fmt(_start),
             endTime: _fmt(_end),
@@ -210,12 +209,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: TpSpacing.s4),
-            TextField(
-              key: const ValueKey('entry-edit-title'),
-              controller: _title,
-              decoration: const InputDecoration(labelText: '標題'),
-              textInputAction: TextInputAction.next,
-            ),
+            if (!_isEdit)
+              TextField(
+                key: const ValueKey('entry-edit-title'),
+                controller: _title,
+                decoration: const InputDecoration(labelText: '標題'),
+                textInputAction: TextInputAction.next,
+              ),
             if (showDayPicker) ...[
               const SizedBox(height: TpSpacing.s3),
               DropdownButtonFormField<int>(

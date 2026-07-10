@@ -361,12 +361,12 @@ void main() {
     expect(fetchDaysAttempts, 2);
   });
 
-  testWidgets('點 entry tile 開啟編輯 sheet（預填標題）', (tester) async {
+  testWidgets('點 entry tile 開啟編輯 sheet（不顯示 legacy 標題欄）', (tester) async {
     await _pumpTimeline(tester);
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
-    expect(find.widgetWithText(TextField, '美麗海水族館'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
   });
 
   testWidgets('左滑 entry → 確認 → 呼叫 deleteEntry', (tester) async {

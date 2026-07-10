@@ -96,14 +96,13 @@ void main() {
     });
   });
 
-  testWidgets('編輯模式：預填標題 + 送出呼叫 updateEntry', (tester) async {
+  testWidgets('編輯模式：不顯示 legacy 標題欄 + 送出呼叫 updateEntry', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.updateEntry(
         tripId: any(named: 'tripId'),
         entryId: any(named: 'entryId'),
         expectedVersion: any(named: 'expectedVersion'),
-        title: any(named: 'title'),
         description: any(named: 'description'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
@@ -111,7 +110,7 @@ void main() {
     ).thenAnswer((_) async {});
 
     await _open(tester, repo, const EntryEditExisting(_entry));
-    expect(find.widgetWithText(TextField, '首里城'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
@@ -121,7 +120,6 @@ void main() {
         tripId: 't1',
         entryId: 11,
         expectedVersion: 2,
-        title: '首里城',
         description: any(named: 'description'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
