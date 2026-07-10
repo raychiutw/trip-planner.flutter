@@ -8,7 +8,7 @@ void main() {
       expect(validateDay(const []), isEmpty);
     });
 
-    test('早於 master 營業時間 → 1 筆警告', () {
+    test('早於 master 營業時間 → 不再警告', () {
       final warnings = validateDay(const [
         TimelineEntry(
           id: 1,
@@ -23,11 +23,7 @@ void main() {
           ),
         ),
       ]);
-      expect(warnings, hasLength(1));
-      expect(
-        warnings.single,
-        '美麗海水族館（08:00)可能早於 沖繩美麗海水族館 營業時間（09:00-18:00)',
-      );
+      expect(warnings, isEmpty);
     });
 
     test('晚於營業時間 → 無警告', () {
@@ -71,7 +67,7 @@ void main() {
       expect(warnings, isEmpty);
     });
 
-    test('master 與 alternate 各自觸發 → 2 筆警告', () {
+    test('master 與 alternate 營業時間都早於到達時間 → 不再警告', () {
       final warnings = validateDay(const [
         TimelineEntry(
           id: 1,
@@ -85,14 +81,7 @@ void main() {
           ],
         ),
       ]);
-      expect(warnings, hasLength(2));
-      expect(
-        warnings,
-        containsAll([
-          '行程點（08:00)可能早於 主景點 營業時間（09:00-18:00)',
-          '行程點（08:00)可能早於 備選景點 營業時間（10:00-19:00)',
-        ]),
-      );
+      expect(warnings, isEmpty);
     });
   });
 }
