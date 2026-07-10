@@ -5,6 +5,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -426,7 +427,9 @@ class _ComposerState extends ConsumerState<_Composer> {
               tooltip: _listening ? '停止語音輸入' : '語音輸入',
               onPressed: micEnabled ? () => unawaited(_onMic()) : null,
               color: _listening ? scheme.primary : null,
-              icon: Icon(_listening ? Icons.mic : Icons.mic_none),
+              icon: Icon(
+                _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+              ),
             ),
             const SizedBox(width: TpSpacing.s1),
             IconButton.filled(
@@ -440,7 +443,7 @@ class _ComposerState extends ConsumerState<_Composer> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Icon(Icons.send),
+                  : const Icon(CupertinoIcons.arrow_up_circle_fill),
             ),
           ],
         ),
@@ -554,7 +557,7 @@ class _Banner extends StatelessWidget {
         padding: const EdgeInsets.all(TpSpacing.s3),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: scheme.onErrorContainer, size: 18),
+            Icon(CupertinoIcons.exclamationmark_circle, color: scheme.onErrorContainer, size: 18),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
               child: Text(

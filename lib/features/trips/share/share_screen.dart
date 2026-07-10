@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -188,7 +189,7 @@ class _CreatedCard extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 key: const ValueKey('share-copy'),
                 onPressed: () => onCopy(url),
-                icon: const Icon(Icons.copy, size: 18),
+                icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
                 label: const Text('複製連結'),
               ),
             ),

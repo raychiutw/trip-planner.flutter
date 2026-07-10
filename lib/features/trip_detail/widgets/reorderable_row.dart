@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 
 import '../../../app/adaptive.dart';
@@ -51,7 +52,7 @@ class ReorderDeleteBackground extends StatelessWidget {
         color: scheme.errorContainer,
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
       ),
-      child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+      child: Icon(CupertinoIcons.delete, color: scheme.onErrorContainer),
     );
   }
 }
@@ -78,7 +79,7 @@ class ReorderDragHandle extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Icon(
-            Icons.drag_handle,
+            CupertinoIcons.line_horizontal_3,
             key: iconKey,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -172,8 +173,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           icon: Icon(
                             _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                                ? CupertinoIcons.eye
+                                : CupertinoIcons.eye_slash,
                           ),
                         ),
                       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
@@ -56,7 +57,9 @@ class PoiSearchCard extends StatelessWidget {
                   tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
                   onPressed: isSaving ? null : onToggleFavorite,
                   icon: Icon(
-                    isSaved ? Icons.favorite : Icons.favorite_border,
+                    isSaved
+                        ? CupertinoIcons.heart_fill
+                        : CupertinoIcons.heart,
                     color: tones.pink,
                   ),
                 ),

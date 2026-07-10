@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -189,7 +190,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         const PopupMenuItem(value: _kCustomRegion, child: Text('+ 自訂地區…')),
       ],
       child: Chip(
-        avatar: const Icon(Icons.location_on_outlined, size: 16),
+        avatar: const Icon(CupertinoIcons.location_solid, size: 16),
         label: Text('$region ▾'),
       ),
     );

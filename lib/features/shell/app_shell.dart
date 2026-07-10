@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,16 +36,16 @@ class AppShell extends StatelessWidget {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
+            icon: Icon(CupertinoIcons.chat_bubble),
             label: '聊天',
           ),
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: '行程'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: '地圖'),
+          NavigationDestination(icon: Icon(CupertinoIcons.house), label: '行程'),
+          NavigationDestination(icon: Icon(CupertinoIcons.map), label: '地圖'),
           NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
+            icon: Icon(CupertinoIcons.heart),
             label: '收藏',
           ),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: '帳號'),
+          NavigationDestination(icon: Icon(CupertinoIcons.person), label: '帳號'),
         ],
       ),
     );

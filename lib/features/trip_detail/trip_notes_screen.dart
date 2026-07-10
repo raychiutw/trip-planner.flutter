@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
@@ -44,7 +45,7 @@ class TripNotesScreen extends ConsumerWidget {
         _NotesSection(
           tripId: tripId,
           section: NoteSection.flights,
-          icon: Icons.flight_takeoff,
+          icon: CupertinoIcons.airplane,
           iconColor: tones.sageDeep,
           title: '航班',
           // mobile 預設展開航班（對齊 web TripNotesPage 行為）
@@ -62,7 +63,7 @@ class TripNotesScreen extends ConsumerWidget {
         _NotesSection(
           tripId: tripId,
           section: NoteSection.lodgings,
-          icon: Icons.hotel_outlined,
+          icon: CupertinoIcons.bed_double,
           iconColor: tones.sageDeep,
           title: '住宿',
           rows: [
@@ -78,7 +79,7 @@ class TripNotesScreen extends ConsumerWidget {
         _NotesSection(
           tripId: tripId,
           section: NoteSection.reservations,
-          icon: Icons.confirmation_number_outlined,
+          icon: CupertinoIcons.ticket,
           iconColor: tones.pinkDeep,
           title: '預訂',
           rows: [
@@ -94,7 +95,7 @@ class TripNotesScreen extends ConsumerWidget {
         _NotesSection(
           tripId: tripId,
           section: NoteSection.pretrip,
-          icon: Icons.checklist_outlined,
+          icon: CupertinoIcons.list_bullet,
           iconColor: tones.accentDeep,
           title: '行前須知',
           rows: [
@@ -291,7 +292,7 @@ class _NotesSection extends ConsumerWidget {
               key: ValueKey('note-add-${section.name}'),
               onPressed: () =>
                   showNoteEditSheet(context, tripId: tripId, section: section),
-              icon: const Icon(Icons.add),
+              icon: const Icon(CupertinoIcons.add),
               label: Text('新增$title'),
             ),
           ),

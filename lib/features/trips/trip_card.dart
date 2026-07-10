@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
@@ -139,7 +140,7 @@ class TripCard extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    Icons.chevron_right,
+                    CupertinoIcons.chevron_right,
                     size: 20,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

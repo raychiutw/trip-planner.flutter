@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/tokens.dart';
@@ -26,7 +27,7 @@ class OfflineStatusBanner extends ConsumerWidget {
         key: const ValueKey('offline-conflict-banner'),
         background: colorScheme.errorContainer,
         foreground: colorScheme.onErrorContainer,
-        icon: Icons.error_outline,
+        icon: CupertinoIcons.exclamationmark_circle,
         text: '$conflictCount 筆同步衝突',
         actionLabel: '檢視',
         onAction: () => showConflictResolveSheet(context, ref),

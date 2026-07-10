@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -116,19 +117,19 @@ class _NotificationsList extends StatelessWidget {
   static const _settings = [
     _NotificationSetting(
       key: 'trip-updates',
-      icon: Icons.home_outlined,
+      icon: CupertinoIcons.house,
       title: '行程更新通知',
       subtitle: '旅伴改了行程、AI 排程完成',
     ),
     _NotificationSetting(
       key: 'invitations',
-      icon: Icons.group_outlined,
+      icon: CupertinoIcons.person_2,
       title: '旅伴邀請',
       subtitle: '收到新的共編邀請',
     ),
     _NotificationSetting(
       key: 'system',
-      icon: Icons.info_outline,
+      icon: CupertinoIcons.info_circle,
       title: '系統通知',
       subtitle: 'Tripline 維護、版本更新',
     ),
@@ -257,7 +258,7 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -275,7 +276,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     '/trips/${widget.tripId}/entries/${entry.id}/pois',
                   );
                 },
-                icon: const Icon(Icons.place_outlined),
+                icon: const Icon(CupertinoIcons.location_solid),
                 label: const Text('管理地點'),
               ),
             ],
@@ -311,7 +312,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
             ),
             tooltip: '清除',
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(CupertinoIcons.xmark, size: 18),
             onPressed: () =>
                 setState(() => isStart ? _start = null : _end = null),
           ),

@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -139,7 +140,7 @@ class _UnverifiedChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 14, color: warningColor),
+          Icon(CupertinoIcons.exclamationmark_circle, size: 14, color: warningColor),
           const SizedBox(width: TpSpacing.s1),
           Text(
             'Email 未驗證',
@@ -260,7 +261,7 @@ class _SettingsGroup extends StatelessWidget {
           tiles: [
             _SettingsTileData(
               key: const ValueKey('settings-profile'),
-              icon: Icons.person_outline,
+              icon: CupertinoIcons.person,
               label: '個人資料',
               onTap: () => context.push('/settings/profile'),
             ),
@@ -272,13 +273,13 @@ class _SettingsGroup extends StatelessWidget {
           tiles: [
             _SettingsTileData(
               key: const ValueKey('settings-appearance'),
-              icon: Icons.palette_outlined,
+              icon: CupertinoIcons.paintbrush,
               label: '外觀',
               onTap: () => context.push('/settings/appearance'),
             ),
             _SettingsTileData(
               key: const ValueKey('settings-notifications'),
-              icon: Icons.notifications_outlined,
+              icon: CupertinoIcons.bell,
               label: '通知',
               onTap: () => context.push('/settings/notifications'),
             ),
@@ -290,19 +291,19 @@ class _SettingsGroup extends StatelessWidget {
           tiles: [
             _SettingsTileData(
               key: const ValueKey('settings-sessions'),
-              icon: Icons.devices_outlined,
+              icon: CupertinoIcons.device_phone_portrait,
               label: '登入裝置',
               onTap: () => context.push('/settings/sessions'),
             ),
             _SettingsTileData(
               key: const ValueKey('settings-connected-apps'),
-              icon: Icons.extension_outlined,
+              icon: CupertinoIcons.square_grid_2x2,
               label: '已連結的應用程式',
               onTap: () => context.push('/settings/connected-apps'),
             ),
             _SettingsTileData(
               key: const ValueKey('settings-developer-apps'),
-              icon: Icons.code_outlined,
+              icon: CupertinoIcons.chevron_left_slash_chevron_right,
               label: '開發者應用',
               onTap: () => context.push('/settings/developer-apps'),
             ),
@@ -368,7 +369,7 @@ class _SettingsSection extends StatelessWidget {
                   key: tiles[i].key,
                   leading: Icon(tiles[i].icon),
                   title: Text(tiles[i].label),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: const Icon(CupertinoIcons.chevron_right),
                   onTap: tiles[i].onTap,
                 ),
               ],
@@ -392,7 +393,7 @@ class _LogoutRow extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
+        leading: Icon(CupertinoIcons.square_arrow_right, size: 20, color: colorScheme.error),
         title: Text(
           '登出',
           style: TextStyle(

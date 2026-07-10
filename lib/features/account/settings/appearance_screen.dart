@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,7 +28,7 @@ class AppearanceScreen extends ConsumerWidget {
             ListTile(
               key: ValueKey('theme-${themeModeToString(m)}'),
               title: Text(label),
-              trailing: mode == m ? const Icon(Icons.check) : null,
+              trailing: mode == m ? const Icon(CupertinoIcons.checkmark) : null,
               onTap: () {
                 HapticFeedback.selectionClick();
                 ref.read(themeModeProvider.notifier).setMode(m);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -294,7 +295,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               IconButton(
                 key: ValueKey('note-datetime-clear-${spec.key}'),
                 tooltip: '清除',
-                icon: const Icon(Icons.close, size: 18),
+                icon: const Icon(CupertinoIcons.xmark, size: 18),
                 onPressed: () => setState(() => _dts[spec.key] = ''),
               ),
           ],

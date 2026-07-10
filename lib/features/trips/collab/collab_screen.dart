@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/adaptive.dart';
@@ -130,7 +131,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 ),
                 IconButton(
                   key: ValueKey('member-remove-${m.id}'),
-                  icon: const Icon(Icons.person_remove_outlined),
+                  icon: const Icon(CupertinoIcons.person_badge_minus),
                   onPressed: state.removingId == m.id
                       ? null
                       : () async {
@@ -155,7 +156,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     return ListTile(
       key: ValueKey('invite-${i.id}'),
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.mail_outline),
+      leading: const Icon(CupertinoIcons.mail),
       title: Text(i.invitedEmail),
       subtitle: Text(status),
       trailing: TextButton(

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/day.dart';
@@ -29,7 +30,7 @@ void main() {
       expect(find.text('退房 11:00'), findsOneWidget);
       expect(find.text('海景房'), findsOneWidget);
       expect(find.byKey(const ValueKey('hotel-card-7')), findsOneWidget);
-      expect(find.byIcon(Icons.bed_outlined), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.bed_double), findsOneWidget);
     });
 
     testWidgets('checkout / note 為 null → 不顯示對應列', (tester) async {

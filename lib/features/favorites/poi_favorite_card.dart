@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../models/poi_favorite.dart';
 import '../../theme/app_theme.dart';
@@ -44,7 +45,7 @@ class PoiFavoriteCard extends StatelessWidget {
               color: tone.bg,
               borderRadius: BorderRadius.circular(TpRadius.md),
             ),
-            child: Icon(Icons.place_outlined, size: 20, color: tone.deep),
+            child: Icon(CupertinoIcons.location_solid, size: 20, color: tone.deep),
           ),
           const SizedBox(width: TpSpacing.s3),
           Expanded(
@@ -98,7 +99,7 @@ class PoiFavoriteCard extends StatelessWidget {
           IconButton(
             key: ValueKey('favorite-remove-${favorite.id}'),
             tooltip: '取消收藏',
-            icon: Icon(Icons.favorite, color: tones.pink),
+            icon: Icon(CupertinoIcons.heart_fill, color: tones.pink),
             onPressed: onRemove,
           ),
         ],

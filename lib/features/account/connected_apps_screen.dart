@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -139,7 +140,7 @@ class _ConnectedAppTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       key: Key('connected-app-row-${app.clientId}'),
-      leading: const Icon(Icons.extension_outlined, size: 22),
+      leading: const Icon(CupertinoIcons.square_grid_2x2, size: 22),
       title: Text(app.appName),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: TpSpacing.s1),
@@ -217,7 +218,7 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

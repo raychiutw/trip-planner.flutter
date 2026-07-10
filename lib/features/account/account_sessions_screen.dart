@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -53,7 +54,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
-                : const Icon(Icons.logout_outlined),
+                : const Icon(CupertinoIcons.square_arrow_right),
           ),
         ],
       ),
@@ -213,7 +214,9 @@ class _SessionTile extends StatelessWidget {
     return ListTile(
       key: Key('account-session-row-${session.sid}'),
       leading: Icon(
-        session.isCurrent ? Icons.devices_outlined : Icons.phonelink_outlined,
+        session.isCurrent
+            ? CupertinoIcons.device_phone_portrait
+            : CupertinoIcons.device_laptop,
         size: 22,
       ),
       title: Text(session.uaSummary ?? '未知裝置'),
@@ -304,7 +307,7 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(CupertinoIcons.exclamationmark_circle, color: colorScheme.onErrorContainer),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

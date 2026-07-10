@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/destination_input.dart';
@@ -80,7 +81,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                 onSubmitted: (_) => _run(),
                 decoration: const InputDecoration(
                   hintText: '搜尋地點（城市、景點）',
-                  prefixIcon: Icon(Icons.search),
+                  prefixIcon: Icon(CupertinoIcons.search),
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -98,7 +99,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Icon(Icons.search),
+                  : const Icon(CupertinoIcons.search),
             ),
           ],
         ),
@@ -124,7 +125,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   key: ValueKey('poi-result-${r.placeId}'),
                   title: Text(r.name),
                   subtitle: r.address == null ? null : Text(r.address!),
-                  trailing: const Icon(Icons.add),
+                  trailing: const Icon(CupertinoIcons.add),
                   onTap: () => _pick(r),
                 ),
               ),
@@ -137,10 +138,10 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
               for (var i = 0; i < dests.length; i++)
                 ListTile(
                   key: ValueKey('dest-$i-${dests[i].name}'),
-                  leading: const Icon(Icons.place_outlined),
+                  leading: const Icon(CupertinoIcons.location_solid),
                   title: Text(dests[i].name),
                   trailing: IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(CupertinoIcons.xmark),
                     onPressed: () => widget.onRemove(i),
                   ),
                 ),

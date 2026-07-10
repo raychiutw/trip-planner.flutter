@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,7 +32,7 @@ class FavoritesScreen extends ConsumerWidget {
                 IconButton(
                   key: const ValueKey('favorites-explore-action'),
                   tooltip: '探索',
-                  icon: const Icon(Icons.search),
+                  icon: const Icon(CupertinoIcons.search),
                   onPressed: () => context.go('/favorites/explore'),
                 ),
               ],
@@ -146,7 +147,7 @@ class _EmptyHero extends StatelessWidget {
           FilledButton.tonalIcon(
             key: const ValueKey('favorites-empty-explore'),
             onPressed: () => context.go('/favorites/explore'),
-            icon: const Icon(Icons.search),
+            icon: const Icon(CupertinoIcons.search),
             label: const Text('去探索'),
           ),
         ],

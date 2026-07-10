@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -117,7 +118,7 @@ class EntryPoiScreen extends ConsumerWidget {
             TextButton.icon(
               key: const ValueKey('add-alternate'),
               onPressed: () => _addAlternate(context, ref, entry),
-              icon: const Icon(Icons.add),
+              icon: const Icon(CupertinoIcons.add),
               label: const Text('加入備選'),
             ),
           ],
@@ -157,7 +158,7 @@ class EntryPoiScreen extends ConsumerWidget {
                   IconButton(
                     key: ValueKey('alt-remove-${alt.poiId}'),
                     tooltip: '移除',
-                    icon: const Icon(Icons.delete_outline),
+                    icon: const Icon(CupertinoIcons.delete),
                     onPressed: () => _run(
                       context,
                       ref,

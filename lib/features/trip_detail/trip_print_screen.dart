@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
@@ -71,7 +72,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
-                : const Icon(Icons.print_outlined),
+                : const Icon(CupertinoIcons.printer),
             onPressed: data == null || busy
                 ? null
                 : () => unawaited(_runAction(_PrintAction.print, data)),
@@ -257,7 +258,7 @@ class _PrintDaySection extends StatelessWidget {
                       color: theme.colorScheme.outlineVariant,
                     ),
                   ListTile(
-                    leading: const Icon(Icons.bed_outlined),
+                    leading: const Icon(CupertinoIcons.bed_double),
                     title: Text(day.hotel!.name),
                     subtitle: day.hotel!.checkout == null
                         ? null
@@ -321,7 +322,7 @@ class _PrintNotesSection extends StatelessWidget {
       if (notes.flights.isNotEmpty)
         _NoteCard(
           title: '航班',
-          icon: Icons.flight_takeoff_outlined,
+          icon: CupertinoIcons.airplane,
           rows: notes.flights
               .map(
                 (flight) => _NoteRowData(
@@ -345,7 +346,7 @@ class _PrintNotesSection extends StatelessWidget {
       if (notes.lodgings.isNotEmpty)
         _NoteCard(
           title: '住宿',
-          icon: Icons.hotel_outlined,
+          icon: CupertinoIcons.bed_double,
           rows: notes.lodgings
               .map(
                 (lodging) => _NoteRowData(
@@ -365,7 +366,7 @@ class _PrintNotesSection extends StatelessWidget {
       if (notes.reservations.isNotEmpty)
         _NoteCard(
           title: '預訂',
-          icon: Icons.check_circle_outline,
+          icon: CupertinoIcons.checkmark_circle,
           rows: notes.reservations
               .map(
                 (reservation) => _NoteRowData(
@@ -386,7 +387,7 @@ class _PrintNotesSection extends StatelessWidget {
       if (notes.pretripNotes.isNotEmpty)
         _NoteCard(
           title: '行前須知',
-          icon: Icons.article_outlined,
+          icon: CupertinoIcons.doc_text,
           rows: notes.pretripNotes
               .map(
                 (note) => _NoteRowData(title: note.title, body: note.content),
@@ -396,7 +397,7 @@ class _PrintNotesSection extends StatelessWidget {
       if (notes.emergencyContacts.isNotEmpty)
         _NoteCard(
           title: '緊急聯絡',
-          icon: Icons.phone_outlined,
+          icon: CupertinoIcons.phone,
           rows: notes.emergencyContacts
               .map(
                 (contact) => _NoteRowData(
