@@ -12,6 +12,7 @@ const List<(String, String)> _modes = [
   ('walking', '步行'),
   ('transit', '大眾運輸'),
 ];
+const _autoTransitSubmodes = {'monorail', 'bus'};
 
 /// 開啟交通編輯 bottom sheet。
 Future<void> showTravelEditSheet(
@@ -49,6 +50,8 @@ class TravelEditSheet extends ConsumerStatefulWidget {
 
 class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   late String _mode;
+  late final String? _submode;
+  late final String _initialMinText;
   late final TextEditingController _min;
   bool _submitting = false;
 
@@ -59,7 +62,9 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
         const {'driving', 'walking', 'transit'}.contains(widget.segment.mode)
         ? widget.segment.mode
         : 'driving';
-    _min = TextEditingController(text: widget.segment.min?.toString() ?? '');
+    _submode = _mode == 'transit' ? widget.segment.submode : null;
+    _initialMinText = widget.segment.min?.toString() ?? '';
+    _min = TextEditingController(text: _initialMinText);
     _min.addListener(() => setState(() {}));
   }
 
@@ -71,15 +76,24 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
 
   bool get _isTransit => _mode == 'transit';
 
+  bool get _isAutoTransit =>
+      _isTransit &&
+      _autoTransitSubmodes.contains(_submode) &&
+      widget.segment.source != 'manual';
+
   bool get _canSubmit {
     if (_submitting) return false;
     if (!_isTransit) return true;
+    if (_isAutoTransit && _min.text.trim() == _initialMinText) return true;
     final v = int.tryParse(_min.text.trim());
     return v != null && v >= 0;
   }
 
   Future<void> _submit() async {
-    final min = _isTransit ? int.tryParse(_min.text.trim()) : null;
+    final minText = _min.text.trim();
+    final min = _isTransit && (!_isAutoTransit || minText != _initialMinText)
+        ? int.tryParse(minText)
+        : null;
     setState(() => _submitting = true);
     final repo = ref.read(tripRepositoryProvider);
     try {
@@ -87,6 +101,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
         tripId: widget.tripId,
         segmentId: widget.segment.id,
         mode: _mode,
+        submode: _isTransit ? _submode : null,
         min: min,
         expectedVersion: widget.segment.version,
       );

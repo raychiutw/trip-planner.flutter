@@ -406,12 +406,18 @@ class TripRepository {
     required String tripId,
     required int segmentId,
     required String mode,
+    String? submode,
     int? min,
     int? expectedVersion,
   }) async {
     final body = await _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/segments/$segmentId',
-      body: {'mode': mode, 'min': ?min, 'expectedVersion': ?expectedVersion},
+      body: {
+        'mode': mode,
+        'submode': ?submode,
+        'min': ?min,
+        'expectedVersion': ?expectedVersion,
+      },
     );
     return TripSegment.fromJson(body as Map<String, dynamic>);
   }

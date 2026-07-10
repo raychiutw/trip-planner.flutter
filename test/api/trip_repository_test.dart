@@ -762,13 +762,19 @@ void main() {
     dioAdapter.onPatch(
       '/trips/okinawa/segments/5',
       (server) => server.reply(200, {'id': 5, 'mode': 'transit', 'version': 4}),
-      data: {'mode': 'transit', 'min': 20, 'expectedVersion': 1},
+      data: {
+        'mode': 'transit',
+        'submode': 'monorail',
+        'min': 20,
+        'expectedVersion': 1,
+      },
     );
 
     final seg = await tripRepository.updateSegment(
       tripId: 'okinawa',
       segmentId: 5,
       mode: 'transit',
+      submode: 'monorail',
       min: 20,
       expectedVersion: 1,
     );

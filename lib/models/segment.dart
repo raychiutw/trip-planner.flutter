@@ -8,6 +8,7 @@ class TripSegment {
     this.fromEntryId,
     this.toEntryId,
     required this.mode,
+    this.submode,
     this.min,
     this.distanceM,
     this.source,
@@ -21,10 +22,11 @@ class TripSegment {
 
   /// driving / walking / transit。
   final String mode;
+  final String? submode;
   final int? min;
   final int? distanceM;
 
-  /// google / manual。
+  /// google / manual / haversine。
   final String? source;
 
   /// true when backend returned computedAt: null, meaning travel is being recomputed.
@@ -39,6 +41,7 @@ class TripSegment {
       fromEntryId: (json['fromEntryId'] as num?)?.toInt(),
       toEntryId: (json['toEntryId'] as num?)?.toInt(),
       mode: json['mode'] as String? ?? 'driving',
+      submode: json['submode'] as String?,
       min: (json['min'] as num?)?.toInt(),
       distanceM: (json['distanceM'] as num?)?.toInt(),
       source: json['source'] as String?,

@@ -936,6 +936,7 @@ void main() {
         tripId: any(named: 'tripId'),
         segmentId: any(named: 'segmentId'),
         mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
         min: any(named: 'min'),
         expectedVersion: any(named: 'expectedVersion'),
       ),
@@ -973,7 +974,64 @@ void main() {
         tripId: _tripId,
         segmentId: 50,
         mode: 'transit',
+        submode: null,
         min: 25,
+        expectedVersion: 1,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('單軌 travel segment 直接儲存 → 保留 submode 且不送 min 覆寫自動計算', (
+    tester,
+  ) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        min: any(named: 'min'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 50,
+        mode: 'transit',
+        submode: 'monorail',
+        version: 2,
+      ),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'transit',
+          submode: 'monorail',
+          min: 18,
+          source: 'haversine',
+          version: 1,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateSegment(
+        tripId: _tripId,
+        segmentId: 50,
+        mode: 'transit',
+        submode: 'monorail',
+        min: null,
         expectedVersion: 1,
       ),
     ).called(1);

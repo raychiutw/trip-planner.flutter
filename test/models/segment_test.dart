@@ -9,9 +9,10 @@ void main() {
         'fromEntryId': 11,
         'toEntryId': 12,
         'mode': 'transit',
+        'submode': 'monorail',
         'min': 20,
         'distanceM': 4200,
-        'source': 'manual',
+        'source': 'haversine',
         'computedAt': 1700000000000,
         'version': 3,
       });
@@ -19,9 +20,10 @@ void main() {
       expect(seg.fromEntryId, 11);
       expect(seg.toEntryId, 12);
       expect(seg.mode, 'transit');
+      expect(seg.submode, 'monorail');
       expect(seg.min, 20);
       expect(seg.distanceM, 4200);
-      expect(seg.source, 'manual');
+      expect(seg.source, 'haversine');
       expect(seg.isStale, isFalse);
       expect(seg.version, 3);
     });
@@ -30,6 +32,7 @@ void main() {
       final seg = TripSegment.fromJson({'id': 1, 'mode': 'driving'});
       expect(seg.fromEntryId, isNull);
       expect(seg.toEntryId, isNull);
+      expect(seg.submode, isNull);
       expect(seg.min, isNull);
       expect(seg.distanceM, isNull);
       expect(seg.source, isNull);
