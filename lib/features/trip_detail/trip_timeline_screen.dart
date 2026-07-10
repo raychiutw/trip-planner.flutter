@@ -490,6 +490,10 @@ class _DaySection extends ConsumerWidget {
                             entry.id,
                           ),
                           tripId: tripId,
+                          missingCoords: _missingTravelCoords(
+                            timeline[i - 1],
+                            entry,
+                          ),
                         ),
                       dropRow,
                     ],
@@ -582,13 +586,28 @@ TripSegment? _findSegment(List<TripSegment> segments, int fromId, int toId) {
   return null;
 }
 
+bool _missingTravelCoords(TimelineEntry from, TimelineEntry to) {
+  bool missing(TimelineEntry entry) {
+    final master = entry.master;
+    return master?.lat == null || master?.lng == null;
+  }
+
+  return missing(from) || missing(to);
+}
+
 /// travel pill 列：沿用 tile 的時間欄 + rail 縮排。有對應 segment 時可點擊編輯交通。
 class _TravelRow extends StatelessWidget {
-  const _TravelRow({required this.travel, this.segment, this.tripId});
+  const _TravelRow({
+    required this.travel,
+    this.segment,
+    this.tripId,
+    this.missingCoords = false,
+  });
 
   final Travel travel;
   final TripSegment? segment;
   final String? tripId;
+  final bool missingCoords;
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +615,9 @@ class _TravelRow extends StatelessWidget {
     final seg = segment;
     Widget pill = TravelPill(
       travel: travel,
-      statusLabel: seg?.isStale == true ? '車程重新計算中' : null,
+      statusLabel: seg?.isStale == true
+          ? (missingCoords ? '缺座標，無法計算車程' : '車程重新計算中')
+          : null,
     );
     if (seg != null && tripId != null) {
       pill = InkWell(
