@@ -106,10 +106,7 @@ class _Bar extends StatelessWidget {
               else if (actionLabel != null)
                 TextButton(
                   onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    foregroundColor: foreground,
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: foreground),
                   child: Text(actionLabel!),
                 ),
             ],

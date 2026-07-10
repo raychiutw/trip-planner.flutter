@@ -10,6 +10,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_status_banner.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 QueuedMutation _mut(String id) => QueuedMutation(
   id: id,
@@ -95,6 +96,10 @@ void main() {
     );
     expect(find.text('2 筆變更待同步'), findsOneWidget);
     expect(find.text('立即重試'), findsOneWidget);
+    expect(
+      tester.getSize(find.widgetWithText(TextButton, '立即重試')).height,
+      greaterThanOrEqualTo(TpSpacing.tapMin),
+    );
   });
 
   testWidgets('點立即重試 → flush 後排空、橫幅消失', (tester) async {
