@@ -4,10 +4,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 
@@ -35,11 +37,12 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('已連結的應用程式')),
       body: appsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => _ConnectedAppsLoadError(
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),
-        data: (apps) => RefreshIndicator(
+        data: (apps) => RefreshIndicator.adaptive(
           onRefresh: () async => ref.invalidate(connectedAppsProvider),
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
@@ -84,39 +87,14 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   }
 
   Future<void> _confirmRevoke(ConnectedApp app) async {
-    final shouldRevoke = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: Text('撤銷 ${app.appName}？'),
-          content: const Text('撤銷後，這個應用程式將無法再使用你的 Tripline 帳號存取資料。'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: const StadiumBorder(),
-                foregroundColor: colorScheme.onSurface,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('撤銷'),
-            ),
-          ],
-        );
-      },
+    final shouldRevoke = await showAppConfirm(
+      context,
+      title: '撤銷 ${app.appName}？',
+      message: '撤銷後，這個應用程式將無法再使用你的 Tripline 帳號存取資料。',
+      confirmLabel: '撤銷',
+      isDestructive: true,
     );
-    if (shouldRevoke != true || !mounted) return;
+    if (!shouldRevoke || !mounted) return;
 
     setState(() {
       _busyClientId = app.clientId;
@@ -126,9 +104,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
       ref.invalidate(connectedAppsProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已撤銷 ${app.appName}')));
+      showAppNotice(context, '已撤銷 ${app.appName}');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -165,7 +141,7 @@ class _ConnectedAppTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       key: Key('connected-app-row-${app.clientId}'),
-      leading: const Icon(Icons.extension_outlined, size: 22),
+      leading: const Icon(CupertinoIcons.square_grid_2x2, size: 22),
       title: Text(app.appName),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: TpSpacing.s1),
@@ -205,7 +181,7 @@ class _ConnectedAppTile extends StatelessWidget {
         child: isBusy
             ? const SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator.adaptive(strokeWidth: 2),
               )
             : const Text('撤銷'),
       ),
@@ -243,7 +219,10 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

@@ -3,6 +3,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -50,6 +52,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref
         .read(authStateProvider.notifier)
         .login(_emailController.text.trim(), _passwordController.text);
+    if (!mounted) return;
+    // 登入成功(無 error)→ 結束 autofill 情境,iOS 才會跳出「儲存密碼到 Keychain」提示。
+    if (!ref.read(authStateProvider).hasError) {
+      TextInput.finishAutofillContext();
+    }
   }
 
   /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
@@ -96,129 +103,138 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 品牌區（奶油底由 scaffold surface 提供）
-                    Text(
-                      'Tripline',
-                      textAlign: TextAlign.center,
-                      style: textTheme.displaySmall?.copyWith(
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: TpSpacing.s2),
-                    Text(
-                      '把每段旅程，安排得剛剛好',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: TpSpacing.s8),
-                    if (authState.hasError) ...[
-                      Container(
-                        key: const ValueKey('login-error-banner'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: TpSpacing.s4,
-                          vertical: TpSpacing.s3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(TpRadius.md),
-                        ),
-                        child: Text(
-                          _loginErrorMessage(authState.error!),
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.error,
-                          ),
+              child: AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 品牌區（奶油底由 scaffold surface 提供）
+                      Text(
+                        'Tripline',
+                        textAlign: TextAlign.center,
+                        style: textTheme.displaySmall?.copyWith(
+                          color: colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(height: TpSpacing.s4),
-                    ],
-                    TextFormField(
-                      key: const ValueKey('login-email-field'),
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autocorrect: false,
-                      textInputAction: TextInputAction.next,
-                      enabled: !isSubmitting,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                          ? '請輸入 Email'
-                          : null,
-                    ),
-                    const SizedBox(height: TpSpacing.s4),
-                    TextFormField(
-                      key: const ValueKey('login-password-field'),
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      enabled: !isSubmitting,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: InputDecoration(
-                        labelText: '密碼',
-                        suffixIcon: IconButton(
-                          key: const ValueKey(
-                            'login-password-visibility-toggle',
-                          ),
-                          tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
+                      const SizedBox(height: TpSpacing.s2),
+                      Text(
+                        '把每段旅程，安排得剛剛好',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      validator: (value) =>
-                          (value == null || value.isEmpty) ? '請輸入密碼' : null,
-                    ),
-                    const SizedBox(height: TpSpacing.s6),
-                    FilledButton(
-                      key: const ValueKey('login-submit-button'),
-                      onPressed: isSubmitting ? null : _submit,
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('登入'),
-                    ),
-                    if (ref.watch(oauthEnabledProvider)) ...[
-                      const SizedBox(height: TpSpacing.s4),
-                      if (_oauthError != null) ...[
-                        Text(
-                          _oauthError!,
-                          textAlign: TextAlign.center,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.error,
+                      const SizedBox(height: TpSpacing.s8),
+                      if (authState.hasError) ...[
+                        Container(
+                          key: const ValueKey('login-error-banner'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: TpSpacing.s4,
+                            vertical: TpSpacing.s3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(TpRadius.md),
+                          ),
+                          child: Text(
+                            _loginErrorMessage(authState.error!),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.error,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: TpSpacing.s2),
+                        const SizedBox(height: TpSpacing.s4),
                       ],
-                      OutlinedButton(
-                        key: const ValueKey('login-oauth-button'),
-                        onPressed: _oauthLoading ? null : _oauthLogin,
-                        child: _oauthLoading
+                      TextFormField(
+                        key: const ValueKey('login-email-field'),
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        autocorrect: false,
+                        autofillHints: const [
+                          AutofillHints.username,
+                          AutofillHints.email,
+                        ],
+                        textInputAction: TextInputAction.next,
+                        enabled: !isSubmitting,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? '請輸入 Email'
+                            : null,
+                      ),
+                      const SizedBox(height: TpSpacing.s4),
+                      TextFormField(
+                        key: const ValueKey('login-password-field'),
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        enabled: !isSubmitting,
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: InputDecoration(
+                          labelText: '密碼',
+                          suffixIcon: IconButton(
+                            key: const ValueKey(
+                              'login-password-visibility-toggle',
+                            ),
+                            tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? CupertinoIcons.eye
+                                  : CupertinoIcons.eye_slash,
+                            ),
+                          ),
+                        ),
+                        validator: (value) =>
+                            (value == null || value.isEmpty) ? '請輸入密碼' : null,
+                      ),
+                      const SizedBox(height: TpSpacing.s6),
+                      FilledButton(
+                        key: const ValueKey('login-submit-button'),
+                        onPressed: isSubmitting ? null : _submit,
+                        child: isSubmitting
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(
+                                child: CircularProgressIndicator.adaptive(
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('用 OAuth 登入'),
+                            : const Text('登入'),
                       ),
+                      if (ref.watch(oauthEnabledProvider)) ...[
+                        const SizedBox(height: TpSpacing.s4),
+                        if (_oauthError != null) ...[
+                          Text(
+                            _oauthError!,
+                            textAlign: TextAlign.center,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.error,
+                            ),
+                          ),
+                          const SizedBox(height: TpSpacing.s2),
+                        ],
+                        OutlinedButton(
+                          key: const ValueKey('login-oauth-button'),
+                          onPressed: _oauthLoading ? null : _oauthLogin,
+                          child: _oauthLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('用 OAuth 登入'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

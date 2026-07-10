@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
@@ -147,7 +148,7 @@ class _EntryCard extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.schedule, size: 14, color: mutedColor),
+            Icon(CupertinoIcons.clock, size: 14, color: mutedColor),
             const SizedBox(width: 2),
             Text(
               duration,
@@ -187,7 +188,7 @@ class _EntryCard extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.star_rounded, size: 14, color: tones.accent),
+              Icon(CupertinoIcons.star_fill, size: 14, color: tones.accent),
               const SizedBox(width: 2),
               Text(
                 master.rating!.toStringAsFixed(1),

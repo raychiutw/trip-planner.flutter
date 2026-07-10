@@ -4,6 +4,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -32,16 +34,17 @@ class DeveloperAppsScreen extends ConsumerWidget {
             tooltip: '新增 OAuth 應用',
             onPressed: () =>
                 GoRouter.maybeOf(context)?.go('/settings/developer-apps/new'),
-            icon: const Icon(Icons.add),
+            icon: const Icon(CupertinoIcons.add),
           ),
         ],
       ),
       body: appsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, stackTrace) => _DeveloperAppsLoadError(
           onRetry: () => ref.invalidate(developerAppsProvider),
         ),
-        data: (apps) => RefreshIndicator(
+        data: (apps) => RefreshIndicator.adaptive(
           onRefresh: () async => ref.invalidate(developerAppsProvider),
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
@@ -177,12 +180,12 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
                       segments: const [
                         ButtonSegment(
                           value: 'public',
-                          icon: Icon(Icons.public_outlined),
+                          icon: Icon(CupertinoIcons.globe),
                           label: Text('Public'),
                         ),
                         ButtonSegment(
                           value: 'confidential',
-                          icon: Icon(Icons.lock_outline),
+                          icon: Icon(CupertinoIcons.lock),
                           label: Text('Confidential'),
                         ),
                       ],
@@ -247,9 +250,9 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
               icon: _isSubmitting
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
-                  : const Icon(Icons.add),
+                  : const Icon(CupertinoIcons.add),
               label: const Text('建立應用程式'),
             ),
           ],
@@ -287,6 +290,7 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
           );
       if (!mounted) return;
       ref.invalidate(developerAppsProvider);
+      HapticFeedback.lightImpact();
       setState(() {
         _isSubmitting = false;
       });
@@ -306,9 +310,9 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
   }
 
   Future<void> _showCreatedDialog(CreatedDeveloperApp app) async {
-    await showDialog<void>(
+    await showAdaptiveDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AlertDialog.adaptive(
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
         ),
@@ -370,7 +374,10 @@ class _DeveloperAppTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       key: Key('developer-app-row-${app.clientId}'),
-      leading: const Icon(Icons.code_outlined, size: 22),
+      leading: const Icon(
+        CupertinoIcons.chevron_left_slash_chevron_right,
+        size: 22,
+      ),
       title: Text(app.appName),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: TpSpacing.s1),
@@ -461,7 +468,10 @@ class _InlineErrorPanel extends StatelessWidget {
         padding: const EdgeInsets.all(TpSpacing.s4),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

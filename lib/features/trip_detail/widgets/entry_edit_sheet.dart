@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/day.dart';
 import '../../../models/entry.dart';
 import '../../../theme/tokens.dart';
@@ -40,6 +43,7 @@ Future<void> showEntryEditSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -173,30 +177,23 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_isEdit ? '已儲存' : '已新增')));
+      showAppNotice(context, _isEdit ? '已儲存' : '已新增');
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripDaysProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('此停留點已更新，已重新載入，請再編輯一次')));
+        showAppNotice(context, '此停留點已更新，已重新載入，請再編輯一次');
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      showAppNotice(context, '儲存失敗，請稍後再試');
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      showAppNotice(context, '儲存失敗，請稍後再試');
     }
   }
 
@@ -279,7 +276,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     '/trips/${widget.tripId}/entries/${entry.id}/pois',
                   );
                 },
-                icon: const Icon(Icons.place_outlined),
+                icon: const Icon(CupertinoIcons.location_solid),
                 label: const Text('管理地點'),
               ),
             ],
@@ -315,7 +312,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
             ),
             tooltip: '清除',
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(CupertinoIcons.xmark, size: 18),
             onPressed: () =>
                 setState(() => isStart ? _start = null : _end = null),
           ),

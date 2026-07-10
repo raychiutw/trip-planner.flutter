@@ -4,6 +4,8 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -46,7 +48,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       body: SafeArea(
         child: shareAsync.when(
           loading: () => const Center(
-            child: CircularProgressIndicator(
+            child: CircularProgressIndicator.adaptive(
               key: ValueKey('public-share-loading'),
             ),
           ),
@@ -82,6 +84,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
           .read(tripRepositoryProvider)
           .clonePublicTripShare(_token);
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       context.go('/trips/${Uri.encodeComponent(tripId)}');
     } catch (_) {
       if (!mounted) return;
@@ -127,9 +130,9 @@ class _ShareContent extends StatelessWidget {
           icon: cloning
               ? const SizedBox.square(
                   dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 )
-              : const Icon(Icons.copy_outlined),
+              : const Icon(CupertinoIcons.doc_on_doc),
           label: Text(
             cloning
                 ? '複製中…'
@@ -175,7 +178,7 @@ class _ShareHero extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.auto_awesome_outlined,
+                  CupertinoIcons.sparkles,
                   size: 18,
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
@@ -345,7 +348,7 @@ class _HotelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: const Icon(Icons.bed_outlined),
+      leading: const Icon(CupertinoIcons.bed_double),
       title: Text(hotel.name),
       subtitle: hotel.note == null && hotel.checkout == null
           ? null
@@ -370,7 +373,7 @@ class _NotesSection extends StatelessWidget {
       if (notes.flights.isNotEmpty)
         _NoteCard(
           title: '航班',
-          icon: Icons.flight_takeoff_outlined,
+          icon: CupertinoIcons.airplane,
           rows: notes.flights
               .map(
                 (flight) => _NoteRowData(
@@ -394,7 +397,7 @@ class _NotesSection extends StatelessWidget {
       if (notes.lodgings.isNotEmpty)
         _NoteCard(
           title: '住宿',
-          icon: Icons.hotel_outlined,
+          icon: CupertinoIcons.bed_double,
           rows: notes.lodgings
               .map(
                 (lodging) => _NoteRowData(
@@ -414,7 +417,7 @@ class _NotesSection extends StatelessWidget {
       if (notes.reservations.isNotEmpty)
         _NoteCard(
           title: '預訂',
-          icon: Icons.check_circle_outline,
+          icon: CupertinoIcons.checkmark_circle,
           rows: notes.reservations
               .map(
                 (reservation) => _NoteRowData(
@@ -435,7 +438,7 @@ class _NotesSection extends StatelessWidget {
       if (notes.pretripNotes.isNotEmpty)
         _NoteCard(
           title: '行前須知',
-          icon: Icons.article_outlined,
+          icon: CupertinoIcons.doc_text,
           rows: notes.pretripNotes
               .map(
                 (note) => _NoteRowData(title: note.title, body: note.content),
@@ -445,7 +448,7 @@ class _NotesSection extends StatelessWidget {
       if (notes.emergencyContacts.isNotEmpty)
         _NoteCard(
           title: '緊急聯絡',
-          icon: Icons.phone_outlined,
+          icon: CupertinoIcons.phone,
           rows: notes.emergencyContacts
               .map(
                 (contact) => _NoteRowData(

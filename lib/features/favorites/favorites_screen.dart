@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/adaptive.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../theme/tokens.dart';
@@ -17,57 +20,82 @@ class FavoritesScreen extends ConsumerWidget {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('收藏'),
-        actions: [
-          IconButton(
-            key: const ValueKey('favorites-explore-action'),
-            tooltip: '探索',
-            icon: const Icon(Icons.search),
-            onPressed: () => context.go('/favorites/explore'),
-          ),
-        ],
-      ),
-      body: favoritesAsync.when(
-        data: (favorites) => RefreshIndicator(
-          onRefresh: () => ref.refresh(favoritesProvider.future),
-          child: favorites.isEmpty
-              ? const _EmptyHero()
-              : _buildList(context, ref, favorites),
+      body: RefreshIndicator.adaptive(
+        onRefresh: () => ref.refresh(favoritesProvider.future),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar.large(
+              pinned: true,
+              title: const Text('收藏'),
+              actions: [
+                IconButton(
+                  key: const ValueKey('favorites-explore-action'),
+                  tooltip: '探索',
+                  icon: const Icon(CupertinoIcons.search),
+                  onPressed: () => context.go('/favorites/explore'),
+                ),
+              ],
+            ),
+            ...favoritesAsync.when(
+              data: (favorites) => favorites.isEmpty
+                  ? [
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyHero(),
+                      ),
+                    ]
+                  : _buildListSlivers(context, ref, favorites),
+              error: (error, stackTrace) => [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _ErrorState(
+                    onRetry: () => ref.invalidate(favoritesProvider),
+                  ),
+                ),
+              ],
+              loading: () => const [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator.adaptive()),
+                ),
+              ],
+            ),
+          ],
         ),
-        error: (error, stackTrace) =>
-            _ErrorState(onRetry: () => ref.invalidate(favoritesProvider)),
-        loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
   }
 
-  Widget _buildList(
+  List<Widget> _buildListSlivers(
     BuildContext context,
     WidgetRef ref,
     List<PoiFavorite> favorites,
   ) {
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(TpSpacing.s4),
-      itemCount: favorites.length,
-      separatorBuilder: (context, index) =>
-          const SizedBox(height: TpSpacing.s3),
-      itemBuilder: (context, index) {
-        final favorite = favorites[index];
-        return PoiFavoriteCard(
-          favorite: favorite,
-          onRemove: () => _confirmRemove(context, ref, favorite),
-          onAddToTrip: () => context.go(
-            '/favorites/add-to-trip',
-            extra: AddToTripFavorite(
-              favoriteId: favorite.id,
-              displayName: favorite.displayName,
-            ),
-          ),
-        );
-      },
-    );
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        sliver: SliverList.separated(
+          itemCount: favorites.length,
+          separatorBuilder: (context, index) =>
+              const SizedBox(height: TpSpacing.s3),
+          itemBuilder: (context, index) {
+            final favorite = favorites[index];
+            return PoiFavoriteCard(
+              favorite: favorite,
+              onRemove: () => _confirmRemove(context, ref, favorite),
+              onAddToTrip: () => context.go(
+                '/favorites/add-to-trip',
+                extra: AddToTripFavorite(
+                  favoriteId: favorite.id,
+                  displayName: favorite.displayName,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   Future<void> _confirmRemove(
@@ -75,33 +103,23 @@ class FavoritesScreen extends ConsumerWidget {
     WidgetRef ref,
     PoiFavorite favorite,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('取消收藏'),
-        content: Text('確定要移除「${favorite.displayName}」嗎?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('保留'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('移除'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirm(
+      context,
+      title: '取消收藏',
+      message: '確定要移除「${favorite.displayName}」嗎?',
+      confirmLabel: '移除',
+      cancelLabel: '保留',
+      isDestructive: true,
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
 
     try {
       await ref.read(favoritesRepositoryProvider).deleteFavorite(favorite.id);
       ref.invalidate(favoritesProvider);
+      HapticFeedback.selectionClick();
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('取消收藏失敗，請稍後再試')));
+      showAppNotice(context, '取消收藏失敗，請稍後再試');
     }
   }
 }
@@ -113,35 +131,27 @@ class _EmptyHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('還沒有收藏的地點', style: theme.textTheme.titleLarge),
-                const SizedBox(height: TpSpacing.s2),
-                Text(
-                  '探索並收藏喜歡的地點。',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: TpSpacing.s4),
-                FilledButton.tonalIcon(
-                  key: const ValueKey('favorites-empty-explore'),
-                  onPressed: () => context.go('/favorites/explore'),
-                  icon: const Icon(Icons.search),
-                  label: const Text('去探索'),
-                ),
-              ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('還沒有收藏的地點', style: theme.textTheme.titleLarge),
+          const SizedBox(height: TpSpacing.s2),
+          Text(
+            '探索並收藏喜歡的地點。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: TpSpacing.s4),
+          FilledButton.tonalIcon(
+            key: const ValueKey('favorites-empty-explore'),
+            onPressed: () => context.go('/favorites/explore'),
+            icon: const Icon(CupertinoIcons.search),
+            label: const Text('去探索'),
+          ),
+        ],
+      ),
     );
   }
 }

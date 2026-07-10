@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -30,6 +31,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           .read(tripRepositoryProvider)
           .updateProfile(displayName: (_draft ?? '').trim());
       ref.invalidate(authStateProvider);
+      HapticFeedback.lightImpact();
       if (mounted && context.canPop()) context.pop();
     } on Exception {
       if (mounted) setState(() => _error = '儲存失敗,請稍後再試');
@@ -47,7 +49,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       body: switch (authState) {
         AsyncData(:final value?) => _form(context, value.displayName ?? ''),
         AsyncError() => const Center(child: Text('無法載入個人資料')),
-        _ => const Center(child: CircularProgressIndicator()),
+        _ => const Center(child: CircularProgressIndicator.adaptive()),
       },
     );
   }
@@ -82,7 +84,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 )
               : const Text('儲存'),
         ),

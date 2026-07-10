@@ -131,13 +131,13 @@ void main() {
       expect(lightTheme.appBarTheme.elevation, 0);
     });
 
-    test('TextTheme：Inter + Noto Sans TC fallback、body 16 letterSpacing 0', () {
+    test('TextTheme：系統字(不打包 Inter)、body 16 letterSpacing 0', () {
       final lightTheme = AppTheme.light();
       final bodyStyle = lightTheme.textTheme.bodyLarge!;
       expect(bodyStyle.fontSize, 16);
       expect(bodyStyle.letterSpacing, 0);
-      expect(bodyStyle.fontFamily, contains('Inter'));
-      expect(bodyStyle.fontFamilyFallback, contains('Noto Sans TC'));
+      // 改用系統字:iOS→SF Pro、Android→Roboto,CJK 由系統 fallback;不再打包 Inter。
+      expect(bodyStyle.fontFamily, isNot(contains('Inter')));
     });
   });
 

@@ -2,10 +2,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -30,58 +32,38 @@ class AccountScreen extends ConsumerWidget {
     final accountStats = ref.watch(accountStatsProvider).value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('帳號')),
-      body: ListView(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        children: [
-          const SizedBox(height: TpSpacing.s4),
-          _ProfileHero(user: currentUser),
-          const SizedBox(height: TpSpacing.s6),
-          _StatsRow(stats: accountStats),
-          const SizedBox(height: TpSpacing.s6),
-          const _SettingsGroup(),
-          const SizedBox(height: TpSpacing.s4),
-          _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+      body: CustomScrollView(
+        slivers: [
+          const SliverAppBar.large(pinned: true, title: Text('帳號')),
+          SliverPadding(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _ProfileHero(user: currentUser),
+                const SizedBox(height: TpSpacing.s6),
+                _StatsRow(stats: accountStats),
+                const SizedBox(height: TpSpacing.s6),
+                const _SettingsGroup(),
+                const SizedBox(height: TpSpacing.s4),
+                _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+              ]),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// 登出前 AlertDialog 確認，確認才呼叫 authStateProvider.logout()。
+  /// 登出前確認，確認才呼叫 authStateProvider.logout()。
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('登出帳號'),
-          content: const Text('確定要登出嗎？'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: const StadiumBorder(),
-                foregroundColor: colorScheme.onSurface,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('登出'),
-            ),
-          ],
-        );
-      },
+    final ok = await showAppConfirm(
+      context,
+      title: '登出帳號',
+      message: '確定要登出嗎？',
+      confirmLabel: '登出',
+      isDestructive: true,
     );
-    if (shouldLogout == true) {
+    if (ok) {
       await ref.read(authStateProvider.notifier).logout();
     }
   }
@@ -158,7 +140,11 @@ class _UnverifiedChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 14, color: warningColor),
+          Icon(
+            CupertinoIcons.exclamationmark_circle,
+            size: 14,
+            color: warningColor,
+          ),
           const SizedBox(width: TpSpacing.s1),
           Text(
             'Email 未驗證',
@@ -265,9 +251,94 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// 設定群組：「個人資料」「外觀」「登入裝置」「OAuth app」「通知」可進子頁。
+/// 設定群組：iOS grouped inset 風格,依語意分「帳號」「偏好」「安全性」三 section。
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SettingsSection(
+          title: '帳號',
+          tiles: [
+            _SettingsTileData(
+              key: const ValueKey('settings-profile'),
+              icon: CupertinoIcons.person,
+              label: '個人資料',
+              onTap: () => context.push('/settings/profile'),
+            ),
+          ],
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        _SettingsSection(
+          title: '偏好',
+          tiles: [
+            _SettingsTileData(
+              key: const ValueKey('settings-appearance'),
+              icon: CupertinoIcons.paintbrush,
+              label: '外觀',
+              onTap: () => context.push('/settings/appearance'),
+            ),
+            _SettingsTileData(
+              key: const ValueKey('settings-notifications'),
+              icon: CupertinoIcons.bell,
+              label: '通知',
+              onTap: () => context.push('/settings/notifications'),
+            ),
+          ],
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        _SettingsSection(
+          title: '安全性',
+          tiles: [
+            _SettingsTileData(
+              key: const ValueKey('settings-sessions'),
+              icon: CupertinoIcons.device_phone_portrait,
+              label: '登入裝置',
+              onTap: () => context.push('/settings/sessions'),
+            ),
+            _SettingsTileData(
+              key: const ValueKey('settings-connected-apps'),
+              icon: CupertinoIcons.square_grid_2x2,
+              label: '已連結的應用程式',
+              onTap: () => context.push('/settings/connected-apps'),
+            ),
+            _SettingsTileData(
+              key: const ValueKey('settings-developer-apps'),
+              icon: CupertinoIcons.chevron_left_slash_chevron_right,
+              label: '開發者應用',
+              onTap: () => context.push('/settings/developer-apps'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 單一 grouped inset section 的資料：section 標題 + 一組 tile。
+class _SettingsTileData {
+  const _SettingsTileData({
+    required this.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Key key;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+}
+
+/// iOS 設定頁常見的 grouped inset section:小灰標題 + 圓角 Card 包住多個 ListTile。
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({required this.title, required this.tiles});
+
+  final String title;
+  final List<_SettingsTileData> tiles;
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +352,7 @@ class _SettingsGroup extends StatelessWidget {
             bottom: TpSpacing.s2,
           ),
           child: Text(
-            '設定',
+            title,
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -291,73 +362,21 @@ class _SettingsGroup extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
-              ListTile(
-                key: const ValueKey('settings-profile'),
-                leading: const Icon(Icons.person_outline),
-                title: const Text('個人資料'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/profile'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
-              ),
-              ListTile(
-                key: const ValueKey('settings-appearance'),
-                leading: const Icon(Icons.palette_outlined),
-                title: const Text('外觀'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/appearance'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
-              ),
-              ListTile(
-                key: const ValueKey('settings-sessions'),
-                leading: const Icon(Icons.devices_outlined),
-                title: const Text('登入裝置'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/sessions'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
-              ),
-              ListTile(
-                key: const ValueKey('settings-connected-apps'),
-                leading: const Icon(Icons.extension_outlined),
-                title: const Text('已連結的應用程式'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/connected-apps'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
-              ),
-              ListTile(
-                key: const ValueKey('settings-developer-apps'),
-                leading: const Icon(Icons.code_outlined),
-                title: const Text('開發者應用'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/developer-apps'),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
-              ),
-              ListTile(
-                key: const ValueKey('settings-notifications'),
-                leading: const Icon(Icons.notifications_outlined),
-                title: const Text('通知'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/notifications'),
-              ),
+              for (var i = 0; i < tiles.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
+                ListTile(
+                  key: tiles[i].key,
+                  leading: Icon(tiles[i].icon),
+                  title: Text(tiles[i].label),
+                  trailing: const Icon(CupertinoIcons.chevron_right),
+                  onTap: tiles[i].onTap,
+                ),
+              ],
             ],
           ),
         ),
@@ -378,7 +397,11 @@ class _LogoutRow extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
+        leading: Icon(
+          CupertinoIcons.square_arrow_right,
+          size: 20,
+          color: colorScheme.error,
+        ),
         title: Text(
           '登出',
           style: TextStyle(

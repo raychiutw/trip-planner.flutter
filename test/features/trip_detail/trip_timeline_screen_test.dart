@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -273,15 +274,15 @@ void main() {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
-    expect(find.byIcon(Icons.map_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.sticky_note_2_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.print_outlined), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.map), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.doc_text), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.printer), findsOneWidget);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(Icons.map_outlined));
+    await tester.tap(find.byIcon(CupertinoIcons.map));
     await tester.pumpAndSettle();
 
     expect(find.text('map-page'), findsOneWidget);
@@ -290,7 +291,7 @@ void main() {
   testWidgets('點列印 icon 以 go_router 導向列印預覽頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(Icons.print_outlined));
+    await tester.tap(find.byIcon(CupertinoIcons.printer));
     await tester.pumpAndSettle();
 
     expect(find.text('print-page'), findsOneWidget);
@@ -557,7 +558,7 @@ void main() {
     await _pumpTimeline(tester);
 
     expect(find.text('美國村海濱飯店'), findsOneWidget);
-    expect(find.byIcon(Icons.bed_outlined), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.bed_double), findsOneWidget);
 
     final hotelCardContainer = tester.widget<Container>(
       find.byKey(const ValueKey('hotel-card-9')),

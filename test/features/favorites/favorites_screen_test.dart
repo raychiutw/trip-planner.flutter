@@ -48,7 +48,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('收藏'), findsOneWidget); // AppBar
+      // SliverAppBar.large 會同時渲染展開大標題與收合小標題兩份,故 findsWidgets。
+      expect(find.text('收藏'), findsWidgets);
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);

@@ -3,6 +3,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,6 +35,7 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
   Future<void> _submit() async {
     final id = await _ctrl.submit();
     if (id != null && mounted) {
+      HapticFeedback.lightImpact();
       ref.invalidate(myTripsProvider);
       context.go('/trips/$id');
     }
@@ -190,7 +193,7 @@ class _FlexibleDate extends StatelessWidget {
             IconButton(
               key: const ValueKey('create-flex-minus'),
               onPressed: () => ctrl.setFlexDayCount(state.flexDayCount - 1),
-              icon: const Icon(Icons.remove_circle_outline),
+              icon: const Icon(CupertinoIcons.minus_circle),
             ),
             Text(
               '${state.flexDayCount}',
@@ -200,7 +203,7 @@ class _FlexibleDate extends StatelessWidget {
             IconButton(
               key: const ValueKey('create-flex-plus'),
               onPressed: () => ctrl.setFlexDayCount(state.flexDayCount + 1),
-              icon: const Icon(Icons.add_circle_outline),
+              icon: const Icon(CupertinoIcons.add_circled),
             ),
           ],
         ),
@@ -238,13 +241,13 @@ class _DayQuotaSection extends StatelessWidget {
               IconButton(
                 onPressed: () =>
                     ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) - 1),
-                icon: const Icon(Icons.remove_circle_outline),
+                icon: const Icon(CupertinoIcons.minus_circle),
               ),
               Text('${state.destinations[i].dayQuota ?? 1}'),
               IconButton(
                 onPressed: () =>
                     ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) + 1),
-                icon: const Icon(Icons.add_circle_outline),
+                icon: const Icon(CupertinoIcons.add_circled),
               ),
             ],
           ),
@@ -296,7 +299,9 @@ class _SubmitBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text('建立行程'),
               ),

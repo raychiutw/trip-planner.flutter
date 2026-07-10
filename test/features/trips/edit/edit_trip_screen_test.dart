@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,7 +114,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.close).first); // 移除「那霸」
+    await tester.tap(find.byIcon(CupertinoIcons.xmark).first); // 移除「那霸」
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-save')));
     await tester.pumpAndSettle();

@@ -1,13 +1,15 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
@@ -132,8 +134,9 @@ final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
 });
 
-/// 行程清單（5-tab「行程」分頁）：AppBar「我的行程」+ 搜尋框 + 下拉更新 + 單欄卡片清單。
-/// 點卡片進詳情；長按開 bottom sheet 刪除（AlertDialog 二次確認）。
+/// 行程清單（5-tab「行程」分頁）：iOS large title「我的行程」+ 搜尋框 + 分段篩選
+/// + 下拉更新 + 單欄卡片清單。搜尋/篩選置於大標題下方,隨內容捲動(Notes/Mail 慣例)。
+/// 點卡片進詳情；長按開 action sheet(分享/共編/匯出/刪除,二次確認)。
 class TripsListScreen extends ConsumerStatefulWidget {
   const TripsListScreen({super.key});
 
@@ -248,126 +251,157 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('我的行程'),
-        actions: [
-          IconButton(
-            key: const ValueKey('trips-list-import-trigger'),
-            tooltip: '匯入行程 JSON',
-            icon: _isImporting
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_outlined),
-            onPressed: _isImporting ? null : _importTripFromJson,
-          ),
-          PopupMenuButton<TripSortOrder>(
-            key: const ValueKey('trips-sort-button'),
-            icon: const Icon(Icons.sort),
-            tooltip: '排序',
-            initialValue: _sortOrder,
-            onSelected: (order) {
-              setState(() {
-                _sortOrder = order;
-              });
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: TripSortOrder.defaultOrder,
-                child: const Text('預設順序'),
-              ),
-              PopupMenuItem(
-                value: TripSortOrder.nameAsc,
-                child: const Text('名稱 A→Z'),
-              ),
-              PopupMenuItem(
-                value: TripSortOrder.updatedDesc,
-                child: const Text('最新編輯'),
-              ),
-              PopupMenuItem(
-                value: TripSortOrder.startDateAsc,
-                child: const Text('出發日'),
-              ),
-            ],
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         key: const ValueKey('trips-create-fab'),
         onPressed: () => context.push('/new-trip'),
-        child: const Icon(Icons.add),
+        child: const Icon(CupertinoIcons.add),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              TpSpacing.s2,
-              TpSpacing.s4,
-              TpSpacing.s2,
+      body: RefreshIndicator.adaptive(
+        onRefresh: () => ref.refresh(myTripsProvider.future),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar.large(
+              pinned: true,
+              automaticallyImplyLeading: false,
+              title: const Text('我的行程'),
+              actions: [
+                IconButton(
+                  key: const ValueKey('trips-list-import-trigger'),
+                  tooltip: '匯入行程 JSON',
+                  icon: _isImporting
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(CupertinoIcons.cloud_upload),
+                  onPressed: _isImporting ? null : _importTripFromJson,
+                ),
+                PopupMenuButton<TripSortOrder>(
+                  key: const ValueKey('trips-sort-button'),
+                  icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
+                  tooltip: '排序',
+                  initialValue: _sortOrder,
+                  onSelected: (order) {
+                    setState(() {
+                      _sortOrder = order;
+                    });
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: TripSortOrder.defaultOrder,
+                      child: const Text('預設順序'),
+                    ),
+                    PopupMenuItem(
+                      value: TripSortOrder.nameAsc,
+                      child: const Text('名稱 A→Z'),
+                    ),
+                    PopupMenuItem(
+                      value: TripSortOrder.updatedDesc,
+                      child: const Text('最新編輯'),
+                    ),
+                    PopupMenuItem(
+                      value: TripSortOrder.startDateAsc,
+                      child: const Text('出發日'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: TextField(
-              key: const ValueKey('trips-search-field'),
-              controller: _searchController,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: '搜尋行程',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _query.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => _searchController.clear(),
-                      )
-                    : null,
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      TpSpacing.s4,
+                      TpSpacing.s2,
+                      TpSpacing.s4,
+                      TpSpacing.s2,
+                    ),
+                    child: AppSearchField(
+                      fieldKey: const ValueKey('trips-search-field'),
+                      controller: _searchController,
+                      placeholder: '搜尋行程',
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      TpSpacing.s4,
+                      0,
+                      TpSpacing.s4,
+                      TpSpacing.s2,
+                    ),
+                    child: SegmentedButton<TripFilter>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: TripFilter.all, label: Text('全部')),
+                        ButtonSegment(
+                          value: TripFilter.mine,
+                          label: Text('我的'),
+                        ),
+                        ButtonSegment(
+                          value: TripFilter.shared,
+                          label: Text('共編'),
+                        ),
+                      ],
+                      selected: {_filterTab},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _filterTab = selection.first;
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              0,
-              TpSpacing.s4,
-              TpSpacing.s2,
-            ),
-            child: SegmentedButton<TripFilter>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                ButtonSegment(value: TripFilter.mine, label: Text('我的')),
-                ButtonSegment(value: TripFilter.shared, label: Text('共編')),
-              ],
-              selected: {_filterTab},
-              onSelectionChanged: (selection) {
-                setState(() {
-                  _filterTab = selection.first;
-                });
-              },
-            ),
-          ),
-          Expanded(
-            child: myTripsAsync.when(
-              data: (trips) {
-                // 串接:filter(分頁) → search(關鍵字) → sort(排序)。
-                final filtered = _sort(
-                  _search(_filterByTab(trips, currentUserId)),
-                );
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(myTripsProvider.future),
-                  child: trips.isEmpty
-                      ? const _EmptyHero()
-                      : filtered.isEmpty
-                      ? _buildNoResults(theme)
-                      : _buildTripList(context, filtered, currentUserId),
-                );
-              },
-              error: (error, stackTrace) =>
-                  _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
-              loading: () => const Center(child: CircularProgressIndicator()),
-            ),
-          ),
-        ],
+            ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
+          ],
+        ),
       ),
+    );
+  }
+
+  /// 依 async 狀態回傳 body sliver 清單(接在搜尋/篩選 sliver 之後)。
+  List<Widget> _buildBodySlivers(
+    BuildContext context,
+    AsyncValue<List<TripSummary>> myTripsAsync,
+    String? currentUserId,
+    ThemeData theme,
+  ) {
+    return myTripsAsync.when(
+      data: (trips) {
+        // 串接:filter(分頁) → search(關鍵字) → sort(排序)。
+        final filtered = _sort(_search(_filterByTab(trips, currentUserId)));
+        if (trips.isEmpty) {
+          return const [
+            SliverFillRemaining(hasScrollBody: false, child: _EmptyHero()),
+          ];
+        }
+        if (filtered.isEmpty) {
+          return [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _buildNoResults(theme),
+            ),
+          ];
+        }
+        return [_buildTripListSliver(context, filtered, currentUserId)];
+      },
+      error: (error, stackTrace) => [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _ErrorState(onRetry: () => ref.invalidate(myTripsProvider)),
+        ),
+      ],
+      loading: () => [
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator.adaptive()),
+        ),
+      ],
     );
   }
 
@@ -433,119 +467,81 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }
 
   void _showActionMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppNotice(context, message);
   }
 
   Widget _buildNoResults(ThemeData theme) {
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Text(
-              '找不到符合的行程',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+    return Center(
+      child: Text(
+        '找不到符合的行程',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildTripList(
+  Widget _buildTripListSliver(
     BuildContext context,
     List<TripSummary> trips,
     String? currentUserId,
   ) {
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
+    return SliverPadding(
       padding: const EdgeInsets.all(TpSpacing.s4),
-      itemCount: trips.length,
-      separatorBuilder: (context, index) =>
-          const SizedBox(height: TpSpacing.s3),
-      itemBuilder: (context, index) {
-        final trip = trips[index];
-        return TripCard(
-          trip: trip,
-          tone: TripCardTone.values[index % TripCardTone.values.length],
-          currentUserId: currentUserId,
-          onTap: () => context.go('/trips/${trip.tripId}'),
-          onLongPress: () => _showTripActions(context, trip),
-        );
-      },
+      sliver: SliverList.separated(
+        itemCount: trips.length,
+        separatorBuilder: (context, index) =>
+            const SizedBox(height: TpSpacing.s3),
+        itemBuilder: (context, index) {
+          final trip = trips[index];
+          return TripCard(
+            trip: trip,
+            tone: TripCardTone.values[index % TripCardTone.values.length],
+            currentUserId: currentUserId,
+            onTap: () => context.go('/trips/${trip.tripId}'),
+            onLongPress: () => _showTripActions(context, trip),
+          );
+        },
+      ),
     );
   }
 
-  /// 長按卡片 → bottom sheet（分享/共編/匯出/刪除）。
+  /// 長按卡片 → 自適應 action sheet（分享/共編/匯出/刪除）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
-    final selectedAction = await showModalBottomSheet<_TripListAction>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(TpRadius.xl)),
-      ),
-      builder: (sheetContext) {
-        final destructiveColor = Theme.of(sheetContext).colorScheme.error;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: TpSpacing.s2),
-              ListTile(
-                leading: const Icon(Icons.ios_share),
-                title: const Text('分享'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  context.push('/share-trip/${trip.tripId}');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_outlined),
-                title: const Text('共編設定'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  context.push('/collab/${trip.tripId}');
-                },
-              ),
-              ListTile(
-                key: ValueKey('trip-card-menu-export-${trip.tripId}'),
-                leading: _exportingTripId == trip.tripId
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download_outlined),
-                title: const Text('匯出 JSON'),
-                onTap: _exportingTripId == null
-                    ? () => Navigator.of(
-                        sheetContext,
-                      ).pop(_TripListAction.exportJson)
-                    : null,
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline, color: destructiveColor),
-                title: Text(
-                  '刪除行程',
-                  style: TextStyle(
-                    color: destructiveColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(_TripListAction.delete),
-              ),
-              const SizedBox(height: TpSpacing.s2),
-            ],
-          ),
-        );
-      },
+    final selectedAction = await showAppActionSheet<_TripListAction>(
+      context,
+      actions: [
+        AppSheetAction(
+          label: '分享',
+          value: _TripListAction.share,
+          icon: CupertinoIcons.share,
+        ),
+        AppSheetAction(
+          label: '共編設定',
+          value: _TripListAction.collab,
+          icon: CupertinoIcons.person_2,
+        ),
+        AppSheetAction(
+          label: '匯出 JSON',
+          value: _TripListAction.exportJson,
+          icon: CupertinoIcons.cloud_download,
+        ),
+        AppSheetAction(
+          label: '刪除行程',
+          value: _TripListAction.delete,
+          isDestructive: true,
+          icon: CupertinoIcons.delete,
+        ),
+      ],
     );
     if (!context.mounted) return;
     switch (selectedAction) {
+      case _TripListAction.share:
+        context.push('/share-trip/${trip.tripId}');
+        return;
+      case _TripListAction.collab:
+        context.push('/collab/${trip.tripId}');
+        return;
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
         return;
@@ -562,50 +558,27 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     BuildContext context,
     TripSummary trip,
   ) async {
-    final confirmedDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final dialogColorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('刪除行程'),
-          content: Text('確定要刪除「${trip.displayTitle}」嗎？此動作無法復原。'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(shape: const StadiumBorder()),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: dialogColorScheme.error,
-                foregroundColor: dialogColorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('刪除'),
-            ),
-          ],
-        );
-      },
+    final confirmedDelete = await showAppConfirm(
+      context,
+      title: '刪除行程',
+      message: '確定要刪除「${trip.displayTitle}」嗎？此動作無法復原。',
+      confirmLabel: '刪除',
+      isDestructive: true,
     );
-    if (confirmedDelete != true || !context.mounted) return;
+    if (!confirmedDelete || !context.mounted) return;
 
     try {
       await ref.read(tripRepositoryProvider).deleteTrip(trip.tripId);
       ref.invalidate(myTripsProvider);
+      HapticFeedback.mediumImpact();
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+      showAppNotice(context, '刪除失敗，請稍後再試');
     }
   }
 }
 
-enum _TripListAction { exportJson, delete }
+enum _TripListAction { share, collab, exportJson, delete }
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {
@@ -614,29 +587,21 @@ class _EmptyHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // 包進 scrollable 讓空清單也能下拉更新
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('還沒有行程', style: theme.textTheme.titleLarge),
-                const SizedBox(height: TpSpacing.s2),
-                Text(
-                  '建立第一趟旅程，開始規劃你的旅行。',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+    // 外層 SliverFillRemaining 已提供捲動(空清單仍可下拉更新),此處只給置中內容。
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('還沒有行程', style: theme.textTheme.titleLarge),
+          const SizedBox(height: TpSpacing.s2),
+          Text(
+            '建立第一趟旅程，開始規劃你的旅行。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

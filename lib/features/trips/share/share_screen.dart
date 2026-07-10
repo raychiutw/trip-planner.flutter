@@ -3,10 +3,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_client.dart' show kTriplineOrigin;
+import '../../../app/adaptive.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
 import 'share_controller.dart';
@@ -32,33 +34,20 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   ShareController get _ctrl =>
       ref.read(shareControllerProvider(widget.tripId).notifier);
 
-  Future<bool> _confirm(String message) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('撤銷分享連結'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('撤銷'),
-          ),
-        ],
-      ),
+  Future<bool> _confirm(String message) {
+    return showAppConfirm(
+      context,
+      title: '撤銷分享連結',
+      message: message,
+      confirmLabel: '撤銷',
+      isDestructive: true,
     );
-    return ok ?? false;
   }
 
   Future<void> _copy(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已複製連結')));
+      showAppNotice(context, '已複製連結');
     }
   }
 
@@ -69,7 +58,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('分享連結')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator.adaptive())
           : !state.canManage
           ? const Center(
               child: Padding(
@@ -136,7 +125,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text('建立分享連結'),
                 ),
@@ -198,7 +189,7 @@ class _CreatedCard extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 key: const ValueKey('share-copy'),
                 onPressed: () => onCopy(url),
-                icon: const Icon(Icons.copy, size: 18),
+                icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
                 label: const Text('複製連結'),
               ),
             ),

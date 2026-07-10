@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/entry.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
@@ -41,22 +43,17 @@ class EntryPoiScreen extends ConsumerWidget {
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(success)));
+      showAppNotice(context, success);
     } on ApiError catch (error) {
       ref.invalidate(entryDetailProvider(_key));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試'),
-        ),
+      showAppNotice(
+        context,
+        error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試',
       );
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('操作失敗，請稍後再試')));
+      showAppNotice(context, '操作失敗，請稍後再試');
     }
   }
 
@@ -74,7 +71,8 @@ class EntryPoiScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('地點管理')),
       body: entryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -121,7 +119,7 @@ class EntryPoiScreen extends ConsumerWidget {
             TextButton.icon(
               key: const ValueKey('add-alternate'),
               onPressed: () => _addAlternate(context, ref, entry),
-              icon: const Icon(Icons.add),
+              icon: const Icon(CupertinoIcons.add),
               label: const Text('加入備選'),
             ),
           ],
@@ -161,7 +159,7 @@ class EntryPoiScreen extends ConsumerWidget {
                   IconButton(
                     key: ValueKey('alt-remove-${alt.poiId}'),
                     tooltip: '移除',
-                    icon: const Icon(Icons.delete_outline),
+                    icon: const Icon(CupertinoIcons.delete),
                     onPressed: () => _run(
                       context,
                       ref,
@@ -187,7 +185,9 @@ class EntryPoiScreen extends ConsumerWidget {
     EntryPoiInfo poi,
   ) async {
     final result =
-        await showDialog<({String? note, String type, String? reservation})>(
+        await showAdaptiveDialog<
+          ({String? note, String type, String? reservation})
+        >(
           context: context,
           builder: (_) => _PoiInfoDialog(poi: poi),
         );
@@ -217,6 +217,7 @@ class EntryPoiScreen extends ConsumerWidget {
     final selected = await showModalBottomSheet<PoiSearchResult>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -346,7 +347,7 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AlertDialog.adaptive(
       title: const Text('編輯地點資訊'),
       content: SingleChildScrollView(
         child: Column(
@@ -454,13 +455,12 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    key: const ValueKey('alt-search-field'),
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('alt-search-field'),
                     controller: _ctrl,
+                    placeholder: '搜尋地點加入備選',
                     autofocus: true,
-                    textInputAction: TextInputAction.search,
                     onSubmitted: (_) => _search(),
-                    decoration: const InputDecoration(hintText: '搜尋地點加入備選'),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),

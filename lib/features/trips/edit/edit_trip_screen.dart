@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,15 +25,18 @@ class EditTripScreen extends ConsumerWidget {
 
     // 儲存成功 → 返回。
     ref.listen(editTripControllerProvider(tripId), (prev, next) {
-      if (next.saved && !(prev?.saved ?? false) && context.canPop()) {
-        context.pop();
+      if (next.saved && !(prev?.saved ?? false)) {
+        HapticFeedback.lightImpact();
+        if (context.canPop()) {
+          context.pop();
+        }
       }
     });
 
     return Scaffold(
       appBar: AppBar(title: const Text('編輯行程')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator.adaptive())
           : Column(
               children: [
                 Expanded(
@@ -90,7 +94,7 @@ class EditTripScreen extends ConsumerWidget {
                         },
                       ),
                       const SizedBox(height: TpSpacing.s2),
-                      SwitchListTile(
+                      SwitchListTile.adaptive(
                         key: const ValueKey('edit-published'),
                         title: const Text('發布（公開上線）'),
                         contentPadding: EdgeInsets.zero,
@@ -158,7 +162,9 @@ class _SaveBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text('儲存'),
               ),

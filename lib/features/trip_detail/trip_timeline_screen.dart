@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
@@ -45,22 +47,22 @@ class TripTimelineScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: '編輯行程',
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(CupertinoIcons.pencil),
             onPressed: () => context.push('/edit-trip/$tripId'),
           ),
           IconButton(
             tooltip: '地圖',
-            icon: const Icon(Icons.map_outlined),
+            icon: const Icon(CupertinoIcons.map),
             onPressed: () => _goTo(context, '/trips/$tripId/map'),
           ),
           IconButton(
             tooltip: '筆記',
-            icon: const Icon(Icons.sticky_note_2_outlined),
+            icon: const Icon(CupertinoIcons.doc_text),
             onPressed: () => _goTo(context, '/trips/$tripId/notes'),
           ),
           IconButton(
             tooltip: '列印',
-            icon: const Icon(Icons.print_outlined),
+            icon: const Icon(CupertinoIcons.printer),
             onPressed: () => _goTo(context, '/trips/$tripId/print'),
           ),
         ],
@@ -267,9 +269,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+        showAppNotice(context, '排序失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -299,9 +299,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
+        showAppNotice(context, '搬移失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -312,9 +310,7 @@ class _DaySection extends ConsumerWidget {
       await _recomputeDay(ref, target.dayNum);
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
+      showAppNotice(context, '已移到 DAY ${target.dayNum}');
     }
   }
 
@@ -327,6 +323,7 @@ class _DaySection extends ConsumerWidget {
     if (targets.isEmpty) return;
     final targetDayId = await showModalBottomSheet<int>(
       context: context,
+      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -539,7 +536,7 @@ class _DaySection extends ConsumerWidget {
                     tripId: tripId,
                     args: EntryEditNew(day.dayNum, days: allDays),
                   ),
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(CupertinoIcons.add),
                   label: const Text('新增停留點'),
                 ),
               ),
@@ -636,7 +633,7 @@ class _EntryTrailing extends StatelessWidget {
       children: [
         IconButton(
           key: ValueKey('entry-menu-$entryId'),
-          icon: const Icon(Icons.drive_file_move_outline),
+          icon: const Icon(CupertinoIcons.folder),
           tooltip: '移到其他天',
           visualDensity: VisualDensity.compact,
           onPressed: onMove,
@@ -797,7 +794,7 @@ class _TimelineError extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.error_outline,
+            CupertinoIcons.exclamationmark_circle,
             size: 32,
             color: theme.colorScheme.onSurfaceVariant,
           ),

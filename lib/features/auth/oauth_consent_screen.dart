@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
@@ -77,8 +78,8 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
                   ListTile(
                     leading: Icon(
                       _isKnownScope(scope)
-                          ? Icons.check_circle_outline
-                          : Icons.warning_amber_outlined,
+                          ? CupertinoIcons.checkmark_circle
+                          : CupertinoIcons.exclamationmark_triangle,
                       size: 20,
                     ),
                     title: Text(oauthScopeLabel(scope)),
@@ -96,7 +97,7 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
                   onPressed: request.isComplete && !_isSubmitting
                       ? () => unawaited(_submit('deny'))
                       : null,
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(CupertinoIcons.xmark),
                   label: const Text('拒絕'),
                 ),
               ),
@@ -110,9 +111,11 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
                   icon: _isSubmitting
                       ? const SizedBox.square(
                           dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                          ),
                         )
-                      : const Icon(Icons.check),
+                      : const Icon(CupertinoIcons.checkmark),
                   label: const Text('同意'),
                 ),
               ),
@@ -205,7 +208,10 @@ class _ConsentErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

@@ -223,4 +223,19 @@ void main() {
       expect(find.text('登入嘗試次數過多，請稍後再試'), findsOneWidget);
     });
   });
+
+  group('autofill(iOS Keychain / QuickType)', () {
+    testWidgets('email/密碼欄位設定 autofillHints 並包在 AutofillGroup', (tester) async {
+      await pumpLoginScreen(tester);
+
+      // 整個表單包在 AutofillGroup 內,iOS 才會把 email + 密碼視為同一組憑證。
+      expect(find.byType(AutofillGroup), findsOneWidget);
+
+      final emailField = innerTextFieldOf(tester, emailFieldKey);
+      expect(emailField.autofillHints, contains(AutofillHints.username));
+
+      final passwordField = innerTextFieldOf(tester, passwordFieldKey);
+      expect(passwordField.autofillHints, contains(AutofillHints.password));
+    });
+  });
 }

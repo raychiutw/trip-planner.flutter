@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -120,7 +121,13 @@ void main() {
         homepageUrl: null,
       ),
     ).called(1);
-    expect(find.byType(AlertDialog), findsOneWidget);
+    // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is AlertDialog || w is CupertinoAlertDialog,
+      ),
+      findsOneWidget,
+    );
     expect(find.text('tp_new'), findsOneWidget);
   });
 }

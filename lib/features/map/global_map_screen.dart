@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/poi_favorite.dart';
@@ -43,7 +44,8 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('地圖')),
       body: favsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (e, _) => const _Hint(title: '載入失敗', body: '無法取得收藏地點,請稍後再試。'),
         data: (favs) {
           final pins = favs.where(_hasCoords).toList();
@@ -147,7 +149,7 @@ class _SelectedCard extends StatelessWidget {
                 ),
                 IconButton(
                   visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(CupertinoIcons.xmark),
                   onPressed: onClose,
                 ),
               ],

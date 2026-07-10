@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
@@ -56,9 +59,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   Future<void> _openCustomRegion() async {
     final textController = TextEditingController();
     try {
-      final result = await showDialog<String>(
+      final result = await showAdaptiveDialog<String>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AlertDialog.adaptive(
           title: const Text('自訂地區'),
           content: TextField(
             controller: textController,
@@ -101,9 +104,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       next,
     ) {
       if (next != null && next != prev) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next)));
+        showAppNotice(context, next);
       }
     });
 
@@ -128,12 +129,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    key: const ValueKey('explore-search-field'),
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('explore-search-field'),
                     controller: _searchController,
-                    textInputAction: TextInputAction.search,
+                    placeholder: '搜尋地點',
                     onSubmitted: (_) => _submitSearch(),
-                    decoration: const InputDecoration(hintText: '搜尋地點'),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),
@@ -189,7 +189,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         const PopupMenuItem(value: _kCustomRegion, child: Text('+ 自訂地區…')),
       ],
       child: Chip(
-        avatar: const Icon(Icons.location_on_outlined, size: 16),
+        avatar: const Icon(CupertinoIcons.location_solid, size: 16),
         label: Text('$region ▾'),
       ),
     );
@@ -200,7 +200,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
     if (state.results.isEmpty) {
       if (state.searching) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: CircularProgressIndicator.adaptive());
       }
       if (state.query.trim().length >= 2 && state.hasSearched) {
         return Center(
@@ -210,7 +210,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         );
       }
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator.adaptive());
     }
 
     final filtered = state.filteredResults;
@@ -251,8 +251,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           poi: poi,
           isSaved: state.isSaved(poi),
           isSaving: state.savingPlaceIds.contains(poi.placeId),
-          onToggleFavorite: () =>
-              ref.read(exploreControllerProvider.notifier).toggleFavorite(poi),
+          onToggleFavorite: () {
+            HapticFeedback.selectionClick();
+            ref.read(exploreControllerProvider.notifier).toggleFavorite(poi);
+          },
           onAddToTrip: () => context.go(
             '/favorites/add-to-trip',
             extra: AddToTripDirect(poi: poi),
