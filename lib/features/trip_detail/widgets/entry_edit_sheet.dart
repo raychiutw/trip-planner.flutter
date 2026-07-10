@@ -200,13 +200,6 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: TpSpacing.s3),
-            TextField(
-              key: const ValueKey('entry-edit-desc'),
-              controller: _desc,
-              decoration: const InputDecoration(labelText: '描述（選填）'),
-              maxLines: 2,
-            ),
-            const SizedBox(height: TpSpacing.s3),
             _timeField(true),
             const SizedBox(height: TpSpacing.s2),
             _timeField(false),
@@ -221,6 +214,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                   ),
                 ),
               ),
+            const SizedBox(height: TpSpacing.s3),
+            TextField(
+              key: const ValueKey('entry-edit-desc'),
+              controller: _desc,
+              decoration: const InputDecoration(labelText: '描述（選填）'),
+              maxLines: 2,
+            ),
             if (_isEdit) ...[
               const SizedBox(height: TpSpacing.s3),
               OutlinedButton.icon(

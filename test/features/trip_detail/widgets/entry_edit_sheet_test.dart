@@ -126,6 +126,24 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('編輯模式：起訖時間在描述欄上方', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(tester, repo, const EntryEditExisting(_entry));
+
+    final startTop = tester.getTopLeft(
+      find.byKey(const ValueKey('entry-edit-start')),
+    ).dy;
+    final endTop = tester.getTopLeft(
+      find.byKey(const ValueKey('entry-edit-end')),
+    ).dy;
+    final descTop = tester.getTopLeft(
+      find.byKey(const ValueKey('entry-edit-desc')),
+    ).dy;
+
+    expect(startTop, lessThan(descTop));
+    expect(endTop, lessThan(descTop));
+  });
+
   testWidgets('新增模式：送出呼叫 addEntryToDay(source custom)', (tester) async {
     final repo = _MockTripRepository();
     when(
