@@ -26,6 +26,9 @@ class PoiFavoriteCard extends StatelessWidget {
     final tones = theme.extension<TpTones>()!;
     final tone = resolvePoiTone(tones, favorite.poiType);
     final mutedColor = theme.colorScheme.onSurfaceVariant;
+    final note = favorite.note
+        ?.replaceFirst(RegExp(r'\s*\(req\s*#\d+\)\s*$'), '')
+        .trim();
 
     return Container(
       key: ValueKey('favorite-card-${favorite.id}'),
@@ -70,11 +73,11 @@ class PoiFavoriteCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
                     child: PoiRatingLabel(rating: favorite.poiRating!),
                   ),
-                if (favorite.note != null && favorite.note!.isNotEmpty)
+                if (note != null && note.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: TpSpacing.s1),
                     child: Text(
-                      favorite.note!,
+                      note,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(

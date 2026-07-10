@@ -126,6 +126,10 @@ void main() {
         find.byType(SegmentedButton<TripFilter>),
       );
       expect(control.direction, Axis.vertical);
+      expect(
+        tester.getSize(find.byType(SegmentedButton<TripFilter>)).width,
+        greaterThanOrEqualTo(350),
+      );
       expect(tester.takeException(), isNull);
     });
 

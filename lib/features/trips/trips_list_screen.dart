@@ -335,28 +335,34 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       TpSpacing.s4,
                       TpSpacing.s2,
                     ),
-                    child: SegmentedButton<TripFilter>(
-                      direction: useVerticalFilters
-                          ? Axis.vertical
-                          : Axis.horizontal,
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                        ButtonSegment(
-                          value: TripFilter.mine,
-                          label: Text('我的'),
-                        ),
-                        ButtonSegment(
-                          value: TripFilter.shared,
-                          label: Text('共編'),
-                        ),
-                      ],
-                      selected: {_filterTab},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _filterTab = selection.first;
-                        });
-                      },
+                    child: SizedBox(
+                      width: useVerticalFilters ? double.infinity : null,
+                      child: SegmentedButton<TripFilter>(
+                        direction: useVerticalFilters
+                            ? Axis.vertical
+                            : Axis.horizontal,
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
+                            value: TripFilter.all,
+                            label: Text('全部'),
+                          ),
+                          ButtonSegment(
+                            value: TripFilter.mine,
+                            label: Text('我的'),
+                          ),
+                          ButtonSegment(
+                            value: TripFilter.shared,
+                            label: Text('共編'),
+                          ),
+                        ],
+                        selected: {_filterTab},
+                        onSelectionChanged: (selection) {
+                          setState(() {
+                            _filterTab = selection.first;
+                          });
+                        },
+                      ),
                     ),
                   ),
                 ],

@@ -65,6 +65,23 @@ void main() {
       expect(find.textContaining('用於'), findsNothing);
     });
 
+    testWidgets('note 不顯示內部 request 編號', (tester) async {
+      await pumpCard(
+        tester,
+        const PoiFavorite(
+          id: 9,
+          userId: 'u-1',
+          poiId: 503,
+          favoritedAt: '2026-06-03T10:00:00Z',
+          poiName: '旅館',
+          note: '旅伴請求加入收藏 (req #184)',
+        ),
+      );
+
+      expect(find.text('旅伴請求加入收藏'), findsOneWidget);
+      expect(find.textContaining('req #'), findsNothing);
+    });
+
     testWidgets('點 heart → onRemove 被呼叫', (tester) async {
       var removed = 0;
       await pumpCard(tester, _favorite, onRemove: () => removed++);

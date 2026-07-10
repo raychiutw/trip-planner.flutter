@@ -70,7 +70,10 @@ class DayHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: TpSpacing.s2,
+          runSpacing: TpSpacing.s1,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
@@ -83,7 +86,6 @@ class DayHeader extends StatelessWidget {
               ),
             ),
             if (dateLabel.isNotEmpty) ...[
-              const SizedBox(width: TpSpacing.s2),
               Text(
                 dateLabel,
                 style: TextStyle(
@@ -94,7 +96,6 @@ class DayHeader extends StatelessWidget {
               ),
             ],
             if (timeRange != null) ...[
-              const SizedBox(width: TpSpacing.s2),
               Text(
                 timeRange,
                 style: TextStyle(

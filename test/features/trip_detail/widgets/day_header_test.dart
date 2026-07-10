@@ -10,10 +10,15 @@ Future<void> pumpHeader(
   WidgetTester tester,
   TripDay day, {
   List<TripSegment> segments = const [],
+  TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
       home: Scaffold(
         body: DayHeader(day: day, segments: segments),
       ),
@@ -23,6 +28,35 @@ Future<void> pumpHeader(
 
 void main() {
   group('DayHeader', () {
+    testWidgets('AXXXL 日期與時間會換行且不溢位', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await pumpHeader(
+        tester,
+        const TripDay(
+          id: 1,
+          dayNum: 1,
+          date: '2026-07-02',
+          dayOfWeek: '週四',
+          title: '那霸',
+          version: 0,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              version: 0,
+              startTime: '09:00',
+              endTime: '20:30',
+              title: 'A',
+            ),
+          ],
+        ),
+        textScaler: const TextScaler.linear(3.2),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('DAY NN 補零 + 日期(全形括號) + displayTitle', (tester) async {
       await pumpHeader(
         tester,
