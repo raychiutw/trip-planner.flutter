@@ -72,7 +72,8 @@ void main() {
             'id': 9001,
             'dayId': 101,
             'sortOrder': 1,
-            'title': '美麗海水族館',
+            // 顯示名來自 POI master;legacy trip_entries.title 已不再當 fallback。
+            'master': {'poiId': 9101, 'name': '美麗海水族館'},
             'version': 1,
           },
         ],

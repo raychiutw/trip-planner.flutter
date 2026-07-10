@@ -80,7 +80,8 @@ void main() {
             {
               'id': 101,
               'sortOrder': 0,
-              'title': '首里城公園',
+              // 顯示名來自 POI master;legacy trip_entries.title 已不再當 fallback。
+              'master': {'poiId': 202, 'name': '首里城公園'},
               'version': 1,
               'startTime': '09:00',
               'endTime': '10:30',
