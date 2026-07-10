@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -93,6 +95,7 @@ class _TimelineBody extends StatefulWidget {
 class _TimelineBodyState extends State<_TimelineBody> {
   late Map<int, GlobalKey> _daySectionKeys;
   late int _activeDayNum;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -126,6 +129,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -136,6 +145,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
         ),
         Expanded(
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
               TpSpacing.s4,
@@ -151,6 +161,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     day: day,
                     allDays: widget.days,
                     tripId: widget.tripId,
+                    scrollController: _scrollController,
                   ),
               ],
             ),
@@ -173,6 +184,34 @@ List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
   ];
 }
 
+List<({int id, int sortOrder, int? dayId})> computeCrossDayMoveUpdates({
+  required int activeEntryId,
+  required int targetDayId,
+  required List<int> targetEntryIds,
+  int? overEntryId,
+}) {
+  final ids = targetEntryIds.where((id) => id != activeEntryId).toList();
+  final overIndex = overEntryId == null ? -1 : ids.indexOf(overEntryId);
+  final insertIndex = overIndex >= 0 ? overIndex : ids.length;
+  return [
+    (id: activeEntryId, sortOrder: insertIndex, dayId: targetDayId),
+    for (var i = insertIndex; i < ids.length; i++)
+      (id: ids[i], sortOrder: i + 1, dayId: null),
+  ];
+}
+
+class _EntryDragPayload {
+  const _EntryDragPayload({
+    required this.entry,
+    required this.sourceDayId,
+    required this.sourceDayNum,
+  });
+
+  final TimelineEntry entry;
+  final int sourceDayId;
+  final int sourceDayNum;
+}
+
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -180,11 +219,13 @@ class _DaySection extends ConsumerWidget {
     required this.tripId,
     required this.day,
     required this.allDays,
+    required this.scrollController,
   });
 
   final String tripId;
   final TripDay day;
   final List<TripDay> allDays;
+  final ScrollController scrollController;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -232,6 +273,46 @@ class _DaySection extends ConsumerWidget {
     await _recomputeAndRefresh(ref);
   }
 
+  Future<void> _moveEntryToDay(
+    BuildContext context,
+    WidgetRef ref, {
+    required TimelineEntry entry,
+    required int sourceDayId,
+    required int sourceDayNum,
+    required TripDay target,
+    int? targetEntryId,
+  }) async {
+    if (target.id == sourceDayId) return;
+    final updates = computeCrossDayMoveUpdates(
+      activeEntryId: entry.id,
+      targetDayId: target.id,
+      targetEntryIds: [for (final e in target.timeline) e.id],
+      overEntryId: targetEntryId,
+    );
+    final repo = ref.read(tripRepositoryProvider);
+    try {
+      await repo.reorderEntries(tripId: tripId, updates: updates);
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
+      }
+      ref.invalidate(tripDaysProvider(tripId));
+      return;
+    }
+    ref.invalidate(tripDaysProvider(tripId));
+    await _recomputeDay(ref, sourceDayNum);
+    if (target.dayNum != sourceDayNum) {
+      await _recomputeDay(ref, target.dayNum);
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
+    }
+  }
+
   Future<void> _moveToDay(
     BuildContext context,
     WidgetRef ref,
@@ -257,39 +338,28 @@ class _DaySection extends ConsumerWidget {
       ),
     );
     if (targetDayId == null) return;
+    if (!context.mounted) return;
     final target = allDays.firstWhere((d) => d.id == targetDayId);
-    final repo = ref.read(tripRepositoryProvider);
-    try {
-      await repo.reorderEntries(
-        tripId: tripId,
-        updates: [
-          (id: entry.id, sortOrder: target.timeline.length, dayId: targetDayId),
-        ],
-      );
-    } on Exception {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
-      }
-      ref.invalidate(tripDaysProvider(tripId));
-      return;
-    }
-    ref.invalidate(tripDaysProvider(tripId));
-    await _recomputeAndRefresh(ref);
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
-    }
+    await _moveEntryToDay(
+      context,
+      ref,
+      entry: entry,
+      sourceDayId: day.id,
+      sourceDayNum: day.dayNum,
+      target: target,
+    );
   }
 
   /// reorder/move 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
   Future<void> _recomputeAndRefresh(WidgetRef ref) async {
+    await _recomputeDay(ref, day.dayNum);
+  }
+
+  Future<void> _recomputeDay(WidgetRef ref, int dayNum) async {
     try {
       await ref
           .read(tripRepositoryProvider)
-          .recomputeTravel(tripId: tripId, day: '${day.dayNum}');
+          .recomputeTravel(tripId: tripId, day: '$dayNum');
       ref.invalidate(tripDaysProvider(tripId));
     } on Exception {
       // 交通重算失敗忽略
@@ -304,42 +374,49 @@ class _DaySection extends ConsumerWidget {
       _ => const <TripSegment>[],
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DayHeader(day: day, segments: segments),
-        const SizedBox(height: TpSpacing.s3),
-        if (day.hotel != null) ...[
-          HotelCard(hotel: day.hotel!),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          buildDefaultDragHandles: false,
-          itemCount: timeline.length,
-          onReorderItem: (oldIndex, newIndex) =>
-              _reorder(context, ref, oldIndex, newIndex),
-          itemBuilder: (context, i) {
-            final entry = timeline[i];
-            return Column(
-              key: ValueKey('entry-${entry.id}'),
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (i > 0 && entry.travel != null)
-                  _TravelRow(
-                    travel: entry.travel!,
-                    segment: _findSegment(
-                      segments,
-                      timeline[i - 1].id,
-                      entry.id,
-                    ),
-                    tripId: tripId,
-                  ),
-                SwipeToDelete(
-                  dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                  onDelete: () => _confirmDelete(context, ref, entry),
-                  child: TimelineEntryTile(
+    return DragTarget<_EntryDragPayload>(
+      key: ValueKey('day-drop-${day.id}'),
+      onWillAcceptWithDetails: (details) => details.data.sourceDayId != day.id,
+      onAcceptWithDetails: (details) {
+        unawaited(
+          _moveEntryToDay(
+            context,
+            ref,
+            entry: details.data.entry,
+            sourceDayId: details.data.sourceDayId,
+            sourceDayNum: details.data.sourceDayNum,
+            target: day,
+          ),
+        );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final highlight = candidateData.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: highlight
+                ? Border.all(color: Theme.of(context).colorScheme.primary)
+                : null,
+            borderRadius: BorderRadius.circular(TpRadius.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DayHeader(day: day, segments: segments),
+              const SizedBox(height: TpSpacing.s3),
+              if (day.hotel != null) ...[
+                HotelCard(hotel: day.hotel!),
+                const SizedBox(height: TpSpacing.s3),
+              ],
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: timeline.length,
+                onReorderItem: (oldIndex, newIndex) =>
+                    _reorder(context, ref, oldIndex, newIndex),
+                itemBuilder: (context, i) {
+                  final entry = timeline[i];
+                  final tile = TimelineEntryTile(
                     entry: entry,
                     number: i + 1,
                     isFirst: i == 0,
@@ -354,29 +431,113 @@ class _DaySection extends ConsumerWidget {
                       index: i,
                       onMove: () => _moveToDay(context, ref, entry),
                     ),
+                  );
+                  final draggableTile = LongPressDraggable<_EntryDragPayload>(
+                    key: ValueKey('entry-cross-drag-${entry.id}'),
+                    data: _EntryDragPayload(
+                      entry: entry,
+                      sourceDayId: day.id,
+                      sourceDayNum: day.dayNum,
+                    ),
+                    dragAnchorStrategy: pointerDragAnchorStrategy,
+                    onDragUpdate: (details) =>
+                        _autoScrollDuringDrag(context, details.globalPosition),
+                    feedback: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(TpRadius.md),
+                      child: Padding(
+                        padding: const EdgeInsets.all(TpSpacing.s3),
+                        child: Text(entry.title),
+                      ),
+                    ),
+                    childWhenDragging: Opacity(opacity: 0.35, child: tile),
+                    child: tile,
+                  );
+                  final row = SwipeToDelete(
+                    dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                    onDelete: () => _confirmDelete(context, ref, entry),
+                    child: draggableTile,
+                  );
+                  final dropRow = DragTarget<_EntryDragPayload>(
+                    key: ValueKey('entry-drop-${entry.id}'),
+                    onWillAcceptWithDetails: (details) =>
+                        details.data.sourceDayId != day.id,
+                    onAcceptWithDetails: (details) {
+                      unawaited(
+                        _moveEntryToDay(
+                          context,
+                          ref,
+                          entry: details.data.entry,
+                          sourceDayId: details.data.sourceDayId,
+                          sourceDayNum: details.data.sourceDayNum,
+                          target: day,
+                          targetEntryId: entry.id,
+                        ),
+                      );
+                    },
+                    builder: (context, candidateData, rejectedData) => row,
+                  );
+                  return Column(
+                    key: ValueKey('entry-${entry.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (i > 0 && entry.travel != null)
+                        _TravelRow(
+                          travel: entry.travel!,
+                          segment: _findSegment(
+                            segments,
+                            timeline[i - 1].id,
+                            entry.id,
+                          ),
+                          tripId: tripId,
+                        ),
+                      dropRow,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: ValueKey('add-entry-${day.dayNum}'),
+                  onPressed: () => showEntryEditSheet(
+                    context,
+                    tripId: tripId,
+                    args: EntryEditNew(day.dayNum, days: allDays),
                   ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('新增停留點'),
                 ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: TpSpacing.s2),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('add-entry-${day.dayNum}'),
-            onPressed: () => showEntryEditSheet(
-              context,
-              tripId: tripId,
-              args: EntryEditNew(day.dayNum, days: allDays),
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('新增停留點'),
+              ),
+              const SizedBox(height: TpSpacing.s6),
+            ],
           ),
-        ),
-        const SizedBox(height: TpSpacing.s6),
-      ],
+        );
+      },
     );
+  }
+
+  void _autoScrollDuringDrag(BuildContext context, Offset globalPosition) {
+    if (!scrollController.hasClients) return;
+    final height = MediaQuery.sizeOf(context).height;
+    const edge = 72.0;
+    const step = 32.0;
+    final delta = globalPosition.dy < edge
+        ? -step
+        : globalPosition.dy > height - edge
+        ? step
+        : 0.0;
+    if (delta == 0) return;
+
+    final position = scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      scrollController.jumpTo(target);
+    }
   }
 }
 
