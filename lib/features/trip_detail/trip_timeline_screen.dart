@@ -239,14 +239,15 @@ class _DaySection extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) {
+    // 在 mounted 時先讀 repo：confirmAndDelete 會先 await 確認框，才呼叫 delete()，
+    // 期間背景刷新 days 可能 remount _DaySection、使此 ref 失效（見 _reorder/_moveEntryToDay 同法）。
+    final repo = ref.read(tripRepositoryProvider);
     return confirmAndDelete(
       context,
       title: '刪除停留點',
       message: '確定要刪除「${entry.title}」嗎？',
       delete: () async {
-        await ref
-            .read(tripRepositoryProvider)
-            .deleteEntry(tripId: tripId, entryId: entry.id);
+        await repo.deleteEntry(tripId: tripId, entryId: entry.id);
         await _recomputeAndRefresh(ref);
       },
       onSuccess: () {

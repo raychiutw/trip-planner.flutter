@@ -527,6 +527,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('確認刪除對話框開著時 days 背景刷新 remount → 按刪除不因 ref.read use-after-dispose 崩潰', (
+    tester,
+  ) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, repo: repo, daysStream: days.stream);
+
+    days.add(_fakeDays.toList());
+    await tester.pumpAndSettle();
+
+    // 左滑 entry 11 → 開確認對話框
+    await tester.drag(
+      find.byKey(const ValueKey('entry-dismiss-11')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('刪除停留點'), findsOneWidget);
+
+    // 對話框開著時 tripDaysProvider 背景刷新（新 list 身份）→ didUpdateWidget 重配 GlobalKey
+    // → _DaySection remount，使 _confirmDelete closure 捕捉的舊 ref 失效。
+    days.add(_fakeDays.toList());
+    await tester.pumpAndSettle();
+
+    // 按刪除 → delete() 執行；修好前第一行 ref.read(tripRepositoryProvider) 會對已 unmount 的舊
+    // element 擲 StateError（非 Exception，confirmAndDelete 的 on Exception 攔不到）→ 未捕捉例外。
+    await tester.tap(find.text('刪除'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+  });
+
   testWidgets('缺 travel segment 但缺座標 → 不自動重算', (tester) async {
     final repo = _MockTripRepository();
     when(
