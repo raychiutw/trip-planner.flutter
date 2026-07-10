@@ -75,8 +75,8 @@ class TripDay {
   final DayHotel? hotel;
   final List<TimelineEntry> timeline;
 
-  /// 顯示標題 fallback chain：title → label → 'Day N'。
-  String get displayTitle => title ?? label ?? 'Day $dayNum';
+  /// Web v2.55.49 起每日 custom title 已下線；日期是唯一主標。
+  String get displayTitle => date ?? 'Day $dayNum';
 
   factory TripDay.fromJson(Map<String, dynamic> json) {
     return TripDay(

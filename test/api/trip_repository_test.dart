@@ -292,7 +292,7 @@ void main() {
     expect(tripDays, hasLength(1));
     final firstDay = tripDays.single;
     expect(firstDay.dayNum, 1);
-    expect(firstDay.displayTitle, '抵達那霸');
+    expect(firstDay.displayTitle, '2026-04-23');
     expect(firstDay.hotel!.name, '那霸海濱飯店');
     expect(firstDay.hotel!.location!.lat, 26.21);
     expect(firstDay.timeline, hasLength(2));
@@ -781,6 +781,29 @@ void main() {
     expect(seg.version, 4);
   });
 
+  test('updateSegment：同一地點送 noTravel true', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/segments/5',
+      (server) => server.reply(200, {
+        'id': 5,
+        'mode': 'driving',
+        'version': 4,
+        'noTravel': 1,
+      }),
+      data: {'mode': 'driving', 'noTravel': true, 'expectedVersion': 3},
+    );
+
+    final seg = await tripRepository.updateSegment(
+      tripId: 'okinawa',
+      segmentId: 5,
+      mode: 'driving',
+      noTravel: true,
+      expectedVersion: 3,
+    );
+
+    expect(seg.noTravel, isTrue);
+  });
+
   test('updateSegment：409 → 拋 ApiError(409)', () async {
     dioAdapter.onPatch(
       '/trips/okinawa/segments/5',
@@ -1235,20 +1258,20 @@ void main() {
       await cache.writeResponse(
         cacheKeyFor('GET', '/trips/okinawa/days', {'all': '1'}),
         [
-          {'id': 11, 'dayNum': 1, 'title': 'stale', 'timeline': []},
+          {'id': 11, 'dayNum': 1, 'date': '2026-07-10', 'timeline': []},
         ],
       );
       swrAdapter.onGet(
         '/trips/okinawa/days',
         (server) => server.reply(200, [
-          {'id': 11, 'dayNum': 1, 'title': 'fresh', 'timeline': []},
+          {'id': 11, 'dayNum': 1, 'date': '2026-07-11', 'timeline': []},
         ]),
         queryParameters: {'all': '1'},
       );
       final emissions = await swrRepo.watchDays('okinawa').toList();
       expect(emissions, hasLength(2));
-      expect(emissions.first.single.displayTitle, 'stale');
-      expect(emissions.last.single.displayTitle, 'fresh');
+      expect(emissions.first.single.displayTitle, '2026-07-10');
+      expect(emissions.last.single.displayTitle, '2026-07-11');
     });
   });
 

@@ -408,6 +408,7 @@ class TripRepository {
     required String mode,
     String? submode,
     int? min,
+    bool? noTravel,
     int? expectedVersion,
   }) async {
     final body = await _client.patch(
@@ -416,6 +417,7 @@ class TripRepository {
         'mode': mode,
         'submode': ?submode,
         'min': ?min,
+        'noTravel': ?noTravel,
         'expectedVersion': ?expectedVersion,
       },
     );

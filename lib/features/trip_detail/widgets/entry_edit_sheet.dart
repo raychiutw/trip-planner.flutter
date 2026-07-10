@@ -162,6 +162,11 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             startTime: _fmt(_start),
             endTime: _fmt(_end),
           );
+          try {
+            await repo.recomputeTravel(tripId: widget.tripId);
+          } on Exception {
+            // Entry save succeeded; travel can self-heal on the next refresh.
+          }
         case final EntryEditNew args:
           final dayNum = _selectedDayNum(args);
           await repo.addEntryToDay(

@@ -59,6 +59,7 @@ class DayHeader extends StatelessWidget {
       if (day.date != null) day.date!,
       if (day.dayOfWeek != null) '（${day.dayOfWeek}）',
     ].join();
+    final headline = dateLabel.isEmpty ? day.displayTitle : dateLabel;
 
     final timeRange = dayTimeRange(day);
     final stopCount = day.timeline.length;
@@ -85,16 +86,6 @@ class DayHeader extends StatelessWidget {
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            if (dateLabel.isNotEmpty) ...[
-              Text(
-                dateLabel,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
             if (timeRange != null) ...[
               Text(
                 timeRange,
@@ -108,7 +99,7 @@ class DayHeader extends StatelessWidget {
           ],
         ),
         const SizedBox(height: TpSpacing.s1),
-        Text(day.displayTitle, style: theme.textTheme.titleLarge),
+        Text(headline, style: theme.textTheme.titleLarge),
         Text(
           summary,
           style: TextStyle(

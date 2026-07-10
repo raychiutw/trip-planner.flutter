@@ -107,6 +107,32 @@ void main() {
     expect(find.text('BR112'), findsOneWidget);
   });
 
+  testWidgets('同一地點交通顯示使用者文案', (tester) async {
+    when(() => repository.fetchDays('trip-1')).thenAnswer(
+      (_) async => const [
+        TripDay(
+          id: 10,
+          dayNum: 1,
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 101,
+              sortOrder: 0,
+              title: '機場商店',
+              version: 1,
+              travel: Travel(type: 'sameplace'),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await pumpScreen(tester);
+
+    expect(find.text('同一地點'), findsOneWidget);
+    expect(find.text('sameplace'), findsNothing);
+  });
+
   testWidgets('列印與 PDF 按鈕呼叫注入的 action service', (tester) async {
     await pumpScreen(tester);
 

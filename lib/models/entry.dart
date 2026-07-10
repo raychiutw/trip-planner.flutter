@@ -5,6 +5,8 @@ library;
 class Travel {
   const Travel({
     required this.type,
+    this.submode,
+    this.sameplace = false,
     this.desc,
     this.min,
     this.distanceM,
@@ -12,14 +14,22 @@ class Travel {
   });
 
   final String type;
+  final String? submode;
+  final bool sameplace;
   final String? desc;
   final int? min;
   final int? distanceM;
   final String? source;
 
   factory Travel.fromJson(Map<String, dynamic> json) {
+    final sameplace = json['sameplace'] == true || json['sameplace'] == 1;
+    final submode = json['submode'] as String?;
     return Travel(
-      type: json['type'] as String,
+      type: sameplace
+          ? 'sameplace'
+          : submode ?? json['type'] as String? ?? 'transit',
+      submode: submode,
+      sameplace: sameplace,
       desc: json['desc'] as String?,
       min: (json['min'] as num?)?.toInt(),
       distanceM: (json['distanceM'] as num?)?.toInt(),

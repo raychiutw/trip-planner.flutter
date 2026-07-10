@@ -27,6 +27,28 @@ void main() {
       expect(travel.distanceM, isNull);
       expect(travel.source, isNull);
     });
+
+    test('sameplace payload 允許 null type 並顯示同一地點', () {
+      final travel = Travel.fromJson({
+        'type': null,
+        'submode': null,
+        'sameplace': true,
+      });
+
+      expect(travel.type, 'sameplace');
+      expect(travel.sameplace, isTrue);
+    });
+
+    test('transit 優先使用 submode 作為顯示類型', () {
+      final travel = Travel.fromJson({
+        'type': 'transit',
+        'submode': 'monorail',
+        'sameplace': false,
+      });
+
+      expect(travel.type, 'monorail');
+      expect(travel.submode, 'monorail');
+    });
   });
 
   group('EntryPoiInfo.fromJson', () {

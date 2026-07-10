@@ -122,5 +122,23 @@ void main() {
       expect(find.text('車程重新計算中'), findsOneWidget);
       expect(find.text('20 分鐘 · 11 km'), findsNothing);
     });
+
+    testWidgets('sameplace 顯示中性描邊「同一地點」marker', (tester) async {
+      await pumpPill(
+        tester,
+        Travel.fromJson({'type': null, 'sameplace': true}),
+      );
+
+      expect(find.text('同一地點'), findsOneWidget);
+      expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+      final container = tester.widget<Container>(
+        find.byKey(const ValueKey('travel-pill')),
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(
+        decoration.border!.top.color,
+        AppTheme.light().colorScheme.outline,
+      );
+    });
   });
 }

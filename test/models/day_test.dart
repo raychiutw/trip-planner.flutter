@@ -102,11 +102,12 @@ void main() {
       expect(day.timeline, isEmpty);
     });
 
-    test('displayTitle fallback：title → label → Day N', () {
+    test('displayTitle 使用日期並忽略 legacy title / label', () {
       final dayWithTitle = TripDay.fromJson({
         'id': 1,
         'dayNum': 1,
         'version': 1,
+        'date': '2026-07-10',
         'title': '抵達日',
         'label': '南部',
       });
@@ -118,8 +119,8 @@ void main() {
       });
       final dayBare = TripDay.fromJson({'id': 3, 'dayNum': 3, 'version': 1});
 
-      expect(dayWithTitle.displayTitle, '抵達日');
-      expect(dayWithLabel.displayTitle, '中部');
+      expect(dayWithTitle.displayTitle, '2026-07-10');
+      expect(dayWithLabel.displayTitle, 'Day 2');
       expect(dayBare.displayTitle, 'Day 3');
     });
   });

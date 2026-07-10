@@ -15,6 +15,7 @@ void main() {
         'source': 'haversine',
         'computedAt': 1700000000000,
         'version': 3,
+        'noTravel': 1,
       });
       expect(seg.id, 5);
       expect(seg.fromEntryId, 11);
@@ -25,6 +26,7 @@ void main() {
       expect(seg.distanceM, 4200);
       expect(seg.source, 'haversine');
       expect(seg.isStale, isFalse);
+      expect(seg.noTravel, isTrue);
       expect(seg.version, 3);
     });
 
@@ -37,6 +39,7 @@ void main() {
       expect(seg.distanceM, isNull);
       expect(seg.source, isNull);
       expect(seg.isStale, isFalse);
+      expect(seg.noTravel, isFalse);
       expect(seg.version, 0);
     });
 

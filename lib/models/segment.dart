@@ -13,6 +13,7 @@ class TripSegment {
     this.distanceM,
     this.source,
     this.isStale = false,
+    this.noTravel = false,
     required this.version,
   });
 
@@ -32,6 +33,9 @@ class TripSegment {
   /// true when backend returned computedAt: null, meaning travel is being recomputed.
   final bool isStale;
 
+  /// true when the user marks this adjacency as the same place/no travel.
+  final bool noTravel;
+
   /// OCC token（PATCH 帶 expectedVersion）。
   final int version;
 
@@ -46,6 +50,7 @@ class TripSegment {
       distanceM: (json['distanceM'] as num?)?.toInt(),
       source: json['source'] as String?,
       isStale: json.containsKey('computedAt') && json['computedAt'] == null,
+      noTravel: json['noTravel'] == true || json['noTravel'] == 1,
       version: (json['version'] as num?)?.toInt() ?? 0,
     );
   }

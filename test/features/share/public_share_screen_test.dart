@@ -121,6 +121,36 @@ void main() {
     expect(find.text('BR112'), findsOneWidget);
   });
 
+  testWidgets('同一地點交通顯示使用者文案', (tester) async {
+    final samePlaceShare = PublicTripShare(
+      name: 'same-place-trip',
+      days: [
+        TripDay(
+          id: 10,
+          dayNum: 1,
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 101,
+              sortOrder: 0,
+              title: '機場商店',
+              version: 1,
+              travel: Travel.fromJson({'type': null, 'sameplace': true}),
+            ),
+          ],
+        ),
+      ],
+    );
+    when(
+      () => repository.fetchPublicTripShare(any()),
+    ).thenAnswer((_) async => samePlaceShare);
+
+    await pumpScreen(tester);
+
+    expect(find.text('同一地點'), findsOneWidget);
+    expect(find.text('sameplace'), findsNothing);
+  });
+
   testWidgets('未登入點複製會前往 login', (tester) async {
     await pumpScreen(tester);
 

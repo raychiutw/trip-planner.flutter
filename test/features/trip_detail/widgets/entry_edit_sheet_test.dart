@@ -22,8 +22,8 @@ const _entry = TimelineEntry(
   version: 2,
 );
 
-TripDay _day(int dayNum, String title) =>
-    TripDay(id: dayNum, dayNum: dayNum, title: title, version: 0);
+TripDay _day(int dayNum, String date) =>
+    TripDay(id: dayNum, dayNum: dayNum, date: date, version: 0);
 
 Future<void> _open(
   WidgetTester tester,
@@ -108,6 +108,7 @@ void main() {
         endTime: any(named: 'endTime'),
       ),
     ).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
 
     await _open(tester, repo, const EntryEditExisting(_entry));
     expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
@@ -125,6 +126,7 @@ void main() {
         endTime: any(named: 'endTime'),
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1')).called(1);
   });
 
   testWidgets('編輯模式：起訖時間在描述欄上方', (tester) async {
@@ -217,7 +219,7 @@ void main() {
     await _open(
       tester,
       repo,
-      EntryEditNew(1, days: [_day(1, '第一天'), _day(3, '第三天')]),
+      EntryEditNew(1, days: [_day(1, '2026-07-01'), _day(3, '2026-07-03')]),
     );
     await tester.enterText(
       find.byKey(const ValueKey('entry-edit-title')),
@@ -225,7 +227,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 3 · 第三天').last);
+    await tester.tap(find.text('DAY 3 · 2026-07-03').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
