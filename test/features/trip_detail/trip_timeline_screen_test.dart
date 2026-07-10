@@ -467,6 +467,30 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
+  testWidgets('自動重算 travel segment 失敗 → 顯示車程待更新', (tester) async {
+    final repo = _MockTripRepository();
+    const tripId = 'trip-recompute-stalled';
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenThrow(Exception('recompute failed'));
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      tripId: tripId,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('車程待更新'), findsOneWidget);
+    expect(find.text('車程重新計算中'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: tripId, day: '1')).called(1);
+  });
+
   testWidgets('缺 travel segment 但缺座標 → 不自動重算', (tester) async {
     final repo = _MockTripRepository();
     when(

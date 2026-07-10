@@ -212,8 +212,9 @@ class _EntryDragPayload {
   final int sourceDayNum;
 }
 
-// ponytail: process-local auto signature guard; move to repo helper if retry/failure UI is needed.
+// ponytail: process-local auto recompute UI state; move to repo helper if retries need persistence.
 final _requestedTravelGapRecomputes = <String>{};
+final _stalledTravelRecomputeScopes = <String>{};
 double? _capturedCrossDayDragScrollOffset;
 
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
@@ -359,14 +360,24 @@ class _DaySection extends ConsumerWidget {
     await _recomputeDay(ref, day.dayNum);
   }
 
-  Future<void> _recomputeDay(WidgetRef ref, int dayNum) async {
+  Future<void> _recomputeDay(
+    WidgetRef ref,
+    int dayNum, {
+    bool auto = false,
+  }) async {
+    final scope = '$tripId:$dayNum';
     try {
       await ref
           .read(tripRepositoryProvider)
           .recomputeTravel(tripId: tripId, day: '$dayNum');
+      _stalledTravelRecomputeScopes.remove(scope);
       ref.invalidate(tripDaysProvider(tripId));
       ref.invalidate(tripSegmentsProvider(tripId));
     } on Exception {
+      if (auto) {
+        _stalledTravelRecomputeScopes.add(scope);
+        ref.invalidate(tripSegmentsProvider(tripId));
+      }
       // 交通重算失敗忽略
     }
   }
@@ -506,6 +517,8 @@ class _DaySection extends ConsumerWidget {
                           tripId: tripId,
                           missingSegment:
                               segmentsReady && travelSegment == null,
+                          recomputeStalled: _stalledTravelRecomputeScopes
+                              .contains('$tripId:${day.dayNum}'),
                           missingCoords: _missingTravelCoords(
                             timeline[i - 1],
                             entry,
@@ -558,7 +571,8 @@ class _DaySection extends ConsumerWidget {
 
     final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
     if (!_requestedTravelGapRecomputes.add(key)) return;
-    unawaited(_recomputeDay(ref, day.dayNum));
+    _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
+    unawaited(_recomputeDay(ref, day.dayNum, auto: true));
   }
 
   void _captureDragScroll() {
@@ -660,6 +674,7 @@ class _TravelRow extends StatelessWidget {
     this.segment,
     this.tripId,
     this.missingSegment = false,
+    this.recomputeStalled = false,
     this.missingCoords = false,
   });
 
@@ -667,6 +682,7 @@ class _TravelRow extends StatelessWidget {
   final TripSegment? segment;
   final String? tripId;
   final bool missingSegment;
+  final bool recomputeStalled;
   final bool missingCoords;
 
   @override
@@ -677,7 +693,11 @@ class _TravelRow extends StatelessWidget {
     Widget pill = TravelPill(
       travel: travel,
       statusLabel: needsStatus
-          ? (missingCoords ? '缺座標，無法計算車程' : '車程重新計算中')
+          ? (missingCoords
+                ? '缺座標，無法計算車程'
+                : recomputeStalled
+                ? '車程待更新'
+                : '車程重新計算中')
           : null,
     );
     if (seg != null && tripId != null) {
