@@ -435,9 +435,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }
 
   void _showActionMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppNotice(context, message);
   }
 
   Widget _buildNoResults(ThemeData theme) {
@@ -550,9 +548,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       HapticFeedback.mediumImpact();
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+      showAppNotice(context, '刪除失敗，請稍後再試');
     }
   }
 }

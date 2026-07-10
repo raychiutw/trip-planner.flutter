@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/entry.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
@@ -41,22 +42,17 @@ class EntryPoiScreen extends ConsumerWidget {
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(success)));
+      showAppNotice(context, success);
     } on ApiError catch (error) {
       ref.invalidate(entryDetailProvider(_key));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試'),
-        ),
+      showAppNotice(
+        context,
+        error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試',
       );
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('操作失敗，請稍後再試')));
+      showAppNotice(context, '操作失敗，請稍後再試');
     }
   }
 

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -375,9 +376,7 @@ class _ComposerState extends ConsumerState<_Composer> {
     final ok = await _ensureInit();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('需要麥克風與語音辨識權限才能語音輸入')),
-      );
+      showAppNotice(context, '需要麥克風與語音辨識權限才能語音輸入');
       return;
     }
     setState(() => _listening = true);

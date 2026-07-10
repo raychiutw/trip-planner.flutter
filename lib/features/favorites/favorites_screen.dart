@@ -118,9 +118,7 @@ class FavoritesScreen extends ConsumerWidget {
       HapticFeedback.selectionClick();
     } on Exception {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('取消收藏失敗，請稍後再試')));
+      showAppNotice(context, '取消收藏失敗，請稍後再試');
     }
   }
 }

@@ -5,8 +5,12 @@
 /// 方便測試以 `ThemeData(platform: ...)` override。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+import '../theme/tokens.dart';
 
 /// 顯示自適應「確認 / 取消」對話框,回傳使用者是否確認。
 ///
@@ -169,4 +173,121 @@ Future<T?> showAppActionSheet<T>(
       );
     },
   );
+}
+
+/// 顯示短暫通知(取代 Material SnackBar 的跨平台一致 API)。
+///
+/// - iOS/macOS → 頂部滑入橫幅(安全區內、約 2.5 秒自動滑出消失),更貼近 iOS
+///   系統通知,而非 Android 底部 SnackBar。
+/// - 其餘平台 → Material [SnackBar]。
+void showAppNotice(BuildContext context, String message) {
+  final platform = Theme.of(context).platform;
+  final isApple =
+      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+  if (!isApple) {
+    // 先清掉排隊中/顯示中的 SnackBar,讓最新訊息立即取代(避免 ScaffoldMessenger
+    // 佇列造成後續訊息被延後顯示)。
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+    return;
+  }
+
+  final overlay = Overlay.of(context, rootOverlay: true);
+  late OverlayEntry entry;
+  var removed = false;
+  entry = OverlayEntry(
+    builder: (_) => _TopNoticeBanner(
+      message: message,
+      onDismissed: () {
+        if (removed) return;
+        removed = true;
+        entry.remove();
+      },
+    ),
+  );
+  overlay.insert(entry);
+}
+
+/// iOS 頂部通知橫幅:下一幀滑入、停留約 2.5 秒後滑出,結束時呼叫 [onDismissed]。
+class _TopNoticeBanner extends StatefulWidget {
+  const _TopNoticeBanner({required this.message, required this.onDismissed});
+
+  final String message;
+  final VoidCallback onDismissed;
+
+  @override
+  State<_TopNoticeBanner> createState() => _TopNoticeBannerState();
+}
+
+class _TopNoticeBannerState extends State<_TopNoticeBanner> {
+  bool _visible = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _visible = true);
+    });
+    _timer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) setState(() => _visible = false);
+    });
+  }
+
+  /// 滑動動畫結束:僅在「滑出」結束(不可見)時移除 overlay entry。
+  void _handleAnimationEnd() {
+    if (!_visible) widget.onDismissed();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          child: AnimatedSlide(
+            duration: TpMotion.normal,
+            curve: TpMotion.appleEase,
+            offset: _visible ? Offset.zero : const Offset(0, -1.6),
+            onEnd: _handleAnimationEnd,
+            child: AnimatedOpacity(
+              duration: TpMotion.fast,
+              opacity: _visible ? 1 : 0,
+              child: Material(
+                color: theme.colorScheme.inverseSurface,
+                borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
+                elevation: 6,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TpSpacing.s4,
+                    vertical: TpSpacing.s3,
+                  ),
+                  child: Text(
+                    widget.message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onInverseSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

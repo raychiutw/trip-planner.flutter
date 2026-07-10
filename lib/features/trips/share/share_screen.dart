@@ -46,9 +46,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
   Future<void> _copy(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已複製連結')));
+      showAppNotice(context, '已複製連結');
     }
   }
 

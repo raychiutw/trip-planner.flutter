@@ -29,14 +29,10 @@ Future<void> confirmAndDelete(
     onSuccess();
     HapticFeedback.mediumImpact();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已刪除')));
+    showAppNotice(context, '已刪除');
   } on Exception {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+    showAppNotice(context, '刪除失敗，請稍後再試');
   }
 }
 

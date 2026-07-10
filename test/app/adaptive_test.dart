@@ -113,4 +113,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(await future, isNull);
   });
+
+  testWidgets('iOS → 頂部橫幅顯示訊息(非 SnackBar);結束不留 pending timer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        showAppNotice(context, '已登出該裝置');
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pump(); // 插入 overlay + 排程 post-frame
+    await tester.pump(const Duration(milliseconds: 300)); // 滑入動畫
+
+    expect(find.text('已登出該裝置'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    // 不推進到 2.5s;測試結束時 tree 拆除須取消 timer,否則框架報 pending timer。
+  });
+
+  testWidgets('Android → Material SnackBar 顯示訊息', (tester) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        showAppNotice(context, '已刪除');
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pump(); // 顯示 SnackBar
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('已刪除'), findsOneWidget);
+  });
 }

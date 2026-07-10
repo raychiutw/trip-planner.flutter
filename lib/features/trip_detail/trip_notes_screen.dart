@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../theme/app_theme.dart';
@@ -192,9 +193,7 @@ class _NotesSection extends ConsumerWidget {
           .reorderNotes(section, tripId: tripId, items: items);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+        showAppNotice(context, '排序失敗，請稍後再試');
       }
     } finally {
       ref.invalidate(tripNotesProvider(tripId));

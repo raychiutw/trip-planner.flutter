@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
@@ -102,9 +103,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       next,
     ) {
       if (next != null && next != prev) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next)));
+        showAppNotice(context, next);
       }
     });
 

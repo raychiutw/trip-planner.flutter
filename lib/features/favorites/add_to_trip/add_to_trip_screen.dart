@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../models/day.dart';
 import '../../../models/poi_note.dart';
@@ -114,9 +115,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       await _recomputeDay(tripId, dayNum);
       if (!mounted) return;
       HapticFeedback.lightImpact();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已加入行程')));
+      showAppNotice(context, '已加入行程');
       Navigator.of(context).pop();
     } on Exception catch (error) {
       if (!mounted) return;
@@ -130,9 +129,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           return;
         }
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('加入行程失敗,請稍後再試')));
+      showAppNotice(context, '加入行程失敗,請稍後再試');
     }
   }
 

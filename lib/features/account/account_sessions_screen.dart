@@ -95,9 +95,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       await ref.read(tripRepositoryProvider).revokeOtherAccountSessions();
       if (!mounted) return;
       ref.invalidate(accountSessionsProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已登出其他裝置')));
+      showAppNotice(context, '已登出其他裝置');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -121,9 +119,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       await ref.read(tripRepositoryProvider).revokeAccountSession(sid);
       if (!mounted) return;
       ref.invalidate(accountSessionsProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已登出該裝置')));
+      showAppNotice(context, '已登出該裝置');
     } catch (error) {
       if (!mounted) return;
       setState(() {

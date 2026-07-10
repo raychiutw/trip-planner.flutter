@@ -102,9 +102,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
       ref.invalidate(connectedAppsProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已撤銷 ${app.appName}')));
+      showAppNotice(context, '已撤銷 ${app.appName}');
     } catch (error) {
       if (!mounted) return;
       setState(() {

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
 
@@ -82,9 +83,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       }
       if (!mounted) return;
       ref.invalidate(accountNotificationPreferencesProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('通知設定已更新')));
+      showAppNotice(context, '通知設定已更新');
     } catch (error) {
       if (!mounted) return;
       setState(() {

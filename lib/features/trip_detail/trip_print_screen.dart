@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
@@ -133,8 +134,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
   }
 
   void _showMessage(String message) {
-    final messenger = ScaffoldMessenger.of(context)..clearSnackBars();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    showAppNotice(context, message);
   }
 }
 
