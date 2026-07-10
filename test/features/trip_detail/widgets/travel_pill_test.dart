@@ -4,12 +4,18 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-Future<void> pumpPill(WidgetTester tester, Travel travel) {
+Future<void> pumpPill(
+  WidgetTester tester,
+  Travel travel, {
+  String? statusLabel,
+}) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(
-        body: Center(child: TravelPill(travel: travel)),
+        body: Center(
+          child: TravelPill(travel: travel, statusLabel: statusLabel),
+        ),
       ),
     ),
   );
@@ -62,34 +68,38 @@ void main() {
     });
 
     testWidgets('僅 distanceM(>=1000m) → 整數 km', (tester) async {
-      await pumpPill(
-        tester,
-        const Travel(type: 'walk', distanceM: 5500),
-      );
+      await pumpPill(tester, const Travel(type: 'walk', distanceM: 5500));
       expect(find.text('5 km'), findsOneWidget);
     });
 
     testWidgets('僅 distanceM(<1000m) → 「M m」', (tester) async {
-      await pumpPill(
-        tester,
-        const Travel(type: 'walk', distanceM: 350),
-      );
+      await pumpPill(tester, const Travel(type: 'walk', distanceM: 350));
       expect(find.text('350 m'), findsOneWidget);
     });
 
-    testWidgets('min 與 distanceM 皆無、有 desc → desc（fallback 不變）',
-        (tester) async {
-      await pumpPill(
-        tester,
-        const Travel(type: 'train', desc: '接駁車'),
-      );
+    testWidgets('min 與 distanceM 皆無、有 desc → desc（fallback 不變）', (
+      tester,
+    ) async {
+      await pumpPill(tester, const Travel(type: 'train', desc: '接駁車'));
       expect(find.text('接駁車'), findsOneWidget);
     });
 
-    testWidgets('min 與 distanceM 與 desc 皆無 → 「移動」（fallback 不變）',
-        (tester) async {
+    testWidgets('min 與 distanceM 與 desc 皆無 → 「移動」（fallback 不變）', (
+      tester,
+    ) async {
       await pumpPill(tester, const Travel(type: 'ferry'));
       expect(find.text('移動'), findsOneWidget);
+    });
+
+    testWidgets('statusLabel 顯示重算中狀態並隱藏舊分鐘距離', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'car', min: 20, distanceM: 11000),
+        statusLabel: '車程重新計算中',
+      );
+
+      expect(find.text('車程重新計算中'), findsOneWidget);
+      expect(find.text('20 分鐘 · 11 km'), findsNothing);
     });
   });
 }

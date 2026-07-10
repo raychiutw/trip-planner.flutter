@@ -284,6 +284,28 @@ void main() {
     expect(find.byIcon(Icons.directions_walk), findsOneWidget);
   });
 
+  testWidgets('stale travel segment 顯示重算中並隱藏舊分鐘數', (tester) async {
+    await _pumpTimeline(
+      tester,
+      segments: [
+        TripSegment.fromJson({
+          'id': 50,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'driving',
+          'min': 15,
+          'distanceM': 11000,
+          'version': 1,
+          'computedAt': null,
+        }),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('車程重新計算中'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+  });
+
   testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {
     await _pumpTimeline(tester);
 

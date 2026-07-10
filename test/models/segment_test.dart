@@ -12,6 +12,7 @@ void main() {
         'min': 20,
         'distanceM': 4200,
         'source': 'manual',
+        'computedAt': 1700000000000,
         'version': 3,
       });
       expect(seg.id, 5);
@@ -21,6 +22,7 @@ void main() {
       expect(seg.min, 20);
       expect(seg.distanceM, 4200);
       expect(seg.source, 'manual');
+      expect(seg.isStale, isFalse);
       expect(seg.version, 3);
     });
 
@@ -31,7 +33,18 @@ void main() {
       expect(seg.min, isNull);
       expect(seg.distanceM, isNull);
       expect(seg.source, isNull);
+      expect(seg.isStale, isFalse);
       expect(seg.version, 0);
+    });
+
+    test('computedAt null marks segment stale', () {
+      final seg = TripSegment.fromJson({
+        'id': 2,
+        'mode': 'driving',
+        'computedAt': null,
+      });
+
+      expect(seg.isStale, isTrue);
     });
   });
 }

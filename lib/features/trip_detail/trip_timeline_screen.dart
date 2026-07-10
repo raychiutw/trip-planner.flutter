@@ -428,7 +428,10 @@ class _TravelRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
-    Widget pill = TravelPill(travel: travel);
+    Widget pill = TravelPill(
+      travel: travel,
+      statusLabel: seg?.isStale == true ? '車程重新計算中' : null,
+    );
     if (seg != null && tripId != null) {
       pill = InkWell(
         key: ValueKey('travel-edit-${seg.id}'),

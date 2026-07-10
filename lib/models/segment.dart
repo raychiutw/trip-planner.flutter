@@ -11,6 +11,7 @@ class TripSegment {
     this.min,
     this.distanceM,
     this.source,
+    this.isStale = false,
     required this.version,
   });
 
@@ -26,6 +27,9 @@ class TripSegment {
   /// google / manual。
   final String? source;
 
+  /// true when backend returned computedAt: null, meaning travel is being recomputed.
+  final bool isStale;
+
   /// OCC token（PATCH 帶 expectedVersion）。
   final int version;
 
@@ -38,6 +42,7 @@ class TripSegment {
       min: (json['min'] as num?)?.toInt(),
       distanceM: (json['distanceM'] as num?)?.toInt(),
       source: json['source'] as String?,
+      isStale: json.containsKey('computedAt') && json['computedAt'] == null,
       version: (json['version'] as num?)?.toInt() ?? 0,
     );
   }

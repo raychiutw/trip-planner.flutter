@@ -5,9 +5,10 @@ import '../../../theme/app_theme.dart';
 
 /// 站間移動 pill：sage 描邊、透明底、type icon + 分鐘數（tabular）。
 class TravelPill extends StatelessWidget {
-  const TravelPill({super.key, required this.travel});
+  const TravelPill({super.key, required this.travel, this.statusLabel});
 
   final Travel travel;
+  final String? statusLabel;
 
   /// 移動方式 → icon；未知 type 用通用路線 icon。
   static IconData iconForType(String type) {
@@ -53,12 +54,14 @@ class TravelPill extends StatelessWidget {
     final tones = Theme.of(context).extension<TpTones>()!;
 
     final String label;
-    final hasMin = travel.min != null;
-    final hasDist = travel.distanceM != null;
+    final hasStatus = statusLabel != null;
+    final hasMin = !hasStatus && travel.min != null;
+    final hasDist = !hasStatus && travel.distanceM != null;
 
-    if (hasMin && hasDist) {
-      label =
-          '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
+    if (hasStatus) {
+      label = statusLabel!;
+    } else if (hasMin && hasDist) {
+      label = '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
     } else if (hasMin) {
       label = '${travel.min} 分鐘';
     } else if (hasDist) {
