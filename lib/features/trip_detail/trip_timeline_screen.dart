@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -446,9 +445,10 @@ class _DaySection extends ConsumerWidget {
     );
   }
 
-  /// 單一 entry row:travel row(選配)＋ 拖放目標(`entry-drop`)包住 tile。
-  /// 唯一拖曳來源是 tile trailing 的 ☰ handle([Draggable]);drop 到本 row →
-  /// 插此 entry 前(同日重排 / 跨日移入,由 [_handleDrop] 依來源天分流)。
+  /// 單一 entry row:travel row(選配)＋ 拖放目標(`entry-drop`)包住整張卡。
+  /// 唯一拖曳手勢:長按整張卡 → 抬起、**限垂直**移動([Axis.vertical]);drop 到
+  /// 某卡 → 插其前(同日重排 / 跨日移入,由 [_handleDrop] 依來源天分流)。
+  /// 對齊 Apple 拖放:整張卡浮起(陰影)、原位留 ghost,無左右位移。
   Widget _buildEntryRow(
     BuildContext context,
     WidgetRef ref, {
@@ -467,43 +467,13 @@ class _DaySection extends ConsumerWidget {
       sourceDayId: day.id,
       sourceDayNum: day.dayNum,
     );
-    // 用 LongPressDraggable(delayed):長按 handle 才起拖,才不會在可捲動列表裡與
-    // 捲動搶手勢。全畫面僅此一套拖曳手勢,不再有第二個手勢可誤觸(原 bug 根因)。
-    final dragHandle = LongPressDraggable<_EntryDragPayload>(
-      key: ValueKey('entry-cross-drag-${entry.id}'),
-      data: payload,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      onDragStarted: _captureDragScroll,
-      onDragUpdate: (details) =>
-          _autoScrollDuringDrag(context, details.globalPosition),
-      onDragEnd: (_) => _restoreDragScroll(),
-      onDraggableCanceled: (velocity, offset) => _restoreDragScroll(),
-      onDragCompleted: _restoreDragScroll,
-      feedback: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s3),
-          child: Text(entry.title),
-        ),
-      ),
-      child: Listener(
-        onPointerDown: (_) => HapticFeedback.selectionClick(),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(
-            CupertinoIcons.line_horizontal_3,
-            key: ValueKey('entry-drag-${entry.id}'),
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-    final tile = TimelineEntryTile(
+
+    // 整張卡建構;lifted=拖曳中的浮起版(隱藏 rail 連線,較乾淨)。
+    Widget buildTile({bool lifted = false}) => TimelineEntryTile(
       entry: entry,
       number: i + 1,
-      isFirst: i == 0,
-      isLast: i == timeline.length - 1,
+      isFirst: lifted || i == 0,
+      isLast: lifted || i == timeline.length - 1,
       onTap: () => showEntryEditSheet(
         context,
         tripId: tripId,
@@ -512,14 +482,9 @@ class _DaySection extends ConsumerWidget {
       trailing: _EntryTrailing(
         entryId: entry.id,
         onMove: () => _moveToDay(context, ref, entry),
-        dragHandle: dragHandle,
       ),
     );
-    final row = SwipeToDelete(
-      dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-      onDelete: () => _confirmDelete(context, ref, entry),
-      child: tile,
-    );
+
     final dropRow = DragTarget<_EntryDragPayload>(
       key: ValueKey('entry-drop-${entry.id}'),
       // 不接受 drop 到自己身上(no-op);其餘同日=重排、他日=移入。
@@ -537,18 +502,45 @@ class _DaySection extends ConsumerWidget {
       },
       builder: (context, candidateData, rejectedData) {
         final highlight = candidateData.isNotEmpty;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            border: highlight
-                ? Border(
-                    top: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
-                  )
-                : null,
-          ),
-          child: row,
+        // 整張卡即拖曳來源:長按抬起、限垂直。SwipeToDelete 在外層處理左滑刪除。
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final draggable = LongPressDraggable<_EntryDragPayload>(
+              key: ValueKey('entry-cross-drag-${entry.id}'),
+              data: payload,
+              axis: Axis.vertical,
+              onDragStarted: _captureDragScroll,
+              onDragUpdate: (details) =>
+                  _autoScrollDuringDrag(context, details.globalPosition),
+              onDragEnd: (_) => _restoreDragScroll(),
+              onDraggableCanceled: (velocity, offset) => _restoreDragScroll(),
+              onDragCompleted: _restoreDragScroll,
+              feedback: _EntryDragFeedback(
+                width: constraints.maxWidth,
+                child: buildTile(lifted: true),
+              ),
+              // 原位留半透明 ghost,傳達「已抬起搬移中」。
+              childWhenDragging: Opacity(opacity: 0.25, child: buildTile()),
+              child: buildTile(),
+            );
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                border: highlight
+                    ? Border(
+                        top: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      )
+                    : null,
+              ),
+              child: SwipeToDelete(
+                dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                onDelete: () => _confirmDelete(context, ref, entry),
+                child: draggable,
+              ),
+            );
+          },
         );
       },
     );
@@ -639,18 +631,30 @@ class _DaySection extends ConsumerWidget {
 }
 
 /// tile 尾端：搬移到其他天 + 拖曳 handle（長按拖動排序）。
+/// 拖曳中的抬起卡片:整張卡浮起(Material 陰影 + 圓角),寬度對齊來源列,
+/// 對齊 Apple 拖放的「拿起」質感。
+class _EntryDragFeedback extends StatelessWidget {
+  const _EntryDragFeedback({required this.width, required this.child});
+
+  final double width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(TpRadius.md),
+      color: Theme.of(context).colorScheme.surface,
+      child: SizedBox(width: width, child: child),
+    );
+  }
+}
+
 class _EntryTrailing extends StatelessWidget {
-  const _EntryTrailing({
-    required this.entryId,
-    required this.onMove,
-    required this.dragHandle,
-  });
+  const _EntryTrailing({required this.entryId, required this.onMove});
 
   final int entryId;
   final VoidCallback onMove;
-
-  /// ☰ 拖曳 handle（由 [_DaySection._buildEntryRow] 建成 [Draggable]）。
-  final Widget dragHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -663,7 +667,15 @@ class _EntryTrailing extends StatelessWidget {
           tooltip: '移到其他天',
           onPressed: onMove,
         ),
-        dragHandle,
+        // 拖曳排序視覺提示（≡）;整張卡長按即可拖曳,此 handle 僅為 affordance。
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            CupertinoIcons.line_horizontal_3,
+            key: ValueKey('entry-drag-$entryId'),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
