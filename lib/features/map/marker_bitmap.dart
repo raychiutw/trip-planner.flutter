@@ -74,7 +74,13 @@ class PinBitmapCache {
       devicePixelRatio: devicePixelRatio,
       focused: focused,
     );
-    final descriptor = BitmapDescriptor.bytes(bytes);
+    // 帶 imagePixelRatio:告訴 Google Maps 這張點陣圖是 devicePixelRatio 倍像素,
+    // 讓它以邏輯點渲染(32/40pt)。省略會被當「1 像素 = 1 邏輯點」→ retina 上放大
+    // devicePixelRatio 倍(3x)顯示過大。
+    final descriptor = BitmapDescriptor.bytes(
+      bytes,
+      imagePixelRatio: devicePixelRatio,
+    );
     _cache[key] = descriptor;
     return descriptor;
   }
