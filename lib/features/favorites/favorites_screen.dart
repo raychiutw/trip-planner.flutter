@@ -25,9 +25,8 @@ class FavoritesScreen extends ConsumerWidget {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverAppBar.large(
-              pinned: true,
-              title: const Text('收藏'),
+            SliverAdaptiveLargeTitle(
+              title: '收藏',
               actions: [
                 IconButton(
                   key: const ValueKey('favorites-explore-action'),

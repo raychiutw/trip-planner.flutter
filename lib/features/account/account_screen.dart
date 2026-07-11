@@ -34,7 +34,7 @@ class AccountScreen extends ConsumerWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar.large(pinned: true, title: Text('帳號')),
+          const SliverAdaptiveLargeTitle(title: '帳號'),
           SliverPadding(
             padding: const EdgeInsets.all(TpSpacing.s4),
             sliver: SliverList(
