@@ -9,14 +9,27 @@ import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/day.dart';
 import '../../../models/entry.dart';
+import '../../../models/poi_favorite.dart';
 import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
 import '../../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
+import '../../favorites/favorites_providers.dart' show favoritesProvider;
 import '../trip_providers.dart';
 
 /// 「新增停留點」熱門搜尋 seed(比照建立行程的熱門目的地)。
 const _hotSearches = ['沖繩', '東京', '京都', '首爾', '曼谷', '台北'];
+
+/// 把收藏(有座標)轉成 PoiSearchResult,走與搜尋結果相同的選取/送出路徑。
+PoiSearchResult _poiFromFavorite(PoiFavorite f) => PoiSearchResult(
+  placeId: 'fav-${f.id}',
+  name: f.displayName,
+  address: f.poiAddress,
+  lat: f.poiLat ?? 0,
+  lng: f.poiLng ?? 0,
+  category: f.poiType,
+  rating: f.poiRating,
+);
 
 /// 編輯/新增停留點的模式參數。
 sealed class EntryEditArgs {
@@ -333,8 +346,63 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                 ],
               ),
             ),
-          ),
+          )
+        else
+          _favoritesSection(context),
       ],
+    );
+  }
+
+  /// 尚未搜尋時,列出「有座標的收藏」供直接加入 — 點選走與搜尋結果相同的
+  /// _pickPoi 路徑,送出時帶 lat/lng(source user-explore)。無座標收藏不列。
+  Widget _favoritesSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final favs =
+        ref.watch(favoritesProvider).asData?.value ?? const <PoiFavorite>[];
+    final withCoords = [
+      for (final f in favs)
+        if (f.poiLat != null && f.poiLng != null) f,
+    ];
+    if (withCoords.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: TpSpacing.s3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '從收藏加入',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: TpSpacing.s1),
+          Material(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(TpRadius.md),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final f in withCoords.take(6))
+                  ListTile(
+                    dense: true,
+                    key: ValueKey('fav-result-${f.id}'),
+                    leading: const Icon(CupertinoIcons.heart_fill, size: 18),
+                    title: Text(f.displayName),
+                    subtitle: f.poiAddress == null
+                        ? null
+                        : Text(
+                            f.poiAddress!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                    onTap: () => _pickPoi(_poiFromFavorite(f)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -8,10 +8,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -222,6 +224,11 @@ Future<void> _pumpTimeline(
         tripSegmentsProvider(
           tripId,
         ).overrideWith((ref) => Stream.value(segments)),
+        // 新增停留點 sheet 會 watch favoritesProvider(從收藏加入),
+        // 給空 stream 以免 cascade 到 apiClientProvider 打真網路。
+        favoritesProvider.overrideWith(
+          (ref) => Stream.value(const <PoiFavorite>[]),
+        ),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
