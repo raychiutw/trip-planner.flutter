@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-/// 測試用 tile provider：回傳套件內建透明圖，避免 widget test 對 OSM 發網路請求。
-class _TransparentTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
-      MemoryImage(TileProvider.transparentImage);
-}
+// google_maps_flutter 的 GoogleMap 是 platform view,widget test 無法真渲染,
+// 也不能靠 marker widget key 斷言(marker 是原生 BitmapDescriptor)。故 pin 萃取
+// 與日切換改由「底部 entry card(與可見 pin 一對一)」間接驗證。
 
 TimelineEntry _entry({
   required int id,
@@ -43,7 +40,7 @@ final _dayOne = TripDay(
   timeline: [
     _entry(id: 11, title: '首里城', startTime: '09:00', lat: 26.217, lng: 127.719),
     _entry(id: 12, title: '國際通', startTime: '11:30', lat: 26.214, lng: 127.688),
-    // 無座標 entry：不應產生 pin 與 entry card。
+    // 無座標 entry:不應產生 pin 與 entry card。
     _entry(id: 13, title: '自由活動', startTime: '14:00'),
   ],
 );
@@ -69,10 +66,7 @@ Widget _buildScreen(List<TripDay> days) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => TripMapScreen(
-          tripId: 'trip-1',
-          tileProvider: _TransparentTileProvider(),
-        ),
+        builder: (context, state) => const TripMapScreen(tripId: 'trip-1'),
       ),
     ],
   );
@@ -85,14 +79,12 @@ Widget _buildScreen(List<TripDay> days) {
 }
 
 void main() {
-  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
-    tester,
-  ) async {
+  testWidgets('總覽:day tabs + 每個含座標 entry 都有 card(無座標則無)', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    // day tabs：總覽 + DAY NN
+    // day tabs:總覽 + DAY NN
     expect(find.text('總覽'), findsOneWidget);
     expect(find.text('DAY 01'), findsOneWidget);
     expect(find.text('DAY 02'), findsOneWidget);
@@ -107,38 +99,31 @@ void main() {
       ),
     );
 
-    // pins：只有 master 座標非 null 的 3 筆
-    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-pin-13')), findsNothing);
-    expect(find.bySemanticsLabel(RegExp(r'^[123]$')), findsNothing);
-
-    // 底部 entry cards（時間 + 標題）；無座標 entry 不出卡片
+    // 每個含座標 entry(11/12/21)都有底部 card;無座標(13)沒有 → 驗證 pin 萃取
     expect(find.byKey(const ValueKey('entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-12')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-13')), findsNothing);
     expect(find.text('首里城'), findsOneWidget);
     expect(find.textContaining('09:00'), findsOneWidget);
     expect(find.text('自由活動'), findsNothing);
-
-    // OSM attribution 必須顯示
-    expect(find.byType(RichAttributionWidget), findsOneWidget);
     semantics.dispose();
   });
 
-  testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
+  testWidgets('切到 DAY 02:只顯示該日 entry cards', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('DAY 02'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-11')), findsNothing);
     expect(find.text('美麗海水族館'), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
   });
 
-  testWidgets('點 entry card：地圖移至該 pin 且不 crash', (tester) async {
+  testWidgets('點 entry card:呼叫地圖 move 且不 crash', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -146,10 +131,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
   });
 
-  testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {
+  testWidgets('全部 entry 無座標:顯示空狀態、不渲染 GoogleMap', (tester) async {
     final dayWithoutCoordinates = TripDay(
       id: 3,
       dayNum: 1,
@@ -160,6 +144,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('此行程尚無地點座標'), findsOneWidget);
-    expect(find.byType(FlutterMap), findsNothing);
+    expect(find.byType(GoogleMap), findsNothing);
   });
 }

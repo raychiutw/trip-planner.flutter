@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
-import '../map/map_adapter.dart';
+import '../map/google_map_adapter.dart';
+import '../map/marker_bitmap.dart';
 import 'trip_providers.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
@@ -23,12 +24,9 @@ const List<Color> kDayPinPalette = [
 
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
-  const TripMapScreen({super.key, required this.tripId, this.tileProvider});
+  const TripMapScreen({super.key, required this.tripId});
 
   final String tripId;
-
-  /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
-  final TripMapTileProvider? tileProvider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,7 +42,7 @@ class TripMapScreen extends ConsumerWidget {
             child: Text('載入失敗：$error', textAlign: TextAlign.center),
           ),
         ),
-        data: (days) => _TripMapView(days: days, tileProvider: tileProvider),
+        data: (days) => _TripMapView(days: days),
       ),
     );
   }
@@ -72,28 +70,37 @@ class _DayPin {
 }
 
 class _TripMapView extends StatefulWidget {
-  const _TripMapView({required this.days, this.tileProvider});
+  const _TripMapView({required this.days});
 
   final List<TripDay> days;
-  final TripMapTileProvider? tileProvider;
 
   @override
   State<_TripMapView> createState() => _TripMapViewState();
 }
 
 class _TripMapViewState extends State<_TripMapView> {
-  final FlutterTripMapController _mapController = FlutterTripMapController();
+  final GoogleTripMapController _mapController = GoogleTripMapController();
+  final PinBitmapCache _pinCache = PinBitmapCache();
+
+  /// 目前 tab 的 marker(bitmap 已 resolve);async 產生故存於 state。
+  List<TripMapBitmapMarker> _markers = const [];
+
+  /// resolve 世代:避免舊 resolve 完成後覆寫新 tab 的 marker。
+  int _markerGen = 0;
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
-
-  /// fitCamera/move 只能在地圖 render 後呼叫。
-  bool _mapIsReady = false;
 
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolveMarkers();
   }
 
   /// 逐日萃取 master 座標非 null 的 entries 為 pins。
@@ -133,11 +140,38 @@ class _TripMapViewState extends State<_TripMapView> {
 
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
+    _resolveMarkers();
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
   }
 
+  /// 逐 pin resolve 彩色序號 bitmap(cache 命中則免重繪),完成後 setState。
+  Future<void> _resolveMarkers() async {
+    final gen = ++_markerGen;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final pins = _pinsForTab(_selectedTabIndex);
+    final resolved = <TripMapBitmapMarker>[];
+    for (final pin in pins) {
+      final icon = await _pinCache.resolve(
+        color: pin.color,
+        number: pin.pinNumber,
+        devicePixelRatio: dpr,
+      );
+      resolved.add(
+        TripMapBitmapMarker(
+          id: 'pin-${pin.entry.id}',
+          point: pin.point,
+          icon: icon,
+          onTap: () => _focusPin(pin),
+        ),
+      );
+    }
+    if (mounted && gen == _markerGen) {
+      setState(() => _markers = resolved);
+    }
+  }
+
   void _fitToPoints(List<TripMapPoint> points) {
-    if (!_mapIsReady || points.isEmpty) return;
+    if (points.isEmpty) return;
     _mapController.fitPoints(
       points,
       padding: const EdgeInsets.all(TpSpacing.s10),
@@ -146,7 +180,6 @@ class _TripMapViewState extends State<_TripMapView> {
   }
 
   void _focusPin(_DayPin pin) {
-    if (!_mapIsReady) return;
     _mapController.move(pin.point, 16);
   }
 
@@ -168,7 +201,7 @@ class _TripMapViewState extends State<_TripMapView> {
     return Column(
       children: [
         _buildDayTabs(context),
-        Expanded(child: _buildMap(allPins, visiblePins)),
+        Expanded(child: _buildMap(allPins)),
         _buildEntryCards(context, visiblePins),
       ],
     );
@@ -256,45 +289,13 @@ class _TripMapViewState extends State<_TripMapView> {
     );
   }
 
-  Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
-    return FlutterMapCanvas(
+  Widget _buildMap(List<_DayPin> allPins) {
+    return GoogleMapCanvas(
       controller: _mapController,
-      tilePreset: kTripMapTilePresets.first,
       initialFitPoints: [for (final pin in allPins) pin.point],
       initialPadding: const EdgeInsets.all(TpSpacing.s10),
       initialMaxZoom: 16,
-      tileProvider: widget.tileProvider,
-      onMapReady: () => _mapIsReady = true,
-      markers: [for (final pin in visiblePins) _buildMarker(pin)],
-    );
-  }
-
-  TripMapMarker _buildMarker(_DayPin pin) {
-    return TripMapMarker(
-      point: pin.point,
-      width: 32,
-      height: 32,
-      child: ExcludeSemantics(
-        child: Container(
-          key: ValueKey('map-pin-${pin.entry.id}'),
-          decoration: BoxDecoration(
-            color: pin.color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '${pin.pinNumber}',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-              fontFeatures: [FontFeature.tabularFigures()],
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
+      markers: _markers,
     );
   }
 
