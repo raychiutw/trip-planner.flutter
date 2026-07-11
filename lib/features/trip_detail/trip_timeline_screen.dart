@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,7 +13,6 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
 import '../../theme/tokens.dart';
-import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
@@ -174,31 +175,32 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 }
 
-/// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
-List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
-  List<int> entryIds,
-  int oldIndex,
-  int newIndex,
-) {
-  return [
-    for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
-      (id: u.id, sortOrder: u.sortOrder, dayId: null),
-  ];
-}
-
-List<({int id, int sortOrder, int? dayId})> computeCrossDayMoveUpdates({
+/// 統一拖放排序(同日重排 + 跨日移動共用一套):把 [activeEntryId] 放進 [targetDayId]
+/// 的 [targetEntryIds] 中 [overEntryId] 的位置(drop 在某 entry 上 → 插其前;
+/// [overEntryId]==null → 放到最後)。target day 全員重編連續 sortOrder。
+///
+/// - 同日([sameDay]=true):active 已在 targetEntryIds 中,先移除再插入;dayId 全 null。
+/// - 跨日([sameDay]=false):active 帶 [targetDayId](換天),其餘 dayId null。
+///
+/// 對應 web:單一拖曳依 drop 目標決定「原地重排」或「移到別天」,不需分兩套手勢。
+List<({int id, int sortOrder, int? dayId})> computeDropReorderUpdates({
   required int activeEntryId,
   required int targetDayId,
   required List<int> targetEntryIds,
+  required bool sameDay,
   int? overEntryId,
 }) {
   final ids = targetEntryIds.where((id) => id != activeEntryId).toList();
   final overIndex = overEntryId == null ? -1 : ids.indexOf(overEntryId);
   final insertIndex = overIndex >= 0 ? overIndex : ids.length;
+  ids.insert(insertIndex, activeEntryId);
   return [
-    (id: activeEntryId, sortOrder: insertIndex, dayId: targetDayId),
-    for (var i = insertIndex; i < ids.length; i++)
-      (id: ids[i], sortOrder: i + 1, dayId: null),
+    for (var i = 0; i < ids.length; i++)
+      (
+        id: ids[i],
+        sortOrder: i,
+        dayId: (!sameDay && ids[i] == activeEntryId) ? targetDayId : null,
+      ),
   ];
 }
 
@@ -256,64 +258,47 @@ class _DaySection extends ConsumerWidget {
     );
   }
 
-  Future<void> _reorder(
-    BuildContext context,
-    WidgetRef ref,
-    int oldIndex,
-    int newIndex,
-  ) async {
-    final updates = computeReorderUpdates(
-      [for (final e in day.timeline) e.id],
-      oldIndex,
-      newIndex,
-    );
-    final repo = ref.read(tripRepositoryProvider);
-    try {
-      await repo.reorderEntries(tripId: tripId, updates: updates);
-    } on Exception {
-      if (context.mounted) {
-        showAppNotice(context, '排序失敗，請稍後再試');
-      }
-      if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
-      return;
-    }
-    if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
-    await _recomputeAndRefresh(ref);
-  }
-
-  Future<void> _moveEntryToDay(
+  /// 統一拖放處理:同日 = 原地重排、跨日 = 移到 [targetDay]。[overEntryId] 為 drop
+  /// 目標 entry(插其前),null = 放到該天末尾。以 [computeDropReorderUpdates] 算
+  /// batch updates;失敗提示並重抓,成功後重算相關日交通。單一手勢依 drop 目標分流,
+  /// 取代原本「重排 handle」與「跨日長按拖曳」兩套會互搶的手勢。
+  Future<void> _handleDrop(
     BuildContext context,
     WidgetRef ref, {
-    required TimelineEntry entry,
-    required int sourceDayId,
-    required int sourceDayNum,
-    required TripDay target,
-    int? targetEntryId,
+    required _EntryDragPayload payload,
+    required TripDay targetDay,
+    int? overEntryId,
   }) async {
-    if (target.id == sourceDayId) return;
-    final updates = computeCrossDayMoveUpdates(
-      activeEntryId: entry.id,
-      targetDayId: target.id,
-      targetEntryIds: [for (final e in target.timeline) e.id],
-      overEntryId: targetEntryId,
+    final sameDay = payload.sourceDayId == targetDay.id;
+    final currentIds = [for (final e in targetDay.timeline) e.id];
+    final updates = computeDropReorderUpdates(
+      activeEntryId: payload.entry.id,
+      targetDayId: targetDay.id,
+      targetEntryIds: currentIds,
+      sameDay: sameDay,
+      overEntryId: overEntryId,
     );
+    // 同日且順序沒變 → 不打 API(避免無謂重排/重算)。
+    if (sameDay && listEquals([for (final u in updates) u.id], currentIds)) {
+      return;
+    }
     final repo = ref.read(tripRepositoryProvider);
     try {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        showAppNotice(context, '搬移失敗，請稍後再試');
+        showAppNotice(context, sameDay ? '排序失敗，請稍後再試' : '搬移失敗，請稍後再試');
       }
       if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
       return;
     }
     if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
-    await _recomputeDay(ref, sourceDayNum);
-    if (target.dayNum != sourceDayNum) {
-      await _recomputeDay(ref, target.dayNum);
+    await _recomputeDay(ref, payload.sourceDayNum);
+    if (!sameDay && targetDay.dayNum != payload.sourceDayNum) {
+      await _recomputeDay(ref, targetDay.dayNum);
     }
-    if (context.mounted) {
-      showAppNotice(context, '已移到 DAY ${target.dayNum}');
+    if (!sameDay && context.mounted) {
+      showAppNotice(context, '已移到 DAY ${targetDay.dayNum}');
     }
   }
 
@@ -345,13 +330,15 @@ class _DaySection extends ConsumerWidget {
     if (targetDayId == null) return;
     if (!context.mounted) return;
     final target = allDays.firstWhere((d) => d.id == targetDayId);
-    await _moveEntryToDay(
+    await _handleDrop(
       context,
       ref,
-      entry: entry,
-      sourceDayId: day.id,
-      sourceDayNum: day.dayNum,
-      target: target,
+      payload: _EntryDragPayload(
+        entry: entry,
+        sourceDayId: day.id,
+        sourceDayNum: day.dayNum,
+      ),
+      targetDay: target,
     );
   }
 
@@ -402,17 +389,11 @@ class _DaySection extends ConsumerWidget {
 
     return DragTarget<_EntryDragPayload>(
       key: ValueKey('day-drop-${day.id}'),
-      onWillAcceptWithDetails: (details) => details.data.sourceDayId != day.id,
+      // 同日 + 跨日皆接受;drop 在此天空白處(非某 entry 上)→ 放到該天末尾。
+      onWillAcceptWithDetails: (details) => true,
       onAcceptWithDetails: (details) {
         unawaited(
-          _moveEntryToDay(
-            context,
-            ref,
-            entry: details.data.entry,
-            sourceDayId: details.data.sourceDayId,
-            sourceDayNum: details.data.sourceDayNum,
-            target: day,
-          ),
+          _handleDrop(context, ref, payload: details.data, targetDay: day),
         );
       },
       builder: (context, candidateData, rejectedData) {
@@ -433,107 +414,16 @@ class _DaySection extends ConsumerWidget {
                 HotelCard(hotel: day.hotel!),
                 const SizedBox(height: TpSpacing.s3),
               ],
-              ReorderableListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                buildDefaultDragHandles: false,
-                itemCount: timeline.length,
-                onReorderItem: (oldIndex, newIndex) =>
-                    _reorder(context, ref, oldIndex, newIndex),
-                itemBuilder: (context, i) {
-                  final entry = timeline[i];
-                  final travelSegment = i > 0 && entry.travel != null
-                      ? _findSegment(segments, timeline[i - 1].id, entry.id)
-                      : null;
-                  final tile = TimelineEntryTile(
-                    entry: entry,
-                    number: i + 1,
-                    isFirst: i == 0,
-                    isLast: i == timeline.length - 1,
-                    onTap: () => showEntryEditSheet(
-                      context,
-                      tripId: tripId,
-                      args: EntryEditExisting(entry),
-                    ),
-                    trailing: _EntryTrailing(
-                      entryId: entry.id,
-                      index: i,
-                      onMove: () => _moveToDay(context, ref, entry),
-                    ),
-                  );
-                  final draggableTile = LongPressDraggable<_EntryDragPayload>(
-                    key: ValueKey('entry-cross-drag-${entry.id}'),
-                    data: _EntryDragPayload(
-                      entry: entry,
-                      sourceDayId: day.id,
-                      sourceDayNum: day.dayNum,
-                    ),
-                    dragAnchorStrategy: pointerDragAnchorStrategy,
-                    onDragStarted: _captureDragScroll,
-                    onDragUpdate: (details) =>
-                        _autoScrollDuringDrag(context, details.globalPosition),
-                    onDragEnd: (_) => _restoreDragScroll(),
-                    onDraggableCanceled: (velocity, offset) =>
-                        _restoreDragScroll(),
-                    onDragCompleted: _restoreDragScroll,
-                    feedback: Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(TpRadius.md),
-                      child: Padding(
-                        padding: const EdgeInsets.all(TpSpacing.s3),
-                        child: Text(entry.title),
-                      ),
-                    ),
-                    childWhenDragging: Opacity(opacity: 0.35, child: tile),
-                    child: tile,
-                  );
-                  final row = SwipeToDelete(
-                    dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                    onDelete: () => _confirmDelete(context, ref, entry),
-                    child: draggableTile,
-                  );
-                  final dropRow = DragTarget<_EntryDragPayload>(
-                    key: ValueKey('entry-drop-${entry.id}'),
-                    onWillAcceptWithDetails: (details) =>
-                        details.data.sourceDayId != day.id,
-                    onAcceptWithDetails: (details) {
-                      unawaited(
-                        _moveEntryToDay(
-                          context,
-                          ref,
-                          entry: details.data.entry,
-                          sourceDayId: details.data.sourceDayId,
-                          sourceDayNum: details.data.sourceDayNum,
-                          target: day,
-                          targetEntryId: entry.id,
-                        ),
-                      );
-                    },
-                    builder: (context, candidateData, rejectedData) => row,
-                  );
-                  return Column(
-                    key: ValueKey('entry-${entry.id}'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (i > 0 && entry.travel != null)
-                        _TravelRow(
-                          travel: entry.travel!,
-                          segment: travelSegment,
-                          tripId: tripId,
-                          missingSegment:
-                              segmentsReady && travelSegment == null,
-                          recomputeStalled: _stalledTravelRecomputeScopes
-                              .contains('$tripId:${day.dayNum}'),
-                          missingCoords: _missingTravelCoords(
-                            timeline[i - 1],
-                            entry,
-                          ),
-                        ),
-                      dropRow,
-                    ],
-                  );
-                },
-              ),
+              for (final (i, entry) in timeline.indexed)
+                _buildEntryRow(
+                  context,
+                  ref,
+                  index: i,
+                  entry: entry,
+                  timeline: timeline,
+                  segments: segments,
+                  segmentsReady: segmentsReady,
+                ),
               const SizedBox(height: TpSpacing.s2),
               Align(
                 alignment: Alignment.centerLeft,
@@ -553,6 +443,132 @@ class _DaySection extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  /// 單一 entry row:travel row(選配)＋ 拖放目標(`entry-drop`)包住 tile。
+  /// 唯一拖曳來源是 tile trailing 的 ☰ handle([Draggable]);drop 到本 row →
+  /// 插此 entry 前(同日重排 / 跨日移入,由 [_handleDrop] 依來源天分流)。
+  Widget _buildEntryRow(
+    BuildContext context,
+    WidgetRef ref, {
+    required int index,
+    required TimelineEntry entry,
+    required List<TimelineEntry> timeline,
+    required List<TripSegment> segments,
+    required bool segmentsReady,
+  }) {
+    final i = index;
+    final travelSegment = i > 0 && entry.travel != null
+        ? _findSegment(segments, timeline[i - 1].id, entry.id)
+        : null;
+    final payload = _EntryDragPayload(
+      entry: entry,
+      sourceDayId: day.id,
+      sourceDayNum: day.dayNum,
+    );
+    // 用 LongPressDraggable(delayed):長按 handle 才起拖,才不會在可捲動列表裡與
+    // 捲動搶手勢。全畫面僅此一套拖曳手勢,不再有第二個手勢可誤觸(原 bug 根因)。
+    final dragHandle = LongPressDraggable<_EntryDragPayload>(
+      key: ValueKey('entry-cross-drag-${entry.id}'),
+      data: payload,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      onDragStarted: _captureDragScroll,
+      onDragUpdate: (details) =>
+          _autoScrollDuringDrag(context, details.globalPosition),
+      onDragEnd: (_) => _restoreDragScroll(),
+      onDraggableCanceled: (velocity, offset) => _restoreDragScroll(),
+      onDragCompleted: _restoreDragScroll,
+      feedback: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          child: Text(entry.title),
+        ),
+      ),
+      child: Listener(
+        onPointerDown: (_) => HapticFeedback.selectionClick(),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            CupertinoIcons.line_horizontal_3,
+            key: ValueKey('entry-drag-${entry.id}'),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+    final tile = TimelineEntryTile(
+      entry: entry,
+      number: i + 1,
+      isFirst: i == 0,
+      isLast: i == timeline.length - 1,
+      onTap: () => showEntryEditSheet(
+        context,
+        tripId: tripId,
+        args: EntryEditExisting(entry),
+      ),
+      trailing: _EntryTrailing(
+        entryId: entry.id,
+        onMove: () => _moveToDay(context, ref, entry),
+        dragHandle: dragHandle,
+      ),
+    );
+    final row = SwipeToDelete(
+      dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+      onDelete: () => _confirmDelete(context, ref, entry),
+      child: tile,
+    );
+    final dropRow = DragTarget<_EntryDragPayload>(
+      key: ValueKey('entry-drop-${entry.id}'),
+      // 不接受 drop 到自己身上(no-op);其餘同日=重排、他日=移入。
+      onWillAcceptWithDetails: (details) => details.data.entry.id != entry.id,
+      onAcceptWithDetails: (details) {
+        unawaited(
+          _handleDrop(
+            context,
+            ref,
+            payload: details.data,
+            targetDay: day,
+            overEntryId: entry.id,
+          ),
+        );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final highlight = candidateData.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: highlight
+                ? Border(
+                    top: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
+                    ),
+                  )
+                : null,
+          ),
+          child: row,
+        );
+      },
+    );
+    return Column(
+      key: ValueKey('entry-${entry.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (i > 0 && entry.travel != null)
+          _TravelRow(
+            travel: entry.travel!,
+            segment: travelSegment,
+            tripId: tripId,
+            missingSegment: segmentsReady && travelSegment == null,
+            recomputeStalled: _stalledTravelRecomputeScopes.contains(
+              '$tripId:${day.dayNum}',
+            ),
+            missingCoords: _missingTravelCoords(timeline[i - 1], entry),
+          ),
+        dropRow,
+      ],
     );
   }
 
@@ -626,13 +642,15 @@ class _DaySection extends ConsumerWidget {
 class _EntryTrailing extends StatelessWidget {
   const _EntryTrailing({
     required this.entryId,
-    required this.index,
     required this.onMove,
+    required this.dragHandle,
   });
 
   final int entryId;
-  final int index;
   final VoidCallback onMove;
+
+  /// ☰ 拖曳 handle（由 [_DaySection._buildEntryRow] 建成 [Draggable]）。
+  final Widget dragHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -645,10 +663,7 @@ class _EntryTrailing extends StatelessWidget {
           tooltip: '移到其他天',
           onPressed: onMove,
         ),
-        ReorderDragHandle(
-          index: index,
-          iconKey: ValueKey('entry-drag-$entryId'),
-        ),
+        dragHandle,
       ],
     );
   }

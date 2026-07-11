@@ -703,10 +703,11 @@ void main() {
 
     final titleFinder = find.text('2026-07-12');
     final before = tester.getTopLeft(titleFinder).dy;
+    // 拖曳來源改為 ☰ handle 的 LongPressDraggable(統一單一手勢);entry id = 100 + index。
     final gesture = await tester.startGesture(
-      tester.getCenter(find.text('景點 drag-0')),
+      tester.getCenter(find.byKey(const ValueKey('entry-cross-drag-100'))),
     );
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     for (var i = 0; i < 8; i++) {
       await gesture.moveBy(const Offset(0, 90));
       await tester.pump(const Duration(milliseconds: 16));
@@ -799,54 +800,88 @@ void main() {
     expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
   });
 
-  group('computeReorderUpdates', () {
-    test('移到末位（onReorderItem 已調整索引）+ 重編連續 sort_order', () {
-      final updates = computeReorderUpdates([11, 12, 13], 0, 2);
+  group('computeDropReorderUpdates（統一拖放:同日重排 + 跨日移動）', () {
+    test('同日:drop 在目標 entry 上 → 插其前並全員重編（dayId 全 null）', () {
+      final updates = computeDropReorderUpdates(
+        activeEntryId: 13,
+        targetDayId: 1,
+        targetEntryIds: [11, 12, 13],
+        sameDay: true,
+        overEntryId: 11,
+      );
+      // 移除 13 → [11,12],於 11 前插入 → [13,11,12]
+      expect(updates, [
+        (id: 13, sortOrder: 0, dayId: null),
+        (id: 11, sortOrder: 1, dayId: null),
+        (id: 12, sortOrder: 2, dayId: null),
+      ]);
+    });
+
+    test('同日:drop 在空白處（overEntryId null）→ 移到末尾', () {
+      final updates = computeDropReorderUpdates(
+        activeEntryId: 11,
+        targetDayId: 1,
+        targetEntryIds: [11, 12, 13],
+        sameDay: true,
+      );
       expect(updates.map((u) => u.id).toList(), [12, 13, 11]);
       expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
       expect(updates.every((u) => u.dayId == null), isTrue);
     });
-    test('末位移到首位', () {
-      final updates = computeReorderUpdates([11, 12, 13], 2, 0);
-      expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
-    });
-  });
 
-  group('computeCrossDayMoveUpdates', () {
-    test('drop 在目標 entry 上 → 插該位並重排後段', () {
-      final updates = computeCrossDayMoveUpdates(
+    test('同日:drop 在緊接後方 entry 上 → 順序不變（no-op）', () {
+      // 11 已在 12 前;drop 11 到 12 → 仍插在 12 前 → 順序不變。
+      final updates = computeDropReorderUpdates(
+        activeEntryId: 11,
+        targetDayId: 1,
+        targetEntryIds: [11, 12, 13],
+        sameDay: true,
+        overEntryId: 12,
+      );
+      expect(updates.map((u) => u.id).toList(), [11, 12, 13]);
+    });
+
+    test('跨日:drop 在目標 entry 上 → active 帶 targetDayId、全員重編', () {
+      final updates = computeDropReorderUpdates(
         activeEntryId: 99,
         targetDayId: 7,
         targetEntryIds: [10, 20, 30],
+        sameDay: false,
         overEntryId: 20,
       );
+      // 於 20 前插入 → [10,99,20,30];active 換天,其餘 dayId null
       expect(updates, [
+        (id: 10, sortOrder: 0, dayId: null),
         (id: 99, sortOrder: 1, dayId: 7),
         (id: 20, sortOrder: 2, dayId: null),
         (id: 30, sortOrder: 3, dayId: null),
       ]);
     });
 
-    test('drop 在 day 空白處 → 插末尾', () {
-      final updates = computeCrossDayMoveUpdates(
+    test('跨日:drop 在空白處 → 插末尾', () {
+      final updates = computeDropReorderUpdates(
         activeEntryId: 99,
         targetDayId: 7,
         targetEntryIds: [10, 20],
+        sameDay: false,
       );
-      expect(updates, [(id: 99, sortOrder: 2, dayId: 7)]);
+      expect(updates, [
+        (id: 10, sortOrder: 0, dayId: null),
+        (id: 20, sortOrder: 1, dayId: null),
+        (id: 99, sortOrder: 2, dayId: 7),
+      ]);
     });
 
-    test('target 列表意外含 active → 先排除再算', () {
-      final updates = computeCrossDayMoveUpdates(
+    test('target 列表意外含 active → 先排除再算（不重複）', () {
+      final updates = computeDropReorderUpdates(
         activeEntryId: 99,
         targetDayId: 7,
         targetEntryIds: [10, 99, 20],
+        sameDay: false,
         overEntryId: 20,
       );
-      expect(updates, [
-        (id: 99, sortOrder: 1, dayId: 7),
-        (id: 20, sortOrder: 2, dayId: null),
-      ]);
+      expect(updates.map((u) => u.id).toList(), [10, 99, 20]);
+      expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
     });
   });
 
@@ -885,8 +920,9 @@ void main() {
               ),
             ).captured.single
             as List<({int id, int sortOrder, int? dayId})>;
-    expect(captured.single.id, 11);
-    expect(captured.single.dayId, 2);
+    // 統一 helper 全員重編:被移動的 entry 11 帶新的 dayId=2(移到 day2 末尾)。
+    final active = captured.firstWhere((u) => u.id == 11);
+    expect(active.dayId, 2);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
   });
@@ -931,7 +967,12 @@ void main() {
               ),
             ).captured.single
             as List<({int id, int sortOrder, int? dayId})>;
-    expect(captured.single, (id: 11, sortOrder: 2, dayId: 2));
+    // 統一 helper 全員重編:day2 [21,22] append 11 → 全部帶連續 sortOrder。
+    expect(captured, [
+      (id: 21, sortOrder: 0, dayId: null),
+      (id: 22, sortOrder: 1, dayId: null),
+      (id: 11, sortOrder: 2, dayId: 2),
+    ]);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
   });
