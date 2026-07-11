@@ -416,8 +416,17 @@ class SliverAdaptiveLargeTitle extends StatelessWidget {
         platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
 
     if (isApple) {
+      // 收合後的小標(persistent middle)放大成 titleLarge(20/700),對齊 Material
+      // AppBar(如 AI 助手)的標題大小;alwaysShowMiddle:false → 只在捲動收合時淡入,
+      // 置頂時仍只顯示大標,維持 iOS 大標題的收合行為。
+      final theme = Theme.of(context);
+      final collapsedStyle = theme.textTheme.titleLarge?.copyWith(
+        color: theme.colorScheme.onSurface,
+      );
       return CupertinoSliverNavigationBar(
         largeTitle: Text(title),
+        middle: Text(title, style: collapsedStyle),
+        alwaysShowMiddle: false,
         automaticallyImplyLeading: automaticallyImplyLeading,
         trailing: actions.isEmpty
             ? null
