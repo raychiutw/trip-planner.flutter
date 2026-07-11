@@ -3,6 +3,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:tripline/features/map/google_map_adapter.dart';
 
 void main() {
+  test('TripMapPoint 是地圖套件無關的座標值物件(相等以 lat/lng 判定)', () {
+    const point = TripMapPoint(26.217, 127.719);
+    expect(point.latitude, 26.217);
+    expect(point.longitude, 127.719);
+    expect(point, const TripMapPoint(26.217, 127.719));
+    expect(point, isNot(const TripMapPoint(26.217, 127.688)));
+  });
+
   group('tripMapBounds', () {
     test('多點涵蓋 min/max lat/lng', () {
       final bounds = tripMapBounds(const [

@@ -3,13 +3,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'map_adapter.dart' show TripMapPoint;
+/// 地圖套件無關的座標值物件(lat/lng)。
+class TripMapPoint {
+  const TripMapPoint(this.latitude, this.longitude);
 
-export 'map_adapter.dart' show TripMapPoint;
+  final double latitude;
+  final double longitude;
 
-/// google_maps_flutter 版地圖抽象(與 flutter_map 版 [map_adapter.dart] 並存;
-/// 待 global_map 於 C2 遷移後移除 flutter_map 版)。放獨立檔避免兩套 `LatLng`
-/// 命名衝突。
+  @override
+  bool operator ==(Object other) =>
+      other is TripMapPoint &&
+      other.latitude == latitude &&
+      other.longitude == longitude;
+
+  @override
+  int get hashCode => Object.hash(latitude, longitude);
+}
+
+/// google_maps_flutter 版地圖抽象。放獨立檔避免與 google 的 `LatLng` 於呼叫端
+/// 命名衝突(呼叫端只碰 [TripMapPoint])。
 LatLng _toGoogle(TripMapPoint p) => LatLng(p.latitude, p.longitude);
 
 /// 地圖 marker:圖示須為預先 resolve 的 [BitmapDescriptor](Google Marker 不吃
