@@ -263,10 +263,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverAppBar.large(
-              pinned: true,
+            SliverAdaptiveLargeTitle(
+              title: '我的行程',
               automaticallyImplyLeading: false,
-              title: const Text('我的行程'),
               actions: [
                 IconButton(
                   key: const ValueKey('trips-list-import-trigger'),
