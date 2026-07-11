@@ -23,6 +23,9 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
+# Secrets — Google Maps SDK 金鑰(見 ios/Flutter/Secrets.xcconfig.example)
+ios/Flutter/Secrets.xcconfig
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
