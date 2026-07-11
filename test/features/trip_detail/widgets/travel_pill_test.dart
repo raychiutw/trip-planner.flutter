@@ -123,6 +123,22 @@ void main() {
       expect(find.text('20 分鐘 · 11 km'), findsNothing);
     });
 
+    testWidgets('transit submode 顯示方式名(地鐵/火車/高鐵/單軌 靠文字區分)', (
+      tester,
+    ) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'metro', submode: 'metro', min: 25, distanceM: 3000),
+      );
+      expect(find.textContaining('地鐵'), findsOneWidget);
+      expect(find.textContaining('25 分鐘'), findsOneWidget);
+    });
+
+    testWidgets('driving 段(無 submode)不顯示方式名,只有分鐘', (tester) async {
+      await pumpPill(tester, const Travel(type: 'driving', min: 8));
+      expect(find.text('8 分鐘'), findsOneWidget);
+    });
+
     testWidgets('sameplace 顯示中性描邊「同一地點」marker', (tester) async {
       await pumpPill(
         tester,

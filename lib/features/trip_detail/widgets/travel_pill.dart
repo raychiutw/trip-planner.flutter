@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
+import '../../../models/travel_method.dart';
 import '../../../theme/app_theme.dart';
 
 /// 站間移動 pill：sage 描邊、透明底、type icon + 分鐘數（tabular）。
@@ -65,18 +66,28 @@ class TravelPill extends StatelessWidget {
     final hasMin = !hasStatus && travel.min != null;
     final hasDist = !hasStatus && travel.distanceM != null;
 
+    // 方式名僅在 transit + submode 時顯示(單軌/公車/地鐵/火車/高鐵靠文字區分,
+    // 因共用 train/bus icon);駕車/步行靠 icon 即可,對齊 web TravelPill。
+    final method = sameplace ? '' : travelMethodLabel(travel.submode);
+    final String core;
+    if (hasMin && hasDist) {
+      core = '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
+    } else if (hasMin) {
+      core = '${travel.min} 分鐘';
+    } else if (hasDist) {
+      core = _formatDistance(travel.distanceM!);
+    } else {
+      core = travel.desc ?? '移動';
+    }
+
     if (sameplace) {
       label = '同一地點';
     } else if (hasStatus) {
       label = statusLabel!;
-    } else if (hasMin && hasDist) {
-      label = '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
-    } else if (hasMin) {
-      label = '${travel.min} 分鐘';
-    } else if (hasDist) {
-      label = _formatDistance(travel.distanceM!);
+    } else if (method.isEmpty) {
+      label = core;
     } else {
-      label = travel.desc ?? '移動';
+      label = '$method · $core';
     }
 
     return Container(

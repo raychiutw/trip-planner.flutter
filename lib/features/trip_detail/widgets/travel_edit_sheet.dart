@@ -6,33 +6,9 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/segment.dart';
+import '../../../models/travel_method.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
-
-typedef _TravelMethod = ({
-  String key,
-  String mode,
-  String? submode,
-  String label,
-  bool auto,
-});
-
-const List<_TravelMethod> _methods = [
-  (key: 'driving', mode: 'driving', submode: null, label: '駕車', auto: true),
-  (key: 'walking', mode: 'walking', submode: null, label: '步行', auto: true),
-  (
-    key: 'monorail',
-    mode: 'transit',
-    submode: 'monorail',
-    label: '單軌',
-    auto: true,
-  ),
-  (key: 'bus', mode: 'transit', submode: 'bus', label: '公車', auto: true),
-  (key: 'metro', mode: 'transit', submode: 'metro', label: '地鐵', auto: false),
-  (key: 'train', mode: 'transit', submode: 'train', label: '火車', auto: false),
-  (key: 'hsr', mode: 'transit', submode: 'hsr', label: '高鐵', auto: false),
-  (key: 'other', mode: 'transit', submode: null, label: '其他', auto: false),
-];
 
 String _initialMethodKey(TripSegment segment) {
   if (segment.noTravel) return 'sameplace';
@@ -40,7 +16,7 @@ String _initialMethodKey(TripSegment segment) {
     return segment.mode;
   }
   final submode = segment.submode;
-  if (_methods.any((method) => method.key == submode)) return submode!;
+  if (kTravelMethods.any((method) => method.key == submode)) return submode!;
   return 'other';
 }
 
@@ -91,7 +67,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     _selectedKey = _initialKey;
     final initialMethod = _selectedKey == 'sameplace'
         ? null
-        : _methods.firstWhere((method) => method.key == _selectedKey);
+        : kTravelMethods.firstWhere((method) => method.key == _selectedKey);
     _initialMinText =
         initialMethod?.auto == true && widget.segment.source != 'manual'
         ? ''
@@ -115,8 +91,8 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
 
   bool get _isSamePlace => _selectedKey == 'sameplace';
 
-  _TravelMethod get _selectedMethod =>
-      _methods.firstWhere((method) => method.key == _selectedKey);
+  TravelMethod get _selectedMethod =>
+      kTravelMethods.firstWhere((method) => method.key == _selectedKey);
 
   bool get _validMinutes {
     final value = int.tryParse(_min.text.trim());
@@ -200,7 +176,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
               spacing: TpSpacing.s2,
               runSpacing: TpSpacing.s2,
               children: [
-                for (final option in _methods)
+                for (final option in kTravelMethods)
                   ChoiceChip(
                     key: ValueKey('travel-method-${option.key}'),
                     label: Text(option.label),
