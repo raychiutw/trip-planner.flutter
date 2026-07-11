@@ -389,3 +389,47 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
     );
   }
 }
+
+/// 平台自適應大標題 sliver(root 清單頁用)。
+///
+/// - iOS/macOS → [CupertinoSliverNavigationBar]:原生大標題,捲動平滑收合成置中
+///   inline 標題 + 半透明模糊(scroll-under),對標 Apple 設定/Mail/Notes。
+/// - 其餘平台 → Material [SliverAppBar.large]。
+///
+/// 只負責標題列;搜尋/篩選等放在此 sliver「之後」的 sliver(隨內容捲動)。
+class SliverAdaptiveLargeTitle extends StatelessWidget {
+  const SliverAdaptiveLargeTitle({
+    super.key,
+    required this.title,
+    this.actions = const [],
+    this.automaticallyImplyLeading = true,
+  });
+
+  final String title;
+  final List<Widget> actions;
+  final bool automaticallyImplyLeading;
+
+  @override
+  Widget build(BuildContext context) {
+    final platform = Theme.of(context).platform;
+    final isApple =
+        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+    if (isApple) {
+      return CupertinoSliverNavigationBar(
+        largeTitle: Text(title),
+        automaticallyImplyLeading: automaticallyImplyLeading,
+        trailing: actions.isEmpty
+            ? null
+            : Row(mainAxisSize: MainAxisSize.min, children: actions),
+      );
+    }
+
+    return SliverAppBar.large(
+      pinned: true,
+      automaticallyImplyLeading: automaticallyImplyLeading,
+      title: Text(title),
+      actions: actions.isEmpty ? null : actions,
+    );
+  }
+}
