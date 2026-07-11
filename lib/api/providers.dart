@@ -12,6 +12,7 @@ import 'oauth/id_token.dart';
 import 'oauth/oauth_config.dart';
 import 'oauth/oauth_providers.dart';
 import 'requests_repository.dart';
+import 'route_repository.dart';
 import 'session_store.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
@@ -49,6 +50,11 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final tripRepositoryProvider = Provider<TripRepository>(
   (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+);
+
+/// 地圖道路折線查詢(`GET /api/route`)。
+final routeRepositoryProvider = Provider<RouteRepository>(
+  (ref) => RouteRepository(client: ref.watch(apiClientProvider)),
 );
 
 final requestsRepositoryProvider = Provider<RequestsRepository>(
