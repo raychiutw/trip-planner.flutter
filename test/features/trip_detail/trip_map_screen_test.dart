@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/route_repository.dart';
+import 'package:tripline/features/map/google_map_adapter.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
@@ -198,5 +199,32 @@ void main() {
 
     // day1 有 11→12 一對;day2 單 pin 無對;不接 12→21(不跨日)→ 僅 1 次呼叫。
     expect(fake.calls, ['26.217,127.719->26.214,127.688']);
+  });
+
+  testWidgets('底圖 FAB:切換 normal ↔ hybrid', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    GoogleMapCanvas canvas() =>
+        tester.widget<GoogleMapCanvas>(find.byType(GoogleMapCanvas));
+    expect(canvas().mapType, TripMapType.normal);
+
+    await tester.tap(find.byKey(const ValueKey('map-basemap-fab')));
+    await tester.pumpAndSettle();
+    expect(canvas().mapType, TripMapType.hybrid);
+
+    await tester.tap(find.byKey(const ValueKey('map-basemap-fab')));
+    await tester.pumpAndSettle();
+    expect(canvas().mapType, TripMapType.normal);
+  });
+
+  testWidgets('全部顯示 FAB:點擊不 crash', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('map-fitall-fab')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
   });
 }

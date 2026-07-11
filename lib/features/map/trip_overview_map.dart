@@ -78,6 +78,9 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
 
+  /// 底圖類型(底圖切換 FAB;normal ↔ hybrid 衛星+標籤,對齊 web hybrid)。
+  TripMapType _mapType = TripMapType.normal;
+
   @override
   void dispose() {
     _mapController.dispose();
@@ -336,14 +339,59 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
   }
 
   Widget _buildMap(List<_DayPin> allPins) {
-    return GoogleMapCanvas(
-      controller: _mapController,
-      initialFitPoints: [for (final pin in allPins) pin.point],
-      initialPadding: const EdgeInsets.all(TpSpacing.s10),
-      initialMaxZoom: 16,
-      markers: _markers,
-      polylines: _polylines,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GoogleMapCanvas(
+            controller: _mapController,
+            initialFitPoints: [for (final pin in allPins) pin.point],
+            initialPadding: const EdgeInsets.all(TpSpacing.s10),
+            initialMaxZoom: 16,
+            markers: _markers,
+            polylines: _polylines,
+            mapType: _mapType,
+          ),
+        ),
+        Positioned(
+          right: TpSpacing.s3,
+          bottom: TpSpacing.s3,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FloatingActionButton.small(
+                key: const ValueKey('map-basemap-fab'),
+                heroTag: null,
+                tooltip: '切換底圖',
+                onPressed: _toggleBasemap,
+                child: Icon(
+                  _mapType == TripMapType.normal
+                      ? Icons.layers_outlined
+                      : Icons.map_outlined,
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              FloatingActionButton.small(
+                key: const ValueKey('map-fitall-fab'),
+                heroTag: null,
+                tooltip: '全部顯示',
+                onPressed: () => _fitToPoints([
+                  for (final pin in _pinsForTab(_selectedTabIndex)) pin.point,
+                ]),
+                child: const Icon(Icons.center_focus_strong),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
+  }
+
+  void _toggleBasemap() {
+    setState(() {
+      _mapType = _mapType == TripMapType.normal
+          ? TripMapType.hybrid
+          : TripMapType.normal;
+    });
   }
 
   Widget _buildEntryCards(BuildContext context, List<_DayPin> visiblePins) {
