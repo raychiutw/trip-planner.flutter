@@ -9,8 +9,14 @@ import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/day.dart';
 import '../../../models/entry.dart';
+import '../../../models/poi_search_result.dart';
 import '../../../theme/tokens.dart';
+import '../../favorites/explore/explore_controller.dart'
+    show poiRepositoryProvider;
 import '../trip_providers.dart';
+
+/// 「新增停留點」熱門搜尋 seed(比照建立行程的熱門目的地)。
+const _hotSearches = ['沖繩', '東京', '京都', '首爾', '曼谷', '台北'];
 
 /// 編輯/新增停留點的模式參數。
 sealed class EntryEditArgs {
@@ -70,6 +76,11 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   TimeOfDay? _end;
   int? _newDayNum;
   bool _submitting = false;
+
+  // POI 搜尋狀態(僅新增模式):選到的 POI、搜尋結果、是否搜尋中。
+  PoiSearchResult? _selectedPoi;
+  List<PoiSearchResult> _results = const [];
+  bool _searching = false;
 
   bool get _isEdit => widget.args is EntryEditExisting;
 
@@ -169,14 +180,20 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
           }
         case final EntryEditNew args:
           final dayNum = _selectedDayNum(args);
+          final poi = _selectedPoi;
+          // 選了 POI → 帶名稱 + 座標(source user-explore,後端 find-or-create 帶分類);
+          // 沒選 → 手打標題當自訂停留點(無座標,source custom)。
+          final hasCoords = poi != null && (poi.lat != 0 || poi.lng != 0);
           await repo.addEntryToDay(
             tripId: widget.tripId,
             dayNum: dayNum,
-            title: title,
+            title: poi?.name ?? title,
             description: description,
+            lat: hasCoords ? poi.lat : null,
+            lng: hasCoords ? poi.lng : null,
             startTime: _fmt(_start),
             endTime: _fmt(_end),
-            source: 'custom',
+            source: poi != null ? 'user-explore' : 'custom',
           );
           await _recomputeDay(dayNum);
       }
@@ -202,6 +219,125 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     }
   }
 
+  Future<void> _runPoiSearch() async {
+    final q = _title.text.trim();
+    if (q.length < 2) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _searching = true);
+    try {
+      final r = await ref
+          .read(poiRepositoryProvider)
+          .searchPois(q: q, region: '全部地區');
+      if (mounted) setState(() => _results = r);
+    } on Exception {
+      if (mounted) {
+        setState(() => _results = const []);
+        showAppNotice(context, '搜尋失敗，請稍後再試');
+      }
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  void _pickPoi(PoiSearchResult poi) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _selectedPoi = poi;
+      _title.text = poi.name;
+      _results = const [];
+    });
+  }
+
+  void _clearPoi() => setState(() {
+    _selectedPoi = null;
+    _results = const [];
+  });
+
+  /// 新增模式的地點區塊:已選 → 地點卡;未選 → 搜尋框 + 熱門 chips + 結果清單。
+  /// 搜尋沿用建立行程那套(AppSearchField + /poi-search on submit);沒選就以手打
+  /// 標題當自訂停留點(無座標)。
+  Widget _buildPoiSection(BuildContext context) {
+    final poi = _selectedPoi;
+    if (poi != null) {
+      return _SelectedPoiCard(poi: poi, onChange: _clearPoi);
+    }
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AppSearchField(
+                fieldKey: const ValueKey('entry-edit-title'),
+                controller: _title,
+                placeholder: '地點名稱(可搜尋)',
+                onSubmitted: (_) => _runPoiSearch(),
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            IconButton.filled(
+              key: const ValueKey('entry-poi-search-btn'),
+              tooltip: '搜尋地點',
+              onPressed: _searching ? null : _runPoiSearch,
+              icon: _searching
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    )
+                  : const Icon(CupertinoIcons.search),
+            ),
+          ],
+        ),
+        const SizedBox(height: TpSpacing.s2),
+        Wrap(
+          spacing: TpSpacing.s2,
+          children: [
+            for (final h in _hotSearches)
+              ActionChip(
+                key: ValueKey('entry-poi-hot-$h'),
+                label: Text(h),
+                onPressed: () {
+                  _title.text = h;
+                  _runPoiSearch();
+                },
+              ),
+          ],
+        ),
+        if (_results.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s2),
+            child: Material(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(TpRadius.md),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final r in _results.take(6))
+                    ListTile(
+                      dense: true,
+                      key: ValueKey('poi-result-${r.placeId}'),
+                      leading: const Icon(CupertinoIcons.location_solid),
+                      title: Text(r.name),
+                      subtitle: r.address == null
+                          ? null
+                          : Text(
+                              r.address!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                      onTap: () => _pickPoi(r),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final timeValid = entryTimeRangeValid(_start, _end);
@@ -214,84 +350,80 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _isEdit ? '編輯停留點' : '新增停留點',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            if (!_isEdit)
-              TextField(
-                key: const ValueKey('entry-edit-title'),
-                controller: _title,
-                decoration: const InputDecoration(labelText: '標題'),
-                textInputAction: TextInputAction.next,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _isEdit ? '編輯停留點' : '新增停留點',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            if (showDayPicker) ...[
+              const SizedBox(height: TpSpacing.s4),
+              if (!_isEdit) _buildPoiSection(context),
+              if (showDayPicker) ...[
+                const SizedBox(height: TpSpacing.s3),
+                DropdownButtonFormField<int>(
+                  key: const ValueKey('entry-edit-day'),
+                  initialValue: selectedDayNum,
+                  decoration: const InputDecoration(labelText: '日期'),
+                  items: [
+                    for (final day in dayOptions)
+                      DropdownMenuItem(
+                        value: day.dayNum,
+                        child: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _newDayNum = value);
+                  },
+                ),
+              ],
               const SizedBox(height: TpSpacing.s3),
-              DropdownButtonFormField<int>(
-                key: const ValueKey('entry-edit-day'),
-                initialValue: selectedDayNum,
-                decoration: const InputDecoration(labelText: '日期'),
-                items: [
-                  for (final day in dayOptions)
-                    DropdownMenuItem(
-                      value: day.dayNum,
-                      child: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
+              _timeField(true),
+              const SizedBox(height: TpSpacing.s2),
+              _timeField(false),
+              if (!timeValid)
+                Padding(
+                  padding: const EdgeInsets.only(top: TpSpacing.s2),
+                  child: Text(
+                    '結束時間需晚於開始時間',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
                     ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _newDayNum = value);
-                },
-              ),
-            ],
-            const SizedBox(height: TpSpacing.s3),
-            _timeField(true),
-            const SizedBox(height: TpSpacing.s2),
-            _timeField(false),
-            if (!timeValid)
-              Padding(
-                padding: const EdgeInsets.only(top: TpSpacing.s2),
-                child: Text(
-                  '結束時間需晚於開始時間',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 12,
                   ),
                 ),
-              ),
-            const SizedBox(height: TpSpacing.s3),
-            TextField(
-              key: const ValueKey('entry-edit-desc'),
-              controller: _desc,
-              decoration: const InputDecoration(labelText: '描述（選填）'),
-              maxLines: 2,
-            ),
-            if (_isEdit) ...[
               const SizedBox(height: TpSpacing.s3),
-              OutlinedButton.icon(
-                key: const ValueKey('entry-edit-manage-pois'),
-                onPressed: () {
-                  final entry = (widget.args as EntryEditExisting).entry;
-                  Navigator.of(context).pop();
-                  context.push(
-                    '/trips/${widget.tripId}/entries/${entry.id}/pois',
-                  );
-                },
-                icon: const Icon(CupertinoIcons.location_solid),
-                label: const Text('管理地點'),
+              TextField(
+                key: const ValueKey('entry-edit-desc'),
+                controller: _desc,
+                decoration: const InputDecoration(labelText: '描述（選填）'),
+                maxLines: 2,
+              ),
+              if (_isEdit) ...[
+                const SizedBox(height: TpSpacing.s3),
+                OutlinedButton.icon(
+                  key: const ValueKey('entry-edit-manage-pois'),
+                  onPressed: () {
+                    final entry = (widget.args as EntryEditExisting).entry;
+                    Navigator.of(context).pop();
+                    context.push(
+                      '/trips/${widget.tripId}/entries/${entry.id}/pois',
+                    );
+                  },
+                  icon: const Icon(CupertinoIcons.location_solid),
+                  label: const Text('管理地點'),
+                ),
+              ],
+              const SizedBox(height: TpSpacing.s6),
+              FilledButton(
+                key: const ValueKey('entry-edit-submit'),
+                onPressed: _canSubmit ? _submit : null,
+                child: Text(_submitting ? '處理中…' : (_isEdit ? '儲存' : '新增')),
               ),
             ],
-            const SizedBox(height: TpSpacing.s6),
-            FilledButton(
-              key: const ValueKey('entry-edit-submit'),
-              onPressed: _canSubmit ? _submit : null,
-              child: Text(_submitting ? '處理中…' : (_isEdit ? '儲存' : '新增')),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -322,6 +454,67 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                 setState(() => isStart ? _start = null : _end = null),
           ),
       ],
+    );
+  }
+}
+
+/// 已選 POI 的確認卡:名稱 + 地址 +「已帶入座標」+ 更換(清除重選)。
+class _SelectedPoiCard extends StatelessWidget {
+  const _SelectedPoiCard({required this.poi, required this.onChange});
+
+  final PoiSearchResult poi;
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasCoords = poi.lat != 0 || poi.lng != 0;
+    return Container(
+      key: const ValueKey('entry-poi-selected'),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(CupertinoIcons.location_solid, color: theme.colorScheme.primary),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(poi.name, style: theme.textTheme.titleMedium),
+                if (poi.address != null)
+                  Text(
+                    poi.address!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (hasCoords)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '已帶入座標',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          TextButton(
+            key: const ValueKey('entry-poi-clear'),
+            onPressed: onChange,
+            child: const Text('更換'),
+          ),
+        ],
+      ),
     );
   }
 }
