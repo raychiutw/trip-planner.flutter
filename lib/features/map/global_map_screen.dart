@@ -1,192 +1,146 @@
-/// 全域地圖:把所有收藏 POI(GET /poi-favorites,跨行程)畫在地圖 adapter 上,
-/// 依 poi_type 上色;點 marker → 顯示名稱/評分/所屬行程。
-/// (web 的 /map 實為 dead code 導回單行程地圖;此處實作真正的跨行程地圖。)
+/// 行程總覽地圖(`/map` 分頁):trip picker 切換行程 → 顯示該行程每天景點與路線
+/// (共用 [TripDayMapView])。比照 web 手機版 GlobalMapPage;不顯示收藏(收藏維持
+/// 清單頁)。與 trip map 的差別僅在頂部多一個可切換 tripId 的 picker。
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/poi_favorite.dart';
-import '../../theme/app_theme.dart';
-import '../../theme/poi_tone.dart';
+import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../favorites/favorites_providers.dart';
-import 'map_adapter.dart';
-
-bool _hasCoords(PoiFavorite f) =>
-    f.poiLat != null && f.poiLng != null && f.poiLat != 0 && f.poiLng != 0;
+import '../trip_detail/trip_providers.dart';
+import '../trips/trips_list_screen.dart';
+import 'trip_overview_map.dart';
 
 class GlobalMapScreen extends ConsumerStatefulWidget {
-  const GlobalMapScreen({super.key, this.tileProvider});
-
-  /// 測試注入(避免抓真 tile);prod 為 null → 走網路 OSM。
-  final TripMapTileProvider? tileProvider;
+  const GlobalMapScreen({super.key});
 
   @override
   ConsumerState<GlobalMapScreen> createState() => _GlobalMapScreenState();
 }
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
-  final FlutterTripMapController _mapController = FlutterTripMapController();
-  int? _selectedId;
-
-  @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
-  }
+  /// null → 尚未手動選 → 用清單第一個行程。
+  String? _selectedTripId;
 
   @override
   Widget build(BuildContext context) {
-    final favsAsync = ref.watch(favoritesProvider);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('地圖')),
-      body: favsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
-        error: (e, _) => const _Hint(title: '載入失敗', body: '無法取得收藏地點,請稍後再試。'),
-        data: (favs) {
-          final pins = favs.where(_hasCoords).toList();
-          if (pins.isEmpty) {
-            return const _Hint(
-              title: '還沒有地點可顯示',
-              body: '到「收藏」或「探索」收藏地點後,就會出現在這張地圖上。',
-            );
-          }
-          PoiFavorite? selected;
-          for (final f in pins) {
-            if (f.id == _selectedId) {
-              selected = f;
-              break;
-            }
-          }
-          return Stack(
-            children: [
-              _buildMap(context, pins),
-              if (selected != null)
-                Positioned(
-                  left: TpSpacing.s4,
-                  right: TpSpacing.s4,
-                  bottom: TpSpacing.s4,
-                  child: _SelectedCard(
-                    favorite: selected,
-                    onClose: () => setState(() => _selectedId = null),
-                  ),
-                ),
-            ],
-          );
-        },
+    final tripsAsync = ref.watch(myTripsProvider);
+    return tripsAsync.when(
+      loading: () => _scaffold(
+        const Text('地圖'),
+        const Center(child: CircularProgressIndicator.adaptive()),
       ),
-    );
-  }
-
-  Widget _buildMap(BuildContext context, List<PoiFavorite> pins) {
-    final tones = Theme.of(context).extension<TpTones>()!;
-    final points = [for (final f in pins) TripMapPoint(f.poiLat!, f.poiLng!)];
-    return FlutterMapCanvas(
-      controller: _mapController,
-      tilePreset: kTripMapTilePresets.first,
-      initialFitPoints: points,
-      initialPadding: const EdgeInsets.all(TpSpacing.s10),
-      initialMaxZoom: 14,
-      tileProvider: widget.tileProvider,
-      onTap: (_) => setState(() => _selectedId = null),
-      markers: [
-        for (final f in pins)
-          TripMapMarker(
-            point: TripMapPoint(f.poiLat!, f.poiLng!),
-            width: TpSpacing.tapMin,
-            height: TpSpacing.tapMin,
-            child: Semantics(
-              key: ValueKey('map-fav-${f.id}'),
-              label: '收藏地點，${f.poiName ?? '未命名地點'}',
-              button: true,
-              selected: _selectedId == f.id,
-              onTap: () => setState(() => _selectedId = f.id),
-              child: ExcludeSemantics(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _selectedId = f.id),
-                  child: Center(
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: resolvePoiTone(tones, f.poiType).base,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _selectedId == f.id
-                              ? Theme.of(context).colorScheme.onSurface
-                              : Colors.white,
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+      error: (e, _) => _scaffold(
+        const Text('地圖'),
+        const _Hint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+      ),
+      data: (trips) {
+        if (trips.isEmpty) {
+          return _scaffold(
+            const Text('地圖'),
+            const _Hint(
+              title: '還沒有行程',
+              body: '建立行程並加入地點後,就能在這裡看到每天的景點與路線。',
             ),
-          ),
-      ],
+          );
+        }
+        final selected = trips.firstWhere(
+          (t) => t.tripId == _selectedTripId,
+          orElse: () => trips.first,
+        );
+        return _scaffold(
+          _pickerTitle(context, trips, selected),
+          _TripDaysBody(tripId: selected.tripId),
+        );
+      },
     );
   }
-}
 
-/// 選中地點卡:名稱 + 評分 + 類型 + 所屬行程。
-class _SelectedCard extends StatelessWidget {
-  const _SelectedCard({required this.favorite, required this.onClose});
+  Widget _scaffold(Widget title, Widget body) =>
+      Scaffold(appBar: AppBar(title: title), body: body);
 
-  final PoiFavorite favorite;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final trips = favorite.usages.map((u) => u.tripName).toSet().toList();
-    return Card(
+  /// AppBar 標題即 trip picker:行程名 + 下拉指示,點擊開 bottom sheet 切換。
+  Widget _pickerTitle(
+    BuildContext context,
+    List<TripSummary> trips,
+    TripSummary selected,
+  ) {
+    return InkWell(
+      key: const ValueKey('trip-picker'),
+      borderRadius: const BorderRadius.all(Radius.circular(TpRadius.sm)),
+      onTap: () => _openPicker(context, trips, selected),
       child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(
+          horizontal: TpSpacing.s2,
+          vertical: TpSpacing.s1,
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    favorite.poiName ?? '未命名地點',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: '關閉地點資訊',
-                  icon: const Icon(CupertinoIcons.xmark),
-                  onPressed: onClose,
-                ),
-              ],
+            Flexible(
+              child: Text(selected.name, overflow: TextOverflow.ellipsis),
             ),
-            if (favorite.poiRating != null)
-              Padding(
-                padding: const EdgeInsets.only(top: TpSpacing.s1),
-                child: Text(
-                  '★ ${favorite.poiRating!.toStringAsFixed(1)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: TpSpacing.s2),
-              child: Text(
-                trips.isEmpty ? '尚未用於任何行程' : '用於:${trips.join('、')}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+            const SizedBox(width: TpSpacing.s1),
+            const Icon(CupertinoIcons.chevron_down, size: 16),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openPicker(
+    BuildContext context,
+    List<TripSummary> trips,
+    TripSummary selected,
+  ) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final t in trips)
+              ListTile(
+                key: ValueKey('picker-trip-${t.tripId}'),
+                title: Text(t.name),
+                trailing: t.tripId == selected.tripId
+                    ? const Icon(CupertinoIcons.check_mark)
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(t.tripId),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedTripId = picked);
+    }
+  }
+}
+
+/// 監看選定行程的 days → 交給共用 [TripDayMapView]。以 `ValueKey(tripId)` 重建,
+/// 切換行程時重置選中日、避免 day tab 越界。
+class _TripDaysBody extends ConsumerWidget {
+  const _TripDaysBody({required this.tripId});
+
+  final String tripId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final daysAsync = ref.watch(tripDaysProvider(tripId));
+    return daysAsync.when(
+      loading: () =>
+          const Center(child: CircularProgressIndicator.adaptive()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s6),
+          child: Text('載入失敗：$error', textAlign: TextAlign.center),
+        ),
+      ),
+      data: (days) => TripDayMapView(key: ValueKey(tripId), days: days),
     );
   }
 }
