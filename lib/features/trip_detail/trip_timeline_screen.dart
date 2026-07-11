@@ -12,6 +12,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
 import '../../theme/tokens.dart';
+import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
 import 'widgets/day_pills.dart';
@@ -163,7 +164,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     day: day,
                     allDays: widget.days,
                     tripId: widget.tripId,
-                    scrollController: _scrollController,
                   ),
               ],
             ),
@@ -218,7 +218,6 @@ class _EntryDragPayload {
 // ponytail: process-local auto recompute UI state; move to repo helper if retries need persistence.
 final _requestedTravelGapRecomputes = <String>{};
 final _stalledTravelRecomputeScopes = <String>{};
-double? _capturedCrossDayDragScrollOffset;
 
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
@@ -227,13 +226,11 @@ class _DaySection extends ConsumerWidget {
     required this.tripId,
     required this.day,
     required this.allDays,
-    required this.scrollController,
   });
 
   final String tripId;
   final TripDay day;
   final List<TripDay> allDays;
-  final ScrollController scrollController;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -386,69 +383,61 @@ class _DaySection extends ConsumerWidget {
       _requestMissingSegmentRecompute(ref, timeline, segments);
     }
 
-    return DragTarget<_EntryDragPayload>(
-      key: ValueKey('day-drop-${day.id}'),
-      // 同日 + 跨日皆接受;drop 在此天空白處(非某 entry 上)→ 放到該天末尾。
-      onWillAcceptWithDetails: (details) => true,
-      onAcceptWithDetails: (details) {
-        unawaited(
-          _handleDrop(context, ref, payload: details.data, targetDay: day),
-        );
-      },
-      builder: (context, candidateData, rejectedData) {
-        final highlight = candidateData.isNotEmpty;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            border: highlight
-                ? Border.all(color: Theme.of(context).colorScheme.primary)
-                : null,
-            borderRadius: BorderRadius.circular(TpRadius.md),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DayHeader(day: day, segments: segments),
+        const SizedBox(height: TpSpacing.s3),
+        if (day.hotel != null) ...[
+          HotelCard(hotel: day.hotel!),
+          const SizedBox(height: TpSpacing.s3),
+        ],
+        // 同日重排:原生 ReorderableListView 提供鄰項讓位動畫 + 抬起質感([_liftProxy])。
+        // buildDefaultDragHandles:false → 只有 ≡ handle 能起拖,整張卡仍可點編輯 / 左滑刪除
+        // （不再與拖曳搶手勢）。跨日移動走 folder 選單([_moveToDay])。
+        // ponytail: 內層 ReorderableListView 用 NeverScrollableScrollPhysics 交給外層捲動,
+        // 故超長單日拖到畫面外不會自動捲動;單日停留點通常不多,需要時再補 auto-scroll。
+        if (timeline.isNotEmpty)
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            proxyDecorator: _liftProxy,
+            itemCount: timeline.length,
+            onReorderItem: (oldIndex, newIndex) =>
+                _reorderWithinDay(context, ref, oldIndex, newIndex),
+            itemBuilder: (context, i) => _buildEntryRow(
+              context,
+              ref,
+              index: i,
+              entry: timeline[i],
+              timeline: timeline,
+              segments: segments,
+              segmentsReady: segmentsReady,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DayHeader(day: day, segments: segments),
-              const SizedBox(height: TpSpacing.s3),
-              if (day.hotel != null) ...[
-                HotelCard(hotel: day.hotel!),
-                const SizedBox(height: TpSpacing.s3),
-              ],
-              for (final (i, entry) in timeline.indexed)
-                _buildEntryRow(
-                  context,
-                  ref,
-                  index: i,
-                  entry: entry,
-                  timeline: timeline,
-                  segments: segments,
-                  segmentsReady: segmentsReady,
-                ),
-              const SizedBox(height: TpSpacing.s2),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: ValueKey('add-entry-${day.dayNum}'),
-                  onPressed: () => showEntryEditSheet(
-                    context,
-                    tripId: tripId,
-                    args: EntryEditNew(day.dayNum, days: allDays),
-                  ),
-                  icon: const Icon(CupertinoIcons.add),
-                  label: const Text('新增停留點'),
-                ),
-              ),
-              const SizedBox(height: TpSpacing.s6),
-            ],
+        const SizedBox(height: TpSpacing.s2),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('add-entry-${day.dayNum}'),
+            onPressed: () => showEntryEditSheet(
+              context,
+              tripId: tripId,
+              args: EntryEditNew(day.dayNum, days: allDays),
+            ),
+            icon: const Icon(CupertinoIcons.add),
+            label: const Text('新增停留點'),
           ),
-        );
-      },
+        ),
+        const SizedBox(height: TpSpacing.s6),
+      ],
     );
   }
 
-  /// 單一 entry row:travel row(選配)＋ 拖放目標(`entry-drop`)包住整張卡。
-  /// 唯一拖曳手勢:長按整張卡 → 抬起、**限垂直**移動([Axis.vertical]);drop 到
-  /// 某卡 → 插其前(同日重排 / 跨日移入,由 [_handleDrop] 依來源天分流)。
-  /// 對齊 Apple 拖放:整張卡浮起(陰影)、原位留 ghost,無左右位移。
+  /// 單一 entry row = ReorderableListView 的一個可重排單元:travel row(選配)＋
+  /// 停留點卡。卡 trailing 帶「搬到其他天」(folder)與 ≡ 拖曳 handle(只有它能起拖)。
+  /// 同日重排的抬起/讓位動畫由 ReorderableListView + [_liftProxy] 原生處理。
   Widget _buildEntryRow(
     BuildContext context,
     WidgetRef ref, {
@@ -462,88 +451,24 @@ class _DaySection extends ConsumerWidget {
     final travelSegment = i > 0 && entry.travel != null
         ? _findSegment(segments, timeline[i - 1].id, entry.id)
         : null;
-    final payload = _EntryDragPayload(
-      entry: entry,
-      sourceDayId: day.id,
-      sourceDayNum: day.dayNum,
-    );
 
-    // 整張卡建構;lifted=拖曳中的浮起版(隱藏 rail 連線,較乾淨)。
-    Widget buildTile({bool lifted = false}) => TimelineEntryTile(
+    final tile = TimelineEntryTile(
       entry: entry,
       number: i + 1,
-      isFirst: lifted || i == 0,
-      isLast: lifted || i == timeline.length - 1,
+      isFirst: i == 0,
+      isLast: i == timeline.length - 1,
       onTap: () => showEntryEditSheet(
         context,
         tripId: tripId,
         args: EntryEditExisting(entry),
       ),
       trailing: _EntryTrailing(
+        index: i,
         entryId: entry.id,
         onMove: () => _moveToDay(context, ref, entry),
       ),
     );
 
-    final dropRow = DragTarget<_EntryDragPayload>(
-      key: ValueKey('entry-drop-${entry.id}'),
-      // 不接受 drop 到自己身上(no-op);其餘同日=重排、他日=移入。
-      onWillAcceptWithDetails: (details) => details.data.entry.id != entry.id,
-      onAcceptWithDetails: (details) {
-        unawaited(
-          _handleDrop(
-            context,
-            ref,
-            payload: details.data,
-            targetDay: day,
-            overEntryId: entry.id,
-          ),
-        );
-      },
-      builder: (context, candidateData, rejectedData) {
-        final highlight = candidateData.isNotEmpty;
-        // 整張卡即拖曳來源:長按抬起、限垂直。SwipeToDelete 在外層處理左滑刪除。
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final draggable = LongPressDraggable<_EntryDragPayload>(
-              key: ValueKey('entry-cross-drag-${entry.id}'),
-              data: payload,
-              axis: Axis.vertical,
-              onDragStarted: _captureDragScroll,
-              onDragUpdate: (details) =>
-                  _autoScrollDuringDrag(context, details.globalPosition),
-              onDragEnd: (_) => _restoreDragScroll(),
-              onDraggableCanceled: (velocity, offset) => _restoreDragScroll(),
-              onDragCompleted: _restoreDragScroll,
-              feedback: _EntryDragFeedback(
-                width: constraints.maxWidth,
-                child: buildTile(lifted: true),
-              ),
-              // 原位留半透明 ghost,傳達「已抬起搬移中」。
-              childWhenDragging: Opacity(opacity: 0.25, child: buildTile()),
-              child: buildTile(),
-            );
-            return DecoratedBox(
-              decoration: BoxDecoration(
-                border: highlight
-                    ? Border(
-                        top: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2,
-                        ),
-                      )
-                    : null,
-              ),
-              child: SwipeToDelete(
-                dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                onDelete: () => _confirmDelete(context, ref, entry),
-                child: draggable,
-              ),
-            );
-          },
-        );
-      },
-    );
     return Column(
       key: ValueKey('entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -559,7 +484,11 @@ class _DaySection extends ConsumerWidget {
             ),
             missingCoords: _missingTravelCoords(timeline[i - 1], entry),
           ),
-        dropRow,
+        SwipeToDelete(
+          dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+          onDelete: () => _confirmDelete(context, ref, entry),
+          child: tile,
+        ),
       ],
     );
   }
@@ -588,71 +517,68 @@ class _DaySection extends ConsumerWidget {
     unawaited(_recomputeDay(ref, day.dayNum, auto: true));
   }
 
-  void _captureDragScroll() {
-    if (!scrollController.hasClients) return;
-    _capturedCrossDayDragScrollOffset = scrollController.offset;
-  }
-
-  void _restoreDragScroll() {
-    final offset = _capturedCrossDayDragScrollOffset;
-    _capturedCrossDayDragScrollOffset = null;
-    if (offset == null || !scrollController.hasClients) return;
-    final position = scrollController.position;
-    final target = offset.clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if (target != position.pixels) {
-      scrollController.jumpTo(target);
+  /// 同日拖曳排序:[oldIndex]→[newIndex]（onReorderItem 已把 newIndex 調成移除後索引,
+  /// 見 [reorderedSortOrders]）。全員重編連續 sortOrder、dayId 全 null(不換天);
+  /// 順序沒變則不打 API。成功後 invalidate 重抓 + 重算該日交通。
+  Future<void> _reorderWithinDay(
+    BuildContext context,
+    WidgetRef ref,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    final ids = [for (final e in day.timeline) e.id];
+    final ordered = reorderedSortOrders(ids, oldIndex, newIndex);
+    if (listEquals([for (final o in ordered) o.id], ids)) return;
+    final List<({int id, int sortOrder, int? dayId})> updates = [
+      for (final o in ordered) (id: o.id, sortOrder: o.sortOrder, dayId: null),
+    ];
+    final repo = ref.read(tripRepositoryProvider);
+    try {
+      await repo.reorderEntries(tripId: tripId, updates: updates);
+    } on Exception {
+      if (context.mounted) showAppNotice(context, '排序失敗，請稍後再試');
+      if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
+      return;
     }
+    if (ref.context.mounted) ref.invalidate(tripDaysProvider(tripId));
+    await _recomputeDay(ref, day.dayNum);
   }
 
-  void _autoScrollDuringDrag(BuildContext context, Offset globalPosition) {
-    if (!scrollController.hasClients) return;
-    final height = MediaQuery.sizeOf(context).height;
-    const edge = 72.0;
-    const step = 32.0;
-    final delta = globalPosition.dy < edge
-        ? -step
-        : globalPosition.dy > height - edge
-        ? step
-        : 0.0;
-    if (delta == 0) return;
-
-    final position = scrollController.position;
-    final target = (position.pixels + delta).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if (target != position.pixels) {
-      scrollController.jumpTo(target);
-    }
-  }
-}
-
-/// tile 尾端：搬移到其他天 + 拖曳 handle（長按拖動排序）。
-/// 拖曳中的抬起卡片:整張卡浮起(Material 陰影 + 圓角),寬度對齊來源列,
-/// 對齊 Apple 拖放的「拿起」質感。
-class _EntryDragFeedback extends StatelessWidget {
-  const _EntryDragFeedback({required this.width, required this.child});
-
-  final double width;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(TpRadius.md),
-      color: Theme.of(context).colorScheme.surface,
-      child: SizedBox(width: width, child: child),
+  /// ReorderableListView 抬起質感:被抓的那列輕微放大 + 一點彈跳(easeOutBack 的
+  /// spring 回彈),傳達「拿起卡片」。整列鋪**不透明 surface 底**(拖曳中不透出後方
+  /// 卡片、較自然),**保留 rail 呈現、不加陰影**(依偏好);鄰項滑開讓位由
+  /// ReorderableListView 原生處理,那才是主要的移動感。
+  Widget _liftProxy(Widget child, int index, Animation<double> animation) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = Curves.easeOutBack.transform(animation.value.clamp(0.0, 1.0));
+        return Transform.scale(
+          scale: 1 + 0.04 * t,
+          child: Material(
+            color: Theme.of(context).colorScheme.surface,
+            elevation: 0,
+            borderRadius: BorderRadius.circular(TpRadius.md),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }
 
+/// tile 尾端：搬到其他天(folder 選單)＋ ≡ 拖曳 handle。handle 是 ReorderableListView
+/// 的唯一起拖點([ReorderDragHandle] 內含 ReorderableDragStartListener),整張卡因此
+/// 仍可點擊編輯 / 左滑刪除而不搶手勢。
 class _EntryTrailing extends StatelessWidget {
-  const _EntryTrailing({required this.entryId, required this.onMove});
+  const _EntryTrailing({
+    required this.index,
+    required this.entryId,
+    required this.onMove,
+  });
 
+  /// 於當日 timeline 的索引(ReorderableDragStartListener 需要)。
+  final int index;
   final int entryId;
   final VoidCallback onMove;
 
@@ -667,14 +593,9 @@ class _EntryTrailing extends StatelessWidget {
           tooltip: '移到其他天',
           onPressed: onMove,
         ),
-        // 拖曳排序視覺提示（≡）;整張卡長按即可拖曳,此 handle 僅為 affordance。
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(
-            CupertinoIcons.line_horizontal_3,
-            key: ValueKey('entry-drag-$entryId'),
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+        ReorderDragHandle(
+          index: index,
+          iconKey: ValueKey('entry-drag-$entryId'),
         ),
       ],
     );

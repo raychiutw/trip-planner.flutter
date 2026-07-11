@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -696,30 +695,6 @@ void main() {
     expect(tester.getTopLeft(find.text('2026-07-11')).dy, before);
   });
 
-  testWidgets('cross-day drag auto-scroll restores original offset on cancel', (
-    tester,
-  ) async {
-    await _pumpTimeline(tester, fetchDays: () => _longDays('drag'));
-
-    final titleFinder = find.text('2026-07-12');
-    final before = tester.getTopLeft(titleFinder).dy;
-    // 拖曳來源改為 ☰ handle 的 LongPressDraggable(統一單一手勢);entry id = 100 + index。
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(const ValueKey('entry-cross-drag-100'))),
-    );
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    for (var i = 0; i < 8; i++) {
-      await gesture.moveBy(const Offset(0, 90));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    expect(tester.getTopLeft(titleFinder).dy, lessThan(before));
-
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(tester.getTopLeft(titleFinder).dy, before);
-  });
-
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
@@ -927,7 +902,9 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
   });
 
-  testWidgets('拖曳 entry 到其他天 → reorderEntries 帶 day_id 並重算兩天', (tester) async {
+  testWidgets('同日拖曳重排 → reorderEntries 帶連續 sortOrder(dayId 全 null)', (
+    tester,
+  ) async {
     final repo = _MockTripRepository();
     when(
       () => repo.reorderEntries(
@@ -943,20 +920,12 @@ void main() {
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
 
-    final source = tester.getCenter(
-      find.byKey(const ValueKey('entry-cross-drag-11')),
+    // day1 [11,12,13,14];第一個 ReorderableListView = day1。直接呼叫其 onReorderItem
+    // 模擬把 index 0(11) 拖到 index 2(onReorderItem 的 newIndex 已是移除後索引)。
+    final list = tester.widget<ReorderableListView>(
+      find.byType(ReorderableListView).first,
     );
-    final gesture = await tester.startGesture(source);
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    await gesture.moveTo(Offset(source.dx, 590));
-    for (var i = 0; i < 30; i++) {
-      await gesture.moveBy(Offset(0, i.isEven ? -1 : 1));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    final target = tester.getCenter(find.byKey(const ValueKey('day-drop-2')));
-    await gesture.moveTo(target);
-    await tester.pump(const Duration(milliseconds: 50));
-    await gesture.up();
+    list.onReorderItem!(0, 2);
     await tester.pumpAndSettle();
 
     final captured =
@@ -967,65 +936,16 @@ void main() {
               ),
             ).captured.single
             as List<({int id, int sortOrder, int? dayId})>;
-    // 統一 helper 全員重編:day2 [21,22] append 11 → 全部帶連續 sortOrder。
+    // reorderedSortOrders([11,12,13,14], 0, 2) → [12,13,11,14];同日 → dayId 全 null。
     expect(captured, [
-      (id: 21, sortOrder: 0, dayId: null),
-      (id: 22, sortOrder: 1, dayId: null),
-      (id: 11, sortOrder: 2, dayId: 2),
+      (id: 12, sortOrder: 0, dayId: null),
+      (id: 13, sortOrder: 1, dayId: null),
+      (id: 11, sortOrder: 2, dayId: null),
+      (id: 14, sortOrder: 3, dayId: null),
     ]);
+    // 同日重排只重算來源日(1),不碰其他天。
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
-    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
-  });
-
-  testWidgets('拖曳 entry 到其他天的 entry 上 → 插入該位並重排目標日', (tester) async {
-    final repo = _MockTripRepository();
-    when(
-      () => repo.reorderEntries(
-        tripId: any(named: 'tripId'),
-        updates: any(named: 'updates'),
-      ),
-    ).thenAnswer((_) async {});
-    when(
-      () => repo.recomputeTravel(
-        tripId: any(named: 'tripId'),
-        day: any(named: 'day'),
-      ),
-    ).thenAnswer((_) async {});
-    await _pumpTimeline(tester, repo: repo);
-
-    final source = tester.getCenter(
-      find.byKey(const ValueKey('entry-cross-drag-11')),
-    );
-    final gesture = await tester.startGesture(source);
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    await gesture.moveTo(Offset(source.dx, 590));
-    for (var i = 0; i < 30; i++) {
-      await gesture.moveBy(Offset(0, i.isEven ? -1 : 1));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    final target = tester.getCenter(
-      find.byKey(const ValueKey('entry-drop-21')),
-    );
-    await gesture.moveTo(target);
-    await tester.pump(const Duration(milliseconds: 50));
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    final captured =
-        verify(
-              () => repo.reorderEntries(
-                tripId: _tripId,
-                updates: captureAny(named: 'updates'),
-              ),
-            ).captured.single
-            as List<({int id, int sortOrder, int? dayId})>;
-    expect(captured, [
-      (id: 11, sortOrder: 0, dayId: 2),
-      (id: 21, sortOrder: 1, dayId: null),
-      (id: 22, sortOrder: 2, dayId: null),
-    ]);
-    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
-    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+    verifyNever(() => repo.recomputeTravel(tripId: _tripId, day: '2'));
   });
 
   testWidgets('entry 早於營業時間 → 不顯示「注意事項」卡', (tester) async {

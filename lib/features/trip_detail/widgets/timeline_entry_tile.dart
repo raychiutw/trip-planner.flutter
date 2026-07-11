@@ -60,13 +60,24 @@ class TimelineEntryTile extends StatelessWidget {
             width: kTimelineTimeColumnWidth,
             child: Padding(
               padding: const EdgeInsets.only(top: 14),
-              child: Text(
-                displayTime,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              // FittedBox(scaleDown)+softWrap:false:時間一律單行,放大文字時縮放而非折行
+              // (避免「08:15」在大字級下斷成兩行)。
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    displayTime,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ),
               ),
             ),
