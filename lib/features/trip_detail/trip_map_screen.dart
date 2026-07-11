@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../theme/tokens.dart';
@@ -69,16 +70,16 @@ class _DayPin {
   Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
 }
 
-class _TripMapView extends StatefulWidget {
+class _TripMapView extends ConsumerStatefulWidget {
   const _TripMapView({required this.days});
 
   final List<TripDay> days;
 
   @override
-  State<_TripMapView> createState() => _TripMapViewState();
+  ConsumerState<_TripMapView> createState() => _TripMapViewState();
 }
 
-class _TripMapViewState extends State<_TripMapView> {
+class _TripMapViewState extends ConsumerState<_TripMapView> {
   final GoogleTripMapController _mapController = GoogleTripMapController();
   final PinBitmapCache _pinCache = PinBitmapCache();
 
@@ -87,6 +88,12 @@ class _TripMapViewState extends State<_TripMapView> {
 
   /// resolve 世代:避免舊 resolve 完成後覆寫新 tab 的 marker。
   int _markerGen = 0;
+
+  /// 目前 tab 的 per-day 道路折線(async 打 /api/route 取真實道路)。
+  List<TripMapPolyline> _polylines = const [];
+
+  /// route resolve 世代:避免舊 tab 的折線覆寫新 tab。
+  int _routeGen = 0;
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
@@ -101,6 +108,7 @@ class _TripMapViewState extends State<_TripMapView> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _resolveMarkers();
+    _resolveRoutes();
   }
 
   /// 逐日萃取 master 座標非 null 的 entries 為 pins。
@@ -141,7 +149,55 @@ class _TripMapViewState extends State<_TripMapView> {
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
     _resolveMarkers();
+    _resolveRoutes();
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
+  }
+
+  /// 目前 tab 要畫折線的「各日 pin 清單」:總覽=全部日、單日=該日。
+  /// 折線只連同一日內相鄰 pin,不跨日,故總覽也要逐日切開。
+  List<List<_DayPin>> _visibleDaysPins() {
+    final byDay = _pinsByDay;
+    if (_selectedTabIndex == 0) return byDay;
+    return [byDay[_selectedTabIndex - 1]];
+  }
+
+  /// 逐日、相鄰 pin 對平行打 /api/route 取道路折線;失敗(null)該段略過(對齊
+  /// web:不退化直線)。折線用該日輪替色。GET 走 ApiClient 透明快取。
+  Future<void> _resolveRoutes() async {
+    final gen = ++_routeGen;
+    final repo = ref.read(routeRepositoryProvider);
+    final futures = <Future<TripMapPolyline?>>[];
+    for (final dayPins in _visibleDaysPins()) {
+      for (var i = 0; i + 1 < dayPins.length; i++) {
+        final from = dayPins[i];
+        final to = dayPins[i + 1];
+        futures.add(
+          repo
+              .fetchRoute(
+                fromLat: from.point.latitude,
+                fromLng: from.point.longitude,
+                toLat: to.point.latitude,
+                toLng: to.point.longitude,
+              )
+              .then((route) {
+                if (route == null || route.polyline.isEmpty) return null;
+                return TripMapPolyline(
+                  id: 'route-${from.entry.id}-${to.entry.id}',
+                  points: [
+                    for (final p in route.polyline) TripMapPoint(p.lat, p.lng),
+                  ],
+                  color: from.color,
+                );
+              }),
+        );
+      }
+    }
+    final resolved = (await Future.wait(
+      futures,
+    )).whereType<TripMapPolyline>().toList();
+    if (mounted && gen == _routeGen) {
+      setState(() => _polylines = resolved);
+    }
   }
 
   /// 逐 pin resolve 彩色序號 bitmap(cache 命中則免重繪),完成後 setState。
@@ -296,6 +352,7 @@ class _TripMapViewState extends State<_TripMapView> {
       initialPadding: const EdgeInsets.all(TpSpacing.s10),
       initialMaxZoom: 16,
       markers: _markers,
+      polylines: _polylines,
     );
   }
 

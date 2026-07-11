@@ -3,11 +3,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/route_repository.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/route_result.dart';
 import 'package:tripline/theme/app_theme.dart';
+
+/// 記錄 fetchRoute 呼叫的假 repo;預設回 null(無折線、不觸網),供多數測試用。
+/// 傳 onFetch 可回傳指定 RouteResult。
+class _FakeRouteRepository implements RouteRepository {
+  _FakeRouteRepository({this.onFetch});
+
+  final List<String> calls = [];
+  final RouteResult? Function(
+    double fromLat,
+    double fromLng,
+    double toLat,
+    double toLng,
+  )?
+  onFetch;
+
+  @override
+  ApiClient get client => throw UnimplementedError();
+
+  @override
+  Future<RouteResult?> fetchRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+  }) async {
+    calls.add('$fromLat,$fromLng->$toLat,$toLng');
+    return onFetch?.call(fromLat, fromLng, toLat, toLng);
+  }
+}
 
 // google_maps_flutter 的 GoogleMap 是 platform view,widget test 無法真渲染,
 // 也不能靠 marker widget key 斷言(marker 是原生 BitmapDescriptor)。故 pin 萃取
@@ -61,7 +94,7 @@ final _dayTwo = TripDay(
   ],
 );
 
-Widget _buildScreen(List<TripDay> days) {
+Widget _buildScreen(List<TripDay> days, {RouteRepository? routeRepository}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -73,6 +106,10 @@ Widget _buildScreen(List<TripDay> days) {
   return ProviderScope(
     overrides: [
       tripDaysProvider.overrideWith((ref, tripId) => Stream.value(days)),
+      // 統一注入假 route repo,避免 _resolveRoutes 打真實網路。
+      routeRepositoryProvider.overrideWithValue(
+        routeRepository ?? _FakeRouteRepository(),
+      ),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
@@ -145,5 +182,21 @@ void main() {
 
     expect(find.text('此行程尚無地點座標'), findsOneWidget);
     expect(find.byType(GoogleMap), findsNothing);
+  });
+
+  testWidgets('總覽:相鄰同日 pin 對打 /api/route(不跨日、單 pin 日略過)', (tester) async {
+    final fake = _FakeRouteRepository(
+      onFetch: (fromLat, fromLng, toLat, toLng) => const RouteResult(
+        polyline: [(lat: 26.217, lng: 127.719), (lat: 26.214, lng: 127.688)],
+        distanceM: 100,
+      ),
+    );
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], routeRepository: fake),
+    );
+    await tester.pumpAndSettle();
+
+    // day1 有 11→12 一對;day2 單 pin 無對;不接 12→21(不跨日)→ 僅 1 次呼叫。
+    expect(fake.calls, ['26.217,127.719->26.214,127.688']);
   });
 }
