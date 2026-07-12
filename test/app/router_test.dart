@@ -3,6 +3,7 @@
 /// 2. 已登入在 /login → redirect 到 /trips
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -222,6 +223,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripPrintScreen), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

@@ -39,12 +39,12 @@ void main() {
         ),
       );
 
-      expect(find.text('DAY 01'), findsOneWidget);
-      expect(find.text('DAY 02'), findsOneWidget);
-      expect(find.text('DAY 03'), findsOneWidget);
+      expect(find.text('D1'), findsOneWidget);
+      expect(find.text('D2'), findsOneWidget);
+      expect(find.text('D3'), findsOneWidget);
       expect(find.text('6/10'), findsOneWidget);
 
-      await tester.tap(find.text('DAY 02'));
+      await tester.tap(find.text('D2'));
       expect(selectedDayNum, 2);
     });
 
@@ -68,7 +68,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.text('DAY 01')).height, greaterThan(22));
+      expect(tester.getSize(find.text('D1')).height, greaterThan(22));
     });
 
     testWidgets('VoiceOver 讀出按鈕與選取狀態', (tester) async {

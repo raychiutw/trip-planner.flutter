@@ -23,12 +23,19 @@ import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
-/// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
+/// 行程時間軸畫面：AppBar（trip 名 + 地圖主操作 + 更多選單）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
-class TripTimelineScreen extends ConsumerWidget {
+class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({super.key, required this.tripId});
 
   final String tripId;
+
+  @override
+  ConsumerState<TripTimelineScreen> createState() => _TripTimelineScreenState();
+}
+
+class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
+  bool _isReordering = false;
 
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
@@ -36,7 +43,8 @@ class TripTimelineScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final tripId = widget.tripId;
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final trip = tripAsync.value;
@@ -47,31 +55,45 @@ class TripTimelineScreen extends ConsumerWidget {
         title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
-            tooltip: '編輯行程',
-            icon: const Icon(CupertinoIcons.pencil),
-            onPressed: () => context.push('/edit-trip/$tripId'),
-          ),
-          IconButton(
             tooltip: '地圖',
             icon: const Icon(CupertinoIcons.map),
             onPressed: () => _goTo(context, '/trips/$tripId/map'),
           ),
-          IconButton(
-            tooltip: '筆記',
-            icon: const Icon(CupertinoIcons.doc_text),
-            onPressed: () => _goTo(context, '/trips/$tripId/notes'),
-          ),
-          IconButton(
-            tooltip: '列印',
-            icon: const Icon(CupertinoIcons.printer),
-            onPressed: () => _goTo(context, '/trips/$tripId/print'),
+          PopupMenuButton<String>(
+            tooltip: '更多行程操作',
+            icon: const Icon(CupertinoIcons.ellipsis_circle),
+            onSelected: (action) {
+              switch (action) {
+                case 'edit':
+                  context.push('/edit-trip/$tripId');
+                case 'notes':
+                  _goTo(context, '/trips/$tripId/notes');
+                case 'print':
+                  _goTo(context, '/trips/$tripId/print');
+                case 'reorder':
+                  setState(() => _isReordering = !_isReordering);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'edit', child: Text('編輯行程')),
+              const PopupMenuItem(value: 'notes', child: Text('筆記')),
+              PopupMenuItem(
+                value: 'reorder',
+                child: Text(_isReordering ? '完成排序' : '調整順序'),
+              ),
+              const PopupMenuItem(value: 'print', child: Text('列印預覽')),
+            ],
           ),
         ],
       ),
       body: daysAsync.when(
         data: (days) => days.isEmpty
             ? const _EmptyTimeline()
-            : _TimelineBody(days: days, tripId: tripId),
+            : _TimelineBody(
+                days: days,
+                tripId: tripId,
+                isReordering: _isReordering,
+              ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
@@ -86,10 +108,15 @@ class TripTimelineScreen extends ConsumerWidget {
 
 /// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
 class _TimelineBody extends StatefulWidget {
-  const _TimelineBody({required this.days, required this.tripId});
+  const _TimelineBody({
+    required this.days,
+    required this.tripId,
+    required this.isReordering,
+  });
 
   final List<TripDay> days;
   final String tripId;
+  final bool isReordering;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
@@ -164,6 +191,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     day: day,
                     allDays: widget.days,
                     tripId: widget.tripId,
+                    isReordering: widget.isReordering,
                   ),
               ],
             ),
@@ -226,11 +254,13 @@ class _DaySection extends ConsumerWidget {
     required this.tripId,
     required this.day,
     required this.allDays,
+    required this.isReordering,
   });
 
   final String tripId;
   final TripDay day;
   final List<TripDay> allDays;
+  final bool isReordering;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -465,6 +495,7 @@ class _DaySection extends ConsumerWidget {
       trailing: _EntryTrailing(
         index: i,
         entryId: entry.id,
+        isReordering: isReordering,
         onMove: () => _moveToDay(context, ref, entry),
       ),
     );
@@ -574,12 +605,14 @@ class _EntryTrailing extends StatelessWidget {
   const _EntryTrailing({
     required this.index,
     required this.entryId,
+    required this.isReordering,
     required this.onMove,
   });
 
   /// 於當日 timeline 的索引(ReorderableDragStartListener 需要)。
   final int index;
   final int entryId;
+  final bool isReordering;
   final VoidCallback onMove;
 
   @override
@@ -593,10 +626,11 @@ class _EntryTrailing extends StatelessWidget {
           tooltip: '移到其他天',
           onPressed: onMove,
         ),
-        ReorderDragHandle(
-          index: index,
-          iconKey: ValueKey('entry-drag-$entryId'),
-        ),
+        if (isReordering)
+          ReorderDragHandle(
+            index: index,
+            iconKey: ValueKey('entry-drag-$entryId'),
+          ),
       ],
     );
   }

@@ -31,6 +31,7 @@ class TripMapBitmapMarker {
     required this.id,
     required this.point,
     required this.icon,
+    required this.label,
     this.onTap,
     this.anchor = const Offset(0.5, 0.5),
     this.zIndex = 0,
@@ -39,6 +40,7 @@ class TripMapBitmapMarker {
   final String id;
   final TripMapPoint point;
   final BitmapDescriptor icon;
+  final String label;
   final VoidCallback? onTap;
   final Offset anchor;
   final double zIndex;
@@ -91,7 +93,8 @@ LatLngBounds tripMapBounds(List<TripMapPoint> points) {
 /// 地圖控制器:包 [GoogleMapController]。map 未 layout 前呼叫 fit/move 會 throw,
 /// 故以 [Completer] 做 ready gate — 未 ready 時 await 到 ready 後再執行。
 class GoogleTripMapController {
-  final Completer<GoogleMapController> _ready = Completer<GoogleMapController>();
+  final Completer<GoogleMapController> _ready =
+      Completer<GoogleMapController>();
 
   bool get isReady => _ready.isCompleted;
 
@@ -181,6 +184,7 @@ class GoogleMapCanvas extends StatelessWidget {
             markerId: MarkerId(m.id),
             position: _toGoogle(m.point),
             icon: m.icon,
+            infoWindow: InfoWindow(title: m.label),
             anchor: m.anchor,
             zIndexInt: m.zIndex.round(),
             onTap: m.onTap,

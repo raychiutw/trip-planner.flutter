@@ -186,6 +186,18 @@ void main() {
     expect(find.text('2026-04-01 19:00'), findsOneWidget);
   });
 
+  testWidgets('筆記 row 使用分隔線，不再堆疊內層卡片邊框', (tester) async {
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+
+    final rowSurface = tester.widget<Container>(
+      find.byKey(const ValueKey('note-row-surface')).first,
+    );
+    final decoration = rowSurface.decoration! as BoxDecoration;
+    expect(decoration.borderRadius, isNull);
+    expect(decoration.border?.bottom, isNotNull);
+  });
+
   testWidgets('展開緊急聯絡：name + kind + phone', (tester) async {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();

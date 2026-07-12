@@ -383,6 +383,15 @@ void main() {
 
       // 排序按鈕應存在
       expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
+      expect(find.text('預設'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('trips-list-more-trigger')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('trips-list-import-trigger')),
+        findsNothing,
+      );
 
       // 預設順序：okinawa → kyoto → busan（沖繩 → kyoto → 釜山）
       final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
@@ -581,6 +590,8 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('trips-list-more-trigger')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
       await tester.pumpAndSettle();
 

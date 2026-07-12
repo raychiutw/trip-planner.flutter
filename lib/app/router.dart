@@ -138,6 +138,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             PublicShareScreen(token: state.pathParameters['token']!),
       ),
+      // 文件預覽是沉浸式工作流程，不沿用主 app 的底部 tab bar。
+      GoRoute(
+        path: '/trips/:tripId/print',
+        builder: (context, state) =>
+            TripPrintScreen(tripId: state.pathParameters['tripId']!),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -171,12 +177,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'notes',
                         builder: (context, state) => TripNotesScreen(
-                          tripId: state.pathParameters['tripId']!,
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'print',
-                        builder: (context, state) => TripPrintScreen(
                           tripId: state.pathParameters['tripId']!,
                         ),
                       ),

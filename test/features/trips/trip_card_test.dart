@@ -57,7 +57,7 @@ void main() {
   });
 
   group('TripCard 渲染與互動', () {
-    testWidgets('cover 首字、eyebrow、標題;tap / long-press 回呼', (tester) async {
+    testWidgets('緊湊識別圖示、eyebrow、標題;tap / long-press 回呼', (tester) async {
       var tapped = 0;
       var longPressed = 0;
       await pumpCard(
@@ -67,14 +67,20 @@ void main() {
           name: 'okinawa',
           title: '沖繩家族之旅',
           totalDays: 5,
+          memberCount: 3,
         ),
         onTap: () => tapped++,
         onLongPress: () => longPressed++,
       );
 
       expect(find.text('沖繩家族之旅'), findsOneWidget);
-      expect(find.text('沖'), findsOneWidget); // cover 首字
+      expect(
+        find.byKey(const ValueKey('trip-card-leading-icon')),
+        findsOneWidget,
+      );
+      expect(find.text('沖'), findsNothing);
       expect(find.text('5 天'), findsOneWidget); // eyebrow
+      expect(find.text('3 位旅伴'), findsOneWidget);
 
       await tester.tap(find.text('沖繩家族之旅'));
       await tester.longPress(find.text('沖繩家族之旅'));

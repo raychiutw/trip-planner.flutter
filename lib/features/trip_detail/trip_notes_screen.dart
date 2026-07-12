@@ -365,13 +365,15 @@ class _NoteRowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
+      key: const ValueKey('note-row-surface'),
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: TpSpacing.s2),
       padding: const EdgeInsets.all(TpSpacing.s3),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

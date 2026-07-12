@@ -148,6 +148,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   TripSortOrder _sortOrder = TripSortOrder.defaultOrder;
+
+  String get _sortLabel => switch (_sortOrder) {
+    TripSortOrder.defaultOrder => '預設',
+    TripSortOrder.nameAsc => '名稱',
+    TripSortOrder.updatedDesc => '最新',
+    TripSortOrder.startDateAsc => '出發日',
+  };
   TripFilter _filterTab = TripFilter.all;
   bool _isImporting = false;
   String? _exportingTripId;
@@ -267,9 +274,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               title: '我的行程',
               automaticallyImplyLeading: false,
               actions: [
-                IconButton(
-                  key: const ValueKey('trips-list-import-trigger'),
-                  tooltip: '匯入行程 JSON',
+                PopupMenuButton<String>(
+                  key: const ValueKey('trips-list-more-trigger'),
+                  tooltip: '更多行程操作',
                   icon: _isImporting
                       ? const SizedBox.square(
                           dimension: 20,
@@ -277,13 +284,20 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Icon(CupertinoIcons.cloud_upload),
-                  onPressed: _isImporting ? null : _importTripFromJson,
+                      : const Icon(CupertinoIcons.ellipsis_circle),
+                  onSelected: (_) => _importTripFromJson(),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      key: const ValueKey('trips-list-import-trigger'),
+                      value: 'import',
+                      enabled: !_isImporting,
+                      child: const Text('匯入行程 JSON'),
+                    ),
+                  ],
                 ),
                 PopupMenuButton<TripSortOrder>(
                   key: const ValueKey('trips-sort-button'),
-                  icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
-                  tooltip: '排序',
+                  tooltip: '排序：$_sortLabel',
                   initialValue: _sortOrder,
                   onSelected: (order) {
                     setState(() {
@@ -308,6 +322,20 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                       child: const Text('出發日'),
                     ),
                   ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s2,
+                      vertical: TpSpacing.s2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_sortLabel),
+                        const SizedBox(width: TpSpacing.s1),
+                        const Icon(CupertinoIcons.chevron_down, size: 14),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:tripline/features/map/google_map_adapter.dart';
@@ -31,5 +32,27 @@ void main() {
 
   test('controller 初始未 ready(尚未 attach GoogleMapController)', () {
     expect(GoogleTripMapController().isReady, isFalse);
+  });
+
+  testWidgets('marker label 轉成 Google Maps info window 標題', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GoogleMapCanvas(
+          controller: GoogleTripMapController(),
+          initialFitPoints: const [TripMapPoint(25, 121)],
+          markers: const [
+            TripMapBitmapMarker(
+              id: 'poi-1',
+              point: TripMapPoint(25, 121),
+              icon: BitmapDescriptor.defaultMarker,
+              label: '台北車站',
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
+    expect(googleMap.markers.single.infoWindow.title, '台北車站');
   });
 }

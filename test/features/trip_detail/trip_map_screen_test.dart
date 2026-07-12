@@ -117,19 +117,19 @@ Widget _buildScreen(List<TripDay> days, {RouteRepository? routeRepository}) {
 }
 
 void main() {
-  testWidgets('總覽:day tabs + 每個含座標 entry 都有 card(無座標則無)', (tester) async {
+  testWidgets('預設聚焦第一天，總覽仍可查看全部地點', (tester) async {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    // day tabs:總覽 + DAY NN
+    // 顯示用標籤保持緊湊，完整 DAY NN 留給 VoiceOver。
     expect(find.text('總覽'), findsOneWidget);
-    expect(find.text('DAY 01'), findsOneWidget);
-    expect(find.text('DAY 02'), findsOneWidget);
+    expect(find.text('D1'), findsOneWidget);
+    expect(find.text('D2'), findsOneWidget);
     expect(
-      tester.getSemantics(find.byKey(const ValueKey('trip-map-tab-0'))),
+      tester.getSemantics(find.byKey(const ValueKey('trip-map-tab-1'))),
       matchesSemantics(
-        label: '總覽',
+        label: 'DAY 01',
         isSelected: true,
         hasSelectedState: true,
         isButton: true,
@@ -137,10 +137,18 @@ void main() {
       ),
     );
 
-    // 每個含座標 entry(11/12/21)都有底部 card;無座標(13)沒有 → 驗證 pin 萃取
     expect(find.byKey(const ValueKey('entry-card-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-card-12')), findsOneWidget);
-    expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-21')), findsNothing);
+
+    await tester.tap(find.text('總覽'));
+    await tester.pumpAndSettle();
+
+    // 總覽才顯示所有含座標 entry；無座標 entry 仍排除。
+    expect(find.byKey(const ValueKey('entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-card-12')), findsOneWidget);
+    final overviewPager = tester.widget<PageView>(find.byType(PageView));
+    expect(overviewPager.childrenDelegate.estimatedChildCount, 3);
     expect(find.byKey(const ValueKey('entry-card-13')), findsNothing);
     expect(find.text('首里城'), findsOneWidget);
     expect(find.textContaining('09:00'), findsOneWidget);
@@ -152,7 +160,7 @@ void main() {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAY 02'));
+    await tester.tap(find.text('D2'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entry-card-21')), findsOneWidget);
@@ -165,7 +173,7 @@ void main() {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('entry-card-12')));
+    await tester.tap(find.byKey(const ValueKey('entry-card-11')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -185,7 +193,7 @@ void main() {
     expect(find.byType(GoogleMap), findsNothing);
   });
 
-  testWidgets('總覽:相鄰同日 pin 對打 /api/route(不跨日、單 pin 日略過)', (tester) async {
+  testWidgets('第一天相鄰 pin 對打 /api/route', (tester) async {
     final fake = _FakeRouteRepository(
       onFetch: (fromLat, fromLng, toLat, toLng) => const RouteResult(
         polyline: [(lat: 26.217, lng: 127.719), (lat: 26.214, lng: 127.688)],
@@ -216,6 +224,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('map-basemap-fab')));
     await tester.pumpAndSettle();
     expect(canvas().mapType, TripMapType.normal);
+  });
+
+  testWidgets('底部地點使用可吸附 PageView', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsOneWidget);
   });
 
   testWidgets('全部顯示 FAB:點擊不 crash', (tester) async {

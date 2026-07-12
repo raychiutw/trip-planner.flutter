@@ -6,7 +6,7 @@ import '../../../models/day.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
-/// 頂部橫向 day pills（DAY NN + 日期）；點擊以回呼通知捲動至該日。
+/// 頂部橫向 day pills（D N + 日期）；完整 DAY NN 保留給語意標籤。
 class DayPills extends StatelessWidget {
   const DayPills({
     super.key,
@@ -94,7 +94,7 @@ class _DayPill extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(
               minHeight: TpSpacing.tapMin,
-              minWidth: 64,
+              minWidth: 58,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
@@ -110,13 +110,13 @@ class _DayPill extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+                  'D${day.dayNum}',
                   style: TextStyle(
                     fontSize: 11,
                     // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
                     height: 1.35,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
+                    letterSpacing: 0,
                     color: isActive
                         ? tones.accentDeep
                         : theme.colorScheme.onSurfaceVariant,

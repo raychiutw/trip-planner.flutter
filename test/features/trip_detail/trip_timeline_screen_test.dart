@@ -283,13 +283,20 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 顯示行程標題與地圖/筆記/列印 actions', (tester) async {
+  testWidgets('AppBar 只保留地圖主操作，其餘收入更多選單', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.map), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.doc_text), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.printer), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.doc_text), findsNothing);
+    expect(find.byIcon(CupertinoIcons.printer), findsNothing);
+    expect(find.byTooltip('更多行程操作'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('更多行程操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯行程'), findsOneWidget);
+    expect(find.text('筆記'), findsOneWidget);
+    expect(find.text('列印預覽'), findsOneWidget);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
@@ -301,10 +308,12 @@ void main() {
     expect(find.text('map-page'), findsOneWidget);
   });
 
-  testWidgets('點列印 icon 以 go_router 導向列印預覽頁', (tester) async {
+  testWidgets('從更多選單導向列印預覽頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(CupertinoIcons.printer));
+    await tester.tap(find.byTooltip('更多行程操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('列印預覽'));
     await tester.pumpAndSettle();
 
     expect(find.text('print-page'), findsOneWidget);
@@ -315,9 +324,10 @@ void main() {
   ) async {
     await _pumpTimeline(tester);
 
-    // 'DAY 01' 同時出現在頂部 pill 與 day header eyebrow
-    expect(find.text('DAY 01'), findsNWidgets(2));
-    expect(find.text('DAY 02'), findsNWidgets(2));
+    expect(find.text('D1'), findsOneWidget);
+    expect(find.text('D2'), findsOneWidget);
+    expect(find.text('DAY 01'), findsOneWidget);
+    expect(find.text('DAY 02'), findsOneWidget);
     expect(find.text('2026-04-23（四）'), findsOneWidget);
     expect(find.text('2026-04-24（五）'), findsOneWidget);
   });
@@ -670,8 +680,7 @@ void main() {
         .getTopLeft(find.text('2026-04-24（五）'))
         .dy;
 
-    // 第一個 'DAY 02' 是頂部 pill（pill 列在捲動內容之前）
-    await tester.tap(find.text('DAY 02').first);
+    await tester.tap(find.text('D2'));
     await tester.pumpAndSettle();
 
     final day2TitleTopAfterTap = tester
@@ -867,8 +876,16 @@ void main() {
     });
   });
 
-  testWidgets('每個 entry 有拖曳 handle', (tester) async {
+  testWidgets('拖曳 handle 只在調整順序模式顯示', (tester) async {
     await _pumpTimeline(tester);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
+    expect(find.byKey(const ValueKey('entry-drag-12')), findsNothing);
+
+    await tester.tap(find.byTooltip('更多行程操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('調整順序'));
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });

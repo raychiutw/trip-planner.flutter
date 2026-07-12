@@ -62,6 +62,7 @@ class TripDayMapView extends ConsumerStatefulWidget {
 class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
   final GoogleTripMapController _mapController = GoogleTripMapController();
   final PinBitmapCache _pinCache = PinBitmapCache();
+  final PageController _cardController = PageController(viewportFraction: 0.88);
 
   /// 目前 tab 的 marker(bitmap 已 resolve);async 產生故存於 state。
   List<TripMapBitmapMarker> _markers = const [];
@@ -76,14 +77,21 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
   int _routeGen = 0;
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
-  int _selectedTabIndex = 0;
+  late int _selectedTabIndex;
 
   /// 底圖類型(底圖切換 FAB;normal ↔ hybrid 衛星+標籤,對齊 web hybrid)。
   TripMapType _mapType = TripMapType.normal;
 
   @override
+  void initState() {
+    super.initState();
+    _selectedTabIndex = widget.days.isEmpty ? 0 : 1;
+  }
+
+  @override
   void dispose() {
     _mapController.dispose();
+    _cardController.dispose();
     super.dispose();
   }
 
@@ -99,6 +107,12 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
     super.didUpdateWidget(oldWidget);
     // SWR fresh emit(同 tripId、新 days 實例)→ 重解 marker/折線,避免顯示舊資料。
     if (!identical(oldWidget.days, widget.days)) {
+      if (widget.days.isEmpty) {
+        _selectedTabIndex = 0;
+      } else if (_selectedTabIndex == 0 ||
+          _selectedTabIndex > widget.days.length) {
+        _selectedTabIndex = 1;
+      }
       _resolveMarkers();
       _resolveRoutes();
     }
@@ -141,6 +155,7 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
 
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
+    if (_cardController.hasClients) _cardController.jumpToPage(0);
     _resolveMarkers();
     _resolveRoutes();
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
@@ -171,6 +186,7 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
           id: 'pin-${pin.entry.id}',
           point: pin.point,
           icon: icon,
+          label: pin.entry.title,
           onTap: () => _focusPin(pin),
         ),
       );
@@ -250,7 +266,7 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
     return Column(
       children: [
         _buildDayTabs(context),
-        Expanded(child: _buildMap(allPins)),
+        Expanded(child: _buildMap(visiblePins)),
         _buildEntryCards(context, visiblePins),
       ],
     );
@@ -276,9 +292,12 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
     final colorScheme = Theme.of(context).colorScheme;
     final isSelected = tabIndex == _selectedTabIndex;
     final isOverview = tabIndex == 0;
-    final label = isOverview
+    final semanticsLabel = isOverview
         ? '總覽'
         : 'DAY ${widget.days[tabIndex - 1].dayNum.toString().padLeft(2, '0')}';
+    final visibleLabel = isOverview
+        ? semanticsLabel
+        : 'D${widget.days[tabIndex - 1].dayNum}';
     // 總覽用主色，單日用該日輪替色（地圖 data-viz 例外）。
     final pillColor = isOverview
         ? colorScheme.primary
@@ -286,7 +305,7 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
 
     return Semantics(
       key: ValueKey('trip-map-tab-$tabIndex'),
-      label: label,
+      label: semanticsLabel,
       button: true,
       selected: isSelected,
       onTap: () => _selectTab(tabIndex),
@@ -320,7 +339,7 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
                     const SizedBox(width: TpSpacing.s2),
                   ],
                   Text(
-                    label,
+                    visibleLabel,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -338,13 +357,13 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
     );
   }
 
-  Widget _buildMap(List<_DayPin> allPins) {
+  Widget _buildMap(List<_DayPin> visiblePins) {
     return Stack(
       children: [
         Positioned.fill(
           child: GoogleMapCanvas(
             controller: _mapController,
-            initialFitPoints: [for (final pin in allPins) pin.point],
+            initialFitPoints: [for (final pin in visiblePins) pin.point],
             initialPadding: const EdgeInsets.all(TpSpacing.s10),
             initialMaxZoom: 16,
             markers: _markers,
@@ -407,13 +426,19 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
                 ),
               ),
             )
-          : ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(TpSpacing.s3),
+          : PageView.builder(
+              controller: _cardController,
+              padEnds: false,
               itemCount: visiblePins.length,
-              separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
-              itemBuilder: (context, cardIndex) =>
-                  _buildEntryCard(context, visiblePins[cardIndex]),
+              itemBuilder: (context, cardIndex) => Padding(
+                padding: EdgeInsets.only(
+                  left: cardIndex == 0 ? TpSpacing.s3 : TpSpacing.s1,
+                  right: TpSpacing.s1,
+                  top: TpSpacing.s3,
+                  bottom: TpSpacing.s3,
+                ),
+                child: _buildEntryCard(context, visiblePins[cardIndex]),
+              ),
             ),
     );
   }
@@ -426,8 +451,9 @@ class _TripDayMapViewState extends ConsumerState<TripDayMapView> {
         ? 'D${pin.dayNum} · $timeText'
         : timeText;
 
-    return SizedBox(
-      width: 220,
+    return Semantics(
+      label: '${pin.pinNumber}，${pin.entry.title}，$timeLabel',
+      button: true,
       child: Card(
         child: InkWell(
           key: ValueKey('entry-card-${pin.entry.id}'),

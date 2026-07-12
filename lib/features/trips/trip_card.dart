@@ -17,8 +17,8 @@ extension TripSummaryDisplay on TripSummary {
   }
 }
 
-/// 行程清單卡片：cover 色塊（tone subtle 底 + deep 首字）→ eyebrow
-/// （{countries} · N 天）+ 標題 + 建立者列 + 日期範圍 + chevron。
+/// 行程清單卡片：緊湊圖示 + eyebrow（{countries} · N 天）+ 標題 +
+/// 建立者 / 旅伴 / 日期範圍 + chevron。
 /// elevation 0 + hairline 由 CardTheme 提供。
 class TripCard extends StatelessWidget {
   const TripCard({
@@ -76,78 +76,83 @@ class TripCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // cover 色塊：subtle 底 + deep 首字 glyph（同色相由淺到深）
-            Container(
-              height: 88,
-              color: coverBackground,
-              alignment: Alignment.center,
-              child: Text(
-                trip.displayTitle.characters.first,
-                style: theme.textTheme.displaySmall?.copyWith(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TpSpacing.s4,
+            vertical: TpSpacing.s3,
+          ),
+          child: Row(
+            children: [
+              Container(
+                key: const ValueKey('trip-card-leading-icon'),
+                width: TpSpacing.tapMin,
+                height: TpSpacing.tapMin,
+                decoration: BoxDecoration(
+                  color: coverBackground,
+                  borderRadius: BorderRadius.circular(TpRadius.sm),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  CupertinoIcons.map,
+                  size: 21,
                   color: coverForeground,
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TpSpacing.s4,
-                vertical: TpSpacing.s3,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (eyebrowText != null) ...[
-                          Text(
-                            eyebrowText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: TpSpacing.s1),
-                        ],
-                        Text(
-                          trip.displayTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
+              const SizedBox(width: TpSpacing.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (eyebrowText != null) ...[
+                      Text(
+                        eyebrowText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
-                        if (dateRangeText != null) ...[
-                          const SizedBox(height: TpSpacing.s1),
-                          Text(
-                            dateRangeText,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ],
-                        _buildOwnerRow(theme, coverBackground, coverForeground),
-                      ],
+                      ),
+                      const SizedBox(height: TpSpacing.s1),
+                    ],
+                    Text(
+                      trip.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
                     ),
-                  ),
-                  Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                    if (dateRangeText != null) ...[
+                      const SizedBox(height: TpSpacing.s1),
+                      Text(
+                        dateRangeText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                    if (trip.memberCount != null && trip.memberCount! > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: Text(
+                          '${trip.memberCount} 位旅伴',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    _buildOwnerRow(theme, coverBackground, coverForeground),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
