@@ -149,6 +149,52 @@ void main() {
     );
   });
 
+  testWidgets('長 AI 回覆先顯示摘要、移除結構 emoji，建議轉成 action chips', (tester) async {
+    const reply = '''👍 建議先調整今天下午的順序，避免來回折返。
+
+目前水族館與午餐距離較遠，直接接續會增加交通時間。這裡先保留最重要的結論。
+
+1️⃣ 移到午餐後
+2️⃣ 改成 10:00
+3️⃣ 移除超市
+
+詳細原因：午後交通較壅塞，而且同行者需要較長的休息時間。這段內容預設不應占滿整個畫面。''';
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 1,
+            message: '請調整行程',
+            status: RequestStatus.completed,
+            reply: reply,
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('顯示詳細內容'), findsOneWidget);
+    expect(find.textContaining('詳細原因'), findsNothing);
+    expect(find.textContaining('👍'), findsNothing);
+    expect(find.textContaining('1️⃣'), findsNothing);
+    expect(find.byKey(const ValueKey('assistant-action-0')), findsOneWidget);
+
+    await tester.tap(find.text('顯示詳細內容'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('詳細原因'), findsOneWidget);
+  });
+
   testWidgets('思考中態顯示', (tester) async {
     // sendRequest 永不回 → 樂觀 temp(open)維持「思考中…」。
     final pending = Completer<TripRequest>();

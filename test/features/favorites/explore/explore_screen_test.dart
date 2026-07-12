@@ -55,6 +55,12 @@ void main() {
 
     expect(find.text('探索'), findsOneWidget); // AppBar
     expect(find.byType(PoiSearchCard), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('explore-results-list')), findsOneWidget);
+    expect(find.byType(GridView), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('poi-card-p1'))).width,
+      greaterThan(500),
+    );
     verify(
       () => poi.searchPois(
         q: '東京',
@@ -63,6 +69,22 @@ void main() {
         cancelToken: any(named: 'cancelToken'),
       ),
     ).called(1);
+  });
+
+  testWidgets('地區選單提供 button 語意與目前選擇', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('explore-region-menu'))),
+      matchesSemantics(
+        label: '地區，目前選擇全部地區',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    semantics.dispose();
   });
 
   testWidgets('分類 chip「美食」→ 只剩拉麵店', (tester) async {

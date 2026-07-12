@@ -8,7 +8,7 @@ import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
 import '../poi_rating_label.dart';
 
-/// 探索 POI 卡片：cover tone 漸層 + 類型 label + name/address/rating + heart toggle。
+/// 探索 POI 單欄資訊卡：緊湊 tone 圖示 + 類型/name/address/rating + actions。
 class PoiSearchCard extends StatelessWidget {
   const PoiSearchCard({
     super.key,
@@ -43,42 +43,25 @@ class PoiSearchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(TpRadius.md),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Stack(
-            children: [
-              Container(height: 64, color: tone.subtle),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: IconButton(
-                  key: ValueKey('poi-heart-${poi.placeId}'),
-                  tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
-                  onPressed: isSaving ? null : onToggleFavorite,
-                  icon: Icon(
-                    isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                    color: tones.pink,
-                  ),
-                ),
-              ),
-              if (onAddToTrip != null)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: IconButton(
-                    key: ValueKey('poi-add-to-trip-${poi.placeId}'),
-                    tooltip: '加入行程',
-                    icon: const Icon(Icons.add_location_alt_outlined),
-                    onPressed: onAddToTrip,
-                  ),
-                ),
-            ],
+          Container(
+            width: 72,
+            constraints: const BoxConstraints(minHeight: 112),
+            color: tone.subtle,
+            alignment: Alignment.center,
+            child: Icon(
+              CupertinoIcons.location_solid,
+              size: 26,
+              color: tone.deep,
+            ),
           ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(TpSpacing.s3),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -108,11 +91,36 @@ class PoiSearchCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  const Spacer(),
-                  if (poi.rating != null) PoiRatingLabel(rating: poi.rating!),
+                  if (poi.rating != null) ...[
+                    const SizedBox(height: TpSpacing.s2),
+                    PoiRatingLabel(rating: poi.rating!),
+                  ],
                 ],
               ),
             ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onAddToTrip != null)
+                IconButton(
+                  key: ValueKey('poi-add-to-trip-${poi.placeId}'),
+                  tooltip: '加入行程',
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  onPressed: onAddToTrip,
+                ),
+              IconButton(
+                key: ValueKey('poi-heart-${poi.placeId}'),
+                tooltip: isSaved ? '已收藏 · 點擊取消' : '加入收藏',
+                onPressed: isSaving ? null : onToggleFavorite,
+                icon: Icon(
+                  isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                  color: isSaved
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -225,8 +225,53 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   }
 }
 
+String _cleanAssistantMarkdown(String source) {
+  const structuralEmoji = ['👍', '🙏', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+  return source
+      .split('\n')
+      .map((line) {
+        var cleaned = line.trimLeft();
+        for (final emoji in structuralEmoji) {
+          if (cleaned.startsWith(emoji)) {
+            cleaned = cleaned.substring(emoji.length).trimLeft();
+            break;
+          }
+        }
+        return cleaned;
+      })
+      .join('\n');
+}
+
+List<String> _assistantActions(String markdown) {
+  final actions = <String>[];
+  final actionStart = RegExp(r'^(移到|改成|移除|調整|加入|保留|重新|查看)');
+  for (final rawLine in _cleanAssistantMarkdown(markdown).split('\n')) {
+    final candidate = rawLine
+        .replaceFirst(RegExp(r'^\s*(?:[-*]|\d+[.)])\s*'), '')
+        .replaceAll(RegExp(r'[*_`]'), '')
+        .trim();
+    if (candidate.length > 30 || !actionStart.hasMatch(candidate)) continue;
+    if (!actions.contains(candidate)) actions.add(candidate);
+    if (actions.length == 3) break;
+  }
+  return actions;
+}
+
+String _assistantSummary(String markdown) {
+  final actionStart = RegExp(
+    r'^\s*(?:[-*]|\d+[.)])?\s*(移到|改成|移除|調整|加入|保留|重新|查看)',
+  );
+  final lines = _cleanAssistantMarkdown(markdown)
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty && !actionStart.hasMatch(line))
+      .take(2)
+      .toList();
+  return lines.join('\n\n');
+}
+
 /// 三方氣泡:自己(accent,右)/ 協作者(pink,左+名字)/ AI(sage,左+「Tripline AI」)。
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends ConsumerStatefulWidget {
   const _MessageBubble({
     required this.message,
     required this.tripId,
@@ -238,11 +283,21 @@ class _MessageBubble extends StatelessWidget {
   final String? myEmail;
 
   @override
+  ConsumerState<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends ConsumerState<_MessageBubble> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final tones = theme.extension<TpTones>()!;
 
+    final message = widget.message;
+    final tripId = widget.tripId;
+    final myEmail = widget.myEmail;
     final isAssistant = message.role == ChatRole.assistant;
     // submittedBy 為空(樂觀 temp / 認證未解析)視為自己。
     final isSelf =
@@ -288,12 +343,43 @@ class _MessageBubble extends StatelessWidget {
         ],
       );
     } else if (isAssistant && message.isMarkdown) {
-      content = MarkdownBody(
-        data: message.text,
-        onTapLink: (text, href, title) {
-          final loc = mapReplyLink(href ?? '', tripId);
-          if (loc != null) context.push(loc);
-        },
+      final cleaned = _cleanAssistantMarkdown(message.text);
+      final isLong =
+          cleaned.length > 240 || '\n'.allMatches(cleaned).length > 6;
+      final actions = _assistantActions(cleaned);
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MarkdownBody(
+            data: isLong && !_expanded ? _assistantSummary(cleaned) : cleaned,
+            onTapLink: (text, href, title) {
+              final loc = mapReplyLink(href ?? '', tripId);
+              if (loc != null) context.push(loc);
+            },
+          ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: TpSpacing.s2),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s1,
+              children: [
+                for (final (index, action) in actions.indexed)
+                  ActionChip(
+                    key: ValueKey('assistant-action-$index'),
+                    label: Text(action),
+                    onPressed: () => ref
+                        .read(chatControllerProvider(tripId).notifier)
+                        .send(action),
+                  ),
+              ],
+            ),
+          ],
+          if (isLong)
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(_expanded ? '收合內容' : '顯示詳細內容'),
+            ),
+        ],
       );
     } else {
       content = Text(message.text);

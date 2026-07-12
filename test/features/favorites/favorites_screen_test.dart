@@ -100,7 +100,7 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
-    testWidgets('heart → 確認對話框 → deleteFavorite + refresh', (tester) async {
+    testWidgets('左滑 → 確認對話框 → deleteFavorite + refresh', (tester) async {
       final mockRepo = MockFavoritesRepository();
       var fetchCount = 0;
       when(mockRepo.watchFavorites).thenAnswer((_) {
@@ -118,7 +118,10 @@ void main() {
       await tester.pump();
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
 
-      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.drag(
+        find.byKey(const ValueKey('favorite-swipe-7')),
+        const Offset(-500, 0),
+      );
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
 
@@ -129,7 +132,7 @@ void main() {
       expect(fetchCount, 2); // 初載 + 刪除後 invalidate refresh
     });
 
-    testWidgets('heart → 對話框「保留」→ 不刪除', (tester) async {
+    testWidgets('左滑 → 對話框「保留」→ 不刪除', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
 
@@ -141,7 +144,10 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.drag(
+        find.byKey(const ValueKey('favorite-swipe-7')),
+        const Offset(-500, 0),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('保留'));
       await tester.pumpAndSettle();

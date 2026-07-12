@@ -82,10 +82,15 @@ void main() {
       expect(find.textContaining('req #'), findsNothing);
     });
 
-    testWidgets('點 heart → onRemove 被呼叫', (tester) async {
+    testWidgets('取消收藏改為左滑，列尾不再顯示 competing heart', (tester) async {
       var removed = 0;
       await pumpCard(tester, _favorite, onRemove: () => removed++);
-      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      expect(find.byKey(const ValueKey('favorite-remove-7')), findsNothing);
+      await tester.drag(
+        find.byKey(const ValueKey('favorite-swipe-7')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
       expect(removed, 1);
     });
 

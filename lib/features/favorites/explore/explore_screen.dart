@@ -33,6 +33,7 @@ class ExploreScreen extends ConsumerStatefulWidget {
 
 class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   final _searchController = TextEditingController();
+  final _regionMenuKey = GlobalKey<PopupMenuButtonState<String>>();
 
   @override
   void initState() {
@@ -175,22 +176,32 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     if (region != '全部地區' && !options.contains(region)) {
       options.insert(1, region);
     }
-    return PopupMenuButton<String>(
-      onSelected: (selected) {
-        if (selected == _kCustomRegion) {
-          _openCustomRegion();
-        } else {
-          ref.read(exploreControllerProvider.notifier).setRegion(selected);
-        }
-      },
-      itemBuilder: (context) => [
-        for (final opt in options) PopupMenuItem(value: opt, child: Text(opt)),
-        const PopupMenuDivider(),
-        const PopupMenuItem(value: _kCustomRegion, child: Text('+ 自訂地區…')),
-      ],
-      child: Chip(
-        avatar: const Icon(CupertinoIcons.location_solid, size: 16),
-        label: Text('$region ▾'),
+    return Semantics(
+      key: const ValueKey('explore-region-menu'),
+      label: '地區，目前選擇$region',
+      button: true,
+      onTap: () => _regionMenuKey.currentState?.showButtonMenu(),
+      child: ExcludeSemantics(
+        child: PopupMenuButton<String>(
+          key: _regionMenuKey,
+          onSelected: (selected) {
+            if (selected == _kCustomRegion) {
+              _openCustomRegion();
+            } else {
+              ref.read(exploreControllerProvider.notifier).setRegion(selected);
+            }
+          },
+          itemBuilder: (context) => [
+            for (final opt in options)
+              PopupMenuItem(value: opt, child: Text(opt)),
+            const PopupMenuDivider(),
+            const PopupMenuItem(value: _kCustomRegion, child: Text('+ 自訂地區…')),
+          ],
+          child: Chip(
+            avatar: const Icon(CupertinoIcons.location_solid, size: 16),
+            label: Text('$region ▾'),
+          ),
+        ),
       ),
     );
   }
@@ -236,15 +247,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       );
     }
 
-    return GridView.builder(
+    return ListView.separated(
+      key: const ValueKey('explore-results-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 260,
-        mainAxisSpacing: TpSpacing.s3,
-        crossAxisSpacing: TpSpacing.s3,
-        childAspectRatio: 0.82,
-      ),
       itemCount: filtered.length,
+      separatorBuilder: (_, _) => const SizedBox(height: TpSpacing.s3),
       itemBuilder: (context, index) {
         final poi = filtered[index];
         return PoiSearchCard(
