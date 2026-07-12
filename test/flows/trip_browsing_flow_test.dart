@@ -136,8 +136,10 @@ void main() {
     expect(find.byType(TripTimelineScreen), findsOneWidget);
     expect(find.text('那霸機場'), findsOneWidget);
 
-    // 點筆記 action → 筆記頁
-    await tester.tap(find.byTooltip('筆記'));
+    // 筆記已收進「更多行程操作」以保留標題寬度。
+    await tester.tap(find.byTooltip('更多行程操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('筆記'));
     await tester.pumpAndSettle();
     expect(find.byType(TripNotesScreen), findsOneWidget);
     expect(find.text('行程筆記'), findsOneWidget);
