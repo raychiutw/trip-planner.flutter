@@ -83,6 +83,7 @@ class FavoritesScreen extends ConsumerWidget {
             return PoiFavoriteCard(
               favorite: favorite,
               onRemove: () => _confirmRemove(context, ref, favorite),
+              onTap: () => _showFavoriteDetails(context, ref, favorite),
               onAddToTrip: () => context.go(
                 '/favorites/add-to-trip',
                 extra: AddToTripFavorite(
@@ -95,6 +96,69 @@ class FavoritesScreen extends ConsumerWidget {
         ),
       ),
     ];
+  }
+
+  Future<void> _showFavoriteDetails(
+    BuildContext context,
+    WidgetRef ref,
+    PoiFavorite favorite,
+  ) {
+    final note = favorite.note
+        ?.replaceFirst(RegExp(r'\s*\(req\s*#\d+\)\s*$'), '')
+        .trim();
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TpSpacing.s4,
+            0,
+            TpSpacing.s4,
+            TpSpacing.s4,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('地點詳情', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                favorite.displayName,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              if (favorite.poiRating != null) ...[
+                const SizedBox(height: TpSpacing.s1),
+                Text('評分 ${favorite.poiRating}'),
+              ],
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Text(note),
+              ],
+              if (favorite.usages.isNotEmpty) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Text('已加入的行程', style: Theme.of(context).textTheme.labelLarge),
+                for (final usage in favorite.usages)
+                  Text(
+                    usage.dayNum == null
+                        ? usage.tripName
+                        : '${usage.tripName} · D${usage.dayNum}',
+                  ),
+              ],
+              const SizedBox(height: TpSpacing.s4),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  _confirmRemove(context, ref, favorite);
+                },
+                icon: const Icon(CupertinoIcons.heart_slash),
+                label: const Text('取消收藏'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmRemove(

@@ -15,11 +15,13 @@ class PoiFavoriteCard extends StatelessWidget {
     required this.favorite,
     required this.onRemove,
     this.onAddToTrip,
+    this.onTap,
   });
 
   final PoiFavorite favorite;
   final VoidCallback onRemove;
   final VoidCallback? onAddToTrip;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -50,80 +52,84 @@ class PoiFavoriteCard extends StatelessWidget {
           color: theme.colorScheme.onPrimary,
         ),
       ),
-      child: Container(
+      child: InkWell(
         key: ValueKey('favorite-card-${favorite.id}'),
-        padding: const EdgeInsets.all(TpSpacing.s3),
-        decoration: BoxDecoration(
-          color: tone.subtle,
-          borderRadius: BorderRadius.circular(TpRadius.md),
-          border: Border.all(color: tone.bg),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: tone.bg,
-                borderRadius: BorderRadius.circular(TpRadius.md),
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          decoration: BoxDecoration(
+            color: tone.subtle,
+            borderRadius: BorderRadius.circular(TpRadius.md),
+            border: Border.all(color: tone.bg),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: tone.bg,
+                  borderRadius: BorderRadius.circular(TpRadius.md),
+                ),
+                child: Icon(
+                  CupertinoIcons.location_solid,
+                  size: 20,
+                  color: tone.deep,
+                ),
               ),
-              child: Icon(
-                CupertinoIcons.location_solid,
-                size: 20,
-                color: tone.deep,
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    favorite.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
+              const SizedBox(width: TpSpacing.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      favorite.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
-                  if (favorite.poiRating != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: PoiRatingLabel(rating: favorite.poiRating!),
-                    ),
-                  if (note != null && note.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: Text(
-                        note,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: mutedColor,
+                    if (favorite.poiRating != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: PoiRatingLabel(rating: favorite.poiRating!),
+                      ),
+                    if (note != null && note.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: Text(
+                          note,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: mutedColor,
+                          ),
                         ),
                       ),
-                    ),
-                  if (favorite.usages.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: TpSpacing.s1),
-                      child: Text(
-                        '用於 ${favorite.usages.length} 個行程',
-                        style: TextStyle(fontSize: 12, color: tone.deep),
+                    if (favorite.usages.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: TpSpacing.s1),
+                        child: Text(
+                          '用於 ${favorite.usages.length} 個行程',
+                          style: TextStyle(fontSize: 12, color: tone.deep),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (onAddToTrip != null)
-              IconButton(
-                key: ValueKey('favorite-add-to-trip-${favorite.id}'),
-                tooltip: '加入行程',
-                icon: const Icon(Icons.add_location_alt_outlined),
-                onPressed: onAddToTrip,
-              ),
-          ],
+              if (onAddToTrip != null)
+                IconButton(
+                  key: ValueKey('favorite-add-to-trip-${favorite.id}'),
+                  tooltip: '加入行程',
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  onPressed: onAddToTrip,
+                ),
+            ],
+          ),
         ),
       ),
     );

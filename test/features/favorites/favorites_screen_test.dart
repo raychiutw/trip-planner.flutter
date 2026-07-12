@@ -156,6 +156,26 @@ void main() {
       verifyNever(() => mockRepo.deleteFavorite(any()));
     });
 
+    testWidgets('點整張收藏列開啟地點詳情，列尾只保留加入行程', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('地點詳情'), findsOneWidget);
+      expect(find.text('美麗海水族館'), findsWidgets);
+      expect(find.text('取消收藏'), findsOneWidget);
+      expect(find.byKey(const ValueKey('favorite-remove-7')), findsNothing);
+    });
+
     testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(const []));

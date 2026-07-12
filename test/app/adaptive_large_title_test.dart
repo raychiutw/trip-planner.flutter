@@ -9,11 +9,24 @@ Widget _host(TargetPlatform platform) => MaterialApp(
     body: CustomScrollView(
       slivers: [
         SliverAdaptiveLargeTitle(title: '我的行程'),
-        SliverToBoxAdapter(
-          child: SizedBox(height: 1200, child: Text('body')),
-        ),
+        SliverToBoxAdapter(child: SizedBox(height: 1200, child: Text('body'))),
       ],
     ),
+  ),
+);
+
+Widget _darkHost() => MaterialApp(
+  theme: ThemeData(
+    platform: TargetPlatform.iOS,
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      surface: Color(0xFF111315),
+      onSurface: Color(0xFFF3F4F4),
+      outlineVariant: Color(0xFF34393D),
+    ),
+  ),
+  home: const Scaffold(
+    body: CustomScrollView(slivers: [SliverAdaptiveLargeTitle(title: '帳號')]),
   ),
 );
 
@@ -24,9 +37,7 @@ void main() {
     expect(find.text('我的行程'), findsWidgets);
   });
 
-  testWidgets('iOS 收合後小標放大成 titleLarge(對齊 AppBar,只在收合時顯示)', (
-    tester,
-  ) async {
+  testWidgets('iOS 收合後小標放大成 titleLarge(對齊 AppBar,只在收合時顯示)', (tester) async {
     await tester.pumpWidget(_host(TargetPlatform.iOS));
     final nav = tester.widget<CupertinoSliverNavigationBar>(
       find.byType(CupertinoSliverNavigationBar),
@@ -44,6 +55,16 @@ void main() {
     await tester.pumpWidget(_host(TargetPlatform.android));
     expect(find.byType(SliverAppBar), findsOneWidget);
     expect(find.text('我的行程'), findsWidgets);
+  });
+
+  testWidgets('iOS 深色大標題使用 dark surface 與 onSurface 文字', (tester) async {
+    await tester.pumpWidget(_darkHost());
+    final nav = tester.widget<CupertinoSliverNavigationBar>(
+      find.byType(CupertinoSliverNavigationBar),
+    );
+    expect(nav.backgroundColor, const Color(0xFF111315));
+    expect(nav.brightness, Brightness.dark);
+    expect((nav.largeTitle as Text).style?.color, const Color(0xFFF3F4F4));
   });
 
   testWidgets('actions 會渲染在標題列', (tester) async {

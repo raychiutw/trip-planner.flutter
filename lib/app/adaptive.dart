@@ -446,8 +446,16 @@ class SliverAdaptiveLargeTitle extends StatelessWidget {
         color: theme.colorScheme.onSurface,
       );
       return CupertinoSliverNavigationBar(
-        largeTitle: Text(title),
+        largeTitle: Text(
+          title,
+          style: TextStyle(color: theme.colorScheme.onSurface),
+        ),
         middle: Text(title, style: collapsedStyle),
+        backgroundColor: theme.colorScheme.surface,
+        brightness: theme.brightness,
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
         alwaysShowMiddle: false,
         automaticallyImplyLeading: automaticallyImplyLeading,
         trailing: actions.isEmpty
