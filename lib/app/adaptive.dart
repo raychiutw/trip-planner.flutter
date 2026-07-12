@@ -187,6 +187,9 @@ class AppSearchField extends StatefulWidget {
     required this.placeholder,
     this.onChanged,
     this.onSubmitted,
+    this.onSearch,
+    this.searching = false,
+    this.searchButtonKey,
     this.autofocus = false,
     this.enabled = true,
   });
@@ -197,6 +200,9 @@ class AppSearchField extends StatefulWidget {
   final String placeholder;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onSearch;
+  final bool searching;
+  final Key? searchButtonKey;
   final bool autofocus;
   final bool enabled;
 
@@ -242,6 +248,8 @@ class _AppSearchFieldState extends State<AppSearchField> {
         onSubmitted: widget.onSubmitted,
         autofocus: widget.autofocus,
         enabled: widget.enabled,
+        suffixIcon: const Icon(CupertinoIcons.search, size: 18),
+        onSuffixTap: widget.searching ? null : widget.onSearch,
       );
     }
 
@@ -257,7 +265,21 @@ class _AppSearchFieldState extends State<AppSearchField> {
         hintText: widget.placeholder,
         isDense: true,
         prefixIcon: const Icon(CupertinoIcons.search),
-        suffixIcon: widget.controller.text.isEmpty
+        suffixIcon: widget.onSearch != null
+            ? IconButton(
+                key: widget.searchButtonKey,
+                tooltip: '搜尋地點',
+                onPressed: widget.searching ? null : widget.onSearch,
+                icon: widget.searching
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(CupertinoIcons.search),
+              )
+            : widget.controller.text.isEmpty
             ? null
             : IconButton(
                 tooltip: '清除搜尋',

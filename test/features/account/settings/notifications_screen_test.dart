@@ -69,6 +69,8 @@ void main() {
     expect(find.text('行程更新通知'), findsOneWidget);
     expect(find.text('旅伴邀請'), findsOneWidget);
     expect(find.text('系統通知'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notifications-group')), findsOneWidget);
+    expect(find.byType(Card), findsOneWidget);
 
     expect(
       tester

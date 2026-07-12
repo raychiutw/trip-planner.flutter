@@ -57,6 +57,8 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.text('舊名字'), findsOneWidget); // 帶入初值
+    expect(find.text('me@x.com'), findsOneWidget);
+    expect(find.byKey(const ValueKey('profile-avatar')), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('profile-display-name')),

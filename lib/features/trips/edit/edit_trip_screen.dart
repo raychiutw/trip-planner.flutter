@@ -1,4 +1,4 @@
-/// 編輯行程:標題 + 目的地(可加/排序/移除)+ 描述 + 語言 + 發布 + 明確儲存。
+/// 編輯行程:標題 + 目的地(可加/排序/移除)+ 介紹 + 語言 + 公開分享 + 明確儲存。
 /// 不含日期/天數(日管理另案)。儲存成功 → pop。
 library;
 
@@ -62,7 +62,7 @@ class EditTripScreen extends ConsumerWidget {
                         onReorder: ctrl.reorderDestination,
                       ),
                       const SizedBox(height: TpSpacing.s5),
-                      _title(context, '描述（用於 SEO,選填）'),
+                      _title(context, '行程介紹（選填）'),
                       TextFormField(
                         key: const ValueKey('edit-desc'),
                         initialValue: state.description,
@@ -96,7 +96,8 @@ class EditTripScreen extends ConsumerWidget {
                       const SizedBox(height: TpSpacing.s2),
                       SwitchListTile.adaptive(
                         key: const ValueKey('edit-published'),
-                        title: const Text('發布（公開上線）'),
+                        title: const Text('公開分享'),
+                        subtitle: const Text('開啟後，擁有分享連結的人可以查看這份行程。'),
                         contentPadding: EdgeInsets.zero,
                         value: state.published,
                         onChanged: ctrl.setPublished,

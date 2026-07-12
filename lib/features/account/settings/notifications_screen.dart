@@ -154,6 +154,7 @@ class _NotificationsList extends StatelessWidget {
           const SizedBox(height: TpSpacing.s4),
         ],
         Card(
+          key: const ValueKey('notifications-group'),
           clipBehavior: Clip.antiAlias,
           child: Column(
             children: [

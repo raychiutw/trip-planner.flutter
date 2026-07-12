@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
@@ -71,6 +72,13 @@ void main() {
     );
     expect(btn.onPressed, isNull);
     expect(find.byTooltip('搜尋地點'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('dest-poi-search-btn')),
+        matching: find.byType(AppSearchField),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('POI 搜尋 → 點結果 → 加入目的地', (tester) async {
@@ -97,9 +105,10 @@ void main() {
   testWidgets('切到彈性模式 → 顯示天數 stepper', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('大概時間'));
+    await tester.tap(find.text('日期未定'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('create-flex-count')), findsOneWidget);
+    expect(find.text('選擇大概月份與旅程天數，之後仍可調整。'), findsOneWidget);
   });
 
   testWidgets('加目的地 + 彈性日期 → 送出呼叫 createTrip + 導頁', (tester) async {
@@ -132,7 +141,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 彈性日期(自動有效)
-    await tester.tap(find.text('大概時間'));
+    await tester.tap(find.text('日期未定'));
     await tester.pumpAndSettle();
 
     // 送出(捲到底確保可點)

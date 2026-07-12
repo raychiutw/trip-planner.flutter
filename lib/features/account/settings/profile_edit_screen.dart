@@ -47,18 +47,50 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('個人資料')),
       body: switch (authState) {
-        AsyncData(:final value?) => _form(context, value.displayName ?? ''),
+        AsyncData(:final value?) => _form(
+          context,
+          value.displayName ?? '',
+          value.email,
+        ),
         AsyncError() => const Center(child: Text('無法載入個人資料')),
         _ => const Center(child: CircularProgressIndicator.adaptive()),
       },
     );
   }
 
-  Widget _form(BuildContext context, String currentName) {
+  Widget _form(BuildContext context, String currentName, String email) {
     _draft ??= currentName;
+    final avatarLabel = currentName.trim().isNotEmpty
+        ? currentName.trim().characters.first.toUpperCase()
+        : email.characters.first.toUpperCase();
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
+        Center(
+          child: Column(
+            children: [
+              CircleAvatar(
+                key: const ValueKey('profile-avatar'),
+                radius: 32,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Text(
+                  avatarLabel,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Text(
+                email,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: TpSpacing.s6),
         TextFormField(
           key: const ValueKey('profile-display-name'),
           initialValue: _draft,

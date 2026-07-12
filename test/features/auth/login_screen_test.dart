@@ -69,6 +69,15 @@ void main() {
       expect(find.byKey(emailFieldKey), findsOneWidget);
       expect(find.byKey(passwordFieldKey), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '登入'), findsOneWidget);
+      expect(find.text('電子郵件'), findsOneWidget);
+      expect(find.byKey(const ValueKey('login-help-forgot')), findsOneWidget);
+      expect(find.byKey(const ValueKey('login-help-register')), findsOneWidget);
+      expect(find.text('Email'), findsNothing);
+
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('login-brand'))).dy,
+        lessThan(150),
+      );
 
       final emailTextField = innerTextFieldOf(tester, emailFieldKey);
       expect(emailTextField.keyboardType, TextInputType.emailAddress);
@@ -95,7 +104,7 @@ void main() {
       await tester.tap(find.byKey(submitButtonKey));
       await tester.pump();
 
-      expect(find.text('請輸入 Email'), findsOneWidget);
+      expect(find.text('請輸入電子郵件'), findsOneWidget);
       expect(find.text('請輸入密碼'), findsOneWidget);
       verifyNever(
         () => mockAuthRepository.login(

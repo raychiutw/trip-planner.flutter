@@ -72,30 +72,14 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: AppSearchField(
-                fieldKey: const ValueKey('dest-poi-search'),
-                controller: _search,
-                placeholder: '搜尋地點（城市、景點）',
-                onSubmitted: (_) => _run(),
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            IconButton.filled(
-              key: const ValueKey('dest-poi-search-btn'),
-              tooltip: '搜尋地點',
-              onPressed: _run,
-              icon: _searching
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                    )
-                  : const Icon(CupertinoIcons.search),
-            ),
-          ],
+        AppSearchField(
+          fieldKey: const ValueKey('dest-poi-search'),
+          controller: _search,
+          placeholder: '搜尋地點（城市、景點）',
+          onSubmitted: (_) => _run(),
+          onSearch: _run,
+          searching: _searching,
+          searchButtonKey: const ValueKey('dest-poi-search-btn'),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),

@@ -78,6 +78,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('原標題'), findsOneWidget);
     expect(find.text('那霸'), findsWidgets);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.text('行程介紹（選填）'), findsOneWidget);
+    expect(find.text('公開分享'), findsOneWidget);
+    expect(find.text('開啟後，擁有分享連結的人可以查看這份行程。'), findsOneWidget);
+    expect(find.textContaining('SEO'), findsNothing);
+    expect(find.textContaining('公開上線'), findsNothing);
   });
 
   testWidgets('行程標題欄位在目的地上方', (tester) async {

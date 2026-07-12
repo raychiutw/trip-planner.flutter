@@ -49,10 +49,10 @@ abstract final class TpColorsLight {
 
 /// Dark mode 色 token（獨立暖褐黑 palette，非反色）。
 abstract final class TpColorsDark {
-  static const accent = Color(0xFFCBA06E);
-  static const accentDeep = Color(0xFFE0BC90);
-  static const accentSubtle = Color(0xFF33271A);
-  static const accentBg = Color(0xFF44341F);
+  static const accent = Color(0xFFD7A96D);
+  static const accentDeep = Color(0xFFF0C58E);
+  static const accentSubtle = Color(0xFF30291F);
+  static const accentBg = Color(0xFF443724);
 
   static const sage = Color(0xFF8FBE9C);
   static const sageDeep = Color(0xFFA8D0B4);
@@ -64,17 +64,17 @@ abstract final class TpColorsDark {
   static const pinkSubtle = Color(0xFF4A2A3A);
   static const pinkBg = Color(0xFF6B3F52);
 
-  static const background = Color(0xFF1A140F);
-  static const secondary = Color(0xFF241B14);
-  static const tertiary = Color(0xFF2E2418);
-  static const hover = Color(0xFF2D2218);
+  static const background = Color(0xFF111315);
+  static const secondary = Color(0xFF1A1D1F);
+  static const tertiary = Color(0xFF24282B);
+  static const hover = Color(0xFF2B3033);
 
-  static const foreground = Color(0xFFF5EBDD);
-  static const muted = Color(0xFFB89E84);
-  static const accentForeground = Color(0xFF1A140F);
+  static const foreground = Color(0xFFF3F4F4);
+  static const muted = Color(0xFFADB3B7);
+  static const accentForeground = Color(0xFF19130C);
 
-  static const border = Color(0xFF3D2D22);
-  static const lineStrong = Color(0xFF5A4634);
+  static const border = Color(0xFF34393D);
+  static const lineStrong = Color(0xFF4B5257);
 
   static const destructive = Color(0xFFE8A0A0);
   static const destructiveBg = Color(0x26E8A0A0); // rgba(232,160,160,.15)
@@ -82,7 +82,7 @@ abstract final class TpColorsDark {
   static const warning = Color(0xFFFAA94B);
   static const info = Color(0xFFCBA06E);
 
-  static const disabled = Color(0xFF5A4634);
+  static const disabled = Color(0xFF596066);
   static const overlay = Color(0xA6000000); // rgba(0,0,0,.65)
 }
 

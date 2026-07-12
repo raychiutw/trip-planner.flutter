@@ -11,6 +11,7 @@ import '../../api/api_error.dart';
 import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
 
 /// 密碼登入畫面（/login，shell 外）。
@@ -32,7 +33,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// 已知錯誤碼的繁中人話 fallback（server message 非繁中時使用）。
   static const _fallbackMessageByCode = <String, String>{
     'LOGIN_RATE_LIMITED': '登入嘗試次數過多，請稍後再試',
-    'LOGIN_INVALID': 'Email 或密碼錯誤',
+    'LOGIN_INVALID': '電子郵件或密碼錯誤',
     'AUTH_NO_SESSION_COOKIE': '登入回應異常，請稍後再試',
   };
 
@@ -95,7 +96,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(
               horizontal: TpSpacing.s6,
@@ -113,6 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       // 品牌區（奶油底由 scaffold surface 提供）
                       Text(
                         'Tripline',
+                        key: const ValueKey('login-brand'),
                         textAlign: TextAlign.center,
                         style: textTheme.displaySmall?.copyWith(
                           color: colorScheme.primary,
@@ -158,10 +161,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ],
                         textInputAction: TextInputAction.next,
                         enabled: !isSubmitting,
-                        decoration: const InputDecoration(labelText: 'Email'),
+                        decoration: const InputDecoration(labelText: '電子郵件'),
                         validator: (value) =>
                             (value == null || value.trim().isEmpty)
-                            ? '請輸入 Email'
+                            ? '請輸入電子郵件'
                             : null,
                       ),
                       const SizedBox(height: TpSpacing.s4),
@@ -206,6 +209,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               )
                             : const Text('登入'),
+                      ),
+                      const SizedBox(height: TpSpacing.s2),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          TextButton(
+                            key: const ValueKey('login-help-forgot'),
+                            onPressed: () => showAppNotice(
+                              context,
+                              '請聯絡 Tripline 管理員協助重設密碼',
+                            ),
+                            child: const Text('忘記密碼？'),
+                          ),
+                          TextButton(
+                            key: const ValueKey('login-help-register'),
+                            onPressed: () => showAppNotice(
+                              context,
+                              '目前採邀請制，請向 Tripline 管理員申請帳號',
+                            ),
+                            child: const Text('申請帳號'),
+                          ),
+                        ],
                       ),
                       if (ref.watch(oauthEnabledProvider)) ...[
                         const SizedBox(height: TpSpacing.s4),

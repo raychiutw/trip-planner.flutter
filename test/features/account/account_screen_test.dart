@@ -76,6 +76,11 @@ void main() {
     expect(find.text('5'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
+    expect(find.text('旅程摘要'), findsOneWidget);
+    final statValue = tester.widget<Text>(
+      find.byKey(const ValueKey('account-stat-value-行程數')),
+    );
+    expect(statValue.style?.fontSize, lessThanOrEqualTo(18));
   });
 
   testWidgets('三個統計值使用單一 grouped 容器與合併語意', (tester) async {

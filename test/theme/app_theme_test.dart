@@ -72,15 +72,23 @@ void main() {
       expect(darkTheme.colorScheme.brightness, Brightness.dark);
     });
 
-    test('primary = 調亮柔褐 0xFFCBA06E', () {
+    test('primary = 深色模式高明度柔褐 0xFFD7A96D', () {
       final darkTheme = AppTheme.dark();
-      expect(darkTheme.colorScheme.primary, const Color(0xFFCBA06E));
+      expect(darkTheme.colorScheme.primary, const Color(0xFFD7A96D));
     });
 
-    test('background = 暖褐黑 0xFF1A140F', () {
+    test('background 使用中性深灰，三層 surface 可辨識', () {
       final darkTheme = AppTheme.dark();
-      expect(darkTheme.colorScheme.surface, const Color(0xFF1A140F));
-      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF1A140F));
+      expect(darkTheme.colorScheme.surface, const Color(0xFF111315));
+      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF111315));
+      expect(
+        darkTheme.colorScheme.surfaceContainerLow,
+        const Color(0xFF1A1D1F),
+      );
+      expect(
+        darkTheme.colorScheme.surfaceContainerHigh,
+        const Color(0xFF24282B),
+      );
     });
 
     test('CardTheme elevation 為 0', () {

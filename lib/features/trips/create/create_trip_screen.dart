@@ -137,8 +137,8 @@ class _DateModeSection extends StatelessWidget {
       children: [
         SegmentedButton<TripDateMode>(
           segments: const [
-            ButtonSegment(value: TripDateMode.fixed, label: Text('固定日期')),
-            ButtonSegment(value: TripDateMode.flexible, label: Text('大概時間')),
+            ButtonSegment(value: TripDateMode.fixed, label: Text('確定日期')),
+            ButtonSegment(value: TripDateMode.flexible, label: Text('日期未定')),
           ],
           selected: {state.dateMode},
           onSelectionChanged: (s) => ctrl.setDateMode(s.first),
@@ -165,7 +165,19 @@ class _DateModeSection extends StatelessWidget {
             ],
           )
         else
-          _FlexibleDate(state: state, ctrl: ctrl),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '選擇大概月份與旅程天數，之後仍可調整。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              _FlexibleDate(state: state, ctrl: ctrl),
+            ],
+          ),
       ],
     );
   }

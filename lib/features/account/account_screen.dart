@@ -212,21 +212,40 @@ class _StatsRow extends StatelessWidget {
             ),
           );
 
-    return Semantics(
-      key: const ValueKey('account-stats-group'),
-      container: true,
-      label: values.map((item) => '${item.label} ${item.value}').join('，'),
-      child: ExcludeSemantics(
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLow,
-            borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
-            border: Border.all(color: dividerColor),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            left: TpSpacing.s1,
+            bottom: TpSpacing.s2,
           ),
-          clipBehavior: Clip.antiAlias,
-          child: content,
+          child: Text(
+            '旅程摘要',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
-      ),
+        Semantics(
+          key: const ValueKey('account-stats-group'),
+          container: true,
+          label: values.map((item) => '${item.label} ${item.value}').join('，'),
+          child: ExcludeSemantics(
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TpRadius.lg),
+                ),
+                border: Border.all(color: dividerColor),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: content,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -252,7 +271,10 @@ class _StatItem extends StatelessWidget {
         children: [
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(
+            key: ValueKey('account-stat-value-$label'),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
