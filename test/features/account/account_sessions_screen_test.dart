@@ -79,6 +79,9 @@ void main() {
       find.byKey(const Key('account-sessions-revoke-others')),
       findsOneWidget,
     );
+    expect(find.textContaining('2026-07-08T'), findsNothing);
+    expect(find.textContaining('IP 指紋'), findsNothing);
+    expect(find.textContaining('最近活動：'), findsWidgets);
   });
 
   testWidgets('登出單一非目前裝置會呼叫 repository 並顯示成功提示', (tester) async {

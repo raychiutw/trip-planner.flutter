@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
@@ -163,7 +164,7 @@ class _ConnectedAppTile extends StatelessWidget {
             ),
             const SizedBox(height: TpSpacing.s1),
             Text(
-              '${app.statusLabel} · 授權時間：${app.grantedAt}',
+              '${app.statusLabel} · 授權時間：${_formattedGrantedAt(app.grantedAt)}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -186,6 +187,11 @@ class _ConnectedAppTile extends StatelessWidget {
             : const Text('撤銷'),
       ),
     );
+  }
+
+  String _formattedGrantedAt(int milliseconds) {
+    final date = DateTime.fromMillisecondsSinceEpoch(milliseconds).toLocal();
+    return DateFormat('yyyy/M/d HH:mm').format(date);
   }
 }
 

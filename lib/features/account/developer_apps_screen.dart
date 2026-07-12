@@ -372,6 +372,8 @@ class _DeveloperAppTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final clientType = app.clientType == 'confidential' ? '機密用戶端' : '公開用戶端';
+    final redirectUris = app.redirectUris.join(', ');
     return ListTile(
       key: Key('developer-app-row-${app.clientId}'),
       leading: const Icon(
@@ -387,7 +389,7 @@ class _DeveloperAppTile extends StatelessWidget {
             Text(app.clientId),
             const SizedBox(height: TpSpacing.s1),
             Text(
-              '${app.clientTypeLabel} · ${app.redirectUris.join(', ')}',
+              redirectUris.isEmpty ? clientType : '$clientType · $redirectUris',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

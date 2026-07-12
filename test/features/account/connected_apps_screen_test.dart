@@ -56,6 +56,8 @@ void main() {
     expect(find.text('行程同步工具'), findsOneWidget);
     expect(find.text('openid'), findsOneWidget);
     expect(find.text('email'), findsOneWidget);
+    expect(find.textContaining('1783500000000'), findsNothing);
+    expect(find.textContaining('授權時間：'), findsOneWidget);
   });
 
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {

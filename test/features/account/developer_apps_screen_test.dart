@@ -25,12 +25,22 @@ void main() {
     createdAt: '2026-07-08T10:00:00Z',
     updatedAt: '2026-07-08T10:00:00Z',
   );
+  const confidentialAppWithoutRedirect = DeveloperApp(
+    clientId: 'tp_internal',
+    clientType: 'confidential',
+    appName: 'Internal App',
+    redirectUris: [],
+    allowedScopes: ['openid'],
+    status: 'active',
+    createdAt: '2026-07-08T10:00:00Z',
+    updatedAt: '2026-07-08T10:00:00Z',
+  );
 
   setUp(() {
     mockTripRepository = MockTripRepository();
-    when(
-      () => mockTripRepository.fetchDeveloperApps(),
-    ).thenAnswer((_) async => const [developerApp]);
+    when(() => mockTripRepository.fetchDeveloperApps()).thenAnswer(
+      (_) async => const [developerApp, confidentialAppWithoutRedirect],
+    );
     when(
       () => mockTripRepository.createDeveloperApp(
         appName: any(named: 'appName'),
@@ -93,6 +103,8 @@ void main() {
     expect(find.text('Dev App'), findsOneWidget);
     expect(find.text('待審核'), findsOneWidget);
     expect(find.byKey(const Key('developer-apps-new')), findsOneWidget);
+    expect(find.text('機密用戶端'), findsOneWidget);
+    expect(find.text('機密用戶端 · '), findsNothing);
   });
 
   testWidgets('新增 app 表單送出 redirect URI 與 scopes', (tester) async {

@@ -323,6 +323,12 @@ class _SettingsGroup extends StatelessWidget {
               label: '已連結的應用程式',
               onTap: () => context.push('/settings/connected-apps'),
             ),
+          ],
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        _SettingsSection(
+          title: '進階',
+          tiles: [
             _SettingsTileData(
               key: const ValueKey('settings-developer-apps'),
               icon: CupertinoIcons.chevron_left_slash_chevron_right,

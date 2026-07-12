@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
@@ -219,7 +220,7 @@ class _SessionTile extends StatelessWidget {
             : CupertinoIcons.device_laptop,
         size: 22,
       ),
-      title: Text(session.uaSummary ?? '未知裝置'),
+      title: Text(session.uaSummary ?? (session.isCurrent ? '這台裝置' : '其他裝置')),
       subtitle: Text(_subtitle),
       trailing: session.isCurrent
           ? const _CurrentSessionChip()
@@ -242,11 +243,18 @@ class _SessionTile extends StatelessWidget {
 
   String get _subtitle {
     final parts = <String>[
-      if (session.lastSeenAt.isNotEmpty) '最近活動：${session.lastSeenAt}',
-      if (session.createdAt.isNotEmpty) '建立時間：${session.createdAt}',
-      if (session.ipHashPrefix != null) 'IP 指紋：${session.ipHashPrefix}',
+      if (session.lastSeenAt.isNotEmpty)
+        '最近活動：${_formatTimestamp(session.lastSeenAt)}',
+      if (session.createdAt.isNotEmpty)
+        '首次登入：${_formatTimestamp(session.createdAt)}',
     ];
     return parts.isEmpty ? '沒有活動時間' : parts.join('\n');
+  }
+
+  String _formatTimestamp(String value) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    return DateFormat('yyyy/M/d HH:mm').format(parsed.toLocal());
   }
 }
 
