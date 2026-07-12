@@ -303,7 +303,9 @@ class TripRepository {
         'name': title,
         'description': description,
         'note': note,
-        'poi_type': poiType,
+        // 後端 whitelist:`poi_type !== undefined` 的 null 會被視為無效 → 400。
+        // 沒指定型別時直接省略 key(後端 find-or-create 預設 attraction)。
+        'poi_type': ?poiType,
         'lat': lat,
         'lng': lng,
         'start_time': startTime,

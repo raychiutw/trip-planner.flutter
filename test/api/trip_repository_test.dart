@@ -631,6 +631,30 @@ void main() {
     },
   );
 
+  test(
+    'addEntryToDay：poiType 為 null → body 省略 poi_type（後端 whitelist 拒收 null poi_type）',
+    () async {
+      dioAdapter.onPost(
+        '/trips/okinawa/days/1/entries',
+        (server) => server.reply(201, {'id': 100}),
+        data: {'name': '自訂地點', 'source': 'custom'},
+      );
+
+      await expectLater(
+        tripRepository.addEntryToDay(
+          tripId: 'okinawa',
+          dayNum: 1,
+          title: '自訂地點',
+          source: 'custom',
+        ),
+        completes,
+      );
+      // poi_type 缺省時不可送出 key（即使值為 null）:後端 whitelist 對
+      // `poi_type !== undefined` 的 null 會回 400 DATA_VALIDATION。
+      expect(recordedRequests.single.data, isNot(contains('poi_type')));
+    },
+  );
+
   test('updateEntry：PATCH /trips/:id/entries/:eid 不送 legacy title', () async {
     dioAdapter.onPatch(
       '/trips/okinawa/entries/11',
