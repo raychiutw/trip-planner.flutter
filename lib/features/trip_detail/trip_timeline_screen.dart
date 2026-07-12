@@ -545,7 +545,9 @@ class _DaySection extends ConsumerWidget {
     final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
     if (!_requestedTravelGapRecomputes.add(key)) return;
     _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
-    unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+    });
   }
 
   /// 同日拖曳排序:[oldIndex]→[newIndex]（onReorderItem 已把 newIndex 調成移除後索引,
