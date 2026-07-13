@@ -43,7 +43,7 @@ jobs:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: ci
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 75
     concurrency:
       group: testflight-${{ github.repository }}
