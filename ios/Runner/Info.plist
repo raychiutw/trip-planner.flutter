@@ -4,6 +4,8 @@
 <dict>
 	<key>MAPS_API_KEY</key>
 	<string>$(MAPS_API_KEY)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Tripline 會在您使用地圖功能時取用位置，以顯示目前位置並協助規劃行程。</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
