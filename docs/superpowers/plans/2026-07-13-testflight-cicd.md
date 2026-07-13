@@ -6,7 +6,7 @@
 
 **Architecture:** One workflow contains a Linux `ci` job for pull requests and pushes plus a conditional macOS `testflight` job for `workflow_dispatch`. Apple credentials stay in GitHub Actions secrets; the provisioning profile is downloaded at runtime, Flutter produces the IPA, and the Apple upload action sends it to App Store Connect.
 
-**Tech Stack:** Flutter 3.44.6, Dart 3.12.2, GitHub Actions, Xcode on `macos-15`, App Store Connect API, Apple code signing
+**Tech Stack:** Flutter 3.44.6, Dart 3.12.2, GitHub Actions, Xcode 26 on `macos-26`, App Store Connect API, Apple code signing
 
 ## Global Constraints
 
@@ -150,7 +150,7 @@ jobs:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: ci
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 75
     concurrency:
       group: testflight-${{ github.repository }}
@@ -220,7 +220,7 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          wait-for-processing: 'true'
+          wait-for-processing: 'false'
 ```
 
 - [ ] **Step 4: Validate both configuration files**

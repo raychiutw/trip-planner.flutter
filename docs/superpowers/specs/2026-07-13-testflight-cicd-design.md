@@ -10,7 +10,7 @@ Add GitHub Actions CI for Tripline and a manually triggered TestFlight upload fo
 - The repository has no GitHub Actions workflows.
 - Flutter is `3.44.6` and Dart is `3.12.2`.
 - The app version is sourced from `pubspec.yaml`; the current value is `0.5.1+6`.
-- Apple team `8Z6WVFJ574` and automatic signing are configured in the Xcode project.
+- Apple team `8Z6WVFJ574` is configured, with manual Apple Distribution signing for Release archives.
 - App Store Connect and Apple Developer already contain the Tripline app and explicit bundle ID.
 - The local keychain has Apple Development identities but no Apple Distribution identity.
 - `ios/Flutter/Secrets.xcconfig` supplies the iOS Google Maps key locally and is excluded from version control.
@@ -57,9 +57,10 @@ The `testflight` job will:
 6. Download the current `IOS_APP_STORE` provisioning profile for `com.raychiu.tripline` through the App Store Connect API.
 7. Run `flutter build ipa --release` with `ios/ExportOptions.plist` and use the numeric GitHub run ID as the unique iOS build number.
 8. Locate the single generated IPA and upload it to TestFlight through the App Store Connect API.
-9. Wait for Apple's initial build processing result and report the result in the workflow run.
+9. Finish after Apple accepts the upload; verify processing separately with a fresh App Store Connect API token.
 
 A TestFlight concurrency group will prevent two manual uploads from running at the same time.
+The upload job runs on `macos-26` so archives use the iOS 26 SDK required by App Store Connect.
 
 ## Signing and Secrets
 
@@ -78,7 +79,7 @@ Secrets will be written with `gh secret set` from local files or standard input.
 
 ## Export Configuration
 
-`ios/ExportOptions.plist` will select App Store Connect distribution, automatic signing, and Apple team `8Z6WVFJ574`. The Xcode project remains the source of truth for bundle ID and signing style.
+`ios/ExportOptions.plist` will select App Store Connect distribution, manual signing, `Tripline App Store CI`, and Apple team `8Z6WVFJ574`. The Release build configuration uses the matching Apple Distribution identity and provisioning profile.
 
 ## Failure Handling
 
@@ -86,7 +87,7 @@ Secrets will be written with `gh secret set` from local files or standard input.
 - Analyze or test failures block deployment.
 - Certificate/profile mismatch fails the archive or export step; no IPA is uploaded.
 - Duplicate or invalid build numbers fail at Apple upload; each new workflow run receives a new numeric GitHub run ID.
-- Apple processing failures are reported by the upload step and remain inspectable through `gh run view --log`.
+- Apple processing is checked after upload through App Store Connect or a fresh API token; upload-step JWTs are not kept alive during long processing waits.
 - A failed run is retried by starting a new manual workflow run after correcting the cause.
 
 ## Verification and Success Criteria
