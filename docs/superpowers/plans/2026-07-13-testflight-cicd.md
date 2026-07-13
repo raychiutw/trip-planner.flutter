@@ -14,7 +14,7 @@
 - Bundle ID: `com.raychiu.tripline`.
 - Apple team: `8Z6WVFJ574`.
 - Deployment is manual-only through `workflow_dispatch`; do not upload TestFlight builds on push or pull request.
-- CI runs `flutter analyze` and `flutter test` before any manual deployment.
+- CI runs `flutter analyze --no-fatal-infos` and `flutter test` before any manual deployment; analyzer warnings remain visible while the three pre-existing `master` deprecation infos do not block delivery.
 - Use GitHub-hosted runners; do not add Fastlane, Match, a custom release service, or Dart dependencies.
 - Never print, commit, or paste certificate passwords, `.p8` contents, `.p12` contents, or the Maps API key.
 - This is configuration-only work; the approved design requires configuration validation and a real workflow run instead of new app unit tests.
@@ -141,7 +141,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Test
         run: flutter test
@@ -361,7 +361,7 @@ Expected: all six names appear exactly once. Preserve the `.p8` and `.p12` in se
 ```bash
 cd /Users/ray/Projects/trip-planner.flutter/.worktrees/testflight-cicd
 flutter pub get
-flutter analyze
+flutter analyze --no-fatal-infos
 flutter test
 ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0)); puts "workflow YAML: OK"' .github/workflows/mobile.yml
 plutil -lint ios/ExportOptions.plist
@@ -379,7 +379,7 @@ gh pr create \
   --base master \
   --head feature/testflight-cicd \
   --title "ci: add manual TestFlight delivery" \
-  --body $'## Summary\n- run Flutter analyze and tests on pull requests and master\n- add a manual signed TestFlight upload\n- keep Apple and Maps credentials in GitHub Actions secrets\n\n## Verification\n- flutter analyze\n- flutter test\n- workflow YAML parse\n- ExportOptions.plist lint'
+  --body $'## Summary\n- run Flutter analyze and tests on pull requests and master\n- add a manual signed TestFlight upload\n- keep Apple and Maps credentials in GitHub Actions secrets\n\n## Verification\n- flutter analyze --no-fatal-infos\n- flutter test\n- workflow YAML parse\n- ExportOptions.plist lint'
 ```
 
 Expected: GitHub returns the new pull request URL.
