@@ -38,6 +38,9 @@ void main() {
       ),
     );
     when(
+      () => mockAuthRepository.fetchOAuthClientName(any()),
+    ).thenAnswer((_) async => 'Tokyo Planner');
+    when(
       () => mockAuthRepository.submitOAuthConsent(
         any(),
         decision: any(named: 'decision'),
@@ -69,9 +72,21 @@ void main() {
     await pumpScreen(tester);
 
     expect(find.text('授權請求'), findsOneWidget);
-    expect(find.text('未知應用程式 (client_id=tp_alpha)'), findsOneWidget);
+    expect(find.text('Tokyo Planner'), findsOneWidget);
+    expect(find.text('未知應用程式 (client_id=tp_alpha)'), findsNothing);
     expect(find.text('識別您的身分（唯一 ID）'), findsOneWidget);
     expect(find.text('您的電子郵件地址'), findsOneWidget);
+  });
+
+  testWidgets('client-info 查詢失敗保留未知應用程式 fallback', (tester) async {
+    when(
+      () => mockAuthRepository.fetchOAuthClientName(any()),
+    ).thenThrow(Exception('offline'));
+
+    await pumpScreen(tester);
+
+    expect(find.text('未知應用程式 (client_id=tp_alpha)'), findsOneWidget);
+    expect(find.byKey(const Key('oauth-consent-allow')), findsOneWidget);
   });
 
   testWidgets('同意授權送出 allow 並顯示 redirect location', (tester) async {

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/session_store.dart';
 
 /// 依序回放腳本 response 的假 adapter（http_mock_adapter 無法對同一
@@ -48,6 +49,15 @@ ResponseBody jsonResponseBody(
     },
   );
 }
+
+ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
+  '<!doctype html><title>Attention Required</title>',
+  200,
+  headers: {
+    Headers.contentTypeHeader: ['Text/HTML; charset=UTF-8'],
+    'retry-after': ['0'],
+  },
+);
 
 void main() {
   late Dio dio;
@@ -118,7 +128,7 @@ void main() {
     });
   });
 
-  group('規則 3：非 2xx 與 429 retry', () {
+  group('規則 3：非 2xx、429 與 edge block retry', () {
     test('非 2xx 丟出 ApiError', () async {
       dioAdapter.onGet(
         '/trips/missing',
@@ -223,6 +233,135 @@ void main() {
         throwsA(isA<ApiError>().having((error) => error.status, 'status', 429)),
       );
       expect(sequencedAdapter.recordedRequests, hasLength(1));
+    });
+
+    test('200 text/html GET 讀 Retry-After 後 retry 一次', () async {
+      final adapter = SequencedResponseAdapter([
+        htmlBlockResponseBody(),
+        jsonResponseBody(200, {'ok': true}),
+      ]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+
+      expect(await client.get('/trips'), {'ok': true});
+      expect(adapter.recordedRequests, hasLength(2));
+    });
+
+    test('200 text/html GET 最終丟指定 ApiError，且不寫入快取', () async {
+      final adapter = SequencedResponseAdapter([
+        htmlBlockResponseBody(),
+        htmlBlockResponseBody(),
+      ]);
+      final cacheStore = InMemoryCacheStore();
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+        cacheStore: cacheStore,
+      );
+
+      await expectLater(
+        client.get('/trips'),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 200)
+              .having((error) => error.code, 'code', 'SYS_UPSTREAM_UNAVAILABLE')
+              .having((error) => error.message, 'message', '伺服器暫時無法回應，請稍後重試'),
+        ),
+      );
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(await cacheStore.readResponse('GET /trips'), isNull);
+    });
+
+    test('200 text/html retry 等候可由 CancelToken 立即取消', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          '<!doctype html>',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/html'],
+            'retry-after': ['30'],
+          },
+        ),
+        jsonResponseBody(200, {'ok': true}),
+      ]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+      final cancelToken = CancelToken();
+      final request = client.get('/trips', cancelToken: cancelToken);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      cancelToken.cancel('route disposed');
+
+      await expectLater(
+        request,
+        throwsA(
+          isA<DioException>().having(
+            (error) => error.type,
+            'type',
+            DioExceptionType.cancel,
+          ),
+        ),
+      );
+      expect(adapter.recordedRequests, hasLength(1));
+    });
+
+    test('200 text/html HEAD retry 一次', () async {
+      final adapter = SequencedResponseAdapter([
+        htmlBlockResponseBody(),
+        ResponseBody.fromString(
+          '',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/plain'],
+          },
+        ),
+      ]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+
+      expect(await client.head('/health'), isNull);
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(
+        adapter.recordedRequests,
+        everyElement(
+          isA<RequestOptions>().having(
+            (request) => request.method,
+            'method',
+            'HEAD',
+          ),
+        ),
+      );
+    });
+
+    test('200 text/html mutation 不 retry，直接丟指定 ApiError', () async {
+      final adapter = SequencedResponseAdapter([
+        htmlBlockResponseBody(),
+        jsonResponseBody(200, {'ok': true}),
+      ]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+
+      await expectLater(
+        client.post('/trips', body: {'id': 't1'}),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 200)
+              .having(
+                (error) => error.code,
+                'code',
+                'SYS_UPSTREAM_UNAVAILABLE',
+              ),
+        ),
+      );
+      expect(adapter.recordedRequests, hasLength(1));
     });
 
     test('parseRetryAfterSeconds：delta-seconds、cap 30s、HTTP-date、無效值', () {
@@ -348,6 +487,31 @@ void main() {
         ),
       );
     });
+
+    test('getTextStream 遇 200 text/html retry 一次後丟指定 ApiError', () async {
+      final adapter = SequencedResponseAdapter([
+        htmlBlockResponseBody(),
+        htmlBlockResponseBody(),
+      ]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+
+      await expectLater(
+        client.getTextStream('/requests/7/events').drain<void>(),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 200)
+              .having(
+                (error) => error.code,
+                'code',
+                'SYS_UPSTREAM_UNAVAILABLE',
+              ),
+        ),
+      );
+      expect(adapter.recordedRequests, hasLength(2));
+    });
   });
 
   group('redirect response', () {
@@ -383,6 +547,28 @@ void main() {
         'tripline_session=token123',
       );
       expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
+    });
+
+    test('postForRedirect 遇 200 text/html 不 retry，直接丟指定 ApiError', () async {
+      final adapter = SequencedResponseAdapter([htmlBlockResponseBody()]);
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+      );
+
+      await expectLater(
+        client.postForRedirect('/oauth/consent'),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 200)
+              .having(
+                (error) => error.code,
+                'code',
+                'SYS_UPSTREAM_UNAVAILABLE',
+              ),
+        ),
+      );
+      expect(adapter.recordedRequests, hasLength(1));
     });
   });
 }

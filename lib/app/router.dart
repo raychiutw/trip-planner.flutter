@@ -282,8 +282,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/oauth/consent',
-        builder: (context, state) =>
-            OAuthConsentScreen(request: OAuthConsentRequest.fromUri(state.uri)),
+        builder: (context, state) => OAuthConsentScreen(
+          key: ValueKey(state.uri.toString()),
+          request: OAuthConsentRequest.fromUri(state.uri),
+        ),
       ),
       GoRoute(
         path: '/invite',
@@ -303,7 +305,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/chat',
-                builder: (context, state) => const ChatScreen(),
+                builder: (context, state) => ChatScreen(
+                  key: ValueKey(state.uri.toString()),
+                  initialTripId: state.uri.queryParameters['tripId'],
+                  initialPrefill: state.uri.queryParameters['prefill'],
+                ),
               ),
             ],
           ),

@@ -6,24 +6,31 @@ class Travel {
   const Travel({
     required this.type,
     this.desc,
+    this.submode,
     this.min,
     this.distanceM,
     this.source,
+    this.sameplace = false,
   });
 
   final String type;
   final String? desc;
+  final String? submode;
   final int? min;
   final int? distanceM;
   final String? source;
+  final bool sameplace;
 
   factory Travel.fromJson(Map<String, dynamic> json) {
     return Travel(
-      type: json['type'] as String,
+      // no-travel payload 會回 type:null；顯示層以 sameplace 優先。
+      type: json['type'] as String? ?? 'transit',
       desc: json['desc'] as String?,
+      submode: json['submode'] as String?,
       min: (json['min'] as num?)?.toInt(),
-      distanceM: (json['distanceM'] as num?)?.toInt(),
+      distanceM: ((json['distanceM'] ?? json['distance_m']) as num?)?.toInt(),
       source: json['source'] as String?,
+      sameplace: json['sameplace'] == true || json['sameplace'] == 1,
     );
   }
 }

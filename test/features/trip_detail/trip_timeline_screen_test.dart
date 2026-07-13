@@ -40,6 +40,7 @@ const _fakeDays = [
         startTime: '09:00',
         title: '美麗海水族館',
         version: 1,
+        travel: Travel(type: 'car', min: 15),
         master: EntryPoiInfo(
           poiId: 101,
           name: '沖繩美麗海水族館',
@@ -54,7 +55,7 @@ const _fakeDays = [
         startTime: '12:30',
         title: '海人食堂',
         version: 1,
-        travel: Travel(type: 'car', min: 15),
+        travel: Travel(type: 'walk', min: 10),
         master: EntryPoiInfo(
           poiId: 102,
           name: '海人食堂',
@@ -69,7 +70,7 @@ const _fakeDays = [
         startTime: '14:30',
         title: '美國村購物',
         version: 1,
-        travel: Travel(type: 'walk', min: 10),
+        travel: Travel(type: 'car', min: 8),
         master: EntryPoiInfo(
           poiId: 103,
           name: '美國村',
@@ -83,7 +84,6 @@ const _fakeDays = [
         startTime: '16:00',
         title: '日落海灘',
         version: 1,
-        travel: Travel(type: 'car', min: 8),
         master: EntryPoiInfo(poiId: 104, name: '日落海灘', type: 'activity'),
       ),
     ],
@@ -102,6 +102,7 @@ const _fakeDays = [
         startTime: '10:00',
         title: '單軌電車移動',
         version: 1,
+        travel: Travel(type: 'monorail', min: 20),
         master: EntryPoiInfo(poiId: 201, name: '沖繩都市單軌電車', type: 'transport'),
       ),
       TimelineEntry(
@@ -110,7 +111,6 @@ const _fakeDays = [
         startTime: '11:00',
         title: '首里城公園',
         version: 1,
-        travel: Travel(type: 'monorail', min: 20),
         master: EntryPoiInfo(
           poiId: 202,
           name: '首里城',
@@ -314,8 +314,8 @@ void main() {
     // 'DAY 01' 同時出現在頂部 pill 與 day header eyebrow
     expect(find.text('DAY 01'), findsNWidgets(2));
     expect(find.text('DAY 02'), findsNWidgets(2));
-    expect(find.text('北部海岸線'), findsOneWidget);
-    expect(find.text('南部文化'), findsOneWidget);
+    expect(find.text('2026-04-23（四）'), findsOneWidget);
+    expect(find.text('2026-04-24（五）'), findsOneWidget);
   });
 
   testWidgets('entry tile 依 master.type 顯示對應 tone 圓點', (tester) async {
@@ -327,11 +327,13 @@ void main() {
     expect(_entryDotColor(tester, 21), TpColorsLight.sageDeep);
   });
 
-  testWidgets('travel pill 顯示移動分鐘數與 type icon', (tester) async {
+  testWidgets('travel pill 使用出發 entry 的 travel 顯示各相鄰路段', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('15 分鐘'), findsOneWidget);
     expect(find.text('10 分鐘'), findsOneWidget);
+    expect(find.text('8 分鐘'), findsOneWidget);
+    expect(find.text('20 分鐘'), findsOneWidget);
     expect(find.byIcon(Icons.directions_car), findsNWidgets(2));
     expect(find.byIcon(Icons.directions_walk), findsOneWidget);
   });
@@ -399,13 +401,14 @@ void main() {
   testWidgets('點 day pill 捲動至該日 section', (tester) async {
     await _pumpTimeline(tester);
 
-    final day2TitleTopBeforeTap = tester.getTopLeft(find.text('南部文化')).dy;
+    final day2Title = find.text('2026-04-24（五）');
+    final day2TitleTopBeforeTap = tester.getTopLeft(day2Title).dy;
 
     // 第一個 'DAY 02' 是頂部 pill（pill 列在捲動內容之前）
     await tester.tap(find.text('DAY 02').first);
     await tester.pumpAndSettle();
 
-    final day2TitleTopAfterTap = tester.getTopLeft(find.text('南部文化')).dy;
+    final day2TitleTopAfterTap = tester.getTopLeft(day2Title).dy;
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
   });
 
@@ -456,7 +459,7 @@ void main() {
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
 
-    expect(find.text('北部海岸線'), findsOneWidget);
+    expect(find.text('2026-04-23（四）'), findsOneWidget);
     expect(fetchDaysAttempts, 2);
   });
 
@@ -612,7 +615,10 @@ void main() {
         tripId: any(named: 'tripId'),
         segmentId: any(named: 'segmentId'),
         mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        clearSubmode: any(named: 'clearSubmode'),
         min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
         expectedVersion: any(named: 'expectedVersion'),
       ),
     ).thenAnswer(
@@ -649,7 +655,146 @@ void main() {
         tripId: _tripId,
         segmentId: 50,
         mode: 'transit',
+        submode: '大眾運輸',
+        clearSubmode: false,
         min: 25,
+        noTravel: false,
+        expectedVersion: 1,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('火車類方式分鐘留白仍會儲存並交由後端自動估算', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        clearSubmode: any(named: 'clearSubmode'),
+        min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 50,
+        mode: 'transit',
+        submode: 'train',
+        version: 2,
+      ),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          version: 1,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-mode-train')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('travel-submit')))
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateSegment(
+        tripId: _tripId,
+        segmentId: 50,
+        mode: 'transit',
+        submode: 'train',
+        clearSubmode: false,
+        min: null,
+        noTravel: false,
+        expectedVersion: 1,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('切換交通方式會清除舊的手動分鐘，避免鎖到新方式', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        clearSubmode: any(named: 'clearSubmode'),
+        min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 50,
+        mode: 'transit',
+        submode: 'train',
+        version: 2,
+      ),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          min: 30,
+          source: 'manual',
+          version: 1,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('travel-min')))
+          .controller!
+          .text,
+      '30',
+    );
+    await tester.tap(find.byKey(const ValueKey('travel-mode-train')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('travel-min')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateSegment(
+        tripId: _tripId,
+        segmentId: 50,
+        mode: 'transit',
+        submode: 'train',
+        clearSubmode: false,
+        min: null,
+        noTravel: false,
         expectedVersion: 1,
       ),
     ).called(1);
@@ -663,7 +808,9 @@ void main() {
         fromEntryId: any(named: 'fromEntryId'),
         toEntryId: any(named: 'toEntryId'),
         mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
         min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
       ),
     ).thenAnswer(
       (_) async => const TripSegment(
@@ -671,7 +818,9 @@ void main() {
         fromEntryId: 11,
         toEntryId: 12,
         mode: 'transit',
+        submode: '大眾運輸',
         min: 25,
+        noTravel: false,
         version: 1,
       ),
     );
@@ -693,7 +842,9 @@ void main() {
         fromEntryId: 11,
         toEntryId: 12,
         mode: 'transit',
+        submode: '大眾運輸',
         min: 25,
+        noTravel: false,
       ),
     ).called(1);
     verifyNever(
@@ -701,9 +852,70 @@ void main() {
         tripId: any(named: 'tripId'),
         segmentId: any(named: 'segmentId'),
         mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        clearSubmode: any(named: 'clearSubmode'),
         min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
         expectedVersion: any(named: 'expectedVersion'),
       ),
     );
+  });
+
+  testWidgets('完全缺少 segment/travel 時可直接建立「不需計算路程」', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.createSegment(
+        tripId: any(named: 'tripId'),
+        fromEntryId: any(named: 'fromEntryId'),
+        toEntryId: any(named: 'toEntryId'),
+        mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 52,
+        fromEntryId: 1,
+        toEntryId: 2,
+        mode: 'driving',
+        noTravel: true,
+        version: 1,
+      ),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          version: 1,
+          timeline: [
+            TimelineEntry(id: 1, sortOrder: 0, title: 'A', version: 1),
+            TimelineEntry(id: 2, sortOrder: 1, title: 'B', version: 1),
+          ],
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-create-1-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-mode-no-travel')));
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.createSegment(
+        tripId: _tripId,
+        fromEntryId: 1,
+        toEntryId: 2,
+        mode: null,
+        submode: null,
+        min: null,
+        noTravel: true,
+      ),
+    ).called(1);
   });
 }

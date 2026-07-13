@@ -58,7 +58,7 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, EntryRouteAction.copy));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAY 2 · 市區'));
+    await tester.tap(find.text('DAY 2'));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('entry-action-submit')));
     await tester.pumpAndSettle();
@@ -82,7 +82,7 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, EntryRouteAction.move));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAY 2 · 市區'));
+    await tester.tap(find.text('DAY 2'));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('entry-action-submit')));
     await tester.pumpAndSettle();

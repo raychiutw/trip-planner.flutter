@@ -2,9 +2,43 @@
 library;
 
 import '../../models/day.dart';
+import '../../models/entry.dart';
 import '../../models/notes.dart';
+import '../../models/segment.dart';
 import '../../models/share.dart';
 import '../../models/trip.dart';
+
+/// 列印、PDF 與公開分享共用的交通摘要。
+String formatTravelLine(Travel? travel) {
+  if (travel == null) return '';
+  if (travel.sameplace) return '不需計算路程';
+  final rawType = travel.type.trim();
+  final submode = travel.submode?.trim();
+  final parts = <String>[
+    if (submode?.isNotEmpty == true)
+      travelMethodLabel('transit', submode)
+    else if (rawType.isNotEmpty)
+      _legacyTravelModeLabel(rawType),
+    if (travel.min != null && travel.min! > 0) '${travel.min} 分',
+    if (travel.distanceM != null && travel.distanceM! > 0)
+      '${(travel.distanceM! / 1000).toStringAsFixed(1)}km',
+  ];
+  return parts.join(' · ');
+}
+
+String _legacyTravelModeLabel(String value) {
+  return switch (value) {
+    'driving' || 'car' || 'drive' => '開車',
+    'walking' || 'walk' => '步行',
+    'transit' => '大眾運輸',
+    'bus' => '公車',
+    'train' => '火車',
+    'metro' || 'subway' => '捷運',
+    'ferry' => '渡輪',
+    'flight' || 'plane' => '飛機',
+    _ => value,
+  };
+}
 
 /// Aggregated trip, days, and notes used to render print/PDF documents.
 class TripPrintData {

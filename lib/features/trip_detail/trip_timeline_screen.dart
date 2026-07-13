@@ -452,7 +452,9 @@ class _DaySection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
     final warnings = validateDay(timeline);
-    final segments = switch (ref.watch(tripSegmentsProvider(tripId))) {
+    final segmentsValue = ref.watch(tripSegmentsProvider(tripId));
+    final segmentsReady = segmentsValue is AsyncData<List<TripSegment>>;
+    final segments = switch (segmentsValue) {
       AsyncData(:final value) => value,
       _ => const <TripSegment>[],
     };
@@ -483,6 +485,7 @@ class _DaySection extends ConsumerWidget {
               _reorder(context, ref, oldIndex, newIndex),
           itemBuilder: (context, i) {
             final entry = timeline[i];
+            final previous = i > 0 ? timeline[i - 1] : null;
             return KeyedSubtree(
               key: ValueKey('entry-${entry.id}'),
               child: Container(
@@ -490,16 +493,14 @@ class _DaySection extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (i > 0 && entry.travel != null)
+                    if (previous != null &&
+                        (previous.travel != null || segmentsReady))
                       _TravelRow(
-                        travel: entry.travel!,
-                        segment: _findSegment(
-                          segments,
-                          timeline[i - 1].id,
-                          entry.id,
-                        ),
+                        travel: previous.travel,
+                        segment: _findSegment(segments, previous.id, entry.id),
+                        segmentsReady: segmentsReady,
                         tripId: tripId,
-                        fromEntryId: timeline[i - 1].id,
+                        fromEntryId: previous.id,
                         toEntryId: entry.id,
                       ),
                     SwipeToDelete(
@@ -646,13 +647,15 @@ class _TravelRow extends StatelessWidget {
     required this.travel,
     required this.fromEntryId,
     required this.toEntryId,
+    required this.segmentsReady,
     this.segment,
     this.tripId,
   });
 
-  final Travel travel;
+  final Travel? travel;
   final int fromEntryId;
   final int toEntryId;
+  final bool segmentsReady;
   final TripSegment? segment;
   final String? tripId;
 
@@ -660,9 +663,14 @@ class _TravelRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
-    Widget pill = TravelPill(travel: travel);
+    Widget pill = TravelPill(
+      travel: travel,
+      segment: seg,
+      missing: seg == null && travel == null,
+    );
     final id = tripId;
-    if (id != null) {
+    final canEdit = seg != null || segmentsReady;
+    if (id != null && canEdit) {
       pill = InkWell(
         key: seg != null
             ? ValueKey('travel-edit-${seg.id}')
@@ -673,8 +681,11 @@ class _TravelRow extends StatelessWidget {
           segment: seg,
           fromEntryId: fromEntryId,
           toEntryId: toEntryId,
-          initialMode: travel.type,
-          initialMin: travel.min,
+          initialMode: travel?.type,
+          initialSubmode: travel?.submode,
+          initialMin: travel?.min,
+          initialSource: travel?.source,
+          initialNoTravel: travel?.sameplace ?? false,
         ),
         borderRadius: BorderRadius.circular(TpRadius.md),
         child: pill,

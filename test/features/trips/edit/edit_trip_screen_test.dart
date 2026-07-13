@@ -222,8 +222,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('抵達那霸'), findsOneWidget);
-    expect(find.text('北部景點'), findsOneWidget);
+    expect(find.text('2026-04-24（五）'), findsOneWidget);
+    expect(find.text('北部景點'), findsNothing);
 
     await tester.ensureVisible(find.byKey(const ValueKey('edit-add-day-end')));
     await tester.pumpAndSettle();
@@ -233,7 +233,8 @@ void main() {
     verify(
       () => tripRepo.createDay(tripId: 'okinawa', position: 'end', date: null),
     ).called(1);
-    expect(find.text('返回日'), findsOneWidget);
+    expect(find.text('2026-04-25（六）'), findsOneWidget);
+    expect(find.text('返回日'), findsNothing);
 
     await tester.ensureVisible(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
@@ -244,7 +245,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     verify(() => tripRepo.deleteDay(tripId: 'okinawa', dayNum: 3)).called(1);
-    expect(find.text('返回日'), findsNothing);
+    expect(find.text('2026-04-25（六）'), findsNothing);
     expect(find.text('Day 3 已刪除'), findsOneWidget);
   });
 

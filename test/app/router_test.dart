@@ -344,6 +344,26 @@ void main() {
 
     expect(find.byType(OAuthConsentScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+
+    final first = tester.widget<OAuthConsentScreen>(
+      find.byType(OAuthConsentScreen),
+    );
+    container
+        .read(appRouterProvider)
+        .go(
+          '/oauth/consent?client_id=tp_beta'
+          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
+          '&scope=openid'
+          '&state=next'
+          '&response_type=code',
+        );
+    await tester.pumpAndSettle();
+
+    final second = tester.widget<OAuthConsentScreen>(
+      find.byType(OAuthConsentScreen),
+    );
+    expect(second.request.clientId, 'tp_beta');
+    expect(second.key, isNot(first.key));
   });
 
   testWidgets('已登入可進入 /trips/:tripId/print', (tester) async {
@@ -400,6 +420,41 @@ void main() {
 
     expect(find.byType(ChatScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('/chat query 會傳給 ChatScreen', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(appRouterProvider)
+        .go('/chat?tripId=trip-1&prefill=%E5%AE%89%E6%8E%92%E6%99%9A%E9%A4%90');
+    await tester.pump();
+
+    final screen = tester.widget<ChatScreen>(find.byType(ChatScreen));
+    expect(screen.initialTripId, 'trip-1');
+    expect(screen.initialPrefill, '安排晚餐');
+
+    container
+        .read(appRouterProvider)
+        .go('/chat?tripId=trip-2&prefill=%E6%94%B9%E8%A1%8C%E7%A8%8B');
+    await tester.pump();
+
+    final updated = tester.widget<ChatScreen>(find.byType(ChatScreen));
+    expect(updated.initialTripId, 'trip-2');
+    expect(updated.initialPrefill, '改行程');
+    expect(updated.key, isNot(screen.key));
+
+    container.read(appRouterProvider).go('/trips');
+    await tester.pumpAndSettle();
   });
 
   testWidgets('已登入可進入 /trips/:tripId/health 與 web alias', (tester) async {

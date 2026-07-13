@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -17,6 +20,8 @@ class _MockTripRepo extends Mock implements TripRepository {}
 
 class _MockPoiRepo extends Mock implements PoiRepository {}
 
+class _MockAuthRepo extends Mock implements AuthRepository {}
+
 const _tokyo = PoiSearchResult(
   placeId: 'p1',
   name: '東京',
@@ -30,16 +35,20 @@ void main() {
 
   late _MockTripRepo tripRepo;
   late _MockPoiRepo poiRepo;
+  late _MockAuthRepo authRepo;
 
   setUp(() {
     tripRepo = _MockTripRepo();
     poiRepo = _MockPoiRepo();
+    authRepo = _MockAuthRepo();
     when(
       () => poiRepo.searchPois(
         q: any(named: 'q'),
         region: any(named: 'region'),
       ),
     ).thenAnswer((_) async => const [_tokyo]);
+    when(() => authRepo.fetchAiAuthorization()).thenAnswer((_) async => false);
+    when(() => authRepo.authorizeAi()).thenAnswer((_) async => true);
   });
 
   Widget buildApp() {
@@ -58,6 +67,7 @@ void main() {
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
         poiRepositoryProvider.overrideWithValue(poiRepo),
+        authRepositoryProvider.overrideWithValue(authRepo),
       ],
       child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
     );
@@ -109,7 +119,66 @@ void main() {
     expect(find.byKey(const ValueKey('create-flex-count')), findsOneWidget);
   });
 
+  testWidgets('AI 授權載入時只顯示說明，POST busy 後顯示已授權', (tester) async {
+    final load = Completer<bool>();
+    final authorize = Completer<bool>();
+    when(() => authRepo.fetchAiAuthorization()).thenAnswer((_) => load.future);
+    when(() => authRepo.authorizeAi()).thenAnswer((_) => authorize.future);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ai-authorize-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('讓 AI 幫你把行程填滿'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-authorize-btn')), findsNothing);
+
+    load.complete(false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ai-authorize-btn')));
+    await tester.pump();
+
+    expect(find.text('授權中⋯'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('ai-authorize-btn')))
+          .onPressed,
+      isNull,
+    );
+
+    authorize.complete(true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ai-authorize-on')), findsOneWidget);
+    expect(find.text('已授權 · 可隨時在「已連結應用」撤銷'), findsOneWidget);
+  });
+
+  testWidgets('AI 授權失敗顯示錯誤並可重試', (tester) async {
+    when(() => authRepo.authorizeAi()).thenThrow(Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ai-authorize-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('ai-authorize-btn')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('授權失敗，請稍後再試。'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('ai-authorize-btn')))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
   testWidgets('加目的地 + 彈性日期 → 送出呼叫 createTrip + 導頁', (tester) async {
+    when(() => authRepo.fetchAiAuthorization()).thenThrow(Exception('offline'));
     when(
       () => tripRepo.createTrip(
         id: any(named: 'id'),

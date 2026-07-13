@@ -7,6 +7,7 @@ void main() {
       final travel = Travel.fromJson({
         'type': 'driving',
         'desc': '開車 25 分',
+        'submode': 'bus',
         'min': 25,
         'distanceM': 18000,
         'source': 'google',
@@ -14,6 +15,7 @@ void main() {
 
       expect(travel.type, 'driving');
       expect(travel.desc, '開車 25 分');
+      expect(travel.submode, 'bus');
       expect(travel.min, 25);
       expect(travel.distanceM, 18000);
       expect(travel.source, 'google');
@@ -26,6 +28,14 @@ void main() {
       expect(travel.min, isNull);
       expect(travel.distanceM, isNull);
       expect(travel.source, isNull);
+      expect(travel.sameplace, isFalse);
+    });
+
+    test('免交通 payload 的 type:null 不會解析崩潰', () {
+      final travel = Travel.fromJson({'type': null, 'sameplace': true});
+
+      expect(travel.type, 'transit');
+      expect(travel.sameplace, isTrue);
     });
   });
 

@@ -1,27 +1,35 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
+import '../../../models/segment.dart';
 import '../../../theme/app_theme.dart';
 
 /// 站間移動 pill：sage 描邊、透明底、type icon + 分鐘數（tabular）。
 class TravelPill extends StatelessWidget {
-  const TravelPill({super.key, required this.travel});
+  const TravelPill({super.key, this.travel, this.segment, this.missing = false})
+    : assert(travel != null || segment != null || missing);
 
-  final Travel travel;
+  final Travel? travel;
+  final TripSegment? segment;
+  final bool missing;
 
   /// 移動方式 → icon；未知 type 用通用路線 icon。
   static IconData iconForType(String type) {
     switch (type) {
       case 'walk':
+      case 'walking':
         return Icons.directions_walk;
       case 'car':
       case 'drive':
+      case 'driving':
         return Icons.directions_car;
       case 'taxi':
         return Icons.local_taxi;
       case 'bus':
         return Icons.directions_bus;
       case 'train':
+      case 'metro':
+      case 'hsr':
         return Icons.train;
       case 'monorail':
       case 'tram':
@@ -51,23 +59,71 @@ class TravelPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = Theme.of(context).extension<TpTones>()!;
+    final colorScheme = Theme.of(context).colorScheme;
+    final noTravel = segment?.noTravel ?? travel?.sameplace ?? false;
+
+    if (noTravel) {
+      return Container(
+        key: const ValueKey('travel-no-travel'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.location_on_outlined,
+              size: 14,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '不需計算路程',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final String label;
-    final hasMin = travel.min != null;
-    final hasDist = travel.distanceM != null;
+    final mode = segment?.mode ?? travel?.type;
+    final submode = segment?.submode ?? travel?.submode;
+    final isStale = segment != null && segment!.computedAt == null;
+    final min = isStale ? null : segment?.min ?? travel?.min;
+    final distanceM = isStale ? null : segment?.distanceM ?? travel?.distanceM;
+    final desc = travel?.desc;
+    final method = travelMethodLabel(mode, submode);
+    final showMethod = mode == 'transit' && submode?.isNotEmpty == true;
+    final hasMin = min != null;
+    final hasDist = distanceM != null;
 
     if (hasMin && hasDist) {
       label =
-          '${travel.min} 分鐘 · ${_formatDistance(travel.distanceM!)}';
+          '${showMethod ? '$method · ' : ''}$min 分鐘 · '
+          '${_formatDistance(distanceM)}';
     } else if (hasMin) {
-      label = '${travel.min} 分鐘';
+      label = '${showMethod ? '$method · ' : ''}$min 分鐘';
     } else if (hasDist) {
-      label = _formatDistance(travel.distanceM!);
+      label = '${showMethod ? '$method · ' : ''}${_formatDistance(distanceM)}';
+    } else if (isStale) {
+      label = showMethod ? '$method · 車程待更新' : '車程待更新';
+    } else if (showMethod) {
+      label = desc?.trim().isNotEmpty == true ? '$method · $desc' : method;
+    } else if (missing) {
+      label = '尚未設定交通';
     } else {
-      label = travel.desc ?? '移動';
+      label = desc ?? '移動';
     }
 
     return Container(
+      key: isStale ? const ValueKey('travel-stale') : null,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
@@ -76,7 +132,11 @@ class TravelPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(iconForType(travel.type), size: 14, color: tones.sageDeep),
+          Icon(
+            iconForType(submode ?? mode ?? ''),
+            size: 14,
+            color: tones.sageDeep,
+          ),
           const SizedBox(width: 4),
           Text(
             label,

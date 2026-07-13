@@ -325,15 +325,6 @@ class _DaySummaryRow extends StatelessWidget {
               ),
               const SizedBox(height: TpSpacing.s1),
               Text(day.displayTitle, style: textTheme.bodyLarge),
-              if (day.date != null && day.date!.isNotEmpty) ...[
-                const SizedBox(height: TpSpacing.s1),
-                Text(
-                  _dayDateLabel(day),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -467,12 +458,6 @@ String _dateRangeLabel(String? startDate, String? endDate) {
     return startDate;
   }
   return '$startDate → $endDate';
-}
-
-String _dayDateLabel(TripDay day) {
-  final weekday = day.dayOfWeek;
-  if (weekday == null || weekday.isEmpty) return day.date ?? '';
-  return '${day.date} ($weekday)';
 }
 
 List<String> _missingDatesAfter(List<TripDay> days, int index) {

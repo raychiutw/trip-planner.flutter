@@ -1,4 +1,4 @@
-/// dio 封裝：cookie 認證、CSRF Origin、錯誤轉換、429 retry、204 處理。
+/// dio 封裝：cookie 認證、CSRF Origin、錯誤轉換、暫時性失敗 retry、204 處理。
 library;
 
 import 'dart:convert';
@@ -91,6 +91,12 @@ class ApiClient {
     fallbackToCache: fallbackToCache,
   );
 
+  Future<dynamic> head(
+    String path, {
+    Map<String, dynamic>? query,
+    CancelToken? cancelToken,
+  }) => _send('HEAD', path, query: query, cancelToken: cancelToken);
+
   Future<dynamic> post(
     String path, {
     Object? body,
@@ -124,6 +130,9 @@ class ApiClient {
       ),
     );
     final statusCode = response.statusCode ?? 0;
+    if (_isEdgeBlockPage(response)) {
+      throw _upstreamUnavailable(statusCode);
+    }
     if (statusCode < 200 || statusCode >= 400) {
       throw ApiError.fromResponse(statusCode, response.data);
     }
@@ -173,8 +182,11 @@ class ApiClient {
 
   /// Authenticated streaming GET for text-based long-lived responses such as
   /// `text/event-stream`. This intentionally bypasses cache/SWR handling.
-  Stream<String> getTextStream(String path, {Map<String, dynamic>? query}) =>
-      _getTextStream(path, query: query);
+  Stream<String> getTextStream(
+    String path, {
+    Map<String, dynamic>? query,
+    CancelToken? cancelToken,
+  }) => _getTextStream(path, query: query, cancelToken: cancelToken);
 
   /// 寫入:線上直送(成功即依失效表 evict);離線且帶 [optimistic] → 入持久化佇列
   /// + 對 op.cacheKey 套樂觀 patch + 回 null(樂觀成功)。無 optimistic 或非離線 → rethrow。
@@ -469,6 +481,38 @@ class ApiClient {
     }
   }
 
+  static bool _isEdgeBlockPage(Response<dynamic> response) {
+    final statusCode = response.statusCode ?? 0;
+    return statusCode >= 200 &&
+        statusCode < 300 &&
+        statusCode != 204 &&
+        (response.headers
+                .value(Headers.contentTypeHeader)
+                ?.toLowerCase()
+                .contains('text/html') ??
+            false);
+  }
+
+  static ApiError _upstreamUnavailable(int statusCode) => ApiError(
+    status: statusCode,
+    code: 'SYS_UPSTREAM_UNAVAILABLE',
+    message: '伺服器暫時無法回應，請稍後重試',
+  );
+
+  static Future<void> _waitForRetry(
+    int seconds,
+    CancelToken? cancelToken,
+  ) async {
+    final initialError = cancelToken?.cancelError;
+    if (initialError != null) throw initialError;
+    if (seconds <= 0) return;
+    final delay = Future<void>.delayed(Duration(seconds: seconds));
+    if (cancelToken == null) return delay;
+    await Future.any<void>([delay, cancelToken.whenCancel.then<void>((_) {})]);
+    final cancelError = cancelToken.cancelError;
+    if (cancelError != null) throw cancelError;
+  }
+
   Future<dynamic> _send(
     String method,
     String path, {
@@ -506,7 +550,9 @@ class ApiClient {
     }
 
     final statusCode = response.statusCode ?? 0;
-    // 429 GET / 401 Bearer-refresh 共用的「同參數重送一次」。
+    final isEdgeBlockPage = _isEdgeBlockPage(response);
+    final isRetryableMethod = method == 'GET' || method == 'HEAD';
+    // 429、edge block page、401 Bearer-refresh 共用「同參數重送一次」。
     Future<dynamic> retry() => _send(
       method,
       path,
@@ -517,11 +563,13 @@ class ApiClient {
       fallbackToCache: fallbackToCache,
       writeCache: writeCache,
     );
-    if (statusCode == 429 && method == 'GET' && !isRetryAttempt) {
+    if ((statusCode == 429 || isEdgeBlockPage) &&
+        isRetryableMethod &&
+        !isRetryAttempt) {
       final waitSeconds = parseRetryAfterSeconds(
         response.headers.value('retry-after'),
       );
-      await Future<void>.delayed(Duration(seconds: waitSeconds));
+      await _waitForRetry(waitSeconds, cancelToken);
       return retry();
     }
     // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
@@ -534,6 +582,9 @@ class ApiClient {
     }
     if (statusCode < 200 || statusCode >= 300) {
       throw ApiError.fromResponse(statusCode, response.data);
+    }
+    if (isEdgeBlockPage) {
+      throw _upstreamUnavailable(statusCode);
     }
     if (statusCode == 204) {
       await _evictForMutation(method, path, body);
@@ -559,6 +610,7 @@ class ApiClient {
   Stream<String> _getTextStream(
     String path, {
     Map<String, dynamic>? query,
+    CancelToken? cancelToken,
     bool isRetryAttempt = false,
   }) async* {
     final auth = await _authHeadersFor('GET');
@@ -570,16 +622,23 @@ class ApiClient {
         responseType: ResponseType.stream,
         headers: {...auth.headers, Headers.acceptHeader: 'text/event-stream'},
       ),
+      cancelToken: cancelToken,
     );
 
     final statusCode = response.statusCode ?? 0;
-    if (statusCode == 429 && !isRetryAttempt) {
+    final isEdgeBlockPage = _isEdgeBlockPage(response);
+    if ((statusCode == 429 || isEdgeBlockPage) && !isRetryAttempt) {
       final waitSeconds = parseRetryAfterSeconds(
         response.headers.value('retry-after'),
       );
       await response.data?.stream.drain<void>();
-      await Future<void>.delayed(Duration(seconds: waitSeconds));
-      yield* _getTextStream(path, query: query, isRetryAttempt: true);
+      await _waitForRetry(waitSeconds, cancelToken);
+      yield* _getTextStream(
+        path,
+        query: query,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+      );
       return;
     }
     if (statusCode == 401 &&
@@ -588,12 +647,21 @@ class ApiClient {
         _bearerSource != null &&
         await _bearerSource.refresh()) {
       await response.data?.stream.drain<void>();
-      yield* _getTextStream(path, query: query, isRetryAttempt: true);
+      yield* _getTextStream(
+        path,
+        query: query,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+      );
       return;
     }
     if (statusCode < 200 || statusCode >= 300) {
       final body = await _decodeStreamBody(response.data);
       throw ApiError.fromResponse(statusCode, body);
+    }
+    if (isEdgeBlockPage) {
+      await response.data?.stream.drain<void>();
+      throw _upstreamUnavailable(statusCode);
     }
 
     final body = response.data;

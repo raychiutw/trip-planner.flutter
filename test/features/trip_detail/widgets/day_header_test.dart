@@ -16,7 +16,7 @@ Future<void> pumpHeader(WidgetTester tester, TripDay day) {
 
 void main() {
   group('DayHeader', () {
-    testWidgets('DAY NN 補零 + 日期(全形括號) + displayTitle', (tester) async {
+    testWidgets('DAY NN 補零 + 日期作唯一主標，不再顯示 custom title', (tester) async {
       await pumpHeader(
         tester,
         const TripDay(
@@ -30,7 +30,7 @@ void main() {
       );
       expect(find.text('DAY 03'), findsOneWidget);
       expect(find.text('2026-06-12（週五）'), findsOneWidget);
-      expect(find.text('首里城與國際通'), findsOneWidget);
+      expect(find.text('首里城與國際通'), findsNothing);
     });
 
     testWidgets('date / dayOfWeek 皆 null → 不顯示日期列,title 退回 Day N', (
@@ -38,7 +38,7 @@ void main() {
     ) async {
       await pumpHeader(tester, const TripDay(id: 2, dayNum: 2, version: 0));
       expect(find.text('DAY 02'), findsOneWidget);
-      // displayTitle fallback chain: title → label → 'Day N'
+      // 日期缺漏時固定退回 Day N。
       expect(find.text('Day 2'), findsOneWidget);
       expect(find.textContaining('（'), findsNothing);
     });

@@ -313,6 +313,35 @@ void main() {
     });
   });
 
+  group('OAuth client branding and AI authorization', () {
+    test('fetchOAuthClientName 使用 client_id query 並回 app_name', () async {
+      dioAdapter.onGet(
+        '/oauth/client-info',
+        (server) => server.reply(200, {'app_name': 'Tokyo Planner'}),
+        queryParameters: {'client_id': 'tp_alpha'},
+      );
+
+      expect(
+        await authRepository.fetchOAuthClientName(' tp_alpha '),
+        'Tokyo Planner',
+      );
+    });
+
+    test('AI authorization GET/POST 回 authorized 狀態', () async {
+      dioAdapter.onGet(
+        '/account/ai-authorization',
+        (server) => server.reply(200, {'authorized': false}),
+      );
+      dioAdapter.onPost(
+        '/account/ai-authorization',
+        (server) => server.reply(200, {'authorized': true}),
+      );
+
+      expect(await authRepository.fetchAiAuthorization(), isFalse);
+      expect(await authRepository.authorizeAi(), isTrue);
+    });
+  });
+
   group('oauth consent', () {
     test('submitOAuthConsent 打 POST /oauth/consent 並保留 302 Location', () async {
       final request = OAuthConsentRequest.fromUri(

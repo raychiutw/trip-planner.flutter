@@ -283,7 +283,7 @@ class _EntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final travelLine = _travelLine(entry.travel);
+    final travelLine = formatTravelLine(entry.travel);
     return ListTile(
       title: Text(entry.title),
       subtitle: Column(
@@ -526,29 +526,4 @@ String _timeLine(TimelineEntry entry) {
   if (start.isNotEmpty && end.isNotEmpty) return '$start-$end';
   if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
   return start.isNotEmpty ? start : end;
-}
-
-String _travelLine(Travel? travel) {
-  if (travel == null) return '';
-  final parts = <String>[
-    _travelModeLabel(travel.type),
-    if (travel.min != null && travel.min! > 0) '${travel.min} 分',
-    if (travel.distanceM != null && travel.distanceM! > 0)
-      '${(travel.distanceM! / 1000).toStringAsFixed(1)}km',
-  ].where((part) => part.trim().isNotEmpty).toList();
-  return parts.join(' · ');
-}
-
-String _travelModeLabel(String value) {
-  return switch (value) {
-    'driving' || 'car' || 'drive' => '開車',
-    'walking' || 'walk' => '步行',
-    'transit' => '大眾運輸',
-    'bus' => '公車',
-    'train' => '火車',
-    'metro' || 'subway' => '捷運',
-    'ferry' => '渡輪',
-    'flight' || 'plane' => '飛機',
-    _ => value,
-  };
 }

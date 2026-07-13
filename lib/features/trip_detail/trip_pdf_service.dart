@@ -166,7 +166,7 @@ class _PdfDaySection extends pw.StatelessWidget {
                     children: [
                       _cell(_timeLine(entry)),
                       _entryCell(entry),
-                      _cell(_travelLine(entry.travel)),
+                      _cell(formatTravelLine(entry.travel)),
                     ],
                   ),
                 if (day.hotel != null)
@@ -389,29 +389,4 @@ String _timeLine(TimelineEntry entry) {
   if (start.isNotEmpty && end.isNotEmpty) return '$start-$end';
   if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
   return start.isNotEmpty ? start : end;
-}
-
-String _travelLine(Travel? travel) {
-  if (travel == null) return '';
-  final parts = <String>[
-    _travelModeLabel(travel.type),
-    if (travel.min != null && travel.min! > 0) '${travel.min} 分',
-    if (travel.distanceM != null && travel.distanceM! > 0)
-      '${(travel.distanceM! / 1000).toStringAsFixed(1)}km',
-  ].where((part) => part.trim().isNotEmpty).toList();
-  return parts.join(' · ');
-}
-
-String _travelModeLabel(String value) {
-  return switch (value) {
-    'driving' || 'car' || 'drive' => '開車',
-    'walking' || 'walk' => '步行',
-    'transit' => '大眾運輸',
-    'bus' => '公車',
-    'train' => '火車',
-    'metro' || 'subway' => '捷運',
-    'ferry' => '渡輪',
-    'flight' || 'plane' => '飛機',
-    _ => value,
-  };
 }

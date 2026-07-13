@@ -28,7 +28,10 @@ const List<String> _suggestedPrompts = [
 ];
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({super.key, this.initialTripId, this.initialPrefill});
+
+  final String? initialTripId;
+  final String? initialPrefill;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -36,6 +39,19 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _tripId;
+  String? _pendingPrefill;
+
+  @override
+  void initState() {
+    super.initState();
+    _tripId = widget.initialTripId;
+    _pendingPrefill = widget.initialPrefill;
+  }
+
+  void _consumePrefill() {
+    if (_pendingPrefill == null || !mounted) return;
+    setState(() => _pendingPrefill = null);
+  }
 
   /// 下拉顯示名:title 優先,空值退回 name。
   String _tripLabel(TripSummary t) {
@@ -98,7 +114,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
               ),
               Expanded(
-                child: _ChatBody(key: ValueKey(tripId), tripId: tripId),
+                child: _ChatBody(
+                  key: ValueKey(tripId),
+                  tripId: tripId,
+                  initialPrefill: _pendingPrefill,
+                  onInitialPrefillConsumed: _consumePrefill,
+                ),
               ),
             ],
           );
@@ -110,9 +131,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
 /// 單一行程的聊天串(訊息清單 + 輸入列)。
 class _ChatBody extends ConsumerStatefulWidget {
-  const _ChatBody({super.key, required this.tripId});
+  const _ChatBody({
+    super.key,
+    required this.tripId,
+    required this.onInitialPrefillConsumed,
+    this.initialPrefill,
+  });
 
   final String tripId;
+  final String? initialPrefill;
+  final VoidCallback onInitialPrefillConsumed;
 
   @override
   ConsumerState<_ChatBody> createState() => _ChatBodyState();
@@ -120,12 +148,18 @@ class _ChatBody extends ConsumerStatefulWidget {
 
 class _ChatBodyState extends ConsumerState<_ChatBody> {
   final _scroll = ScrollController();
-  final _input = TextEditingController();
+  late final TextEditingController _input;
 
   @override
   void initState() {
     super.initState();
+    _input = TextEditingController(text: widget.initialPrefill);
     _scroll.addListener(_onScroll);
+    if (widget.initialPrefill != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onInitialPrefillConsumed();
+      });
+    }
   }
 
   @override
@@ -373,9 +407,9 @@ class _ComposerState extends ConsumerState<_Composer> {
     final ok = await _ensureInit();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('需要麥克風與語音辨識權限才能語音輸入')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('需要麥克風與語音辨識權限才能語音輸入')));
       return;
     }
     setState(() => _listening = true);
@@ -448,10 +482,7 @@ class _ComposerState extends ConsumerState<_Composer> {
 
 /// 空對話引導:標題 + 說明 + 4 個建議 prompt 快捷鈕。
 class _EmptyStatePrompts extends StatelessWidget {
-  const _EmptyStatePrompts({
-    required this.sending,
-    required this.onSelect,
-  });
+  const _EmptyStatePrompts({required this.sending, required this.onSelect});
 
   final bool sending;
   final void Function(String prompt) onSelect;
@@ -484,7 +515,9 @@ class _EmptyStatePrompts extends StatelessWidget {
                   ActionChip(
                     key: ValueKey('chat-suggestion-$i'),
                     label: Text(_suggestedPrompts[i]),
-                    onPressed: sending ? null : () => onSelect(_suggestedPrompts[i]),
+                    onPressed: sending
+                        ? null
+                        : () => onSelect(_suggestedPrompts[i]),
                   ),
               ],
             ),

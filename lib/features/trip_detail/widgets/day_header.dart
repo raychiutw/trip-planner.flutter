@@ -25,7 +25,7 @@ String? dayTimeRange(TripDay day) {
   return '$min–$max';
 }
 
-/// 逐日 section 標頭：eyebrow「DAY NN」+ 日期（tabular）+ displayTitle。
+/// 逐日 section 標頭：eyebrow「DAY NN」+ 日期主標。
 class DayHeader extends StatelessWidget {
   const DayHeader({super.key, required this.day});
 
@@ -35,11 +35,6 @@ class DayHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    final dateLabel = [
-      if (day.date != null) day.date!,
-      if (day.dayOfWeek != null) '（${day.dayOfWeek}）',
-    ].join();
-
     final timeRange = dayTimeRange(day);
     final stopCount = day.timeline.length;
     final totalM = day.timeline.fold<int>(
@@ -65,17 +60,6 @@ class DayHeader extends StatelessWidget {
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            if (dateLabel.isNotEmpty) ...[
-              const SizedBox(width: TpSpacing.s2),
-              Text(
-                dateLabel,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
             if (timeRange != null) ...[
               const SizedBox(width: TpSpacing.s2),
               Text(

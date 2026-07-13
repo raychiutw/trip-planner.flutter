@@ -60,7 +60,7 @@ void main() {
     final weatherDay = buildWeatherDay(_okinawaDay);
 
     expect(weatherDay, isNotNull);
-    expect(weatherDay!.label, '北部海岸線');
+    expect(weatherDay!.label, '2026-04-23');
     expect(weatherDay.locations, hasLength(2));
     expect(weatherDay.locations.first.name, '沖繩美麗海水族館');
     expect(weatherDay.locations.first.startHour, 9);

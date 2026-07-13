@@ -65,7 +65,7 @@ void main() {
     expect(s.description, '原描述');
     expect(s.published, isTrue);
     expect(s.destinations.single.name, '那霸');
-    expect(s.days.map((d) => d.displayTitle), ['抵達日', '北部']);
+    expect(s.days.map((d) => d.displayTitle), ['2026-04-23', '2026-04-24']);
   });
 
   test('改 title → save 送 diff(只 title)', () async {

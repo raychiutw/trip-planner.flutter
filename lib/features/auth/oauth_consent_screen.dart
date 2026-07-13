@@ -22,8 +22,15 @@ class OAuthConsentScreen extends ConsumerStatefulWidget {
 
 class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
   bool _isSubmitting = false;
+  String? _clientName;
   OAuthConsentResult? _result;
   String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadClientName());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +59,7 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '未知應用程式 (client_id=${request.clientId})',
+                    _clientName ?? '未知應用程式 (client_id=${request.clientId})',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: TpSpacing.s2),
@@ -121,6 +128,17 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _loadClientName() async {
+    try {
+      final name = await ref
+          .read(authRepositoryProvider)
+          .fetchOAuthClientName(widget.request.clientId);
+      if (mounted && name != null) setState(() => _clientName = name);
+    } catch (_) {
+      // 未知或停用的 client 保留明確的未驗證 fallback，不阻擋 consent。
+    }
   }
 
   Future<void> _submit(String decision) async {

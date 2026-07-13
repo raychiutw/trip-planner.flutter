@@ -116,11 +116,13 @@ void main() {
       expect(day.version, 0);
     });
 
-    test('displayTitle fallback：title → label → Day N', () {
+    test('displayTitle：日期為主標，缺日期才退回 Day N', () {
       final dayWithTitle = TripDay.fromJson({
         'id': 1,
         'dayNum': 1,
         'version': 1,
+        'date': '2026-07-13',
+        'dayOfWeek': '週一',
         'title': '抵達日',
         'label': '南部',
       });
@@ -132,8 +134,8 @@ void main() {
       });
       final dayBare = TripDay.fromJson({'id': 3, 'dayNum': 3, 'version': 1});
 
-      expect(dayWithTitle.displayTitle, '抵達日');
-      expect(dayWithLabel.displayTitle, '中部');
+      expect(dayWithTitle.displayTitle, '2026-07-13（週一）');
+      expect(dayWithLabel.displayTitle, 'Day 2');
       expect(dayBare.displayTitle, 'Day 3');
     });
   });

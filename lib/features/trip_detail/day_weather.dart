@@ -162,10 +162,7 @@ TripWeatherDay? buildWeatherDay(TripDay day) {
     );
   }
   if (locations.isEmpty) return null;
-  return TripWeatherDay(
-    label: day.title ?? day.label ?? day.date ?? 'DAY ${day.dayNum}',
-    locations: locations,
-  );
+  return TripWeatherDay(label: day.displayTitle, locations: locations);
 }
 
 bool hasWeatherDay(TripDay day) {

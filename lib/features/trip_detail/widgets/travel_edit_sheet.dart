@@ -7,12 +7,6 @@ import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
 
-const List<(String, String)> _modes = [
-  ('driving', '開車'),
-  ('walking', '步行'),
-  ('transit', '大眾運輸'),
-];
-
 /// 開啟交通編輯 bottom sheet。
 Future<void> showTravelEditSheet(
   BuildContext context, {
@@ -21,7 +15,10 @@ Future<void> showTravelEditSheet(
   int? fromEntryId,
   int? toEntryId,
   String? initialMode,
+  String? initialSubmode,
   int? initialMin,
+  String? initialSource,
+  bool initialNoTravel = false,
 }) {
   assert(
     segment != null || (fromEntryId != null && toEntryId != null),
@@ -40,13 +37,16 @@ Future<void> showTravelEditSheet(
         fromEntryId: fromEntryId,
         toEntryId: toEntryId,
         initialMode: initialMode,
+        initialSubmode: initialSubmode,
         initialMin: initialMin,
+        initialSource: initialSource,
+        initialNoTravel: initialNoTravel,
       ),
     ),
   );
 }
 
-/// 交通方式編輯：開車/步行（後端打 Google 重算）、大眾運輸（手動填分鐘）。
+/// 交通方式編輯：固定方式可自動估算並覆寫分鐘；「其他」需填 1–1440 分鐘。
 /// 有 segment 時走 OCC PATCH；缺 segment row 時以 from/to entry pair 建立。
 class TravelEditSheet extends ConsumerStatefulWidget {
   const TravelEditSheet({
@@ -56,7 +56,10 @@ class TravelEditSheet extends ConsumerStatefulWidget {
     this.fromEntryId,
     this.toEntryId,
     this.initialMode,
+    this.initialSubmode,
     this.initialMin,
+    this.initialSource,
+    this.initialNoTravel = false,
   }) : assert(
          segment != null || (fromEntryId != null && toEntryId != null),
          'Missing segment creation requires fromEntryId and toEntryId.',
@@ -67,44 +70,99 @@ class TravelEditSheet extends ConsumerStatefulWidget {
   final int? fromEntryId;
   final int? toEntryId;
   final String? initialMode;
+  final String? initialSubmode;
   final int? initialMin;
+  final String? initialSource;
+  final bool initialNoTravel;
 
   @override
   ConsumerState<TravelEditSheet> createState() => _TravelEditSheetState();
 }
 
 class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
-  late String _mode;
+  late String _methodKey;
+  late final String _initialMethodKey;
+  late final String? _initialSource;
+  late final int? _initialMin;
   late final TextEditingController _min;
+  late final TextEditingController _other;
+  late bool _noTravel;
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _mode = _normalizeTravelMode(widget.segment?.mode ?? widget.initialMode);
+    final mode = widget.segment?.mode ?? widget.initialMode;
+    final submode = widget.segment?.submode ?? widget.initialSubmode;
+    final source = widget.segment?.source ?? widget.initialSource;
+    _methodKey = travelMethodKey(mode, submode);
+    _initialMethodKey = _methodKey;
+    _initialSource = source;
+    _noTravel = widget.segment?.noTravel ?? widget.initialNoTravel;
+    final option = _optionFor(_methodKey);
+    final currentMin = widget.segment?.min ?? widget.initialMin;
+    _initialMin = currentMin;
     _min = TextEditingController(
-      text: (widget.segment?.min ?? widget.initialMin)?.toString() ?? '',
+      text: !option.automatic || source == 'manual'
+          ? currentMin?.toString() ?? ''
+          : '',
+    );
+    _other = TextEditingController(
+      text: _methodKey == 'other'
+          ? (submode?.trim().isNotEmpty == true ? submode!.trim() : '大眾運輸')
+          : '大眾運輸',
     );
     _min.addListener(() => setState(() {}));
+    _other.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _min.dispose();
+    _other.dispose();
     super.dispose();
   }
 
-  bool get _isTransit => _mode == 'transit';
+  TravelMethodOption get _selected => _optionFor(_methodKey);
+
+  int? get _minuteValue => int.tryParse(_min.text.trim());
+
+  bool get _minuteIsValid {
+    final value = _minuteValue;
+    return value != null && value >= 1 && value <= 1440;
+  }
 
   bool get _canSubmit {
     if (_submitting) return false;
-    if (!_isTransit) return true;
-    final v = int.tryParse(_min.text.trim());
-    return v != null && v >= 0;
+    if (_noTravel) return true;
+    if (_methodKey == 'other') {
+      final name = _other.text.trim();
+      if (name.isEmpty || name.length > 20) return false;
+    }
+    if (_min.text.trim().isEmpty) return _selected.automatic;
+    return _minuteIsValid;
+  }
+
+  void _selectMethod(TravelMethodOption option) {
+    final changed = _methodKey != option.key;
+    setState(() {
+      _noTravel = false;
+      _methodKey = option.key;
+    });
+    if (!changed) return;
+    if (option.automatic &&
+        option.key == _initialMethodKey &&
+        _initialSource == 'manual') {
+      _min.text = _initialMin?.toString() ?? '';
+    } else {
+      _min.clear();
+    }
   }
 
   Future<void> _submit() async {
-    final min = _isTransit ? int.tryParse(_min.text.trim()) : null;
+    final min = _min.text.trim().isEmpty ? null : _minuteValue;
+    final option = _selected;
+    final submode = _methodKey == 'other' ? _other.text.trim() : option.submode;
     setState(() => _submitting = true);
     final repo = ref.read(tripRepositoryProvider);
     try {
@@ -113,8 +171,11 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
         await repo.updateSegment(
           tripId: widget.tripId,
           segmentId: segment.id,
-          mode: _mode,
-          min: min,
+          mode: _noTravel ? null : option.mode,
+          submode: _noTravel ? null : submode,
+          clearSubmode: !_noTravel && submode == null,
+          min: _noTravel ? null : min,
+          noTravel: _noTravel,
           expectedVersion: segment.version,
         );
       } else {
@@ -127,8 +188,10 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
           tripId: widget.tripId,
           fromEntryId: fromEntryId,
           toEntryId: toEntryId,
-          mode: _mode,
-          min: min,
+          mode: _noTravel ? null : option.mode,
+          submode: _noTravel ? null : submode,
+          min: _noTravel ? null : min,
+          noTravel: _noTravel,
         );
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
@@ -165,67 +228,92 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('交通方式', style: theme.textTheme.titleLarge),
-            const SizedBox(height: TpSpacing.s4),
-            Wrap(
-              spacing: TpSpacing.s2,
-              children: [
-                for (final (value, label) in _modes)
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('交通方式', style: theme.textTheme.titleLarge),
+              const SizedBox(height: TpSpacing.s4),
+              Wrap(
+                spacing: TpSpacing.s2,
+                runSpacing: TpSpacing.s2,
+                children: [
+                  for (final option in travelMethodOptions)
+                    ChoiceChip(
+                      key: ValueKey(
+                        option.key == 'other'
+                            ? 'travel-mode-transit'
+                            : 'travel-mode-${option.key}',
+                      ),
+                      label: Text(option.label),
+                      selected: !_noTravel && _methodKey == option.key,
+                      onSelected: (_) => _selectMethod(option),
+                    ),
                   ChoiceChip(
-                    key: ValueKey('travel-mode-$value'),
-                    label: Text(label),
-                    selected: _mode == value,
-                    onSelected: (_) => setState(() => _mode = value),
+                    key: const ValueKey('travel-mode-no-travel'),
+                    label: const Text('不需計算路程'),
+                    selected: _noTravel,
+                    onSelected: (_) => setState(() => _noTravel = true),
                   ),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            if (_isTransit)
-              TextField(
-                key: const ValueKey('travel-min'),
-                controller: _min,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '分鐘數',
-                  helperText: '大眾運輸需手動填寫',
-                ),
-              )
-            else
-              Text(
-                '開車／步行會自動重算時間與距離',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                ],
               ),
-            const SizedBox(height: TpSpacing.s5),
-            FilledButton(
-              key: const ValueKey('travel-submit'),
-              onPressed: _canSubmit ? _submit : null,
-              child: Text(_submitting ? '更新中…' : '儲存'),
-            ),
-          ],
+              const SizedBox(height: TpSpacing.s3),
+              if (!_noTravel && _methodKey == 'other') ...[
+                TextField(
+                  key: const ValueKey('travel-other-name'),
+                  controller: _other,
+                  maxLength: 20,
+                  decoration: const InputDecoration(labelText: '交通方式名稱'),
+                ),
+                const SizedBox(height: TpSpacing.s2),
+              ],
+              if (!_noTravel) ...[
+                TextField(
+                  key: const ValueKey('travel-min'),
+                  controller: _min,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: '分鐘數',
+                    helperText: _selected.automatic
+                        ? '自動計算；選填 1–1440 分鐘可手動覆寫'
+                        : '必填 1–1440 分鐘',
+                    errorText: _min.text.trim().isNotEmpty && !_minuteIsValid
+                        ? '請輸入 1–1440'
+                        : null,
+                  ),
+                ),
+                if (_selected.automatic && _min.text.trim().isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const ValueKey('travel-restore-auto'),
+                      onPressed: _min.clear,
+                      child: const Text('恢復自動計算'),
+                    ),
+                  ),
+              ] else
+                Text(
+                  '此段會保留相鄰地點，但不顯示交通時間與距離。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              const SizedBox(height: TpSpacing.s5),
+              FilledButton(
+                key: const ValueKey('travel-submit'),
+                onPressed: _canSubmit ? _submit : null,
+                child: Text(_submitting ? '更新中…' : '儲存'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-String _normalizeTravelMode(String? value) {
-  return switch (value) {
-    'driving' || 'drive' || 'car' || 'taxi' => 'driving',
-    'walking' || 'walk' => 'walking',
-    'transit' ||
-    'bus' ||
-    'train' ||
-    'monorail' ||
-    'tram' ||
-    'ferry' => 'transit',
-    _ => 'driving',
-  };
-}
+TravelMethodOption _optionFor(String key) =>
+    travelMethodOptions.firstWhere((option) => option.key == key);

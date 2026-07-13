@@ -60,7 +60,19 @@ void main() {
           version: 1,
           startTime: '09:00',
           endTime: '10:30',
-          travel: Travel(type: 'walking', min: 18, distanceM: 950),
+          travel: Travel(
+            type: 'transit',
+            submode: 'hsr',
+            min: 18,
+            distanceM: 950,
+          ),
+        ),
+        TimelineEntry(
+          id: 102,
+          sortOrder: 1,
+          title: '園區內移動',
+          version: 1,
+          travel: Travel(type: 'transit', sameplace: true),
         ),
       ],
     ),
@@ -103,6 +115,8 @@ void main() {
     expect(find.text('Day 1'), findsOneWidget);
     expect(find.text('09:00-10:30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
+    expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
+    expect(find.text('不需計算路程'), findsOneWidget);
     expect(find.text('航班'), findsOneWidget);
     expect(find.text('BR112'), findsOneWidget);
   });

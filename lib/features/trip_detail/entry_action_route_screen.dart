@@ -107,6 +107,9 @@ class _EntryActionRouteScreenState
 
   Widget _dayTile(BuildContext context, TripDay day) {
     final selected = _targetDayId == day.id;
+    final title = day.displayTitle == 'Day ${day.dayNum}'
+        ? 'DAY ${day.dayNum}'
+        : 'DAY ${day.dayNum} · ${day.displayTitle}';
     return ListTile(
       key: ValueKey('entry-action-day-${day.id}'),
       enabled: !_submitting,
@@ -116,7 +119,7 @@ class _EntryActionRouteScreenState
             ? Icons.radio_button_checked_outlined
             : Icons.radio_button_unchecked_outlined,
       ),
-      title: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
+      title: Text(title),
       onTap: _submitting
           ? null
           : () => setState(() {

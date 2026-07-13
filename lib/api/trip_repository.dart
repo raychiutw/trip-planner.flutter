@@ -658,21 +658,25 @@ class TripRepository {
         TripSegment.fromJson,
       );
 
-  /// POST /trips/:id/segments（from/to entry pair upsert；transit 必帶 min）。
+  /// POST /trips/:id/segments（from/to entry pair upsert）。
   Future<TripSegment> createSegment({
     required String tripId,
     required int fromEntryId,
     required int toEntryId,
-    required String mode,
+    String? mode,
+    String? submode,
     int? min,
+    bool? noTravel,
   }) async {
     final body = await _client.post(
       '/trips/${Uri.encodeComponent(tripId)}/segments',
       body: {
         'from_entry_id': fromEntryId,
         'to_entry_id': toEntryId,
-        'mode': mode,
+        'mode': ?mode,
+        'submode': ?submode,
         'min': ?min,
+        'noTravel': ?noTravel,
       },
     );
     return TripSegment.fromJson(body as Map<String, dynamic>);
@@ -683,18 +687,27 @@ class TripRepository {
       .getStream('/trips/${Uri.encodeComponent(tripId)}/segments')
       .map((b) => _list(b, TripSegment.fromJson));
 
-  /// PATCH /trips/:id/segments/:sid（mode driving/walking/transit;OCC expectedVersion）。
-  /// transit 必帶 min;driving/walking 後端打 Google 重算(忽略 min)。
+  /// PATCH /trips/:id/segments/:sid（交通方式或 noTravel；OCC expectedVersion）。
+  /// 省略 min 會恢復自動計算；submode 需顯式 null 才會清除。
   Future<TripSegment> updateSegment({
     required String tripId,
     required int segmentId,
-    required String mode,
+    String? mode,
+    String? submode,
+    bool clearSubmode = false,
     int? min,
+    bool? noTravel,
     int? expectedVersion,
   }) async {
     final body = await _client.patch(
       '/trips/${Uri.encodeComponent(tripId)}/segments/$segmentId',
-      body: {'mode': mode, 'min': ?min, 'expectedVersion': ?expectedVersion},
+      body: {
+        'mode': ?mode,
+        if (submode != null || clearSubmode) 'submode': submode,
+        'min': ?min,
+        'noTravel': ?noTravel,
+        'expectedVersion': ?expectedVersion,
+      },
     );
     return TripSegment.fromJson(body as Map<String, dynamic>);
   }
@@ -1166,9 +1179,17 @@ Map<String, dynamic> _buildTripExportJson({
       'fromEntryIdx': fromEntryPosition,
       'toEntryIdx': toEntryPosition,
       'mode': _stringOrNull(segment['mode']) ?? '',
+      'submode': _stringOrNull(segment['submode']),
       'min': _numberOrNull(segment['min']),
       'distanceM': _numberFromAnyKey(segment, 'distanceM', 'distance_m'),
       'source': _stringOrNull(segment['source']),
+      'noTravel':
+          segment['noTravel'] == 1 ||
+              segment['noTravel'] == true ||
+              segment['no_travel'] == 1 ||
+              segment['no_travel'] == true
+          ? 1
+          : null,
     });
   }
 
