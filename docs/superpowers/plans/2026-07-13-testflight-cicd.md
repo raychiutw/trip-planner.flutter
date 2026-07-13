@@ -220,7 +220,7 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          wait-for-processing: 'true'
+          wait-for-processing: 'false'
 ```
 
 - [ ] **Step 4: Validate both configuration files**
