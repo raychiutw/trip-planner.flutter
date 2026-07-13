@@ -50,6 +50,14 @@ class _FakeTripExportFileWriter implements TripExportFileWriter {
 
 UserInfo _userWithId(String id) => UserInfo(id: id, email: '$id@example.com');
 
+/// large title(SliverAppBar.large)+ 搜尋/篩選 header 會吃掉垂直空間;預設 600px
+/// 測試視窗下 SliverList 懶載入只建部分卡片。放大視窗讓短清單一次全建,穩定斷言卡片數。
+/// setSurfaceSize 斷言須在測試內呼叫,故用 helper + addTearDown 於測試 zone 內還原。
+Future<void> _useWideSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(800, 1600));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   const fakeTrips = [
     TripSummary(
@@ -106,6 +114,7 @@ void main() {
 
   group('TripsListScreen 清單渲染', () {
     testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -116,7 +125,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('我的行程'), findsOneWidget);
+      // SliverAppBar.large 標題會雙渲染(展開 + 收合),故用 findsWidgets。
+      expect(find.text('我的行程'), findsWidgets);
       expect(find.byType(TripCard), findsNWidgets(3));
 
       // title 優先顯示，無 title 退回 name
@@ -140,6 +150,7 @@ void main() {
     });
 
     testWidgets('empty state：顯示「還沒有行程」hero 文案', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -157,6 +168,7 @@ void main() {
     });
 
     testWidgets('error state：顯示重試按鈕，點擊後重新載入成功', (tester) async {
+      await _useWideSurface(tester);
       var fetchAttempts = 0;
       await tester.pumpWidget(
         ProviderScope(
@@ -190,6 +202,7 @@ void main() {
 
   group('TripsListScreen 搜尋', () {
     testWidgets('輸入關鍵字 → 只顯示符合的卡片', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -217,6 +230,7 @@ void main() {
     });
 
     testWidgets('清空搜尋框 → 全部卡片還原', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -241,6 +255,7 @@ void main() {
     });
 
     testWidgets('無相符結果 → 顯示空狀態文字', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -262,6 +277,7 @@ void main() {
     });
 
     testWidgets('搜尋匹配 name 欄位（無 title 的行程）', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -284,6 +300,7 @@ void main() {
     });
 
     testWidgets('filtered 後 tone 輪替依新 index 計算', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -332,6 +349,7 @@ void main() {
     ];
 
     testWidgets('初始有排序按鈕，預設顯示原始順序', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -354,6 +372,7 @@ void main() {
     });
 
     testWidgets('選「名稱 A→Z」後依 displayTitle 排序', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -382,6 +401,7 @@ void main() {
     });
 
     testWidgets('選「預設順序」可切回原始順序', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -413,6 +433,7 @@ void main() {
     });
 
     testWidgets('搜尋 + 排序並存：filter 之後再 sort', (tester) async {
+      await _useWideSurface(tester);
       // 加入第四筆，讓搜尋後仍有多筆可以驗證排序
       const moreTrips = [
         TripSummary(
@@ -466,6 +487,7 @@ void main() {
     });
 
     testWidgets('nameAsc 排序後 tone 輪替依最終 index 計算', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -492,6 +514,7 @@ void main() {
 
   group('TripsListScreen 互動', () {
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -509,6 +532,7 @@ void main() {
     });
 
     testWidgets('AppBar 匯入 JSON → 呼叫 importTripJson 並導向新行程', (tester) async {
+      await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();
       when(
         () => mockTripRepository.watchMyTrips(),
@@ -547,6 +571,7 @@ void main() {
     });
 
     testWidgets('長按 → 匯出 JSON → 寫入 export 檔名與內容', (tester) async {
+      await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();
       final writer = _FakeTripExportFileWriter();
       when(
@@ -605,6 +630,7 @@ void main() {
     testWidgets(
       '長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
       (tester) async {
+        await _useWideSurface(tester);
         final mockTripRepository = MockTripRepository();
         when(
           () => mockTripRepository.watchMyTrips(),
@@ -647,6 +673,7 @@ void main() {
     );
 
     testWidgets('刪除確認對話框按「取消」→ 不呼叫 deleteTrip', (tester) async {
+      await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();
       when(
         () => mockTripRepository.watchMyTrips(),
@@ -756,11 +783,13 @@ void main() {
     }
 
     testWidgets('預設「全部」顯示所有行程', (tester) async {
+      await _useWideSurface(tester);
       await pumpMixed(tester);
       expect(find.byType(TripCard), findsNWidgets(3));
     });
 
     testWidgets('切「我的」→ 只剩 ownerUserId == 當前 user', (tester) async {
+      await _useWideSurface(tester);
       await pumpMixed(tester);
 
       await tester.tap(find.text('我的'));
@@ -773,6 +802,7 @@ void main() {
     });
 
     testWidgets('切「共編」→ 只剩 ownerUserId != 當前 user', (tester) async {
+      await _useWideSurface(tester);
       await pumpMixed(tester);
 
       await tester.tap(find.text('共編'));
@@ -783,6 +813,7 @@ void main() {
     });
 
     testWidgets('篩選 + 搜尋並存：filter → search', (tester) async {
+      await _useWideSurface(tester);
       await pumpMixed(tester);
 
       await tester.tap(find.text('我的'));
@@ -838,6 +869,7 @@ void main() {
     }
 
     testWidgets('選「最新編輯」→ updatedAt 由新到舊', (tester) async {
+      await _useWideSurface(tester);
       await pumpDated(tester);
 
       await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
@@ -851,6 +883,7 @@ void main() {
     });
 
     testWidgets('選「出發日」→ startDate 由近到遠', (tester) async {
+      await _useWideSurface(tester);
       await pumpDated(tester);
 
       await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
@@ -864,6 +897,7 @@ void main() {
     });
 
     testWidgets('缺 startDate 的行程排到最後（出發日排序）', (tester) async {
+      await _useWideSurface(tester);
       const withMissing = [
         TripSummary(
           tripId: 'x',

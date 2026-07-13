@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/poi_search_result.dart';
@@ -42,7 +43,7 @@ void main() {
       findsOneWidget,
     ); // ramen_restaurant → restaurant → 餐廳
     expect(find.text('4.5'), findsOneWidget);
-    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.heart), findsOneWidget);
     expect(find.byKey(const ValueKey('poi-card-p1')), findsOneWidget);
   });
 
@@ -64,7 +65,7 @@ void main() {
 
   testWidgets('已收藏 = filled heart', (tester) async {
     await pumpCard(tester, isSaved: true);
-    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
   });
 
   testWidgets('點 heart → onToggleFavorite', (tester) async {

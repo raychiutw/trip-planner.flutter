@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/cache/optimistic_patchers.dart';
+import 'package:tripline/models/entry.dart';
 
 void main() {
   // 每個測試用新鮮 days(確認 patcher 不就地改)。
@@ -33,6 +34,20 @@ void main() {
     ]);
     final day2 = out.firstWhere((d) => (d as Map)['dayNum'] == 2) as Map;
     expect(day2['timeline'] as List, hasLength(1));
+  });
+
+  test('entry.add 樂觀資料用 displayTitle 給 TimelineEntry 顯示', () {
+    final out =
+        applyOptimisticPatch('entry.add', makeDays(), {
+              'dayNum': 1,
+              'title': 'New',
+              'tempId': -1,
+            })
+            as List;
+    final day1 = out.firstWhere((d) => (d as Map)['dayNum'] == 1) as Map;
+    final added = (day1['timeline'] as List).last as Map<String, dynamic>;
+
+    expect(TimelineEntry.fromJson(added).title, 'New');
   });
 
   test('entry.add 帶 lat/lng → 建 master', () {

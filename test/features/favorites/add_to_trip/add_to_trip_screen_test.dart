@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -159,6 +160,12 @@ void main() {
         endTime: any(named: 'endTime'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
 
     await tester.pumpWidget(
       buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
@@ -175,6 +182,9 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
       ),
+    ).called(1);
+    verify(
+      () => tripRepo.recomputeTravel(tripId: 'okinawa', day: '1'),
     ).called(1);
   });
 
@@ -199,6 +209,12 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
       ),
     ).thenAnswer((_) async {});
 
@@ -235,6 +251,9 @@ void main() {
         source: 'google',
       ),
     ).called(1);
+    verify(
+      () => tripRepo.recomputeTravel(tripId: 'okinawa', day: '1'),
+    ).called(1);
   });
 
   testWidgets('favorite mode：409 → 顯示 ConflictDialog', (tester) async {
@@ -269,7 +288,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
+    // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is AlertDialog || w is CupertinoAlertDialog,
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
   });
 

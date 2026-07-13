@@ -195,7 +195,7 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, initialDayNum: 1));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAY 2'));
+    await tester.tap(find.byKey(const ValueKey('entry-add-day-2')));
     await tester.pump();
     await tester.enterText(
       find.byKey(const ValueKey('entry-edit-title')),

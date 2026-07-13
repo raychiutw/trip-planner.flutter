@@ -130,6 +130,13 @@ class TimelineEntry {
   final List<EntryPoiInfo> alternates;
 
   factory TimelineEntry.fromJson(Map<String, dynamic> json) {
+    final master = json['master'] == null
+        ? null
+        : EntryPoiInfo.fromJson(json['master'] as Map<String, dynamic>);
+    final displayTitle =
+        _clean(json['displayTitle'] as String?) ??
+        _clean(master?.name) ??
+        '（未選擇景點）';
     return TimelineEntry(
       id: (json['id'] as num).toInt(),
       dayId: (json['dayId'] as num?)?.toInt(),
@@ -137,7 +144,7 @@ class TimelineEntry {
       time: json['time'] as String?,
       startTime: json['startTime'] as String?,
       endTime: json['endTime'] as String?,
-      title: json['title'] as String,
+      title: displayTitle,
       description: json['description'] as String?,
       note: json['note'] as String?,
       version: (json['version'] as num?)?.toInt() ?? 0,
@@ -145,9 +152,7 @@ class TimelineEntry {
       travel: json['travel'] == null
           ? null
           : Travel.fromJson(json['travel'] as Map<String, dynamic>),
-      master: json['master'] == null
-          ? null
-          : EntryPoiInfo.fromJson(json['master'] as Map<String, dynamic>),
+      master: master,
       alternates: (json['alternates'] as List<dynamic>? ?? [])
           .map(
             (alternateJson) =>
@@ -156,4 +161,9 @@ class TimelineEntry {
           .toList(),
     );
   }
+}
+
+String? _clean(String? value) {
+  final text = value?.trim();
+  return text == null || text.isEmpty ? null : text;
 }

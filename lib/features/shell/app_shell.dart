@@ -2,6 +2,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../offline/offline_status_banner.dart';
@@ -24,23 +26,23 @@ class AppShell extends StatelessWidget {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (selectedIndex) => navigationShell.goBranch(
-          selectedIndex,
-          // 點擊目前 tab 時回到該 branch 的初始路徑
-          initialLocation: selectedIndex == navigationShell.currentIndex,
-        ),
+        onDestinationSelected: (selectedIndex) {
+          HapticFeedback.selectionClick();
+          navigationShell.goBranch(
+            selectedIndex,
+            // 點擊目前 tab 時回到該 branch 的初始路徑
+            initialLocation: selectedIndex == navigationShell.currentIndex,
+          );
+        },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
+            icon: Icon(CupertinoIcons.chat_bubble),
             label: '聊天',
           ),
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: '行程'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), label: '地圖'),
-          NavigationDestination(
-            icon: Icon(Icons.favorite_outline),
-            label: '收藏',
-          ),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: '帳號'),
+          NavigationDestination(icon: Icon(CupertinoIcons.house), label: '行程'),
+          NavigationDestination(icon: Icon(CupertinoIcons.map), label: '地圖'),
+          NavigationDestination(icon: Icon(CupertinoIcons.heart), label: '收藏'),
+          NavigationDestination(icon: Icon(CupertinoIcons.person), label: '帳號'),
         ],
       ),
     );

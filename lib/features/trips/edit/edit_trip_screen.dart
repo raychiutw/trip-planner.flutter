@@ -1,8 +1,9 @@
-/// 編輯行程:目的地(可加/排序/移除)+ 整體平移日期 + 標題 + 描述 + 語言 + 發布。
+/// 編輯行程:標題 + 目的地 + 日期/天數 + 描述 + 語言 + 發布 + 明確儲存。
 /// 儲存成功 → pop。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,21 +26,35 @@ class EditTripScreen extends ConsumerWidget {
 
     // 儲存成功 → 返回。
     ref.listen(editTripControllerProvider(tripId), (prev, next) {
-      if (next.saved && !(prev?.saved ?? false) && context.canPop()) {
-        context.pop();
+      if (next.saved && !(prev?.saved ?? false)) {
+        HapticFeedback.lightImpact();
+        if (context.canPop()) {
+          context.pop();
+        }
       }
     });
 
     return Scaffold(
       appBar: AppBar(title: const Text('編輯行程')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator.adaptive())
           : Column(
               children: [
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(TpSpacing.s4),
                     children: [
+                      _title(context, '行程標題'),
+                      TextFormField(
+                        key: const ValueKey('edit-title'),
+                        initialValue: state.title,
+                        decoration: const InputDecoration(
+                          hintText: '例如:2026 沖繩自駕',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: ctrl.setTitle,
+                      ),
+                      const SizedBox(height: TpSpacing.s5),
                       _title(context, '目的地'),
                       DestinationPicker(
                         destinations: state.destinations,
@@ -66,17 +81,6 @@ class EditTripScreen extends ConsumerWidget {
                         },
                       ),
                       const SizedBox(height: TpSpacing.s5),
-                      _title(context, '行程標題'),
-                      TextFormField(
-                        key: const ValueKey('edit-title'),
-                        initialValue: state.title,
-                        decoration: const InputDecoration(
-                          hintText: '例如:2026 沖繩自駕',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: ctrl.setTitle,
-                      ),
-                      const SizedBox(height: TpSpacing.s4),
                       _title(context, '行程天數'),
                       _DayManagementSection(
                         days: state.days,
@@ -147,7 +151,7 @@ class EditTripScreen extends ConsumerWidget {
                         },
                       ),
                       const SizedBox(height: TpSpacing.s2),
-                      SwitchListTile(
+                      SwitchListTile.adaptive(
                         key: const ValueKey('edit-published'),
                         title: const Text('發布（公開上線）'),
                         contentPadding: EdgeInsets.zero,
@@ -570,7 +574,9 @@ class _SaveBar extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text('儲存'),
               ),

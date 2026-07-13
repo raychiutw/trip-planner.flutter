@@ -4,7 +4,16 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-10
+
 ### 新增
+
+- **iOS 原生化(對標 Apple HIG)**:全 app 互動層改平台自適應。
+  - 互動層:對話框/破壞性確認、action sheet、頂部通知橫幅、`.adaptive` spinner/switch、全程 `HapticFeedback` 觸覺回饋(平台自適應 helper 集中在 `lib/app/adaptive.dart`)。
+  - 導航:行程清單/收藏/帳號改 iOS large title(`SliverAppBar.large`);帳號設定改 grouped inset list。
+  - 輸入:登入 email/密碼支援 iOS Keychain 自動填入(`autofillHints` + `AutofillGroup`);搜尋列改 `CupertinoSearchTextField`(adaptive);聊天輸入列改 iMessage 圓角膠囊。
+  - 下拉更新改 `RefreshIndicator.adaptive`(iOS Cupertino 轉圈)。
+  - 圖示改 CupertinoIcons(交通模式與少數無對應者保留 Material);字型改系統字(iOS SF Pro、CJK 由系統 PingFang/Noto fallback,拿到真 Dynamic Type)。
 
 - **公開分享頁補齊**:`/s/:token` 可未登入瀏覽公開行程、查看 days/notes 摘要,登入後可複製到自己的帳號。
 - **列印與 PDF 預覽**:行程詳情新增列印頁,可預覽每日行程、筆記摘要並分享/輸出 PDF。新增 `pdf`、`printing` 依賴。

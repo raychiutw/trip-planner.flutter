@@ -258,12 +258,10 @@ void main() {
         message: any(named: 'message'),
       ),
     ).thenAnswer(
-      (_) async =>
-          _req(id: 99, message: 'x', status: RequestStatus.processing),
+      (_) async => _req(id: 99, message: 'x', status: RequestStatus.processing),
     );
     when(() => reqRepo.fetchRequest(99)).thenAnswer(
-      (_) async =>
-          _req(id: 99, message: 'x', status: RequestStatus.completed),
+      (_) async => _req(id: 99, message: 'x', status: RequestStatus.completed),
     );
 
     await tester.pumpWidget(buildApp());

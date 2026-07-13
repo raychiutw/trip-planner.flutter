@@ -1,14 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
-import 'day_warnings.dart';
 import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -59,22 +61,22 @@ class TripTimelineScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: '編輯行程',
-            icon: const Icon(Icons.edit_outlined),
+            icon: const Icon(CupertinoIcons.pencil),
             onPressed: () => context.push('/edit-trip/$tripId'),
           ),
           IconButton(
             tooltip: '地圖',
-            icon: const Icon(Icons.map_outlined),
+            icon: const Icon(CupertinoIcons.map),
             onPressed: () => _goTo(context, '/trips/$tripId/map'),
           ),
           IconButton(
             tooltip: '筆記',
-            icon: const Icon(Icons.sticky_note_2_outlined),
+            icon: const Icon(CupertinoIcons.doc_text),
             onPressed: () => _goTo(context, '/trips/$tripId/notes'),
           ),
           IconButton(
             tooltip: '列印',
-            icon: const Icon(Icons.print_outlined),
+            icon: const Icon(CupertinoIcons.printer),
             onPressed: () => _goTo(context, '/trips/$tripId/print'),
           ),
           IconButton(
@@ -187,6 +189,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
   late int _activeDayNum;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -274,6 +277,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -284,6 +293,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
         ),
         Expanded(
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
               TpSpacing.s4,
@@ -301,6 +311,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     tripId: widget.tripId,
                     entryKeys: _entryKeys,
                     focusedEntryId: widget.initialEntryId,
+                    scrollController: _scrollController,
                   ),
               ],
             ),
@@ -323,6 +334,39 @@ List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
   ];
 }
 
+List<({int id, int sortOrder, int? dayId})> computeCrossDayMoveUpdates({
+  required int activeEntryId,
+  required int targetDayId,
+  required List<int> targetEntryIds,
+  int? overEntryId,
+}) {
+  final ids = targetEntryIds.where((id) => id != activeEntryId).toList();
+  final overIndex = overEntryId == null ? -1 : ids.indexOf(overEntryId);
+  final insertIndex = overIndex >= 0 ? overIndex : ids.length;
+  return [
+    (id: activeEntryId, sortOrder: insertIndex, dayId: targetDayId),
+    for (var i = insertIndex; i < ids.length; i++)
+      (id: ids[i], sortOrder: i + 1, dayId: null),
+  ];
+}
+
+class _EntryDragPayload {
+  const _EntryDragPayload({
+    required this.entry,
+    required this.sourceDayId,
+    required this.sourceDayNum,
+  });
+
+  final TimelineEntry entry;
+  final int sourceDayId;
+  final int sourceDayNum;
+}
+
+// ponytail: process-local auto recompute UI state; move to repo helper if retries need persistence.
+final _requestedTravelGapRecomputes = <String>{};
+final _stalledTravelRecomputeScopes = <String>{};
+double? _capturedCrossDayDragScrollOffset;
+
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -332,6 +376,7 @@ class _DaySection extends ConsumerWidget {
     required this.allDays,
     required this.entryKeys,
     this.focusedEntryId,
+    required this.scrollController,
   });
 
   final String tripId;
@@ -339,6 +384,7 @@ class _DaySection extends ConsumerWidget {
   final List<TripDay> allDays;
   final Map<int, GlobalKey> entryKeys;
   final int? focusedEntryId;
+  final ScrollController scrollController;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -375,15 +421,49 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('排序失敗，請稍後再試')));
+        showAppNotice(context, '排序失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
     }
     ref.invalidate(tripDaysProvider(tripId));
     await _recomputeAndRefresh(ref);
+  }
+
+  Future<void> _moveEntryToDay(
+    BuildContext context,
+    WidgetRef ref, {
+    required TimelineEntry entry,
+    required int sourceDayId,
+    required int sourceDayNum,
+    required TripDay target,
+    int? targetEntryId,
+  }) async {
+    if (target.id == sourceDayId) return;
+    final updates = computeCrossDayMoveUpdates(
+      activeEntryId: entry.id,
+      targetDayId: target.id,
+      targetEntryIds: [for (final e in target.timeline) e.id],
+      overEntryId: targetEntryId,
+    );
+    final repo = ref.read(tripRepositoryProvider);
+    try {
+      await repo.reorderEntries(tripId: tripId, updates: updates);
+    } on Exception {
+      if (context.mounted) {
+        showAppNotice(context, '搬移失敗，請稍後再試');
+      }
+      ref.invalidate(tripDaysProvider(tripId));
+      return;
+    }
+    ref.invalidate(tripDaysProvider(tripId));
+    await _recomputeDay(ref, sourceDayNum);
+    if (target.dayNum != sourceDayNum) {
+      await _recomputeDay(ref, target.dayNum);
+    }
+    if (context.mounted) {
+      showAppNotice(context, '已移到 DAY ${target.dayNum}');
+    }
   }
 
   Future<void> _moveToDay(
@@ -395,6 +475,7 @@ class _DaySection extends ConsumerWidget {
     if (targets.isEmpty) return;
     final targetDayId = await showModalBottomSheet<int>(
       context: context,
+      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -411,39 +492,41 @@ class _DaySection extends ConsumerWidget {
       ),
     );
     if (targetDayId == null) return;
+    if (!context.mounted) return;
     final target = allDays.firstWhere((d) => d.id == targetDayId);
-    final repo = ref.read(tripRepositoryProvider);
-    try {
-      await repo.reorderEntries(
-        tripId: tripId,
-        updates: [
-          (id: entry.id, sortOrder: target.timeline.length, dayId: targetDayId),
-        ],
-      );
-    } on Exception {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('搬移失敗，請稍後再試')));
-      }
-      ref.invalidate(tripDaysProvider(tripId));
-      return;
-    }
-    ref.invalidate(tripDaysProvider(tripId));
-    await _recomputeAndRefresh(ref);
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已移到 DAY ${target.dayNum}')));
-    }
+    await _moveEntryToDay(
+      context,
+      ref,
+      entry: entry,
+      sourceDayId: day.id,
+      sourceDayNum: day.dayNum,
+      target: target,
+    );
   }
 
   /// reorder/move 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
   Future<void> _recomputeAndRefresh(WidgetRef ref) async {
+    await _recomputeDay(ref, day.dayNum);
+  }
+
+  Future<void> _recomputeDay(
+    WidgetRef ref,
+    int dayNum, {
+    bool auto = false,
+  }) async {
+    final scope = '$tripId:$dayNum';
     try {
-      await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
+      await ref
+          .read(tripRepositoryProvider)
+          .recomputeTravel(tripId: tripId, day: '$dayNum');
+      _stalledTravelRecomputeScopes.remove(scope);
       ref.invalidate(tripDaysProvider(tripId));
+      ref.invalidate(tripSegmentsProvider(tripId));
     } on Exception {
+      if (auto) {
+        _stalledTravelRecomputeScopes.add(scope);
+        ref.invalidate(tripSegmentsProvider(tripId));
+      }
       // 交通重算失敗忽略
     }
   }
@@ -451,152 +534,251 @@ class _DaySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timeline = day.timeline;
-    final warnings = validateDay(timeline);
-    final segmentsValue = ref.watch(tripSegmentsProvider(tripId));
-    final segmentsReady = segmentsValue is AsyncData<List<TripSegment>>;
-    final segments = switch (segmentsValue) {
+    final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
+    final segments = switch (segmentsAsync) {
       AsyncData(:final value) => value,
       _ => const <TripSegment>[],
     };
+    final segmentsReady = segmentsAsync is AsyncData<List<TripSegment>>;
+    if (segmentsReady) {
+      _requestMissingSegmentRecompute(ref, timeline, segments);
+    }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DayHeader(day: day),
-        const SizedBox(height: TpSpacing.s3),
-        if (warnings.isNotEmpty) ...[
-          _DayWarningsCard(warnings: warnings),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-        if (hasWeatherDay(day)) ...[
-          DayWeatherCard(day: day),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-        if (day.hotel != null) ...[
-          HotelCard(hotel: day.hotel!),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          buildDefaultDragHandles: false,
-          itemCount: timeline.length,
-          onReorder: (oldIndex, newIndex) =>
-              _reorder(context, ref, oldIndex, newIndex),
-          itemBuilder: (context, i) {
-            final entry = timeline[i];
-            final previous = i > 0 ? timeline[i - 1] : null;
-            return KeyedSubtree(
-              key: ValueKey('entry-${entry.id}'),
-              child: Container(
-                key: entryKeys[entry.id],
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (previous != null &&
-                        (previous.travel != null || segmentsReady))
-                      _TravelRow(
-                        travel: previous.travel,
-                        segment: _findSegment(segments, previous.id, entry.id),
-                        segmentsReady: segmentsReady,
-                        tripId: tripId,
-                        fromEntryId: previous.id,
-                        toEntryId: entry.id,
-                      ),
-                    SwipeToDelete(
-                      dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                      onDelete: () => _confirmDelete(context, ref, entry),
-                      child: TimelineEntryTile(
-                        entry: entry,
-                        number: i + 1,
-                        isFirst: i == 0,
-                        isLast: i == timeline.length - 1,
-                        isFocused: entry.id == focusedEntryId,
-                        onTap: () => showEntryEditSheet(
-                          context,
-                          tripId: tripId,
-                          args: EntryEditExisting(entry),
-                        ),
-                        trailing: _EntryTrailing(
-                          entryId: entry.id,
-                          index: i,
-                          onMove: () => _moveToDay(context, ref, entry),
-                        ),
+    return DragTarget<_EntryDragPayload>(
+      key: ValueKey('day-drop-${day.id}'),
+      onWillAcceptWithDetails: (details) => details.data.sourceDayId != day.id,
+      onAcceptWithDetails: (details) {
+        unawaited(
+          _moveEntryToDay(
+            context,
+            ref,
+            entry: details.data.entry,
+            sourceDayId: details.data.sourceDayId,
+            sourceDayNum: details.data.sourceDayNum,
+            target: day,
+          ),
+        );
+      },
+      builder: (context, candidateData, rejectedData) {
+        final highlight = candidateData.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: highlight
+                ? Border.all(color: Theme.of(context).colorScheme.primary)
+                : null,
+            borderRadius: BorderRadius.circular(TpRadius.md),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DayHeader(day: day, segments: segments),
+              const SizedBox(height: TpSpacing.s3),
+              if (hasWeatherDay(day)) ...[
+                DayWeatherCard(day: day),
+                const SizedBox(height: TpSpacing.s3),
+              ],
+              if (day.hotel != null) ...[
+                HotelCard(hotel: day.hotel!),
+                const SizedBox(height: TpSpacing.s3),
+              ],
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: timeline.length,
+                onReorder: (oldIndex, newIndex) =>
+                    _reorder(context, ref, oldIndex, newIndex),
+                itemBuilder: (context, i) {
+                  final entry = timeline[i];
+                  final previous = i > 0 ? timeline[i - 1] : null;
+                  final travel = previous?.travel;
+                  final travelSegment = previous == null
+                      ? null
+                      : _findSegment(segments, previous.id, entry.id);
+                  final tile = TimelineEntryTile(
+                    entry: entry,
+                    number: i + 1,
+                    isFirst: i == 0,
+                    isLast: i == timeline.length - 1,
+                    isFocused: entry.id == focusedEntryId,
+                    onTap: () => showEntryEditSheet(
+                      context,
+                      tripId: tripId,
+                      args: EntryEditExisting(entry),
+                    ),
+                    trailing: _EntryTrailing(
+                      entryId: entry.id,
+                      index: i,
+                      onMove: () => _moveToDay(context, ref, entry),
+                    ),
+                  );
+                  final draggableTile = LongPressDraggable<_EntryDragPayload>(
+                    key: ValueKey('entry-cross-drag-${entry.id}'),
+                    data: _EntryDragPayload(
+                      entry: entry,
+                      sourceDayId: day.id,
+                      sourceDayNum: day.dayNum,
+                    ),
+                    dragAnchorStrategy: pointerDragAnchorStrategy,
+                    onDragStarted: _captureDragScroll,
+                    onDragUpdate: (details) =>
+                        _autoScrollDuringDrag(context, details.globalPosition),
+                    onDragEnd: (_) => _restoreDragScroll(),
+                    onDraggableCanceled: (velocity, offset) =>
+                        _restoreDragScroll(),
+                    onDragCompleted: _restoreDragScroll,
+                    feedback: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(TpRadius.md),
+                      child: Padding(
+                        padding: const EdgeInsets.all(TpSpacing.s3),
+                        child: Text(entry.title),
                       ),
                     ),
-                  ],
+                    childWhenDragging: Opacity(opacity: 0.35, child: tile),
+                    child: tile,
+                  );
+                  final row = SwipeToDelete(
+                    dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                    onDelete: () => _confirmDelete(context, ref, entry),
+                    child: draggableTile,
+                  );
+                  final dropRow = DragTarget<_EntryDragPayload>(
+                    key: ValueKey('entry-drop-${entry.id}'),
+                    onWillAcceptWithDetails: (details) =>
+                        details.data.sourceDayId != day.id,
+                    onAcceptWithDetails: (details) {
+                      unawaited(
+                        _moveEntryToDay(
+                          context,
+                          ref,
+                          entry: details.data.entry,
+                          sourceDayId: details.data.sourceDayId,
+                          sourceDayNum: details.data.sourceDayNum,
+                          target: day,
+                          targetEntryId: entry.id,
+                        ),
+                      );
+                    },
+                    builder: (context, candidateData, rejectedData) => row,
+                  );
+                  return Container(
+                    key: entryKeys[entry.id],
+                    child: Column(
+                      key: ValueKey('entry-${entry.id}'),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (previous != null &&
+                            (travel != null || segmentsReady))
+                          _TravelRow(
+                            travel: travel,
+                            segment: travelSegment,
+                            tripId: tripId,
+                            fromEntryId: previous.id,
+                            toEntryId: entry.id,
+                            segmentsReady: segmentsReady,
+                            missingSegment:
+                                segmentsReady &&
+                                travelSegment == null &&
+                                travel != null,
+                            recomputeStalled: _stalledTravelRecomputeScopes
+                                .contains('$tripId:${day.dayNum}'),
+                            missingCoords: _missingTravelCoords(
+                              previous,
+                              entry,
+                            ),
+                          ),
+                        dropRow,
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: ValueKey('add-entry-${day.dayNum}'),
+                  onPressed: () => showEntryEditSheet(
+                    context,
+                    tripId: tripId,
+                    args: EntryEditNew(day.dayNum, days: allDays),
+                  ),
+                  icon: const Icon(CupertinoIcons.add),
+                  label: const Text('新增停留點'),
                 ),
               ),
-            );
-          },
-        ),
-        const SizedBox(height: TpSpacing.s2),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('add-entry-${day.dayNum}'),
-            onPressed: () => showEntryEditSheet(
-              context,
-              tripId: tripId,
-              args: EntryEditNew(day.dayNum),
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('新增停留點'),
-          ),
-        ),
-        const SizedBox(height: TpSpacing.s6),
-      ],
-    );
-  }
-}
-
-/// 注意事項卡：早於營業時間等提醒,以 warning tone 呈現（淡底 + 警示圖示）。
-class _DayWarningsCard extends StatelessWidget {
-  const _DayWarningsCard({required this.warnings});
-
-  final List<String> warnings;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final warningColor = theme.extension<TpTones>()!.warning;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(TpSpacing.s3),
-      decoration: BoxDecoration(
-        color: warningColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(TpRadius.md),
-        border: Border.all(color: warningColor.withValues(alpha: 0.24)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, size: 18, color: warningColor),
-              const SizedBox(width: TpSpacing.s2),
-              Text(
-                '注意事項',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
+              const SizedBox(height: TpSpacing.s6),
             ],
           ),
-          for (final warning in warnings)
-            Padding(
-              padding: const EdgeInsets.only(top: TpSpacing.s1),
-              child: Text(
-                warning,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  void _requestMissingSegmentRecompute(
+    WidgetRef ref,
+    List<TimelineEntry> timeline,
+    List<TripSegment> segments,
+  ) {
+    final gapIds = <String>[];
+    for (var i = 1; i < timeline.length; i++) {
+      final previous = timeline[i - 1];
+      final entry = timeline[i];
+      if (previous.travel == null) continue;
+      if (_missingTravelCoords(previous, entry)) continue;
+      final segment = _findSegment(segments, previous.id, entry.id);
+      if (segment == null || segment.isStale) {
+        gapIds.add('${previous.id}-${entry.id}');
+      }
+    }
+    if (gapIds.isEmpty) return;
+
+    final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
+    if (!_requestedTravelGapRecomputes.add(key)) return;
+    _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
+    unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+  }
+
+  void _captureDragScroll() {
+    if (!scrollController.hasClients) return;
+    _capturedCrossDayDragScrollOffset = scrollController.offset;
+  }
+
+  void _restoreDragScroll() {
+    final offset = _capturedCrossDayDragScrollOffset;
+    _capturedCrossDayDragScrollOffset = null;
+    if (offset == null || !scrollController.hasClients) return;
+    final position = scrollController.position;
+    final target = offset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      scrollController.jumpTo(target);
+    }
+  }
+
+  void _autoScrollDuringDrag(BuildContext context, Offset globalPosition) {
+    if (!scrollController.hasClients) return;
+    final height = MediaQuery.sizeOf(context).height;
+    const edge = 72.0;
+    const step = 32.0;
+    final delta = globalPosition.dy < edge
+        ? -step
+        : globalPosition.dy > height - edge
+        ? step
+        : 0.0;
+    if (delta == 0) return;
+
+    final position = scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target != position.pixels) {
+      scrollController.jumpTo(target);
+    }
   }
 }
 
@@ -619,7 +801,7 @@ class _EntryTrailing extends StatelessWidget {
       children: [
         IconButton(
           key: ValueKey('entry-menu-$entryId'),
-          icon: const Icon(Icons.drive_file_move_outline),
+          icon: const Icon(CupertinoIcons.folder),
           tooltip: '移到其他天',
           visualDensity: VisualDensity.compact,
           onPressed: onMove,
@@ -641,6 +823,15 @@ TripSegment? _findSegment(List<TripSegment> segments, int fromId, int toId) {
   return null;
 }
 
+bool _missingTravelCoords(TimelineEntry from, TimelineEntry to) {
+  bool missing(TimelineEntry entry) {
+    final master = entry.master;
+    return master?.lat == null || master?.lng == null;
+  }
+
+  return missing(from) || missing(to);
+}
+
 /// travel pill 列：沿用 tile 的時間欄 + rail 縮排，可編輯或補建交通 segment。
 class _TravelRow extends StatelessWidget {
   const _TravelRow({
@@ -650,6 +841,9 @@ class _TravelRow extends StatelessWidget {
     required this.segmentsReady,
     this.segment,
     this.tripId,
+    this.missingSegment = false,
+    this.recomputeStalled = false,
+    this.missingCoords = false,
   });
 
   final Travel? travel;
@@ -658,15 +852,26 @@ class _TravelRow extends StatelessWidget {
   final bool segmentsReady;
   final TripSegment? segment;
   final String? tripId;
+  final bool missingSegment;
+  final bool recomputeStalled;
+  final bool missingCoords;
 
   @override
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
+    final needsStatus = missingSegment || seg?.isStale == true;
     Widget pill = TravelPill(
       travel: travel,
       segment: seg,
       missing: seg == null && travel == null,
+      statusLabel: needsStatus
+          ? (missingCoords
+                ? '缺座標，無法計算車程'
+                : recomputeStalled
+                ? '車程待更新'
+                : '車程重新計算中')
+          : null,
     );
     final id = tripId;
     final canEdit = seg != null || segmentsReady;
@@ -779,7 +984,7 @@ class _TimelineError extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.error_outline,
+            CupertinoIcons.exclamationmark_circle,
             size: 32,
             color: theme.colorScheme.onSurfaceVariant,
           ),

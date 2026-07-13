@@ -22,6 +22,9 @@ const _entry = TimelineEntry(
   version: 2,
 );
 
+TripDay _day(int dayNum, String date) =>
+    TripDay(id: dayNum, dayNum: dayNum, date: date, version: 0);
+
 Future<void> _open(
   WidgetTester tester,
   _MockTripRepository repo,
@@ -93,22 +96,22 @@ void main() {
     });
   });
 
-  testWidgets('編輯模式：預填標題 + 送出呼叫 updateEntry', (tester) async {
+  testWidgets('編輯模式：不顯示 legacy 標題欄 + 送出呼叫 updateEntry', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.updateEntry(
         tripId: any(named: 'tripId'),
         entryId: any(named: 'entryId'),
         expectedVersion: any(named: 'expectedVersion'),
-        title: any(named: 'title'),
         description: any(named: 'description'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
       ),
     ).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
 
     await _open(tester, repo, const EntryEditExisting(_entry));
-    expect(find.widgetWithText(TextField, '首里城'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
     await tester.pumpAndSettle();
@@ -118,12 +121,30 @@ void main() {
         tripId: 't1',
         entryId: 11,
         expectedVersion: 2,
-        title: '首里城',
         description: any(named: 'description'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1')).called(1);
+  });
+
+  testWidgets('編輯模式：起訖時間在描述欄上方', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(tester, repo, const EntryEditExisting(_entry));
+
+    final startTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-start')))
+        .dy;
+    final endTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-end')))
+        .dy;
+    final descTop = tester
+        .getTopLeft(find.byKey(const ValueKey('entry-edit-desc')))
+        .dy;
+
+    expect(startTop, lessThan(descTop));
+    expect(endTop, lessThan(descTop));
   });
 
   testWidgets('新增模式：送出呼叫 addEntryToDay(source custom)', (tester) async {
@@ -140,6 +161,12 @@ void main() {
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
         source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
       ),
     ).thenAnswer((_) async {});
 
@@ -259,6 +286,71 @@ void main() {
         source: 'custom',
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '2')).called(1);
+  });
+
+  testWidgets('新增模式：可切換加入日期', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _open(
+      tester,
+      repo,
+      EntryEditNew(1, days: [_day(1, '2026-07-01'), _day(3, '2026-07-03')]),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '自由活動',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lat')),
+      '26.21',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-lng')),
+      '127.68',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 3 · 2026-07-03').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.addEntryToDay(
+        tripId: 't1',
+        dayNum: 3,
+        title: '自由活動',
+        description: any(named: 'description'),
+        poiType: 'attraction',
+        lat: 26.21,
+        lng: 127.68,
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: 'custom',
+      ),
+    ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '3')).called(1);
   });
 
   testWidgets('標題清空 → 送出鈕 disabled', (tester) async {

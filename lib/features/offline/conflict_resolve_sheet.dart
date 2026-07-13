@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/cache/cache_store.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
 import '../trip_detail/trip_providers.dart';
 import 'offline_sync.dart';
@@ -133,9 +134,7 @@ class _ConflictCard extends ConsumerWidget {
       _invalidateTripFamilies(ref);
     } on Exception {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('仍離線,稍後重試')));
+        showAppNotice(context, '仍離線,稍後重試');
       }
     }
   }

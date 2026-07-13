@@ -65,7 +65,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('收藏'), findsOneWidget); // AppBar
+      // SliverAppBar.large 會同時渲染展開大標題與收合小標題兩份,故 findsWidgets。
+      expect(find.text('收藏'), findsWidgets);
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
@@ -305,8 +306,9 @@ void main() {
       expect(find.text('收藏地點 25'), findsNothing);
 
       final pagination = find.byKey(const ValueKey('favorites-pagination'));
+      final scrollView = find.byType(CustomScrollView);
       for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
-        await tester.drag(find.byType(ListView), const Offset(0, -500));
+        await tester.drag(scrollView, const Offset(0, -500));
         await tester.pump();
       }
       expect(pagination, findsOneWidget);
@@ -319,7 +321,7 @@ void main() {
       expect(find.text('25-48 / 200'), findsOneWidget);
       expect(find.text('第 2 / 9 頁'), findsOneWidget);
 
-      await tester.fling(find.byType(ListView), const Offset(0, 5000), 10000);
+      await tester.fling(scrollView, const Offset(0, 5000), 10000);
       await tester.pumpAndSettle();
 
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
@@ -328,7 +330,7 @@ void main() {
 
       expect(find.text('收藏地點 1', skipOffstage: false), findsWidgets);
       for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
-        await tester.drag(find.byType(ListView), const Offset(0, -500));
+        await tester.drag(scrollView, const Offset(0, -500));
         await tester.pump();
       }
       expect(find.text('第 1 / 5 頁'), findsOneWidget);

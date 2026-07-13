@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../../models/day.dart';
 import '../../../theme/app_theme.dart';
@@ -32,7 +33,11 @@ class HotelCard extends StatelessWidget {
               color: tones.sageBg,
               borderRadius: BorderRadius.circular(TpRadius.md),
             ),
-            child: Icon(Icons.bed_outlined, size: 20, color: tones.sageDeep),
+            child: Icon(
+              CupertinoIcons.bed_double,
+              size: 20,
+              color: tones.sageDeep,
+            ),
           ),
           const SizedBox(width: TpSpacing.s3),
           Expanded(

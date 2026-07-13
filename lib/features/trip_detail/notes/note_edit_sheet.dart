@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -22,6 +24,7 @@ Future<void> showNoteEditSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -174,30 +177,23 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
       }
       ref.invalidate(tripNotesProvider(widget.tripId));
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(widget.isEdit ? '已儲存' : '已新增')));
+      showAppNotice(context, widget.isEdit ? '已儲存' : '已新增');
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripNotesProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('此筆記已更新，請重新編輯')));
+        showAppNotice(context, '此筆記已更新，請重新編輯');
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      showAppNotice(context, '儲存失敗，請稍後再試');
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      showAppNotice(context, '儲存失敗，請稍後再試');
     }
   }
 
@@ -299,7 +295,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               IconButton(
                 key: ValueKey('note-datetime-clear-${spec.key}'),
                 tooltip: '清除',
-                icon: const Icon(Icons.close, size: 18),
+                icon: const Icon(CupertinoIcons.xmark, size: 18),
                 onPressed: () => setState(() => _dts[spec.key] = ''),
               ),
           ],

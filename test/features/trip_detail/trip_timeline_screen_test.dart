@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,20 +124,62 @@ const _fakeDays = [
   ),
 ];
 
+const _computableTravelGapDays = [
+  TripDay(
+    id: 1,
+    dayNum: 1,
+    title: '北部海岸線',
+    version: 1,
+    timeline: [
+      TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        startTime: '09:00',
+        title: '美麗海水族館',
+        version: 1,
+        travel: Travel(type: 'car', min: 15),
+        master: EntryPoiInfo(
+          poiId: 101,
+          name: '沖繩美麗海水族館',
+          lat: 26.6942,
+          lng: 127.8778,
+          type: 'attraction',
+        ),
+      ),
+      TimelineEntry(
+        id: 12,
+        sortOrder: 1,
+        startTime: '12:30',
+        title: '海人食堂',
+        version: 1,
+        master: EntryPoiInfo(
+          poiId: 102,
+          name: '海人食堂',
+          lat: 26.6501,
+          lng: 127.9294,
+          type: 'restaurant',
+        ),
+      ),
+    ],
+  ),
+];
+
 /// 以 create callback 注入假資料（flutter_riverpod 3.x 未匯出 Override 型別，
 /// 故在此 helper 內 inline 組 overrides，型別交由推斷）。
 Future<void> _pumpTimeline(
   WidgetTester tester, {
   FutureOr<Trip> Function()? fetchTrip,
   FutureOr<List<TripDay>> Function()? fetchDays,
+  Stream<List<TripDay>>? daysStream,
   _MockTripRepository? repo,
+  String tripId = _tripId,
   List<TripSegment> segments = const [],
   int? initialEntryId,
   int? initialDayNum,
   DayWeatherFetcher? dayWeatherFetcher,
 }) async {
   final router = GoRouter(
-    initialLocation: '/trips/$_tripId',
+    initialLocation: '/trips/$tripId',
     routes: [
       GoRoute(
         path: '/trips/:tripId',
@@ -189,18 +233,20 @@ Future<void> _pumpTimeline(
       overrides: [
         // StreamProvider override 需回 Stream；以 Stream.fromFuture(Future.sync(...))
         // 包裝 helper 的 FutureOr callback，同時保留同步 throw / 永不完成的語意。
-        tripDetailProvider(_tripId).overrideWith(
+        tripDetailProvider(tripId).overrideWith(
           (ref) => Stream.fromFuture(
             Future.sync(() => (fetchTrip ?? () => _fakeTrip)()),
           ),
         ),
-        tripDaysProvider(_tripId).overrideWith(
-          (ref) => Stream.fromFuture(
-            Future.sync(() => (fetchDays ?? () => _fakeDays)()),
-          ),
+        tripDaysProvider(tripId).overrideWith(
+          (ref) =>
+              daysStream ??
+              Stream.fromFuture(
+                Future.sync(() => (fetchDays ?? () => _fakeDays)()),
+              ),
         ),
         tripSegmentsProvider(
-          _tripId,
+          tripId,
         ).overrideWith((ref) => Stream.value(segments)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
         if (dayWeatherFetcher != null)
@@ -210,6 +256,32 @@ Future<void> _pumpTimeline(
     ),
   );
   await tester.pump();
+}
+
+List<TripDay> _longDays(String label) {
+  return [
+    TripDay(
+      id: 1,
+      dayNum: 1,
+      title: '長列表 $label',
+      version: 1,
+      timeline: [
+        for (var i = 0; i < 30; i++)
+          TimelineEntry(
+            id: 100 + i,
+            sortOrder: i,
+            startTime: '${(8 + (i ~/ 2)).toString().padLeft(2, '0')}:00',
+            title: '景點 $label-$i',
+            version: 1,
+            master: EntryPoiInfo(
+              poiId: 1000 + i,
+              name: '景點 $label-$i',
+              type: i.isEven ? 'attraction' : 'restaurant',
+            ),
+          ),
+      ],
+    ),
+  ];
 }
 
 Color _entryDotColor(WidgetTester tester, int entryId) {
@@ -229,16 +301,16 @@ void main() {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
-    expect(find.byIcon(Icons.map_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.sticky_note_2_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.print_outlined), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.map), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.doc_text), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.printer), findsOneWidget);
     expect(find.byIcon(Icons.history_outlined), findsOneWidget);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(Icons.map_outlined));
+    await tester.tap(find.byIcon(CupertinoIcons.map));
     await tester.pumpAndSettle();
 
     expect(find.text('map-page'), findsOneWidget);
@@ -247,7 +319,7 @@ void main() {
   testWidgets('點列印 icon 以 go_router 導向列印預覽頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(Icons.print_outlined));
+    await tester.tap(find.byIcon(CupertinoIcons.printer));
     await tester.pumpAndSettle();
 
     expect(find.text('print-page'), findsOneWidget);
@@ -328,7 +400,40 @@ void main() {
   });
 
   testWidgets('travel pill 使用出發 entry 的 travel 顯示各相鄰路段', (tester) async {
-    await _pumpTimeline(tester);
+    await _pumpTimeline(
+      tester,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'driving',
+          version: 1,
+        ),
+        TripSegment(
+          id: 51,
+          fromEntryId: 12,
+          toEntryId: 13,
+          mode: 'walking',
+          version: 1,
+        ),
+        TripSegment(
+          id: 52,
+          fromEntryId: 13,
+          toEntryId: 14,
+          mode: 'driving',
+          version: 1,
+        ),
+        TripSegment(
+          id: 53,
+          fromEntryId: 21,
+          toEntryId: 22,
+          mode: 'transit',
+          submode: 'monorail',
+          version: 1,
+        ),
+      ],
+    );
 
     expect(find.text('15 分鐘'), findsOneWidget);
     expect(find.text('10 分鐘'), findsOneWidget);
@@ -338,11 +443,213 @@ void main() {
     expect(find.byIcon(Icons.directions_walk), findsOneWidget);
   });
 
+  testWidgets('stale travel segment 顯示重算中並隱藏舊分鐘數', (tester) async {
+    final repo = _MockTripRepository();
+    const staleTripId = 'trip-stale-segment';
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      tripId: staleTripId,
+      fetchDays: () => _computableTravelGapDays,
+      segments: [
+        TripSegment.fromJson({
+          'id': 50,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'driving',
+          'min': 15,
+          'distanceM': 11000,
+          'version': 1,
+          'computedAt': null,
+        }),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('車程重新計算中'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: staleTripId, day: '1')).called(1);
+  });
+
+  testWidgets('stale travel segment 缺座標 → 顯示無法計算', (tester) async {
+    await _pumpTimeline(
+      tester,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              travel: Travel(type: 'car', min: 15),
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+                type: 'attraction',
+              ),
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              startTime: '12:30',
+              title: '海人食堂',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 102,
+                name: '海人食堂',
+                type: 'restaurant',
+              ),
+            ),
+          ],
+        ),
+      ],
+      segments: [
+        TripSegment.fromJson({
+          'id': 50,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'driving',
+          'min': 15,
+          'distanceM': 11000,
+          'version': 1,
+          'computedAt': null,
+        }),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+    expect(find.text('車程重新計算中'), findsNothing);
+    expect(find.text('15 分鐘'), findsNothing);
+  });
+
+  testWidgets('缺 travel segment 且兩端有座標 → 自動重算該日', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump();
+
+    expect(find.text('車程重新計算中'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+  });
+
+  testWidgets('自動重算 travel segment 失敗 → 顯示車程待更新', (tester) async {
+    final repo = _MockTripRepository();
+    const tripId = 'trip-recompute-stalled';
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenThrow(Exception('recompute failed'));
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      tripId: tripId,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('車程待更新'), findsOneWidget);
+    expect(find.text('車程重新計算中'), findsNothing);
+    verify(() => repo.recomputeTravel(tripId: tripId, day: '1')).called(1);
+  });
+
+  testWidgets('缺 travel segment 但缺座標 → 不自動重算', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              travel: Travel(type: 'car', min: 15),
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+                type: 'attraction',
+              ),
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              startTime: '12:30',
+              title: '海人食堂',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 102,
+                name: '海人食堂',
+                type: 'restaurant',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+    expect(find.text('15 分鐘'), findsNothing);
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: _tripId,
+        day: any(named: 'day'),
+      ),
+    );
+  });
+
   testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('美國村海濱飯店'), findsOneWidget);
-    expect(find.byIcon(Icons.bed_outlined), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.bed_double), findsOneWidget);
 
     final hotelCardContainer = tester.widget<Container>(
       find.byKey(const ValueKey('hotel-card-9')),
@@ -434,6 +741,52 @@ void main() {
     expect(border.top.width, 2);
   });
 
+  testWidgets('days refresh preserves current scroll offset', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_longDays('before'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('景點 before-29'),
+      find.byType(SingleChildScrollView),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    final daySection = find.byKey(const ValueKey('day-drop-1'));
+    final before = tester.getTopLeft(daySection).dy;
+    expect(before, lessThan(0));
+
+    days.add(_longDays('after'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(daySection).dy, before);
+  });
+
+  testWidgets('cross-day drag auto-scroll restores original offset on cancel', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester, fetchDays: () => _longDays('drag'));
+
+    final daySection = find.byKey(const ValueKey('day-drop-1'));
+    final before = tester.getTopLeft(daySection).dy;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('景點 drag-0')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(0, 90));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(tester.getTopLeft(daySection).dy, lessThan(before));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(daySection).dy, before);
+  });
+
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
@@ -463,12 +816,12 @@ void main() {
     expect(fetchDaysAttempts, 2);
   });
 
-  testWidgets('點 entry tile 開啟編輯 sheet（預填標題）', (tester) async {
+  testWidgets('點 entry tile 開啟編輯 sheet（不顯示 legacy 標題欄）', (tester) async {
     await _pumpTimeline(tester);
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
-    expect(find.widgetWithText(TextField, '美麗海水族館'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
   });
 
   testWidgets('左滑 entry → 確認 → 刪除後重算交通', (tester) async {
@@ -496,12 +849,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
-    verify(
-      () => repo.recomputeTravel(
-        tripId: _tripId,
-        day: any(named: 'day'),
-      ),
-    ).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
   testWidgets('點「新增停留點」開啟新增 sheet', (tester) async {
@@ -512,6 +860,10 @@ void main() {
     await tester.tap(addBtn);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-day')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
+    await tester.pumpAndSettle();
+    expect(find.text('DAY 2 · 2026-04-24（五）'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
   });
 
@@ -525,6 +877,44 @@ void main() {
     test('末位移到首位', () {
       final updates = computeReorderUpdates([11, 12, 13], 2, 0);
       expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
+    });
+  });
+
+  group('computeCrossDayMoveUpdates', () {
+    test('drop 在目標 entry 上 → 插該位並重排後段', () {
+      final updates = computeCrossDayMoveUpdates(
+        activeEntryId: 99,
+        targetDayId: 7,
+        targetEntryIds: [10, 20, 30],
+        overEntryId: 20,
+      );
+      expect(updates, [
+        (id: 99, sortOrder: 1, dayId: 7),
+        (id: 20, sortOrder: 2, dayId: null),
+        (id: 30, sortOrder: 3, dayId: null),
+      ]);
+    });
+
+    test('drop 在 day 空白處 → 插末尾', () {
+      final updates = computeCrossDayMoveUpdates(
+        activeEntryId: 99,
+        targetDayId: 7,
+        targetEntryIds: [10, 20],
+      );
+      expect(updates, [(id: 99, sortOrder: 2, dayId: 7)]);
+    });
+
+    test('target 列表意外含 active → 先排除再算', () {
+      final updates = computeCrossDayMoveUpdates(
+        activeEntryId: 99,
+        targetDayId: 7,
+        targetEntryIds: [10, 99, 20],
+        overEntryId: 20,
+      );
+      expect(updates, [
+        (id: 99, sortOrder: 1, dayId: 7),
+        (id: 20, sortOrder: 2, dayId: null),
+      ]);
     });
   });
 
@@ -565,9 +955,107 @@ void main() {
             as List<({int id, int sortOrder, int? dayId})>;
     expect(captured.single.id, 11);
     expect(captured.single.dayId, 2);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
   });
 
-  testWidgets('entry 早於營業時間 → 顯示「注意事項」卡', (tester) async {
+  testWidgets('拖曳 entry 到其他天 → reorderEntries 帶 day_id 並重算兩天', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    final source = tester.getCenter(
+      find.byKey(const ValueKey('entry-cross-drag-11')),
+    );
+    final gesture = await tester.startGesture(source);
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await gesture.moveTo(Offset(source.dx, 590));
+    for (var i = 0; i < 30; i++) {
+      await gesture.moveBy(Offset(0, i.isEven ? -1 : 1));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final target = tester.getCenter(find.byKey(const ValueKey('day-drop-2')));
+    await gesture.moveTo(target);
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final captured =
+        verify(
+              () => repo.reorderEntries(
+                tripId: _tripId,
+                updates: captureAny(named: 'updates'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured.single, (id: 11, sortOrder: 2, dayId: 2));
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+  });
+
+  testWidgets('拖曳 entry 到其他天的 entry 上 → 插入該位並重排目標日', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    final source = tester.getCenter(
+      find.byKey(const ValueKey('entry-cross-drag-11')),
+    );
+    final gesture = await tester.startGesture(source);
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await gesture.moveTo(Offset(source.dx, 590));
+    for (var i = 0; i < 30; i++) {
+      await gesture.moveBy(Offset(0, i.isEven ? -1 : 1));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final target = tester.getCenter(
+      find.byKey(const ValueKey('entry-drop-21')),
+    );
+    await gesture.moveTo(target);
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final captured =
+        verify(
+              () => repo.reorderEntries(
+                tripId: _tripId,
+                updates: captureAny(named: 'updates'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured, [
+      (id: 11, sortOrder: 0, dayId: 2),
+      (id: 21, sortOrder: 1, dayId: null),
+      (id: 22, sortOrder: 2, dayId: null),
+    ]);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+  });
+
+  testWidgets('entry 早於營業時間 → 不顯示「注意事項」卡', (tester) async {
     await _pumpTimeline(
       tester,
       fetchDays: () => const [
@@ -595,12 +1083,8 @@ void main() {
       ],
     );
 
-    expect(find.text('注意事項'), findsOneWidget);
-    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-    expect(
-      find.text('美麗海水族館（08:00)可能早於 沖繩美麗海水族館 營業時間（09:00-18:00)'),
-      findsOneWidget,
-    );
+    expect(find.text('注意事項'), findsNothing);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
   });
 
   testWidgets('無早於營業時間問題 → 不顯示「注意事項」卡', (tester) async {
@@ -719,6 +1203,66 @@ void main() {
         segmentId: 50,
         mode: 'transit',
         submode: 'train',
+        clearSubmode: false,
+        min: null,
+        noTravel: false,
+        expectedVersion: 1,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('單軌 travel segment 直接儲存 → 保留 submode 且不送 min 覆寫自動計算', (
+    tester,
+  ) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateSegment(
+        tripId: any(named: 'tripId'),
+        segmentId: any(named: 'segmentId'),
+        mode: any(named: 'mode'),
+        submode: any(named: 'submode'),
+        clearSubmode: any(named: 'clearSubmode'),
+        min: any(named: 'min'),
+        noTravel: any(named: 'noTravel'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer(
+      (_) async => const TripSegment(
+        id: 50,
+        mode: 'transit',
+        submode: 'monorail',
+        version: 2,
+      ),
+    );
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      segments: const [
+        TripSegment(
+          id: 50,
+          fromEntryId: 11,
+          toEntryId: 12,
+          mode: 'transit',
+          submode: 'monorail',
+          min: 18,
+          source: 'haversine',
+          version: 1,
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('travel-edit-50')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('travel-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateSegment(
+        tripId: _tripId,
+        segmentId: 50,
+        mode: 'transit',
+        submode: 'monorail',
         clearSubmode: false,
         min: null,
         noTravel: false,

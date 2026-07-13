@@ -23,11 +23,21 @@ import 'package:tripline/models/user.dart';
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
+  late List<RequestOptions> recordedRequests;
   late TripRepository tripRepository;
 
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
+    recordedRequests = [];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          recordedRequests.add(options);
+          handler.next(options);
+        },
+      ),
+    );
     final apiClient = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
     tripRepository = TripRepository(client: apiClient);
   });
@@ -415,7 +425,7 @@ void main() {
     expect(firstDay.timeline, hasLength(2));
 
     final shuriCastleEntry = firstDay.timeline.first;
-    expect(shuriCastleEntry.title, '首里城');
+    expect(shuriCastleEntry.title, '首里城公園');
     expect(shuriCastleEntry.travel!.min, 20);
     expect(shuriCastleEntry.master!.poiId, 501);
     expect(shuriCastleEntry.master!.rating, 4.4);
@@ -460,7 +470,7 @@ void main() {
         'dayOfWeek': '四',
         'title': '抵達那霸',
         'timeline': [
-          {'id': 101, 'dayId': 11, 'sortOrder': 0, 'title': '首里城'},
+          {'id': 101, 'dayId': 11, 'sortOrder': 0, 'displayTitle': '首里城'},
         ],
       }),
     );
@@ -1118,13 +1128,13 @@ void main() {
   );
 
   test(
-    'addEntryToDay：POST /trips/:id/days/:num/entries snake_case body',
+    'addEntryToDay：POST /trips/:id/days/:num/entries 用 name 建 POI 並送 snake_case body',
     () async {
       dioAdapter.onPost(
         '/trips/okinawa/days/1/entries',
         (server) => server.reply(201, {'id': 99}),
         data: {
-          'title': '美麗海水族館',
+          'name': '美麗海水族館',
           'description': '海景第一排',
           'poi_type': 'attraction',
           'lat': 26.69,
@@ -1152,35 +1162,31 @@ void main() {
     },
   );
 
-  test(
-    'updateEntry：PATCH /trips/:id/entries/:eid snake_case + expectedVersion',
-    () async {
-      dioAdapter.onPatch(
-        '/trips/okinawa/entries/11',
-        (server) => server.reply(200, {'id': 11, 'version': 3, 'title': '新標題'}),
-        data: {
-          'title': '新標題',
-          'description': '改描述',
-          'start_time': '09:30',
-          'end_time': '10:30',
-          'expectedVersion': 2,
-        },
-      );
+  test('updateEntry：PATCH /trips/:id/entries/:eid 不送 legacy title', () async {
+    dioAdapter.onPatch(
+      '/trips/okinawa/entries/11',
+      (server) => server.reply(200, {'id': 11, 'version': 3, 'title': '新標題'}),
+      data: {
+        'description': '改描述',
+        'start_time': '09:30',
+        'end_time': '10:30',
+        'expectedVersion': 2,
+      },
+    );
 
-      await expectLater(
-        tripRepository.updateEntry(
-          tripId: 'okinawa',
-          entryId: 11,
-          expectedVersion: 2,
-          title: '新標題',
-          description: '改描述',
-          startTime: '09:30',
-          endTime: '10:30',
-        ),
-        completes,
-      );
-    },
-  );
+    await expectLater(
+      tripRepository.updateEntry(
+        tripId: 'okinawa',
+        entryId: 11,
+        expectedVersion: 2,
+        description: '改描述',
+        startTime: '09:30',
+        endTime: '10:30',
+      ),
+      completes,
+    );
+    expect(recordedRequests.single.data, isNot(contains('title')));
+  });
 
   test('updateEntry：409 STALE_ENTRY → 拋 ApiError(409)', () async {
     dioAdapter.onPatch(
@@ -1192,7 +1198,6 @@ void main() {
         },
       }),
       data: {
-        'title': '標題',
         'description': null,
         'start_time': null,
         'end_time': null,
@@ -1205,7 +1210,6 @@ void main() {
         tripId: 'okinawa',
         entryId: 11,
         expectedVersion: 2,
-        title: '標題',
       ),
       throwsA(
         isA<ApiError>()
@@ -1368,20 +1372,28 @@ void main() {
         'from_entry_id': 11,
         'to_entry_id': 12,
         'mode': 'transit',
+        'submode': 'monorail',
         'version': 4,
       }),
-      data: {'mode': 'transit', 'min': 20, 'expectedVersion': 1},
+      data: {
+        'mode': 'transit',
+        'submode': 'monorail',
+        'min': 20,
+        'expectedVersion': 1,
+      },
     );
 
     final seg = await tripRepository.updateSegment(
       tripId: 'okinawa',
       segmentId: 5,
       mode: 'transit',
+      submode: 'monorail',
       min: 20,
       expectedVersion: 1,
     );
     expect(seg.version, 4);
     expect(seg.fromEntryId, 11);
+    expect(seg.submode, 'monorail');
   });
 
   test('createSegment：可直接建立「不需計算路程」段', () async {
@@ -2017,7 +2029,12 @@ void main() {
             'dayNum': 1,
             'title': '抵達那霸',
             'timeline': [
-              {'id': 101, 'sortOrder': 0, 'title': '首里城', 'alternates': []},
+              {
+                'id': 101,
+                'sortOrder': 0,
+                'displayTitle': '首里城',
+                'alternates': [],
+              },
             ],
           },
         ]),
@@ -2160,6 +2177,7 @@ void main() {
       final days = (await cache.readResponse(daysKey))!.data as List;
       final timeline = (days.first as Map)['timeline'] as List;
       expect(timeline, hasLength(1));
+      expect((timeline.first as Map)['displayTitle'], '新景點');
       expect((timeline.first as Map)['title'], '新景點');
       expect(
         ((timeline.first as Map)['master'] as Map)['note'],
@@ -2280,7 +2298,6 @@ void main() {
         tripId: 'okinawa',
         entryId: 7,
         expectedVersion: 3,
-        title: '新標題',
         description: '新描述',
         startTime: '10:00',
         endTime: '11:00',
@@ -2291,7 +2308,7 @@ void main() {
       final base = q.single.base;
       expect(base, isNotNull);
       // base 應含快取中 entry 的原始值(camelCase)+ version
-      expect(base!['title'], '舊標題');
+      expect(base!, isNot(contains('title')));
       expect(base['description'], '舊描述');
       expect(base['startTime'], '09:00');
       expect(base['endTime'], '10:00');

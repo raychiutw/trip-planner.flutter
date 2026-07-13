@@ -5,12 +5,18 @@ import 'package:tripline/models/segment.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-Future<void> pumpPill(WidgetTester tester, Travel travel) {
+Future<void> pumpPill(
+  WidgetTester tester,
+  Travel travel, {
+  String? statusLabel,
+}) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
       home: Scaffold(
-        body: Center(child: TravelPill(travel: travel)),
+        body: Center(
+          child: TravelPill(travel: travel, statusLabel: statusLabel),
+        ),
       ),
     ),
   );
@@ -125,7 +131,7 @@ void main() {
       expect(find.text('5 分鐘'), findsNothing);
     });
 
-    testWidgets('computedAt 為 null 時隱藏舊估值並標示待更新', (tester) async {
+    testWidgets('stale segment 隱藏舊估值並標示待更新', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
@@ -137,6 +143,7 @@ void main() {
                 min: 20,
                 distanceM: 5000,
                 computedAt: null,
+                isStale: true,
                 version: 1,
               ),
             ),
@@ -148,6 +155,17 @@ void main() {
       expect(find.textContaining('20'), findsNothing);
       expect(find.textContaining('5 km'), findsNothing);
       expect(find.byKey(const ValueKey('travel-stale')), findsOneWidget);
+    });
+
+    testWidgets('statusLabel 顯示重算中狀態並隱藏舊分鐘距離', (tester) async {
+      await pumpPill(
+        tester,
+        const Travel(type: 'car', min: 20, distanceM: 11000),
+        statusLabel: '車程重新計算中',
+      );
+
+      expect(find.text('車程重新計算中'), findsOneWidget);
+      expect(find.text('20 分鐘 · 11 km'), findsNothing);
     });
   });
 }

@@ -129,14 +129,10 @@ class TpTones extends ThemeExtension<TpTones> {
 }
 
 /// Tripline ThemeData 工廠（warm editorial：hairline over shadow、radius md 8）。
+///
+/// 字型不指定 fontFamily → 走各平台系統字(iOS: SF Pro、Android: Roboto,
+/// CJK 由系統 PingFang/Noto 自動 fallback),最貼 HIG 且拿到真 Dynamic Type。
 abstract final class AppTheme {
-  static const _fontFamily = 'Inter';
-  static const _fontFamilyFallback = [
-    'Noto Sans TC',
-    'PingFang TC',
-    'Microsoft JhengHei',
-  ];
-
   static ThemeData light() {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
@@ -234,8 +230,6 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       hoverColor: hover,
       disabledColor: disabled,
-      fontFamily: _fontFamily,
-      fontFamilyFallback: _fontFamilyFallback,
       textTheme: textTheme,
       extensions: [tones],
       cardTheme: CardThemeData(

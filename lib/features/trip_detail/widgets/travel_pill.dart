@@ -6,12 +6,18 @@ import '../../../theme/app_theme.dart';
 
 /// 站間移動 pill：sage 描邊、透明底、type icon + 分鐘數（tabular）。
 class TravelPill extends StatelessWidget {
-  const TravelPill({super.key, this.travel, this.segment, this.missing = false})
-    : assert(travel != null || segment != null || missing);
+  const TravelPill({
+    super.key,
+    this.travel,
+    this.segment,
+    this.missing = false,
+    this.statusLabel,
+  }) : assert(travel != null || segment != null || missing);
 
   final Travel? travel;
   final TripSegment? segment;
   final bool missing;
+  final String? statusLabel;
 
   /// 移動方式 → icon；未知 type 用通用路線 icon。
   static IconData iconForType(String type) {
@@ -95,16 +101,21 @@ class TravelPill extends StatelessWidget {
     final String label;
     final mode = segment?.mode ?? travel?.type;
     final submode = segment?.submode ?? travel?.submode;
-    final isStale = segment != null && segment!.computedAt == null;
-    final min = isStale ? null : segment?.min ?? travel?.min;
-    final distanceM = isStale ? null : segment?.distanceM ?? travel?.distanceM;
+    final isStale = segment?.isStale == true;
+    final hasStatus = statusLabel != null;
+    final min = hasStatus || isStale ? null : segment?.min ?? travel?.min;
+    final distanceM = hasStatus || isStale
+        ? null
+        : segment?.distanceM ?? travel?.distanceM;
     final desc = travel?.desc;
     final method = travelMethodLabel(mode, submode);
     final showMethod = mode == 'transit' && submode?.isNotEmpty == true;
     final hasMin = min != null;
     final hasDist = distanceM != null;
 
-    if (hasMin && hasDist) {
+    if (hasStatus) {
+      label = statusLabel!;
+    } else if (hasMin && hasDist) {
       label =
           '${showMethod ? '$method · ' : ''}$min 分鐘 · '
           '${_formatDistance(distanceM)}';

@@ -15,6 +15,7 @@ class TripSegment {
     this.computedAt,
     this.updatedAt,
     this.noTravel = false,
+    this.isStale = false,
     required this.version,
   });
 
@@ -30,7 +31,7 @@ class TripSegment {
   final int? min;
   final int? distanceM;
 
-  /// google / manual。
+  /// google / manual / haversine。
   final String? source;
   final int? computedAt;
   final int? updatedAt;
@@ -38,10 +39,16 @@ class TripSegment {
   /// 此相鄰地點不需計算路程。
   final bool noTravel;
 
+  /// true when backend returned computedAt: null, meaning travel is being recomputed.
+  final bool isStale;
+
   /// OCC token（PATCH 帶 expectedVersion）。
   final int version;
 
   factory TripSegment.fromJson(Map<String, dynamic> json) {
+    final hasComputedAt =
+        json.containsKey('computedAt') || json.containsKey('computed_at');
+    final rawComputedAt = json['computedAt'] ?? json['computed_at'];
     return TripSegment(
       id: (json['id'] as num).toInt(),
       fromEntryId: ((json['fromEntryId'] ?? json['from_entry_id']) as num?)
@@ -52,10 +59,10 @@ class TripSegment {
       min: (json['min'] as num?)?.toInt(),
       distanceM: ((json['distanceM'] ?? json['distance_m']) as num?)?.toInt(),
       source: json['source'] as String?,
-      computedAt: ((json['computedAt'] ?? json['computed_at']) as num?)
-          ?.toInt(),
+      computedAt: (rawComputedAt as num?)?.toInt(),
       updatedAt: ((json['updatedAt'] ?? json['updated_at']) as num?)?.toInt(),
       noTravel: _jsonBool(json['noTravel'] ?? json['no_travel']),
+      isStale: hasComputedAt && rawComputedAt == null,
       version: (json['version'] as num?)?.toInt() ?? 0,
     );
   }

@@ -29,6 +29,7 @@ void main() {
       expect(seg.computedAt, 1783904400000);
       expect(seg.updatedAt, 1783904460000);
       expect(seg.noTravel, isTrue);
+      expect(seg.isStale, isFalse);
       expect(seg.version, 3);
     });
 
@@ -36,9 +37,14 @@ void main() {
       final seg = TripSegment.fromJson({'id': 1, 'mode': 'driving'});
       expect(seg.fromEntryId, isNull);
       expect(seg.toEntryId, isNull);
+      expect(seg.submode, isNull);
       expect(seg.min, isNull);
       expect(seg.distanceM, isNull);
       expect(seg.source, isNull);
+      expect(seg.computedAt, isNull);
+      expect(seg.updatedAt, isNull);
+      expect(seg.noTravel, isFalse);
+      expect(seg.isStale, isFalse);
       expect(seg.version, 0);
     });
 
@@ -61,7 +67,28 @@ void main() {
       expect(seg.computedAt, 1783904400000);
       expect(seg.updatedAt, 1783904460000);
       expect(seg.noTravel, isTrue);
+      expect(seg.isStale, isFalse);
       expect(seg.version, 4);
+    });
+
+    test('computedAt null marks segment stale', () {
+      final seg = TripSegment.fromJson({
+        'id': 2,
+        'mode': 'driving',
+        'computedAt': null,
+      });
+
+      expect(seg.isStale, isTrue);
+    });
+
+    test('computed_at null marks segment stale', () {
+      final seg = TripSegment.fromJson({
+        'id': 3,
+        'mode': 'walking',
+        'computed_at': null,
+      });
+
+      expect(seg.isStale, isTrue);
     });
   });
 

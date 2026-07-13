@@ -80,7 +80,7 @@ void main() {
             {
               'id': 101,
               'sortOrder': 0,
-              'title': '首里城公園',
+              'displayTitle': '首里城公園',
               'version': 1,
               'startTime': '09:00',
               'endTime': '10:30',

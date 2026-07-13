@@ -4,10 +4,13 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
 
@@ -38,14 +41,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       appBar: AppBar(title: const Text('通知設定')),
       body: prefsAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(
+          child: CircularProgressIndicator.adaptive(
             key: ValueKey('notifications-loading'),
           ),
         ),
         error: (error, stackTrace) => _LoadError(
           onRetry: () => ref.invalidate(accountNotificationPreferencesProvider),
         ),
-        data: (preferences) => RefreshIndicator(
+        data: (preferences) => RefreshIndicator.adaptive(
           onRefresh: () =>
               ref.refresh(accountNotificationPreferencesProvider.future),
           child: _NotificationsList(
@@ -81,9 +84,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       }
       if (!mounted) return;
       ref.invalidate(accountNotificationPreferencesProvider);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('通知設定已更新')));
+      showAppNotice(context, '通知設定已更新');
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -116,19 +117,19 @@ class _NotificationsList extends StatelessWidget {
   static const _settings = [
     _NotificationSetting(
       key: 'trip-updates',
-      icon: Icons.home_outlined,
+      icon: CupertinoIcons.house,
       title: '行程更新通知',
       subtitle: '旅伴改了行程、AI 排程完成',
     ),
     _NotificationSetting(
       key: 'invitations',
-      icon: Icons.group_outlined,
+      icon: CupertinoIcons.person_2,
       title: '旅伴邀請',
       subtitle: '收到新的共編邀請',
     ),
     _NotificationSetting(
       key: 'system',
-      icon: Icons.info_outline,
+      icon: CupertinoIcons.info_circle,
       title: '系統通知',
       subtitle: 'Tripline 維護、版本更新',
     ),
@@ -206,18 +207,23 @@ class _NotificationSwitchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
+    return SwitchListTile.adaptive(
       key: ValueKey('notif-switch-${setting.key}'),
       secondary: isBusy
           ? const SizedBox.square(
               dimension: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             )
           : Icon(setting.icon, size: 22),
       title: Text(setting.title),
       subtitle: Text(setting.subtitle),
       value: value,
-      onChanged: isDisabled ? null : onChanged,
+      onChanged: isDisabled
+          ? null
+          : (nextValue) {
+              HapticFeedback.selectionClick();
+              onChanged(nextValue);
+            },
     );
   }
 }
@@ -252,7 +258,10 @@ class _InlineErrorPanel extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: colorScheme.onErrorContainer,
+            ),
             const SizedBox(width: TpSpacing.s3),
             Expanded(
               child: Text(

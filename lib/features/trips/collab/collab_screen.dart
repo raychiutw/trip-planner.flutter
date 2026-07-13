@@ -3,8 +3,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../models/trip_member.dart';
 import '../../../theme/tokens.dart';
 import 'collab_controller.dart';
@@ -40,25 +42,14 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
   CollabController get _ctrl =>
       ref.read(collabControllerProvider(widget.tripId).notifier);
 
-  Future<bool> _confirm(String title, String message) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('確定'),
-          ),
-        ],
-      ),
+  Future<bool> _confirm(String title, String message) {
+    return showAppConfirm(
+      context,
+      title: title,
+      message: message,
+      confirmLabel: '確定',
+      isDestructive: true,
     );
-    return ok ?? false;
   }
 
   @override
@@ -68,7 +59,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('共編設定')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator.adaptive())
           : !state.canManage
           ? const Center(
               child: Padding(
@@ -140,7 +131,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                 ),
                 IconButton(
                   key: ValueKey('member-remove-${m.id}'),
-                  icon: const Icon(Icons.person_remove_outlined),
+                  icon: const Icon(CupertinoIcons.person_badge_minus),
                   onPressed: state.removingId == m.id
                       ? null
                       : () async {
@@ -165,7 +156,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     return ListTile(
       key: ValueKey('invite-${i.id}'),
       contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.mail_outline),
+      leading: const Icon(CupertinoIcons.mail),
       title: Text(i.invitedEmail),
       subtitle: Text(status),
       trailing: TextButton(
@@ -222,7 +213,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                     )
                   : const Text('新增'),
             ),

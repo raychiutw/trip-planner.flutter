@@ -65,7 +65,8 @@ class TripMapScreen extends ConsumerWidget {
         ],
       ),
       body: daysAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

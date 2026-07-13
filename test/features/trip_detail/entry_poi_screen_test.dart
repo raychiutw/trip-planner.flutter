@@ -167,6 +167,9 @@ void main() {
         entryPoisVersion: any(named: 'entryPoisVersion'),
       ),
     ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(tripId: any(named: 'tripId')),
+    ).thenAnswer((_) async {});
     await _pump(tester, repo);
 
     await tester.tap(find.byKey(const ValueKey('alt-setmaster-502')));
@@ -194,6 +197,7 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1')).called(1);
   });
 
   testWidgets('設為正選跨區域時顯示距離警示', (tester) async {

@@ -2,7 +2,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../theme/tokens.dart';
 
 /// 確認對話框 → 執行 [delete] → [onSuccess]（通常是 invalidate provider）→ 成功/失敗 snackbar。
@@ -14,36 +17,23 @@ Future<void> confirmAndDelete(
   required Future<void> Function() delete,
   required void Function() onSuccess,
 }) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('刪除'),
-        ),
-      ],
-    ),
+  final ok = await showAppConfirm(
+    context,
+    title: title,
+    message: message,
+    confirmLabel: '刪除',
+    isDestructive: true,
   );
-  if (ok != true) return;
+  if (!ok) return;
   try {
     await delete();
     onSuccess();
+    HapticFeedback.mediumImpact();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已刪除')));
+    showAppNotice(context, '已刪除');
   } on Exception {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
+    showAppNotice(context, '刪除失敗，請稍後再試');
   }
 }
 
@@ -62,7 +52,7 @@ class ReorderDeleteBackground extends StatelessWidget {
         color: scheme.errorContainer,
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
       ),
-      child: Icon(Icons.delete_outline, color: scheme.onErrorContainer),
+      child: Icon(CupertinoIcons.delete, color: scheme.onErrorContainer),
     );
   }
 }
@@ -84,12 +74,15 @@ class ReorderDragHandle extends StatelessWidget {
   Widget build(BuildContext context) {
     return ReorderableDragStartListener(
       index: index,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          Icons.drag_handle,
-          key: iconKey,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+      child: Listener(
+        onPointerDown: (_) => HapticFeedback.selectionClick(),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            CupertinoIcons.line_horizontal_3,
+            key: iconKey,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     );

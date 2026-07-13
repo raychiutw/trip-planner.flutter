@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -27,6 +29,7 @@ Future<void> showTravelEditSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -197,30 +200,23 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       ref.invalidate(tripDaysProvider(widget.tripId));
       ref.invalidate(tripSegmentsProvider(widget.tripId));
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已更新交通')));
+      showAppNotice(context, '已更新交通');
     } on ApiError catch (error) {
       if (!mounted) return;
       if (error.status == 409) {
         ref.invalidate(tripSegmentsProvider(widget.tripId));
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('交通已更新，已重新載入')));
+        showAppNotice(context, '交通已更新，已重新載入');
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
+      showAppNotice(context, '更新失敗，請稍後再試');
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('更新失敗，請稍後再試')));
+      showAppNotice(context, '更新失敗，請稍後再試');
     }
   }
 
