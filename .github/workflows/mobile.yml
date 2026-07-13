@@ -1,0 +1,116 @@
+name: Mobile CI / TestFlight
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+  IOS_BUNDLE_ID: com.raychiu.tripline
+
+jobs:
+  ci:
+    name: Analyze and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+  testflight:
+    name: Upload to TestFlight
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: ci
+    runs-on: macos-15
+    timeout-minutes: 75
+    concurrency:
+      group: testflight-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Write iOS build secrets
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
+
+      - name: Import Apple Distribution certificate
+        uses: Apple-Actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Download App Store provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@c62019de00bb4395ed414e4a17c98f4e279636de # v6.0.0
+        with:
+          bundle-id: ${{ env.IOS_BUNDLE_ID }}
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Build IPA
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          flutter build ipa \
+            --release \
+            --build-number="$GITHUB_RUN_ID" \
+            --export-options-plist=ios/ExportOptions.plist
+
+      - name: Resolve IPA path
+        id: ipa
+        run: |
+          set -euo pipefail
+          ipa_files=(build/ios/ipa/*.ipa)
+          if [[ ! -e "${ipa_files[0]}" || "${#ipa_files[@]}" -ne 1 ]]; then
+            echo "Expected exactly one IPA in build/ios/ipa" >&2
+            exit 1
+          fi
+          printf 'path=%s\n' "${ipa_files[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA to TestFlight
+        uses: Apple-Actions/upload-testflight-build@1ad58030672057aa084b4e96beb6f7a8c627f9e6 # v5.2.1
+        with:
+          app-path: ${{ steps.ipa.outputs.path }}
+          app-type: ios
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          wait-for-processing: 'true'
