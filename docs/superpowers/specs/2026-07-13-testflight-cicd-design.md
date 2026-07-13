@@ -10,7 +10,7 @@ Add GitHub Actions CI for Tripline and a manually triggered TestFlight upload fo
 - The repository has no GitHub Actions workflows.
 - Flutter is `3.44.6` and Dart is `3.12.2`.
 - The app version is sourced from `pubspec.yaml`; the current value is `0.5.1+6`.
-- Apple team `8Z6WVFJ574` and automatic signing are configured in the Xcode project.
+- Apple team `8Z6WVFJ574` is configured, with manual Apple Distribution signing for Release archives.
 - App Store Connect and Apple Developer already contain the Tripline app and explicit bundle ID.
 - The local keychain has Apple Development identities but no Apple Distribution identity.
 - `ios/Flutter/Secrets.xcconfig` supplies the iOS Google Maps key locally and is excluded from version control.
@@ -60,6 +60,7 @@ The `testflight` job will:
 9. Finish after Apple accepts the upload; verify processing separately with a fresh App Store Connect API token.
 
 A TestFlight concurrency group will prevent two manual uploads from running at the same time.
+The upload job runs on `macos-26` so archives use the iOS 26 SDK required by App Store Connect.
 
 ## Signing and Secrets
 
