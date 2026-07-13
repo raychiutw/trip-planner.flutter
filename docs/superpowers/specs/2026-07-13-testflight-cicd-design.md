@@ -78,7 +78,7 @@ Secrets will be written with `gh secret set` from local files or standard input.
 
 ## Export Configuration
 
-`ios/ExportOptions.plist` will select App Store Connect distribution, manual signing, `Tripline App Store`, and Apple team `8Z6WVFJ574`. The Release build configuration uses the matching Apple Distribution identity and provisioning profile.
+`ios/ExportOptions.plist` will select App Store Connect distribution, manual signing, `Tripline App Store CI`, and Apple team `8Z6WVFJ574`. The Release build configuration uses the matching Apple Distribution identity and provisioning profile.
 
 ## Failure Handling
 

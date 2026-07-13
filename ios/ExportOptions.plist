@@ -15,7 +15,7 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.raychiu.tripline</key>
-		<string>Tripline App Store</string>
+		<string>Tripline App Store CI</string>
 	</dict>
 	<key>stripSwiftSymbols</key>
 	<true/>
