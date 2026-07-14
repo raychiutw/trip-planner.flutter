@@ -23,9 +23,9 @@ import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
-enum _TripMoreAction { share, collab, health }
+enum _TripMoreAction { map, notes, print, audit, share, collab, health }
 
-/// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
+/// 行程時間軸畫面：AppBar（trip 名 + 編輯/更多）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerWidget {
   const TripTimelineScreen({
@@ -64,32 +64,20 @@ class TripTimelineScreen extends ConsumerWidget {
             icon: const Icon(CupertinoIcons.pencil),
             onPressed: () => context.push('/edit-trip/$tripId'),
           ),
-          IconButton(
-            tooltip: '地圖',
-            icon: const Icon(CupertinoIcons.map),
-            onPressed: () => _goTo(context, '/trips/$tripId/map'),
-          ),
-          IconButton(
-            tooltip: '筆記',
-            icon: const Icon(CupertinoIcons.doc_text),
-            onPressed: () => _goTo(context, '/trips/$tripId/notes'),
-          ),
-          IconButton(
-            tooltip: '列印',
-            icon: const Icon(CupertinoIcons.printer),
-            onPressed: () => _goTo(context, '/trips/$tripId/print'),
-          ),
-          IconButton(
-            tooltip: '異動紀錄',
-            icon: const Icon(Icons.history_outlined),
-            onPressed: () => _goTo(context, '/trips/$tripId/audit'),
-          ),
           PopupMenuButton<_TripMoreAction>(
             key: const ValueKey('trip-actions-menu'),
             tooltip: '更多',
-            icon: const Icon(Icons.more_vert),
+            icon: const Icon(CupertinoIcons.ellipsis),
             onSelected: (action) {
               switch (action) {
+                case _TripMoreAction.map:
+                  _goTo(context, '/trips/$tripId/map');
+                case _TripMoreAction.notes:
+                  _goTo(context, '/trips/$tripId/notes');
+                case _TripMoreAction.print:
+                  _goTo(context, '/trips/$tripId/print');
+                case _TripMoreAction.audit:
+                  _goTo(context, '/trips/$tripId/audit');
                 case _TripMoreAction.share:
                   _goTo(context, '/share-trip/$tripId');
                 case _TripMoreAction.collab:
@@ -99,6 +87,39 @@ class TripTimelineScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(
+                key: ValueKey('trip-action-map'),
+                value: _TripMoreAction.map,
+                child: _TripActionMenuItem(
+                  icon: Icons.map_outlined,
+                  label: '地圖',
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('trip-action-notes'),
+                value: _TripMoreAction.notes,
+                child: _TripActionMenuItem(
+                  icon: Icons.sticky_note_2_outlined,
+                  label: '筆記',
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('trip-action-print'),
+                value: _TripMoreAction.print,
+                child: _TripActionMenuItem(
+                  icon: Icons.print_outlined,
+                  label: '列印',
+                ),
+              ),
+              PopupMenuItem(
+                key: ValueKey('trip-action-audit'),
+                value: _TripMoreAction.audit,
+                child: _TripActionMenuItem(
+                  icon: Icons.history_outlined,
+                  label: '異動紀錄',
+                ),
+              ),
+              PopupMenuDivider(),
               PopupMenuItem(
                 key: ValueKey('trip-action-share'),
                 value: _TripMoreAction.share,
