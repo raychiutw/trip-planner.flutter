@@ -4,6 +4,27 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-14
+
+### 新增
+
+- **自適應導覽與寬版版型**：compact iOS/macOS 使用 `CupertinoTabBar`、Android 使用 `NavigationBar`，寬度 `>=768` 改用 `NavigationRail`；表單、對話與 feed 新增角色式最大寬度。
+- **持續錯誤與版型載入狀態**：真正錯誤改用可關閉、可重試的 persistent banner；列表、地圖、時間軸與主要 route 補齊靜態 skeleton 與載入 semantics。
+- **地圖 accessibility**：marker 擴為 44pt 互動目標，加入 POI 類型 icon、語意標籤與定位失敗重試。
+- **Tripline 座標 App Icon**：保留定位圖釘與中央指南針箭頭識別，提供 iOS Default/Dark/Tinted 與 Android density 資產。
+- **設計系統文件**：補齊 Apple Music/Apple HIG 對標理由、Flutter 自適應 UI reference 與新增畫面指南。
+
+### 變更
+
+- **Apple Music 式內容階層**：強化行程清單 CTA、時間軸 More 選單與 active day 捲動同步；收藏改為明確選取/完成與批次工具列，建立行程改為漸進揭露。
+- **系統排版與動態效果**：移除自訂 Inter 依賴方向，改用平台系統字、HIG 字階、中文零字距、Dynamic Type 與 reduced-motion duration。
+- **單一支援語系**：現階段明確限制為 `zh-TW`，避免介面宣告尚未完成的語系。
+- **回饋分級**：成功與低風險狀態保留短暫 notice；載入、定位、搜尋與 mutation 失敗改為持續可見的錯誤介面。
+
+### 修正
+
+- 修正寬螢幕內容過度延伸、route 載入只顯示 spinner、空狀態缺少下一步，以及 rebase 後未使用的 loading/timeline state。
+
 ## [0.5.0] - 2026-07-10
 
 ### 新增
