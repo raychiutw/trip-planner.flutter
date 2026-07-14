@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 
@@ -37,8 +38,10 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('已連結的應用程式')),
       body: appsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('connected-apps-loading'),
+          itemCount: 3,
+        ),
         error: (error, stackTrace) => _ConnectedAppsLoadError(
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),

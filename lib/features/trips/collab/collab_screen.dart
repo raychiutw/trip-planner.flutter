@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/adaptive.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip_member.dart';
 import '../../../theme/tokens.dart';
 import 'collab_controller.dart';
@@ -59,7 +60,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('共編設定')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator.adaptive())
+          ? const AppListLoadingSkeleton(key: ValueKey('collab-loading'))
           : !state.canManage
           ? const Center(
               child: Padding(

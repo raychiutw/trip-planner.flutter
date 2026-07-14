@@ -10,6 +10,7 @@ import '../../api/providers.dart';
 import '../../api/trip_repository.dart' show CustomEntryPoi;
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/poi_favorite.dart';
@@ -91,7 +92,7 @@ class EntryPoiScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('地點管理')),
       body: entryAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+            const AppListLoadingSkeleton(key: ValueKey('entry-poi-loading')),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -917,9 +918,12 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
               ),
             ] else if (_tab == _PoiPickerTab.favorites) ...[
               if (_favoritesLoading)
-                const Padding(
-                  padding: EdgeInsets.all(TpSpacing.s4),
-                  child: CircularProgressIndicator(),
+                const SizedBox(
+                  height: 180,
+                  child: AppListLoadingSkeleton(
+                    key: ValueKey('entry-poi-favorites-loading'),
+                    itemCount: 1,
+                  ),
                 )
               else if (_favoritesError != null)
                 Padding(

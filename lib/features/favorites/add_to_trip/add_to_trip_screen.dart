@@ -6,6 +6,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/app_feedback.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../models/day.dart';
 import '../../../models/poi_note.dart';
@@ -217,7 +218,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       appBar: AppBar(title: Text('加入行程：$_title')),
       body: tripsAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+            const AppListLoadingSkeleton(key: ValueKey('add-to-trip-loading')),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -332,14 +333,16 @@ class _AddToTripRouteState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('加入行程')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s6),
-          child: loading
-              ? const CircularProgressIndicator()
-              : Text(message ?? '載入失敗', textAlign: TextAlign.center),
-        ),
-      ),
+      body: loading
+          ? const AppListLoadingSkeleton(
+              key: ValueKey('add-to-trip-route-loading'),
+            )
+          : Center(
+              child: Padding(
+                padding: const EdgeInsets.all(TpSpacing.s6),
+                child: Text(message ?? '載入失敗', textAlign: TextAlign.center),
+              ),
+            ),
     );
   }
 }

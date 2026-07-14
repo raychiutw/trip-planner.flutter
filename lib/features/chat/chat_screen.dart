@@ -15,6 +15,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -80,8 +81,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         maxWidth: AppContentWidth.conversation,
         contentKey: const ValueKey('chat-content'),
         child: tripsAsync.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator.adaptive()),
+          loading: () => const AppListLoadingSkeleton(
+            key: ValueKey('chat-trips-loading'),
+            itemCount: 4,
+          ),
           error: (e, _) =>
               const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
           data: (trips) {
@@ -226,7 +229,10 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
         Expanded(
           child: state.initialLoading
-              ? const Center(child: CircularProgressIndicator.adaptive())
+              ? const AppListLoadingSkeleton(
+                  key: ValueKey('chat-thread-loading'),
+                  itemCount: 5,
+                )
               : (state.error != null && msgs.isEmpty)
               ? _CenteredHint(
                   title: '載入失敗',

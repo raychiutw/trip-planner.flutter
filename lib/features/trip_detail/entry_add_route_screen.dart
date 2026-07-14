@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/day.dart';
 import '../../models/poi_note.dart';
@@ -285,7 +286,8 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('新增停留點')),
       body: daysAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const AppListLoadingSkeleton(key: ValueKey('entry-add-loading')),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -453,9 +455,12 @@ class _FavoritePoiPanel extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: TpSpacing.s6),
-        child: Center(child: CircularProgressIndicator()),
+      return const SizedBox(
+        height: 180,
+        child: AppListLoadingSkeleton(
+          key: ValueKey('entry-favorites-loading'),
+          itemCount: 1,
+        ),
       );
     }
 

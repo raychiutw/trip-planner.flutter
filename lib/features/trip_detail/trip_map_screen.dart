@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
@@ -67,7 +68,7 @@ class TripMapScreen extends ConsumerWidget {
       ),
       body: daysAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+            const AppMapLoadingSkeleton(key: ValueKey('trip-map-loading')),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/adaptive.dart';
-import '../../../app/app_feedback.dart';
 import '../../../app/adaptive_content.dart';
+import '../../../app/app_feedback.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
@@ -216,7 +217,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
     if (state.results.isEmpty) {
       if (state.searching) {
-        return const Center(child: CircularProgressIndicator.adaptive());
+        return const AppListLoadingSkeleton(key: ValueKey('explore-loading'));
       }
       if (state.query.trim().length >= 2 && state.hasSearched) {
         return Center(
@@ -226,7 +227,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         );
       }
-      return const Center(child: CircularProgressIndicator.adaptive());
+      return const AppListLoadingSkeleton(key: ValueKey('explore-loading'));
     }
 
     final filtered = state.filteredResults;

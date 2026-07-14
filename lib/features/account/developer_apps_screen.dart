@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 
@@ -38,8 +39,10 @@ class DeveloperAppsScreen extends ConsumerWidget {
         ],
       ),
       body: appsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('developer-apps-loading'),
+          itemCount: 3,
+        ),
         error: (error, stackTrace) => _DeveloperAppsLoadError(
           onRetry: () => ref.invalidate(developerAppsProvider),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 import 'trip_providers.dart';
@@ -52,7 +53,10 @@ class _EntryActionRouteScreenState
     return Scaffold(
       appBar: AppBar(title: Text(widget.action.title)),
       body: daysAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('entry-action-loading'),
+          itemCount: 3,
+        ),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../api/providers.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../theme/tokens.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -49,7 +50,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       body: switch (authState) {
         AsyncData(:final value?) => _form(context, value.displayName ?? ''),
         AsyncError() => const Center(child: Text('無法載入個人資料')),
-        _ => const Center(child: CircularProgressIndicator.adaptive()),
+        _ => const AppListLoadingSkeleton(
+          key: ValueKey('profile-edit-loading'),
+          itemCount: 2,
+        ),
       },
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
@@ -128,7 +129,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppListLoadingSkeleton(key: ValueKey('trip-audit-loading'))
             : RefreshIndicator(
                 onRefresh: () => _load(showLoading: false),
                 child: ListView(

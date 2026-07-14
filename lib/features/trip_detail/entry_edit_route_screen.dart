@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/app_loading_skeleton.dart';
 import '../../theme/tokens.dart';
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
@@ -24,7 +25,10 @@ class EntryEditRouteScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('編輯停留點')),
       body: entryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('entry-edit-loading'),
+          itemCount: 3,
+        ),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
