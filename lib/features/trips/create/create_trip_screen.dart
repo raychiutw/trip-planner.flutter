@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../api/providers.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
 import '../trips_list_screen.dart';
 import '../widgets/destination_picker.dart';
@@ -86,78 +87,82 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('建立行程')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(TpSpacing.s4),
-              children: [
-                _sectionTitle(context, '目的地'),
-                DestinationPicker(
-                  destinations: state.destinations,
-                  onAdd: _ctrl.addDestination,
-                  onRemove: _ctrl.removeDestination,
-                  onReorder: _ctrl.reorderDestination,
-                ),
-                const SizedBox(height: TpSpacing.s5),
-                _sectionTitle(context, '日期'),
-                _DateModeSection(state: state, ctrl: _ctrl),
-                if (state.destinations.length >= 2) ...[
-                  const SizedBox(height: TpSpacing.s5),
-                  _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
-                  _DayQuotaSection(state: state, ctrl: _ctrl),
-                ],
-                if (!basicsReady) ...[
-                  const SizedBox(height: TpSpacing.s4),
-                  Text(
-                    '先選好目的地與日期，接著可補充偏好並設定 AI。',
-                    key: const ValueKey('create-next-step-hint'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.form,
+        contentKey: const ValueKey('create-trip-content'),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                children: [
+                  _sectionTitle(context, '目的地'),
+                  DestinationPicker(
+                    destinations: state.destinations,
+                    onAdd: _ctrl.addDestination,
+                    onRemove: _ctrl.removeDestination,
+                    onReorder: _ctrl.reorderDestination,
                   ),
-                ],
-                if (basicsReady) ...[
                   const SizedBox(height: TpSpacing.s5),
-                  ExpansionTile(
-                    key: const ValueKey('create-more-needs'),
-                    tilePadding: EdgeInsets.zero,
-                    childrenPadding: const EdgeInsets.only(
-                      bottom: TpSpacing.s2,
-                    ),
-                    title: Text(
-                      '更多需求（選填）',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
-                    children: [
-                      TextField(
-                        key: const ValueKey('create-desc'),
-                        controller: _desc,
-                        minLines: 2,
-                        maxLines: 5,
-                        maxLength: 2000,
-                        decoration: const InputDecoration(
-                          hintText: '例如：想吃道地拉麵、逛二手書店…',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: _ctrl.setDescription,
+                  _sectionTitle(context, '日期'),
+                  _DateModeSection(state: state, ctrl: _ctrl),
+                  if (state.destinations.length >= 2) ...[
+                    const SizedBox(height: TpSpacing.s5),
+                    _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
+                    _DayQuotaSection(state: state, ctrl: _ctrl),
+                  ],
+                  if (!basicsReady) ...[
+                    const SizedBox(height: TpSpacing.s4),
+                    Text(
+                      '先選好目的地與日期，接著可補充偏好並設定 AI。',
+                      key: const ValueKey('create-next-step-hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: TpSpacing.s3),
-                  _aiAuthorizationCard(context),
+                    ),
+                  ],
+                  if (basicsReady) ...[
+                    const SizedBox(height: TpSpacing.s5),
+                    ExpansionTile(
+                      key: const ValueKey('create-more-needs'),
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(
+                        bottom: TpSpacing.s2,
+                      ),
+                      title: Text(
+                        '更多需求（選填）',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
+                      children: [
+                        TextField(
+                          key: const ValueKey('create-desc'),
+                          controller: _desc,
+                          minLines: 2,
+                          maxLines: 5,
+                          maxLength: 2000,
+                          decoration: const InputDecoration(
+                            hintText: '例如：想吃道地拉麵、逛二手書店…',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: _ctrl.setDescription,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                    _aiAuthorizationCard(context),
+                  ],
+                  const SizedBox(height: TpSpacing.s4),
                 ],
-                const SizedBox(height: TpSpacing.s4),
-              ],
+              ),
             ),
-          ),
-          _SubmitBar(
-            error: state.error,
-            submitting: state.submitting,
-            onSubmit: state.canSubmit ? _submit : null,
-          ),
-        ],
+            _SubmitBar(
+              error: state.error,
+              submitting: state.submitting,
+              onSubmit: state.canSubmit ? _submit : null,
+            ),
+          ],
+        ),
       ),
     );
   }

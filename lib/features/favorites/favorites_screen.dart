@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
+import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/add_to_trip.dart';
@@ -60,60 +61,64 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
-      body: RefreshIndicator.adaptive(
-        onRefresh: () => ref.refresh(favoritesProvider.future),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar.large(
-              pinned: true,
-              title: const Text('收藏'),
-              actions: [
-                if (favoritesAsync.value?.isNotEmpty ?? false)
-                  TextButton(
-                    key: const ValueKey('favorites-select-mode'),
-                    onPressed: _deletingSelected
-                        ? null
-                        : _selectionMode
-                        ? _exitSelectionMode
-                        : () => setState(() => _selectionMode = true),
-                    child: Text(_selectionMode ? '完成' : '選取'),
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.feed,
+        contentKey: const ValueKey('favorites-content'),
+        child: RefreshIndicator.adaptive(
+          onRefresh: () => ref.refresh(favoritesProvider.future),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar.large(
+                pinned: true,
+                title: const Text('收藏'),
+                actions: [
+                  if (favoritesAsync.value?.isNotEmpty ?? false)
+                    TextButton(
+                      key: const ValueKey('favorites-select-mode'),
+                      onPressed: _deletingSelected
+                          ? null
+                          : _selectionMode
+                          ? _exitSelectionMode
+                          : () => setState(() => _selectionMode = true),
+                      child: Text(_selectionMode ? '完成' : '選取'),
+                    ),
+                  IconButton(
+                    key: const ValueKey('favorites-explore-action'),
+                    tooltip: '探索',
+                    icon: const Icon(CupertinoIcons.search),
+                    onPressed: () => context.go('/favorites/explore'),
                   ),
-                IconButton(
-                  key: const ValueKey('favorites-explore-action'),
-                  tooltip: '探索',
-                  icon: const Icon(CupertinoIcons.search),
-                  onPressed: () => context.go('/favorites/explore'),
-                ),
-              ],
-            ),
-            ...favoritesAsync.when(
-              data: (favorites) => favorites.isEmpty
-                  ? [
-                      const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyHero(),
-                      ),
-                    ]
-                  : _buildListSlivers(context, ref, favorites),
-              error: (error, stackTrace) => [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _ErrorState(
-                    onRetry: () => ref.invalidate(favoritesProvider),
+                ],
+              ),
+              ...favoritesAsync.when(
+                data: (favorites) => favorites.isEmpty
+                    ? [
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyHero(),
+                        ),
+                      ]
+                    : _buildListSlivers(context, ref, favorites),
+                error: (error, stackTrace) => [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _ErrorState(
+                      onRetry: () => ref.invalidate(favoritesProvider),
+                    ),
                   ),
-                ),
-              ],
-              loading: () => const [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: AppListLoadingSkeleton(
-                    key: ValueKey('favorites-loading-skeleton'),
+                ],
+                loading: () => const [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: AppListLoadingSkeleton(
+                      key: ValueKey('favorites-loading-skeleton'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

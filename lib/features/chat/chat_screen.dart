@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
@@ -75,66 +76,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI 助手')),
-      body: tripsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
-        error: (e, _) =>
-            const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
-        data: (trips) {
-          if (trips.isEmpty) {
-            return const _CenteredHint(
-              title: '先建立行程',
-              body: '建立行程後,就能在這裡用 AI 助手調整行程。',
-            );
-          }
-          // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
-          // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
-          final tripId = trips.any((t) => t.tripId == _tripId)
-              ? _tripId!
-              : trips.first.tripId;
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TpSpacing.s4,
-                  TpSpacing.s3,
-                  TpSpacing.s4,
-                  TpSpacing.s2,
-                ),
-                child: DropdownButtonFormField<String>(
-                  key: const ValueKey('chat-trip-dropdown'),
-                  initialValue: tripId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '行程',
-                    isDense: true,
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.conversation,
+        contentKey: const ValueKey('chat-content'),
+        child: tripsAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator.adaptive()),
+          error: (e, _) =>
+              const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+          data: (trips) {
+            if (trips.isEmpty) {
+              return const _CenteredHint(
+                title: '先建立行程',
+                body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+              );
+            }
+            // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
+            // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
+            final tripId = trips.any((t) => t.tripId == _tripId)
+                ? _tripId!
+                : trips.first.tripId;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    TpSpacing.s3,
+                    TpSpacing.s4,
+                    TpSpacing.s2,
                   ),
-                  items: [
-                    for (final t in trips)
-                      DropdownMenuItem(
-                        value: t.tripId,
-                        child: Text(
-                          _tripLabel(t),
-                          overflow: TextOverflow.ellipsis,
+                  child: DropdownButtonFormField<String>(
+                    key: const ValueKey('chat-trip-dropdown'),
+                    initialValue: tripId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: '行程',
+                      isDense: true,
+                    ),
+                    items: [
+                      for (final t in trips)
+                        DropdownMenuItem(
+                          value: t.tripId,
+                          child: Text(
+                            _tripLabel(t),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _tripId = v);
-                  },
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _tripId = v);
+                    },
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _ChatBody(
-                  key: ValueKey(tripId),
-                  tripId: tripId,
-                  initialPrefill: _pendingPrefill,
-                  onInitialPrefillConsumed: _consumePrefill,
+                Expanded(
+                  child: _ChatBody(
+                    key: ValueKey(tripId),
+                    tripId: tripId,
+                    initialPrefill: _pendingPrefill,
+                    onInitialPrefillConsumed: _consumePrefill,
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/adaptive.dart';
 import '../../../app/app_feedback.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
@@ -121,62 +122,66 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('探索')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              TpSpacing.s2,
-              TpSpacing.s4,
-              0,
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.conversation,
+        contentKey: const ValueKey('explore-content'),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TpSpacing.s4,
+                TpSpacing.s2,
+                TpSpacing.s4,
+                0,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _regionPill(state.region),
+              ),
             ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _regionPill(state.region),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(TpSpacing.s4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppSearchField(
-                    fieldKey: const ValueKey('explore-search-field'),
-                    controller: _searchController,
-                    placeholder: '搜尋地點',
-                    onSubmitted: (_) => _submitSearch(),
+            Padding(
+              padding: const EdgeInsets.all(TpSpacing.s4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppSearchField(
+                      fieldKey: const ValueKey('explore-search-field'),
+                      controller: _searchController,
+                      placeholder: '搜尋地點',
+                      onSubmitted: (_) => _submitSearch(),
+                    ),
                   ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                FilledButton(
-                  key: const ValueKey('explore-search-button'),
-                  onPressed: state.searching ? null : _submitSearch,
-                  child: Text(state.searching ? '搜尋中…' : '搜尋'),
-                ),
-              ],
+                  const SizedBox(width: TpSpacing.s2),
+                  FilledButton(
+                    key: const ValueKey('explore-search-button'),
+                    onPressed: state.searching ? null : _submitSearch,
+                    child: Text(state.searching ? '搜尋中…' : '搜尋'),
+                  ),
+                ],
+              ),
             ),
-          ),
-          SizedBox(
-            height: 44,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-              itemCount: _categoryChips.length,
-              separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
-              itemBuilder: (context, index) {
-                final (key, label) = _categoryChips[index];
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: state.category == key,
-                  onSelected: (_) => ref
-                      .read(exploreControllerProvider.notifier)
-                      .setCategory(key),
-                );
-              },
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+                itemCount: _categoryChips.length,
+                separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
+                itemBuilder: (context, index) {
+                  final (key, label) = _categoryChips[index];
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: state.category == key,
+                    onSelected: (_) => ref
+                        .read(exploreControllerProvider.notifier)
+                        .setCategory(key),
+                  );
+                },
+              ),
             ),
-          ),
-          Expanded(child: _buildBody(context, state)),
-        ],
+            Expanded(child: _buildBody(context, state)),
+          ],
+        ),
       ),
     );
   }

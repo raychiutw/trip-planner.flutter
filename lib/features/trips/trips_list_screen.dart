@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/trip.dart';
@@ -258,109 +259,116 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         onPressed: () => context.push('/new-trip'),
         child: const Icon(CupertinoIcons.add),
       ),
-      body: RefreshIndicator.adaptive(
-        onRefresh: () => ref.refresh(myTripsProvider.future),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar.large(
-              pinned: true,
-              automaticallyImplyLeading: false,
-              title: const Text('我的行程'),
-              actions: [
-                IconButton(
-                  key: const ValueKey('trips-list-import-trigger'),
-                  tooltip: '匯入行程 JSON',
-                  icon: _isImporting
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(CupertinoIcons.cloud_upload),
-                  onPressed: _isImporting ? null : _importTripFromJson,
-                ),
-                PopupMenuButton<TripSortOrder>(
-                  key: const ValueKey('trips-sort-button'),
-                  icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
-                  tooltip: '排序',
-                  initialValue: _sortOrder,
-                  onSelected: (order) {
-                    setState(() {
-                      _sortOrder = order;
-                    });
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: TripSortOrder.defaultOrder,
-                      child: const Text('預設順序'),
-                    ),
-                    PopupMenuItem(
-                      value: TripSortOrder.nameAsc,
-                      child: const Text('名稱 A→Z'),
-                    ),
-                    PopupMenuItem(
-                      value: TripSortOrder.updatedDesc,
-                      child: const Text('最新編輯'),
-                    ),
-                    PopupMenuItem(
-                      value: TripSortOrder.startDateAsc,
-                      child: const Text('出發日'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                    ),
-                    child: AppSearchField(
-                      fieldKey: const ValueKey('trips-search-field'),
-                      controller: _searchController,
-                      placeholder: '搜尋行程',
-                    ),
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.feed,
+        contentKey: const ValueKey('trips-content'),
+        child: RefreshIndicator.adaptive(
+          onRefresh: () => ref.refresh(myTripsProvider.future),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar.large(
+                pinned: true,
+                automaticallyImplyLeading: false,
+                title: const Text('我的行程'),
+                actions: [
+                  IconButton(
+                    key: const ValueKey('trips-list-import-trigger'),
+                    tooltip: '匯入行程 JSON',
+                    icon: _isImporting
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator.adaptive(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(CupertinoIcons.cloud_upload),
+                    onPressed: _isImporting ? null : _importTripFromJson,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      TpSpacing.s4,
-                      0,
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                    ),
-                    child: SegmentedButton<TripFilter>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                        ButtonSegment(
-                          value: TripFilter.mine,
-                          label: Text('我的'),
-                        ),
-                        ButtonSegment(
-                          value: TripFilter.shared,
-                          label: Text('共編'),
-                        ),
-                      ],
-                      selected: {_filterTab},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _filterTab = selection.first;
-                        });
-                      },
-                    ),
+                  PopupMenuButton<TripSortOrder>(
+                    key: const ValueKey('trips-sort-button'),
+                    icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
+                    tooltip: '排序',
+                    initialValue: _sortOrder,
+                    onSelected: (order) {
+                      setState(() {
+                        _sortOrder = order;
+                      });
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: TripSortOrder.defaultOrder,
+                        child: const Text('預設順序'),
+                      ),
+                      PopupMenuItem(
+                        value: TripSortOrder.nameAsc,
+                        child: const Text('名稱 A→Z'),
+                      ),
+                      PopupMenuItem(
+                        value: TripSortOrder.updatedDesc,
+                        child: const Text('最新編輯'),
+                      ),
+                      PopupMenuItem(
+                        value: TripSortOrder.startDateAsc,
+                        child: const Text('出發日'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-            ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
-          ],
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        TpSpacing.s4,
+                        TpSpacing.s2,
+                        TpSpacing.s4,
+                        TpSpacing.s2,
+                      ),
+                      child: AppSearchField(
+                        fieldKey: const ValueKey('trips-search-field'),
+                        controller: _searchController,
+                        placeholder: '搜尋行程',
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        TpSpacing.s4,
+                        0,
+                        TpSpacing.s4,
+                        TpSpacing.s2,
+                      ),
+                      child: SegmentedButton<TripFilter>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(
+                            value: TripFilter.all,
+                            label: Text('全部'),
+                          ),
+                          ButtonSegment(
+                            value: TripFilter.mine,
+                            label: Text('我的'),
+                          ),
+                          ButtonSegment(
+                            value: TripFilter.shared,
+                            label: Text('共編'),
+                          ),
+                        ],
+                        selected: {_filterTab},
+                        onSelectionChanged: (selection) {
+                          setState(() {
+                            _filterTab = selection.first;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
+            ],
+          ),
         ),
       ),
     );
