@@ -47,5 +47,25 @@ void main() {
       await tester.tap(find.text('DAY 02'));
       expect(selectedDayNum, 2);
     });
+
+    testWidgets('200% 動態字級會增加日期列高度且不溢位', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: DayPills(days: _days, activeDayNum: 1, onDaySelected: (_) {}),
+          ),
+        ),
+      );
+
+      expect(tester.getSize(find.byType(DayPills)).height, greaterThan(60));
+      expect(tester.takeException(), isNull);
+    });
   });
 }

@@ -11,10 +11,15 @@ Future<void> pumpCard(
   String? currentUserId,
   VoidCallback? onTap,
   VoidCallback? onLongPress,
+  TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
       home: Scaffold(
         body: TripCard(
           trip: trip,
@@ -90,6 +95,24 @@ void main() {
       expect(find.text('釜山美食團'), findsOneWidget);
       expect(find.textContaining('天'), findsNothing);
     });
+
+    testWidgets('200% 動態字級不會造成版面溢位', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'large-text',
+          name: 'large-text',
+          title: '沖繩無障礙家族之旅',
+          countries: '日本',
+          totalDays: 5,
+          startDate: '2026-04-23',
+          endDate: '2026-04-27',
+        ),
+        textScaler: const TextScaler.linear(2),
+      );
+
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('TripCard eyebrow（countries · N 天）', () {
@@ -154,27 +177,28 @@ void main() {
       expect(find.text('Ray Chiu'), findsNothing);
     });
 
-    testWidgets('ownerUserId != currentUserId → 顯示 ownerDisplayName + 首字 avatar', (
-      tester,
-    ) async {
-      await pumpCard(
-        tester,
-        const TripSummary(
-          tripId: 'okinawa',
-          name: 'okinawa',
-          title: '沖繩家族之旅',
-          totalDays: 5,
-          ownerUserId: 'u-amy',
-          ownerDisplayName: 'Amy Wang',
-        ),
-        currentUserId: 'u-ray',
-      );
-      expect(find.text('由你建立'), findsNothing);
-      expect(find.text('Amy Wang'), findsOneWidget);
-      // 首字 avatar（非抓圖）
-      expect(find.byType(CircleAvatar), findsOneWidget);
-      expect(find.text('A'), findsOneWidget);
-    });
+    testWidgets(
+      'ownerUserId != currentUserId → 顯示 ownerDisplayName + 首字 avatar',
+      (tester) async {
+        await pumpCard(
+          tester,
+          const TripSummary(
+            tripId: 'okinawa',
+            name: 'okinawa',
+            title: '沖繩家族之旅',
+            totalDays: 5,
+            ownerUserId: 'u-amy',
+            ownerDisplayName: 'Amy Wang',
+          ),
+          currentUserId: 'u-ray',
+        );
+        expect(find.text('由你建立'), findsNothing);
+        expect(find.text('Amy Wang'), findsOneWidget);
+        // 首字 avatar（非抓圖）
+        expect(find.byType(CircleAvatar), findsOneWidget);
+        expect(find.text('A'), findsOneWidget);
+      },
+    );
 
     testWidgets('ownerUserId / ownerDisplayName 皆缺 → 不顯示建立者列', (tester) async {
       await pumpCard(
@@ -209,7 +233,9 @@ void main() {
   });
 
   group('TripCard 日期範圍', () {
-    testWidgets('startDate + endDate 都有 → 「startDate – endDate」', (tester) async {
+    testWidgets('startDate + endDate 都有 → 「startDate – endDate」', (
+      tester,
+    ) async {
       await pumpCard(
         tester,
         const TripSummary(

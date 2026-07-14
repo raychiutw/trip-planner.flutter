@@ -131,10 +131,12 @@ void main() {
       expect(lightTheme.appBarTheme.elevation, 0);
     });
 
-    test('TextTheme：系統字(不打包 Inter)、body 16 letterSpacing 0', () {
+    test('TextTheme：系統字（不打包 Inter）、body 17 letterSpacing 0', () {
       final lightTheme = AppTheme.light();
       final bodyStyle = lightTheme.textTheme.bodyLarge!;
-      expect(bodyStyle.fontSize, 16);
+      expect(bodyStyle.fontSize, 17);
+      expect(lightTheme.textTheme.bodyMedium?.fontSize, 15);
+      expect(lightTheme.textTheme.bodySmall?.fontSize, 13);
       expect(bodyStyle.letterSpacing, 0);
       // 改用系統字:iOS→SF Pro、Android→Roboto,CJK 由系統 fallback;不再打包 Inter。
       expect(bodyStyle.fontFamily, isNot(contains('Inter')));
@@ -150,6 +152,23 @@ void main() {
       expect(TpSpacing.navHeight, 88.0);
       expect(TpMotion.normal, const Duration(milliseconds: 250));
       expect(TpMotion.appleEase, const Cubic(0.2, 0.8, 0.2, 1));
+    });
+
+    testWidgets('系統開啟減少動態效果時，motion duration 歸零', (tester) async {
+      late BuildContext context;
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: Builder(
+            builder: (builderContext) {
+              context = builderContext;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(TpMotion.resolve(context, TpMotion.normal), Duration.zero);
     });
   });
 }

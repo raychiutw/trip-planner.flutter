@@ -107,10 +107,7 @@ class TripCard extends StatelessWidget {
                         if (eyebrowText != null) ...[
                           Text(
                             eyebrowText,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
+                            style: theme.textTheme.labelSmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                               fontFeatures: const [
                                 FontFeature.tabularFigures(),

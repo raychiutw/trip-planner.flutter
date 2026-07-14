@@ -291,7 +291,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
       if (renderObject is! RenderBox || !renderObject.hasSize) return;
       Scrollable.ensureVisible(
         targetContext,
-        duration: TpMotion.normal,
+        duration: TpMotion.resolve(targetContext, TpMotion.normal),
         curve: TpMotion.appleEase,
       );
     });
@@ -303,7 +303,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
     if (sectionContext != null) {
       Scrollable.ensureVisible(
         sectionContext,
-        duration: TpMotion.normal,
+        duration: TpMotion.resolve(sectionContext, TpMotion.normal),
         curve: TpMotion.appleEase,
       );
     }

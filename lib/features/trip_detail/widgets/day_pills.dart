@@ -31,9 +31,15 @@ class DayPills extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scaledFontSize = MediaQuery.textScalerOf(
+      context,
+    ).scale(theme.textTheme.labelSmall?.fontSize ?? 12);
+    final preferredHeight = (scaledFontSize * (8 / 3) + 28)
+        .clamp(60.0, 120.0)
+        .toDouble();
 
     return Container(
-      height: 60,
+      height: preferredHeight,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
@@ -101,12 +107,7 @@ class _DayPill extends StatelessWidget {
             children: [
               Text(
                 'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  fontSize: 11,
-                  // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
-                  height: 1.35,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+                style: theme.textTheme.labelSmall?.copyWith(
                   color: isActive
                       ? tones.accentDeep
                       : theme.colorScheme.onSurfaceVariant,
@@ -115,9 +116,8 @@ class _DayPill extends StatelessWidget {
               ),
               Text(
                 shortDate,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.35,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w400,
                   color: theme.colorScheme.onSurfaceVariant,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
