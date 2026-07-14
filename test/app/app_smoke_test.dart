@@ -25,6 +25,13 @@ class _MockTripRepository extends Mock implements TripRepository {}
 
 void main() {
   testWidgets('已登入時顯示 5-tab NavigationBar', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetPhysicalSize();
+    });
+
     final mockTripRepository = _MockTripRepository();
     when(mockTripRepository.watchMyTrips).thenAnswer((_) => Stream.value([]));
 
@@ -57,5 +64,8 @@ void main() {
         reason: 'NavigationBar 應包含「$tabLabel」tab',
       );
     }
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.supportedLocales, const [Locale('zh', 'TW')]);
   });
 }

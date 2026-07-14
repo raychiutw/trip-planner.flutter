@@ -13,6 +13,9 @@ import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
 import 'theme/app_theme.dart';
 
+/// 現階段所有產品文案均為繁體中文；新增語系前須先完成整套字串在地化。
+const kSupportedLocales = [Locale('zh', 'TW')];
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
@@ -72,7 +75,7 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      supportedLocales: const [Locale('zh', 'TW'), Locale('en'), Locale('ja')],
+      supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),
     );
   }
