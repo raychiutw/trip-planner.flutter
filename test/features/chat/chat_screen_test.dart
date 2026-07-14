@@ -62,7 +62,11 @@ void main() {
     ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
   });
 
-  Widget buildApp({SpeechService? speech}) {
+  Widget buildApp({
+    SpeechService? speech,
+    String? initialTripId,
+    String? initialPrefill,
+  }) {
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
@@ -70,7 +74,13 @@ void main() {
         authStateProvider.overrideWith(_StubAuth.new),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
-      child: MaterialApp(theme: AppTheme.light(), home: const ChatScreen()),
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: ChatScreen(
+          initialTripId: initialTripId,
+          initialPrefill: initialPrefill,
+        ),
+      ),
     );
   }
 
@@ -201,6 +211,45 @@ void main() {
         beforeId: any(named: 'beforeId'),
       ),
     ).called(1);
+  });
+
+  testWidgets('初始 tripId/prefill 會切到指定行程並填入草稿', (tester) async {
+    when(tripRepo.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
+        TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+        TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+      ]),
+    );
+
+    await tester.pumpWidget(
+      buildApp(initialTripId: 'kyoto', initialPrefill: '幫我安排晚餐'),
+    );
+    await tester.pumpAndSettle();
+
+    verify(
+      () => reqRepo.fetchRequests(
+        tripId: 'kyoto',
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).called(1);
+
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller!.text, '幫我安排晚餐');
+
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('沖繩').last);
+    await tester.pumpAndSettle();
+
+    final nextInput = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(nextInput.controller!.text, isEmpty);
   });
 
   testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {
