@@ -136,8 +136,10 @@ void main() {
     expect(find.byType(TripTimelineScreen), findsOneWidget);
     expect(find.text('那霸機場'), findsOneWidget);
 
-    // 點筆記 action → 筆記頁
-    await tester.tap(find.byTooltip('筆記'));
+    // 從精簡 AppBar 的更多選單進入筆記頁
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-notes')));
     await tester.pumpAndSettle();
     expect(find.byType(TripNotesScreen), findsOneWidget);
     expect(find.text('行程筆記'), findsOneWidget);
