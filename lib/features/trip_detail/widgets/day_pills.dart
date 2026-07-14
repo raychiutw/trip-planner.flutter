@@ -74,49 +74,56 @@ class _DayPill extends StatelessWidget {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
-      onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(
-          minHeight: TpSpacing.tapMin,
-          minWidth: 64,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        decoration: BoxDecoration(
-          color: isActive ? tones.accentSubtle : Colors.transparent,
-          borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
-          border: Border.all(
-            color: isActive ? tones.accent : theme.colorScheme.outlineVariant,
+    final shortDate = DayPills.shortDate(day.date);
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: '第 ${day.dayNum} 天${shortDate.isEmpty ? '' : '，$shortDate'}',
+      child: InkWell(
+        key: ValueKey('day-pill-${day.dayNum}'),
+        borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(
+            minHeight: TpSpacing.tapMin,
+            minWidth: 64,
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                fontSize: 11,
-                // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
-                height: 1.35,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-                color: isActive
-                    ? tones.accentDeep
-                    : theme.colorScheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: isActive ? tones.accentSubtle : Colors.transparent,
+            borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
+            border: Border.all(
+              color: isActive ? tones.accent : theme.colorScheme.outlineVariant,
             ),
-            Text(
-              DayPills.shortDate(day.date),
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.35,
-                color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  fontSize: 11,
+                  // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: isActive
+                      ? tones.accentDeep
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
-          ],
+              Text(
+                shortDate,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

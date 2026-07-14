@@ -207,6 +207,8 @@ class _TimelineBody extends StatefulWidget {
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _scrollViewportKey = GlobalKey(debugLabel: 'timeline-scroll');
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
   late int _activeDayNum;
@@ -215,11 +217,20 @@ class _TimelineBodyState extends State<_TimelineBody> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_updateActiveDayFromScroll);
     _rebuildKeys();
     _activeDayNum =
         _initialDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
     _scheduleInitialFocusScroll();
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_updateActiveDayFromScroll)
+      ..dispose();
+    super.dispose();
   }
 
   @override
@@ -297,6 +308,37 @@ class _TimelineBodyState extends State<_TimelineBody> {
     }
   }
 
+  void _updateActiveDayFromScroll() {
+    if (!_scrollController.hasClients || widget.days.isEmpty) return;
+
+    final position = _scrollController.position;
+    var visibleDayNum = widget.days.first.dayNum;
+    if (position.extentAfter <= 1) {
+      visibleDayNum = widget.days.last.dayNum;
+    } else {
+      final viewportBox =
+          _scrollViewportKey.currentContext?.findRenderObject() as RenderBox?;
+      if (viewportBox == null || !viewportBox.hasSize) return;
+      final viewportTop = viewportBox.localToGlobal(Offset.zero).dy;
+      for (final day in widget.days) {
+        final sectionBox =
+            _daySectionKeys[day.dayNum]?.currentContext?.findRenderObject()
+                as RenderBox?;
+        if (sectionBox == null || !sectionBox.hasSize) continue;
+        final sectionTop = sectionBox.localToGlobal(Offset.zero).dy;
+        if (sectionTop <= viewportTop + TpSpacing.s2) {
+          visibleDayNum = day.dayNum;
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (visibleDayNum != _activeDayNum && mounted) {
+      setState(() => _activeDayNum = visibleDayNum);
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -312,9 +354,10 @@ class _TimelineBodyState extends State<_TimelineBody> {
           activeDayNum: _activeDayNum,
           onDaySelected: _scrollToDay,
         ),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scrollController,
+          Expanded(
+            child: SingleChildScrollView(
+              key: _scrollViewportKey,
+              controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
               TpSpacing.s4,

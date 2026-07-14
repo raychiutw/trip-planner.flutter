@@ -728,6 +728,32 @@ void main() {
     expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
   });
 
+  testWidgets('手動捲動跨日會同步 pill 的選取狀態', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pumpTimeline(tester);
+
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -1200),
+    );
+    await tester.pumpAndSettle();
+
+    final day2PillLabel = tester.widget<Text>(find.text('DAY 02').first);
+    final day2Semantics = tester.widget<Semantics>(
+      find
+          .ancestor(
+            of: find.byKey(const ValueKey('day-pill-2')),
+            matching: find.byType(Semantics),
+          )
+          .first,
+    );
+    expect(day2PillLabel.style?.color, TpColorsLight.accentDeep);
+    expect(day2Semantics.properties.label, '第 2 天，4/24');
+    expect(day2Semantics.properties.selected, isTrue);
+
+    semantics.dispose();
+  });
+
   testWidgets('指定 initialDayNum：初始啟用該日 pill', (tester) async {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
