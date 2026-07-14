@@ -73,6 +73,16 @@ void main() {
     );
   }
 
+  Future<void> completeBasics(WidgetTester tester) async {
+    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
+    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-result-p1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('大概時間'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('目的地空 → 送出鈕 disabled', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -80,6 +90,34 @@ void main() {
       find.byKey(const ValueKey('create-submit')),
     );
     expect(btn.onPressed, isNull);
+  });
+
+  testWidgets('首屏只顯示必要欄位，資料有效後才揭露選填設定', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('create-next-step-hint')), findsOneWidget);
+    expect(find.byKey(const ValueKey('create-more-needs')), findsNothing);
+    expect(find.byKey(const ValueKey('ai-authorize-card')), findsNothing);
+
+    await completeBasics(tester);
+
+    expect(find.byKey(const ValueKey('create-next-step-hint')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('create-more-needs')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const ValueKey('create-more-needs')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('create-more-needs')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('create-desc')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ai-authorize-card')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const ValueKey('ai-authorize-card')), findsOneWidget);
   });
 
   testWidgets('POI 搜尋 → 點結果 → 加入目的地', (tester) async {
@@ -127,6 +165,7 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pump();
+    await completeBasics(tester);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('ai-authorize-card')),
       300,
@@ -160,6 +199,7 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    await completeBasics(tester);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('ai-authorize-card')),
       300,
@@ -200,16 +240,8 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    // 加目的地
-    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '東京');
-    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('poi-result-p1')));
-    await tester.pumpAndSettle();
-
-    // 彈性日期(自動有效)
-    await tester.tap(find.text('大概時間'));
-    await tester.pumpAndSettle();
+    // 加目的地並切到自動有效的彈性日期
+    await completeBasics(tester);
 
     // 送出(捲到底確保可點)
     await tester.ensureVisible(find.byKey(const ValueKey('create-submit')));
