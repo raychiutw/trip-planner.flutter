@@ -8,6 +8,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/poi_favorite.dart';
+import '../../models/poi_type.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/poi_tone.dart';
 import '../../theme/tokens.dart';
@@ -38,6 +39,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   TripMapPoint? _userLocation;
   bool _locating = false;
   int? _selectedId;
+  String? _locationError;
 
   @override
   void dispose() {
@@ -73,6 +75,17 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
           return Stack(
             children: [
               _buildMap(context, pins),
+              if (_locationError case final message?)
+                Positioned(
+                  left: TpSpacing.s4,
+                  right: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s3,
+                  top: TpSpacing.s4,
+                  child: _MapErrorBanner(
+                    message: message,
+                    onRetry: _locateMe,
+                    onDismiss: () => setState(() => _locationError = null),
+                  ),
+                ),
               Positioned(
                 top: TpSpacing.s4,
                 right: TpSpacing.s4,
@@ -123,20 +136,35 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         for (final f in pins)
           TripMapMarker(
             point: TripMapPoint(f.poiLat!, f.poiLng!),
-            width: 28,
-            height: 28,
-            child: GestureDetector(
-              key: ValueKey('map-fav-${f.id}'),
-              onTap: () => setState(() => _selectedId = f.id),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: resolvePoiTone(tones, f.poiType).base,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _selectedId == f.id
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Colors.white,
-                    width: 3,
+            width: TpSpacing.tapMin,
+            height: TpSpacing.tapMin,
+            child: Semantics(
+              button: true,
+              selected: _selectedId == f.id,
+              label: _markerSemanticsLabel(f),
+              child: GestureDetector(
+                key: ValueKey('map-fav-${f.id}'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _selectedId = f.id),
+                child: Center(
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: resolvePoiTone(tones, f.poiType).base,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _selectedId == f.id
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.white,
+                        width: 3,
+                      ),
+                    ),
+                    child: Icon(
+                      _markerIcon(f.poiType),
+                      size: 13,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -153,7 +181,10 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
 
   Future<void> _locateMe() async {
     if (_locating) return;
-    setState(() => _locating = true);
+    setState(() {
+      _locating = true;
+      _locationError = null;
+    });
     try {
       final service =
           widget.locationService ?? const GeolocatorTripMapLocationService();
@@ -162,6 +193,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
       setState(() {
         _userLocation = point;
         _selectedId = null;
+        _locationError = null;
       });
       _mapController.move(point, 15);
     } on TripMapLocationException catch (error) {
@@ -176,9 +208,73 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   }
 
   void _showLocationError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    setState(() => _locationError = message);
+  }
+}
+
+String _markerSemanticsLabel(PoiFavorite favorite) {
+  final category = poiCategoryLabel(favorite.poiType);
+  return category == null
+      ? '地點：${favorite.displayName}'
+      : '地點：${favorite.displayName}，$category';
+}
+
+IconData _markerIcon(String? type) {
+  return switch (mapGooglePrimaryTypeToPoiType(type)) {
+    'hotel' => Icons.bed_outlined,
+    'restaurant' => Icons.restaurant_outlined,
+    'shopping' => Icons.shopping_bag_outlined,
+    'parking' => Icons.local_parking,
+    'transport' => Icons.train_outlined,
+    'activity' => Icons.local_activity_outlined,
+    'other' => Icons.place_outlined,
+    _ => Icons.attractions_outlined,
+  };
+}
+
+class _MapErrorBanner extends StatelessWidget {
+  const _MapErrorBanner({
+    required this.message,
+    required this.onRetry,
+    required this.onDismiss,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      key: const ValueKey('global-map-location-error'),
+      color: colors.errorContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TpRadius.md),
+        side: BorderSide(color: colors.error.withValues(alpha: 0.25)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(left: TpSpacing.s3),
+        child: Row(
+          children: [
+            Icon(Icons.location_off_outlined, color: colors.onErrorContainer),
+            const SizedBox(width: TpSpacing.s2),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: colors.onErrorContainer),
+              ),
+            ),
+            TextButton(onPressed: onRetry, child: const Text('重試')),
+            IconButton(
+              tooltip: '關閉錯誤訊息',
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
