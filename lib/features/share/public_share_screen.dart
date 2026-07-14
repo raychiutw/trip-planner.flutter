@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
@@ -53,10 +54,8 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       appBar: AppBar(title: const Text('行程分享')),
       body: SafeArea(
         child: shareAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator.adaptive(
-              key: ValueKey('public-share-loading'),
-            ),
+          loading: () => const AppListLoadingSkeleton(
+            key: ValueKey('public-share-loading'),
           ),
           error: (error, stackTrace) => _NotFoundState(
             onRetry: () => ref.invalidate(publicTripShareProvider(_token)),

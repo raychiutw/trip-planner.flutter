@@ -115,6 +115,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
           tripPrintActionsProvider.overrideWithValue(printActions),

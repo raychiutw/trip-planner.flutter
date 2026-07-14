@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
 
@@ -40,10 +41,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('通知設定')),
       body: prefsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator.adaptive(
-            key: ValueKey('notifications-loading'),
-          ),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('notifications-loading'),
+          itemCount: 4,
         ),
         error: (error, stackTrace) => _LoadError(
           onRetry: () => ref.invalidate(accountNotificationPreferencesProvider),

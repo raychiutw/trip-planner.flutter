@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import 'settings/theme_mode_controller.dart';
@@ -63,11 +64,8 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
         ],
       ),
       body: sessionsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator.adaptive(
-            key: Key('account-sessions-loading'),
-          ),
-        ),
+        loading: () =>
+            const AppListLoadingSkeleton(key: Key('account-sessions-loading')),
         error: (error, stackTrace) => _SessionsLoadError(
           onRetry: () => ref.invalidate(accountSessionsProvider),
         ),
