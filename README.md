@@ -51,7 +51,8 @@ docs/
 | 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
 | 查 API 層介面 | [reference-api](docs/reference-api.md) |
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
-| 查 design token / 三色 tone | [reference-theme](docs/reference-theme.md) |
+| 查設計 token / 自適應 UI 規格 | [reference-theme](docs/reference-theme.md) |
+| 理解 Apple Music / Apple HIG 對標取捨 | [自適應 UI 設計理由](docs/explanation-adaptive-ui.md) |
 | 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
@@ -66,4 +67,4 @@ docs/
 
 ## 設計
 
-視覺規範以 web repo 的 `DESIGN.md` + `css/tokens.css` 為 SoT：柔褐 `#A97A4A` 主色、三色系統（玩/看/買=柔褐、住/移動=sage、吃=玫瑰粉）、hairline 卡片（elevation 0）、HIG 字級、light/dark 雙主題。
+品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 的互動與版型以本 repo 的 [設計系統參考](docs/reference-theme.md)為準。方向是保留 Tripline 柔褐品牌，採 Apple Music 的內容階層與 Apple HIG 的平台慣例，而不是逐像素仿製。座標定位圖釘 App Icon 是固定品牌識別，規格見 [Tripline App Icon](docs/superpowers/specs/2026-07-14-tripline-app-icon-design.md)。

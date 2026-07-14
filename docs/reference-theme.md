@@ -1,6 +1,6 @@
-# Theme 與設計系統參考(`lib/theme/`)
+# Theme 與自適應 UI 設計系統參考
 
-視覺規範的 source of truth 是 web repo 的 `DESIGN.md` + `css/tokens.css`,本層把它翻成 Flutter:`tokens.dart` 是純常數,`app_theme.dart` 把常數組成 `ThemeData` 與 `TpTones` ThemeExtension。原始設計調查在 [`discovery/design.md`](discovery/design.md)。
+品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 互動、字體、導覽、內容寬度與回饋以本文件及程式碼為準。`tokens.dart` 定義常數，`app_theme.dart` 組成 `ThemeData`/`TpTones`，`lib/app/` 提供跨畫面共用的自適應 UI primitive。來源調查保留在 [`discovery/design.md`](discovery/design.md)。
 
 ## 取色守則
 
@@ -50,6 +50,8 @@ Dark 是獨立的暖褐黑 palette,**不是 light 反色**。
 | `springEase` | `Cubic(0.32, 1.28, 0.6, 1)` — 彈跳進場 |
 | `sheetClose` | `Cubic(0.4, 0, 1, 1)` — sheet 收合 |
 
+`TpMotion.resolve(context, preferred)` 在系統開啟「減少動態效果」時回傳 `Duration.zero`。新增動畫必須透過它解析 duration。
+
 ## app_theme.dart
 
 ### TpTones(ThemeExtension)
@@ -70,7 +72,131 @@ abstract final class AppTheme {
 }
 ```
 
-`main.dart` 以 `themeMode: ThemeMode.system` 同時掛 light/dark。主要客製:卡片 elevation 0 + 1px hairline border(`border` 色)、radius 8、NavigationBar 風格、Inter → Noto Sans TC 字體 fallback。
+`main.dart` 同時掛 light/dark theme，實際模式由 `themeModeProvider` 決定。主要客製：卡片 elevation 0 + 1px hairline border、radius 8、44pt 按鈕、NavigationBar 與 HIG 字階。
+
+不指定 `fontFamily`：iOS/macOS 使用系統字（SF Pro，中文由 PingFang fallback），Android 使用 Roboto（中文由 Noto fallback）。這能直接取得 Dynamic Type、Bold Text 與平台字型修正，不打包 Inter。
+
+### TextTheme 字階
+
+| role | size / line-height / weight | 用途 |
+|---|---|---|
+| `displaySmall` | 34 / auto / 700 | large title |
+| `headlineMedium` | 28 / 36 / 700 | 頁面標題 |
+| `titleLarge` | 20 / auto / 700 | app bar / section |
+| `titleMedium` | 17 / 24 / 700 | 卡片標題 |
+| `bodyLarge` | 17 / 26 / 400 | 主要內文 |
+| `bodyMedium` | 15 / 23 / 400 | 次要內文 |
+| `bodySmall` | 13 / 18 / 400 | caption，tabular figures |
+| `labelLarge` | 16 / auto / 600 | 按鈕 |
+| `labelMedium` | 13 / 18 / 600 | chip / label |
+| `labelSmall` | 12 / 16 / 700 | 小型標籤 |
+
+中文 `letterSpacing` 一律為 `0`。
+
+## 自適應導覽與內容寬度
+
+`AppShell` 固定五個頂層目的地：聊天、行程、地圖、收藏、帳號。切換 branch 會觸發 selection haptic；再次點目前 tab 會回到該 branch 初始位置。
+
+| 條件 | 導覽元件 |
+|---|---|
+| 寬度 `< 768` 且 iOS/macOS | `CupertinoTabBar` |
+| 寬度 `< 768` 且其他平台 | Material `NavigationBar` |
+| 寬度 `>= 768` | `NavigationRail` |
+
+`AppAdaptiveContent` 保留父層高度約束，手機全寬，寬螢幕依角色置中：
+
+| `AppContentWidth` | 最大寬度 | 適用內容 |
+|---|---:|---|
+| `form` | 720 | 建立、編輯、設定表單 |
+| `conversation` | 860 | 聊天、搜尋、探索 |
+| `feed` | 920 | 行程、收藏等列表 |
+
+```dart
+const AppAdaptiveContent({
+  Key? key,
+  required double maxWidth,
+  required Widget child,
+  Key? contentKey,
+});
+```
+
+`maxWidth` 必須從內容角色選擇；`contentKey` 只用於需要量測或定位內容容器的測試。
+
+## 平台自適應元件（`lib/app/adaptive.dart`）
+
+| API | Apple 平台 | 其他平台 |
+|---|---|---|
+| `showAppConfirm` | `CupertinoAlertDialog` | Material `AlertDialog` |
+| `showAppActionSheet<T>` | `CupertinoActionSheet` | Material bottom sheet |
+| `AppSearchField` | `CupertinoSearchTextField` | Material `TextField` |
+| `showAppNotice` | 約 2.5 秒的頂部橫幅 | `SnackBar` |
+
+`showAppConfirm` 關閉時回傳 `false`；破壞性動作在兩個平台都使用 error 語意。`AppSheetAction<T>` 封裝 label、回傳值、破壞性狀態與 Material leading icon。
+
+```dart
+Future<bool> showAppConfirm(
+  BuildContext context, {
+  required String title,
+  String? message,
+  required String confirmLabel,
+  String cancelLabel = '取消',
+  bool isDestructive = false,
+});
+
+const AppSheetAction<T>({
+  required String label,
+  required T value,
+  bool isDestructive = false,
+  IconData? icon,
+});
+
+Future<T?> showAppActionSheet<T>(
+  BuildContext context, {
+  String? title,
+  String? message,
+  required List<AppSheetAction<T>> actions,
+  String cancelLabel = '取消',
+});
+
+const AppSearchField({
+  Key? key,
+  Key? fieldKey,
+  required TextEditingController controller,
+  required String placeholder,
+  ValueChanged<String>? onChanged,
+  ValueChanged<String>? onSubmitted,
+  bool autofocus = false,
+  bool enabled = true,
+});
+
+void showAppNotice(BuildContext context, String message);
+```
+
+`fieldKey` 會直接掛到底層原生欄位，讓同一份 widget test 可操作 Apple 與 Material 分支。
+
+## 回饋與載入
+
+- `showAppNotice` 只用於成功、離線/重連等低風險短狀態。
+- `showAppError` 使用持續顯示的 `MaterialBanner`，有 live-region semantics、關閉動作，並可用 `onRetry` 加入重試。新錯誤會取代目前 banner。
+- `AppListLoadingSkeleton(itemCount: 4)` 與 `AppMapLoadingSkeleton` 保留預期版型並提供載入 semantics。
+- skeleton 是靜態的，不使用 shimmer；這避免無意義的持續動畫，也符合 reduced-motion 基線。
+
+```dart
+void showAppError(
+  BuildContext context,
+  String message, {
+  VoidCallback? onRetry,
+});
+
+const AppListLoadingSkeleton({Key? key, int itemCount = 4});
+const AppMapLoadingSkeleton({Key? key});
+```
+
+`AppListLoadingSkeleton.itemCount` 必須大於 `0`。只有操作確實可以安全重送時才提供 `onRetry`。
+
+## App Icon
+
+App Icon 的圓角座標定位圖釘與中央指南針箭頭是固定品牌識別，不因 Apple Music 視覺對標而替換。iOS 由系統套用遮罩，Default/Dark/Tinted 維持相同輪廓；Android 沿用各 density launcher icon。完整規格見 [Tripline App Icon 設計規格](superpowers/specs/2026-07-14-tripline-app-icon-design.md)。
 
 ## POI type → tone 對照
 
@@ -97,5 +223,6 @@ abstract final class AppTheme {
 ## 相關文件
 
 - [How to 新增畫面](howto-add-screen.md) — 新畫面如何正確取用 token 與 tone
+- [自適應 UI 設計理由](explanation-adaptive-ui.md) — Apple Music/HIG 對標、反方意見與取捨
 - [架構說明](explanation-architecture.md) — theme 在分層中的位置
 - [`discovery/design.md`](discovery/design.md) — 完整 token 對照與設計規範調查

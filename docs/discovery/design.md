@@ -2,6 +2,8 @@
 
 > 權威來源優先序：`css/tokens.css` `@theme`（實作 canonical）↔ `DESIGN.md`（規範）。`docs/design-sessions/2026-06-06-three-color-system.md` 是探索 spec（標註「尚未實作」），**現已落地進 tokens.css（v2.53+），少數 dark 色值以 tokens.css 為準**（如 dark sage-deep：doc `#A4CBAF` → 實際 `#A8D0B4`；dark 粉 subtle/bg 改加強版 `#4A2A3A`/`#6B3F52`）。
 
+> 本檔保留 Web → Flutter 的來源調查與早期建議，不是 Flutter 現行 UI 的 source of truth。現行規格已改為系統字、`768px` 起使用 `NavigationRail`、平台自適應控制項與持續錯誤 banner；請以 [`reference-theme.md`](../reference-theme.md) 與 [`explanation-adaptive-ui.md`](../explanation-adaptive-ui.md) 為準。
+
 ---
 
 ## 1. DESIGN.md 摘要
