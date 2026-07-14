@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../models/day.dart';
 import '../../../models/poi_note.dart';
@@ -187,7 +188,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           return;
         }
       }
-      showAppNotice(context, '加入行程失敗,請稍後再試');
+      showAppError(context, '加入行程失敗，請稍後再試');
     }
   }
 

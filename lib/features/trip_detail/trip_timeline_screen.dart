@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
@@ -354,10 +355,10 @@ class _TimelineBodyState extends State<_TimelineBody> {
           activeDayNum: _activeDayNum,
           onDaySelected: _scrollToDay,
         ),
-          Expanded(
-            child: SingleChildScrollView(
-              key: _scrollViewportKey,
-              controller: _scrollController,
+        Expanded(
+          child: SingleChildScrollView(
+            key: _scrollViewportKey,
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
               TpSpacing.s4,
@@ -485,7 +486,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        showAppNotice(context, '排序失敗，請稍後再試');
+        showAppError(context, '排序失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -515,7 +516,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        showAppNotice(context, '搬移失敗，請稍後再試');
+        showAppError(context, '搬移失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;

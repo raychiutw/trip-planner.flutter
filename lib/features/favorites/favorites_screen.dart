@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
@@ -311,9 +312,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         : failed < ids.length
         ? '已刪除 ${ids.length - failed} 個，$failed 個失敗'
         : '刪除失敗，請稍後再試';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    if (failed == 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } else {
+      showAppError(context, message);
+    }
   }
 
   Future<void> _confirmRemove(
@@ -337,7 +342,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       HapticFeedback.selectionClick();
     } on Exception {
       if (!context.mounted) return;
-      showAppNotice(context, '取消收藏失敗，請稍後再試');
+      showAppError(context, '取消收藏失敗，請稍後再試');
     }
   }
 }

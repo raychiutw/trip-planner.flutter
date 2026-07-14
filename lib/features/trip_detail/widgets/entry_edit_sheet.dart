@@ -8,6 +8,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/day.dart';
+import '../../../app/app_feedback.dart';
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
@@ -263,15 +264,15 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       if (error.status == 409) {
         ref.invalidate(tripDaysProvider(widget.tripId));
         Navigator.of(context).pop();
-        showAppNotice(context, '此停留點已更新，已重新載入，請再編輯一次');
+        showAppError(context, '此停留點已更新，已重新載入，請再編輯一次');
         return;
       }
       setState(() => _submitting = false);
-      showAppNotice(context, '儲存失敗，請稍後再試');
+      showAppError(context, '儲存失敗，請稍後再試');
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showAppNotice(context, '儲存失敗，請稍後再試');
+      showAppError(context, '儲存失敗，請稍後再試');
     }
   }
 

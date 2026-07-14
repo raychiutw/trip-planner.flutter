@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
@@ -411,13 +412,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       final file = await ref.read(tripImportFilePickerProvider).pick();
       if (!mounted || file == null) return;
       if (file.length > _maxTripImportBytes) {
-        _showActionMessage('檔案過大（上限 512KB）');
+        _showActionMessage('檔案過大（上限 512KB）', isError: true);
         return;
       }
 
       final decodedJson = jsonDecode(file.content);
       if (decodedJson is! Map || decodedJson['schemaVersion'] != 1) {
-        _showActionMessage('不支援的匯出格式（需 schemaVersion 1）');
+        _showActionMessage('不支援的匯出格式（需 schemaVersion 1）', isError: true);
         return;
       }
 
@@ -430,13 +431,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       context.go('/trips/$tripId');
     } on FormatException {
       if (!mounted) return;
-      _showActionMessage('不是有效的 JSON 檔');
+      _showActionMessage('不是有效的 JSON 檔', isError: true);
     } on ApiError catch (error) {
       if (!mounted) return;
-      _showActionMessage(error.detail ?? error.message);
+      _showActionMessage(error.detail ?? error.message, isError: true);
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯入失敗，請稍後再試');
+      _showActionMessage('匯入失敗，請稍後再試', isError: true);
     } finally {
       if (mounted) {
         setState(() => _isImporting = false);
@@ -458,7 +459,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _showActionMessage(saved ? '匯出成功' : '已取消匯出');
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯出失敗，請稍後再試');
+      _showActionMessage('匯出失敗，請稍後再試', isError: true);
     } finally {
       if (mounted) {
         setState(() => _exportingTripId = null);
@@ -466,7 +467,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     }
   }
 
-  void _showActionMessage(String message) {
+  void _showActionMessage(String message, {bool isError = false}) {
+    if (isError) {
+      showAppError(context, message);
+      return;
+    }
     showAppNotice(context, message);
   }
 
@@ -583,7 +588,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       HapticFeedback.mediumImpact();
     } on Exception {
       if (!context.mounted) return;
-      showAppNotice(context, '刪除失敗，請稍後再試');
+      showAppError(context, '刪除失敗，請稍後再試');
     }
   }
 }

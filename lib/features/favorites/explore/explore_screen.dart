@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
 import '../../../models/add_to_trip.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
@@ -104,7 +105,13 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       next,
     ) {
       if (next != null && next != prev) {
-        showAppNotice(context, next);
+        showAppError(
+          context,
+          next,
+          onRetry: () => ref
+              .read(exploreControllerProvider.notifier)
+              .search(ref.read(exploreControllerProvider).query),
+        );
       }
     });
 

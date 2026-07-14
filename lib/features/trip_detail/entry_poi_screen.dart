@@ -9,6 +9,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../api/trip_repository.dart' show CustomEntryPoi;
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/poi_favorite.dart';
@@ -68,13 +69,10 @@ class EntryPoiScreen extends ConsumerWidget {
     } on ApiError catch (error) {
       ref.invalidate(entryDetailProvider(_key));
       if (!context.mounted) return;
-      showAppNotice(
-        context,
-        error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試',
-      );
+      showAppError(context, error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試');
     } on Exception {
       if (!context.mounted) return;
-      showAppNotice(context, '操作失敗，請稍後再試');
+      showAppError(context, '操作失敗，請稍後再試');
     }
   }
 
@@ -625,9 +623,7 @@ Future<void> _openReservationUrl(
     await launcher(url);
   } on Exception {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('無法開啟訂位連結')));
+    showAppError(context, '無法開啟訂位連結');
   }
 }
 
