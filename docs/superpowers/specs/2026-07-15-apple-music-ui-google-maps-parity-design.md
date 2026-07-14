@@ -2,7 +2,7 @@
 
 日期：2026-07-15
 
-狀態：已核准設計，待書面規格複核
+狀態：已核准，依 2026-07-15 第二意見與 Liquid Glass 決策修訂
 
 ## 目標
 
@@ -14,28 +14,40 @@
 
 - 使用 `google_maps_flutter` 取代 `flutter_map`、OpenStreetMap、OpenTopoMap 與 Esri tile。
 - iOS 與 Android 同步完成原生 SDK、金鑰注入與 CI 設定。
-- 保留 Riverpod、GoRouter、現有資料模型、design tokens 與可重用元件。
+- 保留 Riverpod、GoRouter與現有資料模型；既有 design tokens 可演進成新的 Tripline UI 系統，舊元件只有在符合新層級與可及性規則時才保留。
 - 採同一 Flutter 功能分支、分批提交、最後建立一個 PR；Web 後端使用獨立 worktree。
 - `/map` 對齊 Web 的目前行程地圖，不再以收藏色點作為主要模型。
 - 不建立雙地圖引擎、provider abstraction 或 OSM fallback。
 - 不為了 Apple Music 相似度改變 Tripline 的木棕品牌識別。
+- 根分頁採 iOS 26 Apple 式浮動 Tab Bar 與 Liquid Glass 功能層；Flutter 實作等效視覺、捲動縮減、語意與降級，不宣稱使用原生 SwiftUI `TabView`。
 
 ## 交付切片
 
 ### 1. UI 基礎、Root Shell 與 P0 狀態
 
-先整理既有 tokens，不建立第二套設計系統：
+建立一套精簡且單一來源的 Tripline UI 系統；直接演進既有 tokens，不讓新舊兩套長期並存：
+
+- `TpGlassSurface`：Tab bar、浮動 toolbar 與短暫控制的共用玻璃容器，集中處理 blur、tint、border、shadow、深淺模式與高對比降級。
+- `TpRootScrollScaffold`：根頁 large title、inline title、safe area、可縮減 Tab 通知與底部內容 inset。
+- `TpContentSurface`：只在卡片本身就是互動或語意群組時使用的標準內容材質，不使用玻璃。
+- `TpSettingsGroup`：帳號、通知、外觀與安全頁的 inset grouped row、divider、disclosure 與 destructive hierarchy。
+- `TpStateView`：loading、empty、no result、offline、permission 與 error 的統一結構與動作位置。
+- 新元件依 4pt spacing、44pt 最小觸控、Dynamic Type 與語意 label 建立；禁止畫面自行硬編 blur、陰影、圓角與底部 inset。
 
 - `content canvas` 保留暖奶油底。
 - `content surface` 用於卡片、表單、空狀態，以細微明度差取代厚重邊框。
-- `functional material` 用於 Tab bar、toolbar、sheet，採可讀性穩定的半透明材質。
+- `functional material` 用於 Tab bar、toolbar、sheet，採 Liquid Glass 等效半透明材質；內容卡片與頁面背景維持標準 material，不把玻璃鋪滿內容層。
 - 木棕只用於品牌與主要動作；一般文字改用高對比中性色，錯誤、成功、協作與收藏使用語意色。
 - 根頁統一 large title，捲動後收為 inline title；次層頁固定 inline title。
-- 底部 Tab 移除選取大膠囊，改為一致 icon + label，選取時兩者使用品牌 accent。
+- 底部 Tab 改成浮在內容上方的 Apple 式玻璃功能層，內容可在其下方滑過；正常狀態顯示一致 icon + 單字 label，選取以填滿 icon、字重與品牌 accent 辨識，不使用厚重的 Material 選取膠囊。
 - 根 Tab 切換不做水平 push 動畫；Tab bar 保持固定，內容淡入並保留各 Tab 捲動位置。
-- iOS／Android 的長列表向下捲時縮小 bar、向上捲或停止時恢復；Flutter Web 維持穩定尺寸，僅作響應式與視覺 QA。
+- iPhone 長列表向下捲時縮成只保留圖示的緊湊浮動 bar，向上捲、點目前 Tab 或回到頂端時恢復；Android 採同一可理解行為但保留平台返回語意；Flutter Web 維持展開尺寸，僅作響應式與視覺 QA。
+- 五個根 Tab 固定為「聊天、行程、地圖、收藏、帳號」，全部只負責導覽、始終可見且保留各分頁導覽與捲動狀態；不得把新增、匯入或其他 action 放進 Tab。
+- Glass surface 使用 backdrop blur、淡色 tint、1px 高光邊界與極輕陰影。淺色／深色模式分開取樣；高對比或無法安全判定透明偏好時提高不透明度，文字與 icon 仍達可讀對比。
+- Glass 互動只做 150–250ms 的尺寸、透明度與色彩轉場；Reduce Motion／`disableAnimations` 時立即切換，禁止彈跳、縮放與大範圍位移。
 - 「新增行程」從底部 FAB 移到行程頁 toolbar 的 `+`，避免遮住列表並與 Tab bar 競爭。
 - 所有 toolbar、safe area、鍵盤與小螢幕邊距使用同一規則。
+- 根頁 large title 的展開與 inline 狀態必須與實際捲動綁定；次層頁只用 inline title。每個頂部 toolbar 最多兩個可見 trailing action，其餘收進具名「更多」選單。
 - 新增、收藏與協作成功使用輕微平台 haptic；錯誤只用清楚文案與語意色，不使用懲罰性的強烈震動。
 
 Root 頁面需區分 loading、第一次使用、無資料、搜尋無結果、離線、權限不足與載入失敗。行程顯示 2–3 張結構骨架；聊天顯示對話骨架與文字；地圖先保留地圖容器再疊局部 loading。超過約兩秒才補充較完整的狀態文案，失敗留在原頁並提供重試。
@@ -79,6 +91,7 @@ Root 頁面需區分 loading、第一次使用、無資料、搜尋無結果、�
 - 移除無語意的大型數字封面；已有可用目的地影像時顯示影像，否則使用緊湊日期／目的地色塊，不新增圖片服務。
 - 卡片需清楚顯示名稱、日期、國家、天數與擁有者；提高單屏資訊量。
 - 搜尋使用較緊湊的系統密度；「全部／我的／共編」緊接搜尋並可橫向捲動，選取不只依賴低對比底色。
+- 搜尋預設涵蓋全部內容；scope 只在會明顯改變結果集合時出現。搜尋欄、scope 與 filter 不得同時形成三列常駐控制。
 
 #### 行程詳情
 
@@ -135,6 +148,7 @@ Web 後端 worktree 的修改只允許：
 - API 離線時保留已有快取內容並顯示非阻斷提示；mutation 仍沿用現有 OCC／離線佇列規則。
 - Reduce Motion 關閉非必要位移與 shimmer；Reduce Transparency 時功能層改用不透明高對比 surface。
 - Dynamic Type 放大時 toolbar 動作收進更多選單，卡片高度可成長，不裁切文字。
+- 所有互動目標最小 44×44pt，正文基準 17pt、輔助文字不小於 11pt；200% Dynamic Type 下 Tab label、標題、表單 label 與主要動作仍可辨識且不互相覆蓋。
 
 ## 驗證與完成標準
 
@@ -142,6 +156,7 @@ Web 後端 worktree 的修改只允許：
 
 - 純 Dart 測試：map view model、日／景點同步、單點 bounds、錯誤分類、人類時間與 scope 翻譯。
 - Widget tests：Tab semantics、FAB／icon actions 名稱、root state variants、表單 label/error、toolbar overflow、map card/day interaction。
+- Shell widget tests：五個 Tab 固定且皆有 label／selected semantics、內容延伸到浮動 bar 後方、垂直向下捲縮減、向上捲恢復、水平捲動不觸發、停用動畫時沒有轉場、Web 不縮減。
 - Platform configuration tests：iOS plist/build setting 與 Android manifest placeholder 存在，repository 無新增明文 key。
 - 若修改後端：API schema／相容性測試及該 repo 的既有完整測試。
 - 靜態驗證：`dart format --output=none --set-exit-if-changed .`、`flutter analyze --no-fatal-infos`、`flutter test`。
@@ -149,6 +164,8 @@ Web 後端 worktree 的修改只允許：
 - Runtime QA：Flutter Web 重新跑 390×844、320×568 登入後全頁巡檢；iOS 與 Android 實機驗證地圖手勢、定位、safe area、鍵盤、Dynamic Type、Reduce Motion／Transparency 與 VoiceOver／TalkBack 關鍵流程。
 
 完成需逐項回查 2026-07-14 稽核報告：每個具體 finding 必須有程式碼、測試或 runtime 截圖證據；需要新 API 的項目必須完成後端 additive change，不能只列為待辦。只有受外部平台限制、無法由產品程式控制的項目可以在 PR 中明確記錄限制。
+
+Tab／材質驗收以 Apple 官方現行規範為準：Tab Bar 是根層導覽而非 action、在 iPhone 浮於內容上並以 Liquid Glass 顯示底下內容；Liquid Glass 只形成控制與導覽的功能層，內容層使用標準材質。參考：[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)、[Materials](https://developer.apple.com/design/human-interface-guidelines/materials)、[Build a SwiftUI app with the new design](https://developer.apple.com/videos/play/wwdc2025/323/)。
 
 ## 提交順序
 
