@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,16 +30,33 @@ GoRouter buildShellRouter() {
 
 void main() {
   group('AppShell 5-tab 導航', () {
-    testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
+    Future<void> setWindowSize(WidgetTester tester, Size size) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(() {
+        tester.view.resetDevicePixelRatio();
+        tester.view.resetPhysicalSize();
+      });
+    }
+
+    Future<void> pumpShell(
+      WidgetTester tester, {
+      TargetPlatform platform = TargetPlatform.android,
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
-            theme: AppTheme.light(),
+            theme: AppTheme.light().copyWith(platform: platform),
             routerConfig: buildShellRouter(),
           ),
         ),
       );
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('窄版 Android 顯示 5 個底部 tab 並可切換 branch', (tester) async {
+      await setWindowSize(tester, const Size(390, 844));
+      await pumpShell(tester);
 
       // 初始 branch 0
       expect(find.text('PROBE-CHAT'), findsOneWidget);
@@ -54,6 +72,32 @@ void main() {
       await tester.tap(find.text('帳號'));
       await tester.pumpAndSettle();
       expect(find.text('PROBE-ACCOUNT'), findsOneWidget);
+    });
+
+    testWidgets('窄版 iOS 使用 Cupertino tab bar', (tester) async {
+      await setWindowSize(tester, const Size(390, 844));
+      await pumpShell(tester, platform: TargetPlatform.iOS);
+
+      expect(find.byType(CupertinoTabBar), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+
+      await tester.tap(find.text('收藏'));
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-FAV'), findsOneWidget);
+    });
+
+    testWidgets('寬版改用側邊 NavigationRail 並保留 5 個入口', (tester) async {
+      await setWindowSize(tester, const Size(1024, 768));
+      await pumpShell(tester);
+
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      expect(rail.destinations, hasLength(5));
+
+      await tester.tap(find.text('地圖'));
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
     });
   });
 }
