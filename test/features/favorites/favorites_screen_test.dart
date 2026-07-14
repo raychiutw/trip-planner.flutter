@@ -263,6 +263,10 @@ void main() {
       );
       await tester.pump();
 
+      expect(find.byKey(const ValueKey('favorite-select-7')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('favorites-select-mode')));
+      await tester.pump();
+
       await tester.tap(find.byKey(const ValueKey('favorite-select-7')));
       await tester.tap(find.byKey(const ValueKey('favorite-select-8')));
       await tester.pump();
@@ -290,7 +294,7 @@ void main() {
       expect(fetchCount, 2); // 初載 + 批次刪除後 invalidate refresh
     });
 
-    testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {
+    testWidgets('收藏達 200 筆時使用懶載入連續清單，不顯示假分頁', (tester) async {
       final favorites = _manyFavorites();
       await tester.pumpWidget(
         ProviderScope(
@@ -304,22 +308,18 @@ void main() {
 
       expect(find.text('收藏地點 1'), findsOneWidget);
       expect(find.text('收藏地點 25'), findsNothing);
+      expect(find.byType(PoiFavoriteCard), findsWidgets);
+      expect(find.byType(PoiFavoriteCard), isNot(findsNWidgets(200)));
+      expect(find.byKey(const ValueKey('favorites-pagination')), findsNothing);
 
-      final pagination = find.byKey(const ValueKey('favorites-pagination'));
       final scrollView = find.byType(CustomScrollView);
-      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
-        await tester.drag(scrollView, const Offset(0, -500));
-        await tester.pump();
-      }
-      expect(pagination, findsOneWidget);
-      expect(find.text('1-24 / 200'), findsOneWidget);
-      expect(find.text('第 1 / 9 頁'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
-      await tester.pump();
-
-      expect(find.text('25-48 / 200'), findsOneWidget);
-      expect(find.text('第 2 / 9 頁'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('收藏地點 30'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+        maxScrolls: 30,
+      );
+      expect(find.text('收藏地點 30'), findsOneWidget);
 
       await tester.fling(scrollView, const Offset(0, 5000), 10000);
       await tester.pumpAndSettle();
@@ -329,11 +329,6 @@ void main() {
       await tester.pump();
 
       expect(find.text('收藏地點 1', skipOffstage: false), findsWidgets);
-      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
-        await tester.drag(scrollView, const Offset(0, -500));
-        await tester.pump();
-      }
-      expect(find.text('第 1 / 5 頁'), findsOneWidget);
       expect(find.byType(PoiFavoriteCard), findsWidgets);
     });
 

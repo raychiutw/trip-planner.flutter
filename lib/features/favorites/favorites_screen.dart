@@ -21,9 +21,6 @@ const _typeFilterOptions = [
   _TypeFilterOption(key: 'hotel', label: '住宿'),
 ];
 
-const _favoritesPageSize = 24;
-const _favoritesPaginationThreshold = 200;
-
 final _regionRules = [
   MapEntry(RegExp('沖縄|沖繩', caseSensitive: false), '沖繩'),
   MapEntry(RegExp('京都'), '京都'),
@@ -48,8 +45,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _typeFilter = 'all';
   String _regionFilter = 'all';
   Set<int> _selectedIds = {};
+  bool _selectionMode = false;
   bool _deletingSelected = false;
-  int _page = 1;
 
   @override
   void dispose() {
@@ -71,6 +68,16 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               pinned: true,
               title: const Text('收藏'),
               actions: [
+                if (favoritesAsync.value?.isNotEmpty ?? false)
+                  TextButton(
+                    key: const ValueKey('favorites-select-mode'),
+                    onPressed: _deletingSelected
+                        ? null
+                        : _selectionMode
+                        ? _exitSelectionMode
+                        : () => setState(() => _selectionMode = true),
+                    child: Text(_selectionMode ? '完成' : '選取'),
+                  ),
                 IconButton(
                   key: const ValueKey('favorites-explore-action'),
                   tooltip: '探索',
@@ -122,103 +129,80 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
     final regionCounts = _regionCountsFor(favorites);
     final regionOptions = _regionOptionsFor(regionCounts);
-    final usePagination = favorites.length >= _favoritesPaginationThreshold;
-    final totalPages = usePagination && filteredFavorites.isNotEmpty
-        ? (filteredFavorites.length / _favoritesPageSize).ceil()
-        : 1;
-    final page = _page.clamp(1, totalPages).toInt();
-    if (page != _page) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _page = page);
-      });
-    }
-    final visibleFavorites = usePagination
-        ? filteredFavorites
-              .skip((page - 1) * _favoritesPageSize)
-              .take(_favoritesPageSize)
-              .toList()
-        : filteredFavorites;
+
+    final controls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SearchField(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        if (regionOptions.length >= 2) ...[
+          _RegionFilterRow(
+            selected: _regionFilter,
+            counts: regionCounts,
+            options: regionOptions,
+            onSelected: (value) => setState(() => _regionFilter = value),
+          ),
+          const SizedBox(height: TpSpacing.s3),
+        ],
+        _TypeFilterRow(
+          selected: _typeFilter,
+          onSelected: (value) => setState(() => _typeFilter = value),
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        if (_selectionMode) ...[
+          _BulkToolbar(
+            selectedCount: _selectedIds.length,
+            deleting: _deletingSelected,
+            onSelectAll: () => _selectAllVisible(filteredFavorites),
+            onClear: _clearSelection,
+            onDelete: _confirmDeleteSelected,
+          ),
+          const SizedBox(height: TpSpacing.s3),
+        ],
+      ],
+    );
 
     return [
       SliverPadding(
         padding: const EdgeInsets.all(TpSpacing.s4),
-        sliver: SliverList(
-          delegate: SliverChildListDelegate([
-            _SearchField(
-              controller: _searchController,
-              onChanged: (value) => setState(() {
-                _searchQuery = value;
-                _page = 1;
-              }),
-              onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            if (regionOptions.length >= 2) ...[
-              _RegionFilterRow(
-                selected: _regionFilter,
-                counts: regionCounts,
-                options: regionOptions,
-                onSelected: (value) => setState(() {
-                  _regionFilter = value;
-                  _page = 1;
-                }),
-              ),
-              const SizedBox(height: TpSpacing.s3),
-            ],
-            _TypeFilterRow(
-              selected: _typeFilter,
-              onSelected: (value) => setState(() {
-                _typeFilter = value;
-                _page = 1;
-              }),
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            if (_selectedIds.isNotEmpty) ...[
-              _BulkToolbar(
-                selectedCount: _selectedIds.length,
-                deleting: _deletingSelected,
-                onSelectAll: () => _selectAllVisible(visibleFavorites),
-                onClear: _clearSelection,
-                onDelete: _confirmDeleteSelected,
-              ),
-              const SizedBox(height: TpSpacing.s3),
-            ],
-            if (filteredFavorites.isEmpty)
-              _NoSearchResult(onClear: _clearAllFilters)
-            else
-              for (final favorite in visibleFavorites) ...[
-                PoiFavoriteCard(
-                  favorite: favorite,
-                  selected: _selectedIds.contains(favorite.id),
-                  onSelectedChanged: _deletingSelected
-                      ? null
-                      : (_) => _toggleFavoriteSelection(favorite.id),
-                  onRemove: () => _confirmRemove(context, ref, favorite),
-                  onAddToTrip: () => context.go(
-                    '/favorites/add-to-trip',
-                    extra: AddToTripFavorite(
-                      favoriteId: favorite.id,
-                      displayName: favorite.displayName,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: TpSpacing.s3),
-              ],
-            if (usePagination && filteredFavorites.isNotEmpty)
-              _PaginationControls(
-                page: page,
-                totalPages: totalPages,
-                start: (page - 1) * _favoritesPageSize + 1,
-                end: (page - 1) * _favoritesPageSize + visibleFavorites.length,
-                total: filteredFavorites.length,
-                onPrevious: page <= 1
+        sliver: SliverList.builder(
+          itemCount: filteredFavorites.isEmpty
+              ? 2
+              : filteredFavorites.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) return controls;
+            if (filteredFavorites.isEmpty) {
+              return _NoSearchResult(onClear: _clearAllFilters);
+            }
+
+            final favorite = filteredFavorites[index - 1];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+              child: PoiFavoriteCard(
+                favorite: favorite,
+                selected: _selectedIds.contains(favorite.id),
+                onSelectedChanged: !_selectionMode || _deletingSelected
                     ? null
-                    : () => setState(() => _page = page - 1),
-                onNext: page >= totalPages
+                    : (_) => _toggleFavoriteSelection(favorite.id),
+                onRemove: _selectionMode
                     ? null
-                    : () => setState(() => _page = page + 1),
+                    : () => _confirmRemove(context, ref, favorite),
+                onAddToTrip: _selectionMode
+                    ? null
+                    : () => context.go(
+                        '/favorites/add-to-trip',
+                        extra: AddToTripFavorite(
+                          favoriteId: favorite.id,
+                          displayName: favorite.displayName,
+                        ),
+                      ),
               ),
-          ]),
+            );
+          },
         ),
       ),
     ];
@@ -228,7 +212,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     _searchController.clear();
     setState(() {
       _searchQuery = '';
-      _page = 1;
     });
   }
 
@@ -239,7 +222,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       _typeFilter = 'all';
       _regionFilter = 'all';
       _selectedIds = {};
-      _page = 1;
+      _selectionMode = false;
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds = {};
     });
   }
 
@@ -269,24 +259,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('確定刪除收藏？'),
-        content: Text('即將刪除 ${ids.length} 個收藏景點，此操作無法復原。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('保留'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('刪除'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirm(
+      context,
+      title: '確定刪除收藏？',
+      message: '即將刪除 ${ids.length} 個收藏景點，此操作無法復原。',
+      confirmLabel: '刪除',
+      cancelLabel: '保留',
+      isDestructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _deletingSelected = true);
     final repository = ref.read(favoritesRepositoryProvider);
@@ -304,6 +285,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     if (!mounted) return;
     setState(() {
       _selectedIds = {};
+      _selectionMode = false;
       _deletingSelected = false;
     });
 
@@ -313,9 +295,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ? '已刪除 ${ids.length - failed} 個，$failed 個失敗'
         : '刪除失敗，請稍後再試';
     if (failed == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      showAppNotice(context, message);
     } else {
       showAppError(context, message);
     }
@@ -553,7 +533,7 @@ class _BulkToolbar extends StatelessWidget {
             ),
             FilledButton.tonalIcon(
               key: const ValueKey('favorites-delete-selected'),
-              onPressed: deleting ? null : onDelete,
+              onPressed: deleting || selectedCount == 0 ? null : onDelete,
               icon: deleting
                   ? const SizedBox.square(
                       dimension: 16,
@@ -564,59 +544,6 @@ class _BulkToolbar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PaginationControls extends StatelessWidget {
-  const _PaginationControls({
-    required this.page,
-    required this.totalPages,
-    required this.start,
-    required this.end,
-    required this.total,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final int page;
-  final int totalPages;
-  final int start;
-  final int end;
-  final int total;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      key: const ValueKey('favorites-pagination'),
-      padding: const EdgeInsets.only(top: TpSpacing.s2),
-      child: Row(
-        children: [
-          IconButton(
-            key: const ValueKey('favorites-page-prev'),
-            tooltip: '上一頁',
-            onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$start-$end / $total'),
-                Text('第 $page / $totalPages 頁'),
-              ],
-            ),
-          ),
-          IconButton(
-            key: const ValueKey('favorites-page-next'),
-            tooltip: '下一頁',
-            onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
-          ),
-        ],
       ),
     );
   }

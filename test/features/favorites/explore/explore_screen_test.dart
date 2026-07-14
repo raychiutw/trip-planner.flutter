@@ -77,7 +77,7 @@ void main() {
     expect(find.text('首里城'), findsNothing);
   });
 
-  testWidgets('手動搜尋 <2 字 → SnackBar 提示', (tester) async {
+  testWidgets('手動搜尋 <2 字 → 持續錯誤提示', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -89,6 +89,49 @@ void main() {
     await tester.pump();
 
     expect(find.text('至少輸入 2 個字'), findsOneWidget);
+  });
+
+  testWidgets('離開再返回探索頁會保留搜尋文字與結果', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        poiRepositoryProvider.overrideWithValue(poi),
+        favoritesRepositoryProvider.overrideWithValue(fav),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    Widget app(Widget home) => UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(theme: AppTheme.light(), home: home),
+    );
+
+    await tester.pumpWidget(app(const ExploreScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      '大阪景點',
+    );
+    await tester.tap(find.byKey(const ValueKey('explore-search-button')));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(app(const Scaffold(body: Text('OTHER'))));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(app(const ExploreScreen()));
+    await tester.pumpAndSettle();
+
+    final searchField = tester.widget<TextField>(
+      find.byKey(const ValueKey('explore-search-field')),
+    );
+    expect(searchField.controller?.text, '大阪景點');
+    expect(find.byType(PoiSearchCard), findsNWidgets(2));
+    verify(
+      () => poi.searchPois(
+        q: '大阪景點',
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   testWidgets('點 heart → 觸發 find-or-create + addFavorite', (tester) async {

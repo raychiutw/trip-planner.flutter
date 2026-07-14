@@ -33,16 +33,20 @@ class ExploreScreen extends ConsumerStatefulWidget {
 }
 
 class _ExploreScreenState extends ConsumerState<ExploreScreen> {
-  final _searchController = TextEditingController();
+  late final TextEditingController _searchController;
 
   @override
   void initState() {
     super.initState();
+    final savedState = ref.read(exploreControllerProvider);
+    _searchController = TextEditingController(text: savedState.query);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final controller = ref.read(exploreControllerProvider.notifier);
       await controller.ensureSavedLoaded();
-      final region = ref.read(exploreControllerProvider).region;
-      await controller.search(region != '全部地區' ? region : '東京');
+      final state = ref.read(exploreControllerProvider);
+      if (!state.hasSearched) {
+        await controller.search(state.region != '全部地區' ? state.region : '東京');
+      }
     });
   }
 

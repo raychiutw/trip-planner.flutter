@@ -12,14 +12,14 @@ class PoiFavoriteCard extends StatelessWidget {
   const PoiFavoriteCard({
     super.key,
     required this.favorite,
-    required this.onRemove,
+    this.onRemove,
     this.onAddToTrip,
     this.selected = false,
     this.onSelectedChanged,
   });
 
   final PoiFavorite favorite;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
   final VoidCallback? onAddToTrip;
   final bool selected;
   final ValueChanged<bool>? onSelectedChanged;
@@ -115,12 +115,13 @@ class PoiFavoriteCard extends StatelessWidget {
               icon: const Icon(Icons.add_location_alt_outlined),
               onPressed: onAddToTrip,
             ),
-          IconButton(
-            key: ValueKey('favorite-remove-${favorite.id}'),
-            tooltip: '取消收藏',
-            icon: Icon(CupertinoIcons.heart_fill, color: tones.pink),
-            onPressed: onRemove,
-          ),
+          if (onRemove != null)
+            IconButton(
+              key: ValueKey('favorite-remove-${favorite.id}'),
+              tooltip: '取消收藏',
+              icon: Icon(CupertinoIcons.heart_fill, color: tones.pink),
+              onPressed: onRemove,
+            ),
         ],
       ),
     );
