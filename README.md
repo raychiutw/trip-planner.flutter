@@ -10,7 +10,7 @@
 - 行程清單（三色 tone 卡片、pull-to-refresh、長按刪除）
 - 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
 - 行程地圖（flutter_map + OSM、逐日 pin、day tabs、entry cards 同步）
-- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
+- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
 - 帳號（profile、統計、登出）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
@@ -48,6 +48,8 @@ docs/
 | 懂整體設計與取捨 | [架構說明](docs/explanation-architecture.md) |
 | 新增 API endpoint | [How to 新增 API endpoint](docs/howto-add-endpoint.md) |
 | 新增畫面 | [How to 新增畫面](docs/howto-add-screen.md) |
+| 改連本機後端 | [How to 指向本機後端](docs/howto-local-backend.md) |
+| 啟用 OAuth PKCE | [How to 啟用 OAuth PKCE](docs/howto-oauth-pkce.md) |
 | 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
 | 查 API 層介面 | [reference-api](docs/reference-api.md) |
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |

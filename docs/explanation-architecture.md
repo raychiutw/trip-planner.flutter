@@ -99,11 +99,11 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 
 ## 為什麼 flutter_map(OSM)而不是 google_maps_flutter
 
-免 API key、零帳務設定,個人專案的維運成本最低。已知取捨:OSM tile 風格較陽春、無 Google POI 資料。介面上地圖只在 `TripMapScreen` 一處,之後要換 google_maps_flutter 影響面有限。
+免 API key、零帳務設定,個人專案的維運成本最低。已知取捨:OSM tile 風格較陽春、無 Google POI 資料。`TripMapScreen` 與 `GlobalMapScreen` 都透過 `features/map/map_adapter.dart` 集中 SDK 轉接；日後替換 google_maps_flutter 時，平台地圖差異留在 adapter，而不是散進兩個畫面。
 
 ## OCC(樂觀並行控制)
 
-`TripDay`/`TimelineEntry`/notes row 都帶 `version` 欄位。後端 PATCH 要求 `expectedVersion`,版本不符回 409 `STALE_ENTRY`,client 應重抓再套用。P0 全唯讀所以尚未用到,但 model 已保留 `version` — P1 做 Entry CRUD 時直接可用。
+`TripDay`/`TimelineEntry`/notes row 都帶 `version` 欄位。後端 PATCH 要求 `expectedVersion`,版本不符回 409 `STALE_ENTRY`。現行 Entry、segment 與 notes CRUD 會傳入版本；遇到 409 時重新抓取或 invalidate 對應 provider，避免以舊資料覆蓋協作者的更新。
 
 ## 測試策略
 

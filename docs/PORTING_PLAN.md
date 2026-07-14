@@ -3,6 +3,8 @@
 > 來源：trip-planner React SPA（https://github.com/raychiutw/trip-planner）
 > 後端不變：Cloudflare Pages Functions API（https://trip-planner-dby.pages.dev/api）
 > 詳細調查報告：`docs/discovery/{screens,api-auth,models,design}.md`
+>
+> 本檔保留移植範圍與架構決策；P0/P1/P2 已完成。現行 UI 規格以 [`reference-theme.md`](reference-theme.md) 與 [`explanation-adaptive-ui.md`](explanation-adaptive-ui.md) 為準。
 
 ## 架構決策
 
@@ -71,6 +73,6 @@ test/                       # 與 lib/ 鏡像
 - 主色柔褐 `#A97A4A`（dark `#CBA06E`），奶油底 `#FFFBF5`（dark `#1A140F`）
 - 三色系統：玩/看/買=柔褐 accent、住/移動=sage `#A8BAAA`、吃=粉 `#E78C99`，各 4 階（base/deep/subtle/bg）
 - 卡片：elevation 0 + 1px hairline `#EADFCF`、radius 8；shadow 只給浮層
-- 字體：Inter → Noto Sans TC fallback；中文內文 16/26；時間 tabular-nums
-- Bottom nav：高 88（含 safe area）、glass blur、active = accent + accent-subtle pill
+- 字體：平台系統字（iOS/macOS SF Pro、Android Roboto，中文走系統 fallback）；主要內文 17/26；時間 tabular-nums
+- 導覽：compact iOS/macOS 用 `CupertinoTabBar`、Android 用 `NavigationBar`；寬度 `>=768` 改用 `NavigationRail`
 - 禁止：gradient 裝飾、emoji icon、rainbow 色（地圖 polyline 例外）
