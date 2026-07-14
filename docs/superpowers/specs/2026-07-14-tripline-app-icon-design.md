@@ -15,7 +15,7 @@
 
 ## 綁定
 
-- iOS：沿用 `Assets.xcassets/AppIcon.appiconset`，提供 Default、Dark、Tinted 三個 1024×1024 主檔，並更新既有 iPhone/iPad 尺寸。
+- iOS：沿用 `Assets.xcassets/AppIcon.appiconset` 的 Single Size 格式，提供 Default、Dark、Tinted 三個 1024×1024 主檔，由 Xcode 產生各 iPhone/iPad 尺寸。
 - Android：沿用既有 `mipmap-* / ic_launcher.png`，使用 Default 版本縮放覆蓋，不新增套件或啟動圖示框架。
 - 不變更 Bundle ID、簽章、啟動畫面或 App 內 UI。
 
