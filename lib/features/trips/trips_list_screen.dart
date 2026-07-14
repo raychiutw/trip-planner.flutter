@@ -500,13 +500,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             currentUserId: currentUserId,
             onTap: () => context.go('/trips/${trip.tripId}'),
             onLongPress: () => _showTripActions(context, trip),
+            onMorePressed: () => _showTripActions(context, trip),
           );
         },
       ),
     );
   }
 
-  /// 長按卡片 → 自適應 action sheet（分享/共編/健檢/匯出/刪除）。
+  /// 卡片 More 或長按 → 自適應 action sheet（分享/共編/健檢/匯出/刪除）。
   Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
     final selectedAction = await showAppActionSheet<_TripListAction>(
       context,
@@ -608,6 +609,13 @@ class _EmptyHero extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
+          ),
+          const SizedBox(height: TpSpacing.s4),
+          FilledButton.icon(
+            key: const ValueKey('trips-empty-create'),
+            onPressed: () => context.push('/new-trip'),
+            icon: const Icon(CupertinoIcons.add),
+            label: const Text('建立第一趟行程'),
           ),
         ],
       ),
