@@ -12,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
-import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
 import '../../app/app_loading_skeleton.dart';

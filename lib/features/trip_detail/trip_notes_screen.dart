@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
-import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';

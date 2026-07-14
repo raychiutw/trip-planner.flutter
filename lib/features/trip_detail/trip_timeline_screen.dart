@@ -213,7 +213,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
   late int _activeDayNum;
-  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -338,12 +337,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
     if (visibleDayNum != _activeDayNum && mounted) {
       setState(() => _activeDayNum = visibleDayNum);
     }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   @override
