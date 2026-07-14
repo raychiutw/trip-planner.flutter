@@ -54,6 +54,27 @@ Widget buildApp() =>
 
 void main() {
   group('FavoritesScreen', () {
+    testWidgets('載入中保留清單輪廓並提供讀屏狀態', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith(
+              (ref) => const Stream<List<PoiFavorite>>.empty(),
+            ),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('favorites-loading-skeleton')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('正在載入內容'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
     testWidgets('渲染收藏清單 N 卡', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

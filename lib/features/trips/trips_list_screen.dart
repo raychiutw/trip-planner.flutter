@@ -11,6 +11,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import 'trip_card.dart';
@@ -400,7 +401,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       loading: () => [
         const SliverFillRemaining(
           hasScrollBody: false,
-          child: Center(child: CircularProgressIndicator.adaptive()),
+          child: AppListLoadingSkeleton(
+            key: ValueKey('trips-loading-skeleton'),
+          ),
         ),
       ],
     );

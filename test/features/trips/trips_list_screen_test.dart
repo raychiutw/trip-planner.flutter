@@ -113,6 +113,27 @@ void main() {
   }
 
   group('TripsListScreen 清單渲染', () {
+    testWidgets('載入中保留清單輪廓並提供讀屏狀態', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => const Stream<List<TripSummary>>.empty(),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('trips-loading-skeleton')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('正在載入內容'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
     testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(

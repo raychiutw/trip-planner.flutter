@@ -70,6 +70,27 @@ void main() {
         .urlTemplate;
   }
 
+  testWidgets('載入中保留地圖輪廓並提供讀屏狀態', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          favoritesProvider.overrideWith(
+            (ref) => const Stream<List<PoiFavorite>>.empty(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const GlobalMapScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('map-loading-skeleton')), findsOneWidget);
+    expect(find.bySemanticsLabel('正在載入地圖'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
   testWidgets('有座標的收藏 → 顯示 marker(無座標者跳過)', (tester) async {
     await tester.pumpWidget(buildApp(const [_withCoords, _noCoords]));
     await tester.pumpAndSettle();

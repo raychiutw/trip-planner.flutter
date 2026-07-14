@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
@@ -106,7 +107,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               loading: () => const [
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator.adaptive()),
+                  child: AppListLoadingSkeleton(
+                    key: ValueKey('favorites-loading-skeleton'),
+                  ),
                 ),
               ],
             ),
