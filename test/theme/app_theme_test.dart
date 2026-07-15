@@ -50,10 +50,15 @@ void main() {
       expect(darkTheme.colorScheme.primary, const Color(0xFFCBA06E));
     });
 
-    test('background = 暖褐黑 0xFF1A140F', () {
+    test('V3 使用中性深色 canvas 與 surface', () {
       final darkTheme = AppTheme.dark();
-      expect(darkTheme.colorScheme.surface, const Color(0xFF1A140F));
-      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF1A140F));
+      expect(darkTheme.colorScheme.surface, const Color(0xFF1C1C1E));
+      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF121214));
+      expect(TpColorsDark.background, const Color(0xFF121214));
+      expect(TpColorsDark.secondary, const Color(0xFF1C1C1E));
+      expect(TpColorsDark.tertiary, const Color(0xFF2C2C2E));
+      expect(TpColorsDark.foreground, const Color(0xFFF5F5F7));
+      expect(TpColorsDark.muted, const Color(0xFFA1A1A6));
     });
 
     test('CardTheme elevation 為 0', () {

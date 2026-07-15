@@ -25,6 +25,10 @@ class TpRootScrollScaffold extends StatelessWidget {
         SliverAppBar.large(
           pinned: true,
           automaticallyImplyLeading: false,
+          toolbarHeight: 56,
+          collapsedHeight: 56,
+          expandedHeight: 108,
+          centerTitle: true,
           title: Text(title),
           actions: actions,
         ),

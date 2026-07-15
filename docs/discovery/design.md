@@ -188,6 +188,8 @@ const sheetClose = Cubic(0.4, 0, 1, 1);        // 280ms
 
 本輪是**全 App 的視覺與互動系統調整**，不是只修行程與地圖兩頁。既有元件、頁面結構與 navigation shell 若無法達到本節規格，可以直接改寫；是否重用以結果與維護性決定，不把舊實作視為限制。唯一硬性架構條件是：相同職責必須由共用元件或共用 primitive 提供，禁止每頁各自複製一套 toolbar、menu、glass、scroll edge 或 bottom clearance 邏輯。
 
+Mockup C 的青綠色只代表原 `.flutter` 參考稿，不進入 production theme。正式配色採 **V3 中性深色 + 柔褐 accent**：dark canvas `#121214`、surface `#1C1C1E`、elevated surface `#2C2C2E`、foreground `#F5F5F7`、muted `#A1A1A6`；選取、主要動作與品牌 accent 使用 `#CBA06E`。青綠不得成為 toolbar、scope、root tab、drawer 或主要 CTA 的 chrome 色；sage／pink 僅保留既有分類與語意用途。
+
 比較 mockup：`~/.gstack/projects/raychiutw-trip-planner.flutter/designs/trip-itinerary-map-20260715/design-board.png`。
 
 ### 證據範圍

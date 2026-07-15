@@ -19,6 +19,7 @@
 - `/map` 對齊 Web 的目前行程地圖，不再以收藏色點作為主要模型。
 - 不建立雙地圖引擎、provider abstraction 或 OSM fallback。
 - 不為了 Apple Music 相似度改變 Tripline 的木棕品牌識別。
+- Mockup C 原有青綠配色只作版型參考；production 採 V3 中性 dark canvas `#121214`、surface `#1C1C1E`、elevated surface `#2C2C2E`、foreground `#F5F5F7`、muted `#A1A1A6`，並以柔褐 `#CBA06E` 作為唯一 chrome accent。sage／pink 僅保留分類與語意用途。
 - 根分頁採 iOS 26 Apple 式浮動 Tab Bar 與 Liquid Glass 功能層；Flutter 實作等效視覺、捲動縮減、語意與降級，不宣稱使用原生 SwiftUI `TabView`。
 
 ## 交付切片
