@@ -9,6 +9,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_settings_group.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -206,11 +207,11 @@ void main() {
     );
     expect(find.text('通知'), findsOneWidget);
 
-    final notificationsTile = tester.widget<ListTile>(
+    expect(find.byType(TpSettingsGroup), findsNWidgets(4));
+    final notificationsTile = tester.widget<TpSettingsRow>(
       find.byKey(const ValueKey('settings-notifications')),
     );
-    expect(notificationsTile.enabled, isTrue);
-    expect(notificationsTile.trailing, isA<Icon>());
+    expect(notificationsTile.onTap, isNotNull);
   });
 
   testWidgets('點登出 row 出現確認對話框，確認後呼叫 logout', (tester) async {
