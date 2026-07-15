@@ -70,6 +70,12 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Checkbox), findsNothing);
+      expect(
+        find.byKey(const ValueKey('favorites-filter-button')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('搜尋收藏會比對名稱、地址與備註', (tester) async {
@@ -112,15 +118,21 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-restaurant')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsNothing);
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-all')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
@@ -136,15 +148,21 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-沖繩')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-all')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
@@ -263,7 +281,10 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorite-select-7')));
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('選取'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorite-select-8')));
       await tester.pump();
 

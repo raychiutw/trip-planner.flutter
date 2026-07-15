@@ -72,10 +72,14 @@ void main() {
       expect(removed, 1);
     });
 
-    testWidgets('有 onAddToTrip → 點加入行程鈕觸發', (tester) async {
+    testWidgets('加入行程不常駐顯示,長按才觸發 context action', (tester) async {
       var added = 0;
       await pumpCard(tester, _favorite, onAddToTrip: () => added++);
-      await tester.tap(find.byKey(const ValueKey('favorite-add-to-trip-7')));
+      expect(
+        find.byKey(const ValueKey('favorite-add-to-trip-7')),
+        findsNothing,
+      );
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
       expect(added, 1);
     });
   });
