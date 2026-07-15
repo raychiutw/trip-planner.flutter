@@ -284,14 +284,16 @@ Expected: every command exits 0.
 
 Verify 320×568, 390×844, 430×932, light/dark, 200% text, disabled animations, high contrast, first/last horizontal POI, marker selection, and root-tab clearance. Capture screenshots for trips expanded/collapsed, timeline toolbar/scope, and the fixed map POI accessory.
 
-- [ ] **Step 3: Commit, push, and land**
+- [x] **Step 3: Commit, push, and land**
 
 Run: `git diff --check`
 
 Commit only the verified implementation, tests, plan, and approved design document. Push `feat/map-first-drawer-testflight`, create a PR against `master`, wait for required checks, and merge without rewriting unrelated history.
 
-- [ ] **Step 4: Dispatch and monitor TestFlight**
+- [x] **Step 4: Dispatch and monitor TestFlight**
 
 Run: `gh workflow run mobile.yml --ref master`
 
 Monitor the new run until `Analyze and test`, signing, IPA build, and `Upload IPA to TestFlight` are all successful. Then inspect App Store Connect evidence from the action output/API and require the uploaded build to finish Apple processing; upload start alone is not completion.
+
+Completed via PR #49 and workflow run `29430478068`: Tripline `0.7.0` build `29430478068` finished App Store Connect processing with status `VALID`.
