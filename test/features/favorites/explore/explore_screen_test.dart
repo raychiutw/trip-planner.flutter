@@ -65,16 +65,46 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('分類 chip「美食」→ 只剩拉麵店', (tester) async {
+  testWidgets('動態細分類 chip「拉麵」→ 只剩拉麵店', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('美食'));
+    await tester.tap(find.text('拉麵  1'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PoiSearchCard), findsOneWidget);
     expect(find.text('拉麵店'), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
+  });
+
+  testWidgets('超過四個細分類 → 更多使用平台 action sheet', (tester) async {
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        _poi('p1', '拉麵店', 'ramen_restaurant'),
+        _poi('p2', '壽司店', 'sushi_restaurant'),
+        _poi('p3', '神社', 'shinto_shrine'),
+        _poi('p4', '百貨', 'department_store'),
+        _poi('p5', '車站', 'subway_station'),
+      ],
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('explore-more-categories'));
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('地鐵站  1'), findsOneWidget);
   });
 
   testWidgets('手動搜尋 <2 字 → 持續錯誤提示', (tester) async {

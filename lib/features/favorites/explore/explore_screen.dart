@@ -9,21 +9,13 @@ import '../../../app/adaptive_content.dart';
 import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
+import '../../../theme/app_theme.dart';
+import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
 import 'explore_controller.dart';
 import 'poi_search_card.dart';
 
 const List<String> _popularRegions = ['全部地區', '沖繩', '東京', '京都', '首爾', '台北'];
-const List<(String, String)> _categoryChips = [
-  ('all', '為你推薦'),
-  ('attraction', '景點'),
-  ('food', '美食'),
-  ('hotel', '住宿'),
-  ('shopping', '購物'),
-];
-final Map<String, String> _categoryLabels = {
-  for (final (key, label) in _categoryChips) key: label,
-};
 const String _kCustomRegion = '__custom__';
 
 /// 探索畫面：搜尋 POI + region/分類 filter + heart 收藏 toggle。
@@ -105,6 +97,12 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(exploreControllerProvider);
+    final categories = state.fineCategories;
+    final inlineCategories = categories.take(4).toList();
+    final overflowCategories = categories.skip(4).toList();
+    final selectedOverflow = overflowCategories
+        .where((category) => category.label == state.category)
+        .firstOrNull;
 
     ref.listen(exploreControllerProvider.select((s) => s.errorMessage), (
       prev,
@@ -162,20 +160,48 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
             SizedBox(
-              height: 44,
+              height: TpSpacing.tapMin,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-                itemCount: _categoryChips.length,
+                itemCount:
+                    1 +
+                    inlineCategories.length +
+                    (overflowCategories.isEmpty ? 0 : 1),
                 separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
                 itemBuilder: (context, index) {
-                  final (key, label) = _categoryChips[index];
-                  return ChoiceChip(
-                    label: Text(label),
-                    selected: state.category == key,
-                    onSelected: (_) => ref
-                        .read(exploreControllerProvider.notifier)
-                        .setCategory(key),
+                  if (index == 0) {
+                    return _categoryChip(
+                      key: const ValueKey('explore-category-all'),
+                      label: '為你推薦',
+                      count: state.results.length,
+                      poiType: 'attraction',
+                      selected: state.category == 'all',
+                      onSelected: () => ref
+                          .read(exploreControllerProvider.notifier)
+                          .setCategory('all'),
+                    );
+                  }
+                  if (index <= inlineCategories.length) {
+                    final category = inlineCategories[index - 1];
+                    return _categoryChip(
+                      key: ValueKey('explore-category-${category.label}'),
+                      label: category.label,
+                      count: category.count,
+                      poiType: category.poiType,
+                      selected: state.category == category.label,
+                      onSelected: () => ref
+                          .read(exploreControllerProvider.notifier)
+                          .setCategory(category.label),
+                    );
+                  }
+                  return _categoryChip(
+                    key: const ValueKey('explore-more-categories'),
+                    label: selectedOverflow?.label ?? '更多',
+                    count: selectedOverflow?.count,
+                    poiType: selectedOverflow?.poiType ?? 'attraction',
+                    selected: selectedOverflow != null,
+                    onSelected: () => _openMoreCategories(overflowCategories),
                   );
                 },
               ),
@@ -185,6 +211,49 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         ),
       ),
     );
+  }
+
+  Widget _categoryChip({
+    required Key key,
+    required String label,
+    required int? count,
+    required String poiType,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    final tone = resolvePoiTone(tones, poiType);
+    return ChoiceChip(
+      key: key,
+      label: Text(count == null ? label : '$label  $count'),
+      selected: selected,
+      showCheckmark: false,
+      backgroundColor: tone.subtle,
+      selectedColor: tone.bg,
+      side: BorderSide(color: selected ? tone.deep : tone.base),
+      labelStyle: theme.textTheme.labelLarge?.copyWith(
+        color: tone.deep,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+      ),
+      onSelected: (_) => onSelected(),
+    );
+  }
+
+  Future<void> _openMoreCategories(List<ExploreCategory> categories) async {
+    final selected = await showAppActionSheet<String>(
+      context,
+      title: '更多分類',
+      actions: [
+        for (final category in categories)
+          AppSheetAction(
+            label: '${category.label}  ${category.count}',
+            value: category.label,
+          ),
+      ],
+    );
+    if (selected == null || !mounted) return;
+    ref.read(exploreControllerProvider.notifier).setCategory(selected);
   }
 
   Widget _regionPill(String region) {
@@ -237,7 +306,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '沒有符合「${_categoryLabels[state.category]}」的結果。試試其他分類或回到「為你推薦」。',
+              '沒有符合「${state.activeCategoryLabel}」的結果。試試其他分類或回到「為你推薦」。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),

@@ -77,7 +77,7 @@ void main() {
     );
   });
 
-  test('filteredResults：分類 client-side filter（美食）', () async {
+  test('fineCategories 聚合細類計數，filteredResults 精確篩選', () async {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
     when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
@@ -91,6 +91,7 @@ void main() {
     ).thenAnswer(
       (_) async => [
         _poi('p1', '拉麵店', 'ramen_restaurant'),
+        _poi('p3', '第二間拉麵', 'ramen_restaurant'),
         _poi('p2', '城堡', 'tourist_attraction'),
       ],
     );
@@ -98,15 +99,40 @@ void main() {
     final controller = container.read(exploreControllerProvider.notifier);
     await controller.search('沖繩');
 
-    controller.setCategory('food');
+    final categories = container.read(exploreControllerProvider).fineCategories;
+    expect(categories.first, (label: '拉麵', poiType: 'restaurant', count: 2));
+
+    controller.setCategory('拉麵');
     final state = container.read(exploreControllerProvider);
-    expect(state.filteredResults.map((p) => p.name), ['拉麵店']);
+    expect(state.filteredResults.map((p) => p.name), ['拉麵店', '第二間拉麵']);
 
     controller.setCategory('all');
     expect(
       container.read(exploreControllerProvider).filteredResults,
-      hasLength(2),
+      hasLength(3),
     );
+  });
+
+  test('新搜尋會重設先前的細分類', () async {
+    final poi = _MockPoiRepository();
+    final fav = _MockFavoritesRepository();
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => [_poi('p1', '拉麵店', 'ramen_restaurant')]);
+    final container = _container(poi, fav);
+    final controller = container.read(exploreControllerProvider.notifier);
+    await controller.search('東京');
+    controller.setCategory('拉麵');
+
+    await controller.search('大阪');
+
+    expect(container.read(exploreControllerProvider).category, 'all');
   });
 
   test('toggleFavorite：未收藏 → find-or-create + addFavorite + 重抓', () async {
