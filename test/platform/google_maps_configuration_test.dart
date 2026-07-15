@@ -69,6 +69,14 @@ void main() {
     expect(workflow, contains('GOOGLE_MAPS_IOS_API_KEY=%s'));
     expect(workflow, contains("wait-for-processing: 'true'"));
     expect(workflow, contains("uses-non-exempt-encryption: 'false'"));
+    expect(workflow, contains('runner:'));
+    expect(workflow, contains('tripline-release'));
+    expect(workflow, contains(r'runs-on: ${{ inputs.runner }}'));
+    expect(
+      workflow,
+      contains(r"if: ${{ github.event_name != 'workflow_dispatch' }}"),
+    );
+    expect('flutter test'.allMatches(workflow).length, greaterThanOrEqualTo(2));
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 }
