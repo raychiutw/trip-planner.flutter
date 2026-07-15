@@ -39,6 +39,14 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Build Android debug
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+        run: |
+          set -euo pipefail
+          : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
+          flutter build apk --debug
+
   testflight:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -64,11 +72,12 @@ jobs:
 
       - name: Write iOS build secrets
         env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
         run: |
           set -euo pipefail
+          : "${GOOGLE_MAPS_IOS_API_KEY:?Missing GOOGLE_MAPS_IOS_API_KEY secret}"
           umask 077
-          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
+          printf 'GOOGLE_MAPS_IOS_API_KEY=%s\n' "$GOOGLE_MAPS_IOS_API_KEY" > ios/Flutter/Secrets.xcconfig
 
       - name: Import Apple Distribution certificate
         uses: Apple-Actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
@@ -113,4 +122,4 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          wait-for-processing: 'false'
+          wait-for-processing: 'true'
