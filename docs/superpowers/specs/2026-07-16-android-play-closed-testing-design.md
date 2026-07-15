@@ -46,7 +46,7 @@ Complete the Play Console app setup required to open a closed test, including th
 
 ### 3. Create the upload key and first release
 
-Generate one password-protected Android upload keystore. Keep an encrypted backup outside the repository and configure the existing ignored `android/key.properties` for local release builds.
+Generate one password-protected Android upload keystore. Keep an encrypted backup outside the repository, store the local password in macOS Keychain, and pass it through the release-signing environment variables that Gradle already supports. Do not create a plaintext local password file.
 
 Build the first signed AAB locally with the current `pubspec.yaml` build number and upload it manually in Play Console. The first manual upload establishes the package and upload certificate before the publishing API is used. Every later closed-test release is automated.
 
