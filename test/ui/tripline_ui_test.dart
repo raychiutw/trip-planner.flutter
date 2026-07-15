@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
@@ -99,6 +100,10 @@ void main() {
       app(
         const TpRootScrollScaffold(
           title: '我的行程',
+          actions: [
+            IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
+            IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
+          ],
           slivers: [SliverToBoxAdapter(child: Text('內容'))],
         ),
       ),
@@ -114,6 +119,9 @@ void main() {
     expect(appBar.collapsedHeight, 56);
     expect(appBar.expandedHeight, 108);
     expect(appBar.centerTitle, isTrue);
+    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
+    expect(appBar.actions, hasLength(1));
+    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
   });
 
   testWidgets('TpAppBar more 使用水平 ellipsis 且維持 44pt target', (tester) async {
@@ -164,6 +172,34 @@ void main() {
     expect(titleStyle.maxLines, 1);
     expect(titleStyle.overflow, TextOverflow.ellipsis);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TpAppBar 兩個 trailing actions 仍維持幾何置中', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          appBar: TpAppBar(
+            automaticallyImplyLeading: false,
+            title: Text('行程標題'),
+            actions: [
+              IconButton(onPressed: null, icon: Icon(Icons.edit)),
+              IconButton(onPressed: null, icon: Icon(Icons.more_horiz)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.automaticallyImplyLeading, isFalse);
+    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
+    expect(appBar.actions, hasLength(1));
+    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
+    expect(tester.getCenter(find.text('行程標題')).dx, closeTo(160, 0.1));
   });
 
   testWidgets('TpScopeMenu 顯示目前值並回傳新選項', (tester) async {

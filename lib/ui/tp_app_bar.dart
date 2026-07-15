@@ -3,6 +3,50 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 
+abstract final class TpToolbarSlots {
+  static double sideWidth({
+    required int actionCount,
+    required bool hasLeading,
+  }) {
+    final slotCount = actionCount > (hasLeading ? 1 : 0)
+        ? actionCount
+        : (hasLeading ? 1 : 0);
+    return slotCount * TpSpacing.tapMin;
+  }
+
+  static Widget? leading({required double width, Widget? action}) {
+    if (width == 0) return null;
+    return SizedBox(
+      width: width,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: action == null
+            ? null
+            : SizedBox.square(dimension: TpSpacing.tapMin, child: action),
+      ),
+    );
+  }
+
+  static List<Widget> actions({
+    required double width,
+    required List<Widget> children,
+  }) {
+    if (width == 0) return const [];
+    return [
+      SizedBox(
+        width: width,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            for (final child in children)
+              SizedBox.square(dimension: TpSpacing.tapMin, child: child),
+          ],
+        ),
+      ),
+    ];
+  }
+}
+
 class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   const TpAppBar({
     super.key,
@@ -21,8 +65,28 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     assert(actions.length <= 2, 'Toolbar supports at most two actions.');
+    final route = ModalRoute.of(context);
+    final scaffold = Scaffold.maybeOf(context);
+    final Widget? leadingAction;
+    if (!automaticallyImplyLeading) {
+      leadingAction = null;
+    } else if (scaffold?.hasDrawer ?? false) {
+      leadingAction = const DrawerButton();
+    } else if (route?.impliesAppBarDismissal ?? false) {
+      leadingAction = route is PageRoute<dynamic> && route.fullscreenDialog
+          ? const CloseButton()
+          : const BackButton();
+    } else {
+      leadingAction = null;
+    }
+    final sideWidth = TpToolbarSlots.sideWidth(
+      actionCount: actions.length,
+      hasLeading: leadingAction != null,
+    );
     return AppBar(
-      automaticallyImplyLeading: automaticallyImplyLeading,
+      automaticallyImplyLeading: false,
+      leadingWidth: sideWidth == 0 ? null : sideWidth,
+      leading: TpToolbarSlots.leading(width: sideWidth, action: leadingAction),
       centerTitle: true,
       title: DefaultTextStyle.merge(
         key: const ValueKey('tp-app-bar-title'),
@@ -30,7 +94,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         overflow: TextOverflow.ellipsis,
         child: title,
       ),
-      actions: actions,
+      actions: TpToolbarSlots.actions(width: sideWidth, children: actions),
     );
   }
 }

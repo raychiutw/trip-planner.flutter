@@ -130,7 +130,9 @@ void main() {
       expect(find.byType(TpRootScrollScaffold), findsOneWidget);
       expect(find.byTooltip('新增行程'), findsOneWidget);
       final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-      expect(appBar.actions, hasLength(2));
+      expect(appBar.actions, hasLength(1));
+      final actionGroup = appBar.actions!.single as SizedBox;
+      expect((actionGroup.child! as Row).children, hasLength(2));
       expect(find.byTooltip('更多'), findsOneWidget);
     });
 
