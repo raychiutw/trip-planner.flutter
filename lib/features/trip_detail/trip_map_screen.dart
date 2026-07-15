@@ -10,7 +10,6 @@ import '../../models/entry.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../map/map_adapter.dart';
-import '../map/map_layer_menu.dart';
 import '../map/map_location.dart';
 import '../trips/trip_card.dart';
 import '../trips/trips_list_screen.dart';
@@ -239,7 +238,6 @@ class _TripMapView extends ConsumerStatefulWidget {
 
 class _TripMapViewState extends ConsumerState<_TripMapView> {
   final GoogleTripMapController _mapController = GoogleTripMapController();
-  TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
   TripMapPoint? _userLocation;
   bool _locating = false;
 
@@ -564,12 +562,13 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           child: buildTripMapCanvas(
             TripMapCanvasConfig(
               controller: _mapController,
-              tilePreset: _tilePreset,
+              tilePreset: kTripMapTilePresets.first,
               initialFitPoints: [for (final pin in allPins) pin.point],
               initialPadding: const EdgeInsets.all(TpSpacing.s10),
               initialMaxZoom: 16,
               onMapReady: _handleMapReady,
               routes: _routes,
+              clusterMarkers: visiblePins.length >= 12,
               markers: [
                 for (final pin in visiblePins) _buildMarker(pin),
                 if (_userLocation != null)
@@ -582,15 +581,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             builder: widget.mapBuilder,
           ),
         ),
-        Positioned(
-          top: TpSpacing.s4,
-          right: TpSpacing.s4,
-          child: TripMapLayerMenu(
-            keyPrefix: 'trip-map',
-            selectedPreset: _tilePreset,
-            onSelected: (preset) => setState(() => _tilePreset = preset),
-          ),
-        ),
         if (_loadingRoutes)
           const Positioned(
             left: TpSpacing.s4,
@@ -601,7 +591,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             ),
           ),
         Positioned(
-          top: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
+          top: TpSpacing.s4,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
             key: const ValueKey('trip-map-locate-button'),
@@ -620,6 +610,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       color: pin.color,
       title: '${pin.pinNumber}. ${pin.entry.title}',
       snippet: 'DAY ${pin.dayNum}',
+      glyph: '${pin.pinNumber}',
       onTap: () => _focusPin(pin),
       zIndex: 100 - pin.dayIndex,
     );

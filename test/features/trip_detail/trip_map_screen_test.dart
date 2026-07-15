@@ -210,19 +210,12 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
   });
 
-  testWidgets('圖層選單：可從路線圖切換為衛星圖', (tester) async {
+  testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('map-style-roadmap')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('trip-map-layer-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-layer-satellite')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('map-style-satellite')), findsOneWidget);
-    expect(find.text('衛星'), findsWidgets);
+    expect(find.byKey(const ValueKey('trip-map-layer-menu')), findsNothing);
   });
 
   testWidgets('定位按鈕：取得目前位置後顯示 user marker', (tester) async {

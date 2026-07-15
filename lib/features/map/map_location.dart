@@ -95,5 +95,6 @@ TripMapMarker buildTripMapUserLocationMarker({
     color: const Color(0xFF2563EB),
     title: '目前位置',
     zIndex: 1000,
+    clusterable: false,
   );
 }

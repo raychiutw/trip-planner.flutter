@@ -33,6 +33,7 @@ void main() {
                         controller: controller,
                         initialFitPoints: const [TripMapPoint(26.217, 127.719)],
                         tilePreset: kTripMapTilePresets[1],
+                        clusterMarkers: true,
                         routes: const [
                           TripMapRoute(
                             id: 'day-1',
@@ -65,6 +66,8 @@ void main() {
     expect(googleMap!.mapType, MapType.terrain);
     expect(googleMap!.markers.single.markerId.value, 'stop-1');
     expect(googleMap!.markers.single.infoWindow.title, '首里城');
+    expect(googleMap!.clusterManagers, hasLength(1));
+    expect(googleMap!.markers.single.clusterManagerId, isNotNull);
     expect(googleMap!.polylines.single.polylineId.value, 'day-1');
     expect(googleMap!.polylines.single.points, hasLength(2));
   });

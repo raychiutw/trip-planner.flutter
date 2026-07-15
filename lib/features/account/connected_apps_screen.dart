@@ -12,6 +12,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
+import 'account_display.dart';
 
 /// 已授權 OAuth app 清單（GET /account/connected-apps）。
 final connectedAppsProvider = FutureProvider<List<ConnectedApp>>((ref) {
@@ -156,14 +157,14 @@ class _ConnectedAppTile extends StatelessWidget {
               children: [
                 for (final scope in app.scopes)
                   Chip(
-                    label: Text(scope),
+                    label: Text(oauthScopeLabel(scope)),
                     visualDensity: VisualDensity.compact,
                   ),
               ],
             ),
             const SizedBox(height: TpSpacing.s1),
             Text(
-              '${app.statusLabel} · 授權時間：${app.grantedAt}',
+              '${app.statusLabel} · 授權於 ${humanEpochTime(app.grantedAt)}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

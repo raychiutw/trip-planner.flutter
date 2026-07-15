@@ -1,4 +1,4 @@
-/// App smoke test：已登入狀態 pump TriplineApp，顯示 5-tab NavigationBar。
+/// App smoke test：已登入狀態 pump TriplineApp，顯示 5-tab Liquid Glass root bar。
 library;
 
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ class _FakeAuthNotifier extends AuthNotifier {
 class _MockTripRepository extends Mock implements TripRepository {}
 
 void main() {
-  testWidgets('已登入時顯示 5-tab NavigationBar', (tester) async {
+  testWidgets('已登入時顯示 5-tab Liquid Glass root bar', (tester) async {
     final mockTripRepository = _MockTripRepository();
     when(mockTripRepository.watchMyTrips).thenAnswer((_) => Stream.value([]));
 
@@ -39,22 +39,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.byType(NavigationDestination),
-      ),
-      findsNWidgets(5),
-    );
+    final rootBar = find.byKey(const ValueKey('apple-root-tab-bar'));
+    expect(rootBar, findsOneWidget);
     for (final tabLabel in ['聊天', '行程', '地圖', '收藏', '帳號']) {
       expect(
-        find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text(tabLabel),
-        ),
+        find.descendant(of: rootBar, matching: find.text(tabLabel)),
         findsOneWidget,
-        reason: 'NavigationBar 應包含「$tabLabel」tab',
+        reason: 'Root tab bar 應包含「$tabLabel」tab',
       );
     }
   });

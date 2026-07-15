@@ -62,6 +62,8 @@ const List<TripMapTilePreset> kTripMapTilePresets = [
 typedef TripMapTapCallback = void Function(TripMapPoint point);
 typedef TripMapCanvasBuilder = Widget Function(TripMapCanvasConfig config);
 
+const _tripClusterManagerId = ClusterManagerId('trip-stops');
+
 class TripMapRoute {
   const TripMapRoute({
     required this.id,
@@ -89,6 +91,8 @@ class TripMapMarker {
     this.snippet,
     this.onTap,
     this.zIndex = 0,
+    this.clusterable = true,
+    this.glyph,
   });
 
   final String id;
@@ -98,6 +102,8 @@ class TripMapMarker {
   final String? snippet;
   final VoidCallback? onTap;
   final int zIndex;
+  final bool clusterable;
+  final String? glyph;
 }
 
 class GoogleTripMapController {
@@ -182,6 +188,7 @@ class TripMapCanvasConfig {
     this.initialMaxZoom,
     this.routes = const [],
     this.markers = const [],
+    this.clusterMarkers = false,
     this.onMapReady,
     this.onTap,
     this.mapKey = const ValueKey('google-trip-map-canvas'),
@@ -196,6 +203,7 @@ class TripMapCanvasConfig {
   final double? initialMaxZoom;
   final List<TripMapRoute> routes;
   final List<TripMapMarker> markers;
+  final bool clusterMarkers;
   final VoidCallback? onMapReady;
   final TripMapTapCallback? onTap;
   final Key mapKey;
@@ -246,6 +254,9 @@ class GoogleTripMapCanvas extends StatelessWidget {
         );
         config.onMapReady?.call();
       },
+      clusterManagers: config.clusterMarkers
+          ? {const ClusterManager(clusterManagerId: _tripClusterManagerId)}
+          : const <ClusterManager>{},
       markers: {
         for (final marker in config.markers)
           Marker(
@@ -254,9 +265,20 @@ class GoogleTripMapCanvas extends StatelessWidget {
             consumeTapEvents: marker.onTap != null,
             onTap: marker.onTap,
             zIndexInt: marker.zIndex,
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              HSVColor.fromColor(marker.color).hue,
-            ),
+            clusterManagerId: config.clusterMarkers && marker.clusterable
+                ? _tripClusterManagerId
+                : null,
+            icon: marker.glyph == null
+                ? BitmapDescriptor.defaultMarkerWithHue(
+                    HSVColor.fromColor(marker.color).hue,
+                  )
+                : BitmapDescriptor.pinConfig(
+                    backgroundColor: marker.color,
+                    glyph: TextGlyph(
+                      text: marker.glyph!,
+                      textColor: Colors.white,
+                    ),
+                  ),
             infoWindow: marker.title == null && marker.snippet == null
                 ? InfoWindow.noText
                 : InfoWindow(title: marker.title, snippet: marker.snippet),
