@@ -12,6 +12,8 @@
 - **Liquid Glass 與原生地圖**：根分頁改為 Apple 式浮動功能層，地圖由 `flutter_map`／OSM 遷移至原生 Google Maps，支援路線 polyline、marker 與卡片同步。
 - **持續錯誤與版型載入狀態**：真正錯誤改用可關閉、可重試的 persistent banner；列表、地圖、時間軸與主要 route 補齊靜態 skeleton 與載入 semantics。
 - **地圖 accessibility**：marker 擴為 44pt 互動目標，加入 POI 類型 icon、語意標籤與定位失敗重試。
+- **AI owner 授權流程**：建立行程與已連結應用共用授權卡；聊天首次送出前顯示原生 consent sheet，取消時保留草稿，授權成功後才送出原訊息。
+- **細分類探索**：Google Places `primaryType` 顯示 zh-TW 細分類，探索頁依結果動態聚合、排序與精確篩選，超過四類時改用原生 action sheet。
 - **Tripline 座標 App Icon**：保留定位圖釘與中央指南針箭頭識別，提供 iOS Default/Dark/Tinted 與 Android density 資產。
 - **設計系統文件**：補齊 Apple Music/Apple HIG 對標理由、Flutter 自適應 UI reference 與新增畫面指南。
 
@@ -25,6 +27,7 @@
 ### 修正
 
 - 修正寬螢幕內容過度延伸、route 載入只顯示 spinner、空狀態缺少下一步，以及 rebase 後未使用的 loading/timeline state。
+- 修正 AI 授權狀態查詢期間快速連點會重複開啟 consent sheet，並讓所有自訂動畫與時間軸捲動確實遵守系統「減少動態效果」。
 
 ## [0.5.1] - 2026-07-14
 
