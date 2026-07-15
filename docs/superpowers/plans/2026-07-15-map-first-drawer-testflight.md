@@ -16,7 +16,7 @@
 - Root toolbars expose at most two trailing actions; iOS-style more uses a horizontal ellipsis.
 - Mockup C's teal is not a production color. V3 dark tokens are canvas `#121214`, surface `#1C1C1E`, elevated surface `#2C2C2E`, foreground `#F5F5F7`, muted `#A1A1A6`, and soft-brown chrome accent `#CBA06E`.
 - Root expanded title height is at most 108pt below the safe area and collapses to a geometrically centered inline title.
-- The POI accessory is 88pt at standard text (76pt card + 12pt indicator), switches to a non-draggable 144pt accessibility geometry at ≥150% Dynamic Type, has no vertical drag/collapse behavior, and uses horizontal pages with viewport fraction 0.84 to match the V3 HTML's 84% scroll-snap rail.
+- The POI accessory is 88pt at standard text (76pt card + 12pt indicator), switches to a non-draggable 144pt accessibility geometry at ≥120% Dynamic Type, has no vertical drag/collapse behavior, and uses horizontal pages with viewport fraction 0.84 to match the V3 HTML's 84% scroll-snap rail.
 - Interactive targets are at least 44×44pt and remain operable at 200% text scale.
 - Root tab navigation remains five destinations and is never used for POI/day actions.
 - Existing API contracts, Google Maps SDK integration, and `GITHUB_RUN_ID` build numbering remain unchanged.
@@ -268,7 +268,7 @@ Expected: PASS.
 - Modify: `VERSION`, `pubspec.yaml`, and `CHANGELOG.md` only if the current release version has already been uploaded.
 - Use: `.github/workflows/mobile.yml` without changing the existing signing secret contract unless verification proves a failure.
 
-- [ ] **Step 1: Run repository verification**
+- [x] **Step 1: Run repository verification**
 
 Run: `dart format --output=none --set-exit-if-changed .`
 
@@ -280,7 +280,7 @@ Run: `flutter build ios --release --no-codesign`
 
 Expected: every command exits 0.
 
-- [ ] **Step 2: Run visual/runtime acceptance**
+- [x] **Step 2: Run visual/runtime acceptance**
 
 Verify 320×568, 390×844, 430×932, light/dark, 200% text, disabled animations, high contrast, first/last horizontal POI, marker selection, and root-tab clearance. Capture screenshots for trips expanded/collapsed, timeline toolbar/scope, and the fixed map POI accessory.
 
