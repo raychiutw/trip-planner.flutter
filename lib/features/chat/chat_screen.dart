@@ -199,7 +199,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   late final TextEditingController _input;
   late final Future<void> _aiAuthorizationLoad;
   bool? _aiAuthorized;
-  bool _consentOpen = false;
+  bool _sendInProgress = false;
 
   @override
   void initState() {
@@ -246,37 +246,37 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
 
   Future<void> _sendText(String rawText, {required bool clearComposer}) async {
     final text = rawText.trim();
-    if (text.isEmpty || _consentOpen) return;
+    if (text.isEmpty || _sendInProgress) return;
+    _sendInProgress = true;
+    try {
+      if (_aiAuthorized == null) {
+        await _aiAuthorizationLoad;
+        if (!mounted) return;
+      }
 
-    if (_aiAuthorized == null) {
-      await _aiAuthorizationLoad;
-      if (!mounted) return;
-    }
+      if (_aiAuthorized != true) {
+        final authorized = await showAiConsentSheet(
+          context,
+          message: text,
+          onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
+        );
+        if (!mounted) return;
+        if (!authorized) return;
+        _aiAuthorized = true;
+      }
 
-    if (_aiAuthorized != true) {
-      setState(() => _consentOpen = true);
-      final authorized = await showAiConsentSheet(
-        context,
-        message: text,
-        onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
+      if (clearComposer) _input.clear();
+      HapticFeedback.lightImpact();
+      unawaited(
+        ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
       );
-      if (!mounted) return;
-      setState(() {
-        _consentOpen = false;
-        if (authorized) _aiAuthorized = true;
+      // 捲到底(reverse list 底部 = offset 0)。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) _scroll.jumpTo(0);
       });
-      if (!authorized) return;
+    } finally {
+      _sendInProgress = false;
     }
-
-    if (clearComposer) _input.clear();
-    HapticFeedback.lightImpact();
-    unawaited(
-      ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
-    );
-    // 捲到底(reverse list 底部 = offset 0)。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.jumpTo(0);
-    });
   }
 
   @override

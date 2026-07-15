@@ -191,6 +191,26 @@ void main() {
     expect(find.text('「先等授權」'), findsOneWidget);
   });
 
+  testWidgets('授權狀態載入中快速連點只會開一張 consent sheet', (tester) async {
+    final authorization = Completer<bool>();
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) => authorization.future);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '只送一次');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+
+    authorization.complete(false);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ai-consent-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsNothing);
+  });
+
   testWidgets('授權狀態查詢失敗時仍先顯示 consent', (tester) async {
     when(authRepo.fetchAiAuthorization).thenThrow(Exception('offline'));
 

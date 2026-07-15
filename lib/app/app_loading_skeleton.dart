@@ -31,54 +31,6 @@ class AppListLoadingSkeleton extends StatelessWidget {
   }
 }
 
-class AppMapLoadingSkeleton extends StatelessWidget {
-  const AppMapLoadingSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Semantics(
-      container: true,
-      label: '正在載入地圖',
-      child: ExcludeSemantics(
-        child: ColoredBox(
-          color: colors.surfaceContainer,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _MapSkeletonPainter(
-                    lineColor: colors.outlineVariant.withValues(alpha: 0.55),
-                  ),
-                ),
-              ),
-              const Positioned(left: 92, top: 112, child: _MapPinSkeleton()),
-              const Positioned(right: 76, top: 220, child: _MapPinSkeleton()),
-              const Positioned(
-                left: 140,
-                bottom: 148,
-                child: _MapPinSkeleton(),
-              ),
-              Positioned(
-                left: TpSpacing.s4,
-                right: TpSpacing.s4,
-                bottom: TpSpacing.s4,
-                child: Container(
-                  height: 104,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(TpRadius.lg),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ListSkeletonCard extends StatelessWidget {
   const _ListSkeletonCard();
 
@@ -128,55 +80,4 @@ class _SkeletonBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(TpRadius.sm),
     ),
   );
-}
-
-class _MapPinSkeleton extends StatelessWidget {
-  const _MapPinSkeleton();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: TpSpacing.tapMin,
-    height: TpSpacing.tapMin,
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      shape: BoxShape.circle,
-    ),
-  );
-}
-
-class _MapSkeletonPainter extends CustomPainter {
-  const _MapSkeletonPainter({required this.lineColor});
-
-  final Color lineColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = lineColor
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke;
-    final first = Path()
-      ..moveTo(0, size.height * 0.28)
-      ..quadraticBezierTo(
-        size.width * 0.4,
-        size.height * 0.12,
-        size.width,
-        size.height * 0.34,
-      );
-    final second = Path()
-      ..moveTo(size.width * 0.15, 0)
-      ..quadraticBezierTo(
-        size.width * 0.62,
-        size.height * 0.48,
-        size.width * 0.48,
-        size.height,
-      );
-    canvas
-      ..drawPath(first, paint)
-      ..drawPath(second, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _MapSkeletonPainter oldDelegate) =>
-      oldDelegate.lineColor != lineColor;
 }

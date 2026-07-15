@@ -46,8 +46,7 @@ class AppleRootTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final duration = reduceMotion ? Duration.zero : TpMotion.normal;
+    final duration = TpMotion.resolve(context, TpMotion.normal);
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
       child: SafeArea(

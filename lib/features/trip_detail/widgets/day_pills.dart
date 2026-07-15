@@ -67,12 +67,10 @@ class _DayPillsState extends State<DayPills> {
       if (target == null) return;
       final renderObject = target.findRenderObject();
       if (renderObject is! RenderBox || !renderObject.hasSize) return;
-      final reduceMotion =
-          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
       Scrollable.ensureVisible(
         target,
         alignment: 0.5,
-        duration: reduceMotion ? Duration.zero : TpMotion.normal,
+        duration: TpMotion.resolve(context, TpMotion.normal),
         curve: TpMotion.appleEase,
       );
     });
