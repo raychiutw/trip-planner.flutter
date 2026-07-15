@@ -19,6 +19,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../trips/trips_list_screen.dart';
+import 'ai_consent_sheet.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
@@ -196,12 +197,17 @@ class _ChatBody extends ConsumerStatefulWidget {
 class _ChatBodyState extends ConsumerState<_ChatBody> {
   final _scroll = ScrollController();
   late final TextEditingController _input;
+  late final Future<void> _aiAuthorizationLoad;
+  bool? _aiAuthorized;
+  bool _consentOpen = false;
 
   @override
   void initState() {
     super.initState();
     _input = TextEditingController(text: widget.initialPrefill);
     _scroll.addListener(_onScroll);
+    _aiAuthorizationLoad = _loadAiAuthorization();
+    unawaited(_aiAuthorizationLoad);
     if (widget.initialPrefill != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onInitialPrefillConsumed();
@@ -225,10 +231,44 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     }
   }
 
-  void _send() {
-    final text = _input.text;
-    if (text.trim().isEmpty) return;
-    _input.clear();
+  Future<void> _loadAiAuthorization() async {
+    try {
+      final authorized = await ref
+          .read(authRepositoryProvider)
+          .fetchAiAuthorization();
+      if (mounted) setState(() => _aiAuthorized = authorized);
+    } catch (_) {
+      if (mounted) setState(() => _aiAuthorized = false);
+    }
+  }
+
+  void _send() => unawaited(_sendText(_input.text, clearComposer: true));
+
+  Future<void> _sendText(String rawText, {required bool clearComposer}) async {
+    final text = rawText.trim();
+    if (text.isEmpty || _consentOpen) return;
+
+    if (_aiAuthorized == null) {
+      await _aiAuthorizationLoad;
+      if (!mounted) return;
+    }
+
+    if (_aiAuthorized != true) {
+      setState(() => _consentOpen = true);
+      final authorized = await showAiConsentSheet(
+        context,
+        message: text,
+        onAuthorize: () => ref.read(authRepositoryProvider).authorizeAi(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _consentOpen = false;
+        if (authorized) _aiAuthorized = true;
+      });
+      if (!authorized) return;
+    }
+
+    if (clearComposer) _input.clear();
     HapticFeedback.lightImpact();
     unawaited(
       ref.read(chatControllerProvider(widget.tripId).notifier).send(text),
@@ -267,7 +307,8 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
               : msgs.isEmpty
               ? _EmptyStatePrompts(
                   sending: state.sending,
-                  onSelect: (prompt) => unawaited(controller.send(prompt)),
+                  onSelect: (prompt) =>
+                      unawaited(_sendText(prompt, clearComposer: false)),
                 )
               : ListView.builder(
                   key: const ValueKey('chat-list'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
@@ -10,8 +11,11 @@ import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
+class MockAuthRepository extends Mock implements AuthRepository {}
+
 void main() {
   late MockTripRepository mockTripRepository;
+  late MockAuthRepository mockAuthRepository;
 
   const connectedApp = ConnectedApp(
     clientId: 'tp_alpha',
@@ -28,6 +32,7 @@ void main() {
       ProviderScope(
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          authRepositoryProvider.overrideWithValue(mockAuthRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -40,6 +45,11 @@ void main() {
 
   setUp(() {
     mockTripRepository = MockTripRepository();
+    mockAuthRepository = MockAuthRepository();
+    when(
+      mockAuthRepository.fetchAiAuthorization,
+    ).thenAnswer((_) async => false);
+    when(mockAuthRepository.authorizeAi).thenAnswer((_) async => true);
     when(
       () => mockTripRepository.fetchConnectedApps(),
     ).thenAnswer((_) async => const [connectedApp]);
@@ -59,6 +69,18 @@ void main() {
     expect(find.text('openid'), findsNothing);
     expect(find.textContaining('1783500000000'), findsNothing);
     expect(find.textContaining('2026/7/8'), findsOneWidget);
+  });
+
+  testWidgets('顯示 AI owner 授權卡，成功後刷新清單', (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.byKey(const ValueKey('ai-authorize-card')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('ai-authorize-btn')));
+    await tester.pumpAndSettle();
+
+    verify(mockAuthRepository.authorizeAi).called(1);
+    verify(() => mockTripRepository.fetchConnectedApps()).called(2);
+    expect(find.byKey(const ValueKey('ai-authorize-on')), findsOneWidget);
   });
 
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {

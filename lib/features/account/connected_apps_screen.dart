@@ -14,6 +14,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 import 'account_display.dart';
+import 'ai_authorize_card.dart';
 
 /// 已授權 OAuth app 清單（GET /account/connected-apps）。
 final connectedAppsProvider = FutureProvider<List<ConnectedApp>>((ref) {
@@ -32,6 +33,7 @@ class ConnectedAppsScreen extends ConsumerStatefulWidget {
 class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   String? _busyClientId;
   String? _mutationError;
+  int _aiAuthorizationRevision = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -47,11 +49,16 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),
         data: (apps) => RefreshIndicator.adaptive(
-          onRefresh: () async => ref.invalidate(connectedAppsProvider),
+          onRefresh: _refreshAll,
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+              AiAuthorizeCard(
+                key: ValueKey(_aiAuthorizationRevision),
+                onAuthorized: () => ref.invalidate(connectedAppsProvider),
+              ),
+              const SizedBox(height: TpSpacing.s4),
               if (_mutationError != null) ...[
                 _InlineErrorPanel(
                   message: _mutationError!,
@@ -90,6 +97,16 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     );
   }
 
+  Future<void> _refreshAll() async {
+    setState(() => _aiAuthorizationRevision++);
+    ref.invalidate(connectedAppsProvider);
+    try {
+      await ref.read(connectedAppsProvider.future);
+    } on Exception {
+      // 載入錯誤由 provider 的 persistent error state 顯示。
+    }
+  }
+
   Future<void> _confirmRevoke(ConnectedApp app) async {
     final shouldRevoke = await showAppConfirm(
       context,
@@ -107,6 +124,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     try {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
+      setState(() => _aiAuthorizationRevision++);
       ref.invalidate(connectedAppsProvider);
       showAppNotice(context, '已撤銷 ${app.appName}');
     } catch (error) {

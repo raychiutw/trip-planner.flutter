@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/models/trip.dart';
@@ -21,6 +22,8 @@ class _MockRequestsRepo extends Mock implements RequestsRepository {}
 class _MockTripRepo extends Mock implements TripRepository {}
 
 class _MockSpeechService extends Mock implements SpeechService {}
+
+class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _StubAuth extends AuthNotifier {
   @override
@@ -46,11 +49,15 @@ TripRequest _req({
 void main() {
   late _MockRequestsRepo reqRepo;
   late _MockTripRepo tripRepo;
+  late _MockAuthRepo authRepo;
 
   setUp(() {
     reqRepo = _MockRequestsRepo();
     tripRepo = _MockTripRepo();
+    authRepo = _MockAuthRepo();
     when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(_trips));
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) async => true);
+    when(authRepo.authorizeAi).thenAnswer((_) async => true);
     // 預設聊天串為空(各測試可覆寫)。
     when(
       () => reqRepo.fetchRequests(
@@ -72,6 +79,7 @@ void main() {
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
+        authRepositoryProvider.overrideWithValue(authRepo),
         authStateProvider.overrideWith(_StubAuth.new),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
@@ -130,6 +138,107 @@ void main() {
       () => reqRepo.sendRequest(tripId: 'okinawa', message: '改午餐'),
     ).called(1);
     expect(find.text('改午餐'), findsWidgets); // user 氣泡樂觀顯示
+  });
+
+  testWidgets('未授權送出 → 顯示 consent sheet；取消保留草稿且不送出', (tester) async {
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '保留這段話');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsOneWidget);
+    expect(find.text('「保留這段話」'), findsOneWidget);
+    verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('ai-consent-cancel')));
+    await tester.pumpAndSettle();
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller!.text, '保留這段話');
+  });
+
+  testWidgets('授權狀態載入中不會略過 consent 直接送出', (tester) async {
+    final authorization = Completer<bool>();
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) => authorization.future);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '先等授權');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+
+    verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsNothing);
+
+    authorization.complete(false);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsOneWidget);
+    expect(find.text('「先等授權」'), findsOneWidget);
+  });
+
+  testWidgets('consent 授權成功 → 送出原訊息並清空草稿', (tester) async {
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 8, message: '排晚餐', status: RequestStatus.processing),
+    );
+    when(() => reqRepo.fetchRequest(8)).thenAnswer(
+      (_) async => _req(
+        id: 8,
+        message: '排晚餐',
+        status: RequestStatus.completed,
+        reply: '完成',
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '排晚餐');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ai-consent-authorize')));
+    await tester.pumpAndSettle();
+
+    verify(authRepo.authorizeAi).called(1);
+    verify(
+      () => reqRepo.sendRequest(tripId: 'okinawa', message: '排晚餐'),
+    ).called(1);
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller!.text, isEmpty);
+  });
+
+  testWidgets('未授權時建議 prompt 也先走 consent sheet', (tester) async {
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-suggestion-0')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsOneWidget);
+    expect(find.text('「幫我規劃 Day 1 的早午餐」'), findsOneWidget);
   });
 
   testWidgets('completed reply → markdown 渲染', (tester) async {
