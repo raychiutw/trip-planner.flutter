@@ -16,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
 import '../../ui/tp_settings_group.dart';
+import '../../ui/tp_root_scroll_scaffold.dart';
 
 /// 帳號統計（GET /account/stats）。
 final accountStatsProvider = FutureProvider<AccountStats>(
@@ -66,38 +67,36 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
     final accountStats = ref.watch(accountStatsProvider).value;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar.large(pinned: true, title: Text('帳號')),
-          SliverPadding(
-            padding: const EdgeInsets.only(bottom: 112),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s4),
-                  child: _ProfileHero(
-                    user: effectiveUser,
-                    editingName: _editingName,
-                    savingName: _savingName,
-                    nameError: _nameError,
-                    nameController: _nameController,
-                    nameFocusNode: _nameFocusNode,
-                    onEditName: () => _startEditName(effectiveUser),
-                  ),
+    return TpRootScrollScaffold(
+      title: '帳號',
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.zero,
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              Padding(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                child: _ProfileHero(
+                  user: effectiveUser,
+                  editingName: _editingName,
+                  savingName: _savingName,
+                  nameError: _nameError,
+                  nameController: _nameController,
+                  nameFocusNode: _nameFocusNode,
+                  onEditName: () => _startEditName(effectiveUser),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-                  child: _StatsRow(stats: accountStats),
-                ),
-                const SizedBox(height: TpSpacing.s2),
-                const _SettingsGroup(),
-                _LogoutRow(onTap: () => _confirmLogout(context, ref)),
-              ]),
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+                child: _StatsRow(stats: accountStats),
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              const _SettingsGroup(),
+              _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+            ]),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

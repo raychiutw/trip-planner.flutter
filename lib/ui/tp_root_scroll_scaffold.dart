@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'tp_app_bar.dart';
 
 class TpRootScrollScaffold extends StatelessWidget {
   const TpRootScrollScaffold({
@@ -19,20 +20,30 @@ class TpRootScrollScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(actions.length <= 2, 'Root toolbar supports at most two actions.');
+    final sideWidth = TpToolbarSlots.sideWidth(
+      actionCount: actions.length,
+      hasLeading: false,
+    );
     final scrollView = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverAppBar.large(
           pinned: true,
           automaticallyImplyLeading: false,
+          toolbarHeight: 56,
+          collapsedHeight: 56,
+          expandedHeight: 108,
+          centerTitle: true,
+          leadingWidth: sideWidth == 0 ? null : sideWidth,
+          leading: TpToolbarSlots.leading(width: sideWidth),
           title: Text(title),
-          actions: actions,
+          actions: TpToolbarSlots.actions(width: sideWidth, children: actions),
         ),
         ...slivers,
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: SizedBox(
             key: ValueKey('root-scroll-bottom-inset'),
-            height: TpSpacing.navHeight + TpSpacing.s4,
+            height: TpRootTabGeometry.expandedHeight(context) + TpSpacing.s4,
           ),
         ),
       ],

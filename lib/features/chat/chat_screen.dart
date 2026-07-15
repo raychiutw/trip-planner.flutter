@@ -17,6 +17,7 @@ import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../trips/trips_list_screen.dart';
 import 'ai_consent_sheet.dart';
@@ -76,20 +77,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final tripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         automaticallyImplyLeading: false,
-        centerTitle: false,
-        toolbarHeight: 96,
-        titleSpacing: TpSpacing.s4,
-        title: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            'AI 助手',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
+        title: const Text('AI 助手'),
       ),
       body: tripsAsync.when(
         loading: () =>

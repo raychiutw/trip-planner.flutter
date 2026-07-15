@@ -12,6 +12,7 @@ import '../../models/trip_member.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'invite_controller.dart';
 
 class InviteScreen extends ConsumerStatefulWidget {
@@ -40,7 +41,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
     final authLoading = authState.isLoading;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('邀請確認')),
+      appBar: const TpAppBar(title: Text('邀請確認')),
       body: SafeArea(
         child: ListView(
           key: const ValueKey('invite-page'),

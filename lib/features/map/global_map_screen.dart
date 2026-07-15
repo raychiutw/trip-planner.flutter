@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/trips_list_screen.dart';
 import 'map_adapter.dart';
@@ -122,7 +123,7 @@ class _MapRootAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(automaticallyImplyLeading: false, title: const Text('地圖'));
+    return const TpAppBar(automaticallyImplyLeading: false, title: Text('地圖'));
   }
 }
 

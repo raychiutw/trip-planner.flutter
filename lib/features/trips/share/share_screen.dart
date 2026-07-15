@@ -17,6 +17,7 @@ import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import 'share_controller.dart';
 
 const _shareSectionOrder = [
@@ -198,7 +199,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('分享連結')),
+      appBar: const TpAppBar(title: Text('分享連結')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('share-loading'))
           : !state.canManage

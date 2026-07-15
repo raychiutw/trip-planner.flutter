@@ -6,6 +6,7 @@ import '../../api/providers.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'trip_providers.dart';
 
 /// Web 相容的停留點跨日操作。
@@ -51,7 +52,7 @@ class _EntryActionRouteScreenState
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     return Scaffold(
-      appBar: AppBar(title: Text(widget.action.title)),
+      appBar: TpAppBar(title: Text(widget.action.title)),
       body: daysAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('entry-action-loading'),

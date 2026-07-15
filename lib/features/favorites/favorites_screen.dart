@@ -9,6 +9,7 @@ import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_root_scroll_scaffold.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
 
@@ -60,51 +61,43 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   Widget build(BuildContext context) {
     final favoritesAsync = ref.watch(favoritesProvider);
 
-    return Scaffold(
-      body: RefreshIndicator.adaptive(
-        onRefresh: () => ref.refresh(favoritesProvider.future),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar.large(
-              pinned: true,
-              title: const Text('收藏'),
-              actions: [
-                IconButton(
-                  key: const ValueKey('favorites-explore-action'),
-                  tooltip: '探索',
-                  icon: const Icon(CupertinoIcons.search),
-                  onPressed: () => context.go('/favorites/explore'),
-                ),
-              ],
-            ),
-            ...favoritesAsync.when(
-              data: (favorites) => favorites.isEmpty
-                  ? [
-                      const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyHero(),
-                      ),
-                    ]
-                  : _buildListSlivers(context, ref, favorites),
-              error: (error, stackTrace) => [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _ErrorState(
-                    onRetry: () => ref.invalidate(favoritesProvider),
+    return TpRootScrollScaffold(
+      title: '收藏',
+      onRefresh: () => ref.refresh(favoritesProvider.future),
+      actions: [
+        IconButton(
+          key: const ValueKey('favorites-explore-action'),
+          tooltip: '探索',
+          icon: const Icon(CupertinoIcons.search),
+          onPressed: () => context.go('/favorites/explore'),
+        ),
+      ],
+      slivers: [
+        ...favoritesAsync.when(
+          data: (favorites) => favorites.isEmpty
+              ? [
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyHero(),
                   ),
-                ),
-              ],
-              loading: () => const [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(child: CircularProgressIndicator.adaptive()),
-                ),
-              ],
+                ]
+              : _buildListSlivers(context, ref, favorites),
+          error: (error, stackTrace) => [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _ErrorState(
+                onRetry: () => ref.invalidate(favoritesProvider),
+              ),
+            ),
+          ],
+          loading: () => const [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator.adaptive()),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -144,7 +137,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           TpSpacing.s4,
           TpSpacing.s3,
           TpSpacing.s4,
-          112,
+          TpSpacing.s4,
         ),
         sliver: SliverList(
           delegate: SliverChildListDelegate([

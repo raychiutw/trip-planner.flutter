@@ -14,6 +14,7 @@ import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 
 /// 帳號通知偏好 provider。
 final accountNotificationPreferencesProvider =
@@ -39,7 +40,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final prefsAsync = ref.watch(accountNotificationPreferencesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('通知設定')),
+      appBar: const TpAppBar(title: Text('通知設定')),
       body: prefsAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('notifications-loading'),

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import '../../account/ai_authorize_card.dart';
 import '../trips_list_screen.dart';
 import '../widgets/destination_picker.dart';
@@ -49,7 +50,7 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     final basicsReady = state.destinations.isNotEmpty && state.totalDays > 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('建立行程')),
+      appBar: const TpAppBar(title: Text('建立行程')),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,
         contentKey: const ValueKey('create-trip-content'),

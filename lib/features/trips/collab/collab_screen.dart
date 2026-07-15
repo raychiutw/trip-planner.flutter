@@ -10,6 +10,7 @@ import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip_member.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import 'collab_controller.dart';
 
 const _roleLabels = {
@@ -58,7 +59,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     final state = ref.watch(collabControllerProvider(widget.tripId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('共編設定')),
+      appBar: const TpAppBar(title: Text('共編設定')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('collab-loading'))
           : !state.canManage

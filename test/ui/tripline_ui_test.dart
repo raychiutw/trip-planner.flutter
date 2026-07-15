@@ -2,8 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
+import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
 import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
+import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 import 'package:tripline/ui/tp_state_view.dart';
 
@@ -96,6 +100,10 @@ void main() {
       app(
         const TpRootScrollScaffold(
           title: '我的行程',
+          actions: [
+            IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
+            IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
+          ],
           slivers: [SliverToBoxAdapter(child: Text('內容'))],
         ),
       ),
@@ -106,5 +114,136 @@ void main() {
       find.byKey(const ValueKey('root-scroll-bottom-inset')),
       findsOneWidget,
     );
+    final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
+    expect(appBar.toolbarHeight, 56);
+    expect(appBar.collapsedHeight, 56);
+    expect(appBar.expandedHeight, 108);
+    expect(appBar.centerTitle, isTrue);
+    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
+    expect(appBar.actions, hasLength(1));
+    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
+  });
+
+  testWidgets('TpAppBar more 使用水平 ellipsis 且維持 44pt target', (tester) async {
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          appBar: TpAppBar(
+            title: const Text('行程'),
+            actions: [
+              TpMoreMenuButton<int>(
+                items: const [PopupMenuItem(value: 1, child: Text('列印'))],
+                onSelected: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(CupertinoIcons.ellipsis), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert), findsNothing);
+    expect(
+      tester.getSize(find.byType(TpMoreMenuButton<int>)).height,
+      greaterThanOrEqualTo(44),
+    );
+  });
+
+  testWidgets('TpAppBar 在窄螢幕與 200% 文字強制單行截斷', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          appBar: TpAppBar(
+            title: Text('沖繩家族旅行超長名稱與完整行程設定'),
+            actions: [IconButton(onPressed: null, icon: Icon(Icons.edit))],
+          ),
+        ),
+        textScale: 2,
+      ),
+    );
+
+    final titleStyle = tester.widget<DefaultTextStyle>(
+      find.byKey(const ValueKey('tp-app-bar-title')),
+    );
+    expect(titleStyle.maxLines, 1);
+    expect(titleStyle.overflow, TextOverflow.ellipsis);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TpAppBar 兩個 trailing actions 仍維持幾何置中', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          appBar: TpAppBar(
+            automaticallyImplyLeading: false,
+            title: Text('行程標題'),
+            actions: [
+              IconButton(onPressed: null, icon: Icon(Icons.edit)),
+              IconButton(onPressed: null, icon: Icon(Icons.more_horiz)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.automaticallyImplyLeading, isFalse);
+    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
+    expect(appBar.actions, hasLength(1));
+    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
+    expect(tester.getCenter(find.text('行程標題')).dx, closeTo(160, 0.1));
+  });
+
+  testWidgets('TpScopeMenu 顯示目前值並回傳新選項', (tester) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpScopeMenu<int>(
+            label: '地圖 · 總覽',
+            value: selected,
+            options: const [
+              TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(value: 1, label: 'DAY 01'),
+            ],
+            onSelected: (value) => selected = value,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('地圖 · 總覽'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 01'));
+    await tester.pumpAndSettle();
+    expect(selected, 1);
+  });
+
+  testWidgets('TpBottomAccessory 維持固定高度並不處理垂直收合', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: TpBottomAccessory(child: Text('horizontal pages')),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSize(find.byType(TpBottomAccessory)).height,
+      TpBottomAccessory.height,
+    );
+    expect(find.text('horizontal pages'), findsOneWidget);
+    expect(find.byType(AnimatedContainer), findsNothing);
   });
 }

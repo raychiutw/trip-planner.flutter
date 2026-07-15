@@ -166,6 +166,7 @@ abstract final class AppTheme {
       tones: TpTones.light,
       hover: TpColorsLight.hover,
       disabled: TpColorsLight.disabled,
+      scaffoldBackground: TpColorsLight.background,
     );
   }
 
@@ -184,8 +185,8 @@ abstract final class AppTheme {
       onTertiary: TpColorsDark.background,
       tertiaryContainer: TpColorsDark.pinkBg,
       onTertiaryContainer: TpColorsDark.pinkDeep,
-      surface: TpColorsDark.background,
-      surfaceContainerLow: TpColorsDark.secondary,
+      surface: TpColorsDark.secondary,
+      surfaceContainerLow: TpColorsDark.tertiary,
       surfaceContainerHigh: TpColorsDark.tertiary,
       onSurface: TpColorsDark.foreground,
       onSurfaceVariant: TpColorsDark.muted,
@@ -202,6 +203,7 @@ abstract final class AppTheme {
       tones: TpTones.dark,
       hover: TpColorsDark.hover,
       disabled: TpColorsDark.disabled,
+      scaffoldBackground: TpColorsDark.background,
     );
   }
 
@@ -210,6 +212,7 @@ abstract final class AppTheme {
     required TpTones tones,
     required Color hover,
     required Color disabled,
+    required Color scaffoldBackground,
   }) {
     const buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(TpRadius.md)),
@@ -227,7 +230,7 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.surface,
+      scaffoldBackgroundColor: scaffoldBackground,
       hoverColor: hover,
       disabledColor: disabled,
       textTheme: textTheme,

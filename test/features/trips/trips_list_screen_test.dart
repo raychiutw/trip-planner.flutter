@@ -10,6 +10,7 @@ import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
@@ -126,9 +127,12 @@ void main() {
       await tester.pump();
 
       expect(find.byKey(const ValueKey('trips-create-fab')), findsNothing);
+      expect(find.byType(TpRootScrollScaffold), findsOneWidget);
       expect(find.byTooltip('新增行程'), findsOneWidget);
       final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-      expect(appBar.actions, hasLength(2));
+      expect(appBar.actions, hasLength(1));
+      final actionGroup = appBar.actions!.single as SizedBox;
+      expect((actionGroup.child! as Row).children, hasLength(2));
       expect(find.byTooltip('更多'), findsOneWidget);
     });
 

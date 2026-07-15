@@ -64,17 +64,17 @@ abstract final class TpColorsDark {
   static const pinkSubtle = Color(0xFF4A2A3A);
   static const pinkBg = Color(0xFF6B3F52);
 
-  static const background = Color(0xFF1A140F);
-  static const secondary = Color(0xFF241B14);
-  static const tertiary = Color(0xFF2E2418);
-  static const hover = Color(0xFF2D2218);
+  static const background = Color(0xFF121214);
+  static const secondary = Color(0xFF1C1C1E);
+  static const tertiary = Color(0xFF2C2C2E);
+  static const hover = Color(0xFF242426);
 
-  static const foreground = Color(0xFFF5EBDD);
-  static const muted = Color(0xFFB89E84);
-  static const accentForeground = Color(0xFF1A140F);
+  static const foreground = Color(0xFFF5F5F7);
+  static const muted = Color(0xFFA1A1A6);
+  static const accentForeground = Color(0xFF121214);
 
-  static const border = Color(0xFF3D2D22);
-  static const lineStrong = Color(0xFF5A4634);
+  static const border = Color(0xFF38383A);
+  static const lineStrong = Color(0xFF48484A);
 
   static const destructive = Color(0xFFE8A0A0);
   static const destructiveBg = Color(0x26E8A0A0); // rgba(232,160,160,.15)
@@ -82,7 +82,7 @@ abstract final class TpColorsDark {
   static const warning = Color(0xFFFAA94B);
   static const info = Color(0xFFCBA06E);
 
-  static const disabled = Color(0xFF5A4634);
+  static const disabled = Color(0xFF5A5A5E);
   static const overlay = Color(0xA6000000); // rgba(0,0,0,.65)
 }
 
@@ -113,6 +113,19 @@ abstract final class TpSpacing {
 
   /// 行動版 bottom nav 高度（含 safe area）。
   static const navHeight = 88.0;
+}
+
+/// 浮動五分頁的實際佔位；地圖 accessory 與 root scroll 共用。
+abstract final class TpRootTabGeometry {
+  static const expandedBarHeight = 64.0;
+  static const minimizedBarHeight = 50.0;
+  static const bottomSpacing = TpSpacing.s2;
+
+  static double expandedHeightFor(double bottomInset) =>
+      bottomInset + bottomSpacing + expandedBarHeight;
+
+  static double expandedHeight(BuildContext context) =>
+      expandedHeightFor(MediaQuery.viewPaddingOf(context).bottom);
 }
 
 /// Motion token（Apple 曲線體系）。

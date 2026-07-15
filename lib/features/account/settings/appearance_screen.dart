@@ -6,6 +6,8 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../ui/tp_app_bar.dart';
+
 import 'theme_mode_controller.dart';
 
 class AppearanceScreen extends ConsumerWidget {
@@ -21,7 +23,7 @@ class AppearanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('外觀')),
+      appBar: const TpAppBar(title: Text('外觀')),
       body: ListView(
         children: [
           for (final (m, label) in _options)
