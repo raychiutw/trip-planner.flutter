@@ -14,6 +14,8 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_route.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_bottom_accessory.dart';
 
 import '../../helpers/fake_trip_map.dart';
 
@@ -104,6 +106,8 @@ Widget _buildScreen(
   int? initialEntryId,
   TripMapLocationService? locationService,
   MapRepository? mapRepository,
+  ValueChanged<TripMapCanvasConfig>? onMapConfig,
+  TextScaler textScaler = TextScaler.noScaling,
   List<TripSummary> trips = const [
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
@@ -115,7 +119,10 @@ Widget _buildScreen(
         builder: (context, state) => TripMapScreen(
           tripId: 'trip-1',
           initialEntryId: initialEntryId,
-          mapBuilder: fakeTripMapBuilder,
+          mapBuilder: (config) {
+            onMapConfig?.call(config);
+            return fakeTripMapBuilder(config);
+          },
           locationService: locationService,
         ),
       ),
@@ -135,7 +142,14 @@ Widget _buildScreen(
         mapRepository ?? _StubMapRepository(),
       ),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.light(),
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
+    ),
   );
 }
 
@@ -147,6 +161,21 @@ void main() {
     expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
     expect(find.text('地圖 · 總覽'), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-tabs')), findsNothing);
+    expect(find.byType(PageView), findsOneWidget);
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.scrollDirection, Axis.horizontal);
+    expect(pageView.controller!.viewportFraction, 0.84);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
+      TpBottomAccessory.height,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-map-poi-drawer')),
+        matching: find.byType(AnimatedContainer),
+      ),
+      findsNothing,
+    );
 
     // pins：只有 master 座標非 null 的 3 筆
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
@@ -154,11 +183,18 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-13')), findsNothing);
 
-    // 底部 entry cards（時間 + 標題）；無座標 entry 不出卡片
+    // 底部水平 POI pages（時間 + 標題）。
     expect(find.byKey(const ValueKey('entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('poi-number-11')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-map-poi-drawer')),
+        matching: find.byType(Image),
+      ),
+      findsNothing,
+    );
     expect(find.text('首里城'), findsOneWidget);
     expect(find.textContaining('09:00'), findsOneWidget);
-    expect(find.text('自由活動'), findsNothing);
 
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   });
@@ -200,15 +236,87 @@ void main() {
     expect(find.text('首里城'), findsNothing);
   });
 
-  testWidgets('點 entry card：地圖移至該 pin 且不 crash', (tester) async {
+  testWidgets('點目前 entry card：地圖移至該 pin 且不 crash', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('entry-card-12')));
+    await tester.tap(find.byKey(const ValueKey('entry-card-11')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
+  testWidgets('marker 點擊與左右滑卡共用 active POI', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], onMapConfig: (config) => mapConfig = config),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('map-pin-12')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
+    expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 1);
+
+    await tester.drag(find.byType(PageView), const Offset(700, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+    final first = mapConfig!.markers.singleWhere(
+      (marker) => marker.id == 'map-pin-11',
+    );
+    final second = mapConfig!.markers.singleWhere(
+      (marker) => marker.id == 'map-pin-12',
+    );
+    expect(first.zIndex, greaterThan(second.zIndex));
+  });
+
+  testWidgets('無座標 POI 仍可透過水平滑動到達', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(PageView), const Offset(-700, 0));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(PageView), const Offset(-700, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
+    expect(find.text('自由活動'), findsOneWidget);
+    expect(find.textContaining('尚無位置'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-13')), findsNothing);
+  });
+
+  testWidgets('map padding 避讓固定 POI accessory 與 root tab', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], onMapConfig: (config) => mapConfig = config),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      mapConfig!.initialPadding.bottom,
+      greaterThanOrEqualTo(
+        TpBottomAccessory.height + TpSpacing.navHeight + TpSpacing.s3,
+      ),
+    );
+  });
+
+  testWidgets('320×568 與 200% 文字不溢出 POI rail', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], textScaler: const TextScaler.linear(2)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
   });
 
   testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {
@@ -256,7 +364,7 @@ void main() {
     expect(find.text('trip-map-route-trip-2'), findsOneWidget);
   });
 
-  testWidgets('全部 entry 無座標：顯示空狀態、不渲染地圖', (tester) async {
+  testWidgets('全部 entry 無座標：仍渲染地圖與 POI page', (tester) async {
     final dayWithoutCoordinates = TripDay(
       id: 3,
       dayNum: 1,
@@ -266,7 +374,9 @@ void main() {
     await tester.pumpWidget(_buildScreen([dayWithoutCoordinates]));
     await tester.pumpAndSettle();
 
-    expect(find.text('此行程尚無地點座標'), findsOneWidget);
-    expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);
+    expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-31')), findsOneWidget);
+    expect(find.text('自由活動'), findsOneWidget);
+    expect(find.textContaining('尚無位置'), findsOneWidget);
   });
 }

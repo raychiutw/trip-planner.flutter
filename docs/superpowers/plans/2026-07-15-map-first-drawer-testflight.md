@@ -16,7 +16,7 @@
 - Root toolbars expose at most two trailing actions; iOS-style more uses a horizontal ellipsis.
 - Mockup C's teal is not a production color. V3 dark tokens are canvas `#121214`, surface `#1C1C1E`, elevated surface `#2C2C2E`, foreground `#F5F5F7`, muted `#A1A1A6`, and soft-brown chrome accent `#CBA06E`.
 - Root expanded title height is at most 108pt below the safe area and collapses to a geometrically centered inline title.
-- The POI accessory is fixed at 168pt, has no vertical drag/collapse behavior, and uses horizontal pages with viewport fraction 0.88.
+- The POI accessory is 88pt at standard text (76pt card + 12pt indicator), switches to a non-draggable 144pt accessibility geometry at ≥150% Dynamic Type, has no vertical drag/collapse behavior, and uses horizontal pages with viewport fraction 0.84 to match the V3 HTML's 84% scroll-snap rail.
 - Interactive targets are at least 44×44pt and remain operable at 200% text scale.
 - Root tab navigation remains five destinations and is never used for POI/day actions.
 - Existing API contracts, Google Maps SDK integration, and `GITHUB_RUN_ID` build numbering remain unchanged.
@@ -40,7 +40,7 @@
 - Produces: `TpAppBar({required Widget title, List<Widget> actions, bool automaticallyImplyLeading})`.
 - Produces: `TpMoreMenuButton<T>({required List<PopupMenuEntry<T>> items, required ValueChanged<T> onSelected})`.
 - Produces: `TpScopeMenu<T>({required String label, required T value, required List<TpScopeOption<T>> options, required ValueChanged<T> onSelected})`.
-- Produces: `TpBottomAccessory({required Widget child})`, a fixed 168pt glass host with no gesture state.
+- Produces: `TpBottomAccessory({required Widget child})`, a fixed 88pt transparent rail host with no gesture state; each POI page owns its V3 glass card.
 
 - [x] **Step 1: Add failing primitive tests**
 
@@ -60,7 +60,7 @@ testWidgets('bottom accessory is fixed and leaves paging to its child', (tester)
   await tester.pumpWidget(app(const Scaffold(body: TpBottomAccessory(
     child: Text('horizontal pages'),
   ))));
-  expect(tester.getSize(find.byType(TpBottomAccessory)).height, 168);
+  expect(tester.getSize(find.byType(TpBottomAccessory)).height, 88);
   expect(find.byType(AnimatedContainer), findsNothing);
 });
 
@@ -100,7 +100,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 ```
 
-`TpAppBar` asserts `actions.length <= 2`, centers the title, preserves 44pt slots, and delegates colors/scroll edge to the existing `AppBarTheme`. `TpBottomAccessory` uses `TpGlassSurface` at a fixed 168pt and deliberately owns no vertical gesture or expand/collapse state. `TpRootScrollScaffold` sets `toolbarHeight: 56`, `collapsedHeight: 56`, `expandedHeight: 108`, and `centerTitle: true` on its shared `SliverAppBar.large`.
+`TpAppBar` asserts `actions.length <= 2`, centers the title, preserves 44pt slots, and delegates colors/scroll edge to the existing `AppBarTheme`. `TpBottomAccessory` is a fixed 88pt transparent rail host and deliberately owns no vertical gesture or expand/collapse state; horizontal pages render their own V3 glass cards. `TpRootScrollScaffold` sets `toolbarHeight: 56`, `collapsedHeight: 56`, `expandedHeight: 108`, and `centerTitle: true` on its shared `SliverAppBar.large`.
 
 - [x] **Step 4: Format and verify**
 
@@ -225,38 +225,38 @@ Expected: PASS.
 ### Task 4: Map First horizontal POI state and camera synchronization
 
 **Files:**
-- Modify: `lib/features/map/map_adapter.dart`
+- Inspect: `lib/features/map/map_adapter.dart` (existing `initialPadding` already feeds native `GoogleMap.padding`; no duplicate API added)
 - Modify: `lib/features/trip_detail/trip_map_screen.dart`
-- Modify: `test/helpers/fake_trip_map.dart`
-- Modify: `test/features/map/map_adapter_test.dart`
+- Reuse: `test/helpers/fake_trip_map.dart`
+- Verify: `test/features/map/map_adapter_test.dart`
 - Modify: `test/features/trip_detail/trip_map_screen_test.dart`
 
 **Interfaces:**
-- `TripMapCanvasConfig.padding` feeds `GoogleMap.padding`.
+- Existing `TripMapCanvasConfig.initialPadding` feeds `GoogleMap.padding`.
 - One active entry id drives marker z-index, PageView page, drawer summary, and camera focus.
 
-- [ ] **Step 1: Replace fixed-layout tests with C tests**
+- [x] **Step 1: Replace fixed-layout tests with C tests**
 
 ```dart
 expect(find.byKey(const ValueKey('trip-map-day-tabs')), findsNothing);
 expect(find.byType(PageView), findsOneWidget);
-expect(tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height, 168);
+expect(tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height, 88);
 expect(find.byType(AnimatedContainer), findsNothing);
 ```
 
-Add tests for swipe-to-marker focus, marker-to-card page, missing-coordinate entries remaining in the accessory with `尚無位置`, first/last page reachability, 0.88 viewport fraction, absence of vertical drag/collapse behavior, and bottom map padding at least `168 + TpSpacing.navHeight + TpSpacing.s3`.
+Add tests for swipe-to-marker focus, marker-to-card page, missing-coordinate entries remaining in the accessory with `尚無位置`, first/last page reachability, 0.84 viewport fraction, absence of vertical drag/collapse behavior, and bottom map padding at least `88 + TpSpacing.navHeight + TpSpacing.s3`.
 
-- [ ] **Step 2: Confirm C tests fail**
+- [x] **Step 2: Confirm C tests fail**
 
 Run: `flutter test test/features/trip_detail/trip_map_screen_test.dart test/features/map/map_adapter_test.dart`
 
 Expected: FAIL against fixed DAY tabs and fixed 104pt cards.
 
-- [ ] **Step 3: Implement the horizontal accessory**
+- [x] **Step 3: Implement the horizontal accessory**
 
-Use a `Stack`: map fills the body; `TripSectionMenu` sits top-left; locate/reset controls sit top-right; fixed `TpBottomAccessory` sits `TpSpacing.navHeight + TpSpacing.s3` above the bottom. Its child is a `PageView.builder` with `PageController(viewportFraction: 0.88)`. Marker tap animates to the matching page. Page change updates active entry and focuses only when coordinates exist. Day selection resets to the first stop in that scope, fits mapped points, and reloads route polylines. No-coordinate stops never create markers but remain in accessory data. Do not add a vertical gesture recognizer, grabber, detent, or collapse control.
+Use a `Stack`: map fills the body; centered `TripSectionMenu` follows the V3 phone mockup; locate/reset controls retain their existing function; fixed `TpBottomAccessory` sits above the root tab. Its child is a `PageView.builder` with `PageController(viewportFraction: 0.84)`, a 12pt page indicator, and per-page glass cards. Because the POI model has no image, cards use the marker number badge rather than a fake thumbnail. Marker tap animates to the matching page. Page change updates active entry and focuses only when coordinates exist. Day selection resets to the first stop in that scope, fits mapped points, and reloads route polylines. No-coordinate stops never create markers but remain in accessory data. Do not add a vertical gesture recognizer, grabber, detent, or collapse control.
 
-- [ ] **Step 4: Verify map behavior**
+- [x] **Step 4: Verify map behavior**
 
 Run: `flutter test test/features/map test/features/trip_detail/trip_map_screen_test.dart`
 
