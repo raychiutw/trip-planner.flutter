@@ -1,0 +1,164 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import '../theme/tokens.dart';
+
+class TpSettingsGroup extends StatelessWidget {
+  const TpSettingsGroup({super.key, this.title, required this.children});
+
+  final String? title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s4,
+        TpSpacing.s3,
+        TpSpacing.s4,
+        TpSpacing.s4,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TpSpacing.s3,
+                0,
+                TpSpacing.s3,
+                TpSpacing.s2,
+              ),
+              child: Text(
+                title!,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+          Material(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(TpRadius.lg),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var index = 0; index < children.length; index++) ...[
+                  if (index > 0)
+                    Divider(
+                      height: 1,
+                      indent: TpSpacing.s4,
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  children[index],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TpSettingsRow extends StatelessWidget {
+  const TpSettingsRow({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.value,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.destructive = false,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String? value;
+  final Widget? leading;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final titleColor = destructive
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurface;
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TpSpacing.s4,
+          vertical: TpSpacing.s3,
+        ),
+        child: Row(
+          children: [
+            if (leading != null) ...[
+              IconTheme(
+                data: IconThemeData(color: titleColor, size: 21),
+                child: leading!,
+              ),
+              const SizedBox(width: TpSpacing.s3),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: titleColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: TpSpacing.s1),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (value != null) ...[
+              const SizedBox(width: TpSpacing.s3),
+              Flexible(
+                child: Text(
+                  value!,
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+            if (trailing != null) ...[
+              const SizedBox(width: TpSpacing.s2),
+              trailing!,
+            ] else if (onTap != null) ...[
+              const SizedBox(width: TpSpacing.s2),
+              Icon(
+                CupertinoIcons.chevron_forward,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    return Semantics(
+      button: onTap != null,
+      label: title,
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
+    );
+  }
+}

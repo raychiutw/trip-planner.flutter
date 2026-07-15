@@ -24,13 +24,15 @@ void main() {
     when(() => mockAuth.currentUser()).thenAnswer((_) async => null);
     when(mockTrips.fetchMyTrips).thenAnswer((_) async => const []);
 
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        authRepositoryProvider.overrideWithValue(mockAuth),
-        tripRepositoryProvider.overrideWithValue(mockTrips),
-      ],
-      child: const TriplineApp(),
-    ));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(mockAuth),
+          tripRepositoryProvider.overrideWithValue(mockTrips),
+        ],
+        child: const TriplineApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);

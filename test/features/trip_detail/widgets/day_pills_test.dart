@@ -47,5 +47,46 @@ void main() {
       await tester.tap(find.text('DAY 02'));
       expect(selectedDayNum, 2);
     });
+
+    testWidgets('切換到較後日期時自動把選中 pill 捲進可視範圍', (tester) async {
+      final days = List.generate(
+        12,
+        (index) => TripDay(
+          id: index + 1,
+          dayNum: index + 1,
+          date: '2026-06-${(index + 1).toString().padLeft(2, '0')}',
+          version: 0,
+        ),
+      );
+      var activeDay = 1;
+      late StateSetter setState;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: StatefulBuilder(
+                builder: (context, update) {
+                  setState = update;
+                  return DayPills(
+                    days: days,
+                    activeDayNum: activeDay,
+                    onDaySelected: (_) {},
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      setState(() => activeDay = 12);
+      await tester.pumpAndSettle();
+
+      final selected = find.byKey(const ValueKey('day-pill-12'));
+      expect(selected, findsOneWidget);
+      expect(tester.getRect(selected).center.dx, inInclusiveRange(0, 320));
+    });
   });
 }

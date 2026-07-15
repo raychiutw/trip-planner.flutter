@@ -5,7 +5,7 @@ import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
 /// 頂部橫向 day pills（DAY NN + 日期）；點擊以回呼通知捲動至該日。
-class DayPills extends StatelessWidget {
+class DayPills extends StatefulWidget {
   const DayPills({
     super.key,
     required this.days,
@@ -29,6 +29,56 @@ class DayPills extends StatelessWidget {
   }
 
   @override
+  State<DayPills> createState() => _DayPillsState();
+}
+
+class _DayPillsState extends State<DayPills> {
+  final Map<int, GlobalKey> _pillKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _syncKeys();
+    _scheduleCenterActive();
+  }
+
+  @override
+  void didUpdateWidget(covariant DayPills oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncKeys();
+    if (oldWidget.activeDayNum != widget.activeDayNum ||
+        oldWidget.days != widget.days) {
+      _scheduleCenterActive();
+    }
+  }
+
+  void _syncKeys() {
+    final dayNums = widget.days.map((day) => day.dayNum).toSet();
+    _pillKeys.removeWhere((dayNum, key) => !dayNums.contains(dayNum));
+    for (final day in widget.days) {
+      _pillKeys.putIfAbsent(day.dayNum, GlobalKey.new);
+    }
+  }
+
+  void _scheduleCenterActive() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _pillKeys[widget.activeDayNum]?.currentContext;
+      if (target == null) return;
+      final renderObject = target.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.5,
+        duration: reduceMotion ? Duration.zero : TpMotion.normal,
+        curve: TpMotion.appleEase,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -39,19 +89,24 @@ class DayPills extends StatelessWidget {
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: ListView.separated(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
           horizontal: TpSpacing.s4,
           vertical: TpSpacing.s2,
         ),
-        itemCount: days.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(width: TpSpacing.s2),
-        itemBuilder: (context, index) => _DayPill(
-          day: days[index],
-          isActive: days[index].dayNum == activeDayNum,
-          onTap: () => onDaySelected(days[index].dayNum),
+        child: Row(
+          children: [
+            for (var index = 0; index < widget.days.length; index++) ...[
+              if (index > 0) const SizedBox(width: TpSpacing.s2),
+              _DayPill(
+                key: _pillKeys[widget.days[index].dayNum],
+                day: widget.days[index],
+                isActive: widget.days[index].dayNum == widget.activeDayNum,
+                onTap: () => widget.onDaySelected(widget.days[index].dayNum),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -60,6 +115,7 @@ class DayPills extends StatelessWidget {
 
 class _DayPill extends StatelessWidget {
   const _DayPill({
+    super.key,
     required this.day,
     required this.isActive,
     required this.onTap,
@@ -75,6 +131,7 @@ class _DayPill extends StatelessWidget {
     final tones = theme.extension<TpTones>()!;
 
     return InkWell(
+      key: ValueKey('day-pill-${day.dayNum}'),
       borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
       onTap: onTap,
       child: Container(

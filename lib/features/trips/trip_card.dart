@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_content_surface.dart';
 
 /// 卡片 cover 色調：依清單 index 輪替 accent → sage → pink。
 enum TripCardTone { accent, sage, pink }
@@ -17,9 +18,8 @@ extension TripSummaryDisplay on TripSummary {
   }
 }
 
-/// 行程清單卡片：cover 色塊（tone subtle 底 + deep 首字）→ eyebrow
-/// （{countries} · N 天）+ 標題 + 建立者列 + 日期範圍 + chevron。
-/// elevation 0 + hairline 由 CardTheme 提供。
+/// 行程清單卡片：緊湊的目的地圖示 + eyebrow（{countries} · N 天）+ 標題
+/// + 建立者列 + 日期範圍 + chevron。內容層使用實色 surface，不使用玻璃材質。
 class TripCard extends StatelessWidget {
   const TripCard({
     super.key,
@@ -71,84 +71,72 @@ class TripCard extends StatelessWidget {
     final eyebrowText = _eyebrowText;
     final dateRangeText = _dateRangeText;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // cover 色塊：subtle 底 + deep 首字 glyph（同色相由淺到深）
-            Container(
-              height: 88,
+    return TpContentSurface(
+      semanticLabel: trip.displayTitle,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
               color: coverBackground,
-              alignment: Alignment.center,
-              child: Text(
-                trip.displayTitle.characters.first,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  color: coverForeground,
-                ),
-              ),
+              borderRadius: BorderRadius.circular(TpRadius.md),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TpSpacing.s4,
-                vertical: TpSpacing.s3,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (eyebrowText != null) ...[
-                          Text(
-                            eyebrowText,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: TpSpacing.s1),
-                        ],
-                        Text(
-                          trip.displayTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        if (dateRangeText != null) ...[
-                          const SizedBox(height: TpSpacing.s1),
-                          Text(
-                            dateRangeText,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ],
-                        _buildOwnerRow(theme, coverBackground, coverForeground),
-                      ],
+            alignment: Alignment.center,
+            child: Icon(
+              CupertinoIcons.map_pin_ellipse,
+              color: coverForeground,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (eyebrowText != null) ...[
+                  Text(
+                    eyebrowText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                  Icon(
-                    CupertinoIcons.chevron_right,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: TpSpacing.s1),
+                ],
+                Text(
+                  trip.displayTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium,
+                ),
+                if (dateRangeText != null) ...[
+                  const SizedBox(height: TpSpacing.s1),
+                  Text(
+                    dateRangeText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ],
-              ),
+                _buildOwnerRow(theme, coverBackground, coverForeground),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: TpSpacing.s2),
+          Icon(
+            CupertinoIcons.chevron_right,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ],
       ),
     );
   }

@@ -14,6 +14,8 @@ import '../../app/adaptive.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_settings_group.dart';
 
 /// 帳號統計（GET /account/stats）。
 final accountStatsProvider = FutureProvider<AccountStats>(
@@ -69,23 +71,27 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         slivers: [
           const SliverAppBar.large(pinned: true, title: Text('帳號')),
           SliverPadding(
-            padding: const EdgeInsets.all(TpSpacing.s4),
+            padding: const EdgeInsets.only(bottom: 112),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _ProfileHero(
-                  user: effectiveUser,
-                  editingName: _editingName,
-                  savingName: _savingName,
-                  nameError: _nameError,
-                  nameController: _nameController,
-                  nameFocusNode: _nameFocusNode,
-                  onEditName: () => _startEditName(effectiveUser),
+                Padding(
+                  padding: const EdgeInsets.all(TpSpacing.s4),
+                  child: _ProfileHero(
+                    user: effectiveUser,
+                    editingName: _editingName,
+                    savingName: _savingName,
+                    nameError: _nameError,
+                    nameController: _nameController,
+                    nameFocusNode: _nameFocusNode,
+                    onEditName: () => _startEditName(effectiveUser),
+                  ),
                 ),
-                const SizedBox(height: TpSpacing.s6),
-                _StatsRow(stats: accountStats),
-                const SizedBox(height: TpSpacing.s6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+                  child: _StatsRow(stats: accountStats),
+                ),
+                const SizedBox(height: TpSpacing.s2),
                 const _SettingsGroup(),
-                const SizedBox(height: TpSpacing.s4),
                 _LogoutRow(onTap: () => _confirmLogout(context, ref)),
               ]),
             ),
@@ -292,7 +298,7 @@ class _ProfileHero extends StatelessWidget {
                 key: const ValueKey('account-edit-name-btn'),
                 tooltip: '編輯名稱',
                 onPressed: onEditName,
-                icon: const Icon(Icons.edit_outlined),
+                icon: const Icon(CupertinoIcons.pencil),
               ),
             ],
           ),
@@ -359,7 +365,7 @@ class _UnverifiedChip extends StatelessWidget {
   }
 }
 
-/// 3 統計卡橫排；帳號頁分區 categorical 用色（accent/sage/pink）。
+/// 3 統計卡橫排；同層資訊使用一致的中性內容 surface。
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.stats});
 
@@ -368,24 +374,16 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tones = Theme.of(context).extension<TpTones>()!;
     return Row(
       children: [
         Expanded(
-          child: _StatCard(
-            label: '行程數',
-            value: _formatCount(stats?.tripCount),
-            cardColor: tones.accentSubtle,
-            borderColor: tones.accentBg,
-          ),
+          child: _StatCard(label: '行程數', value: _formatCount(stats?.tripCount)),
         ),
         const SizedBox(width: TpSpacing.s3),
         Expanded(
           child: _StatCard(
             label: '旅程天數',
             value: _formatCount(stats?.totalDays),
-            cardColor: tones.sageSubtle,
-            borderColor: tones.sageBg,
           ),
         ),
         const SizedBox(width: TpSpacing.s3),
@@ -393,8 +391,6 @@ class _StatsRow extends StatelessWidget {
           child: _StatCard(
             label: '旅伴數',
             value: _formatCount(stats?.collaboratorCount),
-            cardColor: tones.pinkSubtle,
-            borderColor: tones.pinkBg,
           ),
         ),
       ],
@@ -404,32 +400,20 @@ class _StatsRow extends StatelessWidget {
   String _formatCount(int? count) => count == null ? '—' : '$count';
 }
 
-/// 單一統計卡：tone subtle 底 + tone bg hairline、數字 tabular figures。
+/// 單一統計卡：中性內容 surface + tabular figures。
 class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.cardColor,
-    required this.borderColor,
-  });
+  const _StatCard({required this.label, required this.value});
 
   final String label;
   final String value;
-  final Color cardColor;
-  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    return TpContentSurface(
       padding: const EdgeInsets.symmetric(
         vertical: TpSpacing.s4,
         horizontal: TpSpacing.s2,
-      ),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-        border: Border.all(color: borderColor),
       ),
       child: Column(
         children: [
@@ -461,125 +445,58 @@ class _SettingsGroup extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SettingsSection(
+        TpSettingsGroup(
           title: '帳號',
-          tiles: [
-            _SettingsTileData(
+          children: [
+            TpSettingsRow(
               key: const ValueKey('settings-profile'),
-              icon: CupertinoIcons.person,
-              label: '個人資料',
+              leading: const Icon(CupertinoIcons.person),
+              title: '個人資料',
               onTap: () => context.push('/settings/profile'),
             ),
           ],
         ),
-        const SizedBox(height: TpSpacing.s4),
-        _SettingsSection(
+        TpSettingsGroup(
           title: '偏好',
-          tiles: [
-            _SettingsTileData(
+          children: [
+            TpSettingsRow(
               key: const ValueKey('settings-appearance'),
-              icon: CupertinoIcons.paintbrush,
-              label: '外觀',
+              leading: const Icon(CupertinoIcons.paintbrush),
+              title: '外觀',
               onTap: () => context.push('/settings/appearance'),
             ),
-            _SettingsTileData(
+            TpSettingsRow(
               key: const ValueKey('settings-notifications'),
-              icon: CupertinoIcons.bell,
-              label: '通知',
+              leading: const Icon(CupertinoIcons.bell),
+              title: '通知',
               onTap: () => context.push('/settings/notifications'),
             ),
           ],
         ),
-        const SizedBox(height: TpSpacing.s4),
-        _SettingsSection(
+        TpSettingsGroup(
           title: '安全性',
-          tiles: [
-            _SettingsTileData(
+          children: [
+            TpSettingsRow(
               key: const ValueKey('settings-sessions'),
-              icon: CupertinoIcons.device_phone_portrait,
-              label: '登入裝置',
+              leading: const Icon(CupertinoIcons.device_phone_portrait),
+              title: '登入裝置',
               onTap: () => context.push('/settings/sessions'),
             ),
-            _SettingsTileData(
+            TpSettingsRow(
               key: const ValueKey('settings-connected-apps'),
-              icon: CupertinoIcons.square_grid_2x2,
-              label: '已連結的應用程式',
+              leading: const Icon(CupertinoIcons.square_grid_2x2),
+              title: '已連結的應用程式',
               onTap: () => context.push('/settings/connected-apps'),
             ),
-            _SettingsTileData(
+            TpSettingsRow(
               key: const ValueKey('settings-developer-apps'),
-              icon: CupertinoIcons.chevron_left_slash_chevron_right,
-              label: '開發者應用',
+              leading: const Icon(
+                CupertinoIcons.chevron_left_slash_chevron_right,
+              ),
+              title: '開發者應用',
               onTap: () => context.push('/settings/developer-apps'),
             ),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-/// 單一 grouped inset section 的資料：section 標題 + 一組 tile。
-class _SettingsTileData {
-  const _SettingsTileData({
-    required this.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final Key key;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-}
-
-/// iOS 設定頁常見的 grouped inset section:小灰標題 + 圓角 Card 包住多個 ListTile。
-class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({required this.title, required this.tiles});
-
-  final String title;
-  final List<_SettingsTileData> tiles;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(
-            left: TpSpacing.s1,
-            bottom: TpSpacing.s2,
-          ),
-          child: Text(
-            title,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (var i = 0; i < tiles.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: theme.colorScheme.outlineVariant,
-                  ),
-                ListTile(
-                  key: tiles[i].key,
-                  leading: Icon(tiles[i].icon),
-                  title: Text(tiles[i].label),
-                  trailing: const Icon(CupertinoIcons.chevron_right),
-                  onTap: tiles[i].onTap,
-                ),
-              ],
-            ],
-          ),
         ),
       ],
     );
@@ -594,24 +511,15 @@ class _LogoutRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        leading: Icon(
-          CupertinoIcons.square_arrow_right,
-          size: 20,
-          color: colorScheme.error,
+    return TpSettingsGroup(
+      children: [
+        TpSettingsRow(
+          title: '登出',
+          leading: const Icon(CupertinoIcons.square_arrow_right),
+          destructive: true,
+          onTap: onTap,
         ),
-        title: Text(
-          '登出',
-          style: TextStyle(
-            color: colorScheme.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        onTap: onTap,
-      ),
+      ],
     );
   }
 }

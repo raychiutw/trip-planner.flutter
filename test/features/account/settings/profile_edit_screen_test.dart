@@ -57,10 +57,23 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.text('舊名字'), findsOneWidget); // 帶入初值
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('profile-save')))
+          .onPressed,
+      isNull,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('profile-display-name')),
       '新名字',
+    );
+    await tester.pump();
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('profile-save')))
+          .onPressed,
+      isNotNull,
     );
     await tester.tap(find.byKey(const ValueKey('profile-save')));
     await tester.pumpAndSettle();

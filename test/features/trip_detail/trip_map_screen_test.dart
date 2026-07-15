@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tripline/api/map_repository.dart';
+import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
@@ -11,14 +12,10 @@ import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/models/trip_route.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-/// 測試用 tile provider：回傳套件內建透明圖，避免 widget test 對 OSM 發網路請求。
-class _TransparentTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
-      MemoryImage(TileProvider.transparentImage);
-}
+import '../../helpers/fake_trip_map.dart';
 
 class _FakeLocationService implements TripMapLocationService {
   int calls = 0;
@@ -27,6 +24,30 @@ class _FakeLocationService implements TripMapLocationService {
   Future<TripMapPoint> currentLocation() async {
     calls++;
     return const TripMapPoint(26.215, 127.72);
+  }
+}
+
+class _StubMapRepository implements MapRepository {
+  int calls = 0;
+
+  @override
+  Future<TripRouteResult> fetchRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+    cancelToken,
+  }) async {
+    calls++;
+    return TripRouteResult(
+      polyline: [
+        TripRoutePoint(lat: fromLat, lng: fromLng),
+        TripRoutePoint(lat: (fromLat + toLat) / 2, lng: (fromLng + toLng) / 2),
+        TripRoutePoint(lat: toLat, lng: toLng),
+      ],
+      durationSeconds: 600,
+      distanceMeters: 4200,
+    );
   }
 }
 
@@ -82,6 +103,7 @@ Widget _buildScreen(
   List<TripDay> days, {
   int? initialEntryId,
   TripMapLocationService? locationService,
+  MapRepository? mapRepository,
   List<TripSummary> trips = const [
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
@@ -93,7 +115,7 @@ Widget _buildScreen(
         builder: (context, state) => TripMapScreen(
           tripId: 'trip-1',
           initialEntryId: initialEntryId,
-          tileProvider: _TransparentTileProvider(),
+          mapBuilder: fakeTripMapBuilder,
           locationService: locationService,
         ),
       ),
@@ -109,23 +131,16 @@ Widget _buildScreen(
     overrides: [
       tripDaysProvider.overrideWith((ref, tripId) => Stream.value(days)),
       myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+      mapRepositoryProvider.overrideWithValue(
+        mapRepository ?? _StubMapRepository(),
+      ),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
 }
 
-String? _tileUrl(WidgetTester tester) {
-  return tester
-      .widget<TileLayer>(
-        find.byKey(const ValueKey('trip-map-canvas-tile-layer')),
-      )
-      .urlTemplate;
-}
-
 void main() {
-  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards、OSM attribution', (
-    tester,
-  ) async {
+  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -146,8 +161,7 @@ void main() {
     expect(find.textContaining('09:00'), findsOneWidget);
     expect(find.text('自由活動'), findsNothing);
 
-    // OSM attribution 必須顯示
-    expect(find.byType(RichAttributionWidget), findsOneWidget);
+    expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   });
 
   testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
@@ -161,6 +175,15 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
     expect(find.text('美麗海水族館'), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
+  });
+
+  testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {
+    final repository = _StubMapRepository();
+    await tester.pumpWidget(_buildScreen([_dayOne], mapRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(repository.calls, 1);
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
   });
 
   testWidgets('指定 initialEntryId：初始顯示該停留點所在天', (tester) async {
@@ -187,19 +210,12 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-12')), findsOneWidget);
   });
 
-  testWidgets('圖層選單：可從路線圖切換為衛星圖', (tester) async {
+  testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    expect(_tileUrl(tester), kTripMapTilePresets.first.urlTemplate);
-
-    await tester.tap(find.byKey(const ValueKey('trip-map-layer-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-layer-satellite')));
-    await tester.pumpAndSettle();
-
-    expect(_tileUrl(tester), kTripMapTilePresets[2].urlTemplate);
-    expect(find.text('衛星'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-style-roadmap')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-layer-menu')), findsNothing);
   });
 
   testWidgets('定位按鈕：取得目前位置後顯示 user marker', (tester) async {
@@ -250,6 +266,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('此行程尚無地點座標'), findsOneWidget);
-    expect(find.byType(FlutterMap), findsNothing);
+    expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);
   });
 }

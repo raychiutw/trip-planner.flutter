@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,6 +26,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
   bool _submitting = false;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -132,11 +134,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             TextFormField(
               key: const ValueKey('signup-password-field'),
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               textInputAction: TextInputAction.done,
               enabled: !_submitting,
               onFieldSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(labelText: '密碼'),
+              decoration: InputDecoration(
+                labelText: '密碼',
+                helperText: '至少 8 個字元',
+                suffixIcon: IconButton(
+                  key: const ValueKey('signup-password-visibility-toggle'),
+                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  icon: Icon(
+                    _obscurePassword
+                        ? CupertinoIcons.eye
+                        : CupertinoIcons.eye_slash,
+                  ),
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) return '請輸入密碼';
                 if (value.length < 8) return '密碼至少 8 字元';
@@ -147,7 +163,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             FilledButton(
               key: const ValueKey('signup-submit-button'),
               onPressed: _submitting ? null : _submit,
-              child: _submitting ? const _ButtonSpinner() : const Text('建立帳號'),
+              child: _submitting
+                  ? const _ButtonProgressLabel('建立帳號')
+                  : const Text('建立帳號'),
             ),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
@@ -229,7 +247,9 @@ class _EmailVerifyPendingScreenState
           OutlinedButton(
             key: const ValueKey('verify-pending-resend-button'),
             onPressed: _sending || widget.email.trim().isEmpty ? null : _resend,
-            child: _sending ? const _ButtonSpinner() : const Text('重寄驗證信'),
+            child: _sending
+                ? const _ButtonProgressLabel('重寄驗證信')
+                : const Text('重寄驗證信'),
           ),
           if (_message != null) ...[
             const SizedBox(height: TpSpacing.s3),
@@ -343,7 +363,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               key: const ValueKey('forgot-password-submit-button'),
               onPressed: _submitting ? null : _submit,
               child: _submitting
-                  ? const _ButtonSpinner()
+                  ? const _ButtonProgressLabel('寄出重設連結')
                   : const Text('寄出重設連結'),
             ),
             const SizedBox(height: TpSpacing.s3),
@@ -375,6 +395,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _confirmController = TextEditingController();
   bool _submitting = false;
   bool _success = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
   String? _error;
 
   @override
@@ -455,10 +477,23 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             TextFormField(
               key: const ValueKey('reset-password-field'),
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               textInputAction: TextInputAction.next,
               enabled: !_submitting,
-              decoration: const InputDecoration(labelText: '新密碼'),
+              decoration: InputDecoration(
+                labelText: '新密碼',
+                helperText: '至少 8 個字元',
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                  icon: Icon(
+                    _obscurePassword
+                        ? CupertinoIcons.eye
+                        : CupertinoIcons.eye_slash,
+                  ),
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) return '請輸入新密碼';
                 if (value.length < 8) return '密碼至少 8 字元';
@@ -469,11 +504,23 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             TextFormField(
               key: const ValueKey('reset-password-confirm-field'),
               controller: _confirmController,
-              obscureText: true,
+              obscureText: _obscureConfirm,
               textInputAction: TextInputAction.done,
               enabled: !_submitting,
               onFieldSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(labelText: '再次輸入新密碼'),
+              decoration: InputDecoration(
+                labelText: '再次輸入新密碼',
+                suffixIcon: IconButton(
+                  tooltip: _obscureConfirm ? '顯示確認密碼' : '隱藏確認密碼',
+                  onPressed: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
+                  icon: Icon(
+                    _obscureConfirm
+                        ? CupertinoIcons.eye
+                        : CupertinoIcons.eye_slash,
+                  ),
+                ),
+              ),
               validator: (value) =>
                   value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
             ),
@@ -481,7 +528,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             FilledButton(
               key: const ValueKey('reset-password-submit-button'),
               onPressed: _submitting ? null : _submit,
-              child: _submitting ? const _ButtonSpinner() : const Text('更新密碼'),
+              child: _submitting
+                  ? const _ButtonProgressLabel('更新密碼')
+                  : const Text('更新密碼'),
             ),
           ],
         ),
@@ -564,7 +613,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
             FilledButton(
               key: const ValueKey('verify-email-confirm-button'),
               onPressed: _verifying ? null : _verify,
-              child: _verifying ? const _ButtonSpinner() : const Text('完成驗證'),
+              child: _verifying
+                  ? const _ButtonProgressLabel('完成驗證')
+                  : const Text('完成驗證'),
             ),
         ],
       ),
@@ -656,15 +707,23 @@ class _InlineAuthMessage extends StatelessWidget {
   }
 }
 
-class _ButtonSpinner extends StatelessWidget {
-  const _ButtonSpinner();
+class _ButtonProgressLabel extends StatelessWidget {
+  const _ButtonProgressLabel(this.label);
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 20,
-      height: 20,
-      child: CircularProgressIndicator(strokeWidth: 2),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox.square(
+          dimension: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(width: TpSpacing.s2),
+        Text(label),
+      ],
     );
   }
 }

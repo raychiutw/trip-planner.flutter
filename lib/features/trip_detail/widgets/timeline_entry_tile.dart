@@ -55,6 +55,15 @@ class TimelineEntryTile extends StatelessWidget {
     final tone = resolvePoiTone(tones, entry.master?.type);
     final railLineColor = theme.colorScheme.outlineVariant;
     final displayTime = entry.startTime ?? entry.time ?? '';
+    final category =
+        poiCategoryLabel(entry.master?.category) ??
+        kPoiTypeLabels[entry.master?.type] ??
+        '停留點';
+    final semanticsLabel = [
+      entry.title,
+      if (displayTime.isNotEmpty) displayTime,
+      category,
+    ].join('，');
 
     return IntrinsicHeight(
       child: Row(
@@ -117,13 +126,20 @@ class TimelineEntryTile extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(TpRadius.md),
-                child: _EntryCard(
-                  entry: entry,
-                  tone: tone,
-                  isFocused: isFocused,
+              child: Semantics(
+                label: semanticsLabel,
+                hint: onTap == null ? null : '點兩下編輯停留點',
+                button: onTap != null,
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(TpRadius.md),
+                    child: _EntryCard(
+                      entry: entry,
+                      tone: tone,
+                      isFocused: isFocused,
+                    ),
+                  ),
                 ),
               ),
             ),

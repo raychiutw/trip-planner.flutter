@@ -129,6 +129,14 @@ enum TripFilter {
   shared,
 }
 
+enum _TripsToolbarAction {
+  importJson,
+  defaultOrder,
+  nameAsc,
+  updatedDesc,
+  startDateAsc,
+}
+
 /// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
 final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
@@ -251,11 +259,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        key: const ValueKey('trips-create-fab'),
-        onPressed: () => context.push('/new-trip'),
-        child: const Icon(CupertinoIcons.add),
-      ),
       body: RefreshIndicator.adaptive(
         onRefresh: () => ref.refresh(myTripsProvider.future),
         child: CustomScrollView(
@@ -267,8 +270,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               title: const Text('我的行程'),
               actions: [
                 IconButton(
-                  key: const ValueKey('trips-list-import-trigger'),
-                  tooltip: '匯入行程 JSON',
+                  key: const ValueKey('trips-create-button'),
+                  tooltip: '新增行程',
+                  icon: const Icon(CupertinoIcons.add),
+                  onPressed: () => context.push('/new-trip'),
+                ),
+                PopupMenuButton<_TripsToolbarAction>(
+                  key: const ValueKey('trips-sort-button'),
                   icon: _isImporting
                       ? const SizedBox.square(
                           dimension: 20,
@@ -276,35 +284,39 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Icon(CupertinoIcons.cloud_upload),
-                  onPressed: _isImporting ? null : _importTripFromJson,
-                ),
-                PopupMenuButton<TripSortOrder>(
-                  key: const ValueKey('trips-sort-button'),
-                  icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
-                  tooltip: '排序',
-                  initialValue: _sortOrder,
-                  onSelected: (order) {
-                    setState(() {
-                      _sortOrder = order;
-                    });
-                  },
+                      : const Icon(CupertinoIcons.ellipsis_circle),
+                  tooltip: '更多',
+                  enabled: !_isImporting,
+                  onSelected: _handleToolbarAction,
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: TripSortOrder.defaultOrder,
-                      child: const Text('預設順序'),
+                    const PopupMenuItem(
+                      key: ValueKey('trips-list-import-trigger'),
+                      value: _TripsToolbarAction.importJson,
+                      child: _TripsMenuRow(
+                        icon: CupertinoIcons.cloud_upload,
+                        label: '匯入行程 JSON',
+                      ),
                     ),
-                    PopupMenuItem(
-                      value: TripSortOrder.nameAsc,
-                      child: const Text('名稱 A→Z'),
+                    const PopupMenuDivider(),
+                    _buildSortMenuItem(
+                      action: _TripsToolbarAction.defaultOrder,
+                      order: TripSortOrder.defaultOrder,
+                      label: '預設順序',
                     ),
-                    PopupMenuItem(
-                      value: TripSortOrder.updatedDesc,
-                      child: const Text('最新編輯'),
+                    _buildSortMenuItem(
+                      action: _TripsToolbarAction.nameAsc,
+                      order: TripSortOrder.nameAsc,
+                      label: '名稱 A→Z',
                     ),
-                    PopupMenuItem(
-                      value: TripSortOrder.startDateAsc,
-                      child: const Text('出發日'),
+                    _buildSortMenuItem(
+                      action: _TripsToolbarAction.updatedDesc,
+                      order: TripSortOrder.updatedDesc,
+                      label: '最新編輯',
+                    ),
+                    _buildSortMenuItem(
+                      action: _TripsToolbarAction.startDateAsc,
+                      order: TripSortOrder.startDateAsc,
+                      label: '出發日',
                     ),
                   ],
                 ),
@@ -362,6 +374,37 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         ),
       ),
     );
+  }
+
+  PopupMenuItem<_TripsToolbarAction> _buildSortMenuItem({
+    required _TripsToolbarAction action,
+    required TripSortOrder order,
+    required String label,
+  }) {
+    return PopupMenuItem(
+      value: action,
+      child: _TripsMenuRow(
+        icon: _sortOrder == order
+            ? CupertinoIcons.check_mark
+            : CupertinoIcons.arrow_up_arrow_down,
+        label: label,
+      ),
+    );
+  }
+
+  void _handleToolbarAction(_TripsToolbarAction action) {
+    if (action == _TripsToolbarAction.importJson) {
+      _importTripFromJson();
+      return;
+    }
+    final order = switch (action) {
+      _TripsToolbarAction.defaultOrder => TripSortOrder.defaultOrder,
+      _TripsToolbarAction.nameAsc => TripSortOrder.nameAsc,
+      _TripsToolbarAction.updatedDesc => TripSortOrder.updatedDesc,
+      _TripsToolbarAction.startDateAsc => TripSortOrder.startDateAsc,
+      _TripsToolbarAction.importJson => throw StateError('Handled above'),
+    };
+    setState(() => _sortOrder = order);
   }
 
   /// 依 async 狀態回傳 body sliver 清單(接在搜尋/篩選 sliver 之後)。
@@ -588,6 +631,24 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 }
 
 enum _TripListAction { share, collab, health, exportJson, delete }
+
+class _TripsMenuRow extends StatelessWidget {
+  const _TripsMenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: TpSpacing.s3),
+        Text(label),
+      ],
+    );
+  }
+}
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {

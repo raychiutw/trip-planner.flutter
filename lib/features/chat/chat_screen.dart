@@ -16,6 +16,8 @@ import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../trips/trips_list_screen.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
@@ -73,7 +75,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final tripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 助手')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        toolbarHeight: 96,
+        titleSpacing: TpSpacing.s4,
+        title: Align(
+          alignment: Alignment.bottomLeft,
+          child: Text(
+            'AI 助手',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
       body: tripsAsync.when(
         loading: () =>
             const Center(child: CircularProgressIndicator.adaptive()),
@@ -100,17 +116,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   TpSpacing.s4,
                   TpSpacing.s2,
                 ),
-                child: DropdownButtonFormField<String>(
+                child: PopupMenuButton<String>(
                   key: const ValueKey('chat-trip-dropdown'),
                   initialValue: tripId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: '行程',
-                    isDense: true,
-                  ),
-                  items: [
+                  tooltip: '切換行程',
+                  onSelected: (value) => setState(() => _tripId = value),
+                  itemBuilder: (context) => [
                     for (final t in trips)
-                      DropdownMenuItem(
+                      PopupMenuItem(
                         value: t.tripId,
                         child: Text(
                           _tripLabel(t),
@@ -118,9 +131,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                   ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _tripId = v);
-                  },
+                  child: TpContentSurface(
+                    semanticLabel:
+                        '目前行程 ${_tripLabel(trips.firstWhere((t) => t.tripId == tripId))}',
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s4,
+                      vertical: TpSpacing.s3,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(CupertinoIcons.map, size: 20),
+                        const SizedBox(width: TpSpacing.s3),
+                        Expanded(
+                          child: Text(
+                            _tripLabel(
+                              trips.firstWhere((t) => t.tripId == tripId),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: TpSpacing.s2),
+                        const Icon(CupertinoIcons.chevron_down, size: 16),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               Expanded(
@@ -444,56 +481,61 @@ class _ComposerState extends ConsumerState<_Composer> {
           TpSpacing.s3,
           TpSpacing.s2,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('chat-input'),
-                controller: widget.input,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => widget.onSend(),
-                // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
-                decoration: InputDecoration(
-                  hintText: '輸入訊息或語音指令',
-                  isDense: true,
-                  filled: true,
-                  fillColor: scheme.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: TpSpacing.s4,
-                    vertical: TpSpacing.s3,
+        child: TpGlassSurface(
+          padding: const EdgeInsets.all(TpSpacing.s2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('chat-input'),
+                  controller: widget.input,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => widget.onSend(),
+                  // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                  decoration: InputDecoration(
+                    hintText: '輸入訊息或語音指令',
+                    isDense: true,
+                    filled: true,
+                    fillColor: scheme.surfaceContainerHighest,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s4,
+                      vertical: TpSpacing.s3,
+                    ),
+                    border: _composerPillBorder,
+                    enabledBorder: _composerPillBorder,
+                    focusedBorder: _composerPillBorder,
                   ),
-                  border: _composerPillBorder,
-                  enabledBorder: _composerPillBorder,
-                  focusedBorder: _composerPillBorder,
                 ),
               ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            IconButton(
-              key: const ValueKey('chat-mic-button'),
-              tooltip: _listening ? '停止語音輸入' : '語音輸入',
-              onPressed: micEnabled ? () => unawaited(_onMic()) : null,
-              color: _listening ? scheme.primary : null,
-              icon: Icon(
-                _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+              const SizedBox(width: TpSpacing.s2),
+              IconButton(
+                key: const ValueKey('chat-mic-button'),
+                tooltip: _listening ? '停止語音輸入' : '語音輸入',
+                onPressed: micEnabled ? () => unawaited(_onMic()) : null,
+                color: _listening ? scheme.primary : null,
+                icon: Icon(
+                  _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+                ),
               ),
-            ),
-            const SizedBox(width: TpSpacing.s1),
-            IconButton.filled(
-              key: const ValueKey('chat-send'),
-              onPressed: widget.sending ? null : widget.onSend,
-              icon: widget.sending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                    )
-                  : const Icon(CupertinoIcons.arrow_up_circle_fill),
-            ),
-          ],
+              const SizedBox(width: TpSpacing.s1),
+              IconButton.filled(
+                key: const ValueKey('chat-send'),
+                onPressed: widget.sending ? null : widget.onSend,
+                icon: widget.sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(CupertinoIcons.arrow_up_circle_fill),
+              ),
+            ],
+          ),
         ),
       ),
     );

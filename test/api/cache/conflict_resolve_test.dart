@@ -161,61 +161,55 @@ void main() {
   // resolveConflictKeepOurs
   // ─────────────────────────────────────────────
 
-  test(
-    '1. resolveKeepOurs 重送成功 → removeConflict(conflict store 清空)',
-    () async {
-      final c = entryConflict(
-        id: 'c1',
-        entryId: 5,
-        oursTitle: '我改的標題',
-        theirsTitle: '他人改的標題',
-        newVersion: 7,
-      );
-      await cache.appendConflict(c);
+  test('1. resolveKeepOurs 重送成功 → removeConflict(conflict store 清空)', () async {
+    final c = entryConflict(
+      id: 'c1',
+      entryId: 5,
+      oursTitle: '我改的標題',
+      theirsTitle: '他人改的標題',
+      newVersion: 7,
+    );
+    await cache.appendConflict(c);
 
-      // PATCH 帶新 expectedVersion → 200 成功。
-      adapter.on('PATCH', '/trips/t/entries/5', [
-        const Scripted.json(200, {'ok': true}),
-      ]);
+    // PATCH 帶新 expectedVersion → 200 成功。
+    adapter.on('PATCH', '/trips/t/entries/5', [
+      const Scripted.json(200, {'ok': true}),
+    ]);
 
-      await client.resolveConflictKeepOurs(c);
+    await client.resolveConflictKeepOurs(c);
 
-      expect(await cache.readConflicts(), isEmpty);
-      // 確認送出的 PATCH 帶正確 expectedVersion(= newVersion)。
-      final patch = adapter.recorded.single;
-      expect(patch.method, 'PATCH');
-      expect(bodyOf(patch)['expectedVersion'], 7);
-      expect(bodyOf(patch)['title'], '我改的標題');
-    },
-  );
+    expect(await cache.readConflicts(), isEmpty);
+    // 確認送出的 PATCH 帶正確 expectedVersion(= newVersion)。
+    final patch = adapter.recorded.single;
+    expect(patch.method, 'PATCH');
+    expect(bodyOf(patch)['expectedVersion'], 7);
+    expect(bodyOf(patch)['title'], '我改的標題');
+  });
 
-  test(
-    '[A3] resolveKeepOurs 重送離線 → 衝突留存 + 方法 throw',
-    () async {
-      final c = entryConflict(
-        id: 'c1',
-        entryId: 5,
-        oursTitle: '我改的標題',
-        theirsTitle: '他人改的標題',
-        newVersion: 7,
-      );
-      await cache.appendConflict(c);
+  test('[A3] resolveKeepOurs 重送離線 → 衝突留存 + 方法 throw', () async {
+    final c = entryConflict(
+      id: 'c1',
+      entryId: 5,
+      oursTitle: '我改的標題',
+      theirsTitle: '他人改的標題',
+      newVersion: 7,
+    );
+    await cache.appendConflict(c);
 
-      // PATCH 連線錯誤(模擬離線)。
-      adapter.on('PATCH', '/trips/t/entries/5', [const Scripted.offline()]);
+    // PATCH 連線錯誤(模擬離線)。
+    adapter.on('PATCH', '/trips/t/entries/5', [const Scripted.offline()]);
 
-      // 方法應拋出 DioException。
-      await expectLater(
-        () => client.resolveConflictKeepOurs(c),
-        throwsA(isA<DioException>()),
-      );
+    // 方法應拋出 DioException。
+    await expectLater(
+      () => client.resolveConflictKeepOurs(c),
+      throwsA(isA<DioException>()),
+    );
 
-      // 衝突仍在 store(未被移除)。
-      final remaining = await cache.readConflicts();
-      expect(remaining, hasLength(1));
-      expect(remaining.single.id, 'c1');
-    },
-  );
+    // 衝突仍在 store(未被移除)。
+    final remaining = await cache.readConflicts();
+    expect(remaining, hasLength(1));
+    expect(remaining.single.id, 'c1');
+  });
 
   test(
     '[A3] resolveKeepOurs 重送再 409 STALE → 重新 rebase:無衝突 → synced + conflict 清空',
@@ -290,91 +284,85 @@ void main() {
     },
   );
 
-  test(
-    '[Issue1] resolveKeepOurs 重送 body 只含 dirty 欄位(不覆蓋使用者沒改的欄)',
-    () async {
-      // ConflictRecord 帶 base:ours 為 full-form(title 與 description 都在),
-      // 但只 title 與 base 不同(使用者只改 title)。description 與 base 相同。
-      // 「保留你的」重送應只送 dirty 的 title + 新 expectedVersion,不送 description。
-      final c = ConflictRecord(
-        id: 'c1',
-        type: 'entry.update',
-        path: '/trips/t/entries/5',
-        body: const {
-          'title': '我改的標題',
-          'description': '舊備註',
-          'start_time': null,
-          'end_time': null,
-          'expectedVersion': 6,
-        },
-        args: const {
-          'entryId': 5,
-          'title': '我改的標題',
-          'description': '舊備註',
-          'startTime': null,
-          'endTime': null,
-        },
-        cacheKey: daysKey,
-        ours: const {
-          'title': '我改的標題',
-          'description': '舊備註',
-          'startTime': null,
-          'endTime': null,
-        },
-        theirs: const {
-          'title': '他人改的標題',
-          'description': '舊備註',
-          'startTime': null,
-          'endTime': null,
-        },
-        newVersion: 7,
-        conflictFields: const ['title'],
-        createdAt: 't',
-        base: const {
-          'title': '舊標題',
-          'description': '舊備註',
-          'startTime': null,
-          'endTime': null,
-        },
-      );
-      await cache.appendConflict(c);
+  test('[Issue1] resolveKeepOurs 重送 body 只含 dirty 欄位(不覆蓋使用者沒改的欄)', () async {
+    // ConflictRecord 帶 base:ours 為 full-form(title 與 description 都在),
+    // 但只 title 與 base 不同(使用者只改 title)。description 與 base 相同。
+    // 「保留你的」重送應只送 dirty 的 title + 新 expectedVersion,不送 description。
+    final c = ConflictRecord(
+      id: 'c1',
+      type: 'entry.update',
+      path: '/trips/t/entries/5',
+      body: const {
+        'title': '我改的標題',
+        'description': '舊備註',
+        'start_time': null,
+        'end_time': null,
+        'expectedVersion': 6,
+      },
+      args: const {
+        'entryId': 5,
+        'title': '我改的標題',
+        'description': '舊備註',
+        'startTime': null,
+        'endTime': null,
+      },
+      cacheKey: daysKey,
+      ours: const {
+        'title': '我改的標題',
+        'description': '舊備註',
+        'startTime': null,
+        'endTime': null,
+      },
+      theirs: const {
+        'title': '他人改的標題',
+        'description': '舊備註',
+        'startTime': null,
+        'endTime': null,
+      },
+      newVersion: 7,
+      conflictFields: const ['title'],
+      createdAt: 't',
+      base: const {
+        'title': '舊標題',
+        'description': '舊備註',
+        'startTime': null,
+        'endTime': null,
+      },
+    );
+    await cache.appendConflict(c);
 
-      adapter.on('PATCH', '/trips/t/entries/5', [
-        const Scripted.json(200, {'ok': true}),
-      ]);
+    adapter.on('PATCH', '/trips/t/entries/5', [
+      const Scripted.json(200, {'ok': true}),
+    ]);
 
-      await client.resolveConflictKeepOurs(c);
+    await client.resolveConflictKeepOurs(c);
 
-      expect(await cache.readConflicts(), isEmpty);
-      final body = bodyOf(adapter.recorded.single);
-      expect(body['title'], '我改的標題');
-      expect(body['expectedVersion'], 7);
-      // 不含 description(使用者沒改 → 保留 server theirs,不覆蓋)。
-      expect(body.containsKey('description'), isFalse);
-    },
-  );
+    expect(await cache.readConflicts(), isEmpty);
+    final body = bodyOf(adapter.recorded.single);
+    expect(body['title'], '我改的標題');
+    expect(body['expectedVersion'], 7);
+    // 不含 description(使用者沒改 → 保留 server theirs,不覆蓋)。
+    expect(body.containsKey('description'), isFalse);
+  });
 
   // ─────────────────────────────────────────────
   // resolveConflictKeepTheirs
   // ─────────────────────────────────────────────
 
-  test(
-    '4. resolveKeepTheirs → 僅 removeConflict(不發網路 request)',
-    () async {
-      final c = entryConflict(
-        id: 'c1',
-        entryId: 5,
-        oursTitle: '我改的標題',
-        theirsTitle: '他人改的標題',
-        newVersion: 7,
-      );
-      await cache.appendConflict(c);
+  test('4. resolveKeepTheirs → 僅 removeConflict(不發網路 request)', () async {
+    final c = entryConflict(
+      id: 'c1',
+      entryId: 5,
+      oursTitle: '我改的標題',
+      theirsTitle: '他人改的標題',
+      newVersion: 7,
+    );
+    await cache.appendConflict(c);
 
-      await client.resolveConflictKeepTheirs(c);
+    await client.resolveConflictKeepTheirs(c);
 
-      expect(await cache.readConflicts(), isEmpty);
-      // 沒有發出任何 HTTP request。
-      expect(adapter.recorded, isEmpty);
-    },
-  );
+    expect(await cache.readConflicts(), isEmpty);
+    // 沒有發出任何 HTTP request。
+    expect(adapter.recorded, isEmpty);
+  });
 }

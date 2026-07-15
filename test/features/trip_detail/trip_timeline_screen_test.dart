@@ -297,14 +297,16 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 顯示行程標題與地圖/筆記/列印/異動紀錄 actions', (tester) async {
+  testWidgets('AppBar 只保留編輯與更多，地圖/筆記改為內容 secondary navigation', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '編輯'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.map), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.doc_text), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.printer), findsOneWidget);
-    expect(find.byIcon(Icons.history_outlined), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.printer), findsNothing);
+    expect(find.byIcon(Icons.history_outlined), findsNothing);
   });
 
   testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
@@ -316,33 +318,54 @@ void main() {
     expect(find.text('map-page'), findsOneWidget);
   });
 
-  testWidgets('點列印 icon 以 go_router 導向列印預覽頁', (tester) async {
+  testWidgets('更多選單的列印可導向列印預覽頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(CupertinoIcons.printer));
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-print')));
     await tester.pumpAndSettle();
 
     expect(find.text('print-page'), findsOneWidget);
   });
 
-  testWidgets('點異動紀錄 icon 以 go_router 導向 audit 頁', (tester) async {
+  testWidgets('更多選單的異動紀錄可導向 audit 頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(Icons.history_outlined));
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-audit')));
     await tester.pumpAndSettle();
 
     expect(find.text('audit-page'), findsOneWidget);
   });
 
-  testWidgets('更多選單提供分享、共編與 AI 健檢入口', (tester) async {
+  testWidgets('更多選單收納行程資料、列印、異動紀錄、分享、共編與 AI 健檢', (tester) async {
     await _pumpTimeline(tester);
 
     await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('trip-action-edit-info')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-action-print')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-action-audit')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-action-share')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-action-collab')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-action-health')), findsOneWidget);
+  });
+
+  testWidgets('閱讀模式隱藏移動與排序控制，點編輯後才顯示', (tester) async {
+    await _pumpTimeline(tester);
+
+    expect(find.byKey(const ValueKey('entry-menu-11')), findsNothing);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
+
+    await tester.tap(find.widgetWithText(TextButton, '編輯'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextButton, '完成'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-menu-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
   });
 
   testWidgets('更多選單可導向分享連結頁', (tester) async {
@@ -768,6 +791,8 @@ void main() {
     tester,
   ) async {
     await _pumpTimeline(tester, fetchDays: () => _longDays('drag'));
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
 
     final daySection = find.byKey(const ValueKey('day-drop-1'));
     final before = tester.getTopLeft(daySection).dy;
@@ -839,6 +864,8 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
 
     await tester.drag(
       find.byKey(const ValueKey('entry-dismiss-11')),
@@ -920,6 +947,8 @@ void main() {
 
   testWidgets('每個 entry 有拖曳 handle', (tester) async {
     await _pumpTimeline(tester);
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
@@ -939,6 +968,8 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
     await tester.pumpAndSettle();
@@ -974,6 +1005,8 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
 
     final source = tester.getCenter(
       find.byKey(const ValueKey('entry-cross-drag-11')),
@@ -1019,6 +1052,8 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
 
     final source = tester.getCenter(
       find.byKey(const ValueKey('entry-cross-drag-11')),
