@@ -7,6 +7,14 @@ on:
     branches: [master]
   workflow_dispatch:
     inputs:
+      release_target:
+        description: Mobile release destination
+        required: true
+        default: testflight
+        type: choice
+        options:
+          - testflight
+          - android-closed
       runner:
         description: Runner used for the manual TestFlight release
         required: true
@@ -59,7 +67,7 @@ jobs:
 
   testflight:
     name: Upload to TestFlight
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'testflight' }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 75
     concurrency:
@@ -138,3 +146,80 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
           wait-for-processing: 'true'
+
+  android_closed:
+    name: Upload to Google Play closed testing
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-closed' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: android-closed-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+      - name: Validate Android release secrets and decode upload key
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
+          : "${ANDROID_KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64 secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing ANDROID_KEY_ALIAS secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD secret}"
+          : "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:?Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret}"
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+
+      - name: Build signed Android App Bundle
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+          ANDROID_KEYSTORE_PATH: upload-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if (( GITHUB_RUN_ATTEMPT >= 100 )); then
+            echo "GITHUB_RUN_ATTEMPT must be below 100; start a new workflow run" >&2
+            exit 1
+          fi
+          version_code=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          if (( version_code > 2100000000 )); then
+            echo "Android version code exceeds the Google Play limit" >&2
+            exit 1
+          fi
+          flutter build appbundle --release --build-number="$version_code"
+          test -f build/app/outputs/bundle/release/app-release.aab
+
+      - name: Upload AAB to Google Play closed testing
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.raychiu.tripline
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: alpha
+          status: completed
