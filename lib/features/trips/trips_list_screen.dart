@@ -543,6 +543,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             currentUserId: currentUserId,
             onTap: () => context.go('/trips/${trip.tripId}'),
             onLongPress: () => _showTripActions(context, trip),
+            onMorePressed: () => _showTripActions(context, trip),
           );
         },
       ),
@@ -669,6 +670,13 @@ class _EmptyHero extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
+          ),
+          const SizedBox(height: TpSpacing.s4),
+          FilledButton.icon(
+            key: const ValueKey('trips-empty-create'),
+            onPressed: () => context.push('/new-trip'),
+            icon: const Icon(CupertinoIcons.add),
+            label: const Text('建立第一趟行程'),
           ),
         ],
       ),
