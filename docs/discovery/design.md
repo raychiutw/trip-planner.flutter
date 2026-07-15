@@ -183,7 +183,7 @@ const sheetClose = Cubic(0.4, 0, 1, 1);        // 280ms
 1. 行程根頁：緊湊 large title，捲動後收為位置穩定的 inline title。
 2. 行程詳情：返回、標題、編輯、更多；行程／地圖／筆記改由單一內容範圍選單切換。
 3. 地圖頂部：單一 `地圖 · DAY 02 ▾` scope capsule，選單內提供總覽與各日。
-4. 地圖底部：可拖曳、可縮合、可水平滑動 POI 的 drawer，永遠位於根 Tab 上方。
+4. 地圖底部：固定高度的 POI accessory，只用左右滑動切換景點，永遠位於根 Tab 上方。
 5. 根 Tab：只負責聊天／行程／地圖／收藏／帳號五個頂層目的地，不承載新增或 POI 操作。
 
 本輪是**全 App 的視覺與互動系統調整**，不是只修行程與地圖兩頁。既有元件、頁面結構與 navigation shell 若無法達到本節規格，可以直接改寫；是否重用以結果與維護性決定，不把舊實作視為限制。唯一硬性架構條件是：相同職責必須由共用元件或共用 primitive 提供，禁止每頁各自複製一套 toolbar、menu、glass、scroll edge 或 bottom clearance 邏輯。
@@ -208,7 +208,7 @@ Mockup C 的青綠色只代表原 `.flutter` 參考稿，不進入 production th
 | 行程內容導覽 | 地圖、筆記是 toolbar icon；DAY pills 在 `_TimelineBodyState.build` 固定佔一列 | 內容目的地與命令混在 toolbar，使用者要記 icon；DAY 列也壓縮內容高度 | 使用單一 `行程 ▾` scope control 切換行程／地圖／筆記；DAY 是內容內薄型 sticky strip |
 | 地圖頂部 | `trip_map_screen.dart:381-400` 為 `DAY tabs → map → 104pt cards` 固定 Column；tabs 實作在 `404-473` | DAY 控制永久佔高；長行程會變成橫向 pill 迷宮 | 只保留一個 44pt `地圖 · DAY NN ▾` capsule；總覽與各日放入 menu / sheet |
 | 地圖控制 | `trip_map_screen.dart:477-546` 圖層與定位按鈕分別浮在右上 | 兩個控制外觀與 toolbar／根 Tab 不同，形成第三套 chrome | 若改 Google Maps，移除圖層選單；只留定位與全覽，使用同一 glass circle、尺寸與邊界 |
-| 地圖 POI | `trip_map_screen.dart:548-629` 固定 104pt 水平卡列；根 shell 另有 `NavigationBar` | 固定卡列與根 Tab 疊加時壓縮地圖；不同高度／safe area 下可能互相遮擋 | POI 改為可縮合 drawer；collapsed 與 medium 兩狀態，水平滑動卡片，動態保留根 Tab 間距 |
+| 地圖 POI | `trip_map_screen.dart:548-629` 固定 104pt 水平卡列；根 shell 另有 `NavigationBar` | 卡列沒有 active page，也未與 marker / camera 同步；不同 safe area 下可能壓住根 Tab | POI 改為固定高度 accessory；只左右滑動 PageView，動態保留根 Tab 間距 |
 | 根 Tab | `app_shell.dart:27` 使用 Material `NavigationBar` | 功能正確，但外觀仍是 Material surface／indicator，未形成 iOS 26 浮動功能層 | 浮動 Liquid Glass root tab；只導覽、保持可見、內容可延伸到後方但可操作內容必須避讓 |
 
 ### Apple Music / HIG 基準
@@ -287,22 +287,15 @@ Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標�
 - 選 DAY 後重新 fit 可見 marker；無座標的 stop 仍保留在 POI drawer，以「尚無位置」表示。
 - 不再保留 `_buildDayTabs` 的固定水平 pill 列；這是 C 案的核心，不得實作成 capsule + DAY tabs 兩者並存。
 
-#### POI drawer
+#### POI 水平 accessory
 
-只需要兩個主要 detent，避免過度設計：
-
-| 狀態 | 高度／行為 | 顯示內容 |
-|---|---|---|
-| Collapsed | 64–72pt，加 root tab 與 safe-area clearance | grabber、時間、POI 名稱、類型／位置狀態；點擊或上拖展開 |
-| Medium | 約 220pt，最大不超過可用高度 45% | 水平 `PageView` POI 卡、相鄰卡露出 12–16%、日別與序號、跳到行程動作 |
-
-- `PageView.viewportFraction` 目標 0.86–0.9；第一張與最後一張都必須完整可達。
-- 水平滑卡 → active POI / marker / camera 同步；點 marker → drawer 展開到 medium 並滑到該卡。
-- 垂直拖 drawer 不得誤觸水平卡；橫向卡滑動不得拖動地圖。
-- 點地圖空白不強制關閉 drawer；只有明確下拖或點 collapse control 才收合，避免地圖操作造成介面跳動。
-- drawer 底部基準為 `viewPadding.bottom + visibleRootTabHeight + 12pt`，任何 detent 都不可壓住根 Tab。
-- map camera padding 隨 drawer 實際高度更新，fit route 後 marker 不得落在 drawer 或 scope capsule 下方。
-- Reduce Motion 時 detent 與卡片同步直接切換；正常動畫 200–280ms，禁止彈跳放大。
+- accessory 固定高度 168pt，不提供垂直拖曳、展開、收合或 detent。
+- 內層只有水平 `PageView`，`viewportFraction` 為 0.88，相鄰卡露出來提示可滑；第一張與最後一張都必須完整可達。
+- 水平滑卡 → active POI / marker / camera 同步；點 marker → PageView 滑到該卡。
+- 橫向卡滑動不得拖動地圖；不建立任何垂直 gesture recognizer。
+- accessory 底部基準為 `viewPadding.bottom + visibleRootTabHeight + 12pt`，不可壓住根 Tab。
+- map camera padding 依 168pt accessory 與 root-tab clearance 計算，fit route 後 marker 不得落在 accessory 或 scope capsule 下方。
+- Reduce Motion 時卡片與 camera 直接切換；正常 PageView 動畫 200–280ms，禁止彈跳放大。
 
 #### Root Tab 關係
 
@@ -310,7 +303,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 
 - root tab 始終保留五個目的地，不把 DAY、定位或新增放進 tab。
 - map tile 可以延伸到 root tab 後方；marker、POI 文字與操作按鈕必須避讓。
-- drawer collapsed 狀態與 root tab 視覺上是兩個層級，不合併成第六個 Tab。
+- POI accessory 與 root tab 視覺上是兩個層級，不合併成第六個 Tab。
 - root tab 在 map drag 時不自動消失；只有垂直內容捲動頁才採 scroll-down minimize。
 
 參考：[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)、[Build a UIKit app with the new design](https://developer.apple.com/videos/play/wwdc2025/284/)。
@@ -334,7 +327,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 2. **P0：統一 toolbar** — 行程詳情六個 action 收斂為編輯＋水平更多。
 3. **P0：穩定 title** — expanded / collapsed 幾何、loading slot、scroll edge。
 4. **P1：行程根頁密度** — 移除 FAB、壓縮 title 後的搜尋與 scope 區。
-5. **P1：Map First Drawer** — 單一 scope capsule、兩 detent、POI/marker/card 同步。
+5. **P1：Map First POI Carousel** — 單一 scope capsule、固定水平 PageView、POI/marker/card 同步。
 6. **P1：全 App 套用** — 聊天、收藏、帳號及所有次層頁改用同一套 title、toolbar、menu、glass、root tab 與 bottom accessory primitive；不允許把非行程頁留在舊視覺系統。
 
 ### 驗收矩陣
@@ -345,14 +338,14 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 - light / dark、Increase Contrast、Reduce Transparency。
 - 100%、135%、200% Dynamic Type；title、scope、toolbar action 不互相覆蓋。
 - 行程首屏可見第一張卡；collapsed title 與四個 toolbar control 的中心線一致。
-- map 在 drawer collapsed / medium、root tab expanded / minimized 各組合都沒有 POI 遮擋。
+- map 在固定 POI accessory 與 root tab expanded / minimized 各組合都沒有 POI 遮擋。
 
 #### 互動
 
 - 大標題捲動收合、向上回復，title 不水平跳動。
 - action loading 時 title 不位移；更多 menu 項目順序與 destructive 樣式正確。
 - 選 DAY、滑 POI、點 marker 三條路徑最後得到同一 active day / POI / camera state。
-- first / last POI 卡可完整選取；drawer 兩 detent 可被 VoiceOver 操作。
+- first / last POI 卡可完整選取；VoiceOver 可以左右切換卡片。
 - root tab 切換保留各分頁 navigation 與 scroll state。
 
 #### 無障礙與動態設定
@@ -360,7 +353,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 - icon-only control 有中文 semantic label；順序為返回 → title → 編輯 → 更多 → scope → map controls → drawer → root tab。
 - 44×44pt target；正文基準 17pt，支援文字不小於 11pt。
 - Reduce Motion 停用非必要位移；VoiceOver 不朗讀被 drawer 遮住或不可見的 marker。
-- drawer collapsed / expanded state 必須可被輔助技術辨識並切換。
+- POI 卡的當前頁、總頁數與位置狀態必須可被輔助技術辨識。
 
 ### 全面改寫與共用架構要求
 
@@ -373,7 +366,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 | Scope control | 統一行程／地圖／筆記與 DAY 範圍選擇的視覺、狀態與語意 | 同一頁同時存在 capsule、segmented control、DAY pills 三套切換器 |
 | Glass material primitive | 統一 blur、tint、border、shadow、Reduce Transparency fallback | 元件自行疊 blur、border、gradient、shadow |
 | Root tab + bottom accessory host | 集中管理 tab 高度、minimize 狀態、safe area、drawer / accessory clearance | POI drawer、FAB、固定卡列各自猜測 bottom padding |
-| Map POI drawer | 管理 detent、水平卡片、active POI、marker 與 camera padding 同步 | 建立第二套 day / POI domain state，或讓 view state 反向成為資料來源 |
+| Map POI accessory | 管理固定高度、水平卡片、active POI、marker 與 camera padding 同步 | 垂直收合／detent，建立第二套 day / POI domain state，或讓 view state 反向成為資料來源 |
 
 - 全部 root 頁與 detail 頁都必須遷移到共用 page shell 與 toolbar primitive；不能只讓新頁使用。
 - 共用元件提供 layout 與 interaction contract，頁面只傳 title、actions、menu commands、scroll state 與內容，不直接覆寫幾何常數。

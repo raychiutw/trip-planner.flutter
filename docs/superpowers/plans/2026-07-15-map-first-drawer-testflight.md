@@ -4,19 +4,19 @@
 
 **Goal:** Finish the approved Apple Music/HIG redesign with shared UI primitives, the C Map First Drawer interaction, and publish the verified build to TestFlight.
 
-**Architecture:** Keep the merged Google Maps, Riverpod, GoRouter, and Liquid Glass implementation. Add one shared toolbar/scope layer and one reusable bottom-accessory container, then migrate the remaining root/detail screens to those contracts. Map day selection, active stop, marker selection, horizontal paging, drawer detent, and camera padding remain one state machine inside `TripMapScreen`; no second domain model or navigation framework is added.
+**Architecture:** Keep the merged Google Maps, Riverpod, GoRouter, and Liquid Glass implementation. Add one shared toolbar/scope layer and one reusable bottom-accessory container, then migrate the remaining root/detail screens to those contracts. Map day selection, active stop, marker selection, horizontal paging, fixed accessory geometry, and camera padding remain one state machine inside `TripMapScreen`; no second domain model or navigation framework is added.
 
 **Tech Stack:** Flutter 3.44.6, Dart 3.11, Riverpod 3, GoRouter 17, google_maps_flutter, Flutter widget tests, GitHub Actions, App Store Connect/TestFlight.
 
 ## Global Constraints
 
-- The selected design is C: one `地圖 · DAY NN` scope capsule and a two-detent POI drawer; fixed DAY tabs and the fixed 104pt card row must not remain.
+- The selected design is C / V3: one `地圖 · DAY NN` scope capsule and a fixed-height horizontally paged POI accessory; fixed DAY tabs, vertical detents, and the old 104pt list must not remain.
 - The work covers every Flutter root/detail screen; existing code may be kept, refactored, or replaced.
 - Shared page title, toolbar/menu, scope, glass, root-tab clearance, and bottom-accessory behavior are mandatory.
 - Root toolbars expose at most two trailing actions; iOS-style more uses a horizontal ellipsis.
 - Mockup C's teal is not a production color. V3 dark tokens are canvas `#121214`, surface `#1C1C1E`, elevated surface `#2C2C2E`, foreground `#F5F5F7`, muted `#A1A1A6`, and soft-brown chrome accent `#CBA06E`.
 - Root expanded title height is at most 108pt below the safe area and collapses to a geometrically centered inline title.
-- Drawer detents are collapsed 72pt and medium 220pt; POI pages use viewport fraction 0.88.
+- The POI accessory is fixed at 168pt, has no vertical drag/collapse behavior, and uses horizontal pages with viewport fraction 0.88.
 - Interactive targets are at least 44×44pt and remain operable at 200% text scale.
 - Root tab navigation remains five destinations and is never used for POI/day actions.
 - Existing API contracts, Google Maps SDK integration, and `GITHUB_RUN_ID` build numbering remain unchanged.
@@ -40,7 +40,7 @@
 - Produces: `TpAppBar({required Widget title, List<Widget> actions, bool automaticallyImplyLeading})`.
 - Produces: `TpMoreMenuButton<T>({required List<PopupMenuEntry<T>> items, required ValueChanged<T> onSelected})`.
 - Produces: `TpScopeMenu<T>({required String label, required T value, required List<TpScopeOption<T>> options, required ValueChanged<T> onSelected})`.
-- Produces: `TpBottomAccessory({required TpAccessoryDetent detent, required Widget collapsed, required Widget medium, required ValueChanged<TpAccessoryDetent> onChanged})`.
+- Produces: `TpBottomAccessory({required Widget child})`, a fixed 168pt glass host with no gesture state.
 
 - [x] **Step 1: Add failing primitive tests**
 
@@ -56,14 +56,12 @@ testWidgets('shared toolbar rejects more than two actions and uses horizontal el
   expect(find.byIcon(Icons.more_vert), findsNothing);
 });
 
-testWidgets('bottom accessory exposes collapsed and medium states', (tester) async {
-  await tester.pumpWidget(app(Scaffold(body: TpBottomAccessory(
-    detent: TpAccessoryDetent.collapsed,
-    collapsed: const Text('collapsed'),
-    medium: const Text('medium'),
-    onChanged: (_) {},
+testWidgets('bottom accessory is fixed and leaves paging to its child', (tester) async {
+  await tester.pumpWidget(app(const Scaffold(body: TpBottomAccessory(
+    child: Text('horizontal pages'),
   ))));
-  expect(tester.getSize(find.byType(TpBottomAccessory)).height, 72);
+  expect(tester.getSize(find.byType(TpBottomAccessory)).height, 168);
+  expect(find.byType(AnimatedContainer), findsNothing);
 });
 
 test('V3 dark palette is neutral with soft-brown accent', () {
@@ -102,7 +100,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 ```
 
-`TpAppBar` asserts `actions.length <= 2`, centers the title, preserves 44pt slots, and delegates colors/scroll edge to the existing `AppBarTheme`. `TpBottomAccessory` uses `TpGlassSurface`, `AnimatedContainer`, `TpMotion.resolve`, a semantic expand/collapse button, and vertical drag velocity to switch only between 72pt and 220pt. `TpRootScrollScaffold` sets `toolbarHeight: 56`, `collapsedHeight: 56`, `expandedHeight: 108`, and `centerTitle: true` on its shared `SliverAppBar.large`.
+`TpAppBar` asserts `actions.length <= 2`, centers the title, preserves 44pt slots, and delegates colors/scroll edge to the existing `AppBarTheme`. `TpBottomAccessory` uses `TpGlassSurface` at a fixed 168pt and deliberately owns no vertical gesture or expand/collapse state. `TpRootScrollScaffold` sets `toolbarHeight: 56`, `collapsedHeight: 56`, `expandedHeight: 108`, and `centerTitle: true` on its shared `SliverAppBar.large`.
 
 - [x] **Step 4: Format and verify**
 
@@ -224,7 +222,7 @@ Run: `flutter test test/features/trip_detail/trip_timeline_screen_test.dart test
 
 Expected: PASS.
 
-### Task 4: Map First Drawer state and camera synchronization
+### Task 4: Map First horizontal POI state and camera synchronization
 
 **Files:**
 - Modify: `lib/features/map/map_adapter.dart`
@@ -242,13 +240,11 @@ Expected: PASS.
 ```dart
 expect(find.byKey(const ValueKey('trip-map-day-tabs')), findsNothing);
 expect(find.byType(PageView), findsOneWidget);
-expect(tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height, 72);
-await tester.tap(find.byKey(const ValueKey('trip-map-poi-drawer')));
-await tester.pumpAndSettle();
-expect(tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height, 220);
+expect(tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height, 168);
+expect(find.byType(AnimatedContainer), findsNothing);
 ```
 
-Add tests for swipe-to-marker focus, marker-to-card page, missing-coordinate entries remaining in the drawer with `尚無位置`, first/last page reachability, 0.88 viewport fraction, and bottom map padding at least `220 + TpSpacing.navHeight + TpSpacing.s3` in medium state.
+Add tests for swipe-to-marker focus, marker-to-card page, missing-coordinate entries remaining in the accessory with `尚無位置`, first/last page reachability, 0.88 viewport fraction, absence of vertical drag/collapse behavior, and bottom map padding at least `168 + TpSpacing.navHeight + TpSpacing.s3`.
 
 - [ ] **Step 2: Confirm C tests fail**
 
@@ -256,9 +252,9 @@ Run: `flutter test test/features/trip_detail/trip_map_screen_test.dart test/feat
 
 Expected: FAIL against fixed DAY tabs and fixed 104pt cards.
 
-- [ ] **Step 3: Implement the drawer**
+- [ ] **Step 3: Implement the horizontal accessory**
 
-Use a `Stack`: map fills the body; `TripSectionMenu` sits top-left; locate/reset controls sit top-right; `TpBottomAccessory` sits `TpSpacing.navHeight + TpSpacing.s3` above the bottom. The medium child is a `PageView.builder` with `PageController(viewportFraction: 0.88)`. Marker tap expands the drawer and animates to the matching page. Page change updates active entry and focuses only when coordinates exist. Day selection resets to the first stop in that scope, fits mapped points, and reloads route polylines. No-coordinate stops never create markers but remain in drawer data.
+Use a `Stack`: map fills the body; `TripSectionMenu` sits top-left; locate/reset controls sit top-right; fixed `TpBottomAccessory` sits `TpSpacing.navHeight + TpSpacing.s3` above the bottom. Its child is a `PageView.builder` with `PageController(viewportFraction: 0.88)`. Marker tap animates to the matching page. Page change updates active entry and focuses only when coordinates exist. Day selection resets to the first stop in that scope, fits mapped points, and reloads route polylines. No-coordinate stops never create markers but remain in accessory data. Do not add a vertical gesture recognizer, grabber, detent, or collapse control.
 
 - [ ] **Step 4: Verify map behavior**
 
@@ -286,7 +282,7 @@ Expected: every command exits 0.
 
 - [ ] **Step 2: Run visual/runtime acceptance**
 
-Verify 320×568, 390×844, 430×932, light/dark, 200% text, disabled animations, high contrast, collapsed/medium drawer, first/last POI, marker selection, and root-tab clearance. Capture screenshots for trips expanded/collapsed, timeline toolbar/scope, and map both detents.
+Verify 320×568, 390×844, 430×932, light/dark, 200% text, disabled animations, high contrast, first/last horizontal POI, marker selection, and root-tab clearance. Capture screenshots for trips expanded/collapsed, timeline toolbar/scope, and the fixed map POI accessory.
 
 - [ ] **Step 3: Commit, push, and land**
 

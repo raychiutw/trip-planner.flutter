@@ -166,31 +166,23 @@ void main() {
     expect(selected, 1);
   });
 
-  testWidgets('TpBottomAccessory 只有 collapsed 與 medium 兩個 detent', (
-    tester,
-  ) async {
-    var detent = TpAccessoryDetent.collapsed;
+  testWidgets('TpBottomAccessory 維持固定高度並不處理垂直收合', (tester) async {
     await tester.pumpWidget(
       app(
-        StatefulBuilder(
-          builder: (context, setState) => Scaffold(
-            body: Align(
-              alignment: Alignment.bottomCenter,
-              child: TpBottomAccessory(
-                detent: detent,
-                collapsed: const Text('collapsed'),
-                medium: const Text('medium'),
-                onChanged: (value) => setState(() => detent = value),
-              ),
-            ),
+        const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: TpBottomAccessory(child: Text('horizontal pages')),
           ),
         ),
       ),
     );
 
-    expect(tester.getSize(find.byType(TpBottomAccessory)).height, 72);
-    await tester.tap(find.byType(TpBottomAccessory));
-    await tester.pumpAndSettle();
-    expect(tester.getSize(find.byType(TpBottomAccessory)).height, 220);
+    expect(
+      tester.getSize(find.byType(TpBottomAccessory)).height,
+      TpBottomAccessory.height,
+    );
+    expect(find.text('horizontal pages'), findsOneWidget);
+    expect(find.byType(AnimatedContainer), findsNothing);
   });
 }
