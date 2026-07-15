@@ -21,6 +21,7 @@ import 'widgets/entry_edit_sheet.dart';
 import 'widgets/hotel_card.dart';
 import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
+import 'widgets/trip_section_menu.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
@@ -72,10 +73,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             onPressed: () => setState(() => _isEditing = !_isEditing),
             child: Text(_isEditing ? '完成' : '編輯'),
           ),
-          PopupMenuButton<_TripMoreAction>(
+          TpMoreMenuButton<_TripMoreAction>(
             key: const ValueKey('trip-actions-menu'),
-            tooltip: '更多',
-            icon: const Icon(Icons.more_vert),
             onSelected: (action) {
               switch (action) {
                 case _TripMoreAction.editInfo:
@@ -92,7 +91,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   _goTo(context, '/trips/${widget.tripId}/health');
               }
             },
-            itemBuilder: (context) => const [
+            items: const [
               PopupMenuItem(
                 key: ValueKey('trip-action-edit-info'),
                 value: _TripMoreAction.editInfo,
@@ -150,10 +149,21 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             ? const _EmptyTimeline()
             : Column(
                 children: [
-                  _TripSecondaryNavigation(
-                    onMap: () => _goTo(context, '/trips/${widget.tripId}/map'),
-                    onNotes: () =>
-                        _goTo(context, '/trips/${widget.tripId}/notes'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      TpSpacing.s4,
+                      TpSpacing.s2,
+                      TpSpacing.s4,
+                      TpSpacing.s1,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TripSectionMenu(
+                        section: TripSection.itinerary,
+                        tripId: widget.tripId,
+                        days: days,
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: _TimelineBody(
@@ -173,46 +183,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             ref.invalidate(tripDaysProvider(widget.tripId));
           },
         ),
-      ),
-    );
-  }
-}
-
-class _TripSecondaryNavigation extends StatelessWidget {
-  const _TripSecondaryNavigation({required this.onMap, required this.onNotes});
-
-  final VoidCallback onMap;
-  final VoidCallback onNotes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        TpSpacing.s4,
-        TpSpacing.s2,
-        TpSpacing.s4,
-        TpSpacing.s1,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: FilledButton.tonalIcon(
-              key: const ValueKey('trip-secondary-map'),
-              onPressed: onMap,
-              icon: const Icon(CupertinoIcons.map),
-              label: const Text('地圖'),
-            ),
-          ),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: FilledButton.tonalIcon(
-              key: const ValueKey('trip-secondary-notes'),
-              onPressed: onNotes,
-              icon: const Icon(CupertinoIcons.doc_text),
-              label: const Text('筆記'),
-            ),
-          ),
-        ],
       ),
     );
   }

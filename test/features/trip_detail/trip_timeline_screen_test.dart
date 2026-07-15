@@ -297,22 +297,26 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 只保留編輯與更多，地圖/筆記改為內容 secondary navigation', (tester) async {
+  testWidgets('AppBar 只保留編輯與更多，內容只保留單一 scope', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '編輯'), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.map), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.doc_text), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
+    expect(find.text('行程'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-secondary-map')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
     expect(find.byIcon(CupertinoIcons.printer), findsNothing);
     expect(find.byIcon(Icons.history_outlined), findsNothing);
   });
 
-  testWidgets('點地圖 icon 以 go_router 導向行程地圖頁', (tester) async {
+  testWidgets('從行程 scope 選地圖以 go_router 導向行程地圖頁', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byIcon(CupertinoIcons.map));
+    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-section-map')));
     await tester.pumpAndSettle();
 
     expect(find.text('map-page'), findsOneWidget);

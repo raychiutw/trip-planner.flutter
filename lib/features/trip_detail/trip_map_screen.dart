@@ -16,6 +16,7 @@ import '../map/map_location.dart';
 import '../trips/trip_card.dart';
 import '../trips/trips_list_screen.dart';
 import 'trip_providers.dart';
+import 'widgets/trip_section_menu.dart';
 
 /// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
 const List<Color> kDayPinPalette = [
@@ -84,6 +85,7 @@ class TripMapScreen extends ConsumerWidget {
           ),
         ),
         data: (days) => _TripMapView(
+          tripId: tripId,
           days: days,
           initialEntryId: initialEntryId,
           mapBuilder: mapBuilder,
@@ -223,12 +225,14 @@ class _DayPin {
 
 class _TripMapView extends ConsumerStatefulWidget {
   const _TripMapView({
+    required this.tripId,
     required this.days,
     this.initialEntryId,
     this.mapBuilder,
     this.locationService,
   });
 
+  final String tripId;
   final List<TripDay> days;
   final int? initialEntryId;
   final TripMapCanvasBuilder? mapBuilder;
@@ -475,83 +479,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     final visiblePins = _pinsForTab(_selectedTabIndex);
     return Column(
       children: [
-        _buildDayTabs(context),
         Expanded(child: _buildMap(allPins, visiblePins)),
         _buildEntryCards(context, visiblePins),
       ],
-    );
-  }
-
-  Widget _buildDayTabs(BuildContext context) {
-    return SizedBox(
-      height: TpSpacing.tapMin + TpSpacing.s2 * 2,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-          horizontal: TpSpacing.s4,
-          vertical: TpSpacing.s2,
-        ),
-        itemCount: widget.days.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
-        itemBuilder: (context, tabIndex) => _buildDayTabPill(context, tabIndex),
-      ),
-    );
-  }
-
-  Widget _buildDayTabPill(BuildContext context, int tabIndex) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isSelected = tabIndex == _selectedTabIndex;
-    final isOverview = tabIndex == 0;
-    final label = isOverview
-        ? '總覽'
-        : 'DAY ${widget.days[tabIndex - 1].dayNum.toString().padLeft(2, '0')}';
-    // 總覽用主色，單日用該日輪替色（地圖 data-viz 例外）。
-    final pillColor = isOverview
-        ? colorScheme.primary
-        : kDayPinPalette[(tabIndex - 1) % kDayPinPalette.length];
-
-    return Material(
-      color: isSelected ? pillColor : Colors.transparent,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: isSelected ? pillColor : colorScheme.outlineVariant,
-        ),
-      ),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: () => _selectTab(tabIndex),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
-          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isOverview) ...[
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : pillColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: isSelected ? Colors.white : colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -584,12 +514,23 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         if (_loadingRoutes)
           const Positioned(
             left: TpSpacing.s4,
-            top: TpSpacing.s4,
+            top: TpSpacing.s10,
             child: SizedBox.square(
               dimension: 24,
               child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             ),
           ),
+        Positioned(
+          top: TpSpacing.s3,
+          left: TpSpacing.s4,
+          child: TripSectionMenu(
+            section: TripSection.map,
+            tripId: widget.tripId,
+            days: widget.days,
+            selectedDayIndex: _selectedTabIndex,
+            onDaySelected: _selectTab,
+          ),
+        ),
         Positioned(
           top: TpSpacing.s4,
           right: TpSpacing.s4,

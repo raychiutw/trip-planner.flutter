@@ -185,7 +185,7 @@ Expected: PASS.
 - Produces: `TripSectionMenu(section, tripId, selectedDayIndex, days, onSectionSelected, onDaySelected)`.
 - Consumes: `TpScopeMenu` and the existing GoRouter locations.
 
-- [ ] **Step 1: Add failing navigation tests**
+- [x] **Step 1: Add failing navigation tests**
 
 ```dart
 expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
@@ -196,13 +196,13 @@ expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
 
 Map asserts one `trip-section-scope`, no `trip-map-day-tabs`, and a visible label `地圖 · 總覽`. Notes asserts `筆記` and can navigate back to itinerary/map from the same menu.
 
-- [ ] **Step 2: Confirm failure**
+- [x] **Step 2: Confirm failure**
 
 Run: `flutter test test/features/trip_detail/trip_timeline_screen_test.dart test/features/trip_detail/trip_notes_screen_test.dart test/features/trip_detail/trip_map_screen_test.dart`
 
 Expected: FAIL because the timeline still renders two tonal buttons and the map still renders fixed day pills.
 
-- [ ] **Step 3: Implement one trip scope**
+- [x] **Step 3: Implement one trip scope**
 
 ```dart
 enum TripSection { itinerary, map, notes }
@@ -216,7 +216,7 @@ String tripSectionLabel(TripSection value) => switch (value) {
 
 Timeline renders `行程 ▾`; notes renders `筆記 ▾`; map renders `地圖 · 總覽 ▾` or `地圖 · DAY NN ▾`. Map menu contains itinerary, notes, overview, and all days but remains one visible capsule. Timeline keeps its content-level sticky DAY strip because it controls the itinerary scroll, not map filtering.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `flutter test test/features/trip_detail/trip_timeline_screen_test.dart test/features/trip_detail/trip_notes_screen_test.dart test/features/trip_detail/trip_map_screen_test.dart`
 

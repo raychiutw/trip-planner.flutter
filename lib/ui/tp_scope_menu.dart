@@ -5,11 +5,17 @@ import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 
 class TpScopeOption<T> {
-  const TpScopeOption({required this.value, required this.label, this.icon});
+  const TpScopeOption({
+    required this.value,
+    required this.label,
+    this.icon,
+    this.key,
+  });
 
   final T value;
   final String label;
   final IconData? icon;
+  final Key? key;
 }
 
 class TpScopeMenu<T> extends StatelessWidget {
@@ -35,6 +41,7 @@ class TpScopeMenu<T> extends StatelessWidget {
       itemBuilder: (context) => [
         for (final option in options)
           PopupMenuItem<T>(
+            key: option.key,
             value: option.value,
             child: Row(
               children: [

@@ -140,14 +140,13 @@ Widget _buildScreen(
 }
 
 void main() {
-  testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards', (tester) async {
+  testWidgets('總覽：單一 scope 、全部含座標 pins 與 entry cards', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    // day tabs：總覽 + DAY NN
-    expect(find.text('總覽'), findsOneWidget);
-    expect(find.text('DAY 01'), findsOneWidget);
-    expect(find.text('DAY 02'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
+    expect(find.text('地圖 · 總覽'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-day-tabs')), findsNothing);
 
     // pins：只有 master 座標非 null 的 3 筆
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
@@ -168,7 +167,9 @@ void main() {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('DAY 02'));
+    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-section-day-2')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
