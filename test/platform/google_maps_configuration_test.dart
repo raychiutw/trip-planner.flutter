@@ -45,8 +45,22 @@ void main() {
     expect(example.trim(), 'GOOGLE_MAPS_ANDROID_API_KEY=');
   });
 
+  test('Android release 不得使用 debug signing key', () {
+    final gradle = read('android/app/build.gradle.kts');
+    final example = read('android/key.properties.example');
+    final gitignore = read('.gitignore');
+
+    expect(gradle, contains('ANDROID_KEYSTORE_PATH'));
+    expect(gradle, contains('ANDROID_KEY_ALIAS'));
+    expect(gradle, isNot(contains('signingConfigs.getByName("debug")')));
+    expect(example, contains('storeFile='));
+    expect(gitignore, contains('android/key.properties'));
+    expect(gitignore, contains('android/upload-keystore.jks'));
+  });
+
   test('workflow 使用 iOS/Android scoped secrets，不再使用泛用 key', () {
     final workflow = read('.github/workflows/mobile.yml');
+    final infoPlist = read('ios/Runner/Info.plist');
 
     expect(workflow, contains('GOOGLE_MAPS_IOS_API_KEY'));
     expect(workflow, contains('secrets.GOOGLE_MAPS_ANDROID_API_KEY'));
@@ -54,5 +68,7 @@ void main() {
     expect(workflow, isNot(contains('secrets.MAPS_API_KEY')));
     expect(workflow, contains('GOOGLE_MAPS_IOS_API_KEY=%s'));
     expect(workflow, contains("wait-for-processing: 'true'"));
+    expect(workflow, contains("uses-non-exempt-encryption: 'false'"));
+    expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 }

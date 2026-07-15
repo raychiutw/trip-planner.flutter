@@ -17,6 +17,26 @@ val googleMapsAndroidApiKey =
         ?: mapsProperties.getProperty("GOOGLE_MAPS_ANDROID_API_KEY")
         ?: ""
 
+val keyProperties = Properties()
+val keyPropertiesFile = rootProject.file("key.properties")
+if (keyPropertiesFile.exists()) {
+    keyPropertiesFile.inputStream().use(keyProperties::load)
+}
+fun signingValue(environmentName: String, propertyName: String): String? =
+    System.getenv(environmentName)
+        ?: keyProperties.getProperty(propertyName)
+
+val androidKeystorePath = signingValue("ANDROID_KEYSTORE_PATH", "storeFile")
+val androidKeystorePassword = signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+val androidKeyAlias = signingValue("ANDROID_KEY_ALIAS", "keyAlias")
+val androidKeyPassword = signingValue("ANDROID_KEY_PASSWORD", "keyPassword")
+val hasReleaseSigning = listOf(
+    androidKeystorePath,
+    androidKeystorePassword,
+    androidKeyAlias,
+    androidKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.raychiu.tripline"
     compileSdk = flutter.compileSdkVersion
@@ -43,11 +63,22 @@ android {
         manifestPlaceholders["googleMapsApiKey"] = googleMapsAndroidApiKey
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(androidKeystorePath!!)
+                storePassword = androidKeystorePassword
+                keyAlias = androidKeyAlias
+                keyPassword = androidKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

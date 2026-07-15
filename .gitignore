@@ -50,3 +50,5 @@ app.*.map.json
 # Local Google Maps key configuration
 ios/Flutter/Secrets.xcconfig
 android/maps.properties
+android/key.properties
+android/upload-keystore.jks
