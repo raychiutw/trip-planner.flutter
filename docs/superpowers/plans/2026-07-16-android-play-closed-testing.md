@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver signed Tripline Android builds to the Google Play `alpha` closed-testing track from a manually triggered GitHub Actions workflow, then prove that an invited tester can install and launch the Play Store build.
+**Goal:** Deliver signed Tripline Android builds to the Google Play `alpha` closed-testing track from a manually triggered GitHub Actions workflow, then prove that an invited tester can install, launch, and render Google Maps in the Play Store build.
 
 **Architecture:** Extend the existing `.github/workflows/mobile.yml` instead of adding another workflow or release framework. A guarded `android_closed` job validates repository secrets, reconstructs the upload keystore, derives a Play-safe version code, builds one signed AAB, and publishes it with a commit-pinned upload action. Google Play App Signing holds the production signing key; the local machine and GitHub hold only the upload key.
 
@@ -12,6 +12,7 @@
 
 - Keep the package name `com.raychiu.tripline` and the Play track name `alpha` unchanged.
 - Keep TestFlight as the default manual release target.
+- Restrict the Android Maps key to Maps SDK for Android and package `com.raychiu.tripline`; authorize both the local upload-certificate SHA-1 and the Google Play app-signing certificate SHA-1.
 - Never print, commit, paste into a patch, or store in a tracked file any keystore password, Maps key, or service-account JSON.
 - Grant the publishing service account access only to Tripline with `View app information (read-only)` and `Release apps to testing tracks`.
 - Do not grant production, financial, order, tester-list, or user-administration permissions.
@@ -248,7 +249,7 @@ Expected: one commit records both the test and implementation.
 **Interfaces:**
 
 - Consumes: Android Studio JBR `keytool`/`jarsigner`, macOS Keychain, the existing Android Maps API key, and Gradle's `ANDROID_KEYSTORE_*` environment-variable contract.
-- Produces: Upload-key alias `tripline-upload`, ignored keystore `android/upload-keystore.jks`, Keychain items `tripline-android-upload-keystore` and `tripline-google-maps-android`, and signed first AAB version `0.7.0 (7)`.
+- Produces: Upload-key alias `tripline-upload`, ignored keystore `android/upload-keystore.jks`, upload-certificate SHA-1, Keychain items `tripline-android-upload-keystore` and `tripline-google-maps-android`, and signed first AAB version `0.7.0 (7)`.
 
 - [ ] **Step 1: Verify prerequisites without exposing credentials**
 
@@ -296,7 +297,7 @@ Expected: Keychain accepts the credential and `keytool` reports that it generate
 
 - [ ] **Step 3: Store the existing Android Maps key in macOS Keychain**
 
-Open Google Cloud Console for the Tripline Android Maps credential, copy the existing key, then run:
+Open Google Cloud Console for the Tripline Android Maps credential. Configure **Application restrictions → Android apps** with package `com.raychiu.tripline` and upload-certificate SHA-1 `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA`. Configure **API restrictions → Restrict key → Maps SDK for Android** and save. Copy the key value, then run:
 
 ```zsh
 read -s "maps_key?Paste GOOGLE_MAPS_ANDROID_API_KEY, then press Return: "
@@ -310,7 +311,7 @@ test -n "$maps_key"
 unset maps_key
 ```
 
-Expected: the pasted value is not echoed and Keychain stores it under `tripline-google-maps-android`. Do not create `android/maps.properties` or `android/key.properties`.
+Expected: Google Cloud shows the Android application and API restrictions; the pasted value is not echoed; Keychain stores it under `tripline-google-maps-android`. Do not create `android/maps.properties` or `android/key.properties`.
 
 - [ ] **Step 4: Build the first signed AAB using Keychain-backed environment variables**
 
@@ -375,7 +376,7 @@ Expected: the only repository copy remains ignored, `git status --short` does no
 **Interfaces:**
 
 - Consumes: The signed `0.7.0 (7)` AAB from Task 2, Play Console owner access, truthful policy answers, one reviewer login, and 12 tester Google accounts.
-- Produces: Play app `com.raychiu.tripline`, Play App Signing enrollment, closed track `alpha`, accepted upload certificate, first release, tester cohort, and opt-in URL.
+- Produces: Play app `com.raychiu.tripline`, Play App Signing enrollment, Google-held app-signing SHA-1 authorized for Maps, closed track `alpha`, accepted upload certificate, first release, tester cohort, and opt-in URL.
 
 - [ ] **Step 1: Register and verify the personal Play Console account**
 
@@ -409,7 +410,13 @@ Navigate to **Test and release → Testing → Closed testing**, create a track 
 
 Expected: Play Console accepts the upload certificate, shows version name `0.7.0`, version code `7`, and records the release under the `alpha` closed track. Resolve any Play review requirement before enabling API automation.
 
-- [ ] **Step 5: Configure the 12-person tester cohort**
+- [ ] **Step 5: Authorize the Play app-signing certificate for Google Maps**
+
+In Play Console, open **Protected with Play → Play Store distribution → Go to Play app signing**, copy the SHA-1 fingerprint under **App signing key certificate** rather than **Upload key certificate**. In Google Cloud Console, edit the same Android Maps key and add another Android application restriction using package `com.raychiu.tripline` plus that Google-held SHA-1. Keep the existing upload-certificate restriction for local signed builds.
+
+Expected: the Maps key has two Android application entries for `com.raychiu.tripline`: upload SHA-1 `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA` and the distinct Play app-signing SHA-1. The key remains restricted to Maps SDK for Android.
+
+- [ ] **Step 6: Configure the 12-person tester cohort**
 
 Create one Play Console email list or Google Group containing the 12 available tester Google accounts, attach it to `alpha`, add a monitored feedback email, and copy the opt-in URL. Ask each tester to open the URL with the listed Google account and opt in.
 

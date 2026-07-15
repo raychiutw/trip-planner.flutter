@@ -50,6 +50,8 @@ Generate one password-protected Android upload keystore. Keep an encrypted backu
 
 Build the first signed AAB locally with the current `pubspec.yaml` build number and upload it manually in Play Console. The first manual upload establishes the package and upload certificate before the publishing API is used. Every later closed-test release is automated.
 
+Use a dedicated Android Maps API key restricted to Maps SDK for Android and package `com.raychiu.tripline`. Allow the upload-certificate SHA-1 for local signed builds. After Play App Signing is enabled, also allow the Google-held app-signing certificate SHA-1 because Play signs the APK delivered to testers with that key.
+
 ### 4. Create the closed test
 
 Create a closed-testing track with the API-visible name `alpha`. Add the 12 tester Google accounts through one Play Console email list or Google Group, provide a feedback email, and share the tester opt-in link.
@@ -105,6 +107,8 @@ Add these repository secrets:
 - `ANDROID_KEY_PASSWORD`: upload-key password.
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`: complete JSON key for the limited Play publishing service account.
 - `GOOGLE_MAPS_ANDROID_API_KEY`: the existing Android Maps key.
+
+The Android Maps key is platform-specific and API-restricted; it is not reused for iOS, browser, or server calls.
 
 At runtime the job sets `ANDROID_KEYSTORE_PATH=upload-keystore.jks`, which matches the existing Gradle lookup relative to the Android project root.
 
