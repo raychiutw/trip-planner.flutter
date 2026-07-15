@@ -58,7 +58,7 @@ class AppleRootTabBar extends StatelessWidget {
             minimized ? 36 : 12,
             0,
             minimized ? 36 : 12,
-            8,
+            TpRootTabGeometry.bottomSpacing,
           ),
           child: TpGlassSurface(
             borderRadius: const BorderRadius.all(Radius.circular(32)),
@@ -67,7 +67,9 @@ class AppleRootTabBar extends StatelessWidget {
               child: AnimatedContainer(
                 duration: duration,
                 curve: TpMotion.appleEase,
-                height: minimized ? 50 : 64,
+                height: minimized
+                    ? TpRootTabGeometry.minimizedBarHeight
+                    : TpRootTabGeometry.expandedBarHeight,
                 child: Row(
                   children: [
                     for (var index = 0; index < _destinations.length; index++)

@@ -108,6 +108,7 @@ Widget _buildScreen(
   MapRepository? mapRepository,
   ValueChanged<TripMapCanvasConfig>? onMapConfig,
   TextScaler textScaler = TextScaler.noScaling,
+  EdgeInsets viewPadding = EdgeInsets.zero,
   List<TripSummary> trips = const [
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
@@ -146,7 +147,11 @@ Widget _buildScreen(
       theme: AppTheme.light(),
       routerConfig: router,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: textScaler,
+          padding: viewPadding,
+          viewPadding: viewPadding,
+        ),
         child: child!,
       ),
     ),
@@ -155,7 +160,13 @@ Widget _buildScreen(
 
 void main() {
   testWidgets('總覽：單一 scope 、全部含座標 pins 與 entry cards', (tester) async {
-    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], onMapConfig: (config) => mapConfig = config),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
@@ -197,6 +208,12 @@ void main() {
     expect(find.textContaining('09:00'), findsOneWidget);
 
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
+    expect(
+      mapConfig?.markers
+          .singleWhere((marker) => marker.id == 'map-pin-21')
+          .glyph,
+      '4',
+    );
   });
 
   testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
@@ -290,18 +307,61 @@ void main() {
   });
 
   testWidgets('map padding 避讓固定 POI accessory 與 root tab', (tester) async {
+    const bottomInset = 34.0;
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
-      _buildScreen([_dayOne], onMapConfig: (config) => mapConfig = config),
+      _buildScreen(
+        [_dayOne],
+        viewPadding: const EdgeInsets.only(bottom: bottomInset),
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final expectedRootClearance = TpRootTabGeometry.expandedHeightFor(
+      bottomInset,
+    );
+    expect(
+      mapConfig!.initialPadding.bottom,
+      greaterThanOrEqualTo(
+        TpBottomAccessory.height + expectedRootClearance + TpSpacing.s3,
+      ),
+    );
+    final drawerRect = tester.getRect(
+      find.byKey(const ValueKey('trip-map-poi-drawer')),
+    );
+    expect(
+      tester.view.physicalSize.height / tester.view.devicePixelRatio -
+          drawerRect.bottom,
+      expectedRootClearance + TpSpacing.s3,
+    );
+  });
+
+  testWidgets('320×568 與 135% 文字使用 accessibility rail 且 scope 不撞定位鈕', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], textScaler: const TextScaler.linear(1.35)),
     );
     await tester.pumpAndSettle();
 
     expect(
-      mapConfig!.initialPadding.bottom,
-      greaterThanOrEqualTo(
-        TpBottomAccessory.height + TpSpacing.navHeight + TpSpacing.s3,
-      ),
+      tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
+      144,
     );
+    final scope = tester.getRect(
+      find.byKey(const ValueKey('trip-section-scope')),
+    );
+    final locate = tester.getRect(
+      find.byKey(const ValueKey('trip-map-locate-button')),
+    );
+    expect(scope.right, lessThanOrEqualTo(locate.left));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('320×568 與 200% 文字不溢出 POI rail', (tester) async {
@@ -317,6 +377,35 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+  });
+
+  testWidgets('長行程 page indicator 不會水平溢出', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final manyStops = TripDay(
+      id: 9,
+      dayNum: 1,
+      date: '2026-04-01',
+      version: 1,
+      timeline: [
+        for (var i = 0; i < 40; i++)
+          _entry(
+            id: 100 + i,
+            title: '停留點 ${i + 1}',
+            startTime: '09:00',
+            lat: 26.2 + i / 1000,
+            lng: 127.7 + i / 1000,
+          ),
+      ],
+    );
+
+    await tester.pumpWidget(_buildScreen([manyStops]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 40'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('地圖維持單一路線圖，不顯示舊圖層選單', (tester) async {

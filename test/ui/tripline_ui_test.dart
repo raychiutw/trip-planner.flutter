@@ -141,6 +141,31 @@ void main() {
     );
   });
 
+  testWidgets('TpAppBar 在窄螢幕與 200% 文字強制單行截斷', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          appBar: TpAppBar(
+            title: Text('沖繩家族旅行超長名稱與完整行程設定'),
+            actions: [IconButton(onPressed: null, icon: Icon(Icons.edit))],
+          ),
+        ),
+        textScale: 2,
+      ),
+    );
+
+    final titleStyle = tester.widget<DefaultTextStyle>(
+      find.byKey(const ValueKey('tp-app-bar-title')),
+    );
+    expect(titleStyle.maxLines, 1);
+    expect(titleStyle.overflow, TextOverflow.ellipsis);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('TpScopeMenu 顯示目前值並回傳新選項', (tester) async {
     var selected = 0;
     await tester.pumpWidget(

@@ -115,6 +115,19 @@ abstract final class TpSpacing {
   static const navHeight = 88.0;
 }
 
+/// 浮動五分頁的實際佔位；地圖 accessory 與 root scroll 共用。
+abstract final class TpRootTabGeometry {
+  static const expandedBarHeight = 64.0;
+  static const minimizedBarHeight = 50.0;
+  static const bottomSpacing = TpSpacing.s2;
+
+  static double expandedHeightFor(double bottomInset) =>
+      bottomInset + bottomSpacing + expandedBarHeight;
+
+  static double expandedHeight(BuildContext context) =>
+      expandedHeightFor(MediaQuery.viewPaddingOf(context).bottom);
+}
+
 /// Motion token（Apple 曲線體系）。
 abstract final class TpMotion {
   static const fast = Duration(milliseconds: 150);

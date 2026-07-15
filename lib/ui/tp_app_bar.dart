@@ -24,7 +24,12 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       automaticallyImplyLeading: automaticallyImplyLeading,
       centerTitle: true,
-      title: title,
+      title: DefaultTextStyle.merge(
+        key: const ValueKey('tp-app-bar-title'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        child: title,
+      ),
       actions: actions,
     );
   }

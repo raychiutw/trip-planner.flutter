@@ -290,12 +290,12 @@ Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標�
 #### POI 水平 accessory
 
 - accessory 固定高度 88pt（76pt 卡片 + 12pt page indicator），不提供垂直拖曳、展開、收合或 detent。
-- Dynamic Type ≥150% 時 accessory 可固定切到 144pt accessibility geometry，同步增加 map padding；這不是使用者可拖曳的第二 detent。
+- Dynamic Type ≥120% 時 accessory 固定切到 144pt accessibility geometry，同步增加 map padding；這不是使用者可拖曳的第二 detent。
 - 內層只有水平 `PageView`，`viewportFraction` 為 0.84，對齊 V3 HTML 的 84% scroll-snap 卡寬；相鄰卡露出來提示可滑，第一張與最後一張都必須完整可達。
 - POI 資料沒有圖片字段，卡片不使用假縮圖；改用與 map marker 一致的編號 badge、停留順序、名稱、時間／類型與 44pt 動作。
 - 水平滑卡 → active POI / marker / camera 同步；點 marker → PageView 滑到該卡。
 - 橫向卡滑動不得拖動地圖；不建立任何垂直 gesture recognizer。
-- accessory 底部基準為 `viewPadding.bottom + visibleRootTabHeight + 12pt`，不可壓住根 Tab。
+- accessory 底部基準為 `viewPadding.bottom + 64pt root tab + 8pt tab margin + 12pt clearance`，由共用 root-tab geometry 計算，不可壓住根 Tab。
 - map camera padding 依 88pt accessory 與 root-tab clearance 計算，fit route 後 marker 不得落在 accessory 或 scope capsule 下方。
 - Reduce Motion 時卡片與 camera 直接切換；正常 PageView 動畫 200–280ms，禁止彈跳放大。
 

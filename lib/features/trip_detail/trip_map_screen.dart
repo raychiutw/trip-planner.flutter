@@ -210,16 +210,12 @@ class _MapStop {
   const _MapStop({
     required this.dayIndex,
     required this.dayNum,
-    required this.pinNumber,
     required this.entry,
     this.point,
   });
 
   final int dayIndex;
   final int dayNum;
-
-  /// 該日內 1-based 序號（圓形 marker 上的數字）。
-  final int pinNumber;
   final TimelineEntry entry;
   final TripMapPoint? point;
 
@@ -253,7 +249,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   int? _activeEntryId;
 
   double get _poiAccessoryHeight =>
-      MediaQuery.textScalerOf(context).scale(1) >= 1.5
+      MediaQuery.textScalerOf(context).scale(1) >= 1.2
       ? 144
       : TpBottomAccessory.height;
 
@@ -261,7 +257,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     TpSpacing.s10,
     TpSpacing.s10 + TpSpacing.tapMin,
     TpSpacing.s10,
-    _poiAccessoryHeight + TpSpacing.navHeight + TpSpacing.s6,
+    _poiAccessoryHeight +
+        TpRootTabGeometry.expandedHeight(context) +
+        TpSpacing.s6,
   );
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
@@ -329,11 +327,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   List<_MapStop> _extractDayStops(int dayIndex, TripDay day) {
     return [
-      for (final (entryIndex, entry) in day.timeline.indexed)
+      for (final entry in day.timeline)
         _MapStop(
           dayIndex: dayIndex,
           dayNum: day.dayNum,
-          pinNumber: entryIndex + 1,
           entry: entry,
           point: switch ((entry.master?.lat, entry.master?.lng)) {
             (final double lat, final double lng) => TripMapPoint(lat, lng),
@@ -561,7 +558,15 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               routes: _routes,
               clusterMarkers: visiblePins.length >= 12,
               markers: [
-                for (final pin in visiblePins) _buildMarker(pin),
+                for (final pin in visiblePins)
+                  _buildMarker(
+                    pin,
+                    number:
+                        visibleStops.indexWhere(
+                          (stop) => stop.entry.id == pin.entry.id,
+                        ) +
+                        1,
+                  ),
                 if (_userLocation != null)
                   buildTripMapUserLocationMarker(
                     point: _userLocation!,
@@ -583,8 +588,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           ),
         Positioned(
           top: TpSpacing.s3,
-          left: 0,
-          right: 0,
+          left: TpSpacing.tapMin + TpSpacing.s4,
+          right: TpSpacing.tapMin + TpSpacing.s4,
           child: Center(
             child: TripSectionMenu(
               section: TripSection.map,
@@ -622,21 +627,21 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         Positioned(
           left: TpSpacing.s3,
           right: TpSpacing.s3,
-          bottom: TpSpacing.navHeight + TpSpacing.s3,
+          bottom: TpRootTabGeometry.expandedHeight(context) + TpSpacing.s3,
           child: _buildPoiAccessory(visibleStops),
         ),
       ],
     );
   }
 
-  TripMapMarker _buildMarker(_MapStop pin) {
+  TripMapMarker _buildMarker(_MapStop pin, {required int number}) {
     return TripMapMarker(
       id: 'map-pin-${pin.entry.id}',
       point: pin.point!,
       color: pin.color,
-      title: '${pin.pinNumber}. ${pin.entry.title}',
+      title: '$number. ${pin.entry.title}',
       snippet: 'DAY ${pin.dayNum}',
-      glyph: '${pin.pinNumber}',
+      glyph: '$number',
       onTap: () => _selectStop(pin, animatePage: true),
       zIndex: _activeEntryId == pin.entry.id ? 1000 : 100 - pin.dayIndex,
     );
@@ -679,25 +684,38 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                 ),
                 SizedBox(
                   height: TpSpacing.s3,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (final stop in visibleStops) ...[
-                        Container(
-                          width: stop.entry.id == _activeEntryId ? 14 : 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: stop.entry.id == _activeEntryId
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.26),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
+                  child: visibleStops.length <= 12
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (final stop in visibleStops) ...[
+                              Container(
+                                width: stop.entry.id == _activeEntryId ? 14 : 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: stop.entry.id == _activeEntryId
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withValues(alpha: 0.26),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              ),
+                              const SizedBox(width: TpSpacing.s1),
+                            ],
+                          ],
+                        )
+                      : Text(
+                          '${visibleStops.indexWhere((stop) => stop.entry.id == _activeEntryId) + 1} / ${visibleStops.length}',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                         ),
-                        const SizedBox(width: TpSpacing.s1),
-                      ],
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -727,6 +745,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       ),
       child: Semantics(
         button: true,
+        excludeSemantics: true,
         label:
             '${index + 1} / $total，${stop.entry.title}，$timeLabel，$locationLabel',
         child: GestureDetector(
@@ -756,7 +775,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      '${stop.pinNumber}',
+                      '${index + 1}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: stop.color,
                         fontWeight: FontWeight.w800,
