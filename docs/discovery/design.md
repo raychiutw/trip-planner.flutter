@@ -171,3 +171,212 @@ const sheetClose = Cubic(0.4, 0, 1, 1);        // 280ms
 - AppBar（=TitleBar）：高 56（desktop 64）、單行 title 18–20/w700 ellipsis、glass blur 14 + 底部 hairline、action 一律 ghost icon 44×44 radius 8。
 
 **來源檔案**：`C:/Users/RayChiu/Desktop/Source/GithubRepos/trip-planner/DESIGN.md`、`C:/Users/RayChiu/Desktop/Source/GithubRepos/trip-planner/css/tokens.css`、`C:/Users/RayChiu/Desktop/Source/GithubRepos/trip-planner/docs/design-sessions/2026-06-06-three-color-system.md`
+
+---
+
+## 4. Apple Music / Apple HIG 嚴格 UI/UX 稽核（2026-07-15）
+
+### 結論與選定方向
+
+本輪選定 mockup **C：Map First Drawer**。Tripline 不採「地圖內容分頁 + DAY 分頁」兩層常駐 Tab，也不讓固定 POI 卡列與底部根 Tab 互相擠壓；最終資訊架構固定為：
+
+1. 行程根頁：緊湊 large title，捲動後收為位置穩定的 inline title。
+2. 行程詳情：返回、標題、編輯、更多；行程／地圖／筆記改由單一內容範圍選單切換。
+3. 地圖頂部：單一 `地圖 · DAY 02 ▾` scope capsule，選單內提供總覽與各日。
+4. 地圖底部：可拖曳、可縮合、可水平滑動 POI 的 drawer，永遠位於根 Tab 上方。
+5. 根 Tab：只負責聊天／行程／地圖／收藏／帳號五個頂層目的地，不承載新增或 POI 操作。
+
+本輪是**全 App 的視覺與互動系統調整**，不是只修行程與地圖兩頁。既有元件、頁面結構與 navigation shell 若無法達到本節規格，可以直接改寫；是否重用以結果與維護性決定，不把舊實作視為限制。唯一硬性架構條件是：相同職責必須由共用元件或共用 primitive 提供，禁止每頁各自複製一套 toolbar、menu、glass、scroll edge 或 bottom clearance 邏輯。
+
+比較 mockup：`~/.gstack/projects/raychiutw-trip-planner.flutter/designs/trip-itinerary-map-20260715/design-board.png`。
+
+### 證據範圍
+
+- 可直接執行的 iOS 26.5 模擬器目前停在登入頁；未使用帳密或建立外部帳號，因此登入後畫面的稽核以目前程式碼、既有元件與使用者直接觀察為準。
+- 行程根頁、詳情與地圖均已由 codebase knowledge graph 定位，再讀取實作確認；以下不是只看舊 spec 的推測。
+- 本節是設計決策與完成標準，不代表目前程式已符合；每一項仍需以 runtime 截圖、widget test 或互動驗證關閉。
+
+### 現況對照
+
+| 區域 | 目前實作證據 | 嚴格評估 | 目標狀態 |
+|---|---|---|---|
+| 行程根頁頂部 | `trips_list_screen.dart:264` 使用 `SliverAppBar.large`；其下再常駐搜尋與「全部／我的／共編」，另有 FAB | title extension、搜尋、scope 與 FAB 同時搶首屏，視覺上比 Apple Music 的內容優先層級更厚 | large title 延伸區只容納標題；搜尋緊接標題；scope 只有在確實改變資料集合時顯示；新增移至 toolbar `+` |
+| 根頁捲動標題 | Material `SliverAppBar.large` 與全域 `AppBarTheme` 共用，但沒有明訂 expanded / collapsed 幾何與 action 對稱 | action 寬度變動時，inline title 的視覺中心容易偏移；不同頁的 title baseline 不一致 | root title 由 leading large title 平滑收為全 toolbar 幾何置中的 inline title，不能依剩餘寬度臨時計算中心 |
+| 行程詳情 toolbar | `trip_timeline_screen.dart:59-139` 同時顯示編輯、地圖、筆記、列印、異動紀錄、更多，共六個 trailing control | 嚴重超出 iPhone toolbar 的必要 action 密度；Cupertino 與 Material icon、直向更多按鈕混用 | visible trailing action 僅「編輯」與水平「更多」；其他命令分組放入具名 menu |
+| 行程內容導覽 | 地圖、筆記是 toolbar icon；DAY pills 在 `_TimelineBodyState.build` 固定佔一列 | 內容目的地與命令混在 toolbar，使用者要記 icon；DAY 列也壓縮內容高度 | 使用單一 `行程 ▾` scope control 切換行程／地圖／筆記；DAY 是內容內薄型 sticky strip |
+| 地圖頂部 | `trip_map_screen.dart:381-400` 為 `DAY tabs → map → 104pt cards` 固定 Column；tabs 實作在 `404-473` | DAY 控制永久佔高；長行程會變成橫向 pill 迷宮 | 只保留一個 44pt `地圖 · DAY NN ▾` capsule；總覽與各日放入 menu / sheet |
+| 地圖控制 | `trip_map_screen.dart:477-546` 圖層與定位按鈕分別浮在右上 | 兩個控制外觀與 toolbar／根 Tab 不同，形成第三套 chrome | 若改 Google Maps，移除圖層選單；只留定位與全覽，使用同一 glass circle、尺寸與邊界 |
+| 地圖 POI | `trip_map_screen.dart:548-629` 固定 104pt 水平卡列；根 shell 另有 `NavigationBar` | 固定卡列與根 Tab 疊加時壓縮地圖；不同高度／safe area 下可能互相遮擋 | POI 改為可縮合 drawer；collapsed 與 medium 兩狀態，水平滑動卡片，動態保留根 Tab 間距 |
+| 根 Tab | `app_shell.dart:27` 使用 Material `NavigationBar` | 功能正確，但外觀仍是 Material surface／indicator，未形成 iOS 26 浮動功能層 | 浮動 Liquid Glass root tab；只導覽、保持可見、內容可延伸到後方但可操作內容必須避讓 |
+
+### Apple Music / HIG 基準
+
+#### 4.1 標題與捲動邊界
+
+Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標準 title；toolbar 項目應只保留最重要的命令。Tripline 採用下列單一規則：
+
+- 根頁（聊天、行程、地圖、收藏、帳號）可以使用 large title；次層頁一律 inline title。
+- 行程根頁 large-title extension 高度最多 52pt；加上 44–56pt toolbar 後，safe area 下方的整個標題區不得超過 108pt。
+- large title 左邊界固定 16pt，34pt / w700；下方只留 8pt，不增加 hero 空白。
+- collapsed title 使用 17–20pt / w600–700，垂直中心與返回、編輯、更多按鈕相同。
+- collapsed title 以整個 toolbar 寬度置中；左右 action 群組採相同 44pt slot，長標題只截斷，不偏移。
+- toolbar 後方有可滾動內容時使用單一 automatic / hard scroll-edge separation；不得同時再畫厚底線與陰影。
+
+參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Scroll views](https://developer.apple.com/design/human-interface-guidelines/scroll-views)。
+
+#### 4.2 Toolbar 與更多選單
+
+所有 iPhone 頂部列共用以下 action hierarchy：
+
+- 行程根頁：`+`、水平 `…`。匯入與排序進 `…`。
+- 行程詳情：返回、title、編輯、水平 `…`。
+- 地圖詳情：返回、title、水平 `…`；範圍切換屬內容控制，不放 toolbar trailing。
+- visible trailing action 最多兩個；全部使用同一套 Cupertino / SF Symbols 視覺重量。
+- 禁止 `Icons.more_vert`；iOS 使用水平 `ellipsis` 或 `ellipsis.circle`。
+- menu 順序：高頻且安全的項目在前，相關命令分組，destructive 最後並使用紅色。
+- menu label 使用可執行動詞或清楚名詞，例如「編輯行程」「分享連結」「列印」「查看異動紀錄」，不只顯示 icon。
+- 44×44pt hit target 不因 icon 視覺尺寸縮小。
+
+目前 `trip_timeline_screen.dart` 已有分享／共編／AI 健檢 menu，可直接擴充，而不是再建立第二套 action sheet。參考：[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
+
+#### 4.3 Liquid Glass 邊界
+
+- Liquid Glass 只用在 root tab、toolbar 控制、map scope capsule、map floating controls、POI drawer 的操作列。
+- 行程卡、時間軸、搜尋結果、POI 卡內容使用標準 surface；禁止每張卡都加 blur。
+- 淺／深色分別取樣；Reduce Transparency 或高對比時改為較不透明 surface。
+- glass 元件僅一層邊界與極輕陰影，不能同時套 thick border、shadow、gradient。
+
+參考：[Materials](https://developer.apple.com/design/human-interface-guidelines/materials)。
+
+### 行程頁定稿規格
+
+#### 展開狀態
+
+1. 標題固定為「我的行程」，large title 區域不承載匯入、排序或裝飾。
+2. toolbar 右側為 `+` 與水平 `…`；移除底部 FAB。
+3. 搜尋欄距標題 8pt、左右 16pt，使用 44pt 高系統密度。
+4. 「全部／我的／共編」是篩選同一列表的 related subview，可使用 segmented control；高度 32–36pt，外層 hit area 44pt。
+5. 搜尋與 scope 合計最多兩列；若使用者沒有共編行程，可隱藏 scope 而不是保留空控制。
+6. 第一張行程卡須在 390×844 裝置上出現在首屏，不得被 title、搜尋、scope、FAB 四層 chrome 推到首屏外。
+
+#### 收合狀態
+
+1. 捲動超過 large-title collapse threshold 後，inline title 固定在 toolbar 幾何中心。
+2. `+`、`…` 的 slot、背景、圓角與 icon weight 完全一致；loading 時也保留 slot 寬度，禁止 title 跳動。
+3. 搜尋欄可隨內容捲走；scope 可依需要 sticky，但 sticky 時只保留一列且套用單一 scroll-edge effect。
+4. 向下捲動只縮合 root tab；向上捲動或點目前 Tab 時恢復。title 與 root tab 動畫不可互相延遲。
+
+### 行程詳情定稿規格
+
+- 次層頁不使用 large title；title 是目前行程名稱，單行截斷。
+- toolbar：返回／title／編輯／更多。
+- `行程 ▾` 是內容範圍控制，選項為行程、地圖、筆記；目前項目顯示 checkmark。
+- DAY strip 只在行程內容出現，緊貼 scroll edge，高度 44pt；選中 DAY 自動置中並露出下一項的一部分，提示可橫向捲動。
+- 地圖與筆記不再各佔 toolbar icon；列印、異動紀錄、分享、共編、AI 健檢全部進更多 menu。
+- 閱讀模式不顯示排序／拖曳控制；編輯後才進入明確 edit mode。
+
+### 地圖 C：Map First Drawer 定稿規格
+
+#### 頂部範圍控制
+
+- 地圖內容上方只顯示一個 capsule：`地圖 · 總覽 ▾` 或 `地圖 · DAY 02 ▾`。
+- capsule 高 44pt，置於 safe area + toolbar 下方 8–12pt；長文以 DAY 數字保留為優先。
+- 點擊後顯示總覽與各 DAY；超過七天可捲動，當前項目有 checkmark。
+- 選 DAY 後重新 fit 可見 marker；無座標的 stop 仍保留在 POI drawer，以「尚無位置」表示。
+- 不再保留 `_buildDayTabs` 的固定水平 pill 列；這是 C 案的核心，不得實作成 capsule + DAY tabs 兩者並存。
+
+#### POI drawer
+
+只需要兩個主要 detent，避免過度設計：
+
+| 狀態 | 高度／行為 | 顯示內容 |
+|---|---|---|
+| Collapsed | 64–72pt，加 root tab 與 safe-area clearance | grabber、時間、POI 名稱、類型／位置狀態；點擊或上拖展開 |
+| Medium | 約 220pt，最大不超過可用高度 45% | 水平 `PageView` POI 卡、相鄰卡露出 12–16%、日別與序號、跳到行程動作 |
+
+- `PageView.viewportFraction` 目標 0.86–0.9；第一張與最後一張都必須完整可達。
+- 水平滑卡 → active POI / marker / camera 同步；點 marker → drawer 展開到 medium 並滑到該卡。
+- 垂直拖 drawer 不得誤觸水平卡；橫向卡滑動不得拖動地圖。
+- 點地圖空白不強制關閉 drawer；只有明確下拖或點 collapse control 才收合，避免地圖操作造成介面跳動。
+- drawer 底部基準為 `viewPadding.bottom + visibleRootTabHeight + 12pt`，任何 detent 都不可壓住根 Tab。
+- map camera padding 隨 drawer 實際高度更新，fit route 後 marker 不得落在 drawer 或 scope capsule 下方。
+- Reduce Motion 時 detent 與卡片同步直接切換；正常動畫 200–280ms，禁止彈跳放大。
+
+#### Root Tab 關係
+
+Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容並允許底層內容透出。Music 的 bottom accessory 可以位於 tab bar 上方，縮小時與 tab bar 併列。Tripline 的 POI drawer借用此空間模型，但不假裝是播放器：
+
+- root tab 始終保留五個目的地，不把 DAY、定位或新增放進 tab。
+- map tile 可以延伸到 root tab 後方；marker、POI 文字與操作按鈕必須避讓。
+- drawer collapsed 狀態與 root tab 視覺上是兩個層級，不合併成第六個 Tab。
+- root tab 在 map drag 時不自動消失；只有垂直內容捲動頁才採 scroll-down minimize。
+
+參考：[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)、[Build a UIKit app with the new design](https://developer.apple.com/videos/play/wwdc2025/284/)。
+
+### 全 App 一致化規則
+
+| 類別 | 統一規則 |
+|---|---|
+| Root title | 34pt large → 17–20pt inline；同一 collapse threshold 與 scroll-edge effect |
+| Detail title | 永遠 inline，不為單頁自訂 hero header |
+| Toolbar actions | 最多兩個 visible trailing action；相同 44pt slot；水平 ellipsis |
+| Content switcher | 同一頁的緊密 subview 才用 segmented / scope control；頂層區域只用 root tab |
+| Menu | 相同 adaptive menu surface、icon weight、label grammar、destructive ordering |
+| Map controls | 同一 glass circle；定位／全覽最多兩個；不保留 tile layer selector |
+| Bottom accessory | root tab 上方保留單一 accessory/drawer 層；不得再疊 FAB 或固定卡列 |
+| Material | glass 在功能層；卡片與內容用 standard surface / hairline |
+
+### 優先順序
+
+1. **P0：消除遮擋** — POI drawer 與 root tab 的 clearance、map padding、safe area。
+2. **P0：統一 toolbar** — 行程詳情六個 action 收斂為編輯＋水平更多。
+3. **P0：穩定 title** — expanded / collapsed 幾何、loading slot、scroll edge。
+4. **P1：行程根頁密度** — 移除 FAB、壓縮 title 後的搜尋與 scope 區。
+5. **P1：Map First Drawer** — 單一 scope capsule、兩 detent、POI/marker/card 同步。
+6. **P1：全 App 套用** — 聊天、收藏、帳號及所有次層頁改用同一套 title、toolbar、menu、glass、root tab 與 bottom accessory primitive；不允許把非行程頁留在舊視覺系統。
+
+### 驗收矩陣
+
+#### 視覺與版面
+
+- 320×568、390×844、402×874、430×932；直向與橫向。
+- light / dark、Increase Contrast、Reduce Transparency。
+- 100%、135%、200% Dynamic Type；title、scope、toolbar action 不互相覆蓋。
+- 行程首屏可見第一張卡；collapsed title 與四個 toolbar control 的中心線一致。
+- map 在 drawer collapsed / medium、root tab expanded / minimized 各組合都沒有 POI 遮擋。
+
+#### 互動
+
+- 大標題捲動收合、向上回復，title 不水平跳動。
+- action loading 時 title 不位移；更多 menu 項目順序與 destructive 樣式正確。
+- 選 DAY、滑 POI、點 marker 三條路徑最後得到同一 active day / POI / camera state。
+- first / last POI 卡可完整選取；drawer 兩 detent 可被 VoiceOver 操作。
+- root tab 切換保留各分頁 navigation 與 scroll state。
+
+#### 無障礙與動態設定
+
+- icon-only control 有中文 semantic label；順序為返回 → title → 編輯 → 更多 → scope → map controls → drawer → root tab。
+- 44×44pt target；正文基準 17pt，支援文字不小於 11pt。
+- Reduce Motion 停用非必要位移；VoiceOver 不朗讀被 drawer 遮住或不可見的 marker。
+- drawer collapsed / expanded state 必須可被輔助技術辨識並切換。
+
+### 全面改寫與共用架構要求
+
+可以保留、重構或直接替換既有 Flutter 實作；判斷標準是能否完整符合本節的視覺、互動、無障礙與測試要求，而不是修改行數最少。以下共用能力是必要條件，實際 class 名稱可依 codebase 調整：
+
+| 共用能力 | 單一責任 | 禁止事項 |
+|---|---|---|
+| App page shell | 統一 root large title、detail inline title、scroll edge、safe area 與 action slots | 各頁自行拼 `AppBar` / `SliverAppBar` 幾何 |
+| Toolbar action / menu | 統一 44pt hit target、SF Symbol 重量、水平更多、menu 分組與 destructive ordering | Cupertino / Material icon 混用，或每頁自製 popup / sheet |
+| Scope control | 統一行程／地圖／筆記與 DAY 範圍選擇的視覺、狀態與語意 | 同一頁同時存在 capsule、segmented control、DAY pills 三套切換器 |
+| Glass material primitive | 統一 blur、tint、border、shadow、Reduce Transparency fallback | 元件自行疊 blur、border、gradient、shadow |
+| Root tab + bottom accessory host | 集中管理 tab 高度、minimize 狀態、safe area、drawer / accessory clearance | POI drawer、FAB、固定卡列各自猜測 bottom padding |
+| Map POI drawer | 管理 detent、水平卡片、active POI、marker 與 camera padding 同步 | 建立第二套 day / POI domain state，或讓 view state 反向成為資料來源 |
+
+- 全部 root 頁與 detail 頁都必須遷移到共用 page shell 與 toolbar primitive；不能只讓新頁使用。
+- 共用元件提供 layout 與 interaction contract，頁面只傳 title、actions、menu commands、scroll state 與內容，不直接覆寫幾何常數。
+- domain state 可以沿用，也可以在有明確問題時改寫；active day / POI 仍必須只有一個權威來源。
+- 不為 mockup 新增圖片服務；POI 沒有影像時使用共用 tone / icon fallback。
+- 本輪可以全面改寫 Flutter UI 與其 widget tests；Web UI、後端資料模型及 API contract 不在這次範圍，除非 Flutter 共用架構無法在不變更 contract 下完成。
+
+完成定義：全部 root / detail 頁均已遷移至共用 primitive，以上 P0/P1 項目有 runtime 截圖與互動證據，驗收矩陣通過，且原本的固定 DAY tabs、固定 104pt POI row、六個詳情 toolbar action 與各頁自製 toolbar / menu 幾何已從 production 路徑移除。
