@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
 import '../widgets/destination_picker.dart';
@@ -37,7 +38,7 @@ class EditTripScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('編輯行程')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator.adaptive())
+          ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
           : Column(
               children: [
                 Expanded(

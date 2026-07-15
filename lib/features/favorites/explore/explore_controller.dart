@@ -16,6 +16,8 @@ final poiRepositoryProvider = Provider<PoiRepository>(
   (ref) => PoiRepository(client: ref.watch(apiClientProvider)),
 );
 
+typedef ExploreCategory = ({String label, String poiType, int count});
+
 /// 探索畫面不可變狀態。
 class ExploreState {
   const ExploreState({
@@ -40,21 +42,44 @@ class ExploreState {
   final String? errorMessage;
   final bool hasSearched;
 
-  /// category client-side filter（比對原始 Google category;對齊 web inline 版）。
+  /// 依搜尋結果動態聚合 Google primaryType 細分類。
+  List<ExploreCategory> get fineCategories {
+    final categories = <String, ({String poiType, int count, int order})>{};
+    for (final poi in results) {
+      final label = poiCategoryLabel(poi.category) ?? '其他';
+      final existing = categories[label];
+      categories[label] = (
+        poiType:
+            existing?.poiType ?? mapGooglePrimaryTypeToPoiType(poi.category),
+        count: (existing?.count ?? 0) + 1,
+        order: existing?.order ?? categories.length,
+      );
+    }
+    final sorted = [
+      for (final entry in categories.entries)
+        (
+          label: entry.key,
+          poiType: entry.value.poiType,
+          count: entry.value.count,
+        ),
+    ];
+    sorted.sort((a, b) {
+      final countOrder = b.count.compareTo(a.count);
+      return countOrder != 0
+          ? countOrder
+          : categories[a.label]!.order.compareTo(categories[b.label]!.order);
+    });
+    return sorted;
+  }
+
+  String get activeCategoryLabel => category == 'all' ? '為你推薦' : category;
+
+  /// category client-side filter（精確比對顯示中的 Google 細分類）。
   List<PoiSearchResult> get filteredResults {
     if (category == 'all') return results;
-    return results.where((p) {
-      final cat = (p.category ?? '').toLowerCase();
-      return switch (category) {
-        'food' => RegExp(r'restaurant|cafe|food|bar|bakery|餐|食').hasMatch(cat),
-        'hotel' => RegExp(r'hotel|hostel|guest|inn|住宿|飯店').hasMatch(cat),
-        'shopping' => RegExp(r'shop|mall|market|購物').hasMatch(cat),
-        'attraction' => RegExp(
-          r'attract|museum|park|temple|景點|公園',
-        ).hasMatch(cat),
-        _ => false,
-      };
-    }).toList();
+    return results
+        .where((poi) => (poiCategoryLabel(poi.category) ?? '其他') == category)
+        .toList();
   }
 
   bool isSaved(PoiSearchResult poi) => savedMap.containsKey(_savedKey(poi));
@@ -137,6 +162,7 @@ class ExploreController extends Notifier<ExploreState> {
       );
       if (seq != _requestSeq) return; // 過期結果丟棄
       state = state.copyWith(
+        category: 'all',
         results: results,
         searching: false,
         hasSearched: true,

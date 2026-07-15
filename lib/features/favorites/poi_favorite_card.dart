@@ -39,7 +39,7 @@ class PoiFavoriteCard extends StatelessWidget {
       onLongPress: onLongPress ?? onAddToTrip,
       child: AnimatedContainer(
         key: ValueKey('favorite-card-${favorite.id}'),
-        duration: const Duration(milliseconds: 180),
+        duration: TpMotion.resolve(context, TpMotion.fast),
         padding: const EdgeInsets.all(TpSpacing.s3),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerLow,

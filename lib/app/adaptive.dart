@@ -344,6 +344,8 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final slideDuration = TpMotion.resolve(context, TpMotion.normal);
+    final fadeDuration = TpMotion.resolve(context, TpMotion.fast);
     return Positioned(
       top: 0,
       left: 0,
@@ -353,12 +355,12 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
         child: Padding(
           padding: const EdgeInsets.all(TpSpacing.s3),
           child: AnimatedSlide(
-            duration: TpMotion.normal,
+            duration: slideDuration,
             curve: TpMotion.appleEase,
             offset: _visible ? Offset.zero : const Offset(0, -1.6),
             onEnd: _handleAnimationEnd,
             child: AnimatedOpacity(
-              duration: TpMotion.fast,
+              duration: fadeDuration,
               opacity: _visible ? 1 : 0,
               child: Material(
                 color: theme.colorScheme.inverseSurface,

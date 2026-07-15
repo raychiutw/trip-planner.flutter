@@ -65,11 +65,11 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('分類 chip「美食」→ 只剩拉麵店', (tester) async {
+  testWidgets('動態細分類 chip「拉麵」→ 只剩拉麵店', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('美食'));
+    await tester.tap(find.text('拉麵  1'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PoiSearchCard), findsOneWidget);
@@ -77,7 +77,51 @@ void main() {
     expect(find.text('首里城'), findsNothing);
   });
 
-  testWidgets('手動搜尋 <2 字 → SnackBar 提示', (tester) async {
+  testWidgets('更多分類可取消，選取後顯示選中狀態並精確篩選', (tester) async {
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => [
+        _poi('p1', '拉麵店', 'ramen_restaurant'),
+        _poi('p2', '壽司店', 'sushi_restaurant'),
+        _poi('p3', '神社', 'shinto_shrine'),
+        _poi('p4', '百貨', 'department_store'),
+        _poi('p5', '車站', 'subway_station'),
+      ],
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('explore-more-categories'));
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('地鐵站  1'), findsOneWidget);
+
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(find.byType(PoiSearchCard), findsNWidgets(5));
+
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('地鐵站  1'));
+    await tester.pumpAndSettle();
+
+    final selectedMore = tester.widget<ChoiceChip>(more);
+    expect(selectedMore.selected, isTrue);
+    expect(find.byType(PoiSearchCard), findsOneWidget);
+    expect(find.text('車站'), findsOneWidget);
+  });
+
+  testWidgets('手動搜尋 <2 字 → 持續錯誤提示', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -89,6 +133,49 @@ void main() {
     await tester.pump();
 
     expect(find.text('至少輸入 2 個字'), findsOneWidget);
+  });
+
+  testWidgets('離開再返回探索頁會保留搜尋文字與結果', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        poiRepositoryProvider.overrideWithValue(poi),
+        favoritesRepositoryProvider.overrideWithValue(fav),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    Widget app(Widget home) => UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(theme: AppTheme.light(), home: home),
+    );
+
+    await tester.pumpWidget(app(const ExploreScreen()));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      '大阪景點',
+    );
+    await tester.tap(find.byKey(const ValueKey('explore-search-button')));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(app(const Scaffold(body: Text('OTHER'))));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(app(const ExploreScreen()));
+    await tester.pumpAndSettle();
+
+    final searchField = tester.widget<TextField>(
+      find.byKey(const ValueKey('explore-search-field')),
+    );
+    expect(searchField.controller?.text, '大阪景點');
+    expect(find.byType(PoiSearchCard), findsNWidgets(2));
+    verify(
+      () => poi.searchPois(
+        q: '大阪景點',
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   testWidgets('點 heart → 觸發 find-or-create + addFavorite', (tester) async {

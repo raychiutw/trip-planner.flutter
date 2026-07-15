@@ -10,7 +10,7 @@
 - 行程清單（三色 tone 卡片、pull-to-refresh、長按刪除）
 - 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
-- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，唯讀）
+- 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
 - 帳號（profile、統計、登出）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
@@ -48,10 +48,13 @@ docs/
 | 懂整體設計與取捨 | [架構說明](docs/explanation-architecture.md) |
 | 新增 API endpoint | [How to 新增 API endpoint](docs/howto-add-endpoint.md) |
 | 新增畫面 | [How to 新增畫面](docs/howto-add-screen.md) |
+| 改連本機後端 | [How to 指向本機後端](docs/howto-local-backend.md) |
+| 啟用 OAuth PKCE | [How to 啟用 OAuth PKCE](docs/howto-oauth-pkce.md) |
 | 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
 | 查 API 層介面 | [reference-api](docs/reference-api.md) |
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
-| 查 design token / 三色 tone | [reference-theme](docs/reference-theme.md) |
+| 查設計 token / 自適應 UI 規格 | [reference-theme](docs/reference-theme.md) |
+| 理解 Apple Music / Apple HIG 對標取捨 | [自適應 UI 設計理由](docs/explanation-adaptive-ui.md) |
 | 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
@@ -66,4 +69,4 @@ docs/
 
 ## 設計
 
-視覺規範以 web repo 的 `DESIGN.md` + `css/tokens.css` 為 SoT：柔褐 `#A97A4A` 主色、三色系統（玩/看/買=柔褐、住/移動=sage、吃=玫瑰粉）、hairline 卡片（elevation 0）、HIG 字級、light/dark 雙主題。
+品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 的互動與版型以本 repo 的 [設計系統參考](docs/reference-theme.md)為準。方向是保留 Tripline 柔褐品牌，採 Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 的平台慣例，而不是逐像素仿製。

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
@@ -149,7 +150,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       ),
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppListLoadingSkeleton(key: ValueKey('trip-health-loading'))
             : _trip == null
             ? _ErrorState(message: _error ?? '載入健檢資料失敗，請稍後重試', onRetry: _load)
             : RefreshIndicator(

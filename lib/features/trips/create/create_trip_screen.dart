@@ -2,16 +2,15 @@
 /// → 每地天數(≥2 目的地)→ 想做什麼(description)→ 送出。
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../api/providers.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
+import '../../account/ai_authorize_card.dart';
 import '../trips_list_screen.dart';
 import '../widgets/destination_picker.dart';
 import 'create_trip_controller.dart';
@@ -25,15 +24,6 @@ class CreateTripScreen extends ConsumerStatefulWidget {
 
 class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
   final _desc = TextEditingController();
-  bool? _aiAuthorized;
-  bool _aiBusy = false;
-  String? _aiError;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadAiAuthorization());
-  }
 
   @override
   void dispose() {
@@ -53,85 +43,89 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     }
   }
 
-  Future<void> _loadAiAuthorization() async {
-    try {
-      final authorized = await ref
-          .read(authRepositoryProvider)
-          .fetchAiAuthorization();
-      if (mounted) setState(() => _aiAuthorized = authorized);
-    } catch (_) {
-      if (mounted) setState(() => _aiAuthorized = false);
-    }
-  }
-
-  Future<void> _authorizeAi() async {
-    setState(() {
-      _aiBusy = true;
-      _aiError = null;
-    });
-    try {
-      final authorized = await ref.read(authRepositoryProvider).authorizeAi();
-      if (mounted) setState(() => _aiAuthorized = authorized);
-    } catch (_) {
-      if (mounted) setState(() => _aiError = '授權失敗，請稍後再試。');
-    } finally {
-      if (mounted) setState(() => _aiBusy = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(createTripControllerProvider);
+    final basicsReady = state.destinations.isNotEmpty && state.totalDays > 0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('建立行程')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(TpSpacing.s4),
-              children: [
-                _sectionTitle(context, '目的地'),
-                DestinationPicker(
-                  destinations: state.destinations,
-                  onAdd: _ctrl.addDestination,
-                  onRemove: _ctrl.removeDestination,
-                  onReorder: _ctrl.reorderDestination,
-                ),
-                const SizedBox(height: TpSpacing.s5),
-                _sectionTitle(context, '日期'),
-                _DateModeSection(state: state, ctrl: _ctrl),
-                if (state.destinations.length >= 2) ...[
-                  const SizedBox(height: TpSpacing.s5),
-                  _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
-                  _DayQuotaSection(state: state, ctrl: _ctrl),
-                ],
-                const SizedBox(height: TpSpacing.s5),
-                _sectionTitle(context, '想做什麼？（選填）'),
-                TextField(
-                  key: const ValueKey('create-desc'),
-                  controller: _desc,
-                  minLines: 2,
-                  maxLines: 5,
-                  maxLength: 2000,
-                  decoration: const InputDecoration(
-                    hintText: '例如:想吃道地拉麵、逛二手書店…',
-                    border: OutlineInputBorder(),
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.form,
+        contentKey: const ValueKey('create-trip-content'),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                children: [
+                  _sectionTitle(context, '目的地'),
+                  DestinationPicker(
+                    destinations: state.destinations,
+                    onAdd: _ctrl.addDestination,
+                    onRemove: _ctrl.removeDestination,
+                    onReorder: _ctrl.reorderDestination,
                   ),
-                  onChanged: _ctrl.setDescription,
-                ),
-                const SizedBox(height: TpSpacing.s4),
-                _aiAuthorizationCard(context),
-                const SizedBox(height: TpSpacing.s4),
-              ],
+                  const SizedBox(height: TpSpacing.s5),
+                  _sectionTitle(context, '日期'),
+                  _DateModeSection(state: state, ctrl: _ctrl),
+                  if (state.destinations.length >= 2) ...[
+                    const SizedBox(height: TpSpacing.s5),
+                    _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
+                    _DayQuotaSection(state: state, ctrl: _ctrl),
+                  ],
+                  if (!basicsReady) ...[
+                    const SizedBox(height: TpSpacing.s4),
+                    Text(
+                      '先選好目的地與日期，接著可補充偏好並設定 AI。',
+                      key: const ValueKey('create-next-step-hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (basicsReady) ...[
+                    const SizedBox(height: TpSpacing.s5),
+                    ExpansionTile(
+                      key: const ValueKey('create-more-needs'),
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(
+                        bottom: TpSpacing.s2,
+                      ),
+                      title: Text(
+                        '更多需求（選填）',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
+                      children: [
+                        TextField(
+                          key: const ValueKey('create-desc'),
+                          controller: _desc,
+                          minLines: 2,
+                          maxLines: 5,
+                          maxLength: 2000,
+                          decoration: const InputDecoration(
+                            hintText: '例如：想吃道地拉麵、逛二手書店…',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: _ctrl.setDescription,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: TpSpacing.s3),
+                    const AiAuthorizeCard(),
+                  ],
+                  const SizedBox(height: TpSpacing.s4),
+                ],
+              ),
             ),
-          ),
-          _SubmitBar(
-            error: state.error,
-            submitting: state.submitting,
-            onSubmit: state.canSubmit ? _submit : null,
-          ),
-        ],
+            _SubmitBar(
+              error: state.error,
+              submitting: state.submitting,
+              onSubmit: state.canSubmit ? _submit : null,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -140,74 +134,6 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     padding: const EdgeInsets.only(bottom: TpSpacing.s2),
     child: Text(t, style: Theme.of(context).textTheme.titleMedium),
   );
-
-  Widget _aiAuthorizationCard(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      key: const ValueKey('ai-authorize-card'),
-      color: colors.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.auto_awesome, color: colors.onPrimaryContainer),
-                const SizedBox(width: TpSpacing.s3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '讓 AI 幫你把行程填滿',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: colors.onPrimaryContainer,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: TpSpacing.s1),
-                      Text(
-                        '授權一次，AI 就能以你的身分安排景點、餐廳、交通。',
-                        style: TextStyle(color: colors.onPrimaryContainer),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (_aiAuthorized == true) ...[
-              const SizedBox(height: TpSpacing.s3),
-              const Row(
-                key: ValueKey('ai-authorize-on'),
-                children: [
-                  Icon(Icons.check_circle_outline, size: 20),
-                  SizedBox(width: TpSpacing.s2),
-                  Expanded(child: Text('已授權 · 可隨時在「已連結應用」撤銷')),
-                ],
-              ),
-            ] else if (_aiAuthorized == false) ...[
-              const SizedBox(height: TpSpacing.s3),
-              FilledButton(
-                key: const ValueKey('ai-authorize-btn'),
-                onPressed: _aiBusy ? null : _authorizeAi,
-                child: Text(_aiBusy ? '授權中⋯' : '授權 AI'),
-              ),
-            ],
-            if (_aiError != null) ...[
-              const SizedBox(height: TpSpacing.s2),
-              Text(
-                _aiError!,
-                key: const ValueKey('ai-authorize-error'),
-                style: TextStyle(color: colors.error),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _DateModeSection extends StatelessWidget {

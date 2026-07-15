@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
@@ -440,9 +441,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _showLocationError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppError(context, message, onRetry: _locateMe);
   }
 
   void _handleMapReady() {

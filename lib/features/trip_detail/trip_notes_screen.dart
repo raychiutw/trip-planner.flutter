@@ -5,7 +5,8 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
-import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../models/trip_request.dart';
@@ -45,7 +46,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       appBar: AppBar(title: const Text('行程筆記')),
       body: notesAsync.when(
         loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+            const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(TpSpacing.s6),
@@ -435,7 +436,7 @@ class _NotesSection extends ConsumerWidget {
           .reorderNotes(section, tripId: tripId, items: items);
     } on Exception {
       if (context.mounted) {
-        showAppNotice(context, '排序失敗，請稍後再試');
+        showAppError(context, '排序失敗，請稍後再試');
       }
     } finally {
       ref.invalidate(tripNotesProvider(tripId));

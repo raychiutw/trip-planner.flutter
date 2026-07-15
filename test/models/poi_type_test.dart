@@ -27,6 +27,7 @@ void main() {
     test('關鍵字映射（順序敏感）', () {
       expect(mapGooglePrimaryTypeToPoiType('lodging'), 'hotel');
       expect(mapGooglePrimaryTypeToPoiType('guest_house'), 'hotel');
+      expect(mapGooglePrimaryTypeToPoiType('bed_and_breakfast'), 'hotel');
       expect(mapGooglePrimaryTypeToPoiType('parking_lot'), 'parking');
       expect(mapGooglePrimaryTypeToPoiType('subway_station'), 'transport');
       expect(mapGooglePrimaryTypeToPoiType('amusement_park'), 'activity');
@@ -62,14 +63,20 @@ void main() {
       expect(poiCategoryLabel('   '), isNull);
     });
 
-    test('英文 Google primaryType → 8 類中文 label，不外露英文', () {
+    test('已收錄 Google primaryType → 細類中文 label', () {
       expect(poiCategoryLabel('tourist_attraction'), '景點');
-      expect(poiCategoryLabel('fast_food_restaurant'), '餐廳');
+      expect(poiCategoryLabel('fast_food_restaurant'), '速食');
+      expect(poiCategoryLabel('ramen_restaurant'), '拉麵');
+      expect(poiCategoryLabel('shinto_shrine'), '神社');
       expect(poiCategoryLabel('lodging'), '飯店');
-      expect(poiCategoryLabel('shopping_mall'), '購物');
-      expect(poiCategoryLabel('subway_station'), '交通');
+      expect(poiCategoryLabel('department_store'), '百貨公司');
+      expect(poiCategoryLabel('subway_station'), '地鐵站');
       expect(poiCategoryLabel('restaurant'), '餐廳');
       expect(poiCategoryLabel('other'), '其他');
+    });
+
+    test('未收錄的合法 snake_case → 可讀英文，方便補 mapping', () {
+      expect(poiCategoryLabel('hindu_temple_annex'), 'Hindu Temple Annex');
     });
 
     test('純 CJK / 假名 curated label → 原樣顯示', () {

@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
 import '../../../theme/tokens.dart';
 
 /// 確認對話框 → 執行 [delete] → [onSuccess]（通常是 invalidate provider）→ 成功/失敗 snackbar。
@@ -33,7 +34,7 @@ Future<void> confirmAndDelete(
     showAppNotice(context, '已刪除');
   } on Exception {
     if (!context.mounted) return;
-    showAppNotice(context, '刪除失敗，請稍後再試');
+    showAppError(context, '刪除失敗，請稍後再試');
   }
 }
 

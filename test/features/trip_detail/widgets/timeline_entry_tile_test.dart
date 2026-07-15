@@ -64,7 +64,7 @@ void main() {
       expect(find.text('世界最大級水槽'), findsOneWidget);
     });
 
-    testWidgets('英文 master.category 顯示中文 label，不外露 primaryType', (
+    testWidgets('英文 master.category 顯示細類中文 label，不外露 primaryType', (
       tester,
     ) async {
       await pumpTile(
@@ -73,17 +73,17 @@ void main() {
           id: 8,
           sortOrder: 0,
           version: 0,
-          title: '首里城',
+          title: '暖暮拉麵',
           master: EntryPoiInfo(
             poiId: 101,
-            type: 'attraction',
-            category: 'tourist_attraction',
+            type: 'restaurant',
+            category: 'ramen_restaurant',
           ),
         ),
       );
 
-      expect(find.text('景點'), findsOneWidget);
-      expect(find.text('tourist_attraction'), findsNothing);
+      expect(find.text('拉麵'), findsOneWidget);
+      expect(find.text('ramen_restaurant'), findsNothing);
     });
 
     testWidgets('純中文 master.category 顯示原樣', (tester) async {

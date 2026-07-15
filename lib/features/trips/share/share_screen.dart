@@ -13,6 +13,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../api/api_client.dart' show kTriplineOrigin;
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
+import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
 import 'share_controller.dart';
@@ -185,9 +187,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       await (widget.shareLink ?? shareTripLink)(url);
     } on Exception {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('分享失敗，請改用複製連結')));
+      showAppError(context, '分享失敗，請改用複製連結');
     }
   }
 
@@ -200,7 +200,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('分享連結')),
       body: state.loading
-          ? const Center(child: CircularProgressIndicator.adaptive())
+          ? const AppListLoadingSkeleton(key: ValueKey('share-loading'))
           : !state.canManage
           ? const Center(
               child: Padding(

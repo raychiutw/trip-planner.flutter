@@ -453,7 +453,10 @@ void main() {
 
     expect(find.text('已選 2 個'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('entry-add-confirm')));
+    final confirm = find.byKey(const ValueKey('entry-add-confirm'));
+    await tester.ensureVisible(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
     await tester.pumpAndSettle();
 
     verify(

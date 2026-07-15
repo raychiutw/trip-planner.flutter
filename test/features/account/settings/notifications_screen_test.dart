@@ -17,6 +17,7 @@ void main() {
   Future<void> pumpScreen(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
         ],

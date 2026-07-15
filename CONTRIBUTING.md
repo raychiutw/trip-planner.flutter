@@ -7,7 +7,7 @@
 ```bash
 flutter --version    # 需 Flutter 3.41+ / Dart 3.11.3+（pubspec: sdk ^3.11.3）
 flutter pub get
-flutter test         # 全綠才算環境就緒(144+ tests)
+flutter test         # 全綠才算環境就緒；數量以當次輸出為準
 ```
 
 完整上手流程(含跑 app、走一輪 TDD)見[新手教學](docs/tutorial-getting-started.md)。
@@ -28,10 +28,12 @@ flutter test         # 全綠才算環境就緒(144+ tests)
 | 新增畫面/路由 | [howto-add-screen](docs/howto-add-screen.md) |
 | 寫測試(假資料注入) | [howto-test-with-providers](docs/howto-test-with-providers.md) |
 | 了解設計取捨 | [explanation-architecture](docs/explanation-architecture.md) |
+| 了解自適應 UI 與 Apple Music/HIG 對標 | [explanation-adaptive-ui](docs/explanation-adaptive-ui.md) |
 
 ## 不可妥協的慣例
 
 - mutating request 一律走 `ApiClient`(它負責 `Origin` CSRF header)— 不要用 raw dio 打 API
 - fromJson 遵守[通用解析規則](docs/reference-models.md#通用解析規則)(camelCase、num 轉型、0/1 bool)
-- 取色走 `colorScheme` 或 `TpTones` extension,不直接引用 `TpColorsLight/Dark`
+- UI 變更遵守[設計系統參考](docs/reference-theme.md)：取色走 `colorScheme`/`TpTones`、平台差異走 `app/adaptive.dart`、寬版內容走 `AppAdaptiveContent`
+- 成功或低風險狀態用 `showAppNotice`；真正錯誤用可關閉、可重試的 `showAppError`，不可用短暫 toast 取代
 - 待辦進 [TODOS.md](TODOS.md),範圍變更先改 [docs/PORTING_PLAN.md](docs/PORTING_PLAN.md)

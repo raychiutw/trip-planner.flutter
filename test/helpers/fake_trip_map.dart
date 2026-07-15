@@ -42,10 +42,18 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
                 (marker.point.longitude % 2) - 1,
                 (marker.point.latitude % 2) - 1,
               ),
-              child: GestureDetector(
-                key: ValueKey(marker.id),
-                onTap: marker.onTap,
-                child: const SizedBox.square(dimension: 32),
+              child: Semantics(
+                label: [
+                  if (marker.title != null) marker.title!,
+                  if (marker.snippet != null) marker.snippet!,
+                ].join('，'),
+                button: marker.onTap != null,
+                child: GestureDetector(
+                  key: ValueKey(marker.id),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: marker.onTap,
+                  child: const SizedBox.square(dimension: 44),
+                ),
               ),
             ),
         ],

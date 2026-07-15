@@ -124,4 +124,8 @@ abstract final class TpMotion {
   static const appleEase = Cubic(0.2, 0.8, 0.2, 1);
   static const springEase = Cubic(0.32, 1.28, 0.6, 1);
   static const sheetClose = Cubic(0.4, 0, 1, 1);
+
+  /// 系統要求減少動態效果時，保留狀態變更但移除過場時間。
+  static Duration resolve(BuildContext context, Duration preferred) =>
+      MediaQuery.disableAnimationsOf(context) ? Duration.zero : preferred;
 }

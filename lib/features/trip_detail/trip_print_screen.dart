@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_loading_skeleton.dart';
+import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
@@ -94,11 +96,8 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
       ),
       body: SafeArea(
         child: dataAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator.adaptive(
-              key: ValueKey('trip-print-loading'),
-            ),
-          ),
+          loading: () =>
+              const AppListLoadingSkeleton(key: ValueKey('trip-print-loading')),
           error: (error, stackTrace) => _PrintError(
             onRetry: () => ref.invalidate(tripPrintDataProvider(widget.tripId)),
           ),
@@ -126,7 +125,8 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
       }
     } on Exception {
       if (!mounted) return;
-      _showMessage(
+      showAppError(
+        context,
         action == _PrintAction.print ? '列印失敗，請稍後再試' : 'PDF 建立失敗，請稍後再試',
       );
     } finally {

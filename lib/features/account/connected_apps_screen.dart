@@ -10,9 +10,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
 import 'account_display.dart';
+import 'ai_authorize_card.dart';
 
 /// 已授權 OAuth app 清單（GET /account/connected-apps）。
 final connectedAppsProvider = FutureProvider<List<ConnectedApp>>((ref) {
@@ -31,6 +33,7 @@ class ConnectedAppsScreen extends ConsumerStatefulWidget {
 class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   String? _busyClientId;
   String? _mutationError;
+  int _aiAuthorizationRevision = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -38,17 +41,24 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('已連結的應用程式')),
       body: appsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
+        loading: () => const AppListLoadingSkeleton(
+          key: ValueKey('connected-apps-loading'),
+          itemCount: 3,
+        ),
         error: (error, stackTrace) => _ConnectedAppsLoadError(
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),
         data: (apps) => RefreshIndicator.adaptive(
-          onRefresh: () async => ref.invalidate(connectedAppsProvider),
+          onRefresh: _refreshAll,
           child: ListView(
             padding: const EdgeInsets.all(TpSpacing.s4),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+              AiAuthorizeCard(
+                key: ValueKey(_aiAuthorizationRevision),
+                onAuthorized: () => ref.invalidate(connectedAppsProvider),
+              ),
+              const SizedBox(height: TpSpacing.s4),
               if (_mutationError != null) ...[
                 _InlineErrorPanel(
                   message: _mutationError!,
@@ -87,6 +97,16 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     );
   }
 
+  Future<void> _refreshAll() async {
+    setState(() => _aiAuthorizationRevision++);
+    ref.invalidate(connectedAppsProvider);
+    try {
+      await ref.read(connectedAppsProvider.future);
+    } on Exception {
+      // 載入錯誤由 provider 的 persistent error state 顯示。
+    }
+  }
+
   Future<void> _confirmRevoke(ConnectedApp app) async {
     final shouldRevoke = await showAppConfirm(
       context,
@@ -104,6 +124,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     try {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
+      setState(() => _aiAuthorizationRevision++);
       ref.invalidate(connectedAppsProvider);
       showAppNotice(context, '已撤銷 ${app.appName}');
     } catch (error) {

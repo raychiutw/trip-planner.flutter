@@ -11,10 +11,15 @@ Future<void> pumpCard(
   String? currentUserId,
   VoidCallback? onTap,
   VoidCallback? onLongPress,
+  TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child!,
+      ),
       home: Scaffold(
         body: TripCard(
           trip: trip,
@@ -89,6 +94,24 @@ void main() {
       );
       expect(find.text('釜山美食團'), findsOneWidget);
       expect(find.textContaining('天'), findsNothing);
+    });
+
+    testWidgets('200% 動態字級不會造成版面溢位', (tester) async {
+      await pumpCard(
+        tester,
+        const TripSummary(
+          tripId: 'large-text',
+          name: 'large-text',
+          title: '沖繩無障礙家族之旅',
+          countries: '日本',
+          totalDays: 5,
+          startDate: '2026-04-23',
+          endDate: '2026-04-27',
+        ),
+        textScaler: const TextScaler.linear(2),
+      );
+
+      expect(tester.takeException(), isNull);
     });
   });
 

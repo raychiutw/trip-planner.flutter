@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
 import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -185,15 +186,15 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
       if (error.status == 409) {
         ref.invalidate(tripNotesProvider(widget.tripId));
         Navigator.of(context).pop();
-        showAppNotice(context, '此筆記已更新，請重新編輯');
+        showAppError(context, '此筆記已更新，請重新編輯');
         return;
       }
       setState(() => _submitting = false);
-      showAppNotice(context, '儲存失敗，請稍後再試');
+      showAppError(context, '儲存失敗，請稍後再試');
     } on Exception {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showAppNotice(context, '儲存失敗，請稍後再試');
+      showAppError(context, '儲存失敗，請稍後再試');
     }
   }
 
