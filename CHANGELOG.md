@@ -8,7 +8,7 @@
 
 ### 新增
 
-- **自適應導覽與寬版版型**：compact iOS/macOS 使用 `CupertinoTabBar`、Android 使用 `NavigationBar`，寬度 `>=768` 改用 `NavigationRail`；表單、對話與 feed 新增角色式最大寬度。
+- **自適應導覽與寬版版型**：五個 branch 共用 `AppleRootTabBar` 浮動根分頁並隨垂直捲動縮合；表單、對話與 feed 新增角色式最大寬度。
 - **Liquid Glass 與原生地圖**：根分頁改為 Apple 式浮動功能層，地圖由 `flutter_map`／OSM 遷移至原生 Google Maps，支援路線 polyline、marker 與卡片同步。
 - **持續錯誤與版型載入狀態**：真正錯誤改用可關閉、可重試的 persistent banner；列表、地圖、時間軸與主要 route 補齊靜態 skeleton 與載入 semantics。
 - **地圖 accessibility**：marker 擴為 44pt 互動目標，加入 POI 類型 icon、語意標籤與定位失敗重試。

@@ -74,5 +74,5 @@ test/                       # 與 lib/ 鏡像
 - 三色系統：玩/看/買=柔褐 accent、住/移動=sage `#A8BAAA`、吃=粉 `#E78C99`，各 4 階（base/deep/subtle/bg）
 - 卡片：elevation 0 + 1px hairline `#EADFCF`、radius 8；shadow 只給浮層
 - 字體：平台系統字（iOS/macOS SF Pro、Android Roboto，中文走系統 fallback）；主要內文 17/26；時間 tabular-nums
-- 導覽：compact iOS/macOS 用 `CupertinoTabBar`、Android 用 `NavigationBar`；寬度 `>=768` 改用 `NavigationRail`
+- 導覽：五個 branch 共用 `AppleRootTabBar` Liquid Glass 浮動功能層；垂直捲動時縮合，內容寬版則由 `AppAdaptiveContent` 依角色限寬
 - 禁止：gradient 裝飾、emoji icon、rainbow 色（地圖 polyline 例外）
