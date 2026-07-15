@@ -27,7 +27,10 @@ List<String> rebaseMerge(
 /// rebase 無衝突重送 / 「保留你的」重送時據此只送改過的欄位,不覆蓋 server。
 Set<String> dirtyFields(Map<String, dynamic>? base, Map<String, dynamic> ours) {
   if (base == null) return ours.keys.toSet();
-  return {for (final f in ours.keys) if (_norm(ours[f]) != _norm(base[f])) f};
+  return {
+    for (final f in ours.keys)
+      if (_norm(ours[f]) != _norm(base[f])) f,
+  };
 }
 
 /// [C1] 型別正規化:wire 數字可能 int 或 double,統一轉 double 再比;其餘原樣。

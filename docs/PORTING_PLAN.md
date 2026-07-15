@@ -12,7 +12,7 @@
 | Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
 | HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry |
 | 認證 | Cookie 登入 + OAuth PKCE/Bearer 就緒 | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE/Bearer client 端已實作並以 dart-define 啟用，production backend 已 provision `tripline-mobile` active public client |
-| 地圖 | flutter_map + OSM tiles + adapter | 免 API key、零帳務設定；`features/map/map_adapter.dart` 集中 SDK 轉接，之後可換 google_maps_flutter |
+| 地圖 | google_maps_flutter + domain adapter | iOS／Android 使用各自受平台限制的金鑰；`features/map/map_adapter.dart` 集中 SDK 轉接，路線沿用 Web `/route` 契約 |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
 | 測試 | flutter_test + mocktail + http_mock_adapter | TDD：models 解析測試、api client 行為測試、widget 測試 |
 

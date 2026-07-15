@@ -4,13 +4,21 @@ import 'package:tripline/api/cache/rebase_merge.dart';
 void main() {
   group('rebaseMerge', () {
     test('server 沒動該欄(theirs==base)→ 無衝突', () {
-      expect(rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'A'}), isEmpty);
+      expect(
+        rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'A'}),
+        isEmpty,
+      );
     });
     test('離線與 server 同值(ours==theirs)→ 無衝突', () {
-      expect(rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'B'}), isEmpty);
+      expect(
+        rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'B'}),
+        isEmpty,
+      );
     });
     test('三方不同 → 衝突欄位', () {
-      expect(rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'C'}), ['title']);
+      expect(rebaseMerge({'title': 'A'}, {'title': 'B'}, {'title': 'C'}), [
+        'title',
+      ]);
     });
     test('多欄位混合 → 只回衝突欄位', () {
       final r = rebaseMerge(
@@ -56,10 +64,7 @@ void main() {
       );
     });
     test('base==null → 全部欄位視為 dirty(降級)', () {
-      expect(
-        dirtyFields(null, {'title': 'A', 'desc': 'X'}),
-        {'title', 'desc'},
-      );
+      expect(dirtyFields(null, {'title': 'A', 'desc': 'X'}), {'title', 'desc'});
     });
     test('[C1] int vs double 同值 → 不算 dirty', () {
       expect(dirtyFields({'min': 5}, {'min': 5.0}), isEmpty);
@@ -71,10 +76,19 @@ void main() {
 
   group('extractEntryFields', () {
     final days = [
-      {'dayNum': 1, 'timeline': [
-        {'id': 7, 'title': '舊標題', 'description': 'd', 'startTime': '09:00',
-         'endTime': '10:00', 'version': 3},
-      ]},
+      {
+        'dayNum': 1,
+        'timeline': [
+          {
+            'id': 7,
+            'title': '舊標題',
+            'description': 'd',
+            'startTime': '09:00',
+            'endTime': '10:00',
+            'version': 3,
+          },
+        ],
+      },
     ];
     test('找到 entry → 取指定欄位 + version(camelCase)', () {
       final r = extractEntryFields(days, 7, ['title', 'startTime']);
