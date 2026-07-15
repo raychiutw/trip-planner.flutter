@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
@@ -33,8 +36,9 @@ class TripMapScreen extends ConsumerWidget {
     super.key,
     required this.tripId,
     this.initialEntryId,
-    this.tileProvider,
+    this.mapBuilder,
     this.locationService,
+    this.onTripSelected,
   });
 
   final String tripId;
@@ -42,11 +46,12 @@ class TripMapScreen extends ConsumerWidget {
   /// 初始聚焦的停留點 id，用於 `/trip/:tripId/stop/:entryId/map` deep link。
   final int? initialEntryId;
 
-  /// 測試注入點：widget test 傳入假 tile provider 避免對 OSM 發網路請求。
-  final TripMapTileProvider? tileProvider;
+  /// 測試注入點：production 為原生 Google Maps，widget test 傳入假 renderer。
+  final TripMapCanvasBuilder? mapBuilder;
 
   /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
   final TripMapLocationService? locationService;
+  final ValueChanged<String>? onTripSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,7 +66,11 @@ class TripMapScreen extends ConsumerWidget {
         title: Text(currentTrip?.displayTitle ?? '行程地圖'),
         actions: [
           if (trips.length > 1)
-            _TripMapTripPicker(currentTripId: tripId, trips: trips),
+            _TripMapTripPicker(
+              currentTripId: tripId,
+              trips: trips,
+              onSelected: onTripSelected,
+            ),
         ],
       ),
       body: daysAsync.when(
@@ -76,7 +85,7 @@ class TripMapScreen extends ConsumerWidget {
         data: (days) => _TripMapView(
           days: days,
           initialEntryId: initialEntryId,
-          tileProvider: tileProvider,
+          mapBuilder: mapBuilder,
           locationService: locationService,
         ),
       ),
@@ -92,10 +101,15 @@ TripSummary? _findTripSummary(List<TripSummary> trips, String tripId) {
 }
 
 class _TripMapTripPicker extends StatelessWidget {
-  const _TripMapTripPicker({required this.currentTripId, required this.trips});
+  const _TripMapTripPicker({
+    required this.currentTripId,
+    required this.trips,
+    this.onSelected,
+  });
 
   final String currentTripId;
   final List<TripSummary> trips;
+  final ValueChanged<String>? onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +119,10 @@ class _TripMapTripPicker extends StatelessWidget {
       icon: const Icon(Icons.swap_horiz),
       onSelected: (tripId) {
         if (tripId == currentTripId) return;
+        if (onSelected != null) {
+          onSelected!(tripId);
+          return;
+        }
         context.go('/trips/${Uri.encodeComponent(tripId)}/map');
       },
       itemBuilder: (context) {
@@ -202,25 +220,25 @@ class _DayPin {
   Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
 }
 
-class _TripMapView extends StatefulWidget {
+class _TripMapView extends ConsumerStatefulWidget {
   const _TripMapView({
     required this.days,
     this.initialEntryId,
-    this.tileProvider,
+    this.mapBuilder,
     this.locationService,
   });
 
   final List<TripDay> days;
   final int? initialEntryId;
-  final TripMapTileProvider? tileProvider;
+  final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
 
   @override
-  State<_TripMapView> createState() => _TripMapViewState();
+  ConsumerState<_TripMapView> createState() => _TripMapViewState();
 }
 
-class _TripMapViewState extends State<_TripMapView> {
-  final FlutterTripMapController _mapController = FlutterTripMapController();
+class _TripMapViewState extends ConsumerState<_TripMapView> {
+  final GoogleTripMapController _mapController = GoogleTripMapController();
   TripMapTilePreset _tilePreset = kTripMapTilePresets.first;
   TripMapPoint? _userLocation;
   bool _locating = false;
@@ -232,11 +250,17 @@ class _TripMapViewState extends State<_TripMapView> {
   bool _mapIsReady = false;
 
   bool _initialFocusApplied = false;
+  List<TripMapRoute> _routes = const [];
+  bool _loadingRoutes = false;
+  int _routeLoadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedTabIndex = _initialTabIndex();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_loadRoutes());
+    });
   }
 
   @override
@@ -246,6 +270,7 @@ class _TripMapViewState extends State<_TripMapView> {
         !identical(oldWidget.days, widget.days)) {
       _selectedTabIndex = _initialTabIndex();
       _initialFocusApplied = false;
+      unawaited(_loadRoutes());
       if (_mapIsReady) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _applyInitialFocus();
@@ -321,6 +346,64 @@ class _TripMapViewState extends State<_TripMapView> {
   void _selectTab(int tabIndex) {
     setState(() => _selectedTabIndex = tabIndex);
     _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
+    unawaited(_loadRoutes());
+  }
+
+  List<(_DayPin, _DayPin)> _routePairsForTab(int tabIndex) {
+    final days = tabIndex == 0 ? _pinsByDay : [_pinsByDay[tabIndex - 1]];
+    return [
+      for (final pins in days)
+        for (var index = 0; index + 1 < pins.length; index++)
+          (pins[index], pins[index + 1]),
+    ];
+  }
+
+  Future<void> _loadRoutes() async {
+    final generation = ++_routeLoadGeneration;
+    final pairs = _routePairsForTab(_selectedTabIndex);
+    if (pairs.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _routes = const [];
+          _loadingRoutes = false;
+        });
+      }
+      return;
+    }
+    setState(() => _loadingRoutes = true);
+    final repository = ref.read(mapRepositoryProvider);
+    final routes = await Future.wait([
+      for (final (index, pair) in pairs.indexed)
+        () async {
+          try {
+            final result = await repository.fetchRoute(
+              fromLat: pair.$1.point.latitude,
+              fromLng: pair.$1.point.longitude,
+              toLat: pair.$2.point.latitude,
+              toLng: pair.$2.point.longitude,
+            );
+            if (result.polyline.length < 2) return null;
+            return TripMapRoute(
+              id: 'day-route-$index',
+              points: [
+                for (final point in result.polyline)
+                  TripMapPoint(point.lat, point.lng),
+              ],
+              color: pair.$1.color,
+              strokeWidth: 5,
+              borderColor: Colors.white,
+              borderStrokeWidth: 1.5,
+            );
+          } on Exception {
+            return null;
+          }
+        }(),
+    ]);
+    if (!mounted || generation != _routeLoadGeneration) return;
+    setState(() {
+      _routes = routes.whereType<TripMapRoute>().toList();
+      _loadingRoutes = false;
+    });
   }
 
   void _fitToPoints(List<TripMapPoint> points) {
@@ -478,22 +561,25 @@ class _TripMapViewState extends State<_TripMapView> {
     return Stack(
       children: [
         Positioned.fill(
-          child: FlutterMapCanvas(
-            controller: _mapController,
-            tilePreset: _tilePreset,
-            initialFitPoints: [for (final pin in allPins) pin.point],
-            initialPadding: const EdgeInsets.all(TpSpacing.s10),
-            initialMaxZoom: 16,
-            tileProvider: widget.tileProvider,
-            onMapReady: _handleMapReady,
-            markers: [
-              for (final pin in visiblePins) _buildMarker(pin),
-              if (_userLocation != null)
-                buildTripMapUserLocationMarker(
-                  point: _userLocation!,
-                  key: const ValueKey('trip-map-user-location'),
-                ),
-            ],
+          child: buildTripMapCanvas(
+            TripMapCanvasConfig(
+              controller: _mapController,
+              tilePreset: _tilePreset,
+              initialFitPoints: [for (final pin in allPins) pin.point],
+              initialPadding: const EdgeInsets.all(TpSpacing.s10),
+              initialMaxZoom: 16,
+              onMapReady: _handleMapReady,
+              routes: _routes,
+              markers: [
+                for (final pin in visiblePins) _buildMarker(pin),
+                if (_userLocation != null)
+                  buildTripMapUserLocationMarker(
+                    point: _userLocation!,
+                    id: 'trip-map-user-location',
+                  ),
+              ],
+            ),
+            builder: widget.mapBuilder,
           ),
         ),
         Positioned(
@@ -505,6 +591,15 @@ class _TripMapViewState extends State<_TripMapView> {
             onSelected: (preset) => setState(() => _tilePreset = preset),
           ),
         ),
+        if (_loadingRoutes)
+          const Positioned(
+            left: TpSpacing.s4,
+            top: TpSpacing.s4,
+            child: SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+            ),
+          ),
         Positioned(
           top: TpSpacing.s4 + TpSpacing.tapMin + TpSpacing.s2,
           right: TpSpacing.s4,
@@ -520,28 +615,13 @@ class _TripMapViewState extends State<_TripMapView> {
 
   TripMapMarker _buildMarker(_DayPin pin) {
     return TripMapMarker(
+      id: 'map-pin-${pin.entry.id}',
       point: pin.point,
-      width: 32,
-      height: 32,
-      child: Container(
-        key: ValueKey('map-pin-${pin.entry.id}'),
-        decoration: BoxDecoration(
-          color: pin.color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          '${pin.pinNumber}',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            fontFeatures: [FontFeature.tabularFigures()],
-            color: Colors.white,
-          ),
-        ),
-      ),
+      color: pin.color,
+      title: '${pin.pinNumber}. ${pin.entry.title}',
+      snippet: 'DAY ${pin.dayNum}',
+      onTap: () => _focusPin(pin),
+      zIndex: 100 - pin.dayIndex,
     );
   }
 
