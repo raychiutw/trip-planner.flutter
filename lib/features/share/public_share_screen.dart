@@ -17,6 +17,7 @@ import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../models/share.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import '../trip_detail/trip_pdf_service.dart';
 import '../trip_detail/trip_print_data.dart';
 
@@ -51,7 +52,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
     final shareAsync = ref.watch(publicTripShareProvider(_token));
     final currentUser = ref.watch(authStateProvider).value;
     return Scaffold(
-      appBar: AppBar(title: const Text('行程分享')),
+      appBar: const TpAppBar(title: Text('行程分享')),
       body: SafeArea(
         child: shareAsync.when(
           loading: () => const AppListLoadingSkeleton(

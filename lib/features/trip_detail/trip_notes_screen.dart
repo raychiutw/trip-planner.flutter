@@ -12,6 +12,7 @@ import '../../models/notes.dart';
 import '../../models/trip_request.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -43,7 +44,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(tripNotesProvider(widget.tripId));
     return Scaffold(
-      appBar: AppBar(title: const Text('行程筆記')),
+      appBar: const TpAppBar(title: Text('行程筆記')),
       body: notesAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),

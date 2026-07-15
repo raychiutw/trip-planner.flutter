@@ -13,6 +13,7 @@ import '../../api/providers.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 
 /// 開發者 OAuth apps 清單（GET /dev/apps）。
 final developerAppsProvider = FutureProvider<List<DeveloperApp>>((ref) {
@@ -26,7 +27,7 @@ class DeveloperAppsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appsAsync = ref.watch(developerAppsProvider);
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: const Text('開發者應用'),
         actions: [
           IconButton(
@@ -111,7 +112,7 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('新增 OAuth 應用')),
+      appBar: const TpAppBar(title: Text('新增 OAuth 應用')),
       body: Form(
         key: _formKey,
         child: ListView(

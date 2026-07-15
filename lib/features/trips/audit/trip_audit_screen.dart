@@ -10,6 +10,7 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 
 /// Shows the latest audit rows for a trip and allows safe rollback.
 class TripAuditScreen extends ConsumerStatefulWidget {
@@ -116,7 +117,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
   Widget build(BuildContext context) {
     final tripTitle = _trip?.title ?? _trip?.name ?? widget.tripId;
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: const Text('異動紀錄'),
         actions: [
           IconButton(

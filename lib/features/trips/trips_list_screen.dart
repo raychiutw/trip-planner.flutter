@@ -12,6 +12,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_root_scroll_scaffold.dart';
 import 'trip_card.dart';
 
 const int _maxTripImportBytes = 512 * 1024;
@@ -258,121 +259,104 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final currentUserId = ref.watch(authStateProvider).value?.id;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: RefreshIndicator.adaptive(
-        onRefresh: () => ref.refresh(myTripsProvider.future),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar.large(
-              pinned: true,
-              automaticallyImplyLeading: false,
-              title: const Text('我的行程'),
-              actions: [
-                IconButton(
-                  key: const ValueKey('trips-create-button'),
-                  tooltip: '新增行程',
-                  icon: const Icon(CupertinoIcons.add),
-                  onPressed: () => context.push('/new-trip'),
-                ),
-                PopupMenuButton<_TripsToolbarAction>(
-                  key: const ValueKey('trips-sort-button'),
-                  icon: _isImporting
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(CupertinoIcons.ellipsis_circle),
-                  tooltip: '更多',
-                  enabled: !_isImporting,
-                  onSelected: _handleToolbarAction,
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      key: ValueKey('trips-list-import-trigger'),
-                      value: _TripsToolbarAction.importJson,
-                      child: _TripsMenuRow(
-                        icon: CupertinoIcons.cloud_upload,
-                        label: '匯入行程 JSON',
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    _buildSortMenuItem(
-                      action: _TripsToolbarAction.defaultOrder,
-                      order: TripSortOrder.defaultOrder,
-                      label: '預設順序',
-                    ),
-                    _buildSortMenuItem(
-                      action: _TripsToolbarAction.nameAsc,
-                      order: TripSortOrder.nameAsc,
-                      label: '名稱 A→Z',
-                    ),
-                    _buildSortMenuItem(
-                      action: _TripsToolbarAction.updatedDesc,
-                      order: TripSortOrder.updatedDesc,
-                      label: '最新編輯',
-                    ),
-                    _buildSortMenuItem(
-                      action: _TripsToolbarAction.startDateAsc,
-                      order: TripSortOrder.startDateAsc,
-                      label: '出發日',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                    ),
-                    child: AppSearchField(
-                      fieldKey: const ValueKey('trips-search-field'),
-                      controller: _searchController,
-                      placeholder: '搜尋行程',
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      TpSpacing.s4,
-                      0,
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                    ),
-                    child: SegmentedButton<TripFilter>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                        ButtonSegment(
-                          value: TripFilter.mine,
-                          label: Text('我的'),
-                        ),
-                        ButtonSegment(
-                          value: TripFilter.shared,
-                          label: Text('共編'),
-                        ),
-                      ],
-                      selected: {_filterTab},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _filterTab = selection.first;
-                        });
-                      },
-                    ),
-                  ),
-                ],
+    return TpRootScrollScaffold(
+      title: '我的行程',
+      onRefresh: () => ref.refresh(myTripsProvider.future),
+      actions: [
+        IconButton(
+          key: const ValueKey('trips-create-button'),
+          tooltip: '新增行程',
+          icon: const Icon(CupertinoIcons.add),
+          onPressed: () => context.push('/new-trip'),
+        ),
+        PopupMenuButton<_TripsToolbarAction>(
+          key: const ValueKey('trips-sort-button'),
+          icon: _isImporting
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                )
+              : const Icon(CupertinoIcons.ellipsis_circle),
+          tooltip: '更多',
+          enabled: !_isImporting,
+          onSelected: _handleToolbarAction,
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              key: ValueKey('trips-list-import-trigger'),
+              value: _TripsToolbarAction.importJson,
+              child: _TripsMenuRow(
+                icon: CupertinoIcons.cloud_upload,
+                label: '匯入行程 JSON',
               ),
             ),
-            ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
+            const PopupMenuDivider(),
+            _buildSortMenuItem(
+              action: _TripsToolbarAction.defaultOrder,
+              order: TripSortOrder.defaultOrder,
+              label: '預設順序',
+            ),
+            _buildSortMenuItem(
+              action: _TripsToolbarAction.nameAsc,
+              order: TripSortOrder.nameAsc,
+              label: '名稱 A→Z',
+            ),
+            _buildSortMenuItem(
+              action: _TripsToolbarAction.updatedDesc,
+              order: TripSortOrder.updatedDesc,
+              label: '最新編輯',
+            ),
+            _buildSortMenuItem(
+              action: _TripsToolbarAction.startDateAsc,
+              order: TripSortOrder.startDateAsc,
+              label: '出發日',
+            ),
           ],
         ),
-      ),
+      ],
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  TpSpacing.s4,
+                  TpSpacing.s2,
+                  TpSpacing.s4,
+                  TpSpacing.s2,
+                ),
+                child: AppSearchField(
+                  fieldKey: const ValueKey('trips-search-field'),
+                  controller: _searchController,
+                  placeholder: '搜尋行程',
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  TpSpacing.s4,
+                  0,
+                  TpSpacing.s4,
+                  TpSpacing.s2,
+                ),
+                child: SegmentedButton<TripFilter>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: TripFilter.all, label: Text('全部')),
+                    ButtonSegment(value: TripFilter.mine, label: Text('我的')),
+                    ButtonSegment(value: TripFilter.shared, label: Text('共編')),
+                  ],
+                  selected: {_filterTab},
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _filterTab = selection.first;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
+      ],
     );
   }
 

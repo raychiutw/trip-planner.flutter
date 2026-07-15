@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/app_loading_skeleton.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'trip_providers.dart';
 import 'widgets/entry_edit_sheet.dart';
 
@@ -23,7 +24,7 @@ class EntryEditRouteScreen extends ConsumerWidget {
       entryDetailProvider((tripId: tripId, entryId: entryId)),
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('編輯停留點')),
+      appBar: const TpAppBar(title: Text('編輯停留點')),
       body: entryAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('entry-edit-loading'),

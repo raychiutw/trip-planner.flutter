@@ -17,6 +17,7 @@ import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import '../favorites/favorites_providers.dart';
@@ -89,7 +90,7 @@ class EntryPoiScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final entryAsync = ref.watch(entryDetailProvider(_key));
     return Scaffold(
-      appBar: AppBar(title: const Text('地點管理')),
+      appBar: const TpAppBar(title: Text('地點管理')),
       body: entryAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('entry-poi-loading')),

@@ -9,7 +9,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.actions = const [],
     this.automaticallyImplyLeading = true,
-  }) : assert(actions.length <= 2, 'Toolbar supports at most two actions.');
+  });
 
   final Widget title;
   final List<Widget> actions;
@@ -20,6 +20,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(actions.length <= 2, 'Toolbar supports at most two actions.');
     return AppBar(
       automaticallyImplyLeading: automaticallyImplyLeading,
       centerTitle: true,

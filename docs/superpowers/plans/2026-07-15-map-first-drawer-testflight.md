@@ -145,7 +145,7 @@ Expected: PASS.
 - Consumes: `TpRootScrollScaffold`, `TpAppBar`, and `TpMoreMenuButton`.
 - Produces: no page-owned root title geometry and no vertical more icon.
 
-- [ ] **Step 1: Add failing migration assertions**
+- [x] **Step 1: Add failing migration assertions**
 
 ```dart
 expect(find.byType(TpRootScrollScaffold), findsOneWidget);
@@ -156,17 +156,17 @@ expect(find.byIcon(Icons.more_vert), findsNothing);
 
 Add these assertions to trips, favorites, account, and representative detail-screen tests. `test/ui/shared_ui_usage_test.dart` recursively scans `lib/features` and fails when a Dart file contains either `appBar: AppBar(` or `SliverAppBar.large(`; shared construction is allowed only in `lib/ui`.
 
-- [ ] **Step 2: Confirm the migration tests fail**
+- [x] **Step 2: Confirm the migration tests fail**
 
 Run: `flutter test test/features/trips/trips_list_screen_test.dart test/features/favorites/favorites_screen_test.dart test/features/account/account_screen_test.dart test/features/trip_detail/trip_timeline_screen_test.dart`
 
 Expected: FAIL because root screens still own `SliverAppBar.large` and detail screens still own `AppBar`.
 
-- [ ] **Step 3: Migrate screens without changing business callbacks**
+- [x] **Step 3: Migrate screens without changing business callbacks**
 
 Trips, favorites, and account pass their current slivers/actions into `TpRootScrollScaffold`. Chat uses `TpAppBar` because its reverse chat list cannot share the root `CustomScrollView`. Detail screens replace `AppBar` with `TpAppBar`; popup menus with a trailing action use `TpMoreMenuButton`. Existing routing, provider invalidation, form submission, and menu command handlers remain unchanged.
 
-- [ ] **Step 4: Verify the screen suite**
+- [x] **Step 4: Verify the screen suite**
 
 Run: `flutter test test/features/trips test/features/favorites test/features/account test/features/chat test/features/trip_detail`
 

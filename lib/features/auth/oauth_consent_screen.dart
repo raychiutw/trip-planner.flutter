@@ -11,6 +11,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 
 class OAuthConsentScreen extends ConsumerStatefulWidget {
   const OAuthConsentScreen({super.key, required this.request});
@@ -37,7 +38,7 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
   Widget build(BuildContext context) {
     final request = widget.request;
     return Scaffold(
-      appBar: AppBar(title: const Text('授權請求')),
+      appBar: const TpAppBar(title: Text('授權請求')),
       body: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [

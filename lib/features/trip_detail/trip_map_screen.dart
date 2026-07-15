@@ -10,6 +10,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import '../map/map_adapter.dart';
 import '../map/map_location.dart';
 import '../trips/trip_card.dart';
@@ -62,7 +63,7 @@ class TripMapScreen extends ConsumerWidget {
     };
     final currentTrip = _findTripSummary(trips, tripId);
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: Text(currentTrip?.displayTitle ?? '行程地圖'),
         actions: [
           if (trips.length > 1)

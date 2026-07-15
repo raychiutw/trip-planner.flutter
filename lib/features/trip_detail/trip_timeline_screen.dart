@@ -11,6 +11,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -63,7 +64,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           TextButton(

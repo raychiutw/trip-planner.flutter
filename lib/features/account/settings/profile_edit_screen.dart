@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../api/providers.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
@@ -52,7 +53,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('個人資料')),
+      appBar: const TpAppBar(title: Text('個人資料')),
       body: switch (authState) {
         AsyncData(:final value?) => _form(context, value.displayName ?? ''),
         AsyncError() => const Center(child: Text('無法載入個人資料')),
