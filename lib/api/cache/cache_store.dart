@@ -37,6 +37,7 @@ class QueuedMutation {
   final String cacheKey; // 受影響的 GET 快取 key
   final Map<String, dynamic> args; // patcher 參數
   final String createdAt;
+
   /// rebase 三方比對用:離線寫入當下受影響欄位的原始值,缺漏舊資料降級為 null。
   final Map<String, dynamic>? base;
 
@@ -95,15 +96,24 @@ class ConflictRecord {
   final int newVersion; // 重抓到的 server version
   final List<String> conflictFields;
   final String createdAt;
+
   /// 離線寫入當下的 base(camelCase),供「保留你的」重送算 dirty 欄位;
   /// 缺漏(舊資料/降級)為 null → 重送全送(last-write-wins)。
   final Map<String, dynamic>? base;
 
   Map<String, Object?> toMap() => {
-    'id': id, 'type': type, 'path': path, 'body': body, 'args': args,
-    'cacheKey': cacheKey, 'ours': ours, 'theirs': theirs,
-    'newVersion': newVersion, 'conflictFields': conflictFields,
-    'createdAt': createdAt, 'base': base,
+    'id': id,
+    'type': type,
+    'path': path,
+    'body': body,
+    'args': args,
+    'cacheKey': cacheKey,
+    'ours': ours,
+    'theirs': theirs,
+    'newVersion': newVersion,
+    'conflictFields': conflictFields,
+    'createdAt': createdAt,
+    'base': base,
   };
 
   factory ConflictRecord.fromMap(Map<String, Object?> m) => ConflictRecord(

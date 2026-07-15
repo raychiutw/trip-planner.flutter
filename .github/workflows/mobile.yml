@@ -6,6 +6,15 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner used for the manual TestFlight release
+        required: true
+        default: macos-26
+        type: choice
+        options:
+          - macos-26
+          - tripline-release
 
 permissions:
   contents: read
@@ -17,6 +26,7 @@ env:
 jobs:
   ci:
     name: Analyze and test
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -39,11 +49,18 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Build Android debug
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+        run: |
+          set -euo pipefail
+          : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
+          flutter build apk --debug
+
   testflight:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    needs: ci
-    runs-on: macos-26
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 75
     concurrency:
       group: testflight-${{ github.repository }}
@@ -62,13 +79,20 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
       - name: Write iOS build secrets
         env:
-          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
         run: |
           set -euo pipefail
+          : "${GOOGLE_MAPS_IOS_API_KEY:?Missing GOOGLE_MAPS_IOS_API_KEY secret}"
           umask 077
-          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
+          printf 'GOOGLE_MAPS_IOS_API_KEY=%s\n' "$GOOGLE_MAPS_IOS_API_KEY" > ios/Flutter/Secrets.xcconfig
 
       - name: Import Apple Distribution certificate
         uses: Apple-Actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
@@ -113,4 +137,4 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          wait-for-processing: 'false'
+          wait-for-processing: 'true'

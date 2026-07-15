@@ -1,96 +1,74 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 
-class _TransparentTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
-      MemoryImage(TileProvider.transparentImage);
-}
-
 void main() {
-  test('TripMapPoint 是地圖套件無關的座標值物件', () {
+  test('TripMapPoint 與 Google Maps LatLng 雙向轉接', () {
     const point = TripMapPoint(26.217, 127.719);
 
-    expect(point.latitude, 26.217);
-    expect(point.longitude, 127.719);
-    expect(point, const TripMapPoint(26.217, 127.719));
+    expect(point.toGoogleLatLng(), const LatLng(26.217, 127.719));
+    expect(TripMapPoint.fromGoogleLatLng(const LatLng(26.217, 127.719)), point);
   });
 
-  test('內建 tile presets 保留路線圖/地形/衛星圖層設定', () {
+  test('內建 Google Maps presets 保留路線圖/地形/衛星', () {
     expect(
-      kTripMapTilePresets.map((preset) => preset.style),
-      containsAll([
-        TripMapTileStyle.roadmap,
-        TripMapTileStyle.terrain,
-        TripMapTileStyle.satellite,
-      ]),
-    );
-    expect(
-      kTripMapTilePresets
-          .firstWhere((preset) => preset.style == TripMapTileStyle.terrain)
-          .urlTemplate,
-      contains('opentopomap'),
+      kTripMapTilePresets.map((preset) => preset.mapType),
+      containsAll([MapType.normal, MapType.terrain, MapType.hybrid]),
     );
   });
 
-  testWidgets('FlutterMapCanvas 只在 adapter 內轉接 tile、route 與 marker', (
-    tester,
-  ) async {
-    final controller = FlutterTripMapController();
+  testWidgets('GoogleTripMapCanvas 轉接原生 marker 與 polyline', (tester) async {
+    final controller = GoogleTripMapController();
     addTearDown(controller.dispose);
+    GoogleMap? googleMap;
 
     await tester.pumpWidget(
       MaterialApp(
-        home: SizedBox(
-          width: 320,
-          height: 320,
-          child: FlutterMapCanvas(
-            controller: controller,
-            initialFitPoints: const [
-              TripMapPoint(26.217, 127.719),
-              TripMapPoint(26.214, 127.688),
-            ],
-            tilePreset: kTripMapTilePresets.firstWhere(
-              (preset) => preset.style == TripMapTileStyle.terrain,
-            ),
-            tileProvider: _TransparentTileProvider(),
-            routes: const [
-              TripMapRoute(
-                points: [
-                  TripMapPoint(26.217, 127.719),
-                  TripMapPoint(26.214, 127.688),
-                ],
-                color: Colors.red,
-                strokeWidth: 4,
-              ),
-            ],
-            markers: const [
-              TripMapMarker(
-                point: TripMapPoint(26.217, 127.719),
-                width: 24,
-                height: 24,
-                child: Text('1'),
-              ),
-            ],
-          ),
+        home: Builder(
+          builder: (context) {
+            googleMap =
+                GoogleTripMapCanvas(
+                      config: TripMapCanvasConfig(
+                        controller: controller,
+                        initialFitPoints: const [TripMapPoint(26.217, 127.719)],
+                        tilePreset: kTripMapTilePresets[1],
+                        clusterMarkers: true,
+                        routes: const [
+                          TripMapRoute(
+                            id: 'day-1',
+                            points: [
+                              TripMapPoint(26.217, 127.719),
+                              TripMapPoint(26.214, 127.688),
+                            ],
+                            color: Colors.red,
+                            strokeWidth: 4,
+                          ),
+                        ],
+                        markers: const [
+                          TripMapMarker(
+                            id: 'stop-1',
+                            point: TripMapPoint(26.217, 127.719),
+                            color: Colors.blue,
+                            title: '首里城',
+                          ),
+                        ],
+                      ),
+                    ).build(context)
+                    as GoogleMap;
+            return const SizedBox.shrink();
+          },
         ),
       ),
     );
-    await tester.pumpAndSettle();
 
-    expect(find.byType(FlutterMap), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
-    final tileLayer = tester.widget<TileLayer>(
-      find.byKey(const ValueKey('trip-map-canvas-tile-layer')),
-    );
-    expect(tileLayer.urlTemplate, contains('opentopomap'));
-
-    final routeLayer = tester.widget<PolylineLayer<Object>>(
-      find.byKey(const ValueKey('trip-map-canvas-routes')),
-    );
-    expect(routeLayer.polylines.single.points, hasLength(2));
-    expect(routeLayer.polylines.single.color, Colors.red);
+    expect(googleMap, isNotNull);
+    expect(googleMap!.mapType, MapType.terrain);
+    expect(googleMap!.markers.single.markerId.value, 'stop-1');
+    expect(googleMap!.markers.single.infoWindow.title, '首里城');
+    expect(googleMap!.clusterManagers, hasLength(1));
+    expect(googleMap!.markers.single.clusterManagerId, isNotNull);
+    expect(googleMap!.polylines.single.polylineId.value, 'day-1');
+    expect(googleMap!.polylines.single.points, hasLength(2));
   });
 }

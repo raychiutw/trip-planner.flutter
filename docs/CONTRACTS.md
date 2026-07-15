@@ -156,7 +156,7 @@ GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRo
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart
-class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // NavigationBar 5 tabs：聊天/行程/地圖/收藏/帳號
+class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // Liquid Glass 浮動根 tab：聊天/行程/地圖/收藏/帳號
 class PlaceholderScreen extends StatelessWidget { const PlaceholderScreen({required this.title}); } // 「即將推出」
 
 // features/trip_detail/trip_providers.dart（由 timeline agent 實作，map/notes agent 只 import）
@@ -167,8 +167,8 @@ final tripNotesProvider = FutureProvider.family<TripNotes, String>(...);
 // 各 screen class 名
 class LoginScreen extends ConsumerStatefulWidget;      // features/auth/login_screen.dart
 class TripsListScreen extends ConsumerWidget;          // features/trips/trips_list_screen.dart
-class TripTimelineScreen extends ConsumerWidget;       // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
-class TripMapScreen extends ConsumerWidget;            // features/trip_detail/trip_map_screen.dart（flutter_map + OSM）
+class TripTimelineScreen extends ConsumerStatefulWidget; // features/trip_detail/trip_timeline_screen.dart（接受 tripId）
+class TripMapScreen extends ConsumerWidget;              // features/trip_detail/trip_map_screen.dart（原生 Google Maps + /route polyline）
 class TripNotesScreen extends ConsumerStatefulWidget;  // features/trip_detail/trip_notes_screen.dart
 class AccountScreen extends ConsumerWidget;            // features/account/account_screen.dart
 ```

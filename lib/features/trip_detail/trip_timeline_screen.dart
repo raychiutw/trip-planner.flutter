@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
-import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
@@ -24,11 +23,11 @@ import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
-enum _TripMoreAction { map, notes, print, audit, share, collab, health }
+enum _TripMoreAction { editInfo, print, audit, share, collab, health }
 
-/// 行程時間軸畫面：AppBar（trip 名 + 編輯/更多）→ 頂部 day pills →
+/// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
-class TripTimelineScreen extends ConsumerWidget {
+class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
     super.key,
     required this.tripId,
@@ -44,15 +43,22 @@ class TripTimelineScreen extends ConsumerWidget {
   /// 初始聚焦的天數，用於 `/trips/:tripId?day=N` deep link。
   final int? initialDayNum;
 
+  @override
+  ConsumerState<TripTimelineScreen> createState() => _TripTimelineScreenState();
+}
+
+class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
+  var _isEditing = false;
+
   void _goTo(BuildContext context, String location) {
     // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
     GoRouter.maybeOf(context)?.go(location);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tripAsync = ref.watch(tripDetailProvider(tripId));
-    final daysAsync = ref.watch(tripDaysProvider(tripId));
+  Widget build(BuildContext context) {
+    final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
+    final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
@@ -60,55 +66,45 @@ class TripTimelineScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
-          IconButton(
-            tooltip: '編輯行程',
-            icon: const Icon(CupertinoIcons.pencil),
-            onPressed: () => context.push('/edit-trip/$tripId'),
+          TextButton(
+            key: const ValueKey('trip-edit-mode'),
+            onPressed: () => setState(() => _isEditing = !_isEditing),
+            child: Text(_isEditing ? '完成' : '編輯'),
           ),
           PopupMenuButton<_TripMoreAction>(
             key: const ValueKey('trip-actions-menu'),
             tooltip: '更多',
-            icon: const Icon(CupertinoIcons.ellipsis),
+            icon: const Icon(Icons.more_vert),
             onSelected: (action) {
               switch (action) {
-                case _TripMoreAction.map:
-                  _goTo(context, '/trips/$tripId/map');
-                case _TripMoreAction.notes:
-                  _goTo(context, '/trips/$tripId/notes');
+                case _TripMoreAction.editInfo:
+                  context.push('/edit-trip/${widget.tripId}');
                 case _TripMoreAction.print:
-                  _goTo(context, '/trips/$tripId/print');
+                  _goTo(context, '/trips/${widget.tripId}/print');
                 case _TripMoreAction.audit:
-                  _goTo(context, '/trips/$tripId/audit');
+                  _goTo(context, '/trips/${widget.tripId}/audit');
                 case _TripMoreAction.share:
-                  _goTo(context, '/share-trip/$tripId');
+                  _goTo(context, '/share-trip/${widget.tripId}');
                 case _TripMoreAction.collab:
-                  _goTo(context, '/collab/$tripId');
+                  _goTo(context, '/collab/${widget.tripId}');
                 case _TripMoreAction.health:
-                  _goTo(context, '/trips/$tripId/health');
+                  _goTo(context, '/trips/${widget.tripId}/health');
               }
             },
             itemBuilder: (context) => const [
               PopupMenuItem(
-                key: ValueKey('trip-action-map'),
-                value: _TripMoreAction.map,
+                key: ValueKey('trip-action-edit-info'),
+                value: _TripMoreAction.editInfo,
                 child: _TripActionMenuItem(
-                  icon: Icons.map_outlined,
-                  label: '地圖',
-                ),
-              ),
-              PopupMenuItem(
-                key: ValueKey('trip-action-notes'),
-                value: _TripMoreAction.notes,
-                child: _TripActionMenuItem(
-                  icon: Icons.sticky_note_2_outlined,
-                  label: '筆記',
+                  icon: CupertinoIcons.pencil,
+                  label: '行程資料',
                 ),
               ),
               PopupMenuItem(
                 key: ValueKey('trip-action-print'),
                 value: _TripMoreAction.print,
                 child: _TripActionMenuItem(
-                  icon: Icons.print_outlined,
+                  icon: CupertinoIcons.printer,
                   label: '列印',
                 ),
               ),
@@ -120,7 +116,6 @@ class TripTimelineScreen extends ConsumerWidget {
                   label: '異動紀錄',
                 ),
               ),
-              PopupMenuDivider(),
               PopupMenuItem(
                 key: ValueKey('trip-action-share'),
                 value: _TripMoreAction.share,
@@ -152,19 +147,71 @@ class TripTimelineScreen extends ConsumerWidget {
       body: daysAsync.when(
         data: (days) => days.isEmpty
             ? const _EmptyTimeline()
-            : _TimelineBody(
-                days: days,
-                tripId: tripId,
-                initialEntryId: initialEntryId,
-                initialDayNum: initialDayNum,
+            : Column(
+                children: [
+                  _TripSecondaryNavigation(
+                    onMap: () => _goTo(context, '/trips/${widget.tripId}/map'),
+                    onNotes: () =>
+                        _goTo(context, '/trips/${widget.tripId}/notes'),
+                  ),
+                  Expanded(
+                    child: _TimelineBody(
+                      days: days,
+                      tripId: widget.tripId,
+                      initialEntryId: widget.initialEntryId,
+                      initialDayNum: widget.initialDayNum,
+                      isEditing: _isEditing,
+                    ),
+                  ),
+                ],
               ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
           onRetry: () {
-            ref.invalidate(tripDetailProvider(tripId));
-            ref.invalidate(tripDaysProvider(tripId));
+            ref.invalidate(tripDetailProvider(widget.tripId));
+            ref.invalidate(tripDaysProvider(widget.tripId));
           },
         ),
+      ),
+    );
+  }
+}
+
+class _TripSecondaryNavigation extends StatelessWidget {
+  const _TripSecondaryNavigation({required this.onMap, required this.onNotes});
+
+  final VoidCallback onMap;
+  final VoidCallback onNotes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s4,
+        TpSpacing.s2,
+        TpSpacing.s4,
+        TpSpacing.s1,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('trip-secondary-map'),
+              onPressed: onMap,
+              icon: const Icon(CupertinoIcons.map),
+              label: const Text('地圖'),
+            ),
+          ),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('trip-secondary-notes'),
+              onPressed: onNotes,
+              icon: const Icon(CupertinoIcons.doc_text),
+              label: const Text('筆記'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -196,41 +243,33 @@ class _TimelineBody extends StatefulWidget {
     required this.tripId,
     this.initialEntryId,
     this.initialDayNum,
+    required this.isEditing,
   });
 
   final List<TripDay> days;
   final String tripId;
   final int? initialEntryId;
   final int? initialDayNum;
+  final bool isEditing;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _scrollViewportKey = GlobalKey(debugLabel: 'timeline-scroll');
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
   late int _activeDayNum;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_updateActiveDayFromScroll);
     _rebuildKeys();
     _activeDayNum =
         _initialDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
     _scheduleInitialFocusScroll();
-  }
-
-  @override
-  void dispose() {
-    _scrollController
-      ..removeListener(_updateActiveDayFromScroll)
-      ..dispose();
-    super.dispose();
   }
 
   @override
@@ -290,7 +329,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
       if (renderObject is! RenderBox || !renderObject.hasSize) return;
       Scrollable.ensureVisible(
         targetContext,
-        duration: TpMotion.resolve(targetContext, TpMotion.normal),
+        duration: TpMotion.normal,
         curve: TpMotion.appleEase,
       );
     });
@@ -302,41 +341,16 @@ class _TimelineBodyState extends State<_TimelineBody> {
     if (sectionContext != null) {
       Scrollable.ensureVisible(
         sectionContext,
-        duration: TpMotion.resolve(sectionContext, TpMotion.normal),
+        duration: TpMotion.normal,
         curve: TpMotion.appleEase,
       );
     }
   }
 
-  void _updateActiveDayFromScroll() {
-    if (!_scrollController.hasClients || widget.days.isEmpty) return;
-
-    final position = _scrollController.position;
-    var visibleDayNum = widget.days.first.dayNum;
-    if (position.extentAfter <= 1) {
-      visibleDayNum = widget.days.last.dayNum;
-    } else {
-      final viewportBox =
-          _scrollViewportKey.currentContext?.findRenderObject() as RenderBox?;
-      if (viewportBox == null || !viewportBox.hasSize) return;
-      final viewportTop = viewportBox.localToGlobal(Offset.zero).dy;
-      for (final day in widget.days) {
-        final sectionBox =
-            _daySectionKeys[day.dayNum]?.currentContext?.findRenderObject()
-                as RenderBox?;
-        if (sectionBox == null || !sectionBox.hasSize) continue;
-        final sectionTop = sectionBox.localToGlobal(Offset.zero).dy;
-        if (sectionTop <= viewportTop + TpSpacing.s2) {
-          visibleDayNum = day.dayNum;
-        } else {
-          break;
-        }
-      }
-    }
-
-    if (visibleDayNum != _activeDayNum && mounted) {
-      setState(() => _activeDayNum = visibleDayNum);
-    }
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -350,7 +364,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
         ),
         Expanded(
           child: SingleChildScrollView(
-            key: _scrollViewportKey,
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               TpSpacing.s4,
@@ -370,6 +383,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     entryKeys: _entryKeys,
                     focusedEntryId: widget.initialEntryId,
                     scrollController: _scrollController,
+                    isEditing: widget.isEditing,
                   ),
               ],
             ),
@@ -435,6 +449,7 @@ class _DaySection extends ConsumerWidget {
     required this.entryKeys,
     this.focusedEntryId,
     required this.scrollController,
+    required this.isEditing,
   });
 
   final String tripId;
@@ -443,6 +458,7 @@ class _DaySection extends ConsumerWidget {
   final Map<int, GlobalKey> entryKeys;
   final int? focusedEntryId;
   final ScrollController scrollController;
+  final bool isEditing;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -479,7 +495,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        showAppError(context, '排序失敗，請稍後再試');
+        showAppNotice(context, '排序失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -509,7 +525,7 @@ class _DaySection extends ConsumerWidget {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
       if (context.mounted) {
-        showAppError(context, '搬移失敗，請稍後再試');
+        showAppNotice(context, '搬移失敗，請稍後再試');
       }
       ref.invalidate(tripDaysProvider(tripId));
       return;
@@ -604,7 +620,8 @@ class _DaySection extends ConsumerWidget {
 
     return DragTarget<_EntryDragPayload>(
       key: ValueKey('day-drop-${day.id}'),
-      onWillAcceptWithDetails: (details) => details.data.sourceDayId != day.id,
+      onWillAcceptWithDetails: (details) =>
+          isEditing && details.data.sourceDayId != day.id,
       onAcceptWithDetails: (details) {
         unawaited(
           _moveEntryToDay(
@@ -664,62 +681,76 @@ class _DaySection extends ConsumerWidget {
                       tripId: tripId,
                       args: EntryEditExisting(entry),
                     ),
-                    trailing: _EntryTrailing(
-                      entryId: entry.id,
-                      index: i,
-                      onMove: () => _moveToDay(context, ref, entry),
-                    ),
+                    trailing: isEditing
+                        ? _EntryTrailing(
+                            entryId: entry.id,
+                            index: i,
+                            onMove: () => _moveToDay(context, ref, entry),
+                          )
+                        : null,
                   );
-                  final draggableTile = LongPressDraggable<_EntryDragPayload>(
-                    key: ValueKey('entry-cross-drag-${entry.id}'),
-                    data: _EntryDragPayload(
-                      entry: entry,
-                      sourceDayId: day.id,
-                      sourceDayNum: day.dayNum,
-                    ),
-                    dragAnchorStrategy: pointerDragAnchorStrategy,
-                    onDragStarted: _captureDragScroll,
-                    onDragUpdate: (details) =>
-                        _autoScrollDuringDrag(context, details.globalPosition),
-                    onDragEnd: (_) => _restoreDragScroll(),
-                    onDraggableCanceled: (velocity, offset) =>
-                        _restoreDragScroll(),
-                    onDragCompleted: _restoreDragScroll,
-                    feedback: Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(TpRadius.md),
-                      child: Padding(
-                        padding: const EdgeInsets.all(TpSpacing.s3),
-                        child: Text(entry.title),
-                      ),
-                    ),
-                    childWhenDragging: Opacity(opacity: 0.35, child: tile),
-                    child: tile,
-                  );
-                  final row = SwipeToDelete(
-                    dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                    onDelete: () => _confirmDelete(context, ref, entry),
-                    child: draggableTile,
-                  );
-                  final dropRow = DragTarget<_EntryDragPayload>(
-                    key: ValueKey('entry-drop-${entry.id}'),
-                    onWillAcceptWithDetails: (details) =>
-                        details.data.sourceDayId != day.id,
-                    onAcceptWithDetails: (details) {
-                      unawaited(
-                        _moveEntryToDay(
-                          context,
-                          ref,
-                          entry: details.data.entry,
-                          sourceDayId: details.data.sourceDayId,
-                          sourceDayNum: details.data.sourceDayNum,
-                          target: day,
-                          targetEntryId: entry.id,
-                        ),
-                      );
-                    },
-                    builder: (context, candidateData, rejectedData) => row,
-                  );
+                  final draggableTile = isEditing
+                      ? LongPressDraggable<_EntryDragPayload>(
+                          key: ValueKey('entry-cross-drag-${entry.id}'),
+                          data: _EntryDragPayload(
+                            entry: entry,
+                            sourceDayId: day.id,
+                            sourceDayNum: day.dayNum,
+                          ),
+                          dragAnchorStrategy: pointerDragAnchorStrategy,
+                          onDragStarted: _captureDragScroll,
+                          onDragUpdate: (details) => _autoScrollDuringDrag(
+                            context,
+                            details.globalPosition,
+                          ),
+                          onDragEnd: (_) => _restoreDragScroll(),
+                          onDraggableCanceled: (velocity, offset) =>
+                              _restoreDragScroll(),
+                          onDragCompleted: _restoreDragScroll,
+                          feedback: Material(
+                            elevation: 4,
+                            borderRadius: BorderRadius.circular(TpRadius.md),
+                            child: Padding(
+                              padding: const EdgeInsets.all(TpSpacing.s3),
+                              child: Text(entry.title),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(
+                            opacity: 0.35,
+                            child: tile,
+                          ),
+                          child: tile,
+                        )
+                      : tile;
+                  final row = isEditing
+                      ? SwipeToDelete(
+                          dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                          onDelete: () => _confirmDelete(context, ref, entry),
+                          child: draggableTile,
+                        )
+                      : draggableTile;
+                  final dropRow = isEditing
+                      ? DragTarget<_EntryDragPayload>(
+                          key: ValueKey('entry-drop-${entry.id}'),
+                          onWillAcceptWithDetails: (details) =>
+                              details.data.sourceDayId != day.id,
+                          onAcceptWithDetails: (details) {
+                            unawaited(
+                              _moveEntryToDay(
+                                context,
+                                ref,
+                                entry: details.data.entry,
+                                sourceDayId: details.data.sourceDayId,
+                                sourceDayNum: details.data.sourceDayNum,
+                                target: day,
+                                targetEntryId: entry.id,
+                              ),
+                            );
+                          },
+                          builder: (context, candidateData, rejectedData) =>
+                              row,
+                        )
+                      : row;
                   return Container(
                     key: entryKeys[entry.id],
                     child: Column(

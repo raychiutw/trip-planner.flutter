@@ -1,17 +1,18 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'dart:async';
 
-/// 地圖套件無關的座標值物件。
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+/// 地圖 SDK 無關的座標值物件。
 class TripMapPoint {
   const TripMapPoint(this.latitude, this.longitude);
 
   final double latitude;
   final double longitude;
 
-  LatLng toLatLng() => LatLng(latitude, longitude);
+  LatLng toGoogleLatLng() => LatLng(latitude, longitude);
 
-  static TripMapPoint fromLatLng(LatLng point) {
+  static TripMapPoint fromGoogleLatLng(LatLng point) {
     return TripMapPoint(point.latitude, point.longitude);
   }
 
@@ -32,43 +33,40 @@ class TripMapTilePreset {
   const TripMapTilePreset({
     required this.style,
     required this.label,
-    required this.urlTemplate,
-    required this.attribution,
+    required this.mapType,
   });
 
   final TripMapTileStyle style;
   final String label;
-  final String urlTemplate;
-  final String attribution;
+  final MapType mapType;
 }
 
 const List<TripMapTilePreset> kTripMapTilePresets = [
   TripMapTilePreset(
     style: TripMapTileStyle.roadmap,
     label: '路線圖',
-    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: 'OpenStreetMap contributors',
+    mapType: MapType.normal,
   ),
   TripMapTilePreset(
     style: TripMapTileStyle.terrain,
     label: '地形',
-    urlTemplate: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: 'OpenTopoMap, OpenStreetMap contributors',
+    mapType: MapType.terrain,
   ),
   TripMapTilePreset(
     style: TripMapTileStyle.satellite,
     label: '衛星',
-    urlTemplate:
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Esri, OpenStreetMap contributors',
+    mapType: MapType.hybrid,
   ),
 ];
 
-typedef TripMapTileProvider = TileProvider;
 typedef TripMapTapCallback = void Function(TripMapPoint point);
+typedef TripMapCanvasBuilder = Widget Function(TripMapCanvasConfig config);
+
+const _tripClusterManagerId = ClusterManagerId('trip-stops');
 
 class TripMapRoute {
   const TripMapRoute({
+    required this.id,
     required this.points,
     required this.color,
     required this.strokeWidth,
@@ -76,6 +74,7 @@ class TripMapRoute {
     this.borderStrokeWidth = 0,
   });
 
+  final String id;
   final List<TripMapPoint> points;
   final Color color;
   final double strokeWidth;
@@ -85,50 +84,101 @@ class TripMapRoute {
 
 class TripMapMarker {
   const TripMapMarker({
+    required this.id,
     required this.point,
-    required this.width,
-    required this.height,
-    required this.child,
+    required this.color,
+    this.title,
+    this.snippet,
+    this.onTap,
+    this.zIndex = 0,
+    this.clusterable = true,
+    this.glyph,
   });
 
+  final String id;
   final TripMapPoint point;
-  final double width;
-  final double height;
-  final Widget child;
+  final Color color;
+  final String? title;
+  final String? snippet;
+  final VoidCallback? onTap;
+  final int zIndex;
+  final bool clusterable;
+  final String? glyph;
 }
 
-class FlutterTripMapController {
-  final MapController _controller = MapController();
+class GoogleTripMapController {
+  GoogleMapController? _controller;
 
-  void fitPoints(
+  void attach(GoogleMapController controller) {
+    _controller?.dispose();
+    _controller = controller;
+  }
+
+  Future<void> fitPoints(
     List<TripMapPoint> points, {
     required EdgeInsets padding,
     double? maxZoom,
-  }) {
-    if (points.isEmpty) return;
-    _controller.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints([
-          for (final point in points) point.toLatLng(),
-        ]),
-        padding: padding,
-        maxZoom: maxZoom,
-      ),
+  }) async {
+    final controller = _controller;
+    if (controller == null || points.isEmpty) return;
+    if (points.length == 1) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          points.single.toGoogleLatLng(),
+          maxZoom ?? 16,
+        ),
+      );
+      return;
+    }
+    final bounds = _boundsFor(points);
+    final edgePadding = [
+      padding.left,
+      padding.top,
+      padding.right,
+      padding.bottom,
+    ].reduce((a, b) => a > b ? a : b);
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, edgePadding),
+    );
+    if (maxZoom != null) {
+      final zoom = await controller.getZoomLevel();
+      if (zoom > maxZoom) {
+        await controller.animateCamera(CameraUpdate.zoomTo(maxZoom));
+      }
+    }
+  }
+
+  Future<void> move(TripMapPoint point, double zoom) async {
+    await _controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(point.toGoogleLatLng(), zoom),
     );
   }
 
-  void move(TripMapPoint point, double zoom) {
-    _controller.move(point.toLatLng(), zoom);
+  void dispose() {
+    _controller?.dispose();
+    _controller = null;
   }
 
-  void dispose() {
-    _controller.dispose();
+  LatLngBounds _boundsFor(List<TripMapPoint> points) {
+    var minLat = points.first.latitude;
+    var maxLat = points.first.latitude;
+    var minLng = points.first.longitude;
+    var maxLng = points.first.longitude;
+    for (final point in points.skip(1)) {
+      minLat = point.latitude < minLat ? point.latitude : minLat;
+      maxLat = point.latitude > maxLat ? point.latitude : maxLat;
+      minLng = point.longitude < minLng ? point.longitude : minLng;
+      maxLng = point.longitude > maxLng ? point.longitude : maxLng;
+    }
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
   }
 }
 
-class FlutterMapCanvas extends StatelessWidget {
-  const FlutterMapCanvas({
-    super.key,
+class TripMapCanvasConfig {
+  const TripMapCanvasConfig({
     required this.controller,
     required this.tilePreset,
     required this.initialFitPoints,
@@ -136,100 +186,125 @@ class FlutterMapCanvas extends StatelessWidget {
     this.initialZoom = 14,
     this.initialPadding = const EdgeInsets.all(32),
     this.initialMaxZoom,
-    this.tileProvider,
     this.routes = const [],
     this.markers = const [],
+    this.clusterMarkers = false,
     this.onMapReady,
     this.onTap,
-    this.tileLayerKey = const ValueKey('trip-map-canvas-tile-layer'),
-    this.routeLayerKey = const ValueKey('trip-map-canvas-routes'),
+    this.mapKey = const ValueKey('google-trip-map-canvas'),
   });
 
-  final FlutterTripMapController controller;
+  final GoogleTripMapController controller;
   final TripMapTilePreset tilePreset;
   final List<TripMapPoint> initialFitPoints;
   final TripMapPoint? initialCenter;
   final double initialZoom;
   final EdgeInsets initialPadding;
   final double? initialMaxZoom;
-  final TripMapTileProvider? tileProvider;
   final List<TripMapRoute> routes;
   final List<TripMapMarker> markers;
+  final bool clusterMarkers;
   final VoidCallback? onMapReady;
   final TripMapTapCallback? onTap;
-  final Key tileLayerKey;
-  final Key routeLayerKey;
+  final Key mapKey;
+}
+
+Widget buildTripMapCanvas(
+  TripMapCanvasConfig config, {
+  TripMapCanvasBuilder? builder,
+}) {
+  return builder?.call(config) ?? GoogleTripMapCanvas(config: config);
+}
+
+class GoogleTripMapCanvas extends StatelessWidget {
+  const GoogleTripMapCanvas({super.key, required this.config});
+
+  final TripMapCanvasConfig config;
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: controller._controller,
-      options: _mapOptions(),
-      children: [
-        TileLayer(
-          key: tileLayerKey,
-          urlTemplate: tilePreset.urlTemplate,
-          userAgentPackageName: 'com.raychiu.tripline',
-          tileProvider: tileProvider,
-        ),
-        if (routes.isNotEmpty)
-          PolylineLayer<Object>(
-            key: routeLayerKey,
-            polylines: [
-              for (final route in routes)
-                Polyline<Object>(
-                  points: [for (final point in route.points) point.toLatLng()],
-                  color: route.color,
-                  strokeWidth: route.strokeWidth,
-                  borderColor: route.borderColor ?? Colors.transparent,
-                  borderStrokeWidth: route.borderStrokeWidth,
-                ),
-            ],
-          ),
-        MarkerLayer(
-          markers: [
-            for (final marker in markers)
-              Marker(
-                point: marker.point.toLatLng(),
-                width: marker.width,
-                height: marker.height,
-                child: marker.child,
-              ),
-          ],
-        ),
-        RichAttributionWidget(
-          attributions: [TextSourceAttribution(tilePreset.attribution)],
-        ),
-      ],
-    );
-  }
-
-  MapOptions _mapOptions() {
-    final onTapCallback = onTap;
-    final fitPoints = initialFitPoints;
-    if (fitPoints.isNotEmpty) {
-      return MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints([
-            for (final point in fitPoints) point.toLatLng(),
-          ]),
-          padding: initialPadding,
-          maxZoom: initialMaxZoom,
-        ),
-        onMapReady: onMapReady,
-        onTap: onTapCallback == null
-            ? null
-            : (_, point) => onTapCallback(TripMapPoint.fromLatLng(point)),
-      );
-    }
-
-    return MapOptions(
-      initialCenter: initialCenter?.toLatLng() ?? const LatLng(0, 0),
-      initialZoom: initialZoom,
-      onMapReady: onMapReady,
-      onTap: onTapCallback == null
+    final initialTarget =
+        config.initialCenter ??
+        (config.initialFitPoints.isEmpty
+            ? const TripMapPoint(25.033, 121.5654)
+            : config.initialFitPoints.first);
+    return GoogleMap(
+      key: config.mapKey,
+      initialCameraPosition: CameraPosition(
+        target: initialTarget.toGoogleLatLng(),
+        zoom: config.initialZoom,
+      ),
+      mapType: config.tilePreset.mapType,
+      compassEnabled: true,
+      mapToolbarEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      padding: config.initialPadding,
+      onTap: config.onTap == null
           ? null
-          : (_, point) => onTapCallback(TripMapPoint.fromLatLng(point)),
+          : (point) => config.onTap!(TripMapPoint.fromGoogleLatLng(point)),
+      onMapCreated: (controller) {
+        config.controller.attach(controller);
+        unawaited(
+          config.controller.fitPoints(
+            config.initialFitPoints,
+            padding: config.initialPadding,
+            maxZoom: config.initialMaxZoom,
+          ),
+        );
+        config.onMapReady?.call();
+      },
+      clusterManagers: config.clusterMarkers
+          ? {const ClusterManager(clusterManagerId: _tripClusterManagerId)}
+          : const <ClusterManager>{},
+      markers: {
+        for (final marker in config.markers)
+          Marker(
+            markerId: MarkerId(marker.id),
+            position: marker.point.toGoogleLatLng(),
+            consumeTapEvents: marker.onTap != null,
+            onTap: marker.onTap,
+            zIndexInt: marker.zIndex,
+            clusterManagerId: config.clusterMarkers && marker.clusterable
+                ? _tripClusterManagerId
+                : null,
+            icon: marker.glyph == null
+                ? BitmapDescriptor.defaultMarkerWithHue(
+                    HSVColor.fromColor(marker.color).hue,
+                  )
+                : BitmapDescriptor.pinConfig(
+                    backgroundColor: marker.color,
+                    glyph: TextGlyph(
+                      text: marker.glyph!,
+                      textColor: Colors.white,
+                    ),
+                  ),
+            infoWindow: marker.title == null && marker.snippet == null
+                ? InfoWindow.noText
+                : InfoWindow(title: marker.title, snippet: marker.snippet),
+          ),
+      },
+      polylines: {
+        for (final route in config.routes) ...{
+          if (route.borderColor != null && route.borderStrokeWidth > 0)
+            Polyline(
+              polylineId: PolylineId('${route.id}-border'),
+              points: [
+                for (final point in route.points) point.toGoogleLatLng(),
+              ],
+              color: route.borderColor!,
+              width: (route.strokeWidth + route.borderStrokeWidth * 2).round(),
+              zIndex: 0,
+            ),
+          Polyline(
+            polylineId: PolylineId(route.id),
+            points: [for (final point in route.points) point.toGoogleLatLng()],
+            color: route.color,
+            width: route.strokeWidth.round(),
+            zIndex: 1,
+          ),
+        },
+      },
     );
   }
 }

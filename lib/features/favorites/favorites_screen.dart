@@ -5,9 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
-import '../../app/adaptive_content.dart';
-import '../../app/app_feedback.dart';
-import '../../app/app_loading_skeleton.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
@@ -22,6 +19,9 @@ const _typeFilterOptions = [
   _TypeFilterOption(key: 'shopping', label: '購物'),
   _TypeFilterOption(key: 'hotel', label: '住宿'),
 ];
+
+const _favoritesPageSize = 24;
+const _favoritesPaginationThreshold = 200;
 
 final _regionRules = [
   MapEntry(RegExp('沖縄|沖繩', caseSensitive: false), '沖繩'),
@@ -47,8 +47,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _typeFilter = 'all';
   String _regionFilter = 'all';
   Set<int> _selectedIds = {};
-  bool _selectionMode = false;
   bool _deletingSelected = false;
+  int _page = 1;
 
   @override
   void dispose() {
@@ -61,64 +61,48 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
-      body: AppAdaptiveContent(
-        maxWidth: AppContentWidth.feed,
-        contentKey: const ValueKey('favorites-content'),
-        child: RefreshIndicator.adaptive(
-          onRefresh: () => ref.refresh(favoritesProvider.future),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverAppBar.large(
-                pinned: true,
-                title: const Text('收藏'),
-                actions: [
-                  if (favoritesAsync.value?.isNotEmpty ?? false)
-                    TextButton(
-                      key: const ValueKey('favorites-select-mode'),
-                      onPressed: _deletingSelected
-                          ? null
-                          : _selectionMode
-                          ? _exitSelectionMode
-                          : () => setState(() => _selectionMode = true),
-                      child: Text(_selectionMode ? '完成' : '選取'),
-                    ),
-                  IconButton(
-                    key: const ValueKey('favorites-explore-action'),
-                    tooltip: '探索',
-                    icon: const Icon(CupertinoIcons.search),
-                    onPressed: () => context.go('/favorites/explore'),
+      body: RefreshIndicator.adaptive(
+        onRefresh: () => ref.refresh(favoritesProvider.future),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar.large(
+              pinned: true,
+              title: const Text('收藏'),
+              actions: [
+                IconButton(
+                  key: const ValueKey('favorites-explore-action'),
+                  tooltip: '探索',
+                  icon: const Icon(CupertinoIcons.search),
+                  onPressed: () => context.go('/favorites/explore'),
+                ),
+              ],
+            ),
+            ...favoritesAsync.when(
+              data: (favorites) => favorites.isEmpty
+                  ? [
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyHero(),
+                      ),
+                    ]
+                  : _buildListSlivers(context, ref, favorites),
+              error: (error, stackTrace) => [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _ErrorState(
+                    onRetry: () => ref.invalidate(favoritesProvider),
                   ),
-                ],
-              ),
-              ...favoritesAsync.when(
-                data: (favorites) => favorites.isEmpty
-                    ? [
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _EmptyHero(),
-                        ),
-                      ]
-                    : _buildListSlivers(context, ref, favorites),
-                error: (error, stackTrace) => [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _ErrorState(
-                      onRetry: () => ref.invalidate(favoritesProvider),
-                    ),
-                  ),
-                ],
-                loading: () => const [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: AppListLoadingSkeleton(
-                      key: ValueKey('favorites-loading-skeleton'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+              loading: () => const [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator.adaptive()),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -137,90 +121,291 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     );
     final regionCounts = _regionCountsFor(favorites);
     final regionOptions = _regionOptionsFor(regionCounts);
-
-    final controls = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SearchField(
-          controller: _searchController,
-          onChanged: (value) => setState(() => _searchQuery = value),
-          onClear: _searchQuery.trim().isEmpty ? null : _clearSearch,
-        ),
-        const SizedBox(height: TpSpacing.s3),
-        if (regionOptions.length >= 2) ...[
-          _RegionFilterRow(
-            selected: _regionFilter,
-            counts: regionCounts,
-            options: regionOptions,
-            onSelected: (value) => setState(() => _regionFilter = value),
-          ),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-        _TypeFilterRow(
-          selected: _typeFilter,
-          onSelected: (value) => setState(() => _typeFilter = value),
-        ),
-        const SizedBox(height: TpSpacing.s3),
-        if (_selectionMode) ...[
-          _BulkToolbar(
-            selectedCount: _selectedIds.length,
-            deleting: _deletingSelected,
-            onSelectAll: () => _selectAllVisible(filteredFavorites),
-            onClear: _clearSelection,
-            onDelete: _confirmDeleteSelected,
-          ),
-          const SizedBox(height: TpSpacing.s3),
-        ],
-      ],
-    );
+    final usePagination = favorites.length >= _favoritesPaginationThreshold;
+    final totalPages = usePagination && filteredFavorites.isNotEmpty
+        ? (filteredFavorites.length / _favoritesPageSize).ceil()
+        : 1;
+    final page = _page.clamp(1, totalPages).toInt();
+    if (page != _page) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _page = page);
+      });
+    }
+    final visibleFavorites = usePagination
+        ? filteredFavorites
+              .skip((page - 1) * _favoritesPageSize)
+              .take(_favoritesPageSize)
+              .toList()
+        : filteredFavorites;
 
     return [
       SliverPadding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        sliver: SliverList.builder(
-          itemCount: filteredFavorites.isEmpty
-              ? 2
-              : filteredFavorites.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) return controls;
-            if (filteredFavorites.isEmpty) {
-              return _NoSearchResult(onClear: _clearAllFilters);
-            }
-
-            final favorite = filteredFavorites[index - 1];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: PoiFavoriteCard(
-                favorite: favorite,
-                selected: _selectedIds.contains(favorite.id),
-                onSelectedChanged: !_selectionMode || _deletingSelected
-                    ? null
-                    : (_) => _toggleFavoriteSelection(favorite.id),
-                onRemove: _selectionMode
-                    ? null
-                    : () => _confirmRemove(context, ref, favorite),
-                onAddToTrip: _selectionMode
-                    ? null
-                    : () => context.go(
-                        '/favorites/add-to-trip',
-                        extra: AddToTripFavorite(
-                          favoriteId: favorite.id,
-                          displayName: favorite.displayName,
-                        ),
-                      ),
+        padding: const EdgeInsets.fromLTRB(
+          TpSpacing.s4,
+          TpSpacing.s3,
+          TpSpacing.s4,
+          112,
+        ),
+        sliver: SliverList(
+          delegate: SliverChildListDelegate([
+            Row(
+              children: [
+                Expanded(
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('favorites-search-input'),
+                    controller: _searchController,
+                    placeholder: '搜尋收藏',
+                    onChanged: (value) => setState(() {
+                      _searchQuery = value;
+                      _page = 1;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: TpSpacing.s2),
+                IconButton.filledTonal(
+                  key: const ValueKey('favorites-filter-button'),
+                  tooltip: '篩選',
+                  icon: Icon(
+                    _hasActiveFilters
+                        ? CupertinoIcons.line_horizontal_3_decrease_circle_fill
+                        : CupertinoIcons.line_horizontal_3_decrease_circle,
+                  ),
+                  onPressed: () => _openFilters(regionCounts, regionOptions),
+                ),
+              ],
+            ),
+            if (_hasActiveFilters) ...[
+              const SizedBox(height: TpSpacing.s2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _activeFilterSummary,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ),
-            );
-          },
+            ],
+            const SizedBox(height: TpSpacing.s3),
+            if (_selectedIds.isNotEmpty) ...[
+              _BulkToolbar(
+                selectedCount: _selectedIds.length,
+                deleting: _deletingSelected,
+                onSelectAll: () => _selectAllVisible(visibleFavorites),
+                onClear: _clearSelection,
+                onDelete: _confirmDeleteSelected,
+              ),
+              const SizedBox(height: TpSpacing.s3),
+            ],
+            if (filteredFavorites.isEmpty)
+              _NoSearchResult(onClear: _clearAllFilters)
+            else
+              for (final favorite in visibleFavorites) ...[
+                PoiFavoriteCard(
+                  favorite: favorite,
+                  selected: _selectedIds.contains(favorite.id),
+                  selectionMode: _selectedIds.isNotEmpty,
+                  onSelectedChanged: _deletingSelected
+                      ? null
+                      : (_) => _toggleFavoriteSelection(favorite.id),
+                  onRemove: () => _confirmRemove(context, ref, favorite),
+                  onLongPress: () =>
+                      _showFavoriteActions(context, ref, favorite),
+                ),
+                const SizedBox(height: TpSpacing.s3),
+              ],
+            if (usePagination && filteredFavorites.isNotEmpty)
+              _PaginationControls(
+                page: page,
+                totalPages: totalPages,
+                start: (page - 1) * _favoritesPageSize + 1,
+                end: (page - 1) * _favoritesPageSize + visibleFavorites.length,
+                total: filteredFavorites.length,
+                onPrevious: page <= 1
+                    ? null
+                    : () => setState(() => _page = page - 1),
+                onNext: page >= totalPages
+                    ? null
+                    : () => setState(() => _page = page + 1),
+              ),
+          ]),
         ),
       ),
     ];
   }
 
-  void _clearSearch() {
-    _searchController.clear();
-    setState(() {
-      _searchQuery = '';
-    });
+  bool get _hasActiveFilters => _typeFilter != 'all' || _regionFilter != 'all';
+
+  String get _activeFilterSummary {
+    final labels = <String>[];
+    if (_typeFilter != 'all') {
+      labels.add(
+        _typeFilterOptions
+            .firstWhere((option) => option.key == _typeFilter)
+            .label,
+      );
+    }
+    if (_regionFilter != 'all') labels.add(_regionFilter);
+    return '已篩選：${labels.join(' · ')}';
+  }
+
+  Future<void> _openFilters(
+    Map<String, int> regionCounts,
+    List<String> regionOptions,
+  ) async {
+    var pendingType = _typeFilter;
+    var pendingRegion = _regionFilter;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                TpSpacing.s4,
+                0,
+                TpSpacing.s4,
+                MediaQuery.viewInsetsOf(context).bottom + TpSpacing.s4,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('篩選收藏', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: TpSpacing.s4),
+                    Text('類型', style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: TpSpacing.s2),
+                    Wrap(
+                      spacing: TpSpacing.s2,
+                      runSpacing: TpSpacing.s2,
+                      children: [
+                        for (final option in _typeFilterOptions)
+                          FilterChip(
+                            key: ValueKey('favorites-type-${option.key}'),
+                            label: Text(option.label),
+                            selected: pendingType == option.key,
+                            onSelected: (_) =>
+                                setSheetState(() => pendingType = option.key),
+                          ),
+                      ],
+                    ),
+                    if (regionOptions.isNotEmpty) ...[
+                      const SizedBox(height: TpSpacing.s5),
+                      Text('地區', style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(height: TpSpacing.s2),
+                      Wrap(
+                        spacing: TpSpacing.s2,
+                        runSpacing: TpSpacing.s2,
+                        children: [
+                          FilterChip(
+                            key: const ValueKey('favorites-region-all'),
+                            label: Text('全部 ${regionCounts['all'] ?? 0}'),
+                            selected: pendingRegion == 'all',
+                            onSelected: (_) =>
+                                setSheetState(() => pendingRegion = 'all'),
+                          ),
+                          for (final region in regionOptions)
+                            FilterChip(
+                              key: ValueKey('favorites-region-$region'),
+                              label: Text(
+                                '$region ${regionCounts[region] ?? 0}',
+                              ),
+                              selected: pendingRegion == region,
+                              onSelected: (_) =>
+                                  setSheetState(() => pendingRegion = region),
+                            ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: TpSpacing.s5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            key: const ValueKey('favorites-filter-reset'),
+                            onPressed: () => setSheetState(() {
+                              pendingType = 'all';
+                              pendingRegion = 'all';
+                            }),
+                            child: const Text('重設'),
+                          ),
+                        ),
+                        const SizedBox(width: TpSpacing.s3),
+                        Expanded(
+                          child: FilledButton(
+                            key: const ValueKey('favorites-filter-apply'),
+                            onPressed: () {
+                              setState(() {
+                                _typeFilter = pendingType;
+                                _regionFilter = pendingRegion;
+                                _page = 1;
+                              });
+                              Navigator.of(sheetContext).pop();
+                            },
+                            child: const Text('套用'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showFavoriteActions(
+    BuildContext context,
+    WidgetRef ref,
+    PoiFavorite favorite,
+  ) async {
+    final action = await showAppActionSheet<_FavoriteContextAction>(
+      context,
+      actions: const [
+        AppSheetAction(
+          label: '加入行程',
+          value: _FavoriteContextAction.addToTrip,
+          icon: CupertinoIcons.calendar_badge_plus,
+        ),
+        AppSheetAction(
+          label: '選取',
+          value: _FavoriteContextAction.select,
+          icon: CupertinoIcons.check_mark_circled,
+        ),
+        AppSheetAction(
+          label: '取消收藏',
+          value: _FavoriteContextAction.remove,
+          icon: CupertinoIcons.heart_slash,
+          isDestructive: true,
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case _FavoriteContextAction.addToTrip:
+        context.go(
+          '/favorites/add-to-trip',
+          extra: AddToTripFavorite(
+            favoriteId: favorite.id,
+            displayName: favorite.displayName,
+          ),
+        );
+        return;
+      case _FavoriteContextAction.select:
+        _toggleFavoriteSelection(favorite.id);
+        return;
+      case _FavoriteContextAction.remove:
+        await _confirmRemove(context, ref, favorite);
+        return;
+      case null:
+        return;
+    }
   }
 
   void _clearAllFilters() {
@@ -230,14 +415,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       _typeFilter = 'all';
       _regionFilter = 'all';
       _selectedIds = {};
-      _selectionMode = false;
-    });
-  }
-
-  void _exitSelectionMode() {
-    setState(() {
-      _selectionMode = false;
-      _selectedIds = {};
+      _page = 1;
     });
   }
 
@@ -267,15 +445,24 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
 
-    final confirmed = await showAppConfirm(
-      context,
-      title: '確定刪除收藏？',
-      message: '即將刪除 ${ids.length} 個收藏景點，此操作無法復原。',
-      confirmLabel: '刪除',
-      cancelLabel: '保留',
-      isDestructive: true,
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('確定刪除收藏？'),
+        content: Text('即將刪除 ${ids.length} 個收藏景點，此操作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('保留'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('刪除'),
+          ),
+        ],
+      ),
     );
-    if (!confirmed || !mounted) return;
+    if (confirmed != true || !mounted) return;
 
     setState(() => _deletingSelected = true);
     final repository = ref.read(favoritesRepositoryProvider);
@@ -293,7 +480,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     if (!mounted) return;
     setState(() {
       _selectedIds = {};
-      _selectionMode = false;
       _deletingSelected = false;
     });
 
@@ -302,11 +488,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         : failed < ids.length
         ? '已刪除 ${ids.length - failed} 個，$failed 個失敗'
         : '刪除失敗，請稍後再試';
-    if (failed == 0) {
-      showAppNotice(context, message);
-    } else {
-      showAppError(context, message);
-    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmRemove(
@@ -330,7 +514,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       HapticFeedback.selectionClick();
     } on Exception {
       if (!context.mounted) return;
-      showAppError(context, '取消收藏失敗，請稍後再試');
+      showAppNotice(context, '取消收藏失敗，請稍後再試');
     }
   }
 }
@@ -397,102 +581,7 @@ class _TypeFilterOption {
   final String label;
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      key: const ValueKey('favorites-search-input'),
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: '搜尋收藏',
-        hintText: '名稱 / 地址 / 備註',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: onClear == null
-            ? null
-            : IconButton(
-                key: const ValueKey('favorites-search-clear'),
-                tooltip: '清除搜尋',
-                icon: const Icon(Icons.close),
-                onPressed: onClear,
-              ),
-        border: const OutlineInputBorder(),
-      ),
-      textInputAction: TextInputAction.search,
-      onChanged: onChanged,
-    );
-  }
-}
-
-class _TypeFilterRow extends StatelessWidget {
-  const _TypeFilterRow({required this.selected, required this.onSelected});
-
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: TpSpacing.s2,
-      runSpacing: TpSpacing.s2,
-      children: [
-        for (final option in _typeFilterOptions)
-          FilterChip(
-            key: ValueKey('favorites-type-${option.key}'),
-            label: Text(option.label),
-            selected: selected == option.key,
-            onSelected: (_) => onSelected(option.key),
-          ),
-      ],
-    );
-  }
-}
-
-class _RegionFilterRow extends StatelessWidget {
-  const _RegionFilterRow({
-    required this.selected,
-    required this.counts,
-    required this.options,
-    required this.onSelected,
-  });
-
-  final String selected;
-  final Map<String, int> counts;
-  final List<String> options;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: TpSpacing.s2,
-      runSpacing: TpSpacing.s2,
-      children: [
-        FilterChip(
-          key: const ValueKey('favorites-region-all'),
-          label: Text('全部 ${counts['all'] ?? 0}'),
-          selected: selected == 'all',
-          onSelected: (_) => onSelected('all'),
-        ),
-        for (final region in options)
-          FilterChip(
-            key: ValueKey('favorites-region-$region'),
-            label: Text('$region ${counts[region] ?? 0}'),
-            selected: selected == region,
-            onSelected: (_) => onSelected(region),
-          ),
-      ],
-    );
-  }
-}
+enum _FavoriteContextAction { addToTrip, select, remove }
 
 class _BulkToolbar extends StatelessWidget {
   const _BulkToolbar({
@@ -541,7 +630,7 @@ class _BulkToolbar extends StatelessWidget {
             ),
             FilledButton.tonalIcon(
               key: const ValueKey('favorites-delete-selected'),
-              onPressed: deleting || selectedCount == 0 ? null : onDelete,
+              onPressed: deleting ? null : onDelete,
               icon: deleting
                   ? const SizedBox.square(
                       dimension: 16,
@@ -552,6 +641,59 @@ class _BulkToolbar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PaginationControls extends StatelessWidget {
+  const _PaginationControls({
+    required this.page,
+    required this.totalPages,
+    required this.start,
+    required this.end,
+    required this.total,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int page;
+  final int totalPages;
+  final int start;
+  final int end;
+  final int total;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey('favorites-pagination'),
+      padding: const EdgeInsets.only(top: TpSpacing.s2),
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('favorites-page-prev'),
+            tooltip: '上一頁',
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$start-$end / $total'),
+                Text('第 $page / $totalPages 頁'),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('favorites-page-next'),
+            tooltip: '下一頁',
+            onPressed: onNext,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
       ),
     );
   }

@@ -97,9 +97,9 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 1. 通用解析規則(num 轉型、0/1 bool、list 預設)集中文件化於 [Models 參考](reference-models.md#通用解析規則),所有 model 一致
 2. 每個 model 都有 fromJson 測試(fixture 對齊後端實際輸出)
 
-## 為什麼 flutter_map(OSM)而不是 google_maps_flutter
+## 為什麼使用 google_maps_flutter
 
-免 API key、零帳務設定,個人專案的維運成本最低。已知取捨:OSM tile 風格較陽春、無 Google POI 資料。`TripMapScreen` 與 `GlobalMapScreen` 都透過 `features/map/map_adapter.dart` 集中 SDK 轉接；日後替換 google_maps_flutter 時，平台地圖差異留在 adapter，而不是散進兩個畫面。
+Flutter 與 Web 共用 Google 路線與地點語意，iOS／Android 直接使用原生 Google Maps SDK。`features/map/map_adapter.dart` 把 SDK 型別限制在 adapter 內，畫面只使用 Tripline 的 marker／route view model；路線由既有 `/route` API 回傳，失敗時保留 marker 而不畫誤導性的直線。兩平台金鑰分離，從未追蹤的本機設定或 CI environment 注入。
 
 ## OCC(樂觀並行控制)
 

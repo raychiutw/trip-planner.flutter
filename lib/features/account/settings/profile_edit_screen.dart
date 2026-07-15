@@ -19,6 +19,7 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String? _draft; // 首次有 user 資料時 seed
+  String? _initialName;
   bool _saving = false;
   String? _error;
 
@@ -33,7 +34,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           .updateProfile(displayName: (_draft ?? '').trim());
       ref.invalidate(authStateProvider);
       HapticFeedback.lightImpact();
-      if (mounted && context.canPop()) context.pop();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已更新個人資料')));
+        if (context.canPop()) context.pop();
+      }
     } on Exception {
       if (mounted) setState(() => _error = '儲存失敗,請稍後再試');
     } finally {
@@ -59,7 +65,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Widget _form(BuildContext context, String currentName) {
+    _initialName ??= currentName;
     _draft ??= currentName;
+    final hasChanges = _draft!.trim() != _initialName!.trim();
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
@@ -70,7 +78,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             labelText: '顯示名稱',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) => _draft = v,
+          onChanged: (value) => setState(() => _draft = value),
         ),
         const SizedBox(height: TpSpacing.s4),
         if (_error != null)
@@ -83,12 +91,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
         FilledButton(
           key: const ValueKey('profile-save'),
-          onPressed: _saving ? null : _save,
+          onPressed: _saving || !hasChanges ? null : _save,
           child: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+              ? const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    ),
+                    SizedBox(width: TpSpacing.s2),
+                    Text('儲存'),
+                  ],
                 )
               : const Text('儲存'),
         ),

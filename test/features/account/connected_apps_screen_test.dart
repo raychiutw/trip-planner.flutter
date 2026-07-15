@@ -48,14 +48,17 @@ void main() {
     ).thenAnswer((_) async {});
   });
 
-  testWidgets('列出已授權 app 與 scopes', (tester) async {
+  testWidgets('列出已授權 app、使用者可理解的權限與日期', (tester) async {
     await pumpScreen(tester);
 
     expect(find.text('已連結的應用程式'), findsOneWidget);
     expect(find.text('Alpha App'), findsOneWidget);
     expect(find.text('行程同步工具'), findsOneWidget);
-    expect(find.text('openid'), findsOneWidget);
-    expect(find.text('email'), findsOneWidget);
+    expect(find.text('識別您的身分（唯一 ID）'), findsOneWidget);
+    expect(find.text('您的電子郵件地址'), findsOneWidget);
+    expect(find.text('openid'), findsNothing);
+    expect(find.textContaining('1783500000000'), findsNothing);
+    expect(find.textContaining('2026/7/8'), findsOneWidget);
   });
 
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {

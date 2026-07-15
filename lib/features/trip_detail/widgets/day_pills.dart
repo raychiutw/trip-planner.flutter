@@ -5,7 +5,7 @@ import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
 /// 頂部橫向 day pills（DAY NN + 日期）；點擊以回呼通知捲動至該日。
-class DayPills extends StatelessWidget {
+class DayPills extends StatefulWidget {
   const DayPills({
     super.key,
     required this.days,
@@ -29,35 +29,84 @@ class DayPills extends StatelessWidget {
   }
 
   @override
+  State<DayPills> createState() => _DayPillsState();
+}
+
+class _DayPillsState extends State<DayPills> {
+  final Map<int, GlobalKey> _pillKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _syncKeys();
+    _scheduleCenterActive();
+  }
+
+  @override
+  void didUpdateWidget(covariant DayPills oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncKeys();
+    if (oldWidget.activeDayNum != widget.activeDayNum ||
+        oldWidget.days != widget.days) {
+      _scheduleCenterActive();
+    }
+  }
+
+  void _syncKeys() {
+    final dayNums = widget.days.map((day) => day.dayNum).toSet();
+    _pillKeys.removeWhere((dayNum, key) => !dayNums.contains(dayNum));
+    for (final day in widget.days) {
+      _pillKeys.putIfAbsent(day.dayNum, GlobalKey.new);
+    }
+  }
+
+  void _scheduleCenterActive() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _pillKeys[widget.activeDayNum]?.currentContext;
+      if (target == null) return;
+      final renderObject = target.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.5,
+        duration: reduceMotion ? Duration.zero : TpMotion.normal,
+        curve: TpMotion.appleEase,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scaledFontSize = MediaQuery.textScalerOf(
-      context,
-    ).scale(theme.textTheme.labelSmall?.fontSize ?? 12);
-    final preferredHeight = (scaledFontSize * (8 / 3) + 28)
-        .clamp(60.0, 120.0)
-        .toDouble();
 
     return Container(
-      height: preferredHeight,
+      height: 60,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: ListView.separated(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
           horizontal: TpSpacing.s4,
           vertical: TpSpacing.s2,
         ),
-        itemCount: days.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(width: TpSpacing.s2),
-        itemBuilder: (context, index) => _DayPill(
-          day: days[index],
-          isActive: days[index].dayNum == activeDayNum,
-          onTap: () => onDaySelected(days[index].dayNum),
+        child: Row(
+          children: [
+            for (var index = 0; index < widget.days.length; index++) ...[
+              if (index > 0) const SizedBox(width: TpSpacing.s2),
+              _DayPill(
+                key: _pillKeys[widget.days[index].dayNum],
+                day: widget.days[index],
+                isActive: widget.days[index].dayNum == widget.activeDayNum,
+                onTap: () => widget.onDaySelected(widget.days[index].dayNum),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -66,6 +115,7 @@ class DayPills extends StatelessWidget {
 
 class _DayPill extends StatelessWidget {
   const _DayPill({
+    super.key,
     required this.day,
     required this.isActive,
     required this.onTap,
@@ -80,50 +130,50 @@ class _DayPill extends StatelessWidget {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
 
-    final shortDate = DayPills.shortDate(day.date);
-    return Semantics(
-      button: true,
-      selected: isActive,
-      label: '第 ${day.dayNum} 天${shortDate.isEmpty ? '' : '，$shortDate'}',
-      child: InkWell(
-        key: ValueKey('day-pill-${day.dayNum}'),
-        borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: TpSpacing.tapMin,
-            minWidth: 64,
+    return InkWell(
+      key: ValueKey('day-pill-${day.dayNum}'),
+      borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(
+          minHeight: TpSpacing.tapMin,
+          minWidth: 64,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? tones.accentSubtle : Colors.transparent,
+          borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
+          border: Border.all(
+            color: isActive ? tones.accent : theme.colorScheme.outlineVariant,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          decoration: BoxDecoration(
-            color: isActive ? tones.accentSubtle : Colors.transparent,
-            borderRadius: BorderRadius.circular(TpSpacing.tapMin / 2),
-            border: Border.all(
-              color: isActive ? tones.accent : theme.colorScheme.outlineVariant,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                fontSize: 11,
+                // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+                color: isActive
+                    ? tones.accentDeep
+                    : theme.colorScheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: isActive
-                      ? tones.accentDeep
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+            Text(
+              DayPills.shortDate(day.date),
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.35,
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-              Text(
-                shortDate,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w400,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

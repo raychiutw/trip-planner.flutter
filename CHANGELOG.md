@@ -9,6 +9,7 @@
 ### 新增
 
 - **自適應導覽與寬版版型**：compact iOS/macOS 使用 `CupertinoTabBar`、Android 使用 `NavigationBar`，寬度 `>=768` 改用 `NavigationRail`；表單、對話與 feed 新增角色式最大寬度。
+- **Liquid Glass 與原生地圖**：根分頁改為 Apple 式浮動功能層，地圖由 `flutter_map`／OSM 遷移至原生 Google Maps，支援路線 polyline、marker 與卡片同步。
 - **持續錯誤與版型載入狀態**：真正錯誤改用可關閉、可重試的 persistent banner；列表、地圖、時間軸與主要 route 補齊靜態 skeleton 與載入 semantics。
 - **地圖 accessibility**：marker 擴為 44pt 互動目標，加入 POI 類型 icon、語意標籤與定位失敗重試。
 - **Tripline 座標 App Icon**：保留定位圖釘與中央指南針箭頭識別，提供 iOS Default/Dark/Tinted 與 Android density 資產。
@@ -24,6 +25,12 @@
 ### 修正
 
 - 修正寬螢幕內容過度延伸、route 載入只顯示 spinner、空狀態缺少下一步，以及 rebase 後未使用的 loading/timeline state。
+
+## [0.5.1] - 2026-07-14
+
+### 新增
+
+- **Tripline App Icon**：加入木棕色主圖示、深色與灰階版本，並套用至 iOS 與 Android。
 
 ## [0.5.0] - 2026-07-10
 

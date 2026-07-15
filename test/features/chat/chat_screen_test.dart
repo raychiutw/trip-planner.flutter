@@ -14,6 +14,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 
 class _MockRequestsRepo extends Mock implements RequestsRepository {}
 
@@ -90,6 +91,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('chat-trip-dropdown')), findsOneWidget);
     expect(find.text('沖繩'), findsWidgets);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.toolbarHeight, greaterThanOrEqualTo(88));
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {
@@ -113,6 +118,8 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+
+    expect(find.byType(TpGlassSurface), findsOneWidget);
 
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '改午餐');
     await tester.pump();

@@ -54,27 +54,6 @@ Widget buildApp() =>
 
 void main() {
   group('FavoritesScreen', () {
-    testWidgets('載入中保留清單輪廓並提供讀屏狀態', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            favoritesProvider.overrideWith(
-              (ref) => const Stream<List<PoiFavorite>>.empty(),
-            ),
-          ],
-          child: buildApp(),
-        ),
-      );
-      await tester.pump();
-
-      expect(
-        find.byKey(const ValueKey('favorites-loading-skeleton')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel('正在載入內容'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-    });
-
     testWidgets('渲染收藏清單 N 卡', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -91,6 +70,12 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
+      expect(find.byType(FilterChip), findsNothing);
+      expect(find.byType(Checkbox), findsNothing);
+      expect(
+        find.byKey(const ValueKey('favorites-filter-button')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('搜尋收藏會比對名稱、地址與備註', (tester) async {
@@ -133,15 +118,21 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-restaurant')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsNothing);
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-all')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
@@ -157,15 +148,21 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-沖繩')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
 
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-all')));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
@@ -284,11 +281,10 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byKey(const ValueKey('favorite-select-7')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('favorites-select-mode')));
-      await tester.pump();
-
-      await tester.tap(find.byKey(const ValueKey('favorite-select-7')));
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('選取'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorite-select-8')));
       await tester.pump();
 
@@ -315,7 +311,7 @@ void main() {
       expect(fetchCount, 2); // 初載 + 批次刪除後 invalidate refresh
     });
 
-    testWidgets('收藏達 200 筆時使用懶載入連續清單，不顯示假分頁', (tester) async {
+    testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {
       final favorites = _manyFavorites();
       await tester.pumpWidget(
         ProviderScope(
@@ -329,18 +325,22 @@ void main() {
 
       expect(find.text('收藏地點 1'), findsOneWidget);
       expect(find.text('收藏地點 25'), findsNothing);
-      expect(find.byType(PoiFavoriteCard), findsWidgets);
-      expect(find.byType(PoiFavoriteCard), isNot(findsNWidgets(200)));
-      expect(find.byKey(const ValueKey('favorites-pagination')), findsNothing);
 
+      final pagination = find.byKey(const ValueKey('favorites-pagination'));
       final scrollView = find.byType(CustomScrollView);
-      await tester.scrollUntilVisible(
-        find.text('收藏地點 30'),
-        400,
-        scrollable: find.byType(Scrollable).first,
-        maxScrolls: 30,
-      );
-      expect(find.text('收藏地點 30'), findsOneWidget);
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(pagination, findsOneWidget);
+      expect(find.text('1-24 / 200'), findsOneWidget);
+      expect(find.text('第 1 / 9 頁'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+      await tester.pump();
+
+      expect(find.text('25-48 / 200'), findsOneWidget);
+      expect(find.text('第 2 / 9 頁'), findsOneWidget);
 
       await tester.fling(scrollView, const Offset(0, 5000), 10000);
       await tester.pumpAndSettle();
@@ -350,6 +350,11 @@ void main() {
       await tester.pump();
 
       expect(find.text('收藏地點 1', skipOffstage: false), findsWidgets);
+      for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+        await tester.drag(scrollView, const Offset(0, -500));
+        await tester.pump();
+      }
+      expect(find.text('第 1 / 5 頁'), findsOneWidget);
       expect(find.byType(PoiFavoriteCard), findsWidgets);
     });
 

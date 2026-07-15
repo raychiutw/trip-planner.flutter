@@ -113,25 +113,23 @@ void main() {
   }
 
   group('TripsListScreen 清單渲染', () {
-    testWidgets('載入中保留清單輪廓並提供讀屏狀態', (tester) async {
+    testWidgets('新增行程位於 toolbar,不使用遮擋清單的 FAB', (tester) async {
+      await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            myTripsProvider.overrideWith(
-              (ref) => const Stream<List<TripSummary>>.empty(),
-            ),
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
           ],
           child: buildRouterApp(),
         ),
       );
       await tester.pump();
 
-      expect(
-        find.byKey(const ValueKey('trips-loading-skeleton')),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel('正在載入內容'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const ValueKey('trips-create-fab')), findsNothing);
+      expect(find.byTooltip('新增行程'), findsOneWidget);
+      final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
+      expect(appBar.actions, hasLength(2));
+      expect(find.byTooltip('更多'), findsOneWidget);
     });
 
     testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
@@ -581,6 +579,8 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
       await tester.pumpAndSettle();
 

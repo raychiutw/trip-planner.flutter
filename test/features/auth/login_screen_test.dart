@@ -200,6 +200,13 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: find.byKey(submitButtonKey),
+          matching: find.text('登入'),
+        ),
+        findsOneWidget,
+      );
       final submitButton = tester.widget<FilledButton>(
         find.byKey(submitButtonKey),
       );

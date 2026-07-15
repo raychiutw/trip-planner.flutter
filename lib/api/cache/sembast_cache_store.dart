@@ -20,8 +20,8 @@ class SembastCacheStore implements CacheStore {
       .store('response_cache');
   final StoreRef<int, Map<String, Object?>> _queueStore = intMapStoreFactory
       .store('mutation_queue');
-  final StoreRef<int, Map<String, Object?>> _conflictStore =
-      intMapStoreFactory.store('conflict_store');
+  final StoreRef<int, Map<String, Object?>> _conflictStore = intMapStoreFactory
+      .store('conflict_store');
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   @override

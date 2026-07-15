@@ -48,24 +48,45 @@ void main() {
       expect(selectedDayNum, 2);
     });
 
-    testWidgets('200% 動態字級會增加日期列高度且不溢位', (tester) async {
+    testWidgets('切換到較後日期時自動把選中 pill 捲進可視範圍', (tester) async {
+      final days = List.generate(
+        12,
+        (index) => TripDay(
+          id: index + 1,
+          dayNum: index + 1,
+          date: '2026-06-${(index + 1).toString().padLeft(2, '0')}',
+          version: 0,
+        ),
+      );
+      var activeDay = 1;
+      late StateSetter setState;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(2)),
-            child: child!,
-          ),
           home: Scaffold(
-            body: DayPills(days: _days, activeDayNum: 1, onDaySelected: (_) {}),
+            body: SizedBox(
+              width: 320,
+              child: StatefulBuilder(
+                builder: (context, update) {
+                  setState = update;
+                  return DayPills(
+                    days: days,
+                    activeDayNum: activeDay,
+                    onDaySelected: (_) {},
+                  );
+                },
+              ),
+            ),
           ),
         ),
       );
 
-      expect(tester.getSize(find.byType(DayPills)).height, greaterThan(60));
-      expect(tester.takeException(), isNull);
+      setState(() => activeDay = 12);
+      await tester.pumpAndSettle();
+
+      final selected = find.byKey(const ValueKey('day-pill-12'));
+      expect(selected, findsOneWidget);
+      expect(tester.getRect(selected).center.dx, inInclusiveRange(0, 320));
     });
   });
 }

@@ -131,6 +131,24 @@ void main() {
     expect(find.text('ray@example.com'), findsOneWidget);
   });
 
+  testWidgets('註冊密碼有持續規則說明與顯示切換', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    expect(find.text('至少 8 個字元'), findsOneWidget);
+    final fieldFinder = find.byKey(const ValueKey('signup-password-field'));
+    TextField textField() => tester.widget<TextField>(
+      find.descendant(of: fieldFinder, matching: find.byType(TextField)),
+    );
+    expect(textField().obscureText, isTrue);
+
+    await tester.tap(
+      find.byKey(const ValueKey('signup-password-visibility-toggle')),
+    );
+    await tester.pump();
+
+    expect(textField().obscureText, isFalse);
+  });
+
   testWidgets('註冊若已加入行程會導向行程清單 selected trip', (tester) async {
     when(
       () => mockAuthRepository.signup(

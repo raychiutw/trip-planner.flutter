@@ -87,35 +87,14 @@ class TripMapLocateButton extends StatelessWidget {
 
 TripMapMarker buildTripMapUserLocationMarker({
   required TripMapPoint point,
-  required Key key,
+  required String id,
 }) {
   return TripMapMarker(
+    id: id,
     point: point,
-    width: 24,
-    height: 24,
-    child: DecoratedBox(
-      key: key,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Center(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Color(0xFF2563EB),
-            shape: BoxShape.circle,
-          ),
-          child: SizedBox.square(dimension: 12),
-        ),
-      ),
-    ),
+    color: const Color(0xFF2563EB),
+    title: '目前位置',
+    zIndex: 1000,
+    clusterable: false,
   );
 }

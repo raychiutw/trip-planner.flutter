@@ -12,16 +12,20 @@ class PoiFavoriteCard extends StatelessWidget {
   const PoiFavoriteCard({
     super.key,
     required this.favorite,
-    this.onRemove,
+    required this.onRemove,
     this.onAddToTrip,
+    this.onLongPress,
     this.selected = false,
+    this.selectionMode = false,
     this.onSelectedChanged,
   });
 
   final PoiFavorite favorite;
-  final VoidCallback? onRemove;
+  final VoidCallback onRemove;
   final VoidCallback? onAddToTrip;
+  final VoidCallback? onLongPress;
   final bool selected;
+  final bool selectionMode;
   final ValueChanged<bool>? onSelectedChanged;
 
   @override
@@ -31,98 +35,94 @@ class PoiFavoriteCard extends StatelessWidget {
     final tone = resolvePoiTone(tones, favorite.poiType);
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
-    return Container(
-      key: ValueKey('favorite-card-${favorite.id}'),
-      padding: const EdgeInsets.all(TpSpacing.s3),
-      decoration: BoxDecoration(
-        color: tone.subtle,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-        border: Border.all(
-          color: selected ? theme.colorScheme.primary : tone.bg,
-          width: selected ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (onSelectedChanged != null) ...[
-            Checkbox(
-              key: ValueKey('favorite-select-${favorite.id}'),
-              value: selected,
-              onChanged: (value) => onSelectedChanged!(value ?? false),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-          ],
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: tone.bg,
-              borderRadius: BorderRadius.circular(TpRadius.md),
-            ),
-            child: Icon(
-              CupertinoIcons.location_solid,
-              size: 20,
-              color: tone.deep,
-            ),
+    return GestureDetector(
+      onLongPress: onLongPress ?? onAddToTrip,
+      child: AnimatedContainer(
+        key: ValueKey('favorite-card-${favorite.id}'),
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(TpSpacing.s3),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(TpRadius.lg),
+          border: Border.all(
+            color: selected ? theme.colorScheme.primary : Colors.transparent,
+            width: selected ? 2 : 1,
           ),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  favorite.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (selectionMode && onSelectedChanged != null) ...[
+              Checkbox(
+                key: ValueKey('favorite-select-${favorite.id}'),
+                value: selected,
+                onChanged: (value) => onSelectedChanged!(value ?? false),
+              ),
+              const SizedBox(width: TpSpacing.s2),
+            ],
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tone.bg,
+                borderRadius: BorderRadius.circular(TpRadius.md),
+              ),
+              child: Icon(
+                CupertinoIcons.location_solid,
+                size: 20,
+                color: tone.deep,
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    favorite.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
                   ),
-                ),
-                if (favorite.poiRating != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: PoiRatingLabel(rating: favorite.poiRating!),
-                  ),
-                if (favorite.note != null && favorite.note!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(
-                      favorite.note!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: mutedColor,
+                  if (favorite.poiRating != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TpSpacing.s1),
+                      child: PoiRatingLabel(rating: favorite.poiRating!),
+                    ),
+                  if (favorite.note != null && favorite.note!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TpSpacing.s1),
+                      child: Text(
+                        favorite.note!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: mutedColor,
+                        ),
                       ),
                     ),
-                  ),
-                if (favorite.usages.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(
-                      '用於 ${favorite.usages.length} 個行程',
-                      style: TextStyle(fontSize: 12, color: tone.deep),
+                  if (favorite.usages.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TpSpacing.s1),
+                      child: Text(
+                        '用於 ${favorite.usages.length} 個行程',
+                        style: TextStyle(fontSize: 12, color: tone.deep),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (onAddToTrip != null)
-            IconButton(
-              key: ValueKey('favorite-add-to-trip-${favorite.id}'),
-              tooltip: '加入行程',
-              icon: const Icon(Icons.add_location_alt_outlined),
-              onPressed: onAddToTrip,
-            ),
-          if (onRemove != null)
             IconButton(
               key: ValueKey('favorite-remove-${favorite.id}'),
               tooltip: '取消收藏',
               icon: Icon(CupertinoIcons.heart_fill, color: tones.pink),
               onPressed: onRemove,
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

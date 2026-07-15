@@ -62,7 +62,7 @@ void main() {
   });
 
   group('TripCard 渲染與互動', () {
-    testWidgets('cover 首字、eyebrow、標題;tap / long-press 回呼', (tester) async {
+    testWidgets('緊湊卡片顯示 eyebrow、標題,不顯示大型首字 cover', (tester) async {
       var tapped = 0;
       var longPressed = 0;
       await pumpCard(
@@ -78,7 +78,7 @@ void main() {
       );
 
       expect(find.text('沖繩家族之旅'), findsOneWidget);
-      expect(find.text('沖'), findsOneWidget); // cover 首字
+      expect(find.text('沖'), findsNothing);
       expect(find.text('5 天'), findsOneWidget); // eyebrow
 
       await tester.tap(find.text('沖繩家族之旅'));

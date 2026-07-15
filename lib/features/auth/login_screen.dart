@@ -221,12 +221,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         key: const ValueKey('login-submit-button'),
                         onPressed: isSubmitting ? null : _submit,
                         child: isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator.adaptive(
-                                  strokeWidth: 2,
-                                ),
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator.adaptive(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  SizedBox(width: TpSpacing.s2),
+                                  Text('登入'),
+                                ],
                               )
                             : const Text('登入'),
                       ),

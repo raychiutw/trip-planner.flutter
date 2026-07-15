@@ -12,12 +12,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
-import '../../app/adaptive_content.dart';
-import '../../app/app_feedback.dart';
-import '../../app/app_loading_skeleton.dart';
+import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../trips/trips_list_screen.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
@@ -75,73 +75,102 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final tripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 助手')),
-      body: AppAdaptiveContent(
-        maxWidth: AppContentWidth.conversation,
-        contentKey: const ValueKey('chat-content'),
-        child: tripsAsync.when(
-          loading: () => const AppListLoadingSkeleton(
-            key: ValueKey('chat-trips-loading'),
-            itemCount: 4,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        toolbarHeight: 96,
+        titleSpacing: TpSpacing.s4,
+        title: Align(
+          alignment: Alignment.bottomLeft,
+          child: Text(
+            'AI 助手',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
-          error: (e, _) =>
-              const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
-          data: (trips) {
-            if (trips.isEmpty) {
-              return const _CenteredHint(
-                title: '先建立行程',
-                body: '建立行程後,就能在這裡用 AI 助手調整行程。',
-              );
-            }
-            // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
-            // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
-            final tripId = trips.any((t) => t.tripId == _tripId)
-                ? _tripId!
-                : trips.first.tripId;
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    TpSpacing.s4,
-                    TpSpacing.s3,
-                    TpSpacing.s4,
-                    TpSpacing.s2,
-                  ),
-                  child: DropdownButtonFormField<String>(
-                    key: const ValueKey('chat-trip-dropdown'),
-                    initialValue: tripId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: '行程',
-                      isDense: true,
+        ),
+      ),
+      body: tripsAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator.adaptive()),
+        error: (e, _) =>
+            const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+        data: (trips) {
+          if (trips.isEmpty) {
+            return const _CenteredHint(
+              title: '先建立行程',
+              body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+            );
+          }
+          // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
+          // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
+          final tripId = trips.any((t) => t.tripId == _tripId)
+              ? _tripId!
+              : trips.first.tripId;
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  TpSpacing.s4,
+                  TpSpacing.s3,
+                  TpSpacing.s4,
+                  TpSpacing.s2,
+                ),
+                child: PopupMenuButton<String>(
+                  key: const ValueKey('chat-trip-dropdown'),
+                  initialValue: tripId,
+                  tooltip: '切換行程',
+                  onSelected: (value) => setState(() => _tripId = value),
+                  itemBuilder: (context) => [
+                    for (final t in trips)
+                      PopupMenuItem(
+                        value: t.tripId,
+                        child: Text(
+                          _tripLabel(t),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  child: TpContentSurface(
+                    semanticLabel:
+                        '目前行程 ${_tripLabel(trips.firstWhere((t) => t.tripId == tripId))}',
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s4,
+                      vertical: TpSpacing.s3,
                     ),
-                    items: [
-                      for (final t in trips)
-                        DropdownMenuItem(
-                          value: t.tripId,
+                    child: Row(
+                      children: [
+                        const Icon(CupertinoIcons.map, size: 20),
+                        const SizedBox(width: TpSpacing.s3),
+                        Expanded(
                           child: Text(
-                            _tripLabel(t),
+                            _tripLabel(
+                              trips.firstWhere((t) => t.tripId == tripId),
+                            ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setState(() => _tripId = v);
-                    },
+                        const SizedBox(width: TpSpacing.s2),
+                        const Icon(CupertinoIcons.chevron_down, size: 16),
+                      ],
+                    ),
                   ),
                 ),
-                Expanded(
-                  child: _ChatBody(
-                    key: ValueKey(tripId),
-                    tripId: tripId,
-                    initialPrefill: _pendingPrefill,
-                    onInitialPrefillConsumed: _consumePrefill,
-                  ),
+              ),
+              Expanded(
+                child: _ChatBody(
+                  key: ValueKey(tripId),
+                  tripId: tripId,
+                  initialPrefill: _pendingPrefill,
+                  onInitialPrefillConsumed: _consumePrefill,
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -228,10 +257,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
         Expanded(
           child: state.initialLoading
-              ? const AppListLoadingSkeleton(
-                  key: ValueKey('chat-thread-loading'),
-                  itemCount: 5,
-                )
+              ? const Center(child: CircularProgressIndicator.adaptive())
               : (state.error != null && msgs.isEmpty)
               ? _CenteredHint(
                   title: '載入失敗',
@@ -429,7 +455,7 @@ class _ComposerState extends ConsumerState<_Composer> {
     final ok = await _ensureInit();
     if (!mounted) return;
     if (!ok) {
-      showAppError(context, '需要麥克風與語音辨識權限才能語音輸入');
+      showAppNotice(context, '需要麥克風與語音辨識權限才能語音輸入');
       return;
     }
     setState(() => _listening = true);
@@ -455,56 +481,61 @@ class _ComposerState extends ConsumerState<_Composer> {
           TpSpacing.s3,
           TpSpacing.s2,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('chat-input'),
-                controller: widget.input,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => widget.onSend(),
-                // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
-                decoration: InputDecoration(
-                  hintText: '輸入訊息或語音指令',
-                  isDense: true,
-                  filled: true,
-                  fillColor: scheme.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: TpSpacing.s4,
-                    vertical: TpSpacing.s3,
+        child: TpGlassSurface(
+          padding: const EdgeInsets.all(TpSpacing.s2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('chat-input'),
+                  controller: widget.input,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => widget.onSend(),
+                  // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                  decoration: InputDecoration(
+                    hintText: '輸入訊息或語音指令',
+                    isDense: true,
+                    filled: true,
+                    fillColor: scheme.surfaceContainerHighest,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s4,
+                      vertical: TpSpacing.s3,
+                    ),
+                    border: _composerPillBorder,
+                    enabledBorder: _composerPillBorder,
+                    focusedBorder: _composerPillBorder,
                   ),
-                  border: _composerPillBorder,
-                  enabledBorder: _composerPillBorder,
-                  focusedBorder: _composerPillBorder,
                 ),
               ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            IconButton(
-              key: const ValueKey('chat-mic-button'),
-              tooltip: _listening ? '停止語音輸入' : '語音輸入',
-              onPressed: micEnabled ? () => unawaited(_onMic()) : null,
-              color: _listening ? scheme.primary : null,
-              icon: Icon(
-                _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+              const SizedBox(width: TpSpacing.s2),
+              IconButton(
+                key: const ValueKey('chat-mic-button'),
+                tooltip: _listening ? '停止語音輸入' : '語音輸入',
+                onPressed: micEnabled ? () => unawaited(_onMic()) : null,
+                color: _listening ? scheme.primary : null,
+                icon: Icon(
+                  _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+                ),
               ),
-            ),
-            const SizedBox(width: TpSpacing.s1),
-            IconButton.filled(
-              key: const ValueKey('chat-send'),
-              onPressed: widget.sending ? null : widget.onSend,
-              icon: widget.sending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                    )
-                  : const Icon(CupertinoIcons.arrow_up_circle_fill),
-            ),
-          ],
+              const SizedBox(width: TpSpacing.s1),
+              IconButton.filled(
+                key: const ValueKey('chat-send'),
+                onPressed: widget.sending ? null : widget.onSend,
+                icon: widget.sending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator.adaptive(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(CupertinoIcons.arrow_up_circle_fill),
+              ),
+            ],
+          ),
         ),
       ),
     );

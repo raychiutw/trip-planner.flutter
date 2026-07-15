@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripline/features/favorites/favorites_providers.dart';
+import 'package:tripline/api/cache/cache_store.dart';
+import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
-import 'package:tripline/models/poi_favorite.dart';
+import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/features/trips/trips_list_screen.dart';
+import 'package:tripline/models/day.dart';
+import 'package:tripline/models/entry.dart';
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-class _TransparentTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
-      MemoryImage(TileProvider.transparentImage);
-}
+import '../../helpers/fake_trip_map.dart';
 
 class _SequencedLocationService implements TripMapLocationService {
   int calls = 0;
@@ -28,26 +28,34 @@ class _SequencedLocationService implements TripMapLocationService {
   }
 }
 
-const _favorite = PoiFavorite(
+const _trip = TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩旅行');
+
+final _day = TripDay(
   id: 1,
-  userId: 'u',
-  poiId: 10,
-  favoritedAt: '2026-01-01',
-  poiName: '首里城',
-  poiLat: 26.2,
-  poiLng: 127.7,
-  poiType: 'attraction',
+  dayNum: 1,
+  version: 1,
+  timeline: const [
+    TimelineEntry(
+      id: 11,
+      sortOrder: 0,
+      title: '首里城',
+      version: 1,
+      master: EntryPoiInfo(poiId: 110, name: '首里城', lat: 26.217, lng: 127.719),
+    ),
+  ],
 );
 
 Widget _buildApp({TripMapLocationService? locationService}) {
   return ProviderScope(
     overrides: [
-      favoritesProvider.overrideWith((ref) => Stream.value(const [_favorite])),
+      cacheStoreProvider.overrideWithValue(InMemoryCacheStore()),
+      myTripsProvider.overrideWith((ref) => Stream.value(const [_trip])),
+      tripDaysProvider.overrideWith((ref, tripId) => Stream.value([_day])),
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
       home: GlobalMapScreen(
-        tileProvider: _TransparentTileProvider(),
+        mapBuilder: fakeTripMapBuilder,
         locationService: locationService,
       ),
     ),
@@ -55,15 +63,15 @@ Widget _buildApp({TripMapLocationService? locationService}) {
 }
 
 void main() {
-  testWidgets('地圖 marker 保留小圓點但提供 44pt 點擊區與名稱語意', (tester) async {
+  testWidgets('地圖 marker 提供 44pt 點擊區與名稱語意', (tester) async {
     final semantics = tester.ensureSemantics();
 
     await tester.pumpWidget(_buildApp());
     await tester.pumpAndSettle();
 
-    final marker = find.byKey(const ValueKey('map-fav-1'));
+    final marker = find.byKey(const ValueKey('map-pin-11'));
     expect(tester.getSize(marker), const Size(44, 44));
-    expect(find.bySemanticsLabel('地點：首里城，景點'), findsOneWidget);
+    expect(find.bySemanticsLabel('1. 首里城，DAY 1'), findsOneWidget);
     semantics.dispose();
   });
 
@@ -72,13 +80,10 @@ void main() {
     await tester.pumpWidget(_buildApp(locationService: location));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('global-map-locate-button')));
+    await tester.tap(find.byKey(const ValueKey('trip-map-locate-button')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('global-map-location-error')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
     expect(find.text('請開啟定位權限'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 10));
@@ -88,12 +93,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(location.calls, 2);
+    expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
     expect(
-      find.byKey(const ValueKey('global-map-location-error')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('global-map-user-location')),
+      find.byKey(const ValueKey('trip-map-user-location')),
       findsOneWidget,
     );
   });

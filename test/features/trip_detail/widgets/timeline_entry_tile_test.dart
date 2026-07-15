@@ -198,5 +198,34 @@ void main() {
       await tester.tap(find.text('首里城'));
       expect(tapped, 1);
     });
+
+    testWidgets('內容卡以單一語意朗讀名稱、時間、類型與動作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: TimelineEntryTile(
+              entry: const TimelineEntry(
+                id: 12,
+                sortOrder: 0,
+                version: 1,
+                startTime: '09:30',
+                title: '首里城',
+                master: EntryPoiInfo(poiId: 2, type: 'attraction'),
+              ),
+              number: 1,
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('首里城，09:30，景點'), findsOneWidget);
+      final node = tester.getSemantics(find.bySemanticsLabel('首里城，09:30，景點'));
+      expect(node.getSemanticsData().hint, '點兩下編輯停留點');
+      expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
+      semantics.dispose();
+    });
   });
 }

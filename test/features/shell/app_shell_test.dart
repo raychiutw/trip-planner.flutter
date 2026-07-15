@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,39 +29,84 @@ GoRouter buildShellRouter() {
   );
 }
 
+GoRouter buildScrollableShellRouter() {
+  StatefulShellBranch probe(String path, Widget child) => StatefulShellBranch(
+    routes: [GoRoute(path: path, builder: (_, _) => child)],
+  );
+  return GoRouter(
+    initialLocation: '/chat',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          probe(
+            '/chat',
+            ListView.builder(
+              key: const ValueKey('root-vertical-list'),
+              itemCount: 60,
+              itemBuilder: (_, index) =>
+                  SizedBox(height: 56, child: Text('ROW-$index')),
+            ),
+          ),
+          probe('/trips', const Text('PROBE-TRIPS')),
+          probe('/map', const Text('PROBE-MAP')),
+          probe('/favorites', const Text('PROBE-FAV')),
+          probe('/account', const Text('PROBE-ACCOUNT')),
+        ],
+      ),
+    ],
+  );
+}
+
+GoRouter buildHorizontalShellRouter() {
+  StatefulShellBranch probe(String path, Widget child) => StatefulShellBranch(
+    routes: [GoRoute(path: path, builder: (_, _) => child)],
+  );
+  return GoRouter(
+    initialLocation: '/chat',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          probe(
+            '/chat',
+            ListView.builder(
+              key: const ValueKey('root-horizontal-list'),
+              scrollDirection: Axis.horizontal,
+              itemCount: 20,
+              itemBuilder: (_, index) =>
+                  SizedBox(width: 120, child: Text('CARD-$index')),
+            ),
+          ),
+          probe('/trips', const Text('PROBE-TRIPS')),
+          probe('/map', const Text('PROBE-MAP')),
+          probe('/favorites', const Text('PROBE-FAV')),
+          probe('/account', const Text('PROBE-ACCOUNT')),
+        ],
+      ),
+    ],
+  );
+}
+
 void main() {
   group('AppShell 5-tab 導航', () {
-    Future<void> setWindowSize(WidgetTester tester, Size size) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = size;
-      addTearDown(() {
-        tester.view.resetDevicePixelRatio();
-        tester.view.resetPhysicalSize();
-      });
-    }
-
-    Future<void> pumpShell(
-      WidgetTester tester, {
-      TargetPlatform platform = TargetPlatform.android,
-    }) async {
+    testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
-            theme: AppTheme.light().copyWith(platform: platform),
+            theme: AppTheme.light(),
             routerConfig: buildShellRouter(),
           ),
         ),
       );
       await tester.pumpAndSettle();
-    }
-
-    testWidgets('窄版 Android 顯示 5 個底部 tab 並可切換 branch', (tester) async {
-      await setWindowSize(tester, const Size(390, 844));
-      await pumpShell(tester);
 
       // 初始 branch 0
       expect(find.text('PROBE-CHAT'), findsOneWidget);
-      expect(find.byType(NavigationDestination), findsNWidgets(5));
+      expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
 
       // 點「地圖」→ branch 2
       await tester.tap(find.text('地圖'));
@@ -74,30 +120,97 @@ void main() {
       expect(find.text('PROBE-ACCOUNT'), findsOneWidget);
     });
 
-    testWidgets('窄版 iOS 使用 Cupertino tab bar', (tester) async {
-      await setWindowSize(tester, const Size(390, 844));
-      await pumpShell(tester, platform: TargetPlatform.iOS);
-
-      expect(find.byType(CupertinoTabBar), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
-
-      await tester.tap(find.text('收藏'));
+    testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(find.text('PROBE-FAV'), findsOneWidget);
+
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      expect(bar, findsOneWidget);
+      expect(
+        find.descendant(of: bar, matching: find.byType(BackdropFilter)),
+        findsOneWidget,
+      );
+      expect(tester.widget<Scaffold>(find.byType(Scaffold)).extendBody, isTrue);
     });
 
-    testWidgets('寬版改用側邊 NavigationRail 並保留 5 個入口', (tester) async {
-      await setWindowSize(tester, const Size(1024, 768));
-      await pumpShell(tester);
-
-      expect(find.byType(NavigationRail), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
-      final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-      expect(rail.destinations, hasLength(5));
-
-      await tester.tap(find.text('地圖'));
+    testWidgets('垂直向下捲縮成 icon-only,向上捲恢復 label', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildScrollableShellRouter(),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(find.text('PROBE-MAP'), findsOneWidget);
+      expect(find.text('聊天'), findsOneWidget);
+
+      await tester.drag(
+        find.byKey(const ValueKey('root-vertical-list')),
+        const Offset(0, -320),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('聊天'), findsNothing);
+
+      await tester.drag(
+        find.byKey(const ValueKey('root-vertical-list')),
+        const Offset(0, 220),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('聊天'), findsOneWidget);
+    });
+
+    testWidgets('水平內容捲動不縮減 root tab', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildHorizontalShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find.byKey(const ValueKey('root-horizontal-list')),
+        const Offset(-320, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('聊天'), findsOneWidget);
+      expect(find.text('帳號'), findsOneWidget);
+    });
+
+    testWidgets('五個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+      }
+      final selected = tester.getSemantics(
+        find.byKey(const ValueKey('root-tab-聊天')),
+      );
+      expect(
+        selected.getSemanticsData().flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+      semantics.dispose();
     });
   });
 }

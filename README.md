@@ -6,10 +6,10 @@
 
 **P0（已完成）**
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
-- 5-tab shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
+- 5-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
 - 行程清單（三色 tone 卡片、pull-to-refresh、長按刪除）
 - 行程時間軸（day pills、逐日 timeline、三色 POI tone、travel pill、hotel 卡）
-- 行程地圖（flutter_map + OSM、逐日 pin、day tabs、entry cards 同步）
+- 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
 - 帳號（profile、統計、登出）
 
@@ -59,7 +59,7 @@ docs/
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 
-技術棧：Flutter 3.41 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、flutter_map 8（OSM tiles，免 API key）。
+技術棧：Flutter 3.44.6 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、google_maps_flutter 2。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 
@@ -69,4 +69,4 @@ docs/
 
 ## 設計
 
-品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 的互動與版型以本 repo 的 [設計系統參考](docs/reference-theme.md)為準。方向是保留 Tripline 柔褐品牌，採 Apple Music 的內容階層與 Apple HIG 的平台慣例，而不是逐像素仿製。座標定位圖釘 App Icon 是固定品牌識別，規格見 [Tripline App Icon](docs/superpowers/specs/2026-07-14-tripline-app-icon-design.md)。
+品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 的互動與版型以本 repo 的 [設計系統參考](docs/reference-theme.md)為準。方向是保留 Tripline 柔褐品牌，採 Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 的平台慣例，而不是逐像素仿製。

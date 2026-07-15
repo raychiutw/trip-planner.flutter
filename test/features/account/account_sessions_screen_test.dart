@@ -96,30 +96,42 @@ void main() {
     ).thenAnswer((_) async => 1);
   });
 
-  testWidgets('列出登入裝置並只讓非目前裝置顯示登出按鈕', (tester) async {
+  testWidgets('裝置列表不直接鋪 destructive action，詳情才顯示登出', (tester) async {
     await pumpScreen(tester);
 
     expect(find.text('登入裝置'), findsOneWidget);
     expect(find.text('Chrome on Windows'), findsOneWidget);
     expect(find.text('Safari on iPhone'), findsOneWidget);
     expect(find.text('目前裝置'), findsOneWidget);
+    expect(find.textContaining('IP 指紋'), findsNothing);
+    expect(find.textContaining('T10:00:00Z'), findsNothing);
     expect(
       find.byKey(const Key('account-session-revoke-sid-current')),
       findsNothing,
     );
     expect(
       find.byKey(const Key('account-session-revoke-sid-phone')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('account-sessions-revoke-others')),
       findsOneWidget,
     );
+
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('account-session-revoke-sid-phone')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('IP 指紋'), findsNothing);
   });
 
   testWidgets('登出單一非目前裝置會呼叫 repository 並顯示成功提示', (tester) async {
     await pumpScreen(tester);
 
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('account-session-revoke-sid-phone')));
     await tester.pumpAndSettle();
 
