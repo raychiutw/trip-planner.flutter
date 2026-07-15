@@ -83,6 +83,17 @@ void main() {
     expect(find.byKey(const ValueKey('ai-authorize-on')), findsOneWidget);
   });
 
+  testWidgets('AI 授權未完成時保留操作並顯示錯誤', (tester) async {
+    when(mockAuthRepository.authorizeAi).thenAnswer((_) async => false);
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('ai-authorize-btn')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('授權未完成，請再試一次。'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-authorize-btn')), findsOneWidget);
+  });
+
   testWidgets('撤銷 app 需確認，確認後呼叫 repository', (tester) async {
     await pumpScreen(tester);
 

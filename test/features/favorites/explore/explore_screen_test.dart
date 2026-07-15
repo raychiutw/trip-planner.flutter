@@ -77,7 +77,7 @@ void main() {
     expect(find.text('首里城'), findsNothing);
   });
 
-  testWidgets('超過四個細分類 → 更多使用平台 action sheet', (tester) async {
+  testWidgets('更多分類可取消，選取後顯示選中狀態並精確篩選', (tester) async {
     when(
       () => poi.searchPois(
         q: any(named: 'q'),
@@ -105,6 +105,20 @@ void main() {
 
     expect(find.byType(BottomSheet), findsOneWidget);
     expect(find.text('地鐵站  1'), findsOneWidget);
+
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(find.byType(PoiSearchCard), findsNWidgets(5));
+
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('地鐵站  1'));
+    await tester.pumpAndSettle();
+
+    final selectedMore = tester.widget<ChoiceChip>(more);
+    expect(selectedMore.selected, isTrue);
+    expect(find.byType(PoiSearchCard), findsOneWidget);
+    expect(find.text('車站'), findsOneWidget);
   });
 
   testWidgets('手動搜尋 <2 字 → 持續錯誤提示', (tester) async {

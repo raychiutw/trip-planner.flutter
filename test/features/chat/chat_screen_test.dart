@@ -191,6 +191,71 @@ void main() {
     expect(find.text('「先等授權」'), findsOneWidget);
   });
 
+  testWidgets('授權狀態查詢失敗時仍先顯示 consent', (tester) async {
+    when(authRepo.fetchAiAuthorization).thenThrow(Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '離線訊息');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-consent-title')), findsOneWidget);
+    verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+  });
+
+  testWidgets('consent 授權未完成可原地重試後送出', (tester) async {
+    var attempts = 0;
+    when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
+    when(authRepo.authorizeAi).thenAnswer((_) async => ++attempts > 1);
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 9, message: '再試一次', status: RequestStatus.processing),
+    );
+    when(() => reqRepo.fetchRequest(9)).thenAnswer(
+      (_) async => _req(
+        id: 9,
+        message: '再試一次',
+        status: RequestStatus.completed,
+        reply: '完成',
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '再試一次');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai-consent-authorize')));
+    await tester.pumpAndSettle();
+    expect(find.text('授權未完成，訊息尚未送出。'), findsOneWidget);
+    verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('ai-consent-authorize')));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 2);
+    verify(
+      () => reqRepo.sendRequest(tripId: 'okinawa', message: '再試一次'),
+    ).called(1);
+  });
+
   testWidgets('consent 授權成功 → 送出原訊息並清空草稿', (tester) async {
     when(authRepo.fetchAiAuthorization).thenAnswer((_) async => false);
     when(
