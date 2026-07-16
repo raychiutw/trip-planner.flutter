@@ -180,7 +180,7 @@ const sheetClose = Cubic(0.4, 0, 1, 1);        // 280ms
 
 本輪選定 mockup **C：Map First Drawer**。Tripline 不採「地圖內容分頁 + DAY 分頁」兩層常駐 Tab，也不讓固定 POI 卡列與底部根 Tab 互相擠壓；最終資訊架構固定為：
 
-1. 行程根頁：緊湊 large title，捲動後收為位置穩定的 inline title。
+1. 行程根頁：inline title，恆為 56pt（2026-07-16 修訂，原訂的 large title 已移除，理由見 4.1）。
 2. 行程詳情：返回、標題、編輯、更多；行程／地圖／筆記改由單一內容範圍選單切換。
 3. 地圖頂部：單一 `地圖 · DAY 02 ▾` scope capsule，選單內提供總覽與各日。
 4. 地圖底部：固定高度的 POI accessory，只用左右滑動切換景點，永遠位於根 Tab 上方。
@@ -202,8 +202,8 @@ Mockup C 的青綠色只代表原 `.flutter` 參考稿，不進入 production th
 
 | 區域 | 目前實作證據 | 嚴格評估 | 目標狀態 |
 |---|---|---|---|
-| 行程根頁頂部 | `trips_list_screen.dart:264` 使用 `SliverAppBar.large`；其下再常駐搜尋與「全部／我的／共編」，另有 FAB | title extension、搜尋、scope 與 FAB 同時搶首屏，視覺上比 Apple Music 的內容優先層級更厚 | large title 延伸區只容納標題；搜尋緊接標題；scope 只有在確實改變資料集合時顯示；新增移至 toolbar `+` |
-| 根頁捲動標題 | Material `SliverAppBar.large` 與全域 `AppBarTheme` 共用，但沒有明訂 expanded / collapsed 幾何與 action 對稱 | action 寬度變動時，inline title 的視覺中心容易偏移；不同頁的 title baseline 不一致 | root title 由 leading large title 平滑收為全 toolbar 幾何置中的 inline title，不能依剩餘寬度臨時計算中心 |
+| 行程根頁頂部 | `trips_list_screen.dart:264` 使用 `SliverAppBar.large`；其下再常駐搜尋與「全部／我的／共編」，另有 FAB | title extension、搜尋、scope 與 FAB 同時搶首屏，視覺上比 Apple Music 的內容優先層級更厚 | **（2026-07-16 修訂）** 不用 large title；搜尋緊接 inline toolbar；scope 只有在確實改變資料集合時顯示；新增移至 toolbar `+` |
+| 根頁捲動標題 | Material `SliverAppBar.large` 與全域 `AppBarTheme` 共用，但沒有明訂 expanded / collapsed 幾何與 action 對稱 | action 寬度變動時，inline title 的視覺中心容易偏移；不同頁的 title baseline 不一致 | **（2026-07-16 修訂）** title 恆為 inline 56pt、不隨捲動變化；以全 toolbar 幾何置中，不依剩餘寬度臨時計算中心 |
 | 行程詳情 toolbar | `trip_timeline_screen.dart:59-139` 同時顯示編輯、地圖、筆記、列印、異動紀錄、更多，共六個 trailing control | 嚴重超出 iPhone toolbar 的必要 action 密度；Cupertino 與 Material icon、直向更多按鈕混用 | visible trailing action 僅「編輯」與水平「更多」；其他命令分組放入具名 menu |
 | 行程內容導覽 | 地圖、筆記是 toolbar icon；DAY pills 在 `_TimelineBodyState.build` 固定佔一列 | 內容目的地與命令混在 toolbar，使用者要記 icon；DAY 列也壓縮內容高度 | 使用單一 `行程 ▾` scope control 切換行程／地圖／筆記；DAY 是內容內薄型 sticky strip |
 | 地圖頂部 | `trip_map_screen.dart:381-400` 為 `DAY tabs → map → 104pt cards` 固定 Column；tabs 實作在 `404-473` | DAY 控制永久佔高；長行程會變成橫向 pill 迷宮 | 只保留一個 44pt `地圖 · DAY NN ▾` capsule；總覽與各日放入 menu / sheet |
@@ -215,14 +215,20 @@ Mockup C 的青綠色只代表原 `.flutter` 參考稿，不進入 production th
 
 #### 4.1 標題與捲動邊界
 
-Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標準 title；toolbar 項目應只保留最重要的命令。Tripline 採用下列單一規則：
+Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標準 title；toolbar 項目應只保留最重要的命令。
 
-- 根頁（聊天、行程、地圖、收藏、帳號）可以使用 large title；次層頁一律 inline title。
-- 行程根頁 large-title extension 高度最多 52pt；加上 44–56pt toolbar 後，safe area 下方的整個標題區不得超過 108pt。
-- large title 左邊界固定 16pt，34pt / w700；下方只留 8pt，不增加 hero 空白。
-- collapsed title 使用 17–20pt / w600–700，垂直中心與返回、編輯、更多按鈕相同。
-- collapsed title 以整個 toolbar 寬度置中；左右 action 群組採相同 44pt slot，長標題只截斷，不偏移。
+**Tripline 刻意不採用 large title（2026-07-16 決議，取代本節原訂的 large-title 規格）。**
+
+理由：large title 的方位感前提是「頁名是新資訊」。Tripline 五個根頁都由常駐 tab bar 標示目前位置，large title 只是把 tab 已經講過的頁名再講一次，卻吃掉 96–108pt —— 那是一整張行程卡的高度。省下的高度換成內容，方位感由 inline title 與選中的 tab 共同承擔。
+
+- 根頁與次層頁**一律 inline title**，恆為 56pt，不放大也不收合（無 collapse threshold、無捲動幾何變化）。
+- title 以整個 toolbar 寬度置中；左右 action 群組採相同 44pt slot，長標題只截斷，不偏移。
+- inline title 使用 17–20pt / w600–700，垂直中心與返回、編輯、更多按鈕相同。
 - toolbar 後方有可滾動內容時使用單一 automatic / hard scroll-edge separation；不得同時再畫厚底線與陰影。
+
+實作：`lib/ui/tp_root_scroll_scaffold.dart`（`expandedHeight == collapsedHeight == 56`，兩者相等即是「大標題已移除」的可測條件），驗收見 `test/ui/tripline_ui_test.dart`。
+
+參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Scroll views](https://developer.apple.com/design/human-interface-guidelines/scroll-views)。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Scroll views](https://developer.apple.com/design/human-interface-guidelines/scroll-views)。
 
@@ -252,21 +258,16 @@ Apple 建議 large title 用來維持方位感，開始捲動時自然轉為標�
 
 ### 行程頁定稿規格
 
-#### 展開狀態
+**（2026-07-16 修訂）** 原本分「展開／收合」兩節，是 large title 的產物 —— 大標題移除後 title 與 root tab 都不隨捲動變形，只剩單一狀態。
 
-1. 標題固定為「我的行程」，large title 區域不承載匯入、排序或裝飾。
+1. 標題固定為「我的行程」，inline 56pt，不放大也不收合。
 2. toolbar 右側為 `+` 與水平 `…`；移除底部 FAB。
-3. 搜尋欄距標題 8pt、左右 16pt，使用 44pt 高系統密度。
-4. 「全部／我的／共編」是篩選同一列表的 related subview，可使用 segmented control；高度 32–36pt，外層 hit area 44pt。
-5. 搜尋與 scope 合計最多兩列；若使用者沒有共編行程，可隱藏 scope 而不是保留空控制。
-6. 第一張行程卡須在 390×844 裝置上出現在首屏，不得被 title、搜尋、scope、FAB 四層 chrome 推到首屏外。
-
-#### 收合狀態
-
-1. 捲動超過 large-title collapse threshold 後，inline title 固定在 toolbar 幾何中心。
-2. `+`、`…` 的 slot、背景、圓角與 icon weight 完全一致；loading 時也保留 slot 寬度，禁止 title 跳動。
-3. 搜尋欄可隨內容捲走；scope 可依需要 sticky，但 sticky 時只保留一列且套用單一 scroll-edge effect。
-4. 向下捲動只縮合 root tab；向上捲動或點目前 Tab 時恢復。title 與 root tab 動畫不可互相延遲。
+3. `+`、`…` 的 slot、背景、圓角與 icon weight 完全一致；loading 時也保留 slot 寬度，禁止 title 跳動。
+4. 搜尋欄距 toolbar 8pt、左右 16pt，使用 44pt 高系統密度；可隨內容捲走。
+5. 「全部／我的／共編」是篩選同一列表的 related subview，可使用 segmented control；高度 32–36pt，外層 hit area 44pt。scope 可依需要 sticky，但 sticky 時只保留一列且套用單一 scroll-edge effect。
+6. 搜尋與 scope 合計最多兩列；若使用者沒有共編行程，可隱藏 scope 而不是保留空控制。
+7. root tab 恆為 64pt，不隨捲動縮合、標籤不淡出（理由同 4.1：捲動時位置會動的目標比較難點中，而縮合換來的高度不足一列內容）。
+8. 第一張行程卡須在 390×844 裝置上出現在首屏，不得被 title、搜尋、scope 三層 chrome 推到首屏外。
 
 ### 行程詳情定稿規格
 
@@ -314,7 +315,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 
 | 類別 | 統一規則 |
 |---|---|
-| Root title | 34pt large → 17–20pt inline；同一 collapse threshold 與 scroll-edge effect |
+| Root title | 永遠 inline 56pt，17–20pt / w600–700；不放大、不收合，套用單一 scroll-edge effect |
 | Detail title | 永遠 inline，不為單頁自訂 hero header |
 | Toolbar actions | 最多兩個 visible trailing action；相同 44pt slot；水平 ellipsis |
 | Content switcher | 同一頁的緊密 subview 才用 segmented / scope control；頂層區域只用 root tab |
@@ -363,7 +364,7 @@ Apple 的 tab bar 是頂層導覽，不是 action；在 iPhone 上浮於內容�
 
 | 共用能力 | 單一責任 | 禁止事項 |
 |---|---|---|
-| App page shell | 統一 root large title、detail inline title、scroll edge、safe area 與 action slots | 各頁自行拼 `AppBar` / `SliverAppBar` 幾何 |
+| App page shell | 統一 root／detail 的 inline title、scroll edge、safe area 與 action slots | 各頁自行拼 `AppBar` / `SliverAppBar` 幾何 |
 | Toolbar action / menu | 統一 44pt hit target、SF Symbol 重量、水平更多、menu 分組與 destructive ordering | Cupertino / Material icon 混用，或每頁自製 popup / sheet |
 | Scope control | 統一行程／地圖／筆記與 DAY 範圍選擇的視覺、狀態與語意 | 同一頁同時存在 capsule、segmented control、DAY pills 三套切換器 |
 | Glass material primitive | 統一 blur、tint、border、shadow、Reduce Transparency fallback | 元件自行疊 blur、border、gradient、shadow |
