@@ -310,6 +310,36 @@ void main() {
     );
   });
 
+  test('/route 不寫入快取(每對座標一個 key、無人 evict → 無限增長)', () async {
+    // sembast 開啟時會全載入記憶體，無界增長的快取會拖垮冷啟動。
+    // /route 與 /poi-search 同病：高基數 key、沒有 mutation 會 evict 它。
+    adapter.onGet(
+      '/route',
+      (s) => s.reply(200, {
+        'polyline': [
+          [35.68, 139.7],
+          [35.66, 139.74],
+        ],
+        'duration': 1315,
+        'distance': 6026,
+      }),
+      queryParameters: {'from': '139.7,35.68', 'to': '139.74,35.66'},
+    );
+    await client.get(
+      '/route',
+      query: {'from': '139.7,35.68', 'to': '139.74,35.66'},
+    );
+    expect(
+      await cache.readResponse(
+        cacheKeyFor('GET', '/route', {
+          'from': '139.7,35.68',
+          'to': '139.74,35.66',
+        }),
+      ),
+      isNull,
+    );
+  });
+
   test('cacheStore=null → 行為不變(GET 成功不報錯)', () async {
     final plain = ApiClient(sessionStore: InMemorySessionStore(), dio: dio);
     adapter.onGet('/trips', (s) => s.reply(200, []));

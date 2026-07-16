@@ -681,8 +681,16 @@ class ApiClient {
     }
   }
 
-  /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
-  bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
+  /// 離線非目標、且每個 query 是不同 key、無 mutation 會 evict 的 GET → 快取只增
+  /// 不減。sembast 開啟時全載入記憶體(見 README「loaded in memory when opened」),
+  /// 無界快取會線性拖垮冷啟動與 RAM,故跳過。
+  ///
+  /// `/route` 的持久化要等快取層遷離 sembast 後,再以 cache-first + 容量上限實作
+  /// (後端已聲明 `Cache-Control: public, max-age=86400`)。
+  static const _uncacheableGetPrefixes = ['/poi-search', '/route'];
+
+  bool _isCacheableGet(String path) =>
+      !_uncacheableGetPrefixes.any(path.startsWith);
 
   Future<({Map<String, dynamic> headers, bool useBearer})> _authHeadersFor(
     String method,
