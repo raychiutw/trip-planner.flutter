@@ -559,17 +559,27 @@ class _DaySection extends ConsumerWidget {
     int dayNum, {
     bool auto = false,
   }) async {
+    // 這裡的 ref 屬於 _DaySection 的 element。unmount 之後碰它會擲 StateError,
+    // 而 StateError 不是 Exception 子類 —— 下面的 `on Exception` 攔不到,會一路
+    // 逃成未捕捉例外把 App 打掛。auto 路徑由 build() 以 unawaited 觸發,和使用者
+    // 離開頁面天然競速,所以每次碰 ref 前都要確認還活著。
+    // (`ref.context.mounted` 正是 riverpod 內部 _assertNotDisposed 的同一條件。)
+    if (!ref.context.mounted) return;
     final scope = '$tripId:$dayNum';
     try {
       await ref
           .read(tripRepositoryProvider)
           .recomputeTravel(tripId: tripId, day: '$dayNum');
+      // scope 記錄是 module-level state,unmount 後仍要更新 —— 該日之後重新
+      // mount 時要看到正確的「待更新」狀態。只有碰 ref 需要守衛。
       _stalledTravelRecomputeScopes.remove(scope);
+      if (!ref.context.mounted) return;
       ref.invalidate(tripDaysProvider(tripId));
       ref.invalidate(tripSegmentsProvider(tripId));
     } on Exception {
       if (auto) {
         _stalledTravelRecomputeScopes.add(scope);
+        if (!ref.context.mounted) return;
         ref.invalidate(tripSegmentsProvider(tripId));
       }
       // 交通重算失敗忽略

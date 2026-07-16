@@ -586,6 +586,42 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
+  testWidgets('自動重算未回來就離開行程頁 → 不得因 use-after-dispose 崩潰', (tester) async {
+    // build() 會 unawaited(_recomputeDay(auto: true))。網路回來前使用者離開,
+    // _DaySection 已 unmount,await 之後的 ref.invalidate 會擲 StateError ——
+    // 而 StateError 不是 Exception 子類,`on Exception` 攔不到 → 未捕捉例外 → 崩潰。
+    // 自成一個 tripId:`_requestedTravelGapRecomputes` 是 module-level static
+    // Set 且跨測試不重置,沿用 _tripId 會被前面的自動重算測試佔掉 key 而提早返回
+    // (既有的 stalled 測試也是這樣各自獨立)。
+    const tripId = 'trip-recompute-unmount';
+    final repo = _MockTripRepository();
+    final pendingRecompute = Completer<void>();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) => pendingRecompute.future);
+
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      tripId: tripId,
+      fetchDays: () => _computableTravelGapDays,
+    );
+    await tester.pump();
+    verify(() => repo.recomputeTravel(tripId: tripId, day: '1')).called(1);
+
+    // 使用者在回應抵達前離開 → 整個 section 連同 ref 一起 unmount。
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    // 網路這時才回來。
+    pendingRecompute.complete();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('自動重算 travel segment 失敗 → 顯示車程待更新', (tester) async {
     final repo = _MockTripRepository();
     const tripId = 'trip-recompute-stalled';
