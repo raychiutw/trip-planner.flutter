@@ -15,6 +15,7 @@ import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_root_scroll_scaffold.dart';
 import '../../ui/tp_settings_group.dart';
 
 /// 帳號統計（GET /account/stats）。
@@ -66,40 +67,33 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
     final accountStats = ref.watch(accountStatsProvider).value;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar.large(pinned: true, title: Text('帳號')),
-          // 底部淨空走 SliverSafeArea：AppShell 開 extendBody，Flutter 把浮動 tab bar
-          // 實測高度灌進 MediaQuery.padding.bottom，不需要自己猜一個常數。
-          SliverSafeArea(
-            top: false,
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s4),
-                  child: _ProfileHero(
-                    user: effectiveUser,
-                    editingName: _editingName,
-                    savingName: _savingName,
-                    nameError: _nameError,
-                    nameController: _nameController,
-                    nameFocusNode: _nameFocusNode,
-                    onEditName: () => _startEditName(effectiveUser),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-                  child: _StatsRow(stats: accountStats),
-                ),
-                const SizedBox(height: TpSpacing.s2),
-                const _SettingsGroup(),
-                _LogoutRow(onTap: () => _confirmLogout(context, ref)),
-              ]),
+    return TpRootScrollScaffold(
+      title: '帳號',
+      slivers: [
+        SliverList(
+          delegate: SliverChildListDelegate([
+            Padding(
+              padding: const EdgeInsets.all(TpSpacing.s4),
+              child: _ProfileHero(
+                user: effectiveUser,
+                editingName: _editingName,
+                savingName: _savingName,
+                nameError: _nameError,
+                nameController: _nameController,
+                nameFocusNode: _nameFocusNode,
+                onEditName: () => _startEditName(effectiveUser),
+              ),
             ),
-          ),
-        ],
-      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+              child: _StatsRow(stats: accountStats),
+            ),
+            const SizedBox(height: TpSpacing.s2),
+            const _SettingsGroup(),
+            _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+          ]),
+        ),
+      ],
     );
   }
 
