@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -237,6 +239,34 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('操作未回來就離開地點管理 → 不得因 use-after-dispose 崩潰', (tester) async {
+    // _run 的 `if (!context.mounted) return` 原本排在兩個 ref.invalidate 之後,
+    // 只護住了 showAppNotice。await 期間使用者離開 → ref.invalidate 擲 StateError
+    // (非 Exception,`on Exception` 攔不到)→ 未捕捉例外 → 崩潰。
+    final repo = _MockTripRepository();
+    final pending = Completer<void>();
+    when(
+      () => repo.removeEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) => pending.future);
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('alt-remove-502')));
+    await tester.pump();
+
+    // 回應抵達前離開頁面。
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    pending.complete();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('下移備選 → reorderEntryAlternates', (tester) async {
