@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_style.dart';
 
@@ -133,4 +134,74 @@ void main() {
 
     expect(chip, isA<BytesMapBitmap>());
   });
+
+  group('Reduce Motion 時鏡頭直接切換而非平移', () {
+    // 規格(design.md 地圖 C 定稿):「Reduce Motion 時卡片與 camera 直接切換」。
+    // 卡片走 TpMotion.resolve 已遵守;鏡頭先前一律 animateCamera —— 而它沒有
+    // duration 參數可以歸零,只能改用 moveCamera。鏡頭平移正是最容易誘發動暈的
+    // 動作,開這個設定的人多半就是為了避免它。
+    setUpAll(() => registerFallbackValue(_FakeCameraUpdate()));
+
+    test('預設(未開啟)→ animateCamera', () async {
+      final googleMap = _MockGoogleMapController();
+      when(() => googleMap.animateCamera(any())).thenAnswer((_) async {});
+      final controller = GoogleTripMapController()..attach(googleMap);
+
+      await controller.move(const TripMapPoint(26.2, 127.7), 16);
+
+      verify(() => googleMap.animateCamera(any())).called(1);
+      verifyNever(() => googleMap.moveCamera(any()));
+    });
+
+    test('開啟後 move 改用 moveCamera', () async {
+      final googleMap = _MockGoogleMapController();
+      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
+      final controller = GoogleTripMapController()
+        ..attach(googleMap)
+        ..reduceMotion = true;
+
+      await controller.move(const TripMapPoint(26.2, 127.7), 16);
+
+      verify(() => googleMap.moveCamera(any())).called(1);
+      verifyNever(() => googleMap.animateCamera(any()));
+    });
+
+    test('開啟後 fitPoints(單點)改用 moveCamera', () async {
+      final googleMap = _MockGoogleMapController();
+      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
+      final controller = GoogleTripMapController()
+        ..attach(googleMap)
+        ..reduceMotion = true;
+
+      await controller.fitPoints(const [
+        TripMapPoint(26.2, 127.7),
+      ], padding: EdgeInsets.zero);
+
+      verify(() => googleMap.moveCamera(any())).called(1);
+      verifyNever(() => googleMap.animateCamera(any()));
+    });
+
+    test('開啟後 fitPoints(多點 bounds + maxZoom 修正)全程 moveCamera', () async {
+      final googleMap = _MockGoogleMapController();
+      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
+      when(() => googleMap.getZoomLevel()).thenAnswer((_) async => 18);
+      final controller = GoogleTripMapController()
+        ..attach(googleMap)
+        ..reduceMotion = true;
+
+      await controller.fitPoints(
+        const [TripMapPoint(26.2, 127.7), TripMapPoint(26.3, 127.8)],
+        padding: EdgeInsets.zero,
+        maxZoom: 16,
+      );
+
+      // bounds 一次 + 超過 maxZoom 的回拉一次,兩次都不得是 animateCamera。
+      verify(() => googleMap.moveCamera(any())).called(2);
+      verifyNever(() => googleMap.animateCamera(any()));
+    });
+  });
 }
+
+class _MockGoogleMapController extends Mock implements GoogleMapController {}
+
+class _FakeCameraUpdate extends Fake implements CameraUpdate {}

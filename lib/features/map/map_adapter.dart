@@ -120,10 +120,27 @@ class TripMapMarker {
 class GoogleTripMapController {
   GoogleMapController? _controller;
 
+  /// 系統開啟「減少動態效果」時設為 true → 鏡頭直接跳,不平移。
+  ///
+  /// 不能像其他動畫那樣走 `TpMotion.resolve` 把 duration 歸零 —— `animateCamera`
+  /// 根本沒有 duration 參數,唯一的「零時間」選項就是換成 `moveCamera`。而鏡頭
+  /// 平移正是最容易誘發動暈的動作,開這個設定的人多半就是為了避免它。
+  ///
+  /// 由 [GoogleTripMapCanvas] 在 build 時依 `MediaQuery.disableAnimationsOf`
+  /// 同步,呼叫端不需各自處理。
+  bool reduceMotion = false;
+
   void attach(GoogleMapController controller) {
     _controller?.dispose();
     _controller = controller;
   }
+
+  Future<void> _applyCamera(
+    GoogleMapController controller,
+    CameraUpdate update,
+  ) => reduceMotion
+      ? controller.moveCamera(update)
+      : controller.animateCamera(update);
 
   Future<void> fitPoints(
     List<TripMapPoint> points, {
@@ -133,7 +150,8 @@ class GoogleTripMapController {
     final controller = _controller;
     if (controller == null || points.isEmpty) return;
     if (points.length == 1) {
-      await controller.animateCamera(
+      await _applyCamera(
+        controller,
         CameraUpdate.newLatLngZoom(
           points.single.toGoogleLatLng(),
           maxZoom ?? 16,
@@ -148,19 +166,23 @@ class GoogleTripMapController {
       padding.right,
       padding.bottom,
     ].reduce((a, b) => a > b ? a : b);
-    await controller.animateCamera(
+    await _applyCamera(
+      controller,
       CameraUpdate.newLatLngBounds(bounds, edgePadding),
     );
     if (maxZoom != null) {
       final zoom = await controller.getZoomLevel();
       if (zoom > maxZoom) {
-        await controller.animateCamera(CameraUpdate.zoomTo(maxZoom));
+        await _applyCamera(controller, CameraUpdate.zoomTo(maxZoom));
       }
     }
   }
 
   Future<void> move(TripMapPoint point, double zoom) async {
-    await _controller?.animateCamera(
+    final controller = _controller;
+    if (controller == null) return;
+    await _applyCamera(
+      controller,
       CameraUpdate.newLatLngZoom(point.toGoogleLatLng(), zoom),
     );
   }
@@ -317,6 +339,9 @@ class _GoogleTripMapCanvasState extends State<GoogleTripMapCanvas> {
   @override
   Widget build(BuildContext context) {
     final config = widget.config;
+    // 在 build 同步而非只在 initState:使用者可能在 app 執行中才打開「減少動態
+    // 效果」,MediaQuery 變動會觸發 rebuild,這裡跟著更新才不會停在舊值。
+    config.controller.reduceMotion = MediaQuery.disableAnimationsOf(context);
     final initialTarget =
         config.initialCenter ??
         (config.initialFitPoints.isEmpty
