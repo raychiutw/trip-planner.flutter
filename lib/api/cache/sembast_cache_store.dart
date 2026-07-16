@@ -1,18 +1,22 @@
-/// sembast-backed 永續快取（app 用;測試走 InMemoryCacheStore）。
+/// 遺留的 sembast 快取存取（僅供一次性搬遷到 drift 時讀取舊 DB）。
+///
+/// **這不是活的 [CacheStore] 實作** —— app 現在跑 `DriftCacheStore`。這裡刻意
+/// 不實作 `CacheStore` 介面：實作了就得跟著介面演進（例如 `enforceCapacity`），
+/// 而那對一個唯讀的遺留格式毫無意義，只會養出死碼。
+///
+/// 只保留 [migrateSembastCacheToDrift] 真正需要的讀取，加上讓測試造出「舊版
+/// app 的 DB」所需的寫入。
 library;
-
-import 'dart:async';
 
 import 'package:sembast/sembast_io.dart';
 
-import 'cache_keys.dart';
 import 'cache_store.dart';
 
-/// 開啟快取 DB(目錄由 path_provider 提供,於 main() 呼叫)。
+/// 開啟舊版 sembast 快取 DB。檔名與 drift 的 `tripline_cache.sqlite` 不同。
 Future<Database> openCacheDatabase(String directoryPath) =>
     databaseFactoryIo.openDatabase('$directoryPath/tripline_cache.db');
 
-class SembastCacheStore implements CacheStore {
+class SembastCacheStore {
   SembastCacheStore(this._db);
 
   final Database _db;
@@ -22,46 +26,9 @@ class SembastCacheStore implements CacheStore {
       .store('mutation_queue');
   final StoreRef<int, Map<String, Object?>> _conflictStore = intMapStoreFactory
       .store('conflict_store');
-  final StreamController<void> _changes = StreamController<void>.broadcast();
 
-  @override
-  Stream<void> get changes => _changes.stream;
-
-  @override
-  Future<CacheEntry?> readResponse(String key) async {
-    final record = await _store.record(key).get(_db);
-    if (record == null) return null;
-    final cachedAt = record['cachedAt'] as String?;
-    return CacheEntry(
-      data: record['data'],
-      cachedAt: cachedAt != null ? DateTime.parse(cachedAt) : DateTime.now(),
-    );
-  }
-
-  @override
-  Future<void> writeResponse(
-    String key,
-    Object? data, {
-    DateTime? cachedAt,
-  }) async {
-    await _store.record(key).put(_db, {
-      'data': data,
-      'cachedAt': (cachedAt ?? DateTime.now()).toIso8601String(),
-    });
-  }
-
-  @override
-  Future<void> evictByPrefix(String prefix) async {
-    final keys = await _store.findKeys(_db);
-    final toDelete = keys
-        .where((k) => cacheKeyMatchesPrefix(k, prefix))
-        .toList();
-    if (toDelete.isNotEmpty) await _store.records(toDelete).delete(_db);
-  }
-
-  @override
+  /// key 為自增 int → 依 key 排序即插入序(= 重播序)。
   Future<List<QueuedMutation>> readQueue() async {
-    // key 為自增 int → 依 key 排序即插入序(= 重播序)。
     final records = await _queueStore.find(
       _db,
       finder: Finder(sortOrders: [SortOrder(Field.key)]),
@@ -71,22 +38,6 @@ class SembastCacheStore implements CacheStore {
     );
   }
 
-  @override
-  Future<void> appendMutation(QueuedMutation mutation) async {
-    await _queueStore.add(_db, mutation.toMap());
-    _changes.add(null);
-  }
-
-  @override
-  Future<void> removeMutation(String id) async {
-    await _queueStore.delete(
-      _db,
-      finder: Finder(filter: Filter.equals('id', id)),
-    );
-    _changes.add(null);
-  }
-
-  @override
   Future<List<ConflictRecord>> readConflicts() async {
     final records = await _conflictStore.find(
       _db,
@@ -97,26 +48,20 @@ class SembastCacheStore implements CacheStore {
     );
   }
 
-  @override
-  Future<void> appendConflict(ConflictRecord conflict) async {
-    await _conflictStore.add(_db, conflict.toMap());
-    _changes.add(null);
-  }
+  // ── 以下僅供測試造出舊版 DB 的 fixture ──────────────────────────────────
 
-  @override
-  Future<void> removeConflict(String id) async {
-    await _conflictStore.delete(
-      _db,
-      finder: Finder(filter: Filter.equals('id', id)),
-    );
-    _changes.add(null);
-  }
+  Future<void> appendMutation(QueuedMutation mutation) =>
+      _queueStore.add(_db, mutation.toMap()).then((_) {});
 
-  @override
-  Future<void> clear() async {
-    await _store.delete(_db);
-    await _queueStore.delete(_db);
-    await _conflictStore.delete(_db);
-    _changes.add(null);
-  }
+  Future<void> appendConflict(ConflictRecord conflict) =>
+      _conflictStore.add(_db, conflict.toMap()).then((_) {});
+
+  Future<void> writeResponse(String key, Object? data, {DateTime? cachedAt}) =>
+      _store
+          .record(key)
+          .put(_db, {
+            'data': data,
+            'cachedAt': (cachedAt ?? DateTime.now()).toIso8601String(),
+          })
+          .then((_) {});
 }

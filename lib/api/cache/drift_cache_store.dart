@@ -40,6 +40,11 @@ class ResponseCacheRows extends Table {
 
   /// ISO8601 字串而非 drift 的 DateTimeColumn —— 後者預設存 unix 秒，會把毫秒
   /// 截掉，TTL 判斷跟著失準。sembast 版也是存字串，行為對齊。
+  ///
+  /// **一律正規化為 UTC 後再寫入**：`enforceCapacity` 在 SQL 裡是拿這個欄位做
+  /// 字典序排序，而本地時間的 `toIso8601String()` 沒有 `Z` 尾綴、UTC 的有 ——
+  /// 格式混用會讓字典序不等於時間序，導致淘汰掉錯的那筆。全部 UTC 後格式一致，
+  /// 字典序即時間序。
   TextColumn get cachedAt => text()();
 
   @override
@@ -110,7 +115,7 @@ class DriftCacheStore implements CacheStore {
           ResponseCacheRowsCompanion.insert(
             key: key,
             data: jsonEncode(data),
-            cachedAt: (cachedAt ?? DateTime.now()).toIso8601String(),
+            cachedAt: (cachedAt ?? DateTime.now()).toUtc().toIso8601String(),
           ),
         );
   }
@@ -123,10 +128,28 @@ class DriftCacheStore implements CacheStore {
     // 而 `%`/`_` 正是 LIKE 的萬用字元 → 會靜默誤刪別的 trip。GLOB 也不行(它的
     // 萬用字元 `*`/`?` 中的 `?` 就在 key 格式裡)。substr 純字面比對，無此問題。
     await _db.customStatement(
-      'DELETE FROM response_cache_rows '
-      'WHERE "key" = ?1 '
-      'OR substr("key", 1, length(?1) + 1) IN (?1 || \'/\', ?1 || \'?\')',
+      'DELETE FROM response_cache_rows WHERE $_prefixMatch',
       [prefix],
+    );
+  }
+
+  /// 對齊 `cacheKeyMatchesPrefix` 的 SQL 片段（`?1` = prefix）。見 [evictByPrefix]
+  /// 為何是 substr 而不是 LIKE。
+  static const _prefixMatch =
+      '("key" = ?1 '
+      'OR substr("key", 1, length(?1) + 1) IN (?1 || \'/\', ?1 || \'?\'))';
+
+  @override
+  Future<void> enforceCapacity(String prefix, int maxEntries) async {
+    // cached_at 是 UTC ISO8601 → 字典序即時間序（見欄位註解）。
+    // maxEntries 為 0 時子查詢回空集合，NOT IN 空集合對所有列為真 → 該前綴全清。
+    await _db.customStatement(
+      'DELETE FROM response_cache_rows '
+      'WHERE $_prefixMatch AND "key" NOT IN ('
+      '  SELECT "key" FROM response_cache_rows '
+      '  WHERE $_prefixMatch ORDER BY cached_at DESC LIMIT ?2'
+      ')',
+      [prefix, maxEntries],
     );
   }
 

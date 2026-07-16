@@ -27,7 +27,7 @@ final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => SecureSettingsStore(),
 );
 
-/// 離線快取 store。預設記憶體版;app 於 main() override 成 SembastCacheStore。
+/// 離線快取 store。預設記憶體版;app 於 main() override 成 DriftCacheStore。
 final cacheStoreProvider = Provider<CacheStore>((ref) => InMemoryCacheStore());
 
 final apiClientProvider = Provider<ApiClient>(
