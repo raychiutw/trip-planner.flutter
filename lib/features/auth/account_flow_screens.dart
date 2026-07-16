@@ -648,6 +648,7 @@ class _AuthScaffold extends StatelessWidget {
               vertical: TpSpacing.s10,
             ),
             child: ConstrainedBox(
+              key: const ValueKey('auth-card'),
               constraints: const BoxConstraints(
                 maxWidth: AppContentWidth.authCard,
               ),
