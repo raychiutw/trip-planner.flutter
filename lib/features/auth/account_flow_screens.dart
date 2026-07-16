@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive_content.dart';
 import '../../theme/tokens.dart';
 
 /// Email/password signup page, including optional invitation token handoff.
@@ -647,7 +648,10 @@ class _AuthScaffold extends StatelessWidget {
               vertical: TpSpacing.s10,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              key: const ValueKey('auth-card'),
+              constraints: const BoxConstraints(
+                maxWidth: AppContentWidth.authCard,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -2,7 +2,7 @@
 
 日期：2026-07-15
 
-狀態：已核准，依 2026-07-15 第二意見與 Liquid Glass 決策修訂
+狀態：已核准，依 2026-07-15 第二意見與 Liquid Glass 決策修訂；2026-07-16 依實機檢視修訂頁首與 Tab 縮減兩項決策（見下方標註）
 
 ## 目標
 
@@ -39,10 +39,10 @@
 - `content surface` 用於卡片、表單、空狀態，以細微明度差取代厚重邊框。
 - `functional material` 用於 Tab bar、toolbar、sheet，採 Liquid Glass 等效半透明材質；內容卡片與頁面背景維持標準 material，不把玻璃鋪滿內容層。
 - 木棕只用於品牌與主要動作；一般文字改用高對比中性色，錯誤、成功、協作與收藏使用語意色。
-- 根頁統一 large title，捲動後收為 inline title；次層頁固定 inline title。
+- **（2026-07-16 修訂）** 全 app 統一 inline title：56pt、單行、過長 ellipsis、右側最多兩個功能鍵；根頁與次層頁同一規格。原訂「根頁統一 large title，捲動後收為 inline title」已撤銷 —— 大標題吃掉手機可觀的垂直空間（連 widget test 都得把視窗放大到 1600px 才穩），且只有部分頁面有大標題會讓 app 讀起來像兩套設計。根頁頁首一律由 `TpRootScrollScaffold` 供給，不得自行建立 `SliverAppBar`。
 - 底部 Tab 改成浮在內容上方的 Apple 式玻璃功能層，內容可在其下方滑過；正常狀態顯示一致 icon + 單字 label，選取以填滿 icon、字重與品牌 accent 辨識，不使用厚重的 Material 選取膠囊。
 - 根 Tab 切換不做水平 push 動畫；Tab bar 保持固定，內容淡入並保留各 Tab 捲動位置。
-- iPhone 長列表向下捲時縮成只保留圖示的緊湊浮動 bar，向上捲、點目前 Tab 或回到頂端時恢復；Android 採同一可理解行為但保留平台返回語意；Flutter Web 維持展開尺寸，僅作響應式與視覺 QA。
+- **（2026-07-16 修訂）** Tab bar 尺寸與 label 固定，不隨捲動縮減。原訂「iPhone 長列表向下捲時縮成只保留圖示的緊湊浮動 bar」已撤銷 —— Apple 的 `tabBarMinimizeBehavior` 語意綁定「tab bar 底下確實是可捲動內容」，本 app 多數根畫面（地圖、聊天）底下是固定版面，縮放沒有對應的捲動語意，只會讓導覽在視線裡跳動。此決策有守門測試（`app_shell_test.dart`「捲動不改變 root tab 尺寸與 label」）。
 - 五個根 Tab 固定為「聊天、行程、地圖、收藏、帳號」，全部只負責導覽、始終可見且保留各分頁導覽與捲動狀態；不得把新增、匯入或其他 action 放進 Tab。
 - Glass surface 使用 backdrop blur、淡色 tint、1px 高光邊界與極輕陰影。淺色／深色模式分開取樣；高對比或無法安全判定透明偏好時提高不透明度，文字與 icon 仍達可讀對比。
 - Glass 互動只做 150–250ms 的尺寸、透明度與色彩轉場；Reduce Motion／`disableAnimations` 時立即切換，禁止彈跳、縮放與大範圍位移。
@@ -157,7 +157,8 @@ Web 後端 worktree 的修改只允許：
 
 - 純 Dart 測試：map view model、日／景點同步、單點 bounds、錯誤分類、人類時間與 scope 翻譯。
 - Widget tests：Tab semantics、FAB／icon actions 名稱、root state variants、表單 label/error、toolbar overflow、map card/day interaction。
-- Shell widget tests：五個 Tab 固定且皆有 label／selected semantics、內容延伸到浮動 bar 後方、垂直向下捲縮減、向上捲恢復、水平捲動不觸發、停用動畫時沒有轉場、Web 不縮減。
+- Shell widget tests：五個 Tab 固定且皆有 label／selected semantics、內容延伸到浮動 bar 後方、捲動不改變 Tab bar 尺寸與 label（2026-07-16 修訂）、停用動畫時沒有轉場。
+- 根頁底部淨空 tests：根頁內容捲到底時最後一項完全露出於浮動 Tab bar 之上；inset 取自 `MediaQuery.padding.bottom` 實測值，不得斷言硬編常數。
 - Platform configuration tests：iOS plist/build setting 與 Android manifest placeholder 存在，repository 無新增明文 key。
 - 若修改後端：API schema／相容性測試及該 repo 的既有完整測試。
 - 靜態驗證：`dart format --output=none --set-exit-if-changed .`、`flutter analyze --no-fatal-infos`、`flutter test`。

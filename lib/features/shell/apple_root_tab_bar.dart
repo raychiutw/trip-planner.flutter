@@ -4,17 +4,19 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 
+/// Root tab bar：固定尺寸、恆顯 label。
+///
+/// 刻意不做 iOS 26 的 tab bar minimize —— Apple 的 minimize 語意綁定「tab bar
+/// 底下是可捲動內容」，本 app 多數 root 畫面底下是固定版面，縮放只會讓導覽跳動。
 class AppleRootTabBar extends StatelessWidget {
   const AppleRootTabBar({
     super.key,
     required this.selectedIndex,
     required this.onSelected,
-    required this.minimized,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-  final bool minimized;
 
   static const _destinations = [
     (
@@ -46,30 +48,23 @@ class AppleRootTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = TpMotion.resolve(context, TpMotion.normal);
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
       child: SafeArea(
         top: false,
-        child: AnimatedPadding(
-          duration: duration,
-          curve: TpMotion.appleEase,
-          padding: EdgeInsets.fromLTRB(
-            minimized ? 36 : 12,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            12,
             0,
-            minimized ? 36 : 12,
+            12,
             TpRootTabGeometry.bottomSpacing,
           ),
           child: TpGlassSurface(
             borderRadius: const BorderRadius.all(Radius.circular(32)),
             child: Material(
               color: Colors.transparent,
-              child: AnimatedContainer(
-                duration: duration,
-                curve: TpMotion.appleEase,
-                height: minimized
-                    ? TpRootTabGeometry.minimizedBarHeight
-                    : TpRootTabGeometry.expandedBarHeight,
+              child: SizedBox(
+                height: TpRootTabGeometry.expandedBarHeight,
                 child: Row(
                   children: [
                     for (var index = 0; index < _destinations.length; index++)
@@ -77,8 +72,6 @@ class AppleRootTabBar extends StatelessWidget {
                         child: _RootTabItem(
                           destination: _destinations[index],
                           selected: selectedIndex == index,
-                          minimized: minimized,
-                          duration: duration,
                           onTap: () => onSelected(index),
                         ),
                       ),
@@ -97,15 +90,11 @@ class _RootTabItem extends StatelessWidget {
   const _RootTabItem({
     required this.destination,
     required this.selected,
-    required this.minimized,
-    required this.duration,
     required this.onTap,
   });
 
   final ({String label, IconData icon, IconData selectedIcon}) destination;
   final bool selected;
-  final bool minimized;
-  final Duration duration;
   final VoidCallback onTap;
 
   @override
@@ -123,29 +112,23 @@ class _RootTabItem extends StatelessWidget {
         radius: 28,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-          child: AnimatedSize(
-            duration: duration,
-            curve: TpMotion.appleEase,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  selected ? destination.selectedIcon : destination.icon,
-                  size: 22,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected ? destination.selectedIcon : destination.icon,
+                size: 22,
+                color: color,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                destination.label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: color,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
-                if (!minimized) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    destination.label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import 'map_style.dart';
 
 /// 地圖 SDK 無關的座標值物件。
 class TripMapPoint {
@@ -70,16 +73,18 @@ class TripMapRoute {
     required this.points,
     required this.color,
     required this.strokeWidth,
-    this.borderColor,
-    this.borderStrokeWidth = 0,
+    this.opacity = 1,
+    this.dashed = false,
   });
 
   final String id;
   final List<TripMapPoint> points;
   final Color color;
   final double strokeWidth;
-  final Color? borderColor;
-  final double borderStrokeWidth;
+  final double opacity;
+
+  /// 虛線：色盲使用者靠線型（而非只靠顏色）區分不同天。
+  final bool dashed;
 }
 
 class TripMapMarker {
@@ -87,6 +92,7 @@ class TripMapMarker {
     required this.id,
     required this.point,
     required this.color,
+    this.style,
     this.title,
     this.snippet,
     this.onTap,
@@ -97,7 +103,12 @@ class TripMapMarker {
 
   final String id;
   final TripMapPoint point;
+
+  /// 該 marker 的識別色（無 [style] 時用於原生 pin 的色相）。
   final Color color;
+
+  /// 給定且有 [glyph] 時畫成白底圓形數字 chip；否則用原生 pin（如使用者定位）。
+  final TripMapMarkerStyle? style;
   final String? title;
   final String? snippet;
   final VoidCallback? onTap;
@@ -216,13 +227,96 @@ Widget buildTripMapCanvas(
   return builder?.call(config) ?? GoogleTripMapCanvas(config: config);
 }
 
-class GoogleTripMapCanvas extends StatelessWidget {
+/// chip 圖快取鍵：同標籤 + 同樣式 + 同像素密度只算一次圖。
+@immutable
+class _ChipKey {
+  const _ChipKey(this.label, this.style, this.pixelRatio);
+
+  final String label;
+  final TripMapMarkerStyle style;
+  final double pixelRatio;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ChipKey &&
+        other.label == label &&
+        other.style == style &&
+        other.pixelRatio == pixelRatio;
+  }
+
+  @override
+  int get hashCode => Object.hash(label, style, pixelRatio);
+}
+
+class GoogleTripMapCanvas extends StatefulWidget {
   const GoogleTripMapCanvas({super.key, required this.config});
 
   final TripMapCanvasConfig config;
 
   @override
+  State<GoogleTripMapCanvas> createState() => _GoogleTripMapCanvasState();
+}
+
+class _GoogleTripMapCanvasState extends State<GoogleTripMapCanvas> {
+  /// 都心 marker 密集重疊時每顆重畫會掉幀，同樣式的 chip 只算一次。
+  final Map<_ChipKey, BitmapDescriptor> _chipCache = {};
+  double _pixelRatio = 1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    unawaited(_renderMissingChips());
+  }
+
+  @override
+  void didUpdateWidget(covariant GoogleTripMapCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    unawaited(_renderMissingChips());
+  }
+
+  Iterable<_ChipKey> get _requiredChips sync* {
+    for (final marker in widget.config.markers) {
+      final style = marker.style;
+      final glyph = marker.glyph;
+      if (style != null && glyph != null) {
+        yield _ChipKey(glyph, style, _pixelRatio);
+      }
+    }
+  }
+
+  Future<void> _renderMissingChips() async {
+    final missing = {
+      for (final key in _requiredChips)
+        if (!_chipCache.containsKey(key)) key,
+    };
+    if (missing.isEmpty) return;
+    for (final key in missing) {
+      _chipCache[key] = await renderTripMapChip(
+        key.label,
+        key.style,
+        pixelRatio: key.pixelRatio,
+      );
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// chip 圖還沒算完時先用原生 pin 佔位（同日別色），算完 setState 換上。
+  BitmapDescriptor _iconFor(TripMapMarker marker) {
+    final style = marker.style;
+    final glyph = marker.glyph;
+    if (style != null && glyph != null) {
+      final chip = _chipCache[_ChipKey(glyph, style, _pixelRatio)];
+      if (chip != null) return chip;
+    }
+    return BitmapDescriptor.defaultMarkerWithHue(
+      HSVColor.fromColor(marker.color).hue,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final config = widget.config;
     final initialTarget =
         config.initialCenter ??
         (config.initialFitPoints.isEmpty
@@ -268,43 +362,87 @@ class GoogleTripMapCanvas extends StatelessWidget {
             clusterManagerId: config.clusterMarkers && marker.clusterable
                 ? _tripClusterManagerId
                 : null,
-            icon: marker.glyph == null
-                ? BitmapDescriptor.defaultMarkerWithHue(
-                    HSVColor.fromColor(marker.color).hue,
-                  )
-                : BitmapDescriptor.pinConfig(
-                    backgroundColor: marker.color,
-                    glyph: TextGlyph(
-                      text: marker.glyph!,
-                      textColor: Colors.white,
-                    ),
-                  ),
+            icon: _iconFor(marker),
             infoWindow: marker.title == null && marker.snippet == null
                 ? InfoWindow.noText
                 : InfoWindow(title: marker.title, snippet: marker.snippet),
           ),
       },
       polylines: {
-        for (final route in config.routes) ...{
-          if (route.borderColor != null && route.borderStrokeWidth > 0)
-            Polyline(
-              polylineId: PolylineId('${route.id}-border'),
-              points: [
-                for (final point in route.points) point.toGoogleLatLng(),
-              ],
-              color: route.borderColor!,
-              width: (route.strokeWidth + route.borderStrokeWidth * 2).round(),
-              zIndex: 0,
-            ),
+        for (final route in config.routes)
           Polyline(
             polylineId: PolylineId(route.id),
             points: [for (final point in route.points) point.toGoogleLatLng()],
-            color: route.color,
+            color: route.color.withValues(alpha: route.opacity),
             width: route.strokeWidth.round(),
-            zIndex: 1,
+            patterns: route.dashed
+                ? [PatternItem.dash(12), PatternItem.gap(8)]
+                : const [],
           ),
-        },
       },
     );
   }
+}
+
+/// 把數字 chip 畫成點陣圖給原生 marker 用：白底圓形、日別色外圈 + 中央數字，
+/// 外側再加一圈半透明黑做分離。
+///
+/// 那圈黑不是裝飾 —— marker 在都心密集重疊時（見沖繩那覇都心）沒有它會糊成一團
+/// 認不出邊界，這是 web 從 production 使用者回饋學到的（見 mapHelpers.markerContent）。
+///
+/// 抽成頂層函式讓繪圖邏輯可獨立於原生 GoogleMap 測試。
+Future<BitmapDescriptor> renderTripMapChip(
+  String label,
+  TripMapMarkerStyle style, {
+  required double pixelRatio,
+}) async {
+  const shadowRing = 3.0;
+  final canvasSize = (style.diameter + shadowRing * 2) * pixelRatio;
+  final center = Offset(canvasSize / 2, canvasSize / 2);
+  final borderWidth = style.borderWidth * pixelRatio;
+  final radius = style.diameter * pixelRatio / 2 - borderWidth / 2;
+
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+
+  canvas.drawCircle(
+    center,
+    radius + borderWidth / 2 + shadowRing * pixelRatio,
+    Paint()..color = const Color(0x2E000000),
+  );
+  canvas.drawCircle(center, radius, Paint()..color = style.fill);
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = borderWidth
+      ..color = style.stroke,
+  );
+
+  final painter = TextPainter(
+    text: TextSpan(
+      text: label,
+      style: TextStyle(
+        color: style.text,
+        fontSize: style.fontSize * pixelRatio,
+        fontWeight: FontWeight.w700,
+        height: 1,
+        letterSpacing: 0,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+
+  final image = await recorder.endRecording().toImage(
+    canvasSize.ceil(),
+    canvasSize.ceil(),
+  );
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return BitmapDescriptor.bytes(
+    bytes!.buffer.asUint8List(),
+    imagePixelRatio: pixelRatio,
+  );
 }

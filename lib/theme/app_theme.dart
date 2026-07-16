@@ -361,6 +361,13 @@ abstract final class AppTheme {
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
+      // HIG title2：內容主體的 hero 標題（行程名等），不是頁面標題。
+      headlineSmall: TextStyle(
+        fontSize: 22,
+        height: 28 / 22,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      ),
       titleLarge: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
@@ -370,6 +377,14 @@ abstract final class AppTheme {
         fontSize: 17,
         height: 24 / 17,
         fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      ),
+      // HIG subheadline：區塊小標。未定義時會 fallback 到 Material 預設的
+      // 14/w500/letterSpacing 0.1 —— 那個字距違反「中文不加字距」。
+      titleSmall: TextStyle(
+        fontSize: 15,
+        height: 20 / 15,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),
       bodyLarge: TextStyle(
