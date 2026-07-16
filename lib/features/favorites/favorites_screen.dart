@@ -139,12 +139,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         : filteredFavorites;
 
     return [
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(
+      // 底部淨空走 SliverSafeArea：AppShell 開 extendBody，Flutter 把浮動 tab bar
+      // 實測高度灌進 MediaQuery.padding.bottom，不需要自己猜一個常數。
+      SliverSafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(
           TpSpacing.s4,
           TpSpacing.s3,
           TpSpacing.s4,
-          112,
+          TpSpacing.s4,
         ),
         sliver: SliverList(
           delegate: SliverChildListDelegate([

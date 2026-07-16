@@ -70,8 +70,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       body: CustomScrollView(
         slivers: [
           const SliverAppBar.large(pinned: true, title: Text('帳號')),
-          SliverPadding(
-            padding: const EdgeInsets.only(bottom: 112),
+          // 底部淨空走 SliverSafeArea：AppShell 開 extendBody，Flutter 把浮動 tab bar
+          // 實測高度灌進 MediaQuery.padding.bottom，不需要自己猜一個常數。
+          SliverSafeArea(
+            top: false,
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 Padding(

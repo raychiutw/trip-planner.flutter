@@ -529,8 +529,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     List<TripSummary> trips,
     String? currentUserId,
   ) {
-    return SliverPadding(
-      padding: const EdgeInsets.all(TpSpacing.s4),
+    // bottom 走 SliverSafeArea：AppShell 開 extendBody，Flutter 把浮動 tab bar 高度
+    // 灌進 MediaQuery.padding.bottom，最後一張卡才捲得出 tab bar。
+    return SliverSafeArea(
+      top: false,
+      minimum: const EdgeInsets.all(TpSpacing.s4),
       sliver: SliverList.separated(
         itemCount: trips.length,
         separatorBuilder: (context, index) =>
