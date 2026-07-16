@@ -82,8 +82,10 @@ abstract final class AppTheme {
 |---|---|---|
 | `displaySmall` | 34 / auto / 700 | large title |
 | `headlineMedium` | 28 / 36 / 700 | 頁面標題 |
+| `headlineSmall` | 22 / 28 / 700 | HIG title2：內容 hero（行程名等），不是頁面標題 |
 | `titleLarge` | 20 / auto / 700 | app bar / section |
 | `titleMedium` | 17 / 24 / 700 | 卡片標題 |
+| `titleSmall` | 15 / 20 / 600 | HIG subheadline：區塊小標 |
 | `bodyLarge` | 17 / 26 / 400 | 主要內文 |
 | `bodyMedium` | 15 / 23 / 400 | 次要內文 |
 | `bodySmall` | 13 / 18 / 400 | caption，tabular figures |
@@ -93,15 +95,26 @@ abstract final class AppTheme {
 
 中文 `letterSpacing` 一律為 `0`。
 
+> **只用上表列出的角色。** `TextTheme` 未定義的角色會 fallback 到 Material 預設值 —— 那是 Material 的字級與字距，不是 Tripline 的 HIG 字階。`headlineSmall` 與 `titleSmall` 就曾因此漏定義，導致約 18 處文字跑掉設計系統，其中 `titleSmall` 還帶著 Material 預設的 `letterSpacing 0.1`，直接違反「中文不加字距」。`app_theme_test.dart` 有測試逐一驗證全字階 `letterSpacing` 為 0。
+
 ## 自適應導覽與內容寬度
 
 `AppShell` 固定五個頂層目的地：聊天、行程、地圖、收藏、帳號。切換 branch 會觸發 selection haptic；再次點目前 tab 會回到該 branch 初始位置。
 
-| 條件 | 導覽元件 |
-|---|---|
-| 寬度 `< 768` 且 iOS/macOS | `CupertinoTabBar` |
-| 寬度 `< 768` 且其他平台 | Material `NavigationBar` |
-| 寬度 `>= 768` | `NavigationRail` |
+導覽元件一律是浮動玻璃 `AppleRootTabBar`（`lib/features/shell/apple_root_tab_bar.dart`），不依平台或寬度切換。
+
+> **2026-07-16 更正**：本節原本記載依寬度切換 `CupertinoTabBar` / `NavigationBar` / `NavigationRail`。該設計**從未實作** —— `AppShell` 一直無條件使用 `AppleRootTabBar`。若日後要支援寬螢幕 rail，需另立規格。
+
+Tab bar 尺寸固定，不隨捲動縮減（決策理由見 [2026-07-15 規格](superpowers/specs/2026-07-15-apple-music-ui-google-maps-parity-design.md)的 2026-07-16 修訂）。
+
+### 根頁底部淨空（重要且非顯而易見）
+
+`AppShell` 開 `extendBody`，內容會延伸到浮動 Tab bar 底下（玻璃要有東西可糊才成立）。Flutter 會把 Tab bar 的**實測高度**灌進 body 的 `MediaQuery.padding.bottom`（見 `scaffold.dart` 的 `_BodyBuilder`），畫面**必須**讀它，不得自行硬編常數：
+
+- 捲動型根頁：使用 `TpRootScrollScaffold`，它已提供底部 spacer。
+- 其他底部錨定內容：包 `SafeArea(top: false)` 或 `SliverSafeArea(top: false)`。
+
+硬編的值在任何裝置都不會剛好對 —— 實際高度是 `safe area + 8 + 64`（34pt 安全區裝置為 106、無安全區裝置為 72）。先前三個根頁分別硬編 `16` / `112` / `112`，其中兩處直接破版。
 
 `AppAdaptiveContent` 保留父層高度約束，手機全寬，寬螢幕依角色置中：
 
