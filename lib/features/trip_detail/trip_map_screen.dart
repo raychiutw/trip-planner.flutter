@@ -12,23 +12,10 @@ import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../map/map_adapter.dart';
 import '../map/map_location.dart';
+import '../map/map_style.dart';
 import '../trips/trip_card.dart';
 import '../trips/trips_list_screen.dart';
 import 'trip_providers.dart';
-
-/// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
-const List<Color> kDayPinPalette = [
-  Color(0xFFEF4444), // red
-  Color(0xFFF97316), // orange
-  Color(0xFFF59E0B), // amber
-  Color(0xFF10B981), // emerald
-  Color(0xFF14B8A6), // teal
-  Color(0xFF0EA5E9), // sky
-  Color(0xFF3B82F6), // blue
-  Color(0xFF8B5CF6), // violet
-  Color(0xFFD946EF), // fuchsia
-  Color(0xFFF43F5E), // rose
-];
 
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
@@ -217,7 +204,25 @@ class _DayPin {
   final TimelineEntry entry;
   final TripMapPoint point;
 
-  Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
+  /// 以 dayNum 取色（非陣列 index）—— 對齊 web，天數有缺口也不會配色錯位。
+  Color get color => dayPinColor(dayNum);
+}
+
+/// 已取得幾何的路段。只存幾何與所屬日／端點，樣式留到 build 時推導。
+class _RouteSegment {
+  const _RouteSegment({
+    required this.id,
+    required this.points,
+    required this.dayNum,
+    required this.fromEntryId,
+    required this.toEntryId,
+  });
+
+  final String id;
+  final List<TripMapPoint> points;
+  final int dayNum;
+  final int fromEntryId;
+  final int toEntryId;
 }
 
 class _TripMapView extends ConsumerStatefulWidget {
@@ -258,7 +263,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   bool _mapIsReady = false;
 
   bool _initialFocusApplied = false;
-  List<TripMapRoute> _routes = const [];
+
+  /// 目前聚焦的停留點：marker 改用 accent 填底放大，相鄰路段加粗。
+  int? _focusedEntryId;
+  List<_RouteSegment> _routeSegments = const [];
   bool _loadingRoutes = false;
   int _routeLoadGeneration = 0;
 
@@ -372,7 +380,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (pairs.isEmpty) {
       if (mounted) {
         setState(() {
-          _routes = const [];
+          _routeSegments = const [];
           _loadingRoutes = false;
         });
       }
@@ -380,7 +388,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     }
     setState(() => _loadingRoutes = true);
     final repository = ref.read(mapRepositoryProvider);
-    final routes = await Future.wait([
+    final segments = await Future.wait([
       for (final (index, pair) in pairs.indexed)
         () async {
           try {
@@ -391,16 +399,15 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               toLng: pair.$2.point.longitude,
             );
             if (result.polyline.length < 2) return null;
-            return TripMapRoute(
+            return _RouteSegment(
               id: 'day-route-$index',
               points: [
                 for (final point in result.polyline)
                   TripMapPoint(point.lat, point.lng),
               ],
-              color: pair.$1.color,
-              strokeWidth: 5,
-              borderColor: Colors.white,
-              borderStrokeWidth: 1.5,
+              dayNum: pair.$1.dayNum,
+              fromEntryId: pair.$1.entry.id,
+              toEntryId: pair.$2.entry.id,
             );
           } catch (_) {
             // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
@@ -412,9 +419,32 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     ]);
     if (!mounted || generation != _routeLoadGeneration) return;
     setState(() {
-      _routes = routes.whereType<TripMapRoute>().toList();
+      _routeSegments = segments.whereType<_RouteSegment>().toList();
       _loadingRoutes = false;
     });
+  }
+
+  /// 只存幾何，樣式在此依目前聚焦點推導 —— 換聚焦不必重打 /route。
+  List<TripMapRoute> _buildRoutes() {
+    return [
+      for (final segment in _routeSegments)
+        () {
+          final style = tripMapRouteStyle(
+            dayNum: segment.dayNum,
+            isActive:
+                _focusedEntryId == segment.fromEntryId ||
+                _focusedEntryId == segment.toEntryId,
+          );
+          return TripMapRoute(
+            id: segment.id,
+            points: segment.points,
+            color: style.color,
+            strokeWidth: style.strokeWidth,
+            opacity: style.opacity,
+            dashed: style.dashed,
+          );
+        }(),
+    ];
   }
 
   /// fitPoints 邊距：地圖是滿版的，pin 必須避開 day tabs、POI 卡與浮動 tab bar，
@@ -433,6 +463,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _focusPin(_DayPin pin) {
+    setState(() => _focusedEntryId = pin.entry.id);
     if (!_mapIsReady) return;
     _mapController.move(pin.point, 16);
   }
@@ -536,7 +567,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     // 總覽用主色，單日用該日輪替色（地圖 data-viz 例外）。
     final pillColor = isOverview
         ? colorScheme.primary
-        : kDayPinPalette[(tabIndex - 1) % kDayPinPalette.length];
+        : dayPinColor(widget.days[tabIndex - 1].dayNum);
 
     // 未選取用 surface 實底而非透明：pill 浮在地圖上，透明底會讓文字糊進地圖。
     return Material(
@@ -596,7 +627,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               initialPadding: _mapFitPadding(),
               initialMaxZoom: 16,
               onMapReady: _handleMapReady,
-              routes: _routes,
+              routes: _buildRoutes(),
               clusterMarkers: visiblePins.length >= 12,
               markers: [
                 for (final pin in visiblePins) _buildMarker(pin),
@@ -634,15 +665,20 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   TripMapMarker _buildMarker(_DayPin pin) {
+    final style = tripMapMarkerStyle(
+      dayColor: pin.color,
+      isFocused: pin.entry.id == _focusedEntryId,
+    );
     return TripMapMarker(
       id: 'map-pin-${pin.entry.id}',
       point: pin.point,
       color: pin.color,
+      style: style,
       title: '${pin.pinNumber}. ${pin.entry.title}',
       snippet: 'DAY ${pin.dayNum}',
       glyph: '${pin.pinNumber}',
       onTap: () => _focusPin(pin),
-      zIndex: 100 - pin.dayIndex,
+      zIndex: style.zIndex,
     );
   }
 
