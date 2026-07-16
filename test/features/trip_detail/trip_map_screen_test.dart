@@ -51,6 +51,32 @@ class _StubMapRepository implements MapRepository {
   }
 }
 
+/// 首段路線丟出 `Error`（非 `Exception`）：重現 `MapRepository.fetchRoute` 對空 body
+/// 做 `as Map<String, dynamic>` 時的 TypeError。單段失敗不得波及其餘路線。
+class _FirstSegmentFailsMapRepository implements MapRepository {
+  int calls = 0;
+
+  @override
+  Future<TripRouteResult> fetchRoute({
+    required double fromLat,
+    required double fromLng,
+    required double toLat,
+    required double toLng,
+    cancelToken,
+  }) async {
+    calls++;
+    if (calls == 1) throw ArgumentError('route upstream returned no body');
+    return TripRouteResult(
+      polyline: [
+        TripRoutePoint(lat: fromLat, lng: fromLng),
+        TripRoutePoint(lat: toLat, lng: toLng),
+      ],
+      durationSeconds: 600,
+      distanceMeters: 4200,
+    );
+  }
+}
+
 TimelineEntry _entry({
   required int id,
   required String title,
@@ -80,6 +106,19 @@ final _dayOne = TripDay(
     _entry(id: 12, title: '國際通', startTime: '11:30', lat: 26.214, lng: 127.688),
     // 無座標 entry：不應產生 pin 與 entry card。
     _entry(id: 13, title: '自由活動', startTime: '14:00'),
+  ],
+);
+
+/// 三個含座標停留點 → 兩段相鄰路線，用來驗證單段失敗的波及範圍。
+final _dayWithTwoSegments = TripDay(
+  id: 3,
+  dayNum: 1,
+  date: '2026-04-01',
+  version: 1,
+  timeline: [
+    _entry(id: 31, title: '首里城', startTime: '09:00', lat: 26.217, lng: 127.719),
+    _entry(id: 32, title: '國際通', startTime: '11:30', lat: 26.214, lng: 127.688),
+    _entry(id: 33, title: '波上宮', startTime: '14:00', lat: 26.221, lng: 127.667),
   ],
 );
 
@@ -209,6 +248,19 @@ void main() {
 
     expect(repository.calls, 1);
     expect(find.byKey(const ValueKey('map-route-day-route-0')), findsOneWidget);
+  });
+
+  testWidgets('單段路線失敗：略過該段但其餘路線仍須繪出', (tester) async {
+    final repository = _FirstSegmentFailsMapRepository();
+    await tester.pumpWidget(
+      _buildScreen([_dayWithTwoSegments], mapRepository: repository),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.calls, 2);
+    // 失敗的第一段略過，成功的第二段不該被一起犧牲。
+    expect(find.byKey(const ValueKey('map-route-day-route-0')), findsNothing);
+    expect(find.byKey(const ValueKey('map-route-day-route-1')), findsOneWidget);
   });
 
   testWidgets('指定 initialEntryId：初始顯示該停留點所在天', (tester) async {

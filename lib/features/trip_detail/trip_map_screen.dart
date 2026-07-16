@@ -402,7 +402,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               borderColor: Colors.white,
               borderStrokeWidth: 1.5,
             );
-          } on Exception {
+          } catch (_) {
+            // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
+            // 而不只是 Exception —— Future.wait 是 fail-fast，漏出去會讓整趟路線
+            // 全滅且 _loadingRoutes 永遠卡在 true。
             return null;
           }
         }(),
