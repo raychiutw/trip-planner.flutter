@@ -15,6 +15,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'trip_pdf_service.dart';
 import 'trip_print_data.dart';
 
@@ -63,7 +64,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
     final data = dataAsync.value;
     final busy = _busyAction != null;
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: const Text('列印預覽'),
         actions: [
           IconButton(

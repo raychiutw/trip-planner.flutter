@@ -14,6 +14,7 @@ import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import '../../trip_detail/trip_providers.dart';
 import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
@@ -215,7 +216,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     final tripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('加入行程：$_title')),
+      appBar: TpAppBar(title: Text('加入行程：$_title')),
       body: tripsAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('add-to-trip-loading')),
@@ -332,7 +333,7 @@ class _AddToTripRouteState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('加入行程')),
+      appBar: const TpAppBar(title: Text('加入行程')),
       body: loading
           ? const AppListLoadingSkeleton(
               key: ValueKey('add-to-trip-route-loading'),

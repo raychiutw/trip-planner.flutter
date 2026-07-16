@@ -13,6 +13,7 @@ import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/oauth.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'account_display.dart';
 import 'ai_authorize_card.dart';
 
@@ -39,7 +40,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   Widget build(BuildContext context) {
     final appsAsync = ref.watch(connectedAppsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('已連結的應用程式')),
+      appBar: const TpAppBar(title: Text('已連結的應用程式')),
       body: appsAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('connected-apps-loading'),

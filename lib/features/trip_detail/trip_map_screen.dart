@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,12 +11,29 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_bottom_accessory.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../map/map_adapter.dart';
 import '../map/map_location.dart';
-import '../map/map_style.dart';
 import '../trips/trip_card.dart';
 import '../trips/trips_list_screen.dart';
 import 'trip_providers.dart';
+import 'widgets/trip_section_menu.dart';
+
+/// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
+const List<Color> kDayPinPalette = [
+  Color(0xFFEF4444), // red
+  Color(0xFFF97316), // orange
+  Color(0xFFF59E0B), // amber
+  Color(0xFF10B981), // emerald
+  Color(0xFF14B8A6), // teal
+  Color(0xFF0EA5E9), // sky
+  Color(0xFF3B82F6), // blue
+  Color(0xFF8B5CF6), // violet
+  Color(0xFFD946EF), // fuchsia
+  Color(0xFFF43F5E), // rose
+];
 
 /// 行程地圖：day tabs（總覽 + DAY NN）＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
@@ -49,7 +67,7 @@ class TripMapScreen extends ConsumerWidget {
     };
     final currentTrip = _findTripSummary(trips, tripId);
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: Text(currentTrip?.displayTitle ?? '行程地圖'),
         actions: [
           if (trips.length > 1)
@@ -70,6 +88,7 @@ class TripMapScreen extends ConsumerWidget {
           ),
         ),
         data: (days) => _TripMapView(
+          tripId: tripId,
           days: days,
           initialEntryId: initialEntryId,
           mapBuilder: mapBuilder,
@@ -186,53 +205,33 @@ String? _tripMeta(TripSummary trip) {
   return parts.join(' · ');
 }
 
-/// 單一 pin：entry master 座標 + 所屬日 index（決定輪替色）與該日內序號。
-class _DayPin {
-  const _DayPin({
+/// 單一地圖停留點：無座標時仍保留在水平 POI pages。
+class _MapStop {
+  const _MapStop({
     required this.dayIndex,
     required this.dayNum,
-    required this.pinNumber,
     required this.entry,
-    required this.point,
+    this.point,
   });
 
   final int dayIndex;
   final int dayNum;
-
-  /// 該日內 1-based 序號（圓形 marker 上的數字）。
-  final int pinNumber;
   final TimelineEntry entry;
-  final TripMapPoint point;
+  final TripMapPoint? point;
 
-  /// 以 dayNum 取色（非陣列 index）—— 對齊 web，天數有缺口也不會配色錯位。
-  Color get color => dayPinColor(dayNum);
-}
-
-/// 已取得幾何的路段。只存幾何與所屬日／端點，樣式留到 build 時推導。
-class _RouteSegment {
-  const _RouteSegment({
-    required this.id,
-    required this.points,
-    required this.dayNum,
-    required this.fromEntryId,
-    required this.toEntryId,
-  });
-
-  final String id;
-  final List<TripMapPoint> points;
-  final int dayNum;
-  final int fromEntryId;
-  final int toEntryId;
+  Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
 }
 
 class _TripMapView extends ConsumerStatefulWidget {
   const _TripMapView({
+    required this.tripId,
     required this.days,
     this.initialEntryId,
     this.mapBuilder,
     this.locationService,
   });
 
+  final String tripId;
   final List<TripDay> days;
   final int? initialEntryId;
   final TripMapCanvasBuilder? mapBuilder;
@@ -243,18 +242,25 @@ class _TripMapView extends ConsumerStatefulWidget {
 }
 
 class _TripMapViewState extends ConsumerState<_TripMapView> {
-  /// day tab 列高度（浮在地圖頂部）。
-  static const _dayTabsHeight = TpSpacing.tapMin + TpSpacing.s2 * 2;
-
-  /// POI 卡列高度（浮在 root tab bar 上方）。
-  static const _entryCardsHeight = 104.0;
-
-  /// 浮層之下、地圖之上的控制項起始 y（避開 day tabs）。
-  static const _mapControlTop = _dayTabsHeight + TpSpacing.s4;
-
   final GoogleTripMapController _mapController = GoogleTripMapController();
+  late final PageController _pageController;
   TripMapPoint? _userLocation;
   bool _locating = false;
+  int? _activeEntryId;
+
+  double get _poiAccessoryHeight =>
+      MediaQuery.textScalerOf(context).scale(1) >= 1.2
+      ? 144
+      : TpBottomAccessory.height;
+
+  EdgeInsets get _mapPadding => EdgeInsets.fromLTRB(
+    TpSpacing.s10,
+    TpSpacing.s10 + TpSpacing.tapMin,
+    TpSpacing.s10,
+    _poiAccessoryHeight +
+        TpRootTabGeometry.expandedHeight(context) +
+        TpSpacing.s6,
+  );
 
   /// 0 = 總覽，i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
@@ -263,10 +269,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   bool _mapIsReady = false;
 
   bool _initialFocusApplied = false;
-
-  /// 目前聚焦的停留點：marker 改用 accent 填底放大，相鄰路段加粗。
-  int? _focusedEntryId;
-  List<_RouteSegment> _routeSegments = const [];
+  List<TripMapRoute> _routes = const [];
   bool _loadingRoutes = false;
   int _routeLoadGeneration = 0;
 
@@ -274,6 +277,15 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   void initState() {
     super.initState();
     _selectedTabIndex = _initialTabIndex();
+    final initialStops = _stopsForTab(_selectedTabIndex);
+    final initialPage = _initialStopPage(initialStops);
+    _activeEntryId = initialStops.isEmpty
+        ? null
+        : initialStops[initialPage].entry.id;
+    _pageController = PageController(
+      viewportFraction: 0.84,
+      initialPage: initialPage,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_loadRoutes());
     });
@@ -285,50 +297,66 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (oldWidget.initialEntryId != widget.initialEntryId ||
         !identical(oldWidget.days, widget.days)) {
       _selectedTabIndex = _initialTabIndex();
+      final stops = _stopsForTab(_selectedTabIndex);
+      final initialPage = _initialStopPage(stops);
+      _activeEntryId = stops.isEmpty ? null : stops[initialPage].entry.id;
       _initialFocusApplied = false;
       unawaited(_loadRoutes());
-      if (_mapIsReady) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _applyInitialFocus();
-        });
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_pageController.hasClients) _pageController.jumpToPage(initialPage);
+        if (_mapIsReady) _applyInitialFocus();
+      });
     }
   }
 
   @override
   void dispose() {
+    _pageController.dispose();
     _mapController.dispose();
     super.dispose();
   }
 
-  /// 逐日萃取 master 座標非 null 的 entries 為 pins。
-  List<List<_DayPin>> get _pinsByDay {
+  /// 所有 entries 都是 POI page 的資料來源。
+  List<List<_MapStop>> get _stopsByDay {
     return [
       for (final (dayIndex, day) in widget.days.indexed)
-        _extractDayPins(dayIndex, day),
+        _extractDayStops(dayIndex, day),
     ];
   }
 
-  List<_DayPin> _extractDayPins(int dayIndex, TripDay day) {
-    final dayPins = <_DayPin>[];
-    for (final entry in day.timeline) {
-      final lat = entry.master?.lat;
-      final lng = entry.master?.lng;
-      if (lat == null || lng == null) continue;
-      dayPins.add(
-        _DayPin(
+  List<_MapStop> _extractDayStops(int dayIndex, TripDay day) {
+    return [
+      for (final entry in day.timeline)
+        _MapStop(
           dayIndex: dayIndex,
           dayNum: day.dayNum,
-          pinNumber: dayPins.length + 1,
           entry: entry,
-          point: TripMapPoint(lat, lng),
+          point: switch ((entry.master?.lat, entry.master?.lng)) {
+            (final double lat, final double lng) => TripMapPoint(lat, lng),
+            _ => null,
+          },
         ),
-      );
-    }
-    return dayPins;
+    ];
   }
 
-  List<_DayPin> _pinsForTab(int tabIndex) {
+  List<List<_MapStop>> get _pinsByDay => [
+    for (final stops in _stopsByDay)
+      [
+        for (final stop in stops)
+          if (stop.point != null) stop,
+      ],
+  ];
+
+  List<_MapStop> _stopsForTab(int tabIndex) {
+    final stopsByDay = _stopsByDay;
+    if (tabIndex == 0) {
+      return [for (final dayStops in stopsByDay) ...dayStops];
+    }
+    return stopsByDay[tabIndex - 1];
+  }
+
+  List<_MapStop> _pinsForTab(int tabIndex) {
     final pinsByDay = _pinsByDay;
     if (tabIndex == 0) {
       return [for (final dayPins in pinsByDay) ...dayPins];
@@ -339,33 +367,44 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   int _initialTabIndex() {
     final entryId = widget.initialEntryId;
     if (entryId == null) return 0;
-    final pinsByDay = _pinsByDay;
-    for (final (dayIndex, dayPins) in pinsByDay.indexed) {
-      if (dayPins.any((pin) => pin.entry.id == entryId)) {
+    for (final (dayIndex, dayStops) in _stopsByDay.indexed) {
+      if (dayStops.any((stop) => stop.entry.id == entryId)) {
         return dayIndex + 1;
       }
     }
     return 0;
   }
 
-  _DayPin? _initialPin() {
+  int _initialStopPage(List<_MapStop> stops) {
+    final entryId = widget.initialEntryId;
+    if (entryId == null) return 0;
+    final index = stops.indexWhere((stop) => stop.entry.id == entryId);
+    return index < 0 ? 0 : index;
+  }
+
+  _MapStop? _initialStop() {
     final entryId = widget.initialEntryId;
     if (entryId == null) return null;
-    for (final dayPins in _pinsByDay) {
-      for (final pin in dayPins) {
-        if (pin.entry.id == entryId) return pin;
+    for (final dayStops in _stopsByDay) {
+      for (final stop in dayStops) {
+        if (stop.entry.id == entryId) return stop;
       }
     }
     return null;
   }
 
   void _selectTab(int tabIndex) {
-    setState(() => _selectedTabIndex = tabIndex);
-    _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point]);
+    final stops = _stopsForTab(tabIndex);
+    setState(() {
+      _selectedTabIndex = tabIndex;
+      _activeEntryId = stops.firstOrNull?.entry.id;
+    });
+    if (_pageController.hasClients) _pageController.jumpToPage(0);
+    _fitToPoints([for (final pin in _pinsForTab(tabIndex)) pin.point!]);
     unawaited(_loadRoutes());
   }
 
-  List<(_DayPin, _DayPin)> _routePairsForTab(int tabIndex) {
+  List<(_MapStop, _MapStop)> _routePairsForTab(int tabIndex) {
     final days = tabIndex == 0 ? _pinsByDay : [_pinsByDay[tabIndex - 1]];
     return [
       for (final pins in days)
@@ -380,7 +419,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (pairs.isEmpty) {
       if (mounted) {
         setState(() {
-          _routeSegments = const [];
+          _routes = const [];
           _loadingRoutes = false;
         });
       }
@@ -388,84 +427,70 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     }
     setState(() => _loadingRoutes = true);
     final repository = ref.read(mapRepositoryProvider);
-    final segments = await Future.wait([
+    final routes = await Future.wait([
       for (final (index, pair) in pairs.indexed)
         () async {
           try {
             final result = await repository.fetchRoute(
-              fromLat: pair.$1.point.latitude,
-              fromLng: pair.$1.point.longitude,
-              toLat: pair.$2.point.latitude,
-              toLng: pair.$2.point.longitude,
+              fromLat: pair.$1.point!.latitude,
+              fromLng: pair.$1.point!.longitude,
+              toLat: pair.$2.point!.latitude,
+              toLng: pair.$2.point!.longitude,
             );
             if (result.polyline.length < 2) return null;
-            return _RouteSegment(
+            return TripMapRoute(
               id: 'day-route-$index',
               points: [
                 for (final point in result.polyline)
                   TripMapPoint(point.lat, point.lng),
               ],
-              dayNum: pair.$1.dayNum,
-              fromEntryId: pair.$1.entry.id,
-              toEntryId: pair.$2.entry.id,
+              color: pair.$1.color,
+              strokeWidth: 5,
+              borderColor: Colors.white,
+              borderStrokeWidth: 1.5,
             );
-          } catch (_) {
-            // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
-            // 而不只是 Exception —— Future.wait 是 fail-fast，漏出去會讓整趟路線
-            // 全滅且 _loadingRoutes 永遠卡在 true。
+          } on Exception {
             return null;
           }
         }(),
     ]);
     if (!mounted || generation != _routeLoadGeneration) return;
     setState(() {
-      _routeSegments = segments.whereType<_RouteSegment>().toList();
+      _routes = routes.whereType<TripMapRoute>().toList();
       _loadingRoutes = false;
     });
   }
 
-  /// 只存幾何，樣式在此依目前聚焦點推導 —— 換聚焦不必重打 /route。
-  List<TripMapRoute> _buildRoutes() {
-    return [
-      for (final segment in _routeSegments)
-        () {
-          final style = tripMapRouteStyle(
-            dayNum: segment.dayNum,
-            isActive:
-                _focusedEntryId == segment.fromEntryId ||
-                _focusedEntryId == segment.toEntryId,
-          );
-          return TripMapRoute(
-            id: segment.id,
-            points: segment.points,
-            color: style.color,
-            strokeWidth: style.strokeWidth,
-            opacity: style.opacity,
-            dashed: style.dashed,
-          );
-        }(),
-    ];
-  }
-
-  /// fitPoints 邊距：地圖是滿版的，pin 必須避開 day tabs、POI 卡與浮動 tab bar，
-  /// 否則會被塞在浮層底下看不到。
-  EdgeInsets _mapFitPadding() => EdgeInsets.only(
-    left: TpSpacing.s10,
-    right: TpSpacing.s10,
-    top: _mapControlTop + TpSpacing.s4,
-    bottom:
-        _entryCardsHeight + MediaQuery.paddingOf(context).bottom + TpSpacing.s4,
-  );
-
   void _fitToPoints(List<TripMapPoint> points) {
     if (!_mapIsReady || points.isEmpty) return;
-    _mapController.fitPoints(points, padding: _mapFitPadding(), maxZoom: 16);
+    _mapController.fitPoints(points, padding: _mapPadding, maxZoom: 16);
   }
 
-  void _focusPin(_DayPin pin) {
-    setState(() => _focusedEntryId = pin.entry.id);
-    if (!_mapIsReady) return;
-    _mapController.move(pin.point, 16);
+  void _focusStop(_MapStop stop) {
+    final point = stop.point;
+    if (!_mapIsReady || point == null) return;
+    _mapController.move(point, 16);
+  }
+
+  void _selectStop(_MapStop stop, {bool animatePage = false}) {
+    if (_activeEntryId != stop.entry.id) {
+      setState(() => _activeEntryId = stop.entry.id);
+    }
+    if (animatePage) {
+      final index = _stopsForTab(
+        _selectedTabIndex,
+      ).indexWhere((candidate) => candidate.entry.id == stop.entry.id);
+      if (index >= 0 && _pageController.hasClients) {
+        unawaited(
+          _pageController.animateToPage(
+            index,
+            duration: TpMotion.resolve(context, TpMotion.normal),
+            curve: TpMotion.appleEase,
+          ),
+        );
+      }
+    }
+    _focusStop(stop);
   }
 
   Future<void> _locateMe() async {
@@ -501,121 +526,24 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   void _applyInitialFocus() {
     if (_initialFocusApplied || !_mapIsReady) return;
     _initialFocusApplied = true;
-    final pin = _initialPin();
-    if (pin == null) return;
-    _focusPin(pin);
+    final stop = _initialStop();
+    if (stop == null) return;
+    _focusStop(stop);
   }
 
   @override
   Widget build(BuildContext context) {
     final allPins = _pinsForTab(0);
-    if (allPins.isEmpty) {
-      return Center(
-        child: Text(
-          '此行程尚無地點座標',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
-
     final visiblePins = _pinsForTab(_selectedTabIndex);
-    // 地圖滿版延伸到浮動玻璃 tab bar 底下（玻璃要有東西可糊才成立）；day tabs 與
-    // POI 卡改為浮層，對應 Apple 的 tab bar accessory 語意，而不是擠壓地圖高度。
-    return Stack(
-      children: [
-        Positioned.fill(child: _buildMap(allPins, visiblePins)),
-        Positioned(top: 0, left: 0, right: 0, child: _buildDayTabs(context)),
-        // POI 卡吃掉 MediaQuery.padding.bottom（= 浮動 tab bar 高度）才不會被蓋住。
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: SafeArea(
-            top: false,
-            child: _buildEntryCards(context, visiblePins),
-          ),
-        ),
-      ],
-    );
+    final visibleStops = _stopsForTab(_selectedTabIndex);
+    return _buildMap(allPins, visiblePins, visibleStops);
   }
 
-  Widget _buildDayTabs(BuildContext context) {
-    return SizedBox(
-      height: _dayTabsHeight,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-          horizontal: TpSpacing.s4,
-          vertical: TpSpacing.s2,
-        ),
-        itemCount: widget.days.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
-        itemBuilder: (context, tabIndex) => _buildDayTabPill(context, tabIndex),
-      ),
-    );
-  }
-
-  Widget _buildDayTabPill(BuildContext context, int tabIndex) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isSelected = tabIndex == _selectedTabIndex;
-    final isOverview = tabIndex == 0;
-    final label = isOverview
-        ? '總覽'
-        : 'DAY ${widget.days[tabIndex - 1].dayNum.toString().padLeft(2, '0')}';
-    // 總覽用主色，單日用該日輪替色（地圖 data-viz 例外）。
-    final pillColor = isOverview
-        ? colorScheme.primary
-        : dayPinColor(widget.days[tabIndex - 1].dayNum);
-
-    // 未選取用 surface 實底而非透明：pill 浮在地圖上，透明底會讓文字糊進地圖。
-    return Material(
-      color: isSelected ? pillColor : colorScheme.surface,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: isSelected ? pillColor : colorScheme.outlineVariant,
-        ),
-      ),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: () => _selectTab(tabIndex),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
-          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isOverview) ...[
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : pillColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  color: isSelected ? Colors.white : colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMap(List<_DayPin> allPins, List<_DayPin> visiblePins) {
+  Widget _buildMap(
+    List<_MapStop> allPins,
+    List<_MapStop> visiblePins,
+    List<_MapStop> visibleStops,
+  ) {
     return Stack(
       children: [
         Positioned.fill(
@@ -623,14 +551,22 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             TripMapCanvasConfig(
               controller: _mapController,
               tilePreset: kTripMapTilePresets.first,
-              initialFitPoints: [for (final pin in allPins) pin.point],
-              initialPadding: _mapFitPadding(),
+              initialFitPoints: [for (final pin in allPins) pin.point!],
+              initialPadding: _mapPadding,
               initialMaxZoom: 16,
               onMapReady: _handleMapReady,
-              routes: _buildRoutes(),
+              routes: _routes,
               clusterMarkers: visiblePins.length >= 12,
               markers: [
-                for (final pin in visiblePins) _buildMarker(pin),
+                for (final pin in visiblePins)
+                  _buildMarker(
+                    pin,
+                    number:
+                        visibleStops.indexWhere(
+                          (stop) => stop.entry.id == pin.entry.id,
+                        ) +
+                        1,
+                  ),
                 if (_userLocation != null)
                   buildTripMapUserLocationMarker(
                     point: _userLocation!,
@@ -641,18 +577,31 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             builder: widget.mapBuilder,
           ),
         ),
-        // 控制項起點避開浮在頂部的 day tabs。
         if (_loadingRoutes)
           const Positioned(
             left: TpSpacing.s4,
-            top: _mapControlTop,
+            top: TpSpacing.s10,
             child: SizedBox.square(
               dimension: 24,
               child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             ),
           ),
         Positioned(
-          top: _mapControlTop,
+          top: TpSpacing.s3,
+          left: TpSpacing.tapMin + TpSpacing.s4,
+          right: TpSpacing.tapMin + TpSpacing.s4,
+          child: Center(
+            child: TripSectionMenu(
+              section: TripSection.map,
+              tripId: widget.tripId,
+              days: widget.days,
+              selectedDayIndex: _selectedTabIndex,
+              onDaySelected: _selectTab,
+            ),
+          ),
+        ),
+        Positioned(
+          top: TpSpacing.s4,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
             key: const ValueKey('trip-map-locate-button'),
@@ -660,122 +609,232 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             onPressed: _locateMe,
           ),
         ),
+        if (visiblePins.isEmpty)
+          Positioned(
+            top: TpSpacing.s10 + TpSpacing.tapMin,
+            left: TpSpacing.s4,
+            right: TpSpacing.s4,
+            child: IgnorePointer(
+              child: Text(
+                '此範圍尚無地點座標',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        Positioned(
+          left: TpSpacing.s3,
+          right: TpSpacing.s3,
+          bottom: TpRootTabGeometry.expandedHeight(context) + TpSpacing.s3,
+          child: _buildPoiAccessory(visibleStops),
+        ),
       ],
     );
   }
 
-  TripMapMarker _buildMarker(_DayPin pin) {
-    final style = tripMapMarkerStyle(
-      dayColor: pin.color,
-      isFocused: pin.entry.id == _focusedEntryId,
-    );
+  TripMapMarker _buildMarker(_MapStop pin, {required int number}) {
     return TripMapMarker(
       id: 'map-pin-${pin.entry.id}',
-      point: pin.point,
+      point: pin.point!,
       color: pin.color,
-      style: style,
-      title: '${pin.pinNumber}. ${pin.entry.title}',
+      title: '$number. ${pin.entry.title}',
       snippet: 'DAY ${pin.dayNum}',
-      glyph: '${pin.pinNumber}',
-      onTap: () => _focusPin(pin),
-      zIndex: style.zIndex,
+      glyph: '$number',
+      onTap: () => _selectStop(pin, animatePage: true),
+      zIndex: _activeEntryId == pin.entry.id ? 1000 : 100 - pin.dayIndex,
     );
   }
 
-  Widget _buildEntryCards(BuildContext context, List<_DayPin> visiblePins) {
-    final theme = Theme.of(context);
-    return SizedBox(
-      height: _entryCardsHeight,
-      child: visiblePins.isEmpty
-          // 空狀態同樣浮在地圖上，需要實底才讀得到。
+  Widget _buildPoiAccessory(List<_MapStop> visibleStops) {
+    return TpBottomAccessory(
+      key: const ValueKey('trip-map-poi-drawer'),
+      accessoryHeight: _poiAccessoryHeight,
+      child: visibleStops.isEmpty
           ? Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: const BorderRadius.all(
-                    Radius.circular(TpRadius.md),
-                  ),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TpSpacing.s4,
-                    vertical: TpSpacing.s2,
-                  ),
-                  child: Text(
-                    '本日尚無地點座標',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+              child: Text(
+                '此範圍尚無停留點',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             )
-          : ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(TpSpacing.s3),
-              itemCount: visiblePins.length,
-              separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
-              itemBuilder: (context, cardIndex) =>
-                  _buildEntryCard(context, visiblePins[cardIndex]),
+          : Column(
+              children: [
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: visibleStops.length,
+                    onPageChanged: (index) => _selectStop(visibleStops[index]),
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(
+                        left: TpSpacing.s3,
+                        right: TpSpacing.s1,
+                      ),
+                      child: _buildEntryCard(
+                        context,
+                        visibleStops[index],
+                        index: index,
+                        total: visibleStops.length,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: TpSpacing.s3,
+                  child: visibleStops.length <= 12
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (final stop in visibleStops) ...[
+                              Container(
+                                width: stop.entry.id == _activeEntryId ? 14 : 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: stop.entry.id == _activeEntryId
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withValues(alpha: 0.26),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              ),
+                              const SizedBox(width: TpSpacing.s1),
+                            ],
+                          ],
+                        )
+                      : Text(
+                          '${visibleStops.indexWhere((stop) => stop.entry.id == _activeEntryId) + 1} / ${visibleStops.length}',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                        ),
+                ),
+              ],
             ),
     );
   }
 
-  Widget _buildEntryCard(BuildContext context, _DayPin pin) {
+  Widget _buildEntryCard(
+    BuildContext context,
+    _MapStop stop, {
+    required int index,
+    required int total,
+  }) {
     final theme = Theme.of(context);
-    final timeText = pin.entry.startTime ?? pin.entry.time ?? '--:--';
+    final timeText = stop.entry.startTime ?? stop.entry.time ?? '--:--';
     // 總覽模式加 D{N} 前綴標示所屬日。
     final timeLabel = _selectedTabIndex == 0
-        ? 'D${pin.dayNum} · $timeText'
+        ? 'D${stop.dayNum} · $timeText'
         : timeText;
+    final isActive = _activeEntryId == stop.entry.id;
+    final locationLabel = stop.point == null
+        ? '尚無位置'
+        : stop.entry.master?.category ?? stop.entry.master?.type ?? '已定位';
 
-    return SizedBox(
-      width: 220,
-      child: Card(
-        child: InkWell(
-          key: ValueKey('entry-card-${pin.entry.id}'),
-          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-          onTap: () => _focusPin(pin),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: TpSpacing.s3,
-              vertical: TpSpacing.s2,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
+    return KeyedSubtree(
+      key: ValueKey(
+        '${isActive ? 'active' : 'inactive'}-entry-card-${stop.entry.id}',
+      ),
+      child: Semantics(
+        button: true,
+        excludeSemantics: true,
+        label:
+            '${index + 1} / $total，${stop.entry.title}，$timeLabel，$locationLabel',
+        child: GestureDetector(
+          key: ValueKey('entry-card-${stop.entry.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _selectStop(stop),
+          child: AnimatedOpacity(
+            opacity: isActive ? 1 : 0.62,
+            duration: TpMotion.resolve(context, TpMotion.normal),
+            child: TpGlassSurface(
+              borderRadius: const BorderRadius.all(
+                Radius.circular(TpRadius.lg),
+              ),
+              padding: const EdgeInsets.all(TpSpacing.s2),
+              child: Row(
+                children: [
+                  Container(
+                    key: ValueKey('poi-number-${stop.entry.id}'),
+                    width: TpSpacing.tapMin,
+                    height: TpSpacing.tapMin,
+                    decoration: BoxDecoration(
+                      color: stop.color.withValues(alpha: 0.20),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: stop.color.withValues(alpha: 0.72),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${index + 1}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: stop.color,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: TpSpacing.s3),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '停留 ${index + 1} / $total',
+                          maxLines: 1,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        Text(
+                          stop.entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        Text(
+                          '$timeLabel · $locationLabel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: stop.point == null
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                  SizedBox.square(
+                    dimension: TpSpacing.tapMin,
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: pin.color,
+                        color: theme.colorScheme.primary,
                         shape: BoxShape.circle,
                       ),
-                    ),
-                    const SizedBox(width: TpSpacing.s2),
-                    Text(
-                      timeLabel,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        color: theme.colorScheme.onSurfaceVariant,
+                      child: Icon(
+                        CupertinoIcons.arrow_right,
+                        size: 18,
+                        color: theme.colorScheme.onPrimary,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: TpSpacing.s1),
-                Text(
-                  pin.entry.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

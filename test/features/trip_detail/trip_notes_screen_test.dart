@@ -88,6 +88,14 @@ Widget _buildScreen(
         path: '/',
         builder: (context, state) => const TripNotesScreen(tripId: 'trip-1'),
       ),
+      GoRoute(
+        path: '/trips/:tripId',
+        builder: (context, state) => const Scaffold(body: Text('trip-page')),
+      ),
+      GoRoute(
+        path: '/trips/:tripId/map',
+        builder: (context, state) => const Scaffold(body: Text('map-page')),
+      ),
     ],
   );
   return ProviderScope(
@@ -114,6 +122,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('行程筆記'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
+    expect(find.text('筆記'), findsOneWidget);
     expect(find.text('航班'), findsOneWidget);
     expect(find.text('住宿'), findsOneWidget);
     expect(find.text('預訂'), findsOneWidget);
@@ -139,6 +149,18 @@ void main() {
     });
   });
 
+  testWidgets('從筆記 scope 可回到行程', (tester) async {
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-section-itinerary')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('trip-page'), findsOneWidget);
+  });
+
   testWidgets('航班預設展開顯示 row；展開住宿、預訂顯示各自欄位', (tester) async {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
@@ -156,6 +178,11 @@ void main() {
     expect(find.text('沖繩縣那霸市西1-2-1'), findsOneWidget);
 
     // 展開預訂：kind chip + title + reservedAt
+    await tester.scrollUntilVisible(
+      find.text('預訂'),
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('預訂'));
     await tester.pumpAndSettle();
     expect(find.text('餐廳'), findsOneWidget);
@@ -171,6 +198,8 @@ void main() {
     await tester.tap(find.text('航班'));
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('緊急聯絡'));
     await tester.pumpAndSettle();
 
@@ -362,6 +391,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.drag(find.byType(ListView), const Offset(0, -120));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('緊急聯絡'));
     await tester.pumpAndSettle();
     final aiButton = find.byKey(const ValueKey('note-ai-emergency'));

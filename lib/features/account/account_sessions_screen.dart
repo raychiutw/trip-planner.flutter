@@ -14,6 +14,7 @@ import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/user.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 import 'account_display.dart';
 import 'settings/theme_mode_controller.dart';
 
@@ -46,7 +47,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
         sessionsPage?.sessions.any((session) => !session.isCurrent) ?? false;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: const Text('登入裝置'),
         actions: [
           IconButton(

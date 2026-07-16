@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../theme/tokens.dart';
+
 class TpGlassSurface extends StatelessWidget {
   const TpGlassSurface({
     super.key,
@@ -20,7 +22,7 @@ class TpGlassSurface extends StatelessWidget {
     final highContrast = MediaQuery.highContrastOf(context);
     final isDark = theme.brightness == Brightness.dark;
     final tint = isDark
-        ? const Color(0xFF241B14).withValues(alpha: highContrast ? 0.96 : 0.72)
+        ? TpColorsDark.background.withValues(alpha: highContrast ? 0.96 : 0.72)
         : Colors.white.withValues(alpha: highContrast ? 0.96 : 0.68);
     final border = isDark
         ? Colors.white.withValues(alpha: highContrast ? 0.34 : 0.18)

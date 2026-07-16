@@ -12,6 +12,7 @@ import '../../../models/add_to_trip.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import 'explore_controller.dart';
 import 'poi_search_card.dart';
 
@@ -120,7 +121,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('探索')),
+      appBar: const TpAppBar(title: Text('探索')),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.conversation,
         contentKey: const ValueKey('explore-content'),

@@ -15,6 +15,7 @@ import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 
 const _pollInterval = Duration(seconds: 5);
 
@@ -137,7 +138,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   Widget build(BuildContext context) {
     final tripTitle = _trip?.title ?? _trip?.name ?? '行程';
     return Scaffold(
-      appBar: AppBar(
+      appBar: TpAppBar(
         title: const Text('AI 健檢'),
         actions: [
           IconButton(

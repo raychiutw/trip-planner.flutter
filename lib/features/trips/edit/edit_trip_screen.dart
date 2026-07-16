@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_app_bar.dart';
 import '../widgets/destination_picker.dart';
 import 'edit_trip_controller.dart';
 
@@ -36,7 +37,7 @@ class EditTripScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('編輯行程')),
+      appBar: const TpAppBar(title: Text('編輯行程')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
           : Column(

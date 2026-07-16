@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-15
+
+### 新增
+
+- **V3 中性深色系統**：全 app 共用中性深色 canvas／surface、柔褐 accent、單行 AppBar、scope menu 與浮動五分頁幾何，取代各頁自管的導覽 chrome。
+- **編號 POI 橫向 rail**：地圖停留點改為 84% 寬度的水平分頁卡；沒有圖片時以 marker 同號 badge、停留順序、名稱、時間與位置狀態呈現，marker 與卡片雙向同步。
+
+### 變更
+
+- 行程、地圖與筆記共用單一 scope menu；移除重複的 DAY tabs 與次級導航按鈕，POI 不再提供垂直展開、收合或 detent。
+- 根內容與地圖 accessory 共用實際五分頁高度及 iPhone bottom safe area；135% 以上 Dynamic Type 使用固定 accessibility rail。
+
+### 修正
+
+- 修正跨天總覽 marker 編號重複、長行程 page dots 溢出、scope 與定位按鈕重疊、POI VoiceOver 重複朗讀，以及 200% 長標題擠壓工具列。
+
 ## [0.6.0] - 2026-07-14
 
 ### 新增
