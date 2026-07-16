@@ -139,6 +139,13 @@ abstract class CacheStore {
   Future<void> writeResponse(String key, Object? data, {DateTime? cachedAt});
   Future<void> evictByPrefix(String prefix);
 
+  /// 只保留 [prefix] 底下最新的 [maxEntries] 筆(依 `cachedAt`),其餘丟棄。
+  ///
+  /// 給「每個 query 都是新 key、且沒有任何 mutation 會 evict 它們」的 GET 用
+  /// (POI 搜尋、路線)—— 這類快取只增不減,沒有上限就會無界成長。前綴比對語意
+  /// 與 [evictByPrefix] 一致(見 `cacheKeyMatchesPrefix`)。
+  Future<void> enforceCapacity(String prefix, int maxEntries);
+
   // 離線寫入佇列(插入序 = 重播序)
   Future<List<QueuedMutation>> readQueue();
   Future<void> appendMutation(QueuedMutation mutation);
@@ -184,6 +191,21 @@ class InMemoryCacheStore implements CacheStore {
   @override
   Future<void> evictByPrefix(String prefix) async {
     _entries.removeWhere((key, _) => cacheKeyMatchesPrefix(key, prefix));
+  }
+
+  @override
+  Future<void> enforceCapacity(String prefix, int maxEntries) async {
+    final matched = _entries.keys
+        .where((key) => cacheKeyMatchesPrefix(key, prefix))
+        .toList();
+    if (matched.length <= maxEntries) return;
+    // 新→舊排序後,第 maxEntries 筆之後的全丟。
+    matched.sort(
+      (a, b) => _entries[b]!.cachedAt.compareTo(_entries[a]!.cachedAt),
+    );
+    for (final key in matched.skip(maxEntries)) {
+      _entries.remove(key);
+    }
   }
 
   @override

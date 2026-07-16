@@ -122,6 +122,78 @@ void cacheStoreContract(
       });
     });
 
+    group('容量上限', () {
+      Future<void> writeAt(String key, int minute) => store.writeResponse(key, {
+        'm': minute,
+      }, cachedAt: DateTime.utc(2026, 7, 16, 0, minute));
+
+      test('未超過上限 → 全部保留', () async {
+        await writeAt('GET /route?a=1', 1);
+        await writeAt('GET /route?a=2', 2);
+        await store.enforceCapacity('GET /route', 5);
+        expect(await store.readResponse('GET /route?a=1'), isNotNull);
+        expect(await store.readResponse('GET /route?a=2'), isNotNull);
+      });
+
+      test('超過上限 → 依 cachedAt 只留最新的 N 筆', () async {
+        await writeAt('GET /route?a=old', 1);
+        await writeAt('GET /route?a=mid', 2);
+        await writeAt('GET /route?a=new', 3);
+
+        await store.enforceCapacity('GET /route', 2);
+
+        expect(await store.readResponse('GET /route?a=old'), isNull);
+        expect(await store.readResponse('GET /route?a=mid'), isNotNull);
+        expect(await store.readResponse('GET /route?a=new'), isNotNull);
+      });
+
+      test('寫入順序與時間順序不一致時,仍以 cachedAt 為準', () async {
+        // 後寫入的不一定比較新（例如補寫舊資料）。實作若用插入序（rowid）
+        // 當新舊，這條會紅。
+        await writeAt('GET /route?a=new', 9);
+        await writeAt('GET /route?a=old', 1);
+
+        await store.enforceCapacity('GET /route', 1);
+
+        expect(await store.readResponse('GET /route?a=new'), isNotNull);
+        expect(await store.readResponse('GET /route?a=old'), isNull);
+      });
+
+      test('只影響同前綴,不動別的前綴', () async {
+        await writeAt('GET /route?a=1', 1);
+        await writeAt('GET /route?a=2', 2);
+        await writeAt('GET /poi-search?q=a', 1);
+        await writeAt('GET /my-trips', 1);
+
+        await store.enforceCapacity('GET /route', 1);
+
+        expect(await store.readResponse('GET /poi-search?q=a'), isNotNull);
+        expect(await store.readResponse('GET /my-trips'), isNotNull);
+      });
+
+      test('前綴比對語意與 evictByPrefix 一致,不誤傷 id 前綴相同者', () async {
+        await writeAt('GET /trips/abc/days?p=1', 1);
+        await writeAt('GET /trips/abc/days?p=2', 2);
+        await writeAt('GET /trips/abcdef/days?p=1', 1);
+
+        await store.enforceCapacity('GET /trips/abc/days', 1);
+
+        // abcdef 不屬於 abc 的前綴 → 不佔額度、也不該被刪。
+        expect(
+          await store.readResponse('GET /trips/abcdef/days?p=1'),
+          isNotNull,
+        );
+        expect(await store.readResponse('GET /trips/abc/days?p=2'), isNotNull);
+        expect(await store.readResponse('GET /trips/abc/days?p=1'), isNull);
+      });
+
+      test('上限 0 → 該前綴全清', () async {
+        await writeAt('GET /route?a=1', 1);
+        await store.enforceCapacity('GET /route', 0);
+        expect(await store.readResponse('GET /route?a=1'), isNull);
+      });
+    });
+
     group('離線寫入佇列', () {
       test('append 依插入序讀回(= 重播序)', () async {
         await store.appendMutation(_mutation('m1'));
