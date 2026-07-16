@@ -141,6 +141,45 @@ void main() {
       // 改用系統字:iOS→SF Pro、Android→Roboto,CJK 由系統 fallback;不再打包 Inter。
       expect(bodyStyle.fontFamily, isNot(contains('Inter')));
     });
+
+    // design.md：中文 letterSpacing 一律 0。未在 _textTheme() 定義的角色會 fallback
+    // 到 Material 預設(帶非零字距與 Material 字級),等於畫面偷偷跑掉設計系統。
+    //
+    // 必須用 widget test：字級幾何(englishLike2021)是 MaterialApp 依語系套上去的,
+    // 不是烘在 ThemeData.textTheme 裡 —— 在 widget tree 外量到的是 null,量不到
+    // 畫面實際拿到的值。
+    testWidgets('TextTheme：app 用到的字階全部有定義且 letterSpacing 為 0', (tester) async {
+      late TextTheme textTheme;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Builder(
+            builder: (context) {
+              textTheme = Theme.of(context).textTheme;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final roles = <String, TextStyle?>{
+        'displaySmall': textTheme.displaySmall,
+        'headlineMedium': textTheme.headlineMedium,
+        'headlineSmall': textTheme.headlineSmall,
+        'titleLarge': textTheme.titleLarge,
+        'titleMedium': textTheme.titleMedium,
+        'titleSmall': textTheme.titleSmall,
+        'bodyLarge': textTheme.bodyLarge,
+        'bodyMedium': textTheme.bodyMedium,
+        'bodySmall': textTheme.bodySmall,
+        'labelLarge': textTheme.labelLarge,
+        'labelMedium': textTheme.labelMedium,
+        'labelSmall': textTheme.labelSmall,
+      };
+      for (final MapEntry(key: role, value: style) in roles.entries) {
+        expect(style?.letterSpacing, 0, reason: '$role 的 letterSpacing 必須為 0');
+      }
+    });
   });
 
   group('tokens', () {

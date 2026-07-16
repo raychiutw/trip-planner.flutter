@@ -101,8 +101,9 @@ void main() {
     expect(find.text('沖繩'), findsWidgets);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.byType(PopupMenuButton<String>), findsOneWidget);
-    final appBar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(appBar.toolbarHeight, greaterThanOrEqualTo(88));
+    // 頁首與其他畫面同高:先前這裡是自製 toolbarHeight 96 + headlineLarge 的大標題,
+    // 是全 app 第三種 header 形狀。每頁不需要大標題,頁首規格一律走 AppBarTheme。
+    expect(tester.getSize(find.byType(AppBar)).height, 56);
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {

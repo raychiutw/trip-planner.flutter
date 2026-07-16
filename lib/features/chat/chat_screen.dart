@@ -78,17 +78,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        centerTitle: false,
-        toolbarHeight: 96,
-        titleSpacing: TpSpacing.s4,
-        title: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            'AI 助手',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
+        title: const Text(
+          'AI 助手',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
       body: tripsAsync.when(
