@@ -238,6 +238,15 @@ class _TripMapView extends ConsumerStatefulWidget {
 }
 
 class _TripMapViewState extends ConsumerState<_TripMapView> {
+  /// day tab 列高度（浮在地圖頂部）。
+  static const _dayTabsHeight = TpSpacing.tapMin + TpSpacing.s2 * 2;
+
+  /// POI 卡列高度（浮在 root tab bar 上方）。
+  static const _entryCardsHeight = 104.0;
+
+  /// 浮層之下、地圖之上的控制項起始 y（避開 day tabs）。
+  static const _mapControlTop = _dayTabsHeight + TpSpacing.s4;
+
   final GoogleTripMapController _mapController = GoogleTripMapController();
   TripMapPoint? _userLocation;
   bool _locating = false;
@@ -405,13 +414,19 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     });
   }
 
+  /// fitPoints 邊距：地圖是滿版的，pin 必須避開 day tabs、POI 卡與浮動 tab bar，
+  /// 否則會被塞在浮層底下看不到。
+  EdgeInsets _mapFitPadding() => EdgeInsets.only(
+    left: TpSpacing.s10,
+    right: TpSpacing.s10,
+    top: _mapControlTop + TpSpacing.s4,
+    bottom:
+        _entryCardsHeight + MediaQuery.paddingOf(context).bottom + TpSpacing.s4,
+  );
+
   void _fitToPoints(List<TripMapPoint> points) {
     if (!_mapIsReady || points.isEmpty) return;
-    _mapController.fitPoints(
-      points,
-      padding: const EdgeInsets.all(TpSpacing.s10),
-      maxZoom: 16,
-    );
+    _mapController.fitPoints(points, padding: _mapFitPadding(), maxZoom: 16);
   }
 
   void _focusPin(_DayPin pin) {
@@ -472,18 +487,34 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     }
 
     final visiblePins = _pinsForTab(_selectedTabIndex);
-    return Column(
+    // 地圖滿版延伸到浮動玻璃 tab bar 底下（玻璃要有東西可糊才成立）；day tabs 與
+    // POI 卡改為浮層，對應 Apple 的 tab bar accessory 語意，而不是擠壓地圖高度。
+    return Stack(
       children: [
-        _buildDayTabs(context),
-        Expanded(child: _buildMap(allPins, visiblePins)),
-        _buildEntryCards(context, visiblePins),
+        Positioned.fill(child: _buildMap(allPins, visiblePins)),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: _buildDayTabs(context),
+        ),
+        // POI 卡吃掉 MediaQuery.padding.bottom（= 浮動 tab bar 高度）才不會被蓋住。
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: _buildEntryCards(context, visiblePins),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildDayTabs(BuildContext context) {
     return SizedBox(
-      height: TpSpacing.tapMin + TpSpacing.s2 * 2,
+      height: _dayTabsHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
@@ -509,8 +540,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         ? colorScheme.primary
         : kDayPinPalette[(tabIndex - 1) % kDayPinPalette.length];
 
+    // 未選取用 surface 實底而非透明：pill 浮在地圖上，透明底會讓文字糊進地圖。
     return Material(
-      color: isSelected ? pillColor : Colors.transparent,
+      color: isSelected ? pillColor : colorScheme.surface,
       shape: StadiumBorder(
         side: BorderSide(
           color: isSelected ? pillColor : colorScheme.outlineVariant,
@@ -563,7 +595,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               controller: _mapController,
               tilePreset: kTripMapTilePresets.first,
               initialFitPoints: [for (final pin in allPins) pin.point],
-              initialPadding: const EdgeInsets.all(TpSpacing.s10),
+              initialPadding: _mapFitPadding(),
               initialMaxZoom: 16,
               onMapReady: _handleMapReady,
               routes: _routes,
@@ -580,17 +612,18 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             builder: widget.mapBuilder,
           ),
         ),
+        // 控制項起點避開浮在頂部的 day tabs。
         if (_loadingRoutes)
           const Positioned(
             left: TpSpacing.s4,
-            top: TpSpacing.s4,
+            top: _mapControlTop,
             child: SizedBox.square(
               dimension: 24,
               child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             ),
           ),
         Positioned(
-          top: TpSpacing.s4,
+          top: _mapControlTop,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
             key: const ValueKey('trip-map-locate-button'),
@@ -618,13 +651,29 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   Widget _buildEntryCards(BuildContext context, List<_DayPin> visiblePins) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 104,
+      height: _entryCardsHeight,
       child: visiblePins.isEmpty
+          // 空狀態同樣浮在地圖上，需要實底才讀得到。
           ? Center(
-              child: Text(
-                '本日尚無地點座標',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: const BorderRadius.all(
+                    Radius.circular(TpRadius.md),
+                  ),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TpSpacing.s4,
+                    vertical: TpSpacing.s2,
+                  ),
+                  child: Text(
+                    '本日尚無地點座標',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ),
             )

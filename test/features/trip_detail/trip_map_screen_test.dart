@@ -99,11 +99,13 @@ final _dayTwo = TripDay(
   ],
 );
 
+/// `bottomInset` 模擬 AppShell（extendBody）灌進 body 的浮動 tab bar 高度。
 Widget _buildScreen(
   List<TripDay> days, {
   int? initialEntryId,
   TripMapLocationService? locationService,
   MapRepository? mapRepository,
+  double bottomInset = 0,
   List<TripSummary> trips = const [
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
@@ -135,11 +137,34 @@ Widget _buildScreen(
         mapRepository ?? _StubMapRepository(),
       ),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.light(),
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(padding: EdgeInsets.only(bottom: bottomInset)),
+        child: child!,
+      ),
+    ),
   );
 }
 
 void main() {
+  // AppShell 開 extendBody,地圖滿版延伸到浮動玻璃 tab bar 底下(玻璃要有東西可糊)。
+  // 代價是底部錨定的 POI 卡會被蓋住 —— 卡片必須吃掉 MediaQuery.padding.bottom。
+  testWidgets('POI 卡片浮在 tab bar 上方,不被蓋住', (tester) async {
+    const inset = 100.0;
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_buildScreen([_dayOne], bottomInset: inset));
+    await tester.pumpAndSettle();
+
+    final card = tester.getRect(find.byKey(const ValueKey('entry-card-11')));
+    expect(card.bottom, lessThanOrEqualTo(800 - inset));
+  });
+
   testWidgets('總覽：渲染 day tabs、全部含座標 pins 與 entry cards', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
