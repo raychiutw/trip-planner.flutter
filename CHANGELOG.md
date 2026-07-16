@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-16
+
+### 變更
+
+- **地圖 marker 與路線樣式對齊 web**：POI 由 Google 預設水滴 pin 改為白底圓形 chip + 日色外環與編號，選中者換成柔褐實心並放大；路線改用 web 的 day palette，偶數天虛線、當前段加粗並提高不透明度。web 的 `dayPalette.ts` 本就規定該色盤「僅用於地圖 polyline，不套用到 UI chrome」——先前 Flutter 版把彩虹色填進 pin 是違反自家規則。
+- **根頁頁首收斂為 inline 56pt**：移除 large title——它吃掉 96–108pt，內容卻只是重複 tab bar 已經講過的頁名；省下的高度換成同一螢幕多看到一張卡。
+- **浮動 tab bar 固定 64pt**：移除捲動縮小與標籤淡出，位置與標籤恆定。
+- **快取層由 sembast 遷移至 drift（sqlite）**：sembast 開啟時會把整個 DB 載入記憶體，撐不住 POI 搜尋與 AI 對話歷史等無界增長的資料。既有裝置的離線佇列與衝突區於首次啟動一次性搬遷（回應快取不搬，重抓即可）。
+
+### 修正
+
+- **地圖完全不顯示路線**：單段路線解析丟出的 `TypeError` 不是 `Exception` 子類 → `on Exception` 漏接 → `Future.wait` fail-fast 使整趟路線全滅並卡在無限 spinner。
+- **路線重複燒 Google Directions 配額**：同 session 加上 in-memory LRU 快取（容量 100，對齊 web 的 IndexedDB LRU）。
+- **認證卡片寬度漂移**：login 寫死 400、`_AuthScaffold` 寫死 420，在登入與忘記密碼之間切換時卡片會橫向跳動。
+
 ## [0.7.0] - 2026-07-15
 
 ### 新增

@@ -6,7 +6,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'api/cache/sembast_cache_store.dart';
+import 'api/cache/cache_migration.dart';
+import 'api/cache/drift_cache_store.dart';
 import 'api/providers.dart';
 import 'app/router.dart';
 import 'features/account/settings/theme_mode_controller.dart';
@@ -20,10 +21,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
   // 開啟失敗(磁碟/權限/檔案損毀)時退回預設 InMemory,不阻擋 app 啟動。
-  SembastCacheStore? cacheStore;
+  DriftCacheStore? cacheStore;
   try {
     final docsDir = await getApplicationDocumentsDirectory();
-    cacheStore = SembastCacheStore(await openCacheDatabase(docsDir.path));
+    cacheStore = DriftCacheStore(openCacheDatabase(docsDir.path));
+    // 舊版是 sembast。既有使用者裝置上可能還躺著沒同步的離線編輯 —— 不搬就是
+    // 永久遺失，所以先搬再讓 app 起來。失敗不擋啟動(舊檔留著,下次再試)。
+    await migrateSembastCacheToDrift(
+      directoryPath: docsDir.path,
+      target: cacheStore,
+    );
   } catch (_) {
     cacheStore = null;
   }
