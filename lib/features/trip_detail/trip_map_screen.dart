@@ -492,12 +492,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     return Stack(
       children: [
         Positioned.fill(child: _buildMap(allPins, visiblePins)),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: _buildDayTabs(context),
-        ),
+        Positioned(top: 0, left: 0, right: 0, child: _buildDayTabs(context)),
         // POI 卡吃掉 MediaQuery.padding.bottom（= 浮動 tab bar 高度）才不會被蓋住。
         Positioned(
           left: 0,

@@ -50,8 +50,8 @@ class _FakeTripExportFileWriter implements TripExportFileWriter {
 
 UserInfo _userWithId(String id) => UserInfo(id: id, email: '$id@example.com');
 
-/// large title(SliverAppBar.large)+ 搜尋/篩選 header 會吃掉垂直空間;預設 600px
-/// 測試視窗下 SliverList 懶載入只建部分卡片。放大視窗讓短清單一次全建,穩定斷言卡片數。
+/// 頁首 + 搜尋/篩選 header 會吃掉垂直空間;預設 600px 測試視窗下 SliverList 懶載入
+/// 只建部分卡片。放大視窗讓短清單一次全建,穩定斷言卡片數。
 /// setSurfaceSize 斷言須在測試內呼叫,故用 helper + addTearDown 於測試 zone 內還原。
 Future<void> _useWideSurface(WidgetTester tester) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -149,10 +149,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.drag(
-        find.byType(CustomScrollView),
-        const Offset(0, -2000),
-      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
       await tester.pumpAndSettle();
 
       final lastCard = tester.getRect(find.byType(TripCard).last);
@@ -192,7 +189,6 @@ void main() {
       );
       await tester.pump();
 
-      // SliverAppBar.large 標題會雙渲染(展開 + 收合),故用 findsWidgets。
       expect(find.text('我的行程'), findsWidgets);
       expect(find.byType(TripCard), findsNWidgets(3));
 
