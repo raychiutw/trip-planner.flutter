@@ -93,9 +93,9 @@ void main() {
     );
   });
 
-  testWidgets('TpRootScrollScaffold 提供 large title 與浮動 tab 底部 inset', (
-    tester,
-  ) async {
+  testWidgets('TpRootScrollScaffold 頁首恆為 inline 56，不放大也不收合', (tester) async {
+    // 大標題吃掉 96-108pt 卻只重複 tab bar 已經講過的頁名。root 頁改為 inline，
+    // 省下的高度換成內容（同一螢幕多看到一張卡）。
     await tester.pumpWidget(
       app(
         const TpRootScrollScaffold(
@@ -117,11 +117,15 @@ void main() {
     final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
     expect(appBar.toolbarHeight, 56);
     expect(appBar.collapsedHeight, 56);
-    expect(appBar.expandedHeight, 108);
+    // 展開高度必須等於 collapsed —— 有落差就是大標題還在。
+    expect(appBar.expandedHeight, 56);
     expect(appBar.centerTitle, isTrue);
     expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
     expect(appBar.actions, hasLength(1));
     expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
+
+    // 實測頁首佔用高度：inline 56，不是 large 的 108。
+    expect(tester.getSize(find.byType(AppBar)).height, 56);
   });
 
   testWidgets('TpAppBar more 使用水平 ellipsis 且維持 44pt target', (tester) async {

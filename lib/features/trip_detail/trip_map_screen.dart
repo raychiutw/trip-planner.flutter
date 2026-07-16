@@ -16,6 +16,7 @@ import '../../ui/tp_bottom_accessory.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../map/map_adapter.dart';
 import '../map/map_location.dart';
+import '../map/map_style.dart';
 import '../trips/trip_card.dart';
 import '../trips/trips_list_screen.dart';
 import 'trip_providers.dart';
@@ -219,7 +220,25 @@ class _MapStop {
   final TimelineEntry entry;
   final TripMapPoint? point;
 
-  Color get color => kDayPinPalette[dayIndex % kDayPinPalette.length];
+  /// 以 dayNum 取色（非陣列 index）—— 對齊 web，天數有缺口也不會配色錯位。
+  Color get color => dayPinColor(dayNum);
+}
+
+/// 已取得幾何的路段。只存幾何與所屬日／端點，樣式留到 build 時依聚焦點推導。
+class _RouteSegment {
+  const _RouteSegment({
+    required this.id,
+    required this.points,
+    required this.dayNum,
+    required this.fromEntryId,
+    required this.toEntryId,
+  });
+
+  final String id;
+  final List<TripMapPoint> points;
+  final int dayNum;
+  final int fromEntryId;
+  final int toEntryId;
 }
 
 class _TripMapView extends ConsumerStatefulWidget {
@@ -269,7 +288,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   bool _mapIsReady = false;
 
   bool _initialFocusApplied = false;
-  List<TripMapRoute> _routes = const [];
+  List<_RouteSegment> _routeSegments = const [];
   bool _loadingRoutes = false;
   int _routeLoadGeneration = 0;
 
@@ -419,7 +438,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (pairs.isEmpty) {
       if (mounted) {
         setState(() {
-          _routes = const [];
+          _routeSegments = const [];
           _loadingRoutes = false;
         });
       }
@@ -427,7 +446,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     }
     setState(() => _loadingRoutes = true);
     final repository = ref.read(mapRepositoryProvider);
-    final routes = await Future.wait([
+    final segments = await Future.wait([
       for (final (index, pair) in pairs.indexed)
         () async {
           try {
@@ -438,27 +457,52 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               toLng: pair.$2.point!.longitude,
             );
             if (result.polyline.length < 2) return null;
-            return TripMapRoute(
+            return _RouteSegment(
               id: 'day-route-$index',
               points: [
                 for (final point in result.polyline)
                   TripMapPoint(point.lat, point.lng),
               ],
-              color: pair.$1.color,
-              strokeWidth: 5,
-              borderColor: Colors.white,
-              borderStrokeWidth: 1.5,
+              dayNum: pair.$1.dayNum,
+              fromEntryId: pair.$1.entry.id,
+              toEntryId: pair.$2.entry.id,
             );
-          } on Exception {
+          } catch (_) {
+            // 單段失敗只略過該段（spec：保留 marker／卡片）。這裡必須攔下 Error
+            // 而不只是 Exception —— Future.wait 是 fail-fast，漏出去會讓整趟路線
+            // 全滅且 _loadingRoutes 永遠卡在 true。
             return null;
           }
         }(),
     ]);
     if (!mounted || generation != _routeLoadGeneration) return;
     setState(() {
-      _routes = routes.whereType<TripMapRoute>().toList();
+      _routeSegments = segments.whereType<_RouteSegment>().toList();
       _loadingRoutes = false;
     });
+  }
+
+  /// 只存幾何，樣式在此依目前聚焦點推導 —— 換聚焦不必重打 /route。
+  List<TripMapRoute> _buildRoutes() {
+    return [
+      for (final segment in _routeSegments)
+        () {
+          final style = tripMapRouteStyle(
+            dayNum: segment.dayNum,
+            isActive:
+                _activeEntryId == segment.fromEntryId ||
+                _activeEntryId == segment.toEntryId,
+          );
+          return TripMapRoute(
+            id: segment.id,
+            points: segment.points,
+            color: style.color,
+            strokeWidth: style.strokeWidth,
+            opacity: style.opacity,
+            dashed: style.dashed,
+          );
+        }(),
+    ];
   }
 
   void _fitToPoints(List<TripMapPoint> points) {
@@ -555,7 +599,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               initialPadding: _mapPadding,
               initialMaxZoom: 16,
               onMapReady: _handleMapReady,
-              routes: _routes,
+              routes: _buildRoutes(),
               clusterMarkers: visiblePins.length >= 12,
               markers: [
                 for (final pin in visiblePins)
@@ -635,10 +679,16 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   TripMapMarker _buildMarker(_MapStop pin, {required int number}) {
+    // 白底圓形 chip + 日別色外圈／數字；聚焦點改 accent 填底並放大（對齊 web）。
+    final style = tripMapMarkerStyle(
+      dayColor: pin.color,
+      isFocused: pin.entry.id == _activeEntryId,
+    );
     return TripMapMarker(
       id: 'map-pin-${pin.entry.id}',
       point: pin.point!,
       color: pin.color,
+      style: style,
       title: '$number. ${pin.entry.title}',
       snippet: 'DAY ${pin.dayNum}',
       glyph: '$number',
