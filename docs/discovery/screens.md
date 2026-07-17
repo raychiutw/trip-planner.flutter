@@ -1,5 +1,7 @@
 # Tripline React SPA — 畫面與導航結構調查（Flutter 移植用）
 
+> 這是 Web 來源調查快照，不是目前 Flutter UI 規格。Flutter 最終導覽、色彩與互動以 [`design.md`](design.md) 為準；其中 Web 的 5-tab、帳號 tab 與三色卡片均不可直接沿用。
+
 入口：`src/entries/main.tsx`（非 src/main.tsx）。`BrowserRouter` + lazy route，外層 Provider：`ErrorBoundary > ActiveTripProvider > NewTripProvider`。`TripLayout`（`src/pages/TripLayout.tsx`）只是 thin wrapper：`useParams.tripId → useTrip() → TripContext.Provider > <Outlet/>`，讓所有 `/trip/:tripId/*` 子路由共用同一份 trip+days fetch — Flutter 對應「per-trip scoped state（Provider/Riverpod scope）」。
 
 ## 1. Route 表（src/entries/main.tsx）

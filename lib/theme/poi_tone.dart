@@ -18,7 +18,7 @@ class PoiToneColors {
   final Color bg;
 }
 
-/// poi_type → 三色 tone：玩/看/買=accent、住/移動=sage、吃=pink；未分類視同 accent。
+/// poi_type 舊 tone 對照。sage／pink 現在映射中性階，只保留 API 相容性。
 PoiToneColors resolvePoiTone(TpTones tones, String? poiType) {
   switch (poiType) {
     case 'hotel':

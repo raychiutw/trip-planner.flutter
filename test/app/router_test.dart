@@ -3,6 +3,7 @@
 /// 2. 已登入在 /login → redirect 到 /trips
 library;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +17,7 @@ import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
+import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
@@ -23,7 +25,9 @@ import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/favorites/explore/explore_screen.dart';
 import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
 import 'package:tripline/features/invite/invite_screen.dart';
+import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
+import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
@@ -714,6 +718,56 @@ void main() {
 
     expect(find.byType(NotificationsScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('帳號頁位於 root shell 外且不顯示 tab bar', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/account');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('account-close-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
+  });
+
+  testWidgets('行程 selector 切到地圖 root branch 並保留 DAY', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1?day=1');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GlobalMapScreen), findsOneWidget);
+    final rootTab = tester.widget<AppleRootTabBar>(
+      find.byType(AppleRootTabBar),
+    );
+    expect(rootTab.selectedIndex, 2);
+    expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
   });
 
   testWidgets('已登入可使用 web route aliases', (tester) async {

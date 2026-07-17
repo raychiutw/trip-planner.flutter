@@ -15,6 +15,7 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_settings_group.dart';
 
 /// 帳號通知偏好 provider。
 final accountNotificationPreferencesProvider =
@@ -147,35 +148,31 @@ class _NotificationsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       key: const ValueKey('notifications-page'),
-      padding: const EdgeInsets.all(TpSpacing.s4),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (mutationError != null) ...[
-          _InlineErrorPanel(message: mutationError!, onRetry: onRetry),
-          const SizedBox(height: TpSpacing.s4),
-        ],
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (final (index, setting) in _settings.indexed) ...[
-                _NotificationSwitchTile(
-                  setting: setting,
-                  value: _valueFor(setting.key),
-                  isBusy: busyKey == setting.key,
-                  isDisabled: busyKey != null,
-                  onChanged: (nextValue) =>
-                      unawaited(onChanged(setting, nextValue)),
-                ),
-                if (index != _settings.length - 1)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-              ],
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              TpSpacing.s4,
+              TpSpacing.s4,
+              TpSpacing.s4,
+              0,
+            ),
+            child: _InlineErrorPanel(message: mutationError!, onRetry: onRetry),
           ),
+        ],
+        TpSettingsGroup(
+          children: [
+            for (final setting in _settings)
+              _NotificationSwitchTile(
+                setting: setting,
+                value: _valueFor(setting.key),
+                isBusy: busyKey == setting.key,
+                isDisabled: busyKey != null,
+                onChanged: (nextValue) =>
+                    unawaited(onChanged(setting, nextValue)),
+              ),
+          ],
         ),
       ],
     );

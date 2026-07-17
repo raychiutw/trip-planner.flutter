@@ -9,6 +9,7 @@ class TpContentSurface extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.semanticLabel,
+    this.color,
     this.padding = const EdgeInsets.all(TpSpacing.s4),
   });
 
@@ -16,6 +17,7 @@ class TpContentSurface extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final String? semanticLabel;
+  final Color? color;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -27,7 +29,7 @@ class TpContentSurface extends StatelessWidget {
       button: onTap != null || onLongPress != null,
       label: semanticLabel,
       child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: color ?? theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(TpRadius.lg),
         clipBehavior: Clip.antiAlias,
         child: onTap == null && onLongPress == null

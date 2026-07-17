@@ -18,7 +18,7 @@ String? mapReplyLink(String href, String tripId) {
   final sub = segments.length >= 2 ? segments[1] : '';
   return switch (sub) {
     'notes' => '/trips/$tripId/notes',
-    'map' => '/trips/$tripId/map',
+    'map' => Uri(path: '/map', queryParameters: {'tripId': tripId}).toString(),
     _ => '/trips/$tripId',
   };
 }

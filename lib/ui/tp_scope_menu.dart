@@ -9,12 +9,14 @@ class TpScopeOption<T> {
     required this.value,
     required this.label,
     this.icon,
+    this.indicatorColor,
     this.key,
   });
 
   final T value;
   final String label;
   final IconData? icon;
+  final Color? indicatorColor;
   final Key? key;
 }
 

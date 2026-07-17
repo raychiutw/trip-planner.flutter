@@ -10,24 +10,37 @@ import '../../app/adaptive.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/segment.dart';
+import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_horizontal_selector.dart';
+import '../../ui/tp_scope_menu.dart';
+import '../trips/trip_title_button.dart';
+import '../trips/trips_list_screen.dart';
 import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/day_header.dart';
-import 'widgets/day_pills.dart';
 import 'widgets/entry_edit_sheet.dart';
 import 'widgets/hotel_card.dart';
 import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
-import 'widgets/trip_section_menu.dart';
 import 'widgets/travel_edit_sheet.dart';
 import 'widgets/travel_pill.dart';
 
-enum _TripMoreAction { editInfo, print, audit, share, collab, health }
+enum _TripMoreAction {
+  editMode,
+  notes,
+  editInfo,
+  print,
+  audit,
+  share,
+  collab,
+  health,
+}
 
-/// 行程時間軸畫面：AppBar（trip 名 + 地圖/筆記 actions）→ 頂部 day pills →
+/// 行程時間軸畫面：AppBar（可切換 trip + 功能選單 + 帳號）→ 單層地圖／DAY selector →
 /// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
@@ -61,22 +74,32 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   Widget build(BuildContext context) {
     final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
+    final trips = switch (ref.watch(myTripsProvider)) {
+      AsyncData(:final value) => value,
+      _ => const <TripSummary>[],
+    };
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
     return Scaffold(
       appBar: TpAppBar(
-        title: Text(tripTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: TripTitleButton(
+          key: const ValueKey('trip-timeline-trip-picker'),
+          currentTripId: widget.tripId,
+          currentTitle: tripTitle,
+          trips: trips,
+          onSelected: (tripId) =>
+              context.go('/trips/${Uri.encodeComponent(tripId)}'),
+        ),
         actions: [
-          TextButton(
-            key: const ValueKey('trip-edit-mode'),
-            onPressed: () => setState(() => _isEditing = !_isEditing),
-            child: Text(_isEditing ? '完成' : '編輯'),
-          ),
           TpMoreMenuButton<_TripMoreAction>(
             key: const ValueKey('trip-actions-menu'),
             onSelected: (action) {
               switch (action) {
+                case _TripMoreAction.editMode:
+                  setState(() => _isEditing = !_isEditing);
+                case _TripMoreAction.notes:
+                  _goTo(context, '/trips/${widget.tripId}/notes');
                 case _TripMoreAction.editInfo:
                   context.push('/edit-trip/${widget.tripId}');
                 case _TripMoreAction.print:
@@ -91,8 +114,27 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   _goTo(context, '/trips/${widget.tripId}/health');
               }
             },
-            items: const [
+            items: [
               PopupMenuItem(
+                key: const ValueKey('trip-edit-mode'),
+                value: _TripMoreAction.editMode,
+                child: _TripActionMenuItem(
+                  icon: _isEditing
+                      ? CupertinoIcons.check_mark
+                      : CupertinoIcons.pencil,
+                  label: _isEditing ? '完成編輯' : '編輯行程',
+                ),
+              ),
+              const PopupMenuItem(
+                key: ValueKey('trip-action-notes'),
+                value: _TripMoreAction.notes,
+                child: _TripActionMenuItem(
+                  icon: CupertinoIcons.doc_text,
+                  label: '筆記',
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
                 key: ValueKey('trip-action-edit-info'),
                 value: _TripMoreAction.editInfo,
                 child: _TripActionMenuItem(
@@ -100,7 +142,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   label: '行程資料',
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 key: ValueKey('trip-action-print'),
                 value: _TripMoreAction.print,
                 child: _TripActionMenuItem(
@@ -108,7 +150,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   label: '列印',
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 key: ValueKey('trip-action-audit'),
                 value: _TripMoreAction.audit,
                 child: _TripActionMenuItem(
@@ -116,7 +158,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   label: '異動紀錄',
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 key: ValueKey('trip-action-share'),
                 value: _TripMoreAction.share,
                 child: _TripActionMenuItem(
@@ -124,7 +166,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   label: '分享連結',
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 key: ValueKey('trip-action-collab'),
                 value: _TripMoreAction.collab,
                 child: _TripActionMenuItem(
@@ -132,7 +174,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                   label: '共編設定',
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 key: ValueKey('trip-action-health'),
                 value: _TripMoreAction.health,
                 child: _TripActionMenuItem(
@@ -142,39 +184,18 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
               ),
             ],
           ),
+          const TpAccountAvatarButton(),
         ],
       ),
       body: daysAsync.when(
         data: (days) => days.isEmpty
             ? const _EmptyTimeline()
-            : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      TpSpacing.s4,
-                      TpSpacing.s2,
-                      TpSpacing.s4,
-                      TpSpacing.s1,
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: TripSectionMenu(
-                        section: TripSection.itinerary,
-                        tripId: widget.tripId,
-                        days: days,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _TimelineBody(
-                      days: days,
-                      tripId: widget.tripId,
-                      initialEntryId: widget.initialEntryId,
-                      initialDayNum: widget.initialDayNum,
-                      isEditing: _isEditing,
-                    ),
-                  ),
-                ],
+            : _TimelineBody(
+                days: days,
+                tripId: widget.tripId,
+                initialEntryId: widget.initialEntryId,
+                initialDayNum: widget.initialDayNum,
+                isEditing: _isEditing,
               ),
         loading: () => const _TimelineSkeleton(),
         error: (error, stackTrace) => _TimelineError(
@@ -207,7 +228,7 @@ class _TripActionMenuItem extends StatelessWidget {
   }
 }
 
-/// 日程主體：day pills + 可捲動逐日 sections；pill 點擊 ensureVisible 捲至該日。
+/// 日程主體：單層「地圖／DAY」selector + 可捲動逐日 sections。
 class _TimelineBody extends StatefulWidget {
   const _TimelineBody({
     required this.days,
@@ -328,10 +349,39 @@ class _TimelineBodyState extends State<_TimelineBody> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DayPills(
-          days: widget.days,
-          activeDayNum: _activeDayNum,
-          onDaySelected: _scrollToDay,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TpSpacing.s3,
+            TpSpacing.s2,
+            TpSpacing.s3,
+            TpSpacing.s1,
+          ),
+          child: TpHorizontalSelector<int>(
+            key: const ValueKey('trip-timeline-view-day-selector'),
+            value: _activeDayNum,
+            options: [
+              const TpScopeOption(
+                value: 0,
+                label: '地圖',
+                key: ValueKey('trip-timeline-map'),
+              ),
+              for (final day in widget.days)
+                TpScopeOption(
+                  value: day.dayNum,
+                  label: 'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+                  key: ValueKey('day-pill-${day.dayNum}'),
+                ),
+            ],
+            onSelected: (value) {
+              if (value == 0) {
+                GoRouter.maybeOf(context)?.go(
+                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}&day=$_activeDayNum',
+                );
+                return;
+              }
+              _scrollToDay(value);
+            },
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(

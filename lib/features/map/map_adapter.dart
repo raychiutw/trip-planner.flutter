@@ -160,12 +160,12 @@ class GoogleTripMapController {
       return;
     }
     final bounds = _boundsFor(points);
-    final edgePadding = [
-      padding.left,
-      padding.top,
-      padding.right,
-      padding.bottom,
-    ].reduce((a, b) => a > b ? a : b);
+    // Directional overlays are already handled by GoogleMap.padding. Bounds
+    // only need the shared horizontal inset; promoting the large bottom card
+    // inset to every edge can make narrow phones zoom out to country level.
+    final edgePadding = padding.left < padding.right
+        ? padding.left
+        : padding.right;
     await _applyCamera(
       controller,
       CameraUpdate.newLatLngBounds(bounds, edgePadding),

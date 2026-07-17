@@ -12,6 +12,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_root_scroll_scaffold.dart';
 import 'trip_card.dart';
 
@@ -131,6 +132,7 @@ enum TripFilter {
 }
 
 enum _TripsToolbarAction {
+  create,
   importJson,
   defaultOrder,
   nameAsc,
@@ -143,7 +145,7 @@ final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
 });
 
-/// 行程清單（5-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選
+/// 行程清單（4-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選
 /// + 下拉更新 + 單欄卡片清單。搜尋/篩選置於大標題下方,隨內容捲動(Notes/Mail 慣例)。
 /// 點卡片進詳情；長按開 action sheet(分享/共編/匯出/刪除,二次確認)。
 class TripsListScreen extends ConsumerStatefulWidget {
@@ -263,12 +265,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       title: '我的行程',
       onRefresh: () => ref.refresh(myTripsProvider.future),
       actions: [
-        IconButton(
-          key: const ValueKey('trips-create-button'),
-          tooltip: '新增行程',
-          icon: const Icon(CupertinoIcons.add),
-          onPressed: () => context.push('/new-trip'),
-        ),
         PopupMenuButton<_TripsToolbarAction>(
           key: const ValueKey('trips-sort-button'),
           icon: _isImporting
@@ -281,6 +277,12 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
           enabled: !_isImporting,
           onSelected: _handleToolbarAction,
           itemBuilder: (context) => [
+            const PopupMenuItem(
+              key: ValueKey('trips-create-button'),
+              value: _TripsToolbarAction.create,
+              child: _TripsMenuRow(icon: CupertinoIcons.add, label: '新增行程'),
+            ),
+            const PopupMenuDivider(),
             const PopupMenuItem(
               key: ValueKey('trips-list-import-trigger'),
               value: _TripsToolbarAction.importJson,
@@ -312,6 +314,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             ),
           ],
         ),
+        const TpAccountAvatarButton(),
       ],
       slivers: [
         SliverToBoxAdapter(
@@ -377,6 +380,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }
 
   void _handleToolbarAction(_TripsToolbarAction action) {
+    if (action == _TripsToolbarAction.create) {
+      context.push('/new-trip');
+      return;
+    }
     if (action == _TripsToolbarAction.importJson) {
       _importTripFromJson();
       return;
@@ -386,6 +393,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _TripsToolbarAction.nameAsc => TripSortOrder.nameAsc,
       _TripsToolbarAction.updatedDesc => TripSortOrder.updatedDesc,
       _TripsToolbarAction.startDateAsc => TripSortOrder.startDateAsc,
+      _TripsToolbarAction.create => throw StateError('Handled above'),
       _TripsToolbarAction.importJson => throw StateError('Handled above'),
     };
     setState(() => _sortOrder = order);
@@ -524,7 +532,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
           final trip = trips[index];
           return TripCard(
             trip: trip,
-            tone: TripCardTone.values[index % TripCardTone.values.length],
             currentUserId: currentUserId,
             onTap: () => context.go('/trips/${trip.tripId}'),
             onLongPress: () => _showTripActions(context, trip),

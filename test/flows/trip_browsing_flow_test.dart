@@ -136,10 +136,10 @@ void main() {
     expect(find.byType(TripTimelineScreen), findsOneWidget);
     expect(find.text('那霸機場'), findsOneWidget);
 
-    // 從共用行程 scope 選筆記 → 筆記頁
-    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
+    // 從右上功能選單選筆記 → 筆記頁
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-section-notes')));
+    await tester.tap(find.byKey(const ValueKey('trip-action-notes')));
     await tester.pumpAndSettle();
     expect(find.byType(TripNotesScreen), findsOneWidget);
     expect(find.text('行程筆記'), findsOneWidget);

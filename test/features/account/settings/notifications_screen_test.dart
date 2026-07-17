@@ -7,6 +7,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_settings_group.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -70,6 +71,8 @@ void main() {
     expect(find.text('行程更新通知'), findsOneWidget);
     expect(find.text('旅伴邀請'), findsOneWidget);
     expect(find.text('系統通知'), findsOneWidget);
+    expect(find.byType(TpSettingsGroup), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
 
     expect(
       tester

@@ -1,6 +1,6 @@
 # How to 新增畫面
 
-把一個新畫面掛進 5-tab shell:建 screen widget、掛路由、寫 widget test。以「把收藏 tab 從 placeholder 換成真畫面」為例。
+把一個新畫面掛進 4-tab shell：建立 screen widget、掛路由、寫 widget test。帳號不是 tab；root 畫面要在右上提供共用圓形 avatar。以下以「把收藏 tab 從 placeholder 換成真畫面」為例。
 
 ## 前置條件
 

@@ -77,6 +77,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('沖繩旅行'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('global-trip-map-okinawa')),
@@ -90,7 +91,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-trip-pick-tokyo')));
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
     await tester.pumpAndSettle();
 
     expect(find.text('東京週末'), findsOneWidget);
@@ -128,6 +129,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('先建立行程'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);
   });

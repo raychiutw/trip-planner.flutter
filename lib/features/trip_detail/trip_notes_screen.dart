@@ -482,10 +482,7 @@ class _NotesSection extends ConsumerWidget {
         leading: Icon(icon, size: 20, color: iconColor),
         title: Row(
           children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
-            ),
+            Text(title, style: theme.textTheme.titleMedium),
             const SizedBox(width: TpSpacing.s2),
             Container(
               key: ValueKey('notes-count-${section.name}'),
@@ -686,7 +683,7 @@ class _TimeText extends StatelessWidget {
   }
 }
 
-/// kind 小 chip（三色 tone）。
+/// kind 小 chip；舊 tone API 目前映射為中性色。
 class _KindChip extends StatelessWidget {
   const _KindChip({required this.label, required this.bg, required this.fg});
 
@@ -792,7 +789,7 @@ class _ReservationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    // 三色語意：吃 = 粉、移動 = sage、其餘 = accent
+    // 舊類型對照保留資料相容性；sage／pink token 已映射中性色。
     final (chipBg, chipFg) = switch (reservation.kind) {
       'restaurant' => (tones.pinkBg, tones.pinkDeep),
       'transport' => (tones.sageBg, tones.sageDeep),

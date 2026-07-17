@@ -1,241 +1,73 @@
-# Theme 與自適應 UI 設計系統參考
+# Tripline Theme 與共用 UI 參考
 
-品牌色與三色 tone 來源是 web repo 的 `DESIGN.md` + `css/tokens.css`；Flutter 互動、字體、導覽、內容寬度與回饋以本文件及程式碼為準。`tokens.dart` 定義常數，`app_theme.dart` 組成 `ThemeData`/`TpTones`，`lib/app/` 提供跨畫面共用的自適應 UI primitive。來源調查保留在 [`discovery/design.md`](discovery/design.md)。
+> 更新：2026-07-17。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-17-tripline-final.html`](design-sessions/2026-07-17-tripline-final.html) 為準。
 
-## 取色守則
+## 取色
 
-- **語意色**(主色、文字、底色、錯誤)走 `Theme.of(context).colorScheme`
-- **三色 tone**(accent/sage/pink 4 階)走 `Theme.of(context).extension<TpTones>()!` — `subtle` 階在 `ColorScheme` 沒有對應欄位,所以 tone 色一律從 TpTones 取
-- **不要**在 widget 裡直接引用 `TpColorsLight`/`TpColorsDark` — 那會破壞 light/dark 切換
-
-## tokens.dart
-
-### 色彩 — `TpColorsLight` / `TpColorsDark`
-
-Dark 是獨立的暖褐黑 palette,**不是 light 反色**。
+- Widget 只從 `Theme.of(context).colorScheme` 或 `TpTones` 取色，不直接引用 Light／Dark 常數。
+- 柔褐 accent 是唯一品牌強調色；sage／pink 只保留舊 API 相容別名，現在映射到中性色。
+- POI、收藏、行程卡與設定列皆使用中性 surface。只有 error／success／warning 與地圖逐日資料視覺化可使用語意色。
+- Dark 是獨立中性深色 palette，不是 Light 反色。
 
 | Token | Light | Dark | 用途 |
 |---|---|---|---|
-| `accent` | `#A97A4A` | `#CBA06E` | 主色柔褐(玩/看/買) |
-| `accentDeep` | `#8A6038` | `#E0BC90` | tone 深階(glyph、圓點) |
-| `accentSubtle` | `#F4EDE3` | `#33271A` | tone 淺底(卡底) |
-| `accentBg` | `#E9DBC8` | `#44341F` | tone 中底(icon 底) |
-| `sage` 4 階 | `#A8BAAA` 起 | `#8FBE9C` 起 | 住/移動 |
-| `pink` 4 階 | `#E78C99` 起 | `#E8A0AB` 起 | 吃 |
-| `background` | `#FFFBF5` | `#1A140F` | 奶油底 / 暖褐黑底 |
-| `secondary` / `tertiary` / `hover` | 米色階 | 褐黑階 | 次級表面 |
-| `foreground` / `muted` | `#2A1F18` / `#6F5A47` | `#F5EBDD` / `#B89E84` | 文字 |
-| `border` / `lineStrong` | `#EADFCF` / `#C8B89F` | `#3D2D22` / `#5A4634` | hairline / 強線 |
-| `destructive` / `destructiveBg` | `#C13515` / `#FDECEC` | `#E8A0A0` / 15% alpha | 破壞性操作 |
-| `success` / `warning` / `info` | `#06A77D` / `#F48C06` / 同 accent | `#7EC89A` / `#FAA94B` / 同 accent | 語意狀態 |
-| `disabled` / `overlay` | `#B8AC9B` / 35% 褐黑 | `#5A4634` / 65% 黑 | 停用 / 遮罩 |
+| background | `#FFFBF5` | `#121214` | 頁面底色 |
+| secondary | `#FAF4EA` | `#1C1C1E` | grouped surface |
+| tertiary | `#F2EAD9` | `#2C2C2E` | 次級／選取 surface |
+| accent | `#A97A4A` | `#CBA06E` | 選取、主要動作 |
+| foreground | `#2A1F18` | `#F5F5F7` | 主要文字 |
+| muted | `#6F5A47` | `#A1A1A6` | 次要文字 |
+| border | `#EADFCF` | `#38383A` | inset separator |
 
-### 圓角 — `TpRadius`
+## 字體
 
-`xs=4`、`sm=6`、`md=8`(卡片/按鈕主力)、`lg=12`、`xl=16`(bottom sheet / dialog)。
+不指定 `fontFamily`，使用平台系統字與 Dynamic Type；中文 `letterSpacing` 固定為 `0`。畫面不得以縮小字級處理溢位。
 
-### 間距 — `TpSpacing`(4px grid)
+| HIG role | TextTheme | size |
+|---|---|---:|
+| Large title | `displaySmall` | 34 |
+| Title 1 | `headlineMedium` | 28 |
+| Title 2 | `headlineSmall` | 22 |
+| Title 3 | `titleLarge` | 20 |
+| Headline / body | `titleMedium` / `bodyLarge` | 17 |
+| Subheadline | `titleSmall` / `bodyMedium` | 15 |
+| Footnote | `bodySmall` / `labelMedium` | 13 |
+| Caption 1 | `labelSmall` | 12 |
 
-`s1=4` 到 `s10=40`(每階 +4)。另有:
+## 導覽
 
-- `tapMin = 44.0` — 最小 tap target(HIG)
-- `navHeight = 88.0` — bottom nav 高度(含 safe area)
+- Root tab 固定四項：聊天、行程、地圖、收藏。
+- 帳號不在 tab；四個 root 畫面右上固定圓形 `TpAccountAvatarButton`，`/account` 保留 deep link。
+- 浮動 tab 使用 `AppleRootTabBar`，左右 margin `24`、可見高度 `56`、安全區上方留白 `18`。
+- `AppShell` 開啟 `extendBody`。根頁底部淨空一律使用 `TpRootScrollScaffold` 或 `TpRootTabGeometry.clearance(context)`，不得另寫 magic number。
+- 最小 tap target `44×44`；selection 使用 haptic；reduced motion 由 `TpMotion.resolve` 處理。
 
-### Motion — `TpMotion`
+## 行程與地圖
 
-| Token | 值 |
-|---|---|
-| `fast` / `normal` / `slow` | 150ms / 250ms / 350ms |
-| `appleEase` | `Cubic(0.2, 0.8, 0.2, 1)` — 預設曲線 |
-| `springEase` | `Cubic(0.32, 1.28, 0.6, 1)` — 彈跳進場 |
-| `sheetClose` | `Cubic(0.4, 0, 1, 1)` — sheet 收合 |
+- 行程頁單層 selector：`地圖 | DAY 1 | DAY 2...`。
+- 地圖頁單層 selector：`行程 | DAY 1 | DAY 2...`。
+- 第一項切換頁面並保留 day；筆記放右上功能區。
+- 目前行程標題可點擊，開啟含搜尋、目前 checkmark、最近行程的 bottom sheet。
+- 每日地圖 zoom 固定 `12`，明確 POI focus 使用 `16`。
+- POI 卡以 `PageView(viewportFraction: .84)` 左右滑動；卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
 
-`TpMotion.resolve(context, preferred)` 在系統開啟「減少動態效果」時回傳 `Duration.zero`。新增動畫必須透過它解析 duration。
+## 內容與設定元件
 
-## app_theme.dart
+- 內容層使用實色 grouped surface；玻璃只用於 tab、浮動 toolbar 與 sheet。
+- 設定頁使用 `TpSettingsGroup`：無外框、無陰影、圓角 grouped surface、內縮 separator。
+- 帳號列、通知 switch、外觀 checkmark 均使用原生熟悉的 HIG 動線。
+- 卡片不靠彩色分類表達資訊；階層以字重、留白與 separator 建立。
 
-### TpTones(ThemeExtension)
+## 共用 primitive
 
-accent/sage/pink 各 4 階(`base`/`deep`/`subtle`/`bg`)+ `success`/`warning`,共 14 色。`TpTones.light` / `TpTones.dark` 兩組常數,`lerp` 支援主題切換動畫。
+- `TpHorizontalSelector`：行程／地圖與 day 的單層 selector。
+- `TripTitleButton`：目前行程標題與切換 sheet。
+- `TpAccountAvatarButton`：root 頁右上帳號入口。
+- `TpSettingsGroup` / `TpSettingsRow`：帳號設定分組。
+- `TpContentSurface`：實色內容卡。
+- `TpGlassSurface`：僅限浮動功能層。
+- `AppSearchField` / `showAppActionSheet` / `showAppConfirm`：平台自適應互動。
 
-```dart
-final tones = Theme.of(context).extension<TpTones>()!;
-Container(color: tones.sageSubtle, child: Icon(color: tones.sageDeep, ...));
-```
+## 例外
 
-### AppTheme
-
-```dart
-abstract final class AppTheme {
-  static ThemeData light();
-  static ThemeData dark();
-}
-```
-
-`main.dart` 同時掛 light/dark theme，實際模式由 `themeModeProvider` 決定。主要客製：卡片 elevation 0 + 1px hairline border、radius 8、44pt 按鈕、NavigationBar 與 HIG 字階。
-
-不指定 `fontFamily`：iOS/macOS 使用系統字（SF Pro，中文由 PingFang fallback），Android 使用 Roboto（中文由 Noto fallback）。這能直接取得 Dynamic Type、Bold Text 與平台字型修正，不打包 Inter。
-
-### TextTheme 字階
-
-| role | size / line-height / weight | 用途 |
-|---|---|---|
-| `displaySmall` | 34 / auto / 700 | large title |
-| `headlineMedium` | 28 / 36 / 700 | 頁面標題 |
-| `headlineSmall` | 22 / 28 / 700 | HIG title2：內容 hero（行程名等），不是頁面標題 |
-| `titleLarge` | 20 / auto / 700 | app bar / section |
-| `titleMedium` | 17 / 24 / 700 | 卡片標題 |
-| `titleSmall` | 15 / 20 / 600 | HIG subheadline：區塊小標 |
-| `bodyLarge` | 17 / 26 / 400 | 主要內文 |
-| `bodyMedium` | 15 / 23 / 400 | 次要內文 |
-| `bodySmall` | 13 / 18 / 400 | caption，tabular figures |
-| `labelLarge` | 16 / auto / 600 | 按鈕 |
-| `labelMedium` | 13 / 18 / 600 | chip / label |
-| `labelSmall` | 12 / 16 / 700 | 小型標籤 |
-
-中文 `letterSpacing` 一律為 `0`。
-
-> **只用上表列出的角色。** `TextTheme` 未定義的角色會 fallback 到 Material 預設值 —— 那是 Material 的字級與字距，不是 Tripline 的 HIG 字階。`headlineSmall` 與 `titleSmall` 就曾因此漏定義，導致約 18 處文字跑掉設計系統，其中 `titleSmall` 還帶著 Material 預設的 `letterSpacing 0.1`，直接違反「中文不加字距」。`app_theme_test.dart` 有測試逐一驗證全字階 `letterSpacing` 為 0。
-
-## 自適應導覽與內容寬度
-
-`AppShell` 固定五個頂層目的地：聊天、行程、地圖、收藏、帳號。切換 branch 會觸發 selection haptic；再次點目前 tab 會回到該 branch 初始位置。
-
-導覽元件一律是浮動玻璃 `AppleRootTabBar`（`lib/features/shell/apple_root_tab_bar.dart`），不依平台或寬度切換。
-
-> **2026-07-16 更正**：本節原本記載依寬度切換 `CupertinoTabBar` / `NavigationBar` / `NavigationRail`。該設計**從未實作** —— `AppShell` 一直無條件使用 `AppleRootTabBar`。若日後要支援寬螢幕 rail，需另立規格。
-
-Tab bar 尺寸固定，不隨捲動縮減（決策理由見 [2026-07-15 規格](superpowers/specs/2026-07-15-apple-music-ui-google-maps-parity-design.md)的 2026-07-16 修訂）。
-
-### 根頁底部淨空（重要且非顯而易見）
-
-`AppShell` 開 `extendBody`，內容會延伸到浮動 Tab bar 底下（玻璃要有東西可糊才成立）。Flutter 會把 Tab bar 的**實測高度**灌進 body 的 `MediaQuery.padding.bottom`（見 `scaffold.dart` 的 `_BodyBuilder`），畫面**必須**讀它，不得自行硬編常數：
-
-- 捲動型根頁：使用 `TpRootScrollScaffold`，它已提供底部 spacer。
-- 其他底部錨定內容：包 `SafeArea(top: false)` 或 `SliverSafeArea(top: false)`。
-
-硬編的值在任何裝置都不會剛好對 —— 實際高度是 `safe area + 8 + 64`（34pt 安全區裝置為 106、無安全區裝置為 72）。先前三個根頁分別硬編 `16` / `112` / `112`，其中兩處直接破版。
-
-`AppAdaptiveContent` 保留父層高度約束，手機全寬，寬螢幕依角色置中：
-
-| `AppContentWidth` | 最大寬度 | 適用內容 |
-|---|---:|---|
-| `form` | 720 | 建立、編輯、設定表單 |
-| `conversation` | 860 | 聊天、搜尋、探索 |
-| `feed` | 920 | 行程、收藏等列表 |
-
-```dart
-const AppAdaptiveContent({
-  Key? key,
-  required double maxWidth,
-  required Widget child,
-  Key? contentKey,
-});
-```
-
-`maxWidth` 必須從內容角色選擇；`contentKey` 只用於需要量測或定位內容容器的測試。
-
-## 平台自適應元件（`lib/app/adaptive.dart`）
-
-| API | Apple 平台 | 其他平台 |
-|---|---|---|
-| `showAppConfirm` | `CupertinoAlertDialog` | Material `AlertDialog` |
-| `showAppActionSheet<T>` | `CupertinoActionSheet` | Material bottom sheet |
-| `AppSearchField` | `CupertinoSearchTextField` | Material `TextField` |
-| `showAppNotice` | 約 2.5 秒的頂部橫幅 | `SnackBar` |
-
-`showAppConfirm` 關閉時回傳 `false`；破壞性動作在兩個平台都使用 error 語意。`AppSheetAction<T>` 封裝 label、回傳值、破壞性狀態與 Material leading icon。
-
-```dart
-Future<bool> showAppConfirm(
-  BuildContext context, {
-  required String title,
-  String? message,
-  required String confirmLabel,
-  String cancelLabel = '取消',
-  bool isDestructive = false,
-});
-
-const AppSheetAction<T>({
-  required String label,
-  required T value,
-  bool isDestructive = false,
-  IconData? icon,
-});
-
-Future<T?> showAppActionSheet<T>(
-  BuildContext context, {
-  String? title,
-  String? message,
-  required List<AppSheetAction<T>> actions,
-  String cancelLabel = '取消',
-});
-
-const AppSearchField({
-  Key? key,
-  Key? fieldKey,
-  required TextEditingController controller,
-  required String placeholder,
-  ValueChanged<String>? onChanged,
-  ValueChanged<String>? onSubmitted,
-  bool autofocus = false,
-  bool enabled = true,
-});
-
-void showAppNotice(BuildContext context, String message);
-```
-
-`fieldKey` 會直接掛到底層原生欄位，讓同一份 widget test 可操作 Apple 與 Material 分支。
-
-## 回饋與載入
-
-- `showAppNotice` 只用於成功、離線/重連等低風險短狀態。
-- `showAppError` 使用持續顯示的 `MaterialBanner`，有 live-region semantics、關閉動作，並可用 `onRetry` 加入重試。新錯誤會取代目前 banner。
-- `AppListLoadingSkeleton(itemCount: 4)` 與 `AppMapLoadingSkeleton` 保留預期版型並提供載入 semantics。
-- skeleton 是靜態的，不使用 shimmer；這避免無意義的持續動畫，也符合 reduced-motion 基線。
-
-```dart
-void showAppError(
-  BuildContext context,
-  String message, {
-  VoidCallback? onRetry,
-});
-
-const AppListLoadingSkeleton({Key? key, int itemCount = 4});
-const AppMapLoadingSkeleton({Key? key});
-```
-
-`AppListLoadingSkeleton.itemCount` 必須大於 `0`。只有操作確實可以安全重送時才提供 `onRetry`。
-
-## App Icon
-
-App Icon 的圓角座標定位圖釘與中央指南針箭頭是固定品牌識別，不因 Apple Music 視覺對標而替換。iOS 由系統套用遮罩，Default/Dark/Tinted 維持相同輪廓；Android 沿用各 density launcher icon。完整規格見 [Tripline App Icon 設計規格](superpowers/specs/2026-07-14-tripline-app-icon-design.md)。
-
-## POI type → tone 對照
-
-`lib/features/trip_detail/widgets/entry_tone.dart` 的 `resolveEntryTone(TpTones, String? poiType)` 把 POI 類型映射到三色 tone:
-
-| poi_type | tone | 語意 |
-|---|---|---|
-| `hotel`、`transport`、`parking` | sage | 住/移動 |
-| `restaurant` | pink | 吃 |
-| 其他(`attraction`/`activity`/`shopping`/`null`…) | accent | 玩/看/買(預設) |
-
-回傳 `EntryToneColors{base, deep, subtle, bg}`,timeline 元件的套色階梯:卡底 `subtle` → icon 底 `bg` → glyph/圓點 `deep`。
-
-### 例外:地圖逐日 pin 色
-
-`trip_map_screen.dart` 的 `kDayPinPalette` 是 10 色 Tailwind-500 palette(red→pink 輪替)。這是 design.md 明定的 data-viz 例外 — 一般 UI 禁用 rainbow 色,地圖 polyline/pin 例外。
-
-## 設計禁忌(來自 web DESIGN.md)
-
-- 禁止 gradient 裝飾、emoji 當 icon、rainbow 色(地圖例外)
-- shadow 只給浮層(sheet/dialog),卡片用 hairline
-- 中文內文 16/26,時間數字 tabular-nums
-
-## 相關文件
-
-- [How to 新增畫面](howto-add-screen.md) — 新畫面如何正確取用 token 與 tone
-- [自適應 UI 設計理由](explanation-adaptive-ui.md) — Apple Music/HIG 對標、反方意見與取捨
-- [架構說明](explanation-architecture.md) — theme 在分層中的位置
-- [`discovery/design.md`](discovery/design.md) — 完整 token 對照與設計規範調查
+地圖不同日的 pin／route 可使用 `kDayPinPalette`，因為它是資料視覺化，不是 UI 分類色。App Icon 的座標圖釘識別不因 UI 改版而變更。

@@ -151,7 +151,7 @@ class _DayPill extends StatelessWidget {
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 // 兩行文字需塞進 44px tap target 的內容區，行高固定避免 overflow
                 height: 1.35,
                 fontWeight: FontWeight.w700,
@@ -165,7 +165,7 @@ class _DayPill extends StatelessWidget {
             Text(
               DayPills.shortDate(day.date),
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 height: 1.35,
                 color: theme.colorScheme.onSurfaceVariant,
                 fontFeatures: const [FontFeature.tabularFigures()],

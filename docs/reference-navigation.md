@@ -1,6 +1,6 @@
 # 導航與路由參考(`lib/app/router.dart`)
 
-路由用 go_router 17 的 `StatefulShellRoute.indexedStack`:5 個 tab 各自保留 navigation stack(切 tab 再切回來,原本逛到哪還在哪)。router 本身是 riverpod provider(`appRouterProvider`),認證 redirect 直接讀 `authStateProvider`。
+路由用 go_router 17 的 `StatefulShellRoute.indexedStack`：4 個 tab 各自保留 navigation stack（切 tab 再切回來，原本逛到哪還在哪）。帳號位於 shell 外，由 root 畫面右上 avatar 開啟。router 本身是 riverpod provider（`appRouterProvider`），認證 redirect 直接讀 `authStateProvider`。
 
 ## 路由表
 
@@ -15,7 +15,7 @@
 | `/chat` | `ChatScreen` | tab 1 |
 | `/trips` | `TripsListScreen` | tab 2(**initialLocation**) |
 | `/trips/:tripId` | `TripTimelineScreen` | tab 2 子路由 |
-| `/trips/:tripId/map` | `TripMapScreen` | tab 2 孫路由 |
+| `/trips/:tripId/map` | redirect 至 `/map?tripId=:tripId` | 舊 deep link 相容入口 |
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
@@ -26,11 +26,11 @@
 | `/trips/:tripId/entries/:eid/copy` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/move` | `EntryActionRouteScreen` | tab 2 孫路由 |
 | `/trips/:tripId/entries/:eid/pois` | `EntryPoiScreen` | tab 2 孫路由(用搜尋/收藏置換正選 POI、加入/移除/排序/設為正選備選、編輯 per-POI 備註/分類/訂位) |
-| `/map` | `GlobalMapScreen` | tab 3 |
+| `/map?tripId=:tripId&day=N&entry=:entryId` | `GlobalMapScreen` → `TripMapScreen` | tab 3；行程／DAY／POI focus 可選 |
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |
 | `/favorites/add-to-trip` | `AddToTripScreen` | tab 4 子路由(加入行程,extra `AddToTripArgs`) |
-| `/account` | `AccountScreen` | tab 5 |
+| `/account` | `AccountScreen` | shell 外帳號 hub（保留 deep link） |
 | `/settings/profile` | `ProfileEditScreen` | shell 外設定頁 |
 | `/settings/appearance` | `AppearanceScreen` | shell 外設定頁 |
 | `/settings/notifications` | `NotificationsScreen` | shell 外設定頁 |
@@ -44,11 +44,11 @@
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
-Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|audit|map` 會導到 `/trips/:tripId/*`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 會導到 `/trips/:tripId/map?entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到可用搜尋或收藏置換正選 POI 的地點管理頁。
+Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:tripId?entry=:entryId`；`/trip/:tripId/notes|print|health|audit` 會導到 `/trips/:tripId/*`，`/trip/:tripId/map` 與舊 `/trips/:tripId/map` 最終導到 tab 3 的 `/map?tripId=:tripId`；`/trip/:tripId/add-entry|add-stop?day=N` 會導到搜尋 POI 新增模式,搜尋模式會保留 `region` query 作為初始地區,`/trip/:tripId/add-stop?tab=favorites&day=N` 會導到收藏景點新增模式,`/trip/:tripId/add-custom-stop?day=N` 會導到自訂停留點新增模式；`/trip/:tripId/stop/:entryId` 會導到 `/trips/:tripId?entry=:entryId`,並初始捲動與標示該停留點；`/trip/:tripId/stop/:entryId/map` 最終導到 `/map?tripId=:tripId&entry=:entryId`,並初始顯示該停留點所在日；`/trip/:tripId/stop/:entryId/edit|copy|move` 會導到停留點操作頁,`/trip/:tripId/stop/:entryId/change-poi` 會導到可用搜尋或收藏置換正選 POI 的地點管理頁。
 
 Legacy redirect：`/admin`、`/admin/` 會導到 `/trips`，`/manage`、`/manage/` 會導到 `/chat`。
 
-shell 外殼是 `AppShell`(`lib/features/shell/app_shell.dart`):Material 3 `NavigationBar`,`onDestinationSelected` → `navigationShell.goBranch(index)`。
+shell 外殼是 `AppShell`（`lib/features/shell/app_shell.dart`）：浮動 `AppleRootTabBar` 的 `onDestinationSelected` 呼叫 `navigationShell.goBranch(index)`。
 
 ## 認證 redirect 規則
 

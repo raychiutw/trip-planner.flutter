@@ -1,6 +1,6 @@
 # 自適應 UI 設計理由：以 Apple Music 為品質基準
 
-Tripline 對標 Apple Music 的資訊階層、內容優先與平台熟悉感，但不複製 Apple Music 的品牌、內容模型或每一個視覺效果。目標是讓旅程規劃像成熟的原生內容 app 一樣安靜、可預期，同時保留 Tripline 的柔褐三色系統與座標 App Icon。
+Tripline 對標 Apple Music 的資訊階層、內容優先與平台熟悉感，但不複製 Apple Music 的品牌、內容模型或每一個視覺效果。目標是讓旅程規劃像成熟的原生內容 app 一樣安靜、可預期，同時保留 Tripline 的柔褐 accent 與座標 App Icon。
 
 ## 問題
 
@@ -46,7 +46,7 @@ Apple Music 在這裡是品質基準，不是元件庫。實作遵循四個優�
 
 Apple Music 的紅色品牌、媒體封面、播放控制與內容推薦模型不屬於旅程規劃。照抄會讓顏色失去 POI 語意，也會把旅行的時間、位置與協作資訊壓進不適合的媒體版型。
 
-> **已過期（2026-07-16 更正）**：本節原本寫「不模擬 Apple 最新視覺材質或自製 Liquid Glass」。該決策已於 [2026-07-15 規格](superpowers/specs/2026-07-15-apple-music-ui-google-maps-parity-design.md)推翻並實作（PR #46「redesign Tripline with Liquid Glass and native maps」）。現況：根分頁採浮動玻璃 Tab bar，玻璃只用於 Tab bar、浮動 toolbar 與 sheet 等**功能層**，內容層維持標準材質，統一由 `TpGlassSurface` 集中處理 blur／tint／border／深淺模式與高對比降級。原本擔心的模糊與對比風險，靠「玻璃不鋪到內容層」與高對比降級來控管。
+> **已過期（2026-07-16 更正）**：本節原本寫「不模擬 Apple 最新視覺材質或自製 Liquid Glass」。現況以[最終設計規範](discovery/design.md)為準：根分頁採浮動玻璃 Tab bar，玻璃只用於 Tab bar、浮動 toolbar 與 sheet 等**功能層**，內容層維持標準材質，統一由 `TpGlassSurface` 集中處理 blur／tint／border／深淺模式與高對比降級。原本擔心的模糊與對比風險，靠「玻璃不鋪到內容層」與高對比降級來控管。
 
 ## Accessibility 基線
 

@@ -16,9 +16,10 @@ import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_glass_surface.dart';
+import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'ai_consent_sheet.dart';
 import 'chat_controller.dart';
@@ -66,20 +67,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _pendingPrefill = null);
   }
 
-  /// 下拉顯示名:title 優先,空值退回 name。
-  String _tripLabel(TripSummary t) {
-    final title = t.title?.trim();
-    return (title == null || title.isEmpty) ? t.name : title;
-  }
-
   @override
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
+    final trips = tripsAsync.value ?? const <TripSummary>[];
+    final tripId = trips.isEmpty
+        ? null
+        : trips.any((trip) => trip.tripId == _tripId)
+        ? _tripId!
+        : trips.first.tripId;
+    final currentTrip = tripId == null
+        ? null
+        : trips.firstWhere((trip) => trip.tripId == tripId);
 
     return Scaffold(
       appBar: TpAppBar(
         automaticallyImplyLeading: false,
-        title: const Text('AI 助手'),
+        title: currentTrip == null
+            ? const Text('行程')
+            : TripTitleButton(
+                key: const ValueKey('chat-trip-dropdown'),
+                currentTripId: currentTrip.tripId,
+                currentTitle: currentTrip.title?.trim().isNotEmpty ?? false
+                    ? currentTrip.title!.trim()
+                    : currentTrip.name,
+                trips: trips,
+                onSelected: (value) => setState(() => _tripId = value),
+              ),
+        actions: const [TpAccountAvatarButton()],
       ),
       body: tripsAsync.when(
         loading: () =>
@@ -93,73 +108,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               body: '建立行程後,就能在這裡用 AI 助手調整行程。',
             );
           }
-          // 預設最近(清單第一筆);使用者可下拉切換。_tripId 可能指向已不存在
-          // 的行程(清單刷新後)→ 退回最近一筆,避免 Dropdown value 不在 items 的 assert。
-          final tripId = trips.any((t) => t.tripId == _tripId)
-              ? _tripId!
-              : trips.first.tripId;
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TpSpacing.s4,
-                  TpSpacing.s3,
-                  TpSpacing.s4,
-                  TpSpacing.s2,
-                ),
-                child: PopupMenuButton<String>(
-                  key: const ValueKey('chat-trip-dropdown'),
-                  initialValue: tripId,
-                  tooltip: '切換行程',
-                  onSelected: (value) => setState(() => _tripId = value),
-                  itemBuilder: (context) => [
-                    for (final t in trips)
-                      PopupMenuItem(
-                        value: t.tripId,
-                        child: Text(
-                          _tripLabel(t),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  child: TpContentSurface(
-                    semanticLabel:
-                        '目前行程 ${_tripLabel(trips.firstWhere((t) => t.tripId == tripId))}',
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TpSpacing.s4,
-                      vertical: TpSpacing.s3,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(CupertinoIcons.map, size: 20),
-                        const SizedBox(width: TpSpacing.s3),
-                        Expanded(
-                          child: Text(
-                            _tripLabel(
-                              trips.firstWhere((t) => t.tripId == tripId),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        const SizedBox(width: TpSpacing.s2),
-                        const Icon(CupertinoIcons.chevron_down, size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: _ChatBody(
-                  key: ValueKey(tripId),
-                  tripId: tripId,
-                  initialPrefill: _pendingPrefill,
-                  onInitialPrefillConsumed: _consumePrefill,
-                ),
-              ),
-            ],
+          return _ChatBody(
+            key: ValueKey(tripId),
+            tripId: tripId!,
+            initialPrefill: _pendingPrefill,
+            onInitialPrefillConsumed: _consumePrefill,
           );
         },
       ),

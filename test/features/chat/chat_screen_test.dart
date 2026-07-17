@@ -94,18 +94,30 @@ void main() {
     );
   }
 
-  testWidgets('行程下拉渲染(預設最近,顯示 trip 標題)', (tester) async {
+  testWidgets('AppBar 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('chat-trip-dropdown')), findsOneWidget);
     expect(find.text('沖繩'), findsWidgets);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
-    expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byType(TpAppBar), findsOneWidget);
     final appBar = tester.widget<AppBar>(find.byType(AppBar));
     expect(appBar.toolbarHeight, isNull);
     expect(find.byIcon(Icons.more_vert), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-picker-sheet')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-picker-search')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-picker-item-okinawa')),
+      findsOneWidget,
+    );
+    expect(find.text('最近的行程'), findsOneWidget);
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {
@@ -390,7 +402,7 @@ void main() {
     expect(find.byKey(const ValueKey('chat-trip-dropdown')), findsNothing);
   });
 
-  testWidgets('下拉切換行程 → 新行程的工單被載入', (tester) async {
+  testWidgets('sheet 切換行程 → 新行程的工單被載入', (tester) async {
     when(tripRepo.watchMyTrips).thenAnswer(
       (_) => Stream.value(const [
         TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
@@ -403,7 +415,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('京都').last); // 選單項
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-kyoto')));
     await tester.pumpAndSettle();
 
     verify(
@@ -447,7 +459,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('沖繩').last);
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-okinawa')));
     await tester.pumpAndSettle();
 
     final nextInput = tester.widget<TextField>(

@@ -7,7 +7,6 @@ import 'package:tripline/theme/app_theme.dart';
 Future<void> pumpCard(
   WidgetTester tester,
   TripSummary trip, {
-  TripCardTone tone = TripCardTone.accent,
   String? currentUserId,
   VoidCallback? onTap,
   VoidCallback? onLongPress,
@@ -23,7 +22,6 @@ Future<void> pumpCard(
       home: Scaffold(
         body: TripCard(
           trip: trip,
-          tone: tone,
           currentUserId: currentUserId,
           onTap: onTap,
           onLongPress: onLongPress,
@@ -80,6 +78,13 @@ void main() {
       expect(find.text('沖繩家族之旅'), findsOneWidget);
       expect(find.text('沖'), findsNothing);
       expect(find.text('5 天'), findsOneWidget); // eyebrow
+      final cover = tester.widget<Container>(
+        find.byKey(const ValueKey('trip-card-cover-okinawa')),
+      );
+      expect(
+        (cover.decoration! as BoxDecoration).color,
+        AppTheme.light().colorScheme.surfaceContainerHigh,
+      );
 
       await tester.tap(find.text('沖繩家族之旅'));
       await tester.longPress(find.text('沖繩家族之旅'));

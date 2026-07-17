@@ -6,6 +6,7 @@ import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_settings_group.dart';
 
 void main() {
   testWidgets('點「深色」→ themeMode 變 dark + 打勾', (tester) async {
@@ -26,6 +27,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    expect(find.byType(TpSettingsGroup), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('theme-dark')));
     await tester.pumpAndSettle();

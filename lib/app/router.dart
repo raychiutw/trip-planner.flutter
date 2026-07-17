@@ -28,7 +28,6 @@ import '../features/trip_detail/entry_action_route_screen.dart';
 import '../features/trip_detail/entry_add_route_screen.dart';
 import '../features/trip_detail/entry_edit_route_screen.dart';
 import '../features/trip_detail/entry_poi_screen.dart';
-import '../features/trip_detail/trip_map_screen.dart';
 import '../features/trip_detail/trip_notes_screen.dart';
 import '../features/trip_detail/trip_print_screen.dart';
 import '../features/trip_detail/trip_timeline_screen.dart';
@@ -237,6 +236,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ShareScreen(tripId: state.pathParameters['tripId']!),
       ),
       GoRoute(
+        path: '/account',
+        builder: (context, state) => const AccountScreen(),
+      ),
+      GoRoute(
         path: '/settings/appearance',
         builder: (context, state) => const AppearanceScreen(),
       ),
@@ -330,10 +333,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     routes: [
                       GoRoute(
                         path: 'map',
-                        builder: (context, state) => TripMapScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          initialEntryId: _entryFocusFromQuery(state.uri),
-                        ),
+                        redirect: (context, state) => _rootMapAlias(state),
                       ),
                       GoRoute(
                         path: 'notes',
@@ -412,7 +412,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/map',
-                builder: (context, state) => const GlobalMapScreen(),
+                builder: (context, state) => GlobalMapScreen(
+                  initialTripId: state.uri.queryParameters['tripId'],
+                  initialEntryId: _entryFocusFromQuery(state.uri),
+                  initialDayNum: _dayFocusFromQuery(state.uri),
+                ),
               ),
             ],
           ),
@@ -446,14 +450,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/account',
-                builder: (context, state) => const AccountScreen(),
               ),
             ],
           ),
@@ -502,6 +498,12 @@ String _entryMapAlias(GoRouterState state) {
   final query = Map<String, String>.from(state.uri.queryParameters);
   query['entry'] = state.pathParameters['entryId']!;
   return Uri(path: '/trips/$tripId/map', queryParameters: query).toString();
+}
+
+String _rootMapAlias(GoRouterState state) {
+  final query = Map<String, String>.from(state.uri.queryParameters);
+  query['tripId'] = state.pathParameters['tripId']!;
+  return Uri(path: '/map', queryParameters: query).toString();
 }
 
 String _entryTimelineAlias(GoRouterState state) {

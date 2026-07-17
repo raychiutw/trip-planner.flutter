@@ -190,10 +190,6 @@ Future<void> _pumpTimeline(
         ),
         routes: [
           GoRoute(
-            path: 'map',
-            builder: (context, state) => const Scaffold(body: Text('map-page')),
-          ),
-          GoRoute(
             path: 'notes',
             builder: (context, state) =>
                 const Scaffold(body: Text('notes-page')),
@@ -214,6 +210,14 @@ Future<void> _pumpTimeline(
                 const Scaffold(body: Text('health-page')),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/map',
+        builder: (context, state) => Scaffold(
+          body: Text(
+            'map-page-${state.uri.queryParameters['tripId']}-${state.uri.queryParameters['day']}',
+          ),
+        ),
       ),
       GoRoute(
         path: '/collab/:tripId',
@@ -291,35 +295,54 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
+Future<void> _enableTimelineEditing(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(<String, dynamic>{});
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 只保留編輯與更多，內容只保留單一 scope', (tester) async {
+  testWidgets('AppBar 顯示行程選擇、功能選單與帳號入口', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.text('沖繩自駕五日'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, '編輯'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-timeline-trip-picker')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
-    expect(find.text('行程'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '編輯'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-secondary-map')), findsNothing);
     expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
     expect(find.byIcon(CupertinoIcons.printer), findsNothing);
     expect(find.byIcon(Icons.history_outlined), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('trip-edit-mode')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-action-notes')), findsOneWidget);
   });
 
-  testWidgets('從行程 scope 選地圖以 go_router 導向行程地圖頁', (tester) async {
+  testWidgets('單層 selector 選地圖並保留目前 DAY', (tester) async {
     await _pumpTimeline(tester);
 
-    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-section-map')));
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
     await tester.pumpAndSettle();
 
-    expect(find.text('map-page'), findsOneWidget);
+    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
   });
 
   testWidgets('更多選單的列印可導向列印預覽頁', (tester) async {
@@ -364,12 +387,13 @@ void main() {
     expect(find.byKey(const ValueKey('entry-menu-11')), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
 
-    await tester.tap(find.widgetWithText(TextButton, '編輯'));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
-    expect(find.widgetWithText(TextButton, '完成'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-menu-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('完成編輯'), findsOneWidget);
   });
 
   testWidgets('更多選單可導向分享連結頁', (tester) async {
@@ -786,8 +810,13 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
-    final day2PillLabel = tester.widget<Text>(find.text('DAY 02').first);
-    expect(day2PillLabel.style?.color, TpColorsLight.accentDeep);
+    final selected = tester.widget<AnimatedContainer>(
+      find.descendant(
+        of: find.byKey(const ValueKey('day-pill-2')),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    expect((selected.decoration! as BoxDecoration).color, TpColorsLight.accent);
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -831,8 +860,7 @@ void main() {
     tester,
   ) async {
     await _pumpTimeline(tester, fetchDays: () => _longDays('drag'));
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
     final daySection = find.byKey(const ValueKey('day-drop-1'));
     final before = tester.getTopLeft(daySection).dy;
@@ -904,8 +932,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
     await tester.drag(
       find.byKey(const ValueKey('entry-dismiss-11')),
@@ -987,8 +1014,7 @@ void main() {
 
   testWidgets('每個 entry 有拖曳 handle', (tester) async {
     await _pumpTimeline(tester);
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
@@ -1008,8 +1034,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
     await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
     await tester.pumpAndSettle();
@@ -1045,8 +1070,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
     final source = tester.getCenter(
       find.byKey(const ValueKey('entry-cross-drag-11')),
@@ -1092,8 +1116,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
-    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
 
     final source = tester.getCenter(
       find.byKey(const ValueKey('entry-cross-drag-11')),

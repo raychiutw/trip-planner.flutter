@@ -159,7 +159,7 @@ void main() {
   });
 
   group('TripsListScreen 清單渲染', () {
-    testWidgets('新增行程位於 toolbar,不使用遮擋清單的 FAB', (tester) async {
+    testWidgets('功能選單收納新增行程，右側固定帳號入口', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -173,15 +173,24 @@ void main() {
 
       expect(find.byKey(const ValueKey('trips-create-fab')), findsNothing);
       expect(find.byType(TpRootScrollScaffold), findsOneWidget);
-      expect(find.byTooltip('新增行程'), findsOneWidget);
+      expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('account-avatar-button')),
+        findsOneWidget,
+      );
       final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
       expect(appBar.actions, hasLength(1));
       final actionGroup = appBar.actions!.single as SizedBox;
       expect((actionGroup.child! as Row).children, hasLength(2));
       expect(find.byTooltip('更多'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('trips-create-button')), findsOneWidget);
+      expect(find.text('新增行程'), findsOneWidget);
     });
 
-    testWidgets('渲染 N 張卡：標題、eyebrow、tone 輪替', (tester) async {
+    testWidgets('渲染 N 張中性卡：標題與 eyebrow', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -205,15 +214,12 @@ void main() {
       expect(find.text('5 天'), findsOneWidget);
       expect(find.text('4 天'), findsOneWidget);
 
-      // tone 依 index 輪替 accent → sage → pink
-      final renderedCards = tester
-          .widgetList<TripCard>(find.byType(TripCard))
-          .toList();
-      expect(renderedCards.map((card) => card.tone).toList(), [
-        TripCardTone.accent,
-        TripCardTone.sage,
-        TripCardTone.pink,
-      ]);
+      for (final trip in fakeTrips) {
+        expect(
+          find.byKey(ValueKey('trip-card-cover-${trip.tripId}')),
+          findsOneWidget,
+        );
+      }
     });
 
     testWidgets('empty state：顯示「還沒有行程」hero 文案', (tester) async {
@@ -366,7 +372,7 @@ void main() {
       expect(find.text('kyoto-trip-2025'), findsOneWidget);
     });
 
-    testWidgets('filtered 後 tone 輪替依新 index 計算', (tester) async {
+    testWidgets('filtered 後仍使用中性卡片', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -378,7 +384,7 @@ void main() {
       );
       await tester.pump();
 
-      // 搜尋「busan」→ 只剩第三張（原 index=2），但 filtered index=0 → accent tone
+      // 搜尋「busan」→ 只剩第三張。
       await tester.enterText(
         find.byKey(const ValueKey('trips-search-field')),
         'busan',
@@ -387,10 +393,7 @@ void main() {
 
       final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
       expect(cards.length, 1);
-      expect(
-        cards.first.tone,
-        TripCardTone.accent,
-      ); // filtered index 0 → accent
+      expect(cards.first.trip.tripId, 'busan-trip-2024');
     });
   });
 
@@ -553,7 +556,7 @@ void main() {
       expect(cards[1].trip.tripId, 'okinawa-trip-2026');
     });
 
-    testWidgets('nameAsc 排序後 tone 輪替依最終 index 計算', (tester) async {
+    testWidgets('nameAsc 排序後仍使用中性卡片', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -572,10 +575,7 @@ void main() {
 
       final cards = tester.widgetList<TripCard>(find.byType(TripCard)).toList();
       expect(cards.length, 3);
-      // 排序後 index 0,1,2 → accent, sage, pink
-      expect(cards[0].tone, TripCardTone.accent);
-      expect(cards[1].tone, TripCardTone.sage);
-      expect(cards[2].tone, TripCardTone.pink);
+      expect(cards.map((card) => card.trip.tripId).toSet(), hasLength(3));
     });
   });
 
