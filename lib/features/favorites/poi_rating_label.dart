@@ -22,7 +22,7 @@ class PoiRatingLabel extends StatelessWidget {
         Text(
           rating.toStringAsFixed(1),
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),

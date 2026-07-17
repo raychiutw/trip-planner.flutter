@@ -58,7 +58,7 @@ class HotelCard extends StatelessWidget {
                   Text(
                     '退房 ${hotel.checkout}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
@@ -69,7 +69,7 @@ class HotelCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),

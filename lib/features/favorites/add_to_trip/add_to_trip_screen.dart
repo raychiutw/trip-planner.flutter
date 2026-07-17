@@ -306,7 +306,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
               '結束時間需晚於開始時間',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.error,
-                fontSize: 12,
+                fontSize: 11,
               ),
             ),
           ),

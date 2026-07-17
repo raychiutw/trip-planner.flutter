@@ -70,7 +70,7 @@ class DayHeader extends StatelessWidget {
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
                 color: tones.accent,
@@ -82,7 +82,7 @@ class DayHeader extends StatelessWidget {
               Text(
                 timeRange,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: theme.colorScheme.onSurfaceVariant,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -95,7 +95,7 @@ class DayHeader extends StatelessWidget {
         Text(
           summary,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),

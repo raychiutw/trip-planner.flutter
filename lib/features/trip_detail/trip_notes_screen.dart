@@ -64,6 +64,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     final tones = Theme.of(context).extension<TpTones>()!;
     final aiBusy = _aiSubmitting || _aiJob != null;
     return ListView(
+      key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
         Align(
@@ -722,10 +723,7 @@ class _FlightRow extends StatelessWidget {
     return _NoteRowCard(
       children: [
         if (flightTitle.isNotEmpty)
-          Text(
-            flightTitle,
-            style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
-          ),
+          Text(flightTitle, style: theme.textTheme.titleMedium),
         const SizedBox(height: TpSpacing.s1),
         Text(
           '${flight.departAirport} → ${flight.arriveAirport}',
@@ -750,10 +748,7 @@ class _LodgingRow extends StatelessWidget {
     final theme = Theme.of(context);
     return _NoteRowCard(
       children: [
-        Text(
-          lodging.name,
-          style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
-        ),
+        Text(lodging.name, style: theme.textTheme.titleMedium),
         if (lodging.checkInAt.isNotEmpty || lodging.checkOutAt.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
           _TimeText('${lodging.checkInAt} ~ ${lodging.checkOutAt}'),
@@ -810,7 +805,7 @@ class _ReservationRow extends StatelessWidget {
                 reservation.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
+                style: theme.textTheme.titleMedium,
               ),
             ),
           ],
@@ -843,10 +838,7 @@ class _PretripNoteRow extends StatelessWidget {
           ),
         if (pretripNote.title.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
-          Text(
-            pretripNote.title,
-            style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
-          ),
+          Text(pretripNote.title, style: theme.textTheme.titleMedium),
         ],
         if (pretripNote.content.isNotEmpty) ...[
           const SizedBox(height: TpSpacing.s1),
@@ -885,7 +877,7 @@ class _EmergencyContactRow extends StatelessWidget {
                 contact.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
+                style: theme.textTheme.titleMedium,
               ),
             ),
             const SizedBox(width: TpSpacing.s2),

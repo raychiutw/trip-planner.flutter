@@ -109,7 +109,7 @@ class PoiFavoriteCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: TpSpacing.s1),
                       child: Text(
                         '用於 ${favorite.usages.length} 個行程',
-                        style: TextStyle(fontSize: 12, color: tone.deep),
+                        style: TextStyle(fontSize: 11, color: tone.deep),
                       ),
                     ),
                 ],

@@ -76,7 +76,7 @@ class TimelineEntryTile extends StatelessWidget {
               child: Text(
                 displayTime,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.onSurface,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -105,7 +105,7 @@ class TimelineEntryTile extends StatelessWidget {
                   child: Text(
                     '$number',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: theme.colorScheme.onPrimary,
                       height: 1,
@@ -182,7 +182,7 @@ class _EntryCard extends StatelessWidget {
             Text(
               duration,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: mutedColor,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
@@ -195,7 +195,7 @@ class _EntryCard extends StatelessWidget {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
         metaItems.add(
-          Text(masterName, style: TextStyle(fontSize: 13, color: mutedColor)),
+          Text(masterName, style: TextStyle(fontSize: 12, color: mutedColor)),
         );
       }
       final categoryLabel = poiCategoryLabel(master.category);
@@ -204,7 +204,7 @@ class _EntryCard extends StatelessWidget {
           Text(
             categoryLabel,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: tone.deep,
             ),
@@ -222,7 +222,7 @@ class _EntryCard extends StatelessWidget {
               Text(
                 master.rating!.toStringAsFixed(1),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: mutedColor,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
