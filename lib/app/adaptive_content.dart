@@ -3,6 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 abstract final class AppContentWidth {
+  /// 登入／註冊／密碼復原等 shell 外的認證卡片。
+  ///
+  /// 這些畫面是同一張視覺卡片的不同內容，寬度必須一致 —— 先前 `login_screen` 寫死
+  /// `400`、`_AuthScaffold` 寫死 `420`，兩份實作各自漂移。
+  static const double authCard = 420;
+
   static const double form = 720;
   static const double conversation = 860;
   static const double feed = 920;

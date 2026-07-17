@@ -132,6 +132,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         : filteredFavorites;
 
     return [
+      // 底部淨空由 TpRootScrollScaffold 統一提供，這裡不再自行處理。
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(
           TpSpacing.s4,

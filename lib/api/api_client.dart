@@ -22,6 +22,18 @@ const String kTriplineOrigin = String.fromEnvironment(
   defaultValue: 'https://trip-planner-dby.pages.dev',
 );
 
+/// 高基數 GET 的永續快取容量上限（path prefix → 最多保留幾筆）。
+///
+/// 這兩條路徑每個 query 都是新 key，且沒有任何 mutation 會 evict 它們 —— 快取
+/// 只增不減，沒有上限就會無界成長。其他路徑靠 `evictionPrefixesFor` 在 mutation
+/// 後失效，天生有界，不需要上限。
+///
+/// 100 對齊 web 版 `useRoute.ts` 的 IndexedDB LRU 容量。
+const Map<String, int> kCacheCapacityByPathPrefix = {
+  '/poi-search': 100,
+  '/route': 100,
+};
+
 /// Redirect-style API response where callers need the `Location` header.
 class ApiRedirectResponse {
   const ApiRedirectResponse({required this.statusCode, required this.location});
@@ -55,10 +67,12 @@ class ApiClient {
     String origin = kTriplineOrigin,
     BearerTokenSource? bearerSource,
     CacheStore? cacheStore,
+    Map<String, int> cacheCapacityByPathPrefix = kCacheCapacityByPathPrefix,
   }) : _sessionStore = sessionStore,
        _origin = origin,
        _bearerSource = bearerSource,
        _cacheStore = cacheStore,
+       _cacheCapacityByPathPrefix = cacheCapacityByPathPrefix,
        _dio = dio ?? Dio() {
     _dio.options.baseUrl = '$origin/api';
     // 全收所有 status code，由 _send 自行判斷丟 ApiError
@@ -69,6 +83,7 @@ class ApiClient {
   final String _origin;
   final BearerTokenSource? _bearerSource;
   final CacheStore? _cacheStore;
+  final Map<String, int> _cacheCapacityByPathPrefix;
   final Dio _dio;
   int _mutationCounter = 0;
   bool _flushing = false;
@@ -595,11 +610,20 @@ class ApiClient {
         responseData == null ||
         (responseData is String && responseData.isEmpty);
     if (method == 'GET') {
-      if (writeCache && !isEmpty && _isCacheableGet(path)) {
-        await _cacheStore?.writeResponse(
-          cacheKeyFor('GET', path, query),
-          responseData,
-        );
+      if (writeCache && !isEmpty) {
+        final store = _cacheStore;
+        if (store != null) {
+          await store.writeResponse(
+            cacheKeyFor('GET', path, query),
+            responseData,
+          );
+          // 高基數 GET(POI 搜尋、路線)沒有 mutation 會 evict 它們,只增不減 →
+          // 每次寫入後就地修剪,不讓它無界成長。
+          final capacity = _capacityFor(path);
+          if (capacity != null) {
+            await store.enforceCapacity('GET ${capacity.key}', capacity.value);
+          }
+        }
       }
     } else {
       await _evictForMutation(method, path, body);
@@ -681,8 +705,13 @@ class ApiClient {
     }
   }
 
-  /// /poi-search 為離線非目標,且每個 query 是不同 key、無人 evict → 跳過快取避免無限增長。
-  bool _isCacheableGet(String path) => !path.startsWith('/poi-search');
+  /// 命中 [_cacheCapacityByPathPrefix] 的 path → 回傳該前綴的快取上限。
+  MapEntry<String, int>? _capacityFor(String path) {
+    for (final entry in _cacheCapacityByPathPrefix.entries) {
+      if (path.startsWith(entry.key)) return entry;
+    }
+    return null;
+  }
 
   Future<({Map<String, dynamic> headers, bool useBearer})> _authHeadersFor(
     String method,

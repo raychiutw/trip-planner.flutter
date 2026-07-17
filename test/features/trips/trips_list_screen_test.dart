@@ -51,8 +51,8 @@ class _FakeTripExportFileWriter implements TripExportFileWriter {
 
 UserInfo _userWithId(String id) => UserInfo(id: id, email: '$id@example.com');
 
-/// large title(SliverAppBar.large)+ 搜尋/篩選 header 會吃掉垂直空間;預設 600px
-/// 測試視窗下 SliverList 懶載入只建部分卡片。放大視窗讓短清單一次全建,穩定斷言卡片數。
+/// 頁首 + 搜尋/篩選 header 會吃掉垂直空間;預設 600px 測試視窗下 SliverList 懶載入
+/// 只建部分卡片。放大視窗讓短清單一次全建,穩定斷言卡片數。
 /// setSurfaceSize 斷言須在測試內呼叫,故用 helper + addTearDown 於測試 zone 內還原。
 Future<void> _useWideSurface(WidgetTester tester) async {
   await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -84,7 +84,9 @@ void main() {
   /// 把畫面包進假 GoRouter：/trips 是清單頁、/trips/:tripId 是導航目的地探針。
   /// （flutter_riverpod 3.x 未匯出 Override 型別，overrides 由各測試
   /// 直接在 ProviderScope 建構處以 list literal 傳入。）
-  Widget buildRouterApp() {
+  ///
+  /// `bottomInset` 模擬 AppShell（extendBody）灌進 body 的浮動 tab bar 高度。
+  Widget buildRouterApp({double bottomInset = 0}) {
     final fakeRouter = GoRouter(
       initialLocation: '/trips',
       routes: [
@@ -110,8 +112,51 @@ void main() {
     return MaterialApp.router(
       theme: AppTheme.light(),
       routerConfig: fakeRouter,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(padding: EdgeInsets.only(bottom: bottomInset)),
+        child: child!,
+      ),
     );
   }
+
+  group('TripsListScreen 底部淨空', () {
+    // AppShell 開 extendBody,Flutter 把浮動 tab bar 高度灌進 body 的
+    // MediaQuery.padding.bottom(scaffold.dart _BodyBuilder)。清單必須吃掉它,
+    // 否則捲到底時最後一張卡永久壓在 tab bar 下。
+    testWidgets('捲到底時最後一張卡不被浮動 tab bar 蓋住', (tester) async {
+      const inset = 100.0;
+      // 清單必須長到溢出視窗,否則捲不動、最後一張卡停在畫面中段,斷言會假綠燈。
+      final longTripList = [
+        for (var index = 0; index < 20; index++)
+          TripSummary(
+            tripId: 'trip-$index',
+            name: 'trip-$index',
+            title: '行程 $index',
+            totalDays: 3,
+          ),
+      ];
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(longTripList)),
+          ],
+          child: buildRouterApp(bottomInset: inset),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      final lastCard = tester.getRect(find.byType(TripCard).last);
+      expect(lastCard.bottom, lessThanOrEqualTo(800 - inset));
+    });
+  });
 
   group('TripsListScreen 清單渲染', () {
     testWidgets('新增行程位於 toolbar,不使用遮擋清單的 FAB', (tester) async {
@@ -148,7 +193,6 @@ void main() {
       );
       await tester.pump();
 
-      // SliverAppBar.large 標題會雙渲染(展開 + 收合),故用 findsWidgets。
       expect(find.text('我的行程'), findsWidgets);
       expect(find.byType(TripCard), findsNWidgets(3));
 

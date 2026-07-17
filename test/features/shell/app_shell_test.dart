@@ -59,37 +59,6 @@ GoRouter buildScrollableShellRouter() {
   );
 }
 
-GoRouter buildHorizontalShellRouter() {
-  StatefulShellBranch probe(String path, Widget child) => StatefulShellBranch(
-    routes: [GoRoute(path: path, builder: (_, _) => child)],
-  );
-  return GoRouter(
-    initialLocation: '/chat',
-    routes: [
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
-        branches: [
-          probe(
-            '/chat',
-            ListView.builder(
-              key: const ValueKey('root-horizontal-list'),
-              scrollDirection: Axis.horizontal,
-              itemCount: 20,
-              itemBuilder: (_, index) =>
-                  SizedBox(width: 120, child: Text('CARD-$index')),
-            ),
-          ),
-          probe('/trips', const Text('PROBE-TRIPS')),
-          probe('/map', const Text('PROBE-MAP')),
-          probe('/favorites', const Text('PROBE-FAV')),
-          probe('/account', const Text('PROBE-ACCOUNT')),
-        ],
-      ),
-    ],
-  );
-}
-
 void main() {
   group('AppShell 5-tab 導航', () {
     testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
@@ -140,7 +109,9 @@ void main() {
       expect(tester.widget<Scaffold>(find.byType(Scaffold)).extendBody, isTrue);
     });
 
-    testWidgets('垂直向下捲縮成 icon-only,向上捲恢復 label', (tester) async {
+    // tab bar 尺寸與 label 不隨捲動改變：Apple 的 minimize 語意綁定「tab bar 底下
+    // 是可捲動內容」,本 app 多數 root 畫面底下是固定版面,縮放只會讓導覽跳動。
+    testWidgets('捲動不改變 root tab 尺寸與 label', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -150,6 +121,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      final restingSize = tester.getSize(bar);
       expect(find.text('聊天'), findsOneWidget);
 
       await tester.drag(
@@ -157,35 +131,19 @@ void main() {
         const Offset(0, -320),
       );
       await tester.pumpAndSettle();
-      expect(find.text('聊天'), findsNothing);
+
+      expect(tester.getSize(bar), restingSize);
+      expect(find.text('聊天'), findsOneWidget);
+      expect(find.text('帳號'), findsOneWidget);
 
       await tester.drag(
         find.byKey(const ValueKey('root-vertical-list')),
         const Offset(0, 220),
       );
       await tester.pumpAndSettle();
+
+      expect(tester.getSize(bar), restingSize);
       expect(find.text('聊天'), findsOneWidget);
-    });
-
-    testWidgets('水平內容捲動不縮減 root tab', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(
-            theme: AppTheme.light(),
-            routerConfig: buildHorizontalShellRouter(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.drag(
-        find.byKey(const ValueKey('root-horizontal-list')),
-        const Offset(-320, 0),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('帳號'), findsOneWidget);
     });
 
     testWidgets('五個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {

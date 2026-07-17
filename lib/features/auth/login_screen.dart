@@ -12,6 +12,7 @@ import '../../api/api_error.dart';
 import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
+import '../../app/adaptive_content.dart';
 import '../../theme/tokens.dart';
 
 /// 密碼登入畫面（/login，shell 外）。
@@ -105,7 +106,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               vertical: TpSpacing.s10,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              key: const ValueKey('auth-card'),
+              constraints: const BoxConstraints(
+                maxWidth: AppContentWidth.authCard,
+              ),
               child: AutofillGroup(
                 child: Form(
                   key: _formKey,

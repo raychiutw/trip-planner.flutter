@@ -27,7 +27,7 @@ final settingsStoreProvider = Provider<SettingsStore>(
   (ref) => SecureSettingsStore(),
 );
 
-/// 離線快取 store。預設記憶體版;app 於 main() override 成 SembastCacheStore。
+/// 離線快取 store。預設記憶體版;app 於 main() override 成 DriftCacheStore。
 final cacheStoreProvider = Provider<CacheStore>((ref) => InMemoryCacheStore());
 
 final apiClientProvider = Provider<ApiClient>(
@@ -87,13 +87,18 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<UserInfo?> _resolveUser() async {
     // OAuth 模式:有 id_token 就用其 claims 當身分(userinfo 不收 Bearer)。
+    // 驗證未過必須落回 currentUser() —— id_token 是這條路徑唯一的身分來源,
+    // 不驗就等於「secure storage 裡有什麼就信什麼」。
     if (OAuthConfig.isConfigured) {
       final idToken =
           (await ref.watch(oauthTokenStoreProvider).read())?.idToken;
       if (idToken != null) {
-        final claims = decodeIdTokenClaims(idToken);
-        final email = claims['email'] as String?;
-        if (email != null) {
+        final claims = verifiedIdTokenClaims(
+          idToken,
+          clientId: OAuthConfig.clientId,
+        );
+        final email = claims?['email'] as String?;
+        if (claims != null && email != null) {
           return UserInfo(
             id: claims['sub'] as String? ?? '',
             email: email,

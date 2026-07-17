@@ -31,8 +31,8 @@ Apple Music 在這裡是品質基準，不是元件庫。實作遵循四個優�
 
 | 面向 | 採用的原則 | Tripline 實作 | 反方意見與結論 |
 |---|---|---|---|
-| 頂層導覽 | 少量、穩定、可保留分頁狀態 | 五個 branch 固定順序；compact iOS/macOS 用 `CupertinoTabBar`、Android 用 `NavigationBar`、`>=768` 用 `NavigationRail` | 「全部做成 Cupertino 才像 Apple Music」忽略 Android 熟悉度；保留平台原生導覽較可靠 |
-| 資訊階層 | 大標題、明確主動作、次要動作收斂 | large app bar、空狀態 CTA、時間軸 More 選單、可見的收藏選取模式 | 「所有動作都露出」會增加 chrome；主動作外露、低頻動作進 More |
+| 頂層導覽 | 少量、穩定、可保留分頁狀態 | 五個 branch 固定順序，一律使用浮動玻璃 `AppleRootTabBar`（2026-07-16 更正：先前記載的 `CupertinoTabBar` / `NavigationBar` / `NavigationRail` 依寬度切換**從未實作**，`AppShell` 無條件只用 `AppleRootTabBar`） | 「全部做成 Cupertino 才像 Apple Music」忽略 Android 熟悉度；改以單一玻璃 Tab bar 統一兩平台，並保留 label 與 selected semantics |
+| 資訊階層 | 統一頁首、明確主動作、次要動作收斂 | inline 頁首（56pt 單行 + 最多兩個功能鍵）、空狀態 CTA、時間軸 More 選單、可見的收藏選取模式（2026-07-16 更正：large app bar 已移除） | 「所有動作都露出」會增加 chrome；主動作外露、低頻動作進 More。大標題只有部分頁面有，反而讓 app 讀起來像兩套設計 |
 | 排版 | 少字型、角色清楚、尊重使用者字級 | 系統字、HIG 字階、中文零字距、Dynamic Type | 「打包 Inter 比較一致」會犧牲平台字型調校與 accessibility；因此不打包 Inter |
 | 寬版閱讀 | 內容有焦點，不因螢幕變大而無限拉長 | form `720`、conversation `860`、feed `920` | 「全寬顯示資訊更多」對表單與段落反而增加視線移動；地圖等空間型內容仍可全寬 |
 | 載入 | 儘快顯示接近最終版型的內容 | list/map/timeline 靜態 skeleton | 「shimmer 更有活力」只是持續動畫，沒有增加資訊；靜態 skeleton 對 reduced motion 更安全 |
@@ -46,7 +46,7 @@ Apple Music 在這裡是品質基準，不是元件庫。實作遵循四個優�
 
 Apple Music 的紅色品牌、媒體封面、播放控制與內容推薦模型不屬於旅程規劃。照抄會讓顏色失去 POI 語意，也會把旅行的時間、位置與協作資訊壓進不適合的媒體版型。
 
-同樣地，本輪不模擬 Apple 最新視覺材質或自製 Liquid Glass。Flutter 目前已有可測試的 Cupertino/Material 元件與清楚表面層級；在沒有原生支援、真機 accessibility 與效能證據前，手刻玻璃效果只會增加模糊、對比與維護風險。
+> **已過期（2026-07-16 更正）**：本節原本寫「不模擬 Apple 最新視覺材質或自製 Liquid Glass」。該決策已於 [2026-07-15 規格](superpowers/specs/2026-07-15-apple-music-ui-google-maps-parity-design.md)推翻並實作（PR #46「redesign Tripline with Liquid Glass and native maps」）。現況：根分頁採浮動玻璃 Tab bar，玻璃只用於 Tab bar、浮動 toolbar 與 sheet 等**功能層**，內容層維持標準材質，統一由 `TpGlassSurface` 集中處理 blur／tint／border／深淺模式與高對比降級。原本擔心的模糊與對比風險，靠「玻璃不鋪到內容層」與高對比降級來控管。
 
 ## Accessibility 基線
 

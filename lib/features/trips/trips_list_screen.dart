@@ -143,7 +143,7 @@ final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
   return ref.watch(tripRepositoryProvider).watchMyTrips();
 });
 
-/// 行程清單（5-tab「行程」分頁）：iOS large title「我的行程」+ 搜尋框 + 分段篩選
+/// 行程清單（5-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選
 /// + 下拉更新 + 單欄卡片清單。搜尋/篩選置於大標題下方,隨內容捲動(Notes/Mail 慣例)。
 /// 點卡片進詳情；長按開 action sheet(分享/共編/匯出/刪除,二次確認)。
 class TripsListScreen extends ConsumerStatefulWidget {
@@ -513,6 +513,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     List<TripSummary> trips,
     String? currentUserId,
   ) {
+    // 底部淨空由 TpRootScrollScaffold 統一提供，這裡不再自行處理。
     return SliverPadding(
       padding: const EdgeInsets.all(TpSpacing.s4),
       sliver: SliverList.separated(

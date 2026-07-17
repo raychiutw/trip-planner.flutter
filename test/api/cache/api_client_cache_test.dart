@@ -293,21 +293,111 @@ void main() {
     expect(result, {'id': 'u1', 'email': 'a@b.c'});
   });
 
-  test('/poi-search 不寫入快取(離線非目標、避免無限增長)', () async {
-    adapter.onGet(
-      '/poi-search',
-      (s) => s.reply(200, [
-        {'name': 'x'},
-      ]),
-      queryParameters: {'q': 'tokyo'},
-    );
-    await client.get('/poi-search', query: {'q': 'tokyo'});
-    expect(
-      await cache.readResponse(
-        cacheKeyFor('GET', '/poi-search', {'q': 'tokyo'}),
-      ),
-      isNull,
-    );
+  group('高基數 GET 的容量上限', () {
+    // /poi-search 與 /route 同病:每個 query 都是新 key、沒有任何 mutation 會
+    // evict 它們 → 快取只增不減。先前是整個排除在快取外(止血),快取層遷到
+    // drift(sqlite,不全載入記憶體)後改為「照常快取,但給容量上限」。
+
+    test('/poi-search 會寫入快取', () async {
+      adapter.onGet(
+        '/poi-search',
+        (s) => s.reply(200, [
+          {'name': 'x'},
+        ]),
+        queryParameters: {'q': 'tokyo'},
+      );
+      await client.get('/poi-search', query: {'q': 'tokyo'});
+      expect(
+        await cache.readResponse(
+          cacheKeyFor('GET', '/poi-search', {'q': 'tokyo'}),
+        ),
+        isNotNull,
+      );
+    });
+
+    test('/route 會寫入快取', () async {
+      adapter.onGet(
+        '/route',
+        (s) => s.reply(200, {
+          'polyline': [
+            [35.68, 139.7],
+          ],
+          'duration': 1315,
+          'distance': 6026,
+        }),
+        queryParameters: {'from': '139.7,35.68', 'to': '139.74,35.66'},
+      );
+      await client.get(
+        '/route',
+        query: {'from': '139.7,35.68', 'to': '139.74,35.66'},
+      );
+      expect(
+        await cache.readResponse(
+          cacheKeyFor('GET', '/route', {
+            'from': '139.7,35.68',
+            'to': '139.74,35.66',
+          }),
+        ),
+        isNotNull,
+      );
+    });
+
+    test('超過上限時丟掉最舊的,總數不超過上限', () async {
+      final capped = ApiClient(
+        sessionStore: InMemorySessionStore(),
+        cacheStore: cache,
+        dio: dio,
+        cacheCapacityByPathPrefix: const {'/poi-search': 2},
+      );
+      for (final q in ['a', 'b', 'c']) {
+        adapter.onGet(
+          '/poi-search',
+          (s) => s.reply(200, [
+            {'name': q},
+          ]),
+          queryParameters: {'q': q},
+        );
+        await capped.get('/poi-search', query: {'q': q});
+      }
+
+      // 最舊的 a 被淘汰,b/c 留著。
+      expect(
+        await cache.readResponse(cacheKeyFor('GET', '/poi-search', {'q': 'a'})),
+        isNull,
+      );
+      expect(
+        await cache.readResponse(cacheKeyFor('GET', '/poi-search', {'q': 'b'})),
+        isNotNull,
+      );
+      expect(
+        await cache.readResponse(cacheKeyFor('GET', '/poi-search', {'q': 'c'})),
+        isNotNull,
+      );
+    });
+
+    test('上限只約束該前綴,不波及一般快取', () async {
+      final capped = ApiClient(
+        sessionStore: InMemorySessionStore(),
+        cacheStore: cache,
+        dio: dio,
+        cacheCapacityByPathPrefix: const {'/poi-search': 1},
+      );
+      await cache.writeResponse(cacheKeyFor('GET', '/my-trips'), [1]);
+      for (final q in ['a', 'b']) {
+        adapter.onGet(
+          '/poi-search',
+          (s) => s.reply(200, [
+            {'name': q},
+          ]),
+          queryParameters: {'q': q},
+        );
+        await capped.get('/poi-search', query: {'q': q});
+      }
+      expect(
+        await cache.readResponse(cacheKeyFor('GET', '/my-trips')),
+        isNotNull,
+      );
+    });
   });
 
   test('cacheStore=null → 行為不變(GET 成功不報錯)', () async {

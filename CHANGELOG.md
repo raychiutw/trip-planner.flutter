@@ -4,6 +4,39 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-16
+
+### 修正
+
+- **非同步操作還沒回來就離開頁面會讓 App 崩潰**：時間軸的交通自動重算由畫面建構時觸發，與使用者離開頁面天然競速；地點管理的操作也有同型問題（守衛寫在 `ref.invalidate` 之後，只護到了提示訊息）。兩處丟出的 `StateError` 都不是 `Exception` 子類，現場的 `on Exception` 攔不到，會一路逃成未捕捉例外。
+- **地圖鏡頭不遵守系統「減少動態效果」**：POI 卡片已遵守，鏡頭卻一律平移 —— 而鏡頭平移正是最容易誘發動暈的動作。開啟該設定時改為直接切換。
+- **OAuth id_token 未經驗證**（開發選項，出貨版本未啟用）：id_token 的 claims 是該模式下唯一的身分來源，先前只解碼不驗證，過期 token 會無限期維持登入。補上 `exp`／`aud`／`sub` 驗證。
+
+## [0.8.1] - 2026-07-16
+
+### 變更
+
+- **路線與 POI 搜尋恢復永續快取**：兩者先前整個排除在快取外（sembast 全載入記憶體，而它們每個 query 都是新 key、無人 evict，會無界成長）。快取層遷到 drift 後前提消失，改為照常快取並給容量上限 100（對齊 web 的 IndexedDB LRU）。重看同一段路線不再重打 Google Directions。
+
+### 修正
+
+- **深色模式啟動會閃白**：launch screen 背景寫死白色，改為隨系統調適的畫布色（對齊 app 的 `#FFFBF5` / `#121214`），並移除自建立以來沒換過的 1×1 佔位圖。
+
+## [0.8.0] - 2026-07-16
+
+### 變更
+
+- **地圖 marker 與路線樣式對齊 web**：POI 由 Google 預設水滴 pin 改為白底圓形 chip + 日色外環與編號，選中者換成柔褐實心並放大；路線改用 web 的 day palette，偶數天虛線、當前段加粗並提高不透明度。web 的 `dayPalette.ts` 本就規定該色盤「僅用於地圖 polyline，不套用到 UI chrome」——先前 Flutter 版把彩虹色填進 pin 是違反自家規則。
+- **根頁頁首收斂為 inline 56pt**：移除 large title——它吃掉 96–108pt，內容卻只是重複 tab bar 已經講過的頁名；省下的高度換成同一螢幕多看到一張卡。
+- **浮動 tab bar 固定 64pt**：移除捲動縮小與標籤淡出，位置與標籤恆定。
+- **快取層由 sembast 遷移至 drift（sqlite）**：sembast 開啟時會把整個 DB 載入記憶體，撐不住 POI 搜尋與 AI 對話歷史等無界增長的資料。既有裝置的離線佇列與衝突區於首次啟動一次性搬遷（回應快取不搬，重抓即可）。
+
+### 修正
+
+- **地圖完全不顯示路線**：單段路線解析丟出的 `TypeError` 不是 `Exception` 子類 → `on Exception` 漏接 → `Future.wait` fail-fast 使整趟路線全滅並卡在無限 spinner。
+- **路線重複燒 Google Directions 配額**：同 session 加上 in-memory LRU 快取（容量 100，對齊 web 的 IndexedDB LRU）。
+- **認證卡片寬度漂移**：login 寫死 400、`_AuthScaffold` 寫死 420，在登入與忘記密碼之間切換時卡片會橫向跳動。
+
 ## [0.7.0] - 2026-07-15
 
 ### 新增

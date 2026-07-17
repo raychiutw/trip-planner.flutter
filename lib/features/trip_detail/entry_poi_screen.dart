@@ -64,13 +64,16 @@ class EntryPoiScreen extends ConsumerWidget {
       if (recomputeTravel) {
         await _recomputeTravel(ref);
       }
+      // 守衛必須在 ref.invalidate 之前 —— await 期間使用者可能已離開,此時碰 ref
+      // 會擲 StateError。StateError 不是 Exception 子類,底下的 `on Exception`
+      // 攔不到,會一路逃成未捕捉例外把 App 打掛。
+      if (!context.mounted) return;
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
-      if (!context.mounted) return;
       showAppNotice(context, success);
     } on ApiError catch (error) {
-      ref.invalidate(entryDetailProvider(_key));
       if (!context.mounted) return;
+      ref.invalidate(entryDetailProvider(_key));
       showAppError(context, error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試');
     } on Exception {
       if (!context.mounted) return;
@@ -79,6 +82,9 @@ class EntryPoiScreen extends ConsumerWidget {
   }
 
   Future<void> _recomputeTravel(WidgetRef ref) async {
+    // 由 _run 在 `await op()` 之後才呼叫 → 進來時可能早已 unmount,連 ref.read
+    // 都不安全（同樣會擲 StateError 而非 Exception）。
+    if (!ref.context.mounted) return;
     try {
       await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
     } on Exception {
