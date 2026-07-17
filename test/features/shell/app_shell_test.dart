@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tripline/features/shell/app_shell.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 GoRouter buildShellRouter() {
   StatefulShellBranch probe(String path, String marker) => StatefulShellBranch(
@@ -171,7 +172,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('root tab 使用定版 24/56/18 幾何', (tester) async {
+    testWidgets('root tab 對齊定版 mockup 的 30/52/8 幾何與玻璃色', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -186,12 +187,45 @@ void main() {
       final padding = tester.widget<Padding>(
         find.descendant(of: bar, matching: find.byType(Padding)).first,
       );
-      expect(padding.padding, const EdgeInsets.fromLTRB(24, 0, 24, 18));
+      expect(padding.padding, const EdgeInsets.fromLTRB(30, 0, 30, 8));
       final glass = find.descendant(
         of: bar,
         matching: find.byType(BackdropFilter),
       );
-      expect(tester.getSize(glass).height, 56);
+      expect(tester.getSize(glass).height, 52);
+
+      final glassDecoration = tester.widget<DecoratedBox>(
+        find.descendant(of: bar, matching: find.byType(DecoratedBox)).first,
+      );
+      expect(
+        (glassDecoration.decoration as BoxDecoration).color,
+        TpColorsLight.background.withValues(alpha: 0.88),
+      );
+      expect(
+        find.byKey(const ValueKey('root-tab-selected-surface-聊天')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('深色 root tab 使用定版 rgba(40,40,42,.86)', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      final glassDecoration = tester.widget<DecoratedBox>(
+        find.descendant(of: bar, matching: find.byType(DecoratedBox)).first,
+      );
+      expect(
+        (glassDecoration.decoration as BoxDecoration).color,
+        TpColorsDark.glass.withValues(alpha: 0.86),
+      );
     });
   });
 }

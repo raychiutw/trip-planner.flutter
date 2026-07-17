@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 
@@ -43,33 +44,41 @@ class AppleRootTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tintColor = isDark
+        ? TpColorsDark.glass.withValues(alpha: 0.86)
+        : TpColorsLight.background.withValues(alpha: 0.88);
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          24,
+          TpRootTabGeometry.horizontalMargin,
           0,
-          24,
+          TpRootTabGeometry.horizontalMargin,
           MediaQuery.viewPaddingOf(context).bottom +
               TpRootTabGeometry.bottomSpacing,
         ),
         child: TpGlassSurface(
-          borderRadius: const BorderRadius.all(Radius.circular(28)),
+          borderRadius: const BorderRadius.all(Radius.circular(26)),
+          tintColor: tintColor,
           child: Material(
             color: Colors.transparent,
             child: SizedBox(
               height: TpRootTabGeometry.expandedBarHeight,
-              child: Row(
-                children: [
-                  for (var index = 0; index < _destinations.length; index++)
-                    Expanded(
-                      child: _RootTabItem(
-                        destination: _destinations[index],
-                        selected: selectedIndex == index,
-                        onTap: () => onSelected(index),
+              child: Padding(
+                padding: const EdgeInsets.all(3),
+                child: Row(
+                  children: [
+                    for (var index = 0; index < _destinations.length; index++)
+                      Expanded(
+                        child: _RootTabItem(
+                          destination: _destinations[index],
+                          selected: selectedIndex == index,
+                          onTap: () => onSelected(index),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -100,28 +109,39 @@ class _RootTabItem extends StatelessWidget {
       selected: selected,
       label: destination.label,
       excludeSemantics: true,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 28,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                selected ? destination.selectedIcon : destination.icon,
-                size: 22,
-                color: color,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                destination.label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+      child: DecoratedBox(
+        key: selected
+            ? ValueKey('root-tab-selected-surface-${destination.label}')
+            : null,
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(context).extension<TpTones>()!.accentSubtle
+              : Colors.transparent,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  selected ? destination.selectedIcon : destination.icon,
+                  size: 22,
                   color: color,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  destination.label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

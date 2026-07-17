@@ -57,6 +57,8 @@ Flutter 必須以 `TextTheme` 語意樣式對應，不在 widget 內硬寫另一
 |---|---|---:|
 | 頁面／行程標題 | Title 3 | 20pt |
 | 模態／設定標題 | Headline | 17pt |
+| 帳號名稱 | Title 2 | 22pt |
+| 設定列 | Body | 17pt |
 | 景點、POI、row title | Subheadline | 15pt semibold |
 | 一般正文 | Subheadline | 15pt |
 | 次要資訊、selector | Footnote | 13pt |
@@ -83,9 +85,10 @@ Root tab 固定四項：
 
 Root tab 幾何：
 
-- 水平 margin 24pt。
-- 可見高度 56pt。
-- iPhone 34pt safe area 時，膠囊底部距螢幕 18pt。
+- 水平 margin 30pt；402pt 畫面上的可見寬度 342pt，對齊定版 mockup 的 85.2%。
+- 可見高度 52pt，外圓角 26pt，內層 padding 3pt。
+- 膠囊底部位於 safe area 上方 8pt，不把 safe area 重複算成視覺 margin。
+- Light glass 使用暖白 `rgba(255,251,245,.88)`；Dark glass 使用 `rgba(40,40,42,.86)`；選中項顯示中性 selected surface。
 - 內容可以延伸到玻璃後方，但可操作內容、POI accessory 與輸入列必須使用相同 geometry 避讓。
 - tab 不隨捲動縮小、淡出或改變標籤。
 

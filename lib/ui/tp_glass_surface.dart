@@ -10,20 +10,25 @@ class TpGlassSurface extends StatelessWidget {
     required this.child,
     this.borderRadius = const BorderRadius.all(Radius.circular(28)),
     this.padding = EdgeInsets.zero,
+    this.tintColor,
   });
 
   final Widget child;
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
+  final Color? tintColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final highContrast = MediaQuery.highContrastOf(context);
     final isDark = theme.brightness == Brightness.dark;
-    final tint = isDark
+    final defaultTint = isDark
         ? TpColorsDark.background.withValues(alpha: highContrast ? 0.96 : 0.72)
         : Colors.white.withValues(alpha: highContrast ? 0.96 : 0.68);
+    final tint = tintColor == null
+        ? defaultTint
+        : tintColor!.withValues(alpha: highContrast ? 0.96 : tintColor!.a);
     final border = isDark
         ? Colors.white.withValues(alpha: highContrast ? 0.34 : 0.18)
         : Colors.white.withValues(alpha: highContrast ? 0.92 : 0.70);

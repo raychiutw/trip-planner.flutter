@@ -81,6 +81,16 @@ void main() {
     expect(find.text('3'), findsOneWidget);
   });
 
+  testWidgets('iOS Large 的帳號名稱與次要資訊使用 HIG 字級', (tester) async {
+    await pumpAccountScreen(tester);
+
+    expect(tester.widget<Text>(find.text('Ray')).style?.fontSize, 22);
+    expect(
+      tester.widget<Text>(find.text('ray@example.com')).style?.fontSize,
+      15,
+    );
+  });
+
   testWidgets('無 displayName 時顯示 email local part 與其首字母大寫', (tester) async {
     const userWithoutName = UserInfo(
       id: 'user-2',

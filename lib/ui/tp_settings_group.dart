@@ -32,7 +32,7 @@ class TpSettingsGroup extends StatelessWidget {
               ),
               child: Text(
                 title!,
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -110,7 +110,7 @@ class TpSettingsRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       color: titleColor,
                       fontWeight: FontWeight.w500,
                     ),
@@ -119,7 +119,7 @@ class TpSettingsRow extends StatelessWidget {
                     const SizedBox(height: TpSpacing.s1),
                     Text(
                       subtitle!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -133,7 +133,7 @@ class TpSettingsRow extends StatelessWidget {
                 child: Text(
                   value!,
                   textAlign: TextAlign.end,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
