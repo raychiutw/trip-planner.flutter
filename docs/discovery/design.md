@@ -190,7 +190,15 @@ const sheetClose = Cubic(0.4, 0, 1, 1);        // 280ms
 
 Mockup C 的青綠色只代表原 `.flutter` 參考稿，不進入 production theme。正式配色採 **V3 中性深色 + 柔褐 accent**：dark canvas `#121214`、surface `#1C1C1E`、elevated surface `#2C2C2E`、foreground `#F5F5F7`、muted `#A1A1A6`；選取、主要動作與品牌 accent 使用 `#CBA06E`。青綠不得成為 toolbar、scope、root tab、drawer 或主要 CTA 的 chrome 色；sage／pink 僅保留既有分類與語意用途。
 
-比較 mockup：`~/.gstack/projects/raychiutw-trip-planner.flutter/designs/trip-itinerary-map-20260715/design-board.png`。
+比較 mockup（`docs/design-sessions/`，已進版控）：
+
+| 檔案 | 內容 | 決議 |
+|------|------|------|
+| [`2026-07-16-map-poi-card-overflow.svg`](../design-sessions/2026-07-16-map-poi-card-overflow.svg) | 行程地圖 POI 卡片破版 | 改 Stack 浮層 + 88pt accessory，卡片不再被 tab bar 蓋住 |
+| [`2026-07-16-headers-and-type-scale.svg`](../design-sessions/2026-07-16-headers-and-type-scale.svg) | 三個根頁 header 收斂 + 字階 | 移除 large title，恆 inline 56pt（理由見 4.1） |
+| [`2026-07-16-root-tabs-consistency.svg`](../design-sessions/2026-07-16-root-tabs-consistency.svg) | 浮動 root tab 一致性 | 固定 64pt，不隨捲動縮合、標籤不淡出 |
+
+原本此處指向 `~/.gstack/projects/.../designs/trip-itinerary-map-20260715/design-board.png` —— 那是 gstack 的 session 暫存區，檔案早已隨 session 消失。定稿依據不該放在會被清掉的地方，故一律簽入 `docs/design-sessions/`。
 
 ### 證據範圍
 
