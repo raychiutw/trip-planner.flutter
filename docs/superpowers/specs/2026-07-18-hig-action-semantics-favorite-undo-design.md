@@ -213,11 +213,75 @@ class TpActionItem<T> {
 
 ### 6.5 Sheet 單一來源
 
-- 行程、帳號與功能內容頁：`showAppLargeSheet`／`showAppLargeScreenSheet`。
-- 短動作清單：`showAppActionSheet`。
-- 新增／編輯表單可保留既有 form widget，但外層 Sheet 必須走共用入口，不得在 feature 內重複 drag handle、關閉鈕與 93% 高度。
+所有由下往上出現的視窗必須由同一個 Sheet presentation engine 呈現。共用的意思是共用材質與行為，不是把所有任務強制做成同一個固定高度、同一組按鈕。
 
-原生時間／日期 picker 不包裝成自製 Tripline picker，繼續使用平台元件。
+底層唯一入口為 `showAppSheet<T>`，只在 `lib/app/adaptive.dart` 內接觸 `GlassModalSheetScaffold`、`showModalBottomSheet`、`showCupertinoModalPopup` 或 `showGeneralDialog`。Feature 不得直接呼叫這些平台 API。
+
+`showAppSheet<T>` 統一負責：
+
+- Light／Dark Liquid Glass、Reduce Transparency fallback 與主題切換。
+- barrier、圓角、safe area、鍵盤 inset、拖曳動畫與 Reduce Motion。
+- large／medium detent、初始 detent、grabber、向下滑動關閉。
+- 標題列幾何、標題、取消／返回／關閉／完成按鈕與 44pt target。
+- 單一 Sheet 內的 Navigator、返回結果與防止重複關閉。
+- 未儲存表單的互動關閉攔截；內容與立即選取 Sheet 不需攔截。
+
+Feature 只能使用以下有語意的 wrapper：
+
+| Wrapper | 使用情境 | HIG 標題列 | 高度與選取 |
+|---|---|---|---|
+| `showAppSelectionSheet<T>` | 切換行程、移到 Day、POI／分類選擇 | 置中任務標題；leading `取消`；無 `完成` | 長清單初始 large，支援 medium＋large；點列立即選取並關閉，現在值顯示 checkmark |
+| `showAppFormSheet<T>` | 新增／編輯停留點、交通、筆記、篩選 | leading `取消`；trailing `完成`／明確動詞 | medium＋large 或依鍵盤擴展；有未儲存內容時攔截 swipe dismiss |
+| `showAppContentSheet<T>` | 帳號、同步衝突、功能說明 | 單頁用 `關閉`；階層子頁用 `返回`，不得把返回當關閉 | 內容需要時使用 large；子頁沿用同一個 Sheet Navigator，不再疊第二張 Sheet |
+| `showAppScreenSheet<T>` | 行程功能開啟的近滿版功能頁 | 共用 Sheet Header／`TpAppBar`；第一層可關閉，後續層返回 | large；不得以 `go()` 替換原頁而失去退出路徑 |
+| `showAppActionSheet<T>` | 使用者剛發起的一個動作需要 2–3 個短選項 | 系統 action sheet 語意，含取消 | 不得捲動；最多 3 個動作加取消；destructive 固定 system red |
+
+原生時間／日期 picker 不包裝成自製 Tripline picker，繼續使用平台元件。由 `...` 按鈕展開、選項超過三個的功能清單應使用共用 `TpMoreMenuButton`，不是 action sheet。
+
+#### 6.5.1 「切換行程」目前實作與 HIG 差異
+
+目前 `TripTitleButton` 直接呼叫 `showAppLargeSheet`；該入口同時供帳號使用，因此「切換行程」被套成帳號／內容型 Sheet。
+
+| 項目 | 現在實際實作 | HIG／定版 |
+|---|---|---|
+| 任務類型 | 與帳號共用同一個泛用 large content sheet | 行程切換是立即選取清單，改走 `showAppSelectionSheet<String>` |
+| 高度 | `halfSize` 與 `fullSize` 都是 `0.93`，只有一個固定高度 | 初始 large 以保留近滿版；另提供 medium detent，內容捲動或拖曳可展開 |
+| Grabber | 自繪 36×5 指示線，但 Sheet 沒有兩個不同 detent | 只有可 resize 時顯示 grabber；medium／large 必須是實際不同停靠點 |
+| 標題列 | 20pt 標題靠左，右上圓形 X | 任務標題置中，leading `取消`；立即選取不顯示多餘的 `完成` |
+| 選取回饋 | 目前行程有 trailing checkmark，點列立即 `pop(tripId)` | 保留；符合 option list 的短暫 highlight＋checkmark 語意 |
+| 搜尋與長清單 | Sheet 內搜尋框＋可捲動 ListView | 保留；長清單不應改成 action sheet |
+| 關閉 | barrier、右上 X、向下拖到 hidden 都能關閉 | 保留 barrier／swipe dismiss；可見出口改由 selection variant 統一提供 |
+| 導航 | 泛用 Sheet 預先建立巢狀 Navigator | 行程選擇是單一步驟，不建立不需要的子頁；只有內容／多步驟 Sheet 啟用內部 Navigator |
+| 動畫 | `showGeneralDialog` 再包一層 500ms 自訂 SlideTransition | 動畫只由共用 engine 管理，避免 dialog transition 與 glass sheet 拖曳各做一次 |
+
+近滿版高度本身不是問題；真正不符合的是「固定 93% 卻顯示可調整的 grabber」，以及把內容型右上關閉 Header 套到立即選取任務。
+
+#### 6.5.2 Sheet 導航規則
+
+- 單頁 selection：`取消`關閉；點選成功直接回傳值並關閉。
+- 單頁 form：`取消`放棄、`完成`儲存；兩者不可只留其一。
+- 多步驟第一頁：leading `取消`；需要提交時 trailing `完成`可先 disabled。
+- 多步驟後續頁：leading `返回`取代`取消`；返回只退一層，不得關閉整張 Sheet。
+- 純內容階層若產品需要「返回」與「關閉全部」同時存在，可用 leading 返回＋trailing 關閉；不得再同時加入完成。
+- 主介面一次只顯示一張 Sheet。若動作必須開另一張 Sheet，先關閉目前 Sheet，再開下一張。
+- 所有 Sheet 必須支援 swipe down；若會遺失輸入，先顯示共用確認，不得默默捨棄。
+
+#### 6.5.3 現有呼叫點遷移
+
+| 現有情境 | 定版共用入口 |
+|---|---|
+| `TripTitleButton` 切換行程 | `showAppSelectionSheet<String>` |
+| Timeline 移到其他 Day | `showAppSelectionSheet<int>` |
+| POI 加入備選／更換正選 | `showAppSelectionSheet<_EntryPoiPick>` |
+| 探索更多分類 | 類別超過三個時使用 `showAppSelectionSheet<String>` |
+| 收藏篩選 | `showAppFormSheet<void>`，取消／套用明確分開 |
+| 停留點、交通、筆記新增／編輯 | `showAppFormSheet<void>` |
+| 帳號入口 | `showAppContentSheet<void>` |
+| 行程功能打開筆記、資料、列印、異動、分享、共編、健檢 | `showAppScreenSheet<void>` |
+| 同步衝突、AI 授權、工作階段詳情 | 依是否有提交分別使用 content／form variant |
+| 收藏卡、行程卡的短情境動作 | 最多三項才用 `showAppActionSheet`；`...` 展開或超過三項改 `TpMoreMenuButton` |
+
+遷移完成後，`lib/features/**` 對 `showModalBottomSheet`、`showCupertinoModalPopup`、`showGeneralDialog` 的搜尋結果必須為零。
 
 ### 6.6 必須遷移的現有例外
 
@@ -227,6 +291,8 @@ class TpActionItem<T> {
 - 行程卡與行程內容頁的功能選單共用 `TpActionItem`＋`TpMoreMenuButton`。
 - 收藏、聊天、行程、地圖的 Header actions 全部由 `TpHeaderActionRow` 排版。
 - 所有 feature 內自行設定的 Header action padding、圓形尺寸與 action gap 必須刪除。
+- 所有 feature 內自行建立的 drag handle、sheet 圓角、高度、barrier、safe area 與鍵盤 padding 必須改由 `showAppSheet` 管理。
+- `showAppLargeSheet`／`showAppLargeScreenSheet` 舊入口完成遷移後退場，避免泛用名稱繼續掩蓋任務語意。
 
 ## 7. Flutter 驗收條件
 
@@ -241,6 +307,11 @@ class TpActionItem<T> {
 9. `TpMenuAction` 與 `AppSheetAction` 退場；所有選單使用 `TpActionItem`。
 10. 收藏頁與其他 Root 頁的最右 action 位置一致，不能再以頁面級 padding 修補。
 11. 不可逆確認全部走 `showAppConfirm`；可復原通知全部走 `showAppUndoNotice`。
+12. `lib/features/**` 不再直接呼叫 `showModalBottomSheet`、`showCupertinoModalPopup` 或 `showGeneralDialog`。
+13. 切換行程使用 selection variant：標題置中、leading 取消、現在值 checkmark、點列立即回傳，不顯示完成。
+14. 可調整 Sheet 的 medium 與 large 是不同高度；固定 93% 的 Sheet 不得顯示暗示可 resize 的 grabber。
+15. 表單 Sheet 具取消／完成與未儲存內容保護；返回只退內部一層，關閉才退出整張 Sheet。
+16. Action sheet 不可捲動且最多三個動作加取消；長功能清單改用 `TpMoreMenuButton`。
 
 ## 8. 參考
 
@@ -248,3 +319,7 @@ class TpActionItem<T> {
 - Apple HIG: Alerts — <https://developer.apple.com/design/human-interface-guidelines/alerts>
 - Apple HIG: Undo and redo — <https://developer.apple.com/design/human-interface-guidelines/undo-and-redo>
 - Apple HIG: Toolbars — <https://developer.apple.com/design/human-interface-guidelines/toolbars>
+- Apple HIG: Sheets — <https://developer.apple.com/design/human-interface-guidelines/sheets>
+- Apple HIG: Modality — <https://developer.apple.com/design/human-interface-guidelines/modality>
+- Apple HIG: Action sheets — <https://developer.apple.com/design/human-interface-guidelines/action-sheets>
+- Apple HIG: Lists and tables — <https://developer.apple.com/design/human-interface-guidelines/lists-and-tables>
