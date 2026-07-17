@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1035" viewBox="0 0 1300 1035" font-family="'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif">
+  <defs>
+    <clipPath id="pA1"><rect x="40" y="130" width="270" height="560" rx="26"/></clipPath>
+    <clipPath id="pA2"><rect x="330" y="130" width="270" height="560" rx="26"/></clipPath>
+    <clipPath id="pB1"><rect x="680" y="130" width="270" height="560" rx="26"/></clipPath>
+    <clipPath id="pB2"><rect x="970" y="130" width="270" height="560" rx="26"/></clipPath>
+    <marker id="aBad" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#C13515"/>
+    </marker>
+    <marker id="aOk" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#06A77D"/>
+    </marker>
+  </defs>
+
+  <rect width="1300" height="1035" fill="#FFFBF5"/>
+
+  <text x="40" y="48" font-size="23" font-weight="700" fill="#2A1F18">Header 收斂 · Tab bar · 字階</text>
+  <text x="40" y="74" font-size="13" fill="#6F5A47">依 tokens.dart 與程式碼實際數值繪製的規格圖（非真機截圖）。左紅＝修正前，右綠＝已 commit。</text>
+
+  <!-- ================= A：行程列表 ================= -->
+  <text x="40" y="116" font-size="14" font-weight="700" fill="#C13515">行程列表 · 修正前</text>
+  <text x="330" y="116" font-size="14" font-weight="700" fill="#06A77D">修正後</text>
+
+  <!-- A1 before：large title -->
+  <g clip-path="url(#pA1)">
+    <rect x="40" y="130" width="270" height="560" fill="#FFFBF5"/>
+    <!-- large title 區塊：吃掉一大塊垂直空間 -->
+    <rect x="40" y="130" width="270" height="96" fill="#FFF6EA"/>
+    <text x="288" y="158" font-size="16" fill="#A97A4A" text-anchor="end">＋　⋯</text>
+    <text x="56" y="212" font-size="27" font-weight="700" fill="#2A1F18">我的行程</text>
+    <path d="M40 226 H310" stroke="#EADFCF" stroke-width="1"/>
+    <!-- 搜尋 -->
+    <rect x="56" y="238" width="238" height="30" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="70" y="258" font-size="11" fill="#6F5A47">搜尋行程</text>
+    <!-- 篩選 -->
+    <rect x="56" y="276" width="238" height="26" rx="6" fill="#FAF4EA" stroke="#EADFCF"/>
+    <rect x="57" y="277" width="78" height="24" rx="5" fill="#A97A4A"/>
+    <text x="96" y="293" font-size="10" font-weight="600" fill="#FFFFFF" text-anchor="middle">全部</text>
+    <text x="175" y="293" font-size="10" font-weight="600" fill="#2A1F18" text-anchor="middle">我的</text>
+    <text x="254" y="293" font-size="10" font-weight="600" fill="#2A1F18" text-anchor="middle">共編</text>
+    <!-- 卡片：只擠得下 2.5 張 -->
+    <rect x="56" y="314" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="70" y="338" font-size="9" font-weight="600" fill="#A97A4A">5 天</text>
+    <text x="70" y="360" font-size="13" font-weight="700" fill="#2A1F18">沖繩家族之旅</text>
+    <rect x="56" y="400" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="70" y="424" font-size="9" font-weight="600" fill="#7E9580">4 天</text>
+    <text x="70" y="446" font-size="13" font-weight="700" fill="#2A1F18">京都紅葉</text>
+    <rect x="56" y="486" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="70" y="510" font-size="9" font-weight="600" fill="#C66B78">3 天</text>
+    <text x="70" y="532" font-size="13" font-weight="700" fill="#2A1F18">釜山美食團</text>
+    <rect x="56" y="572" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="70" y="596" font-size="9" font-weight="600" fill="#A97A4A">6 天</text>
+    <text x="70" y="618" font-size="13" font-weight="700" fill="#2A1F18">北海道滑雪</text>
+    <!-- tab bar -->
+    <rect x="50" y="640" width="250" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <g font-size="8" text-anchor="middle" fill="#6F5A47">
+      <text x="75" y="665">聊天</text><text x="125" y="665" fill="#A97A4A" font-weight="700">行程</text>
+      <text x="175" y="665">地圖</text><text x="225" y="665">收藏</text><text x="275" y="665">帳號</text>
+    </g>
+  </g>
+  <rect x="40" y="130" width="270" height="560" rx="26" fill="none" stroke="#2A1F18" stroke-width="2"/>
+  <!-- large title 高度標註 -->
+  <path d="M32 130 V226" stroke="#C13515" stroke-width="2"/>
+  <path d="M27 130 h10 M27 226 h10" stroke="#C13515" stroke-width="2"/>
+
+  <!-- A2 after：inline -->
+  <g clip-path="url(#pA2)">
+    <rect x="330" y="130" width="270" height="560" fill="#FFFBF5"/>
+    <rect x="330" y="130" width="270" height="42" fill="#FFFBF5"/>
+    <text x="346" y="158" font-size="14" font-weight="700" fill="#2A1F18">我的行程</text>
+    <text x="584" y="158" font-size="15" fill="#A97A4A" text-anchor="end">＋　⋯</text>
+    <path d="M330 172 H600" stroke="#EADFCF" stroke-width="1"/>
+    <rect x="346" y="184" width="238" height="30" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="360" y="204" font-size="11" fill="#6F5A47">搜尋行程</text>
+    <rect x="346" y="222" width="238" height="26" rx="6" fill="#FAF4EA" stroke="#EADFCF"/>
+    <rect x="347" y="223" width="78" height="24" rx="5" fill="#A97A4A"/>
+    <text x="386" y="239" font-size="10" font-weight="600" fill="#FFFFFF" text-anchor="middle">全部</text>
+    <text x="465" y="239" font-size="10" font-weight="600" fill="#2A1F18" text-anchor="middle">我的</text>
+    <text x="544" y="239" font-size="10" font-weight="600" fill="#2A1F18" text-anchor="middle">共編</text>
+    <rect x="346" y="260" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="360" y="284" font-size="9" font-weight="600" fill="#A97A4A">5 天</text>
+    <text x="360" y="306" font-size="13" font-weight="700" fill="#2A1F18">沖繩家族之旅</text>
+    <rect x="346" y="346" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="360" y="370" font-size="9" font-weight="600" fill="#7E9580">4 天</text>
+    <text x="360" y="392" font-size="13" font-weight="700" fill="#2A1F18">京都紅葉</text>
+    <rect x="346" y="432" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="360" y="456" font-size="9" font-weight="600" fill="#C66B78">3 天</text>
+    <text x="360" y="478" font-size="13" font-weight="700" fill="#2A1F18">釜山美食團</text>
+    <rect x="346" y="518" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="360" y="542" font-size="9" font-weight="600" fill="#A97A4A">6 天</text>
+    <text x="360" y="564" font-size="13" font-weight="700" fill="#2A1F18">北海道滑雪</text>
+    <!-- 多出來的第 5 張：large title 省下的空間 -->
+    <rect x="346" y="604" width="238" height="76" rx="8" fill="#FAF4EA" stroke="#06A77D" stroke-dasharray="4 3"/>
+    <text x="360" y="628" font-size="9" font-weight="600" fill="#7E9580">2 天</text>
+    <text x="360" y="650" font-size="13" font-weight="700" fill="#2A1F18">台南小吃</text>
+    <rect x="340" y="640" width="250" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <g font-size="8" text-anchor="middle" fill="#6F5A47">
+      <text x="365" y="665">聊天</text><text x="415" y="665" fill="#A97A4A" font-weight="700">行程</text>
+      <text x="465" y="665">地圖</text><text x="515" y="665">收藏</text><text x="565" y="665">帳號</text>
+    </g>
+  </g>
+  <rect x="330" y="130" width="270" height="560" rx="26" fill="none" stroke="#2A1F18" stroke-width="2"/>
+  <path d="M322 130 V172" stroke="#06A77D" stroke-width="2"/>
+  <path d="M317 130 h10 M317 172 h10" stroke="#06A77D" stroke-width="2"/>
+
+  <text x="40" y="712" font-size="11" font-weight="600" fill="#C13515">大標題吃掉 96pt</text>
+  <text x="40" y="728" font-size="10.5" fill="#6F5A47">連 widget test 都得把視窗放大到</text>
+  <text x="40" y="743" font-size="10.5" fill="#6F5A47">1600px 才穩得住</text>
+  <text x="330" y="712" font-size="11" font-weight="600" fill="#06A77D">inline 56pt · 省下的空間換成內容</text>
+  <text x="330" y="728" font-size="10.5" fill="#6F5A47">同一螢幕多看到一張行程卡（虛線框）</text>
+
+  <!-- ================= B：AI 助手 ================= -->
+  <text x="680" y="116" font-size="14" font-weight="700" fill="#C13515">AI 助手 · 修正前</text>
+  <text x="970" y="116" font-size="14" font-weight="700" fill="#06A77D">修正後</text>
+
+  <g clip-path="url(#pB1)">
+    <rect x="680" y="130" width="270" height="560" fill="#FFFBF5"/>
+    <!-- toolbarHeight 96：第三種 header 形狀 -->
+    <rect x="680" y="130" width="270" height="70" fill="#FFFBF5"/>
+    <text x="696" y="188" font-size="24" font-weight="700" fill="#2A1F18">AI 助手</text>
+    <path d="M680 200 H950" stroke="#EADFCF" stroke-width="1"/>
+    <rect x="696" y="212" width="238" height="38" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="712" y="236" font-size="11" font-weight="600" fill="#2A1F18">沖繩家族之旅</text>
+    <text x="922" y="236" font-size="10" fill="#6F5A47" text-anchor="end">⌄</text>
+    <!-- 對話 -->
+    <rect x="696" y="264" width="150" height="34" rx="10" fill="#F4EDE3"/>
+    <text x="710" y="285" font-size="10" fill="#2A1F18">幫我規劃 Day 1 早午餐</text>
+    <rect x="784" y="310" width="150" height="34" rx="10" fill="#A97A4A"/>
+    <text x="798" y="331" font-size="10" fill="#FFFFFF">好的，推薦這三間…</text>
+    <rect x="696" y="356" width="170" height="34" rx="10" fill="#F4EDE3"/>
+    <text x="710" y="377" font-size="10" fill="#2A1F18">第二天午餐改沖繩麵</text>
+    <!-- composer -->
+    <rect x="690" y="596" width="250" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <text x="708" y="620" font-size="10" fill="#6F5A47">輸入訊息或語音指令</text>
+    <circle cx="900" cy="615" r="11" fill="#A97A4A"/>
+    <rect x="690" y="640" width="250" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <g font-size="8" text-anchor="middle" fill="#6F5A47">
+      <text x="715" y="665" fill="#A97A4A" font-weight="700">聊天</text><text x="765" y="665">行程</text>
+      <text x="815" y="665">地圖</text><text x="865" y="665">收藏</text><text x="915" y="665">帳號</text>
+    </g>
+  </g>
+  <rect x="680" y="130" width="270" height="560" rx="26" fill="none" stroke="#2A1F18" stroke-width="2"/>
+  <path d="M672 130 V200" stroke="#C13515" stroke-width="2"/>
+  <path d="M667 130 h10 M667 200 h10" stroke="#C13515" stroke-width="2"/>
+
+  <g clip-path="url(#pB2)">
+    <rect x="970" y="130" width="270" height="560" fill="#FFFBF5"/>
+    <rect x="970" y="130" width="270" height="42" fill="#FFFBF5"/>
+    <text x="1105" y="158" font-size="14" font-weight="700" fill="#2A1F18" text-anchor="middle">AI 助手</text>
+    <path d="M970 172 H1240" stroke="#EADFCF" stroke-width="1"/>
+    <rect x="986" y="184" width="238" height="38" rx="8" fill="#FAF4EA" stroke="#EADFCF"/>
+    <text x="1002" y="208" font-size="11" font-weight="600" fill="#2A1F18">沖繩家族之旅</text>
+    <text x="1212" y="208" font-size="10" fill="#6F5A47" text-anchor="end">⌄</text>
+    <rect x="986" y="236" width="150" height="34" rx="10" fill="#F4EDE3"/>
+    <text x="1000" y="257" font-size="10" fill="#2A1F18">幫我規劃 Day 1 早午餐</text>
+    <rect x="1074" y="282" width="150" height="34" rx="10" fill="#A97A4A"/>
+    <text x="1088" y="303" font-size="10" fill="#FFFFFF">好的，推薦這三間…</text>
+    <rect x="986" y="328" width="170" height="34" rx="10" fill="#F4EDE3"/>
+    <text x="1000" y="349" font-size="10" fill="#2A1F18">第二天午餐改沖繩麵</text>
+    <rect x="1074" y="374" width="150" height="34" rx="10" fill="#A97A4A"/>
+    <text x="1088" y="395" font-size="10" fill="#FFFFFF">已更新為沖繩麵 …</text>
+    <rect x="980" y="596" width="250" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <text x="998" y="620" font-size="10" fill="#6F5A47">輸入訊息或語音指令</text>
+    <circle cx="1190" cy="615" r="11" fill="#A97A4A"/>
+    <rect x="980" y="640" width="250" height="40" rx="20" fill="#FFFFFF" fill-opacity="0.92" stroke="#FFFFFF"/>
+    <g font-size="8" text-anchor="middle" fill="#6F5A47">
+      <text x="1005" y="665" fill="#A97A4A" font-weight="700">聊天</text><text x="1055" y="665">行程</text>
+      <text x="1105" y="665">地圖</text><text x="1155" y="665">收藏</text><text x="1205" y="665">帳號</text>
+    </g>
+  </g>
+  <rect x="970" y="130" width="270" height="560" rx="26" fill="none" stroke="#2A1F18" stroke-width="2"/>
+  <path d="M962 130 V172" stroke="#06A77D" stroke-width="2"/>
+  <path d="M957 130 h10 M957 172 h10" stroke="#06A77D" stroke-width="2"/>
+
+  <text x="680" y="712" font-size="11" font-weight="600" fill="#C13515">自製 toolbarHeight 96 + headlineLarge</text>
+  <text x="680" y="728" font-size="10.5" fill="#6F5A47">全 app 第三種 header 形狀，而且零 actions</text>
+  <text x="680" y="743" font-size="10.5" fill="#6F5A47">—— 有大標題卻沒有功能</text>
+  <text x="970" y="712" font-size="11" font-weight="600" fill="#06A77D">與其餘 21 頁同規格</text>
+  <text x="970" y="728" font-size="10.5" fill="#6F5A47">頁首規格一律由 AppBarTheme 供給</text>
+
+  <path d="M40 766 H1240" stroke="#EADFCF" stroke-width="1"/>
+
+  <!-- ================= C：tab bar ================= -->
+  <text x="40" y="800" font-size="14" font-weight="700" fill="#2A1F18">Tab bar：捲動縮小效果已移除</text>
+  <text x="40" y="820" font-size="11" fill="#6F5A47">Apple 的 tabBarMinimizeBehavior 綁定「底下是可捲動內容」；地圖／聊天底下是固定版面，縮放沒有對應語意。</text>
+
+  <text x="40" y="850" font-size="11" font-weight="600" fill="#C13515">修正前 · 捲動時兩種尺寸互跳</text>
+  <rect x="40" y="862" width="250" height="40" rx="20" fill="#FAF4EA" stroke="#EADFCF"/>
+  <g font-size="8" text-anchor="middle" fill="#6F5A47">
+    <text x="65" y="879">◍</text><text x="65" y="893">聊天</text>
+    <text x="115" y="879" fill="#A97A4A">◍</text><text x="115" y="893" fill="#A97A4A" font-weight="700">行程</text>
+    <text x="165" y="879">◍</text><text x="165" y="893">地圖</text>
+    <text x="215" y="879">◍</text><text x="215" y="893">收藏</text>
+    <text x="265" y="879">◍</text><text x="265" y="893">帳號</text>
+  </g>
+  <text x="300" y="887" font-size="14" fill="#C13515">⇄</text>
+  <rect x="322" y="868" width="178" height="28" rx="14" fill="#FAF4EA" stroke="#EADFCF"/>
+  <g font-size="9" text-anchor="middle" fill="#6F5A47">
+    <text x="352" y="886">◍</text><text x="387" y="886">◍</text>
+    <text x="422" y="886" fill="#A97A4A">◍</text><text x="457" y="886">◍</text><text x="492" y="886">◍</text>
+  </g>
+  <text x="40" y="922" font-size="10.5" fill="#6F5A47">label 消失、寬度內縮 36px、高度 64→50 同時動 —— 導覽在視線裡跳動</text>
+
+  <text x="600" y="850" font-size="11" font-weight="600" fill="#06A77D">修正後 · 恆定</text>
+  <rect x="600" y="862" width="250" height="40" rx="20" fill="#FAF4EA" stroke="#EADFCF"/>
+  <g font-size="8" text-anchor="middle" fill="#6F5A47">
+    <text x="625" y="879">◍</text><text x="625" y="893">聊天</text>
+    <text x="675" y="879" fill="#A97A4A">◍</text><text x="675" y="893" fill="#A97A4A" font-weight="700">行程</text>
+    <text x="725" y="879">◍</text><text x="725" y="893">地圖</text>
+    <text x="775" y="879">◍</text><text x="775" y="893">收藏</text>
+    <text x="825" y="879">◍</text><text x="825" y="893">帳號</text>
+  </g>
+  <text x="600" y="922" font-size="10.5" fill="#6F5A47">尺寸固定 64pt，label 恆在。有守門測試防止被加回來。</text>
+
+  <!-- ================= D：字階 ================= -->
+  <text x="900" y="800" font-size="14" font-weight="700" fill="#2A1F18">補上漏定義的字階</text>
+  <text x="900" y="820" font-size="11" fill="#6F5A47">先前 fallback 到 Material 預設，約 18 處跑掉設計系統</text>
+
+  <text x="900" y="848" font-size="10" font-weight="600" fill="#C13515">修正前（Material 預設）</text>
+  <text x="900" y="874" font-size="17" font-weight="400" fill="#2A1F18">沖繩家族之旅</text>
+  <text x="1060" y="874" font-size="9" fill="#6F5A47">headlineSmall 24/w400</text>
+  <text x="900" y="898" font-size="11" font-weight="500" fill="#2A1F18" letter-spacing="1.4">公開區塊</text>
+  <text x="1060" y="898" font-size="9" fill="#C13515">titleSmall 14/w500 · ls 0.1 ✗</text>
+
+  <text x="900" y="932" font-size="10" font-weight="600" fill="#06A77D">修正後（Tripline HIG 字階）</text>
+  <text x="900" y="958" font-size="16" font-weight="700" fill="#2A1F18">沖繩家族之旅</text>
+  <text x="1060" y="958" font-size="9" fill="#6F5A47">headlineSmall 22/w700</text>
+  <text x="900" y="982" font-size="11.5" font-weight="600" fill="#2A1F18">公開區塊</text>
+  <text x="1060" y="982" font-size="9" fill="#06A77D">titleSmall 15/w600 · ls 0 ✓</text>
+  <text x="900" y="1008" font-size="10" fill="#6F5A47">design.md：中文 letter-spacing 一律 0</text>
+</svg>
