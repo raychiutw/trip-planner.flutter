@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+
+import '../app/adaptive.dart';
+import '../features/account/account_screen.dart';
 
 /// 主畫面右上角固定帳號入口。
 class TpAccountAvatarButton extends StatelessWidget {
@@ -14,7 +16,15 @@ class TpAccountAvatarButton extends StatelessWidget {
     return IconButton(
       key: const ValueKey('account-avatar-button'),
       tooltip: '帳號',
-      onPressed: onPressed ?? () => context.push('/account'),
+      onPressed:
+          onPressed ??
+          () {
+            showAppLargeSheet<void>(
+              context,
+              title: '帳號',
+              builder: (_) => const AccountScreen(embedded: true),
+            );
+          },
       icon: CircleAvatar(
         radius: 16,
         backgroundColor: colors.surfaceContainerHigh,

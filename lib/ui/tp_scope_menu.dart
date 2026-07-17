@@ -10,6 +10,7 @@ class TpScopeOption<T> {
     required this.label,
     this.icon,
     this.indicatorColor,
+    this.isAction = false,
     this.key,
   });
 
@@ -17,6 +18,7 @@ class TpScopeOption<T> {
   final String label;
   final IconData? icon;
   final Color? indicatorColor;
+  final bool isAction;
   final Key? key;
 }
 

@@ -78,6 +78,13 @@ void main() {
       expect(tones.sageSubtle, TpColorsDark.tertiary);
       expect(tones.pinkSubtle, TpColorsDark.tertiary);
     });
+
+    test('未選取 chip 使用中性深色，柔褐只留給 active 狀態', () {
+      final darkTheme = AppTheme.dark();
+      expect(TpColorsDark.accentSubtle, TpColorsDark.tertiary);
+      expect(darkTheme.chipTheme.backgroundColor, TpColorsDark.tertiary);
+      expect(darkTheme.chipTheme.selectedColor, TpColorsDark.accent);
+    });
   });
 
   group('TpTones', () {

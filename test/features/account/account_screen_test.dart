@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
@@ -9,6 +10,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_account_avatar_button.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -65,6 +67,79 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  Future<void> pumpAccountEntry(WidgetTester tester) async {
+    when(
+      () => mockAuthRepository.currentUser(),
+    ).thenAnswer((_) async => verifiedUser);
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => Scaffold(
+            appBar: AppBar(actions: const [TpAccountAvatarButton()]),
+          ),
+        ),
+        GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountStatsProvider.overrideWith(
+            (ref) => Future.value(defaultStats),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          routerConfig: router,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 59, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+            ),
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('帳號 avatar 開啟共用近滿版 HIG sheet 並可由右上關閉', (tester) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    final sheet = find.byKey(const ValueKey('app-large-sheet'));
+    expect(sheet, findsOneWidget);
+    expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-sheet-profile')), findsOneWidget);
+    expect(find.text('帳號資訊與個人資料'), findsOneWidget);
+    expect(find.text('行程數'), findsNothing);
+    expect(find.text('旅程天數'), findsNothing);
+    expect(find.text('旅伴數'), findsNothing);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
+      findsOneWidget,
+    );
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(tester.getSize(sheet).height, closeTo(screenHeight * 0.93, 1));
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(sheet, findsNothing);
+  });
 
   testWidgets('顯示 displayName、email、avatar 首字母與三個統計值', (tester) async {
     await pumpAccountScreen(tester);

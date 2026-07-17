@@ -138,6 +138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('新增停留點'), findsWidgets);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.text('DAY 2'), findsOneWidget);
 
     await tester.enterText(

@@ -329,6 +329,16 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
   void _scrollToDay(int dayNum) {
     setState(() => _activeDayNum = dayNum);
+    if (dayNum == 0) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: TpMotion.resolve(context, TpMotion.normal),
+          curve: TpMotion.appleEase,
+        );
+      }
+      return;
+    }
     final sectionContext = _daySectionKeys[dayNum]?.currentContext;
     if (sectionContext != null) {
       Scrollable.ensureVisible(
@@ -361,21 +371,31 @@ class _TimelineBodyState extends State<_TimelineBody> {
             value: _activeDayNum,
             options: [
               const TpScopeOption(
-                value: 0,
+                value: -1,
                 label: '地圖',
+                icon: CupertinoIcons.map,
+                isAction: true,
                 key: ValueKey('trip-timeline-map'),
+              ),
+              const TpScopeOption(
+                value: 0,
+                label: '總覽',
+                key: ValueKey('trip-timeline-day-overview'),
               ),
               for (final day in widget.days)
                 TpScopeOption(
                   value: day.dayNum,
-                  label: 'DAY ${day.dayNum.toString().padLeft(2, '0')}',
+                  label: 'DAY ${day.dayNum}',
                   key: ValueKey('day-pill-${day.dayNum}'),
                 ),
             ],
             onSelected: (value) {
-              if (value == 0) {
+              if (value == -1) {
+                final dayNum = _activeDayNum > 0
+                    ? _activeDayNum
+                    : widget.days.firstOrNull?.dayNum;
                 GoRouter.maybeOf(context)?.go(
-                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}&day=$_activeDayNum',
+                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}${dayNum == null ? '' : '&day=$dayNum'}',
                 );
                 return;
               }
@@ -692,7 +712,7 @@ class _DaySection extends ConsumerWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 buildDefaultDragHandles: false,
                 itemCount: timeline.length,
-                onReorder: (oldIndex, newIndex) =>
+                onReorderItem: (oldIndex, newIndex) =>
                     _reorder(context, ref, oldIndex, newIndex),
                 itemBuilder: (context, i) {
                   final entry = timeline[i];
@@ -819,10 +839,9 @@ class _DaySection extends ConsumerWidget {
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   key: ValueKey('add-entry-${day.dayNum}'),
-                  onPressed: () => showEntryEditSheet(
-                    context,
-                    tripId: tripId,
-                    args: EntryEditNew(day.dayNum, days: allDays),
+                  onPressed: () => context.push(
+                    '/trips/${Uri.encodeComponent(tripId)}/entries/new'
+                    '?day=${day.dayNum}&mode=search',
                   ),
                   icon: const Icon(CupertinoIcons.add),
                   label: const Text('新增停留點'),

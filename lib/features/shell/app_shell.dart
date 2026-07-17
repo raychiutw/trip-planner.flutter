@@ -14,9 +14,14 @@ import 'apple_root_tab_bar.dart';
 /// 代價是 root tab 畫面的底部錨定內容會被蓋住 — Flutter 會把 tab bar 高度灌進
 /// body 的 `MediaQuery.padding.bottom`，畫面一律用 `rootTabBottomInset` 取用。
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.navigationShell});
+  const AppShell({
+    super.key,
+    required this.navigationShell,
+    this.showRootTab = true,
+  });
 
   final StatefulNavigationShell navigationShell;
+  final bool showRootTab;
 
   void _selectTab(int selectedIndex) {
     HapticFeedback.selectionClick();
@@ -29,7 +34,7 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
+      extendBody: showRootTab,
       // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
       body: Column(
         children: [
@@ -37,10 +42,12 @@ class AppShell extends StatelessWidget {
           const OfflineStatusBanner(),
         ],
       ),
-      bottomNavigationBar: AppleRootTabBar(
-        selectedIndex: navigationShell.currentIndex,
-        onSelected: _selectTab,
-      ),
+      bottomNavigationBar: showRootTab
+          ? AppleRootTabBar(
+              selectedIndex: navigationShell.currentIndex,
+              onSelected: _selectTab,
+            )
+          : null,
     );
   }
 }

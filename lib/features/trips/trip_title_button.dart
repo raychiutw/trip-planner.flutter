@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 
@@ -20,12 +21,10 @@ class TripTitleButton extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   Future<void> _openPicker(BuildContext context) async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (context) =>
+    final selected = await showAppLargeSheet<String>(
+      context,
+      title: '切換行程',
+      builder: (_) =>
           _TripPickerSheet(currentTripId: currentTripId, trips: trips),
     );
     if (selected != null && selected != currentTripId) onSelected(selected);
@@ -98,93 +97,81 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
               .toList();
     final colors = Theme.of(context).colorScheme;
 
-    return FractionallySizedBox(
+    return Column(
       key: const ValueKey('trip-picker-sheet'),
-      heightFactor: 0.62,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              0,
-              TpSpacing.s4,
-              TpSpacing.s3,
-            ),
-            child: Text('選擇行程', style: Theme.of(context).textTheme.titleLarge),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-            child: TextField(
-              key: const ValueKey('trip-picker-search'),
-              controller: _searchController,
-              onChanged: (value) => setState(() => _query = value),
-              decoration: const InputDecoration(
-                hintText: '搜尋行程',
-                prefixIcon: Icon(CupertinoIcons.search),
-              ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+          child: TextField(
+            key: const ValueKey('trip-picker-search'),
+            controller: _searchController,
+            onChanged: (value) => setState(() => _query = value),
+            decoration: const InputDecoration(
+              hintText: '搜尋行程',
+              prefixIcon: Icon(CupertinoIcons.search),
             ),
           ),
-          const SizedBox(height: TpSpacing.s4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-            child: Text(
-              '最近的行程',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(color: colors.onSurfaceVariant),
-            ),
+        ),
+        const SizedBox(height: TpSpacing.s4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+          child: Text(
+            '最近的行程',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(color: colors.onSurfaceVariant),
           ),
-          const SizedBox(height: TpSpacing.s2),
-          Expanded(
-            child: trips.isEmpty
-                ? Center(
-                    child: Text(
-                      '找不到行程',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
+        ),
+        const SizedBox(height: TpSpacing.s2),
+        Expanded(
+          child: trips.isEmpty
+              ? Center(
+                  child: Text(
+                    '找不到行程',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
-                  )
-                : ListView.separated(
-                    itemCount: trips.length,
-                    separatorBuilder: (context, index) => Divider(
-                      height: 1,
-                      indent: 56,
-                      color: colors.outlineVariant,
-                    ),
-                    itemBuilder: (context, index) {
-                      final trip = trips[index];
-                      final selected = trip.tripId == widget.currentTripId;
-                      final meta = [
-                        if (trip.countries?.trim().isNotEmpty ?? false)
-                          trip.countries!.trim(),
-                        if (trip.totalDays != null) '${trip.totalDays} 天',
-                      ].join(' · ');
-                      return ListTile(
-                        key: ValueKey('trip-picker-item-${trip.tripId}'),
-                        minTileHeight: 56,
-                        leading: Icon(
-                          CupertinoIcons.map,
-                          color: selected
-                              ? colors.primary
-                              : colors.onSurfaceVariant,
-                        ),
-                        title: Text(_title(trip)),
-                        subtitle: meta.isEmpty ? null : Text(meta),
-                        trailing: selected
-                            ? Icon(
-                                CupertinoIcons.check_mark,
-                                color: colors.primary,
-                              )
-                            : null,
-                        onTap: () => Navigator.of(context).pop(trip.tripId),
-                      );
-                    },
                   ),
-          ),
-        ],
-      ),
+                )
+              : ListView.separated(
+                  itemCount: trips.length,
+                  separatorBuilder: (context, index) => Divider(
+                    height: 1,
+                    indent: 56,
+                    color: colors.outlineVariant,
+                  ),
+                  itemBuilder: (context, index) {
+                    final trip = trips[index];
+                    final selected = trip.tripId == widget.currentTripId;
+                    final meta = [
+                      if (trip.countries?.trim().isNotEmpty ?? false)
+                        trip.countries!.trim(),
+                      if (trip.totalDays != null) '${trip.totalDays} 天',
+                    ].join(' · ');
+                    return ListTile(
+                      key: ValueKey('trip-picker-item-${trip.tripId}'),
+                      minTileHeight: 56,
+                      leading: Icon(
+                        CupertinoIcons.map,
+                        color: selected
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                      ),
+                      title: Text(_title(trip)),
+                      subtitle: meta.isEmpty ? null : Text(meta),
+                      trailing: selected
+                          ? Icon(
+                              CupertinoIcons.check_mark,
+                              color: colors.primary,
+                            )
+                          : null,
+                      onTap: () => Navigator.of(context).pop(trip.tripId),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

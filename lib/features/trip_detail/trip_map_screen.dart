@@ -14,7 +14,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_bottom_accessory.dart';
-import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../map/map_adapter.dart';
@@ -89,12 +89,12 @@ class TripMapScreen extends ConsumerWidget {
           },
         ),
         actions: [
-          IconButton(
+          TpToolbarIconButton(
             key: const ValueKey('trip-map-notes-button'),
             tooltip: '筆記',
             onPressed: () =>
                 context.push('/trips/${Uri.encodeComponent(tripId)}/notes'),
-            icon: const Icon(CupertinoIcons.doc_text),
+            icon: CupertinoIcons.doc_text,
           ),
           const TpAccountAvatarButton(),
         ],
@@ -215,7 +215,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     _poiAccessoryHeight + TpRootTabGeometry.clearance(context) + TpSpacing.s6,
   );
 
-  /// 0 = 行程 action，i = 第 i 日（widget.days[i - 1]）。
+  /// -1 = 行程 action、0 = 總覽、i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
@@ -236,7 +236,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         ? null
         : initialStops[initialPage].entry.id;
     _pageController = PageController(
-      viewportFraction: 0.84,
+      viewportFraction: 0.72,
       initialPage: initialPage,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -356,7 +356,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _selectTab(int tabIndex) {
-    if (tabIndex == 0) {
+    if (tabIndex == -1) {
       final dayNum = _selectedTabIndex > 0
           ? widget.days[_selectedTabIndex - 1].dayNum
           : widget.days.firstOrNull?.dayNum;
@@ -607,15 +607,21 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             value: _selectedTabIndex,
             options: [
               const TpScopeOption(
-                value: 0,
+                value: -1,
                 label: '行程',
+                icon: CupertinoIcons.calendar,
+                isAction: true,
                 key: ValueKey('trip-map-itinerary'),
+              ),
+              const TpScopeOption(
+                value: 0,
+                label: '總覽',
+                key: ValueKey('trip-map-day-overview'),
               ),
               for (final (index, day) in widget.days.indexed)
                 TpScopeOption(
                   value: index + 1,
-                  label: 'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-                  indicatorColor: kDayPinPalette[index % kDayPinPalette.length],
+                  label: 'DAY ${day.dayNum}',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
                 ),
             ],
@@ -693,13 +699,13 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
+                    padEnds: false,
                     scrollDirection: Axis.horizontal,
                     itemCount: visibleStops.length,
                     onPageChanged: (index) => _selectStop(visibleStops[index]),
                     itemBuilder: (context, index) => Padding(
-                      padding: const EdgeInsets.only(
-                        left: TpSpacing.s3,
-                        right: TpSpacing.s1,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TpSpacing.s1,
                       ),
                       child: _buildEntryCard(
                         context,
@@ -763,89 +769,104 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     final locationLabel = stop.point == null
         ? '尚無位置'
         : stop.entry.master?.category ?? stop.entry.master?.type ?? '已定位';
+    final cardTint = theme.colorScheme.surface.withValues(
+      alpha: isActive
+          ? (theme.brightness == Brightness.dark ? 0.46 : 0.48)
+          : (theme.brightness == Brightness.dark ? 0.28 : 0.30),
+    );
 
     return KeyedSubtree(
       key: ValueKey(
         '${isActive ? 'active' : 'inactive'}-entry-card-${stop.entry.id}',
       ),
-      child: TpContentSurface(
-        key: ValueKey('entry-card-${stop.entry.id}'),
-        onTap: () => _selectStop(stop),
-        semanticLabel:
+      child: Semantics(
+        button: true,
+        label:
             '${index + 1} / $total，${stop.entry.title}，$timeLabel，$locationLabel',
-        padding: const EdgeInsets.all(TpSpacing.s2),
-        child: Row(
-          children: [
-            Container(
-              key: ValueKey('poi-number-${stop.entry.id}'),
-              width: TpSpacing.tapMin,
-              height: TpSpacing.tapMin,
-              decoration: BoxDecoration(
-                color: stop.color.withValues(alpha: 0.20),
-                shape: BoxShape.circle,
-                border: Border.all(color: stop.color.withValues(alpha: 0.72)),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '${index + 1}',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: stop.color,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '停留 ${index + 1} / $total',
-                    maxLines: 1,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
+        child: GestureDetector(
+          onTap: () => _selectStop(stop),
+          child: TpGlassSurface(
+            key: ValueKey('entry-card-${stop.entry.id}'),
+            blurSigma: isActive ? 16 : 12,
+            tintColor: cardTint,
+            borderRadius: const BorderRadius.all(Radius.circular(15)),
+            padding: const EdgeInsets.all(TpSpacing.s2),
+            child: Row(
+              children: [
+                Container(
+                  key: ValueKey('poi-number-${stop.entry.id}'),
+                  width: TpSpacing.tapMin,
+                  height: TpSpacing.tapMin,
+                  decoration: BoxDecoration(
+                    color: stop.color.withValues(alpha: 0.20),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: stop.color.withValues(alpha: 0.72),
                     ),
                   ),
-                  Text(
-                    stop.entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  Text(
-                    '$timeLabel · $locationLabel',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: stop.point == null
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.onSurfaceVariant,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${index + 1}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: stop.color,
+                      fontWeight: FontWeight.w800,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            SizedBox.square(
-              dimension: TpSpacing.tapMin,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  CupertinoIcons.arrow_right,
-                  size: 18,
-                  color: theme.colorScheme.onPrimary,
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '停留 ${index + 1} / $total',
+                        maxLines: 1,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      Text(
+                        stop.entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        '$timeLabel · $locationLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: stop.point == null
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: TpSpacing.s2),
+                SizedBox.square(
+                  dimension: TpSpacing.tapMin,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CupertinoIcons.arrow_right,
+                      size: 18,
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

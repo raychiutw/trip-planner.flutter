@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +8,7 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
 import 'package:tripline/ui/tp_scope_menu.dart';
@@ -172,6 +175,16 @@ void main() {
       tester.getSize(find.byType(TpMoreMenuButton<int>)).height,
       greaterThanOrEqualTo(44),
     );
+    final menu = tester.widget<PopupMenuButton<int>>(
+      find.descendant(
+        of: find.byType(TpMoreMenuButton<int>),
+        matching: find.byType(PopupMenuButton<int>),
+      ),
+    );
+    expect(menu.constraints, const BoxConstraints.tightFor(width: 248));
+    final menuShape = menu.shape! as RoundedRectangleBorder;
+    expect((menuShape.borderRadius as BorderRadius).topLeft.x, 22);
+    expect(menu.color, TpColorsLight.background.withValues(alpha: 0.88));
   });
 
   testWidgets('TpAppBar 在窄螢幕與 200% 文字強制單行截斷', (tester) async {
@@ -252,40 +265,69 @@ void main() {
     expect(selected, 1);
   });
 
-  testWidgets('TpHorizontalSelector 提供玻璃水平選項與 44pt target', (tester) async {
-    var selected = 0;
-    await tester.pumpWidget(
-      app(
-        Scaffold(
-          body: TpHorizontalSelector<int>(
-            key: const ValueKey('day-selector'),
-            value: selected,
-            options: const [
-              TpScopeOption(
-                value: 0,
-                label: '總覽',
-                key: ValueKey('day-overview'),
-              ),
-              TpScopeOption(value: 1, label: 'DAY 01', key: ValueKey('day-1')),
-            ],
-            onSelected: (value) => selected = value,
+  testWidgets(
+    'TpHorizontalSelector 對齊 44pt glass 外框、34pt thumb 與 11pt DAY 字級',
+    (tester) async {
+      var selected = 0;
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: TpHorizontalSelector<int>(
+              key: const ValueKey('day-selector'),
+              value: selected,
+              options: const [
+                TpScopeOption(
+                  value: -1,
+                  label: '地圖',
+                  icon: CupertinoIcons.map,
+                  isAction: true,
+                  key: ValueKey('day-map'),
+                ),
+                TpScopeOption(
+                  value: 0,
+                  label: '總覽',
+                  key: ValueKey('day-overview'),
+                ),
+                TpScopeOption(
+                  value: 1,
+                  label: 'DAY 01',
+                  key: ValueKey('day-1'),
+                ),
+              ],
+              onSelected: (value) => selected = value,
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    final selector = find.byKey(const ValueKey('day-selector'));
-    expect(
-      find.descendant(of: selector, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('day-overview'))).height,
-      greaterThanOrEqualTo(TpSpacing.tapMin),
-    );
-    await tester.tap(find.byKey(const ValueKey('day-1')));
-    expect(selected, 1);
-  });
+      final selector = find.byKey(const ValueKey('day-selector'));
+      expect(
+        find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+        findsOneWidget,
+      );
+      expect(tester.getSize(selector).height, TpSpacing.tapMin);
+      final selectedThumb = find.descendant(
+        of: find.byKey(const ValueKey('day-overview')),
+        matching: find.byType(AnimatedContainer),
+      );
+      expect(tester.getSize(selectedThumb).height, 34);
+      expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 11);
+      expect(
+        find.byKey(const ValueKey('tp-selector-divider-0')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('day-map')))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isFalse,
+      );
+      await tester.tap(find.byKey(const ValueKey('day-1')));
+      expect(selected, 1);
+    },
+  );
 
   testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
     tester.view.physicalSize = const Size(240, 400);
@@ -330,14 +372,11 @@ void main() {
       app(
         Scaffold(
           body: MediaQuery(
-            data: const MediaQueryData(
+            data: MediaQueryData(
               padding: EdgeInsets.only(
-                bottom:
-                    TpRootTabGeometry.expandedBarHeight +
-                    TpRootTabGeometry.bottomSpacing +
-                    bottomInset,
+                bottom: TpRootTabGeometry.expandedHeightFor(bottomInset),
               ),
-              viewPadding: EdgeInsets.only(bottom: bottomInset),
+              viewPadding: const EdgeInsets.only(bottom: bottomInset),
             ),
             child: const Stack(
               children: [TpBottomAccessory(child: Text('horizontal pages'))],
@@ -353,9 +392,17 @@ void main() {
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
     expect(
       screenHeight - tester.getRect(accessory).bottom,
-      TpRootTabGeometry.expandedHeightFor(bottomInset) + TpSpacing.s3,
+      TpRootTabGeometry.expandedHeightFor(bottomInset) + TpSpacing.s1,
     );
     expect(find.text('horizontal pages'), findsOneWidget);
+    expect(
+      find.descendant(of: accessory, matching: find.byType(TpGlassSurface)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: accessory, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
+    );
     expect(find.byType(AnimatedContainer), findsNothing);
   });
 }

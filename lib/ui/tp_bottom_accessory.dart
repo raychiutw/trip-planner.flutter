@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'tp_glass_surface.dart';
 
 /// Root tab 上方的單一固定高度 accessory host。
 ///
@@ -24,11 +25,15 @@ class TpBottomAccessory extends StatelessWidget {
     return Positioned(
       left: TpSpacing.s3,
       right: TpSpacing.s3,
-      bottom: TpRootTabGeometry.clearance(context) + TpSpacing.s3,
+      bottom: TpRootTabGeometry.clearance(context) + TpSpacing.s1,
       child: SizedBox(
         key: const ValueKey('tp-bottom-accessory'),
         height: accessoryHeight,
-        child: child,
+        child: TpGlassSurface(
+          blurSigma: 28,
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          child: child,
+        ),
       ),
     );
   }

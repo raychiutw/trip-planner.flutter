@@ -209,6 +209,14 @@ Future<void> _pumpTimeline(
             builder: (context, state) =>
                 const Scaffold(body: Text('health-page')),
           ),
+          GoRoute(
+            path: 'entries/new',
+            builder: (context, state) => Scaffold(
+              body: Text(
+                'entry-add-${state.uri.queryParameters['mode']}-${state.uri.queryParameters['day']}',
+              ),
+            ),
+          ),
         ],
       ),
       GoRoute(
@@ -317,6 +325,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-actions-menu')),
+        matching: find.byKey(const ValueKey('tp-toolbar-action-surface')),
+      ),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(TextButton, '編輯'), findsNothing);
     expect(
@@ -325,6 +340,10 @@ void main() {
     );
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-timeline-day-overview')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('trip-secondary-map')), findsNothing);
     expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
     expect(find.byIcon(CupertinoIcons.printer), findsNothing);
@@ -434,9 +453,11 @@ void main() {
   ) async {
     await _pumpTimeline(tester);
 
-    // 'DAY 01' 同時出現在頂部 pill 與 day header eyebrow
-    expect(find.text('DAY 01'), findsNWidgets(2));
-    expect(find.text('DAY 02'), findsNWidgets(2));
+    // selector 使用精簡 DAY N；內容 eyebrow 保留兩位數 DAY NN。
+    expect(find.text('DAY 1'), findsOneWidget);
+    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('DAY 01'), findsOneWidget);
+    expect(find.text('DAY 02'), findsOneWidget);
     expect(find.text('2026-04-23（四）'), findsOneWidget);
     expect(find.text('2026-04-24（五）'), findsOneWidget);
   });
@@ -798,8 +819,7 @@ void main() {
     final day2Title = find.text('2026-04-24（五）');
     final day2TitleTopBeforeTap = tester.getTopLeft(day2Title).dy;
 
-    // 第一個 'DAY 02' 是頂部 pill（pill 列在捲動內容之前）
-    await tester.tap(find.text('DAY 02').first);
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
     final day2TitleTopAfterTap = tester.getTopLeft(day2Title).dy;
@@ -816,7 +836,10 @@ void main() {
         matching: find.byType(AnimatedContainer),
       ),
     );
-    expect((selected.decoration! as BoxDecoration).color, TpColorsLight.accent);
+    expect(
+      (selected.decoration! as BoxDecoration).color,
+      TpColorsLight.accent.withValues(alpha: 0.20),
+    );
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -946,19 +969,14 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
-  testWidgets('點「新增停留點」開啟新增 sheet', (tester) async {
+  testWidgets('點「新增停留點」開啟 Google Maps／收藏／自訂共用流程', (tester) async {
     await _pumpTimeline(tester);
     final addBtn = find.byKey(const ValueKey('add-entry-1'));
     await tester.ensureVisible(addBtn);
     await tester.pumpAndSettle();
     await tester.tap(addBtn);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('entry-edit-title')), findsOneWidget);
-    expect(find.byKey(const ValueKey('entry-edit-day')), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('entry-edit-day')));
-    await tester.pumpAndSettle();
-    expect(find.text('DAY 2 · 2026-04-24（五）'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
+    expect(find.text('entry-add-search-1'), findsOneWidget);
   });
 
   group('computeReorderUpdates', () {

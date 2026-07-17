@@ -99,6 +99,53 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+/// HIG toolbar 的 36pt 可見圓形材質；外層維持 44pt 點擊區。
+class TpToolbarActionSurface extends StatelessWidget {
+  const TpToolbarActionSurface({super.key, required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: DecoratedBox(
+        key: const ValueKey('tp-toolbar-action-surface'),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHigh.withValues(alpha: 0.78),
+          shape: BoxShape.circle,
+        ),
+        child: SizedBox.square(
+          dimension: 36,
+          child: Icon(icon, size: 20, color: colors.onSurface),
+        ),
+      ),
+    );
+  }
+}
+
+class TpToolbarIconButton extends StatelessWidget {
+  const TpToolbarIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: TpToolbarActionSurface(icon: icon),
+    );
+  }
+}
+
 class TpMoreMenuButton<T> extends StatelessWidget {
   const TpMoreMenuButton({
     super.key,
@@ -115,14 +162,28 @@ class TpMoreMenuButton<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
       child: PopupMenuButton<T>(
         enabled: enabled,
         tooltip: tooltip,
-        icon: const Icon(CupertinoIcons.ellipsis),
+        constraints: const BoxConstraints.tightFor(width: 248),
+        menuPadding: const EdgeInsets.symmetric(vertical: 5),
+        color: theme.colorScheme.surface.withValues(alpha: 0.88),
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: Colors.white.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.22 : 0.92,
+            ),
+          ),
+        ),
         onSelected: onSelected,
         itemBuilder: (_) => items,
+        child: const TpToolbarActionSurface(icon: CupertinoIcons.ellipsis),
       ),
     );
   }

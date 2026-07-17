@@ -25,7 +25,9 @@ final accountStatsProvider = FutureProvider<AccountStats>(
 
 /// 帳號 hub。
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key});
+  const AccountScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
@@ -61,11 +63,82 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final currentUser = ref.watch(authStateProvider).value;
     // 未登入（含登出後）由 router redirect 導向 /login，這裡不渲染內容。
     if (currentUser == null) {
-      return const Scaffold(body: SizedBox.shrink());
+      return widget.embedded
+          ? const SizedBox.shrink()
+          : const Scaffold(body: SizedBox.shrink());
     }
     final effectiveUser = _effectiveUser(currentUser);
 
-    final accountStats = ref.watch(accountStatsProvider).value;
+    final accountStats = widget.embedded
+        ? null
+        : ref.watch(accountStatsProvider).value;
+
+    final content = widget.embedded
+        ? <Widget>[
+            TpSettingsGroup(
+              children: [
+                TpSettingsRow(
+                  key: const ValueKey('account-sheet-profile'),
+                  leading: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).extension<TpTones>()!.accentBg,
+                    child: Text(
+                      _resolveDisplayName(
+                        effectiveUser,
+                      ).characters.first.toUpperCase(),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).extension<TpTones>()!.accentDeep,
+                      ),
+                    ),
+                  ),
+                  title: _resolveDisplayName(effectiveUser),
+                  subtitle: '帳號資訊與個人資料',
+                  onTap: () => context.push('/settings/profile'),
+                ),
+              ],
+            ),
+            const _SettingsGroup(compact: true),
+            _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+          ]
+        : <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(TpSpacing.s4),
+              child: _ProfileHero(
+                user: effectiveUser,
+                editingName: _editingName,
+                savingName: _savingName,
+                nameError: _nameError,
+                nameController: _nameController,
+                nameFocusNode: _nameFocusNode,
+                onEditName: () => _startEditName(effectiveUser),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+              child: _StatsRow(stats: accountStats),
+            ),
+            const SizedBox(height: TpSpacing.s2),
+            const _SettingsGroup(),
+            _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+          ];
+
+    final slivers = [
+      SliverPadding(
+        padding: EdgeInsets.zero,
+        sliver: SliverList(delegate: SliverChildListDelegate([...content])),
+      ),
+    ];
+
+    if (widget.embedded) {
+      return CustomScrollView(
+        key: const ValueKey('account-sheet-content'),
+        slivers: slivers,
+      );
+    }
 
     return TpRootScrollScaffold(
       title: '帳號',
@@ -86,34 +159,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           icon: const Icon(CupertinoIcons.xmark),
         ),
       ],
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.zero,
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              Padding(
-                padding: const EdgeInsets.all(TpSpacing.s4),
-                child: _ProfileHero(
-                  user: effectiveUser,
-                  editingName: _editingName,
-                  savingName: _savingName,
-                  nameError: _nameError,
-                  nameController: _nameController,
-                  nameFocusNode: _nameFocusNode,
-                  onEditName: () => _startEditName(effectiveUser),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-                child: _StatsRow(stats: accountStats),
-              ),
-              const SizedBox(height: TpSpacing.s2),
-              const _SettingsGroup(),
-              _LogoutRow(onTap: () => _confirmLogout(context, ref)),
-            ]),
-          ),
-        ),
-      ],
+      slivers: slivers,
     );
   }
 
@@ -454,10 +500,44 @@ class _StatCard extends StatelessWidget {
 
 /// 設定群組：iOS grouped inset 風格,依語意分「帳號」「偏好」「安全性」三 section。
 class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup();
+  const _SettingsGroup({this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return TpSettingsGroup(
+        children: [
+          TpSettingsRow(
+            key: const ValueKey('settings-appearance'),
+            title: '外觀',
+            onTap: () => context.push('/settings/appearance'),
+          ),
+          TpSettingsRow(
+            key: const ValueKey('settings-notifications'),
+            title: '通知',
+            onTap: () => context.push('/settings/notifications'),
+          ),
+          TpSettingsRow(
+            key: const ValueKey('settings-sessions'),
+            title: '登入裝置',
+            onTap: () => context.push('/settings/sessions'),
+          ),
+          TpSettingsRow(
+            key: const ValueKey('settings-connected-apps'),
+            title: '已連結的應用程式',
+            onTap: () => context.push('/settings/connected-apps'),
+          ),
+          TpSettingsRow(
+            key: const ValueKey('settings-developer-apps'),
+            title: '開發者 App',
+            onTap: () => context.push('/settings/developer-apps'),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

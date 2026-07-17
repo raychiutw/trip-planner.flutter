@@ -49,7 +49,7 @@ abstract final class TpColorsLight {
 abstract final class TpColorsDark {
   static const accent = Color(0xFFCBA06E);
   static const accentDeep = Color(0xFFE0BC90);
-  static const accentSubtle = Color(0xFF33271A);
+  static const accentSubtle = tertiary;
   static const accentBg = Color(0xFF44341F);
 
   static const background = Color(0xFF121214);
@@ -117,11 +117,20 @@ abstract final class TpSpacing {
 /// 浮動四分頁的實際佔位；地圖 accessory 與 root scroll 共用。
 abstract final class TpRootTabGeometry {
   static const horizontalMargin = 30.0;
-  static const expandedBarHeight = 52.0;
+  static const expandedBarHeight = 44.0;
   static const bottomSpacing = 8.0;
+  static const safeAreaOverlap = 24.0;
+
+  static double bottomOffsetFor(double bottomInset) {
+    final offset = bottomInset - safeAreaOverlap;
+    return offset > bottomSpacing ? offset : bottomSpacing;
+  }
+
+  static double bottomOffset(BuildContext context) =>
+      bottomOffsetFor(MediaQuery.viewPaddingOf(context).bottom);
 
   static double expandedHeightFor(double bottomInset) =>
-      bottomInset + bottomSpacing + expandedBarHeight;
+      bottomOffsetFor(bottomInset) + expandedBarHeight;
 
   static double expandedHeight(BuildContext context) =>
       expandedHeightFor(MediaQuery.viewPaddingOf(context).bottom);

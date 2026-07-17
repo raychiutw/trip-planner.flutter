@@ -622,6 +622,7 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('新增停留點'), findsWidgets);
+    expect(find.byType(AppleRootTabBar), findsNothing);
     expect(find.byType(LoginScreen), findsNothing);
   });
 

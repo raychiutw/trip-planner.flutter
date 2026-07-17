@@ -172,6 +172,83 @@ Future<T?> showAppActionSheet<T>(
   );
 }
 
+/// 顯示可共用的 HIG 近滿版下方視窗。
+Future<T?> showAppLargeSheet<T>(
+  BuildContext context, {
+  required String title,
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    useSafeArea: false,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (sheetContext) => FractionallySizedBox(
+      heightFactor: 0.93,
+      child: Material(
+        key: const ValueKey('app-large-sheet'),
+        color: Theme.of(sheetContext).colorScheme.surface,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              SizedBox(
+                height: TpSpacing.s5,
+                child: Center(
+                  child: Container(
+                    key: const ValueKey('app-large-sheet-drag-indicator'),
+                    width: 36,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.onSurface.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 56,
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: TpSpacing.s5,
+                    right: TpSpacing.s3,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(sheetContext).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        key: const ValueKey('app-large-sheet-close'),
+                        tooltip: '關閉',
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: const Icon(CupertinoIcons.xmark, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(child: builder(sheetContext)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// 平台自適應搜尋輸入列。
 ///
 /// - iOS/macOS → [CupertinoSearchTextField](灰底圓角、內建放大鏡與清除鈕)。

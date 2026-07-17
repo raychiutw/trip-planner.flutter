@@ -34,6 +34,8 @@
 	<string>用於語音輸入行程指令,將你說的話轉成文字傳給 AI 助手。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用於在地圖上移動到你目前的位置。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Tripline 會在你主動使用地圖定位功能時取得目前位置，用於將地圖移到你所在位置並協助查看附近景點；不會在背景持續追蹤你的位置。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>用於把你的語音辨識成文字,作為調整行程的指令。</string>
 	<key>UIApplicationSceneManifest</key>

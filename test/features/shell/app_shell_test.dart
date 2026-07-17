@@ -172,7 +172,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('root tab 對齊定版 mockup 的 30/52/8 幾何與玻璃色', (tester) async {
+    testWidgets('root tab 對齊定版 mockup 的 30/44/8 幾何與透明玻璃色', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -192,14 +192,14 @@ void main() {
         of: bar,
         matching: find.byType(BackdropFilter),
       );
-      expect(tester.getSize(glass).height, 52);
+      expect(tester.getSize(glass).height, 44);
 
       final glassDecoration = tester.widget<DecoratedBox>(
         find.descendant(of: bar, matching: find.byType(DecoratedBox)).first,
       );
       expect(
         (glassDecoration.decoration as BoxDecoration).color,
-        TpColorsLight.background.withValues(alpha: 0.88),
+        TpColorsLight.background.withValues(alpha: 0.42),
       );
       expect(
         find.byKey(const ValueKey('root-tab-selected-surface-聊天')),
@@ -207,7 +207,9 @@ void main() {
       );
     });
 
-    testWidgets('深色 root tab 使用定版 rgba(40,40,42,.86)', (tester) async {
+    testWidgets('深色 root tab 使用更透的 Liquid Glass rgba(40,40,42,.38)', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -224,8 +226,12 @@ void main() {
       );
       expect(
         (glassDecoration.decoration as BoxDecoration).color,
-        TpColorsDark.glass.withValues(alpha: 0.86),
+        TpColorsDark.glass.withValues(alpha: 0.38),
       );
+    });
+
+    test('iPhone safe area 與膠囊重疊 24pt，底部仍保留 10pt', () {
+      expect(TpRootTabGeometry.expandedHeightFor(34), 54);
     });
   });
 }

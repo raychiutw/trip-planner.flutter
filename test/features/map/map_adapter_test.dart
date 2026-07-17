@@ -58,12 +58,36 @@ void main() {
 
     final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
     expect(googleMap.mapType, MapType.terrain);
+    expect(googleMap.style, isNull);
     expect(googleMap.markers.single.markerId.value, 'stop-1');
     expect(googleMap.markers.single.infoWindow.title, '首里城');
     expect(googleMap.clusterManagers, hasLength(1));
     expect(googleMap.markers.single.clusterManagerId, isNotNull);
     expect(googleMap.polylines.single.polylineId.value, 'day-1');
     expect(googleMap.polylines.single.points, hasLength(2));
+  });
+
+  testWidgets('深色模式套用中性 Google Maps style', (tester) async {
+    final controller = GoogleTripMapController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: GoogleTripMapCanvas(
+          config: TripMapCanvasConfig(
+            controller: controller,
+            initialFitPoints: const [TripMapPoint(26.217, 127.719)],
+            tilePreset: kTripMapTilePresets.first,
+          ),
+        ),
+      ),
+    );
+
+    final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
+    expect(googleMap.style, isNotNull);
+    expect(googleMap.style, contains('#1c1c1e'));
+    expect(googleMap.style, contains('#2c2c2e'));
   });
 
   testWidgets('路線虛線與透明度轉接到原生 Polyline', (tester) async {

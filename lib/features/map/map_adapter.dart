@@ -67,6 +67,23 @@ typedef TripMapCanvasBuilder = Widget Function(TripMapCanvasConfig config);
 
 const _tripClusterManagerId = ClusterManagerId('trip-stops');
 
+const _tripMapDarkStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#1c1c1e"}]},
+  {"elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#a1a1a6"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#121214"}]},
+  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#48484a"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#242426"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2e"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#38383a"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3a3a3c"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#242426"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#101b24"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#636366"}]}
+]
+''';
+
 class TripMapRoute {
   const TripMapRoute({
     required this.id,
@@ -349,6 +366,9 @@ class _GoogleTripMapCanvasState extends State<GoogleTripMapCanvas> {
             : config.initialFitPoints.first);
     return GoogleMap(
       key: config.mapKey,
+      style: Theme.of(context).brightness == Brightness.dark
+          ? _tripMapDarkStyle
+          : null,
       initialCameraPosition: CameraPosition(
         target: initialTarget.toGoogleLatLng(),
         zoom: config.initialZoom,

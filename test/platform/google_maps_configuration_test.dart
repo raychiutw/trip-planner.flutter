@@ -33,6 +33,14 @@ void main() {
     );
   });
 
+  test('iOS 定位權限包含 Apple 要求的完整用途說明', () {
+    final infoPlist = read('ios/Runner/Info.plist');
+
+    expect(infoPlist, contains('NSLocationWhenInUseUsageDescription'));
+    expect(infoPlist, contains('NSLocationAlwaysAndWhenInUseUsageDescription'));
+    expect(infoPlist, contains('不會在背景持續追蹤'));
+  });
+
   test('Android manifest placeholder 從 ignored properties 或環境變數注入', () {
     final manifest = read('android/app/src/main/AndroidManifest.xml');
     final gradle = read('android/app/build.gradle.kts');

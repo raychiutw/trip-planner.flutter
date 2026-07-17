@@ -12,6 +12,7 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
@@ -285,7 +286,10 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     return Scaffold(
-      appBar: const TpAppBar(title: Text('新增停留點')),
+      appBar: const TpAppBar(
+        title: Text('新增停留點'),
+        actions: [TpAccountAvatarButton()],
+      ),
       body: daysAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('entry-add-loading')),

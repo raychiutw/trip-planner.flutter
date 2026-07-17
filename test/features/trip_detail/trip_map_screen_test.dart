@@ -198,7 +198,7 @@ void main() {
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
@@ -208,7 +208,7 @@ void main() {
     expect(find.byType(PageView), findsOneWidget);
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.scrollDirection, Axis.horizontal);
-    expect(pageView.controller!.viewportFraction, 0.84);
+    expect(pageView.controller!.viewportFraction, 0.72);
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
       TpBottomAccessory.height,
@@ -230,7 +230,7 @@ void main() {
         of: find.byKey(const ValueKey('trip-map-poi-drawer')),
         matching: find.byType(BackdropFilter),
       ),
-      findsNothing,
+      findsAtLeastNWidgets(2),
     );
 
     // pins：只顯示 DAY 1 且 master 座標非 null 的 2 筆
@@ -274,12 +274,9 @@ void main() {
     expect(neighborRect.left, lessThan(drawer.right));
     expect(neighborRect.right, greaterThan(drawer.right));
 
-    final surface = tester.widget<Material>(
-      find.descendant(of: neighbor, matching: find.byType(Material)).first,
-    );
     expect(
-      surface.color,
-      Theme.of(tester.element(neighbor)).colorScheme.surfaceContainerLow,
+      find.descendant(of: neighbor, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
     );
   });
 
@@ -450,7 +447,7 @@ void main() {
     expect(
       mapConfig!.initialPadding.bottom,
       greaterThanOrEqualTo(
-        TpBottomAccessory.height + expectedRootClearance + TpSpacing.s3,
+        TpBottomAccessory.height + expectedRootClearance + TpSpacing.s1,
       ),
     );
     final drawerRect = tester.getRect(
@@ -459,11 +456,11 @@ void main() {
     expect(
       tester.view.physicalSize.height / tester.view.devicePixelRatio -
           drawerRect.bottom,
-      expectedRootClearance + TpSpacing.s3,
+      expectedRootClearance + TpSpacing.s1,
     );
   });
 
-  testWidgets('真實浮動 root tab 下 POI accessory 保留 12pt 間距', (tester) async {
+  testWidgets('真實浮動 root tab 下 POI accessory 保留 4pt 間距', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -486,7 +483,7 @@ void main() {
     );
     final accessoryContext = tester.element(find.byType(TpBottomAccessory));
     expect(MediaQuery.paddingOf(accessoryContext).bottom, rootTab.height);
-    expect(poi.bottom, lessThanOrEqualTo(rootTab.top - TpSpacing.s3));
+    expect(poi.bottom, lessThanOrEqualTo(rootTab.top - TpSpacing.s1));
   });
 
   testWidgets('320×568 與 135% 文字使用 accessibility rail 且 selector 不撞定位鈕', (
@@ -599,6 +596,19 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
     await tester.pumpAndSettle();
+    final sheet = find.byKey(const ValueKey('app-large-sheet'));
+    expect(sheet, findsOneWidget);
+    expect(find.text('切換行程'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
+      findsOneWidget,
+    );
+    expect(find.byType(TabBar), findsNothing);
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(tester.getSize(sheet).height, closeTo(screenHeight * 0.93, 1));
+
     await tester.tap(find.byKey(const ValueKey('trip-picker-item-trip-2')));
     await tester.pumpAndSettle();
 

@@ -301,8 +301,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             PublicShareScreen(token: state.pathParameters['token']!),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
+        builder: (context, state, navigationShell) => AppShell(
+          navigationShell: navigationShell,
+          showRootTab: _isRootTabLocation(state.uri.path),
+        ),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -579,4 +581,15 @@ bool _isPublicShellOutsideRoute(GoRouterState state) {
   if (_publicShellOutsideRoutes.contains(state.matchedLocation)) return true;
   final pathSegments = state.uri.pathSegments;
   return pathSegments.length == 2 && pathSegments.first == 's';
+}
+
+bool _isRootTabLocation(String path) {
+  if (path == '/chat' ||
+      path == '/trips' ||
+      path == '/map' ||
+      path == '/favorites') {
+    return true;
+  }
+  final segments = Uri.parse(path).pathSegments;
+  return segments.length == 2 && segments.first == 'trips';
 }

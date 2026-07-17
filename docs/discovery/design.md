@@ -86,18 +86,19 @@ Root tab 固定四項：
 Root tab 幾何：
 
 - 水平 margin 30pt；402pt 畫面上的可見寬度 342pt，對齊定版 mockup 的 85.2%。
-- 可見高度 52pt，外圓角 26pt，內層 padding 3pt。
-- 膠囊底部位於 safe area 上方 8pt，不把 safe area 重複算成視覺 margin。
-- Light glass 使用暖白 `rgba(255,251,245,.88)`；Dark glass 使用 `rgba(40,40,42,.86)`；選中項顯示中性 selected surface。
+- 可見高度 44pt，外圓角 22pt，內層 padding 3pt；不再以 52pt 膠囊壓縮主畫面。
+- 底部位移為 `max(8pt, safe area - 24pt)`，讓膠囊與 home-indicator safe area 重疊 24pt，對齊 Apple Music 的貼底位置。
+- Light glass 使用暖白 `rgba(255,251,245,.68)`；Dark glass 使用 `rgba(40,40,42,.72)`；選中項顯示中性 selected surface。
 - 內容可以延伸到玻璃後方，但可操作內容、POI accessory 與輸入列必須使用相同 geometry 避讓。
 - tab 不隨捲動縮小、淡出或改變標籤。
+- AI chat composer 與其他 bottom accessory 使用同一 geometry，與 root tab 的可見間距固定 4pt；本次只調整位置與視覺，送出、語音、附件與既有狀態處理全部維持原功能。
 
 ## 5. 全域 toolbar
 
 - Chat、行程、地圖的 title 直接顯示目前行程名稱。
-- 點 title 開啟 HIG half-height sheet：搜尋、目前項目 checkmark、最近行程；不是 dropdown。
+- 點 title 開啟共用 HIG 近滿版 bottom sheet：高度 93%、頂部 36×5pt drag indicator、右上 44pt 圓形關閉鈕、搜尋、目前項目 checkmark、最近行程；沒有 tab，也不是 dropdown。
 - 收藏 title 顯示「收藏」。
-- 右側保留 account avatar 與最多一個 context action；額外命令進水平 ellipsis menu。
+- 右側保留 account avatar 與最多一個 context action；額外命令進水平 ellipsis menu。Toolbar action 使用 44pt target、36pt 無框圓形 system material，不使用厚 border。Menu 使用右上錨定的 260pt 浮動玻璃面板、24pt 圓角、48pt 圖示列與 inset separator。
 - 筆記是行程／地圖右上角命令，不是主 selector 或 root tab。
 - Account／Settings 使用 grouped list、inset separator、無 card border／shadow、system red destructive row。
 
@@ -105,10 +106,12 @@ Root tab 幾何：
 
 同一位置、同一高度、同一選取 DAY：
 
-- 行程頁：`地圖 | DAY 1 | DAY 2 | …`
-- 地圖頁：`行程 | DAY 1 | DAY 2 | …`
+- 行程頁：`地圖 | 總覽 | DAY 1 | DAY 2 | …`
+- 地圖頁：`行程 | 總覽 | DAY 1 | DAY 2 | …`
 
-左側是目的地 action，點擊後互切頁面並保留 DAY；右側是單選 DAY，長行程可水平滑動並自動保持目前 DAY 可見。當前頁不重複顯示自己，也不再顯示「行程＋地圖」雙選項。
+左側是 accent icon＋文字的目的地 action，點擊後互切頁面並保留 DAY；細分隔線後依序是「總覽」與單選 DAY。active DAY 使用可滑動的 accent thumb；長行程整段可水平滑動並自動保持目前 DAY 可見。當前頁不重複顯示自己，也不再顯示「行程＋地圖」雙選項。
+
+地圖頁讓地圖延伸到 selector 後方，DAY selector 浮在 toolbar 下方 8pt；行程頁仍在相同垂直位置使用同尺寸 selector。兩者完全依定版圖：外膠囊 44pt 高／22pt 圓角／4pt 內距，active thumb 34pt 高／17pt 圓角，標籤使用 12pt semibold；材質使用 22pt blur、半透明底、低陰影與 1px rim highlight。
 
 行程往下內容必須完整包含：日期、天氣、住宿、景點、交通、長按排序、新增景點、下一日；不能只套用 header。
 
@@ -118,8 +121,9 @@ Root tab 幾何：
 - 所有每日行程固定 zoom `12.0`，切 DAY 不執行全日本 bounds fit。
 - 當日沒有座標時仍維持 zoom `12.0`，並使用行程第一個已知座標作為城市層級 fallback；不得 fit 全行程 bounds。
 - 明確點 marker／POI 卡時使用 zoom `16.0`。
-- POI accessory 固定在 root tab 上方，水平 PageView `viewportFraction = 0.84`；標準文字 88pt，無障礙文字自動增高。
-- 所有 POI 卡使用相同 surface。相鄰卡必須露出，讓使用者知道可左右滑動。
+- POI dock 固定在 root tab 上方 4pt；標準高度 96pt，外層使用參考圖的 full-width glass band、28pt blur、半透明底色、1px rim highlight 與內高光；active 卡再疊一層 16pt blur 的玻璃 surface，不使用實心 group 色。無障礙文字可自動增高。
+- active POI 卡固定置中，前後卡各露出一部分提示可滑動；卡片下方顯示頁碼圓點，active 頁使用 Tripline accent 的短膠囊。第一筆與最後一筆維持置中，但只顯示實際存在的相鄰卡，不循環製造假資料。
+- POI 卡資訊層級參考核准圖：左側當日編號圓章；中央依序為「停留 N / 總數」、景點名、時間與類型摘要；右側為圓形導航動作。卡片與導航按鈕皆使用 Tripline accent，不引入新的分類色。
 - marker、route、卡片與 camera focus 共用同一 active entry；缺座標 POI 仍留在 accessory 並顯示「尚無位置」。
 - POI rail 沒有垂直拖曳、收合、detent 或 grabber。
 
@@ -142,7 +146,7 @@ Root tab 幾何：
 
 ## 10. 帳號與設定
 
-- Account 以 sheet／獨立 route 開啟，右上 close target 44pt。
+- Account avatar 使用與行程切換相同的 93% 高度 bottom sheet，右上 close target 44pt；獨立 `/account` route 僅保留 deep link 與直接導覽相容性。
 - Light group 使用 `#FAF4EA`，Dark group 使用 `#2C2C2E`；無額外 card border 或 shadow。
 - row title 使用 Body／Headline 17pt，secondary 使用 Subheadline 15pt。
 - separator 1pt、左右 inset 16pt；有 leading image 時從文字欄開始。

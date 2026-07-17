@@ -75,76 +75,137 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return SizedBox(
       height: TpSpacing.tapMin,
       child: TpGlassSurface(
         borderRadius: const BorderRadius.all(Radius.circular(22)),
-        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s1),
+        padding: const EdgeInsets.all(TpSpacing.s1),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              for (final (index, option) in widget.options.indexed)
-                KeyedSubtree(
+              for (final (index, option) in widget.options.indexed) ...[
+                _SelectorOption<T>(
                   key: _optionKeys[index],
-                  child: Semantics(
-                    key: option.key,
-                    button: true,
-                    selected: option.value == widget.value,
-                    label: option.label,
-                    excludeSemantics: true,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(18),
-                        onTap: () => widget.onSelected(option.value),
-                        child: AnimatedContainer(
-                          duration: TpMotion.resolve(context, TpMotion.fast),
-                          constraints: const BoxConstraints(
-                            minHeight: TpSpacing.tapMin,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: TpSpacing.s3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: option.value == widget.value
-                                ? theme.colorScheme.primary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (option.indicatorColor != null) ...[
-                                Container(
-                                  width: TpSpacing.s2,
-                                  height: TpSpacing.s2,
-                                  decoration: BoxDecoration(
-                                    color: option.indicatorColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: TpSpacing.s2),
-                              ],
-                              Text(
-                                option.label,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: option.value == widget.value
-                                      ? theme.colorScheme.onPrimary
-                                      : theme.colorScheme.onSurface,
-                                  fontWeight: option.value == widget.value
-                                      ? FontWeight.w700
-                                      : FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                  option: option,
+                  selected: !option.isAction && option.value == widget.value,
+                  isDark: isDark,
+                  onTap: () => widget.onSelected(option.value),
+                ),
+                if (option.isAction && index < widget.options.length - 1)
+                  Container(
+                    key: ValueKey('tp-selector-divider-$index'),
+                    width: 1,
+                    height: 18,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s1,
+                    ),
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.72,
                     ),
                   ),
-                ),
+              ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectorOption<T> extends StatelessWidget {
+  const _SelectorOption({
+    super.key,
+    required this.option,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final TpScopeOption<T> option;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    return Semantics(
+      key: option.key,
+      button: true,
+      selected: selected,
+      label: option.label,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: TpMotion.resolve(context, TpMotion.fast),
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s3),
+            decoration: BoxDecoration(
+              color: selected
+                  ? accent.withValues(alpha: isDark ? 0.30 : 0.20)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(17),
+              border: selected
+                  ? Border.all(
+                      color: Colors.white.withValues(
+                        alpha: isDark ? 0.34 : 0.86,
+                      ),
+                    )
+                  : null,
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: accent.withValues(alpha: isDark ? 0.16 : 0.12),
+                        blurRadius: 12,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (option.icon != null) ...[
+                  Icon(
+                    option.icon,
+                    size: 14,
+                    color: option.isAction || selected
+                        ? accent
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: TpSpacing.s1),
+                ],
+                if (option.indicatorColor != null) ...[
+                  Container(
+                    width: TpSpacing.s2,
+                    height: TpSpacing.s2,
+                    decoration: BoxDecoration(
+                      color: option.indicatorColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                ],
+                Text(
+                  option.label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 11,
+                    color: option.isAction || selected
+                        ? accent
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: selected || option.isAction
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
