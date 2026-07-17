@@ -1,4 +1,4 @@
-name: Mobile CI / TestFlight
+name: Mobile CI / Releases
 
 on:
   pull_request:
