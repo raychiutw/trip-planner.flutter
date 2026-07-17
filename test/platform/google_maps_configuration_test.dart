@@ -103,7 +103,15 @@ void main() {
         'e738b9dd8f2476ea806d921b64aacd24f34515a5',
       ),
     );
-    expect(workflow, contains('track: alpha'));
+    expect(
+      workflow,
+      contains(
+        'actions/upload-artifact@'
+        'ea165f8d65b6e75b540449e92b4886f43607fa02',
+      ),
+    );
+    expect(workflow, contains('tripline-android-closed-'));
+    expect(workflow, contains('tracks: alpha'));
     expect(workflow, contains('status: completed'));
     expect(workflow, isNot(contains('track: production')));
     expect(workflow, isNot(contains('tracks: production')));
