@@ -218,7 +218,7 @@ abstract final class AppTheme {
     );
     const buttonMinSize = Size(0, TpSpacing.tapMin);
     const buttonTextStyle = TextStyle(
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: FontWeight.w600,
       letterSpacing: 0,
     );
@@ -280,7 +280,7 @@ abstract final class AppTheme {
         backgroundColor: tones.accentSubtle,
         selectedColor: tones.accent,
         labelStyle: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0,
           color: colorScheme.onSurface,
@@ -323,7 +323,7 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             letterSpacing: 0,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: isSelected
@@ -346,79 +346,82 @@ abstract final class AppTheme {
     );
   }
 
-  /// HIG 字級表；中文 letterSpacing 一律 0。
+  /// HIG 字級表；畫面角色統一下移一級，中文 letterSpacing 一律 0。
   static TextTheme _textTheme() {
     return const TextTheme(
       displaySmall: TextStyle(
-        fontSize: 34,
+        fontSize: 28,
+        height: 34 / 28,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       headlineMedium: TextStyle(
-        fontSize: 28,
-        height: 36 / 28,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      ),
-      // HIG title2：內容主體的 hero 標題（行程名等），不是頁面標題。
-      headlineSmall: TextStyle(
         fontSize: 22,
         height: 28 / 22,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
-      titleLarge: TextStyle(
+      // HIG title3：內容主體的 hero 標題（行程名等），不是頁面標題。
+      headlineSmall: TextStyle(
         fontSize: 20,
+        height: 25 / 20,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      ),
+      titleLarge: TextStyle(
+        fontSize: 17,
+        height: 22 / 17,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       titleMedium: TextStyle(
-        fontSize: 17,
-        height: 24 / 17,
+        fontSize: 15,
+        height: 20 / 15,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
-      // HIG subheadline：區塊小標。未定義時會 fallback 到 Material 預設的
+      // HIG footnote：區塊小標。未定義時會 fallback 到 Material 預設的
       // 14/w500/letterSpacing 0.1 —— 那個字距違反「中文不加字距」。
       titleSmall: TextStyle(
-        fontSize: 15,
-        height: 20 / 15,
+        fontSize: 13,
+        height: 18 / 13,
         fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),
       bodyLarge: TextStyle(
-        fontSize: 17,
-        height: 26 / 17,
+        fontSize: 15,
+        height: 20 / 15,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
       ),
       bodyMedium: TextStyle(
-        fontSize: 15,
-        height: 23 / 15,
+        fontSize: 13,
+        height: 18 / 13,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
       ),
       bodySmall: TextStyle(
-        fontSize: 13,
-        height: 18 / 13,
+        fontSize: 12,
+        height: 16 / 12,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
         fontFeatures: [FontFeature.tabularFigures()],
       ),
       labelLarge: TextStyle(
-        fontSize: 16,
+        fontSize: 15,
+        height: 20 / 15,
         fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),
       labelMedium: TextStyle(
-        fontSize: 13,
-        height: 18 / 13,
+        fontSize: 12,
+        height: 16 / 12,
         fontWeight: FontWeight.w600,
         letterSpacing: 0,
       ),
       labelSmall: TextStyle(
-        fontSize: 12,
-        height: 16 / 12,
+        fontSize: 11,
+        height: 13 / 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),

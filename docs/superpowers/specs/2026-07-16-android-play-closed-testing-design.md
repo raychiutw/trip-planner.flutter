@@ -1,31 +1,33 @@
-# Google Play Closed Testing CI/CD Design
+# Google Play Testing CI/CD Design
+
+> 更新：2026-07-17。開發團隊的第一階段使用 Google Play `internal` 內部測試；現行 workflow target 是 `android-internal`。本文後段的 `alpha` 封閉測試只在準備申請正式版存取權時執行。
 
 ## Goal
 
-Let the Tripline development team install signed Android test builds through Google Play, while making the same closed-testing period count toward the production-access requirement for a new personal Play Console account.
+Let the Tripline development team install signed Android test builds through Google Play internal testing first. Closed testing remains a later production-access gate for the personal Play Console account.
 
 ## Current State
 
 - The app ID is `com.raychiu.tripline`.
 - `.github/workflows/mobile.yml` runs analyze, tests, and an Android debug build on pull requests and pushes to `master`.
-- Manual `workflow_dispatch` currently means TestFlight only.
+- Manual `workflow_dispatch` supports TestFlight and Android internal testing.
 - `android/app/build.gradle.kts` already reads release-signing values from environment variables or ignored `android/key.properties`.
 - `android/upload-keystore.jks` and `android/key.properties` are ignored by Git.
 - There is no Firebase dependency or Android distribution service to preserve.
 
 ## Chosen Approach
 
-Use a personal Google Play Console account and a closed test named `alpha` from the first release. Do not add Firebase App Distribution or a second Android-only workflow.
+Use Google Play internal testing for the first release. Do not add Firebase App Distribution or a second Android-only workflow. Add the required closed-test cohort only when preparing for production access.
 
 Extend the existing mobile workflow with a `release_target` choice:
 
 - `testflight` remains the default so the existing manual command keeps its current behavior.
-- `android-closed` runs the new Google Play closed-testing job.
+- `android-internal` runs the Google Play internal-testing job.
 
-Android closed testing is triggered with:
+Android internal testing is triggered with:
 
 ```bash
-gh workflow run mobile.yml --ref master -f release_target=android-closed
+gh workflow run mobile.yml --ref master -f release_target=android-internal
 ```
 
 This keeps normal CI, TestFlight, and Android beta delivery in one workflow without sharing signing credentials between platforms.

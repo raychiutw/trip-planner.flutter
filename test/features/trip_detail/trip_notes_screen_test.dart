@@ -178,11 +178,11 @@ void main() {
     expect(find.text('沖繩縣那霸市西1-2-1'), findsOneWidget);
 
     // 展開預訂：kind chip + title + reservedAt
-    await tester.scrollUntilVisible(
-      find.text('預訂'),
-      120,
-      scrollable: find.byType(Scrollable).last,
+    await tester.drag(
+      find.byKey(const ValueKey('trip-notes-list')),
+      const Offset(0, -120),
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('預訂'));
     await tester.pumpAndSettle();
     expect(find.text('餐廳'), findsOneWidget);

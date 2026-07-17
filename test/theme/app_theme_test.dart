@@ -97,14 +97,14 @@ void main() {
   });
 
   group('元件 theme 規格', () {
-    test('NavigationBar：active=accent、indicator=accentSubtle、label 12', () {
+    test('NavigationBar：active=accent、indicator=accentSubtle、label 11', () {
       final lightTheme = AppTheme.light();
       final navigationBarTheme = lightTheme.navigationBarTheme;
       expect(navigationBarTheme.indicatorColor, TpColorsLight.accentSubtle);
       final selectedLabelStyle = navigationBarTheme.labelTextStyle!.resolve({
         WidgetState.selected,
       });
-      expect(selectedLabelStyle!.fontSize, 12);
+      expect(selectedLabelStyle!.fontSize, 11);
       expect(selectedLabelStyle.color, TpColorsLight.accent);
       final selectedIconTheme = navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,
@@ -116,6 +116,7 @@ void main() {
       final lightTheme = AppTheme.light();
       final filledButtonStyle = lightTheme.filledButtonTheme.style!;
       expect(filledButtonStyle.minimumSize!.resolve({})!.height, 44);
+      expect(filledButtonStyle.textStyle!.resolve({})!.fontSize, 15);
       final buttonShape =
           filledButtonStyle.shape!.resolve({}) as RoundedRectangleBorder;
       expect(buttonShape.borderRadius, BorderRadius.circular(TpRadius.md));
@@ -124,6 +125,7 @@ void main() {
     test('Chip 為 StadiumBorder', () {
       final lightTheme = AppTheme.light();
       expect(lightTheme.chipTheme.shape, isA<StadiumBorder>());
+      expect(lightTheme.chipTheme.labelStyle?.fontSize, 11);
     });
 
     test('Input：filled、radius 12', () {
@@ -140,12 +142,21 @@ void main() {
       expect(lightTheme.appBarTheme.elevation, 0);
     });
 
-    test('TextTheme：系統字（不打包 Inter）、body 17 letterSpacing 0', () {
+    test('TextTheme：HIG 語意角色縮小一級且中文 letterSpacing 0', () {
       final lightTheme = AppTheme.light();
       final bodyStyle = lightTheme.textTheme.bodyLarge!;
-      expect(bodyStyle.fontSize, 17);
-      expect(lightTheme.textTheme.bodyMedium?.fontSize, 15);
-      expect(lightTheme.textTheme.bodySmall?.fontSize, 13);
+      expect(lightTheme.textTheme.displaySmall?.fontSize, 28);
+      expect(lightTheme.textTheme.headlineMedium?.fontSize, 22);
+      expect(lightTheme.textTheme.headlineSmall?.fontSize, 20);
+      expect(lightTheme.textTheme.titleLarge?.fontSize, 17);
+      expect(lightTheme.textTheme.titleMedium?.fontSize, 15);
+      expect(lightTheme.textTheme.titleSmall?.fontSize, 13);
+      expect(bodyStyle.fontSize, 15);
+      expect(lightTheme.textTheme.bodyMedium?.fontSize, 13);
+      expect(lightTheme.textTheme.bodySmall?.fontSize, 12);
+      expect(lightTheme.textTheme.labelLarge?.fontSize, 15);
+      expect(lightTheme.textTheme.labelMedium?.fontSize, 12);
+      expect(lightTheme.textTheme.labelSmall?.fontSize, 11);
       expect(bodyStyle.letterSpacing, 0);
       // 改用系統字:iOS→SF Pro、Android→Roboto,CJK 由系統 fallback;不再打包 Inter。
       expect(bodyStyle.fontFamily, isNot(contains('Inter')));

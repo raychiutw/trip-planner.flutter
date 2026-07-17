@@ -88,7 +88,7 @@ class TravelPill extends StatelessWidget {
             Text(
               '不需計算路程',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -152,7 +152,7 @@ class TravelPill extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: tones.sageDeep,
               fontFeatures: const [FontFeature.tabularFigures()],

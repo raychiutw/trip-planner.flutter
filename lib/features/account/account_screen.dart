@@ -304,7 +304,7 @@ class _ProfileHero extends StatelessWidget {
                     ),
                     child: Text(
                       resolvedName,
-                      style: theme.textTheme.titleLarge,
+                      style: theme.textTheme.headlineMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -330,7 +330,7 @@ class _ProfileHero extends StatelessWidget {
         const SizedBox(height: TpSpacing.s1),
         Text(
           user.email,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),

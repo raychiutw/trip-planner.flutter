@@ -55,6 +55,7 @@ abstract final class TpColorsDark {
   static const background = Color(0xFF121214);
   static const secondary = Color(0xFF1C1C1E);
   static const tertiary = Color(0xFF2C2C2E);
+  static const glass = Color(0xFF28282A);
   static const hover = Color(0xFF242426);
 
   static const foreground = Color(0xFFF5F5F7);
@@ -115,8 +116,9 @@ abstract final class TpSpacing {
 
 /// 浮動四分頁的實際佔位；地圖 accessory 與 root scroll 共用。
 abstract final class TpRootTabGeometry {
-  static const expandedBarHeight = 56.0;
-  static const bottomSpacing = 18.0;
+  static const horizontalMargin = 30.0;
+  static const expandedBarHeight = 52.0;
+  static const bottomSpacing = 8.0;
 
   static double expandedHeightFor(double bottomInset) =>
       bottomInset + bottomSpacing + expandedBarHeight;

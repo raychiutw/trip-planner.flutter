@@ -84,7 +84,7 @@ class PoiSearchCard extends StatelessWidget {
                   Text(
                     categoryLabel,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: tone.deep,
                     ),

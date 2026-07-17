@@ -373,7 +373,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     _coordErrorText!,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ),
@@ -389,7 +389,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                   '結束時間需晚於開始時間',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.error,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ),

@@ -94,7 +94,7 @@ class TripCard extends StatelessWidget {
                   Text(
                     eyebrowText,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.8,
                       color: theme.colorScheme.onSurfaceVariant,

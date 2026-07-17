@@ -55,15 +55,18 @@ Flutter 必須以 `TextTheme` 語意樣式對應，不在 widget 內硬寫另一
 
 | 角色 | HIG text style | 預設 Large 尺寸 |
 |---|---|---:|
-| 頁面／行程標題 | Title 2 | 22pt |
-| 模態／設定標題 | Title 3 | 20pt |
-| 景點、POI、row title | Headline | 17pt semibold |
-| 一般正文 | Body | 17pt |
-| 次要資訊、selector | Subheadline | 15pt |
-| 時間、輔助資訊 | Footnote | 13pt |
-| root tab label | Caption 1 | 12pt |
+| 頁面／行程標題 | Title 3 | 20pt |
+| 模態／設定標題 | Headline | 17pt |
+| 帳號名稱 | Title 2 | 22pt |
+| 設定列 | Body | 17pt |
+| 景點、POI、row title | Subheadline | 15pt semibold |
+| 一般正文 | Subheadline | 15pt |
+| 次要資訊、selector | Footnote | 13pt |
+| 時間、輔助資訊 | Caption 1 | 12pt |
+| root tab label | Caption 2 | 11pt |
 
 - 使用 SF Pro system font 與中文系統 fallback；中文 letter spacing 為 0。
+- 相較初版 HIG mapping，畫面角色統一下移一個語意字階；不個別縮放單一頁面。
 - 支援 Dynamic Type、Bold Text 與至少 200% 文字。
 - 大字模式讓 row、卡片、sheet 自動長高與換行；禁止縮字維持固定高度。
 - 時間與日期使用 tabular figures。
@@ -82,9 +85,10 @@ Root tab 固定四項：
 
 Root tab 幾何：
 
-- 水平 margin 24pt。
-- 可見高度 56pt。
-- iPhone 34pt safe area 時，膠囊底部距螢幕 18pt。
+- 水平 margin 30pt；402pt 畫面上的可見寬度 342pt，對齊定版 mockup 的 85.2%。
+- 可見高度 52pt，外圓角 26pt，內層 padding 3pt。
+- 膠囊底部位於 safe area 上方 8pt，不把 safe area 重複算成視覺 margin。
+- Light glass 使用暖白 `rgba(255,251,245,.88)`；Dark glass 使用 `rgba(40,40,42,.86)`；選中項顯示中性 selected surface。
 - 內容可以延伸到玻璃後方，但可操作內容、POI accessory 與輸入列必須使用相同 geometry 避讓。
 - tab 不隨捲動縮小、淡出或改變標籤。
 

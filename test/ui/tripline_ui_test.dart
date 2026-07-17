@@ -77,6 +77,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('TpSettingsGroup 在 iOS Large 使用 HIG 設定列字級', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          body: TpSettingsGroup(
+            title: '偏好',
+            children: [
+              TpSettingsRow(title: '外觀', subtitle: '跟隨系統', value: '自動'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.widget<Text>(find.text('偏好')).style?.fontSize, 13);
+    expect(tester.widget<Text>(find.text('外觀')).style?.fontSize, 17);
+    expect(tester.widget<Text>(find.text('跟隨系統')).style?.fontSize, 15);
+    expect(tester.widget<Text>(find.text('自動')).style?.fontSize, 15);
+  });
+
   testWidgets('TpContentSurface 是內容材質而不是 glass', (tester) async {
     await tester.pumpWidget(
       app(

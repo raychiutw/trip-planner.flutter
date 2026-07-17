@@ -100,7 +100,7 @@ TripMapMarkerStyle tripMapMarkerStyle({
       text: Colors.white,
       diameter: 36,
       borderWidth: 2,
-      fontSize: 13,
+      fontSize: 12,
       zIndex: 1000,
     );
   }
@@ -110,7 +110,7 @@ TripMapMarkerStyle tripMapMarkerStyle({
     text: dayColor,
     diameter: 28,
     borderWidth: 1.5,
-    fontSize: 12,
+    fontSize: 11,
     zIndex: 0,
   );
 }

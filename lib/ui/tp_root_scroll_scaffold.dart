@@ -48,7 +48,7 @@ class TpRootScrollScaffold extends StatelessWidget {
         SliverToBoxAdapter(
           child: SizedBox(
             key: ValueKey('root-scroll-bottom-inset'),
-            height: TpRootTabGeometry.expandedHeight(context) + TpSpacing.s4,
+            height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
           ),
         ),
       ],
