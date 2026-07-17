@@ -1,16 +1,18 @@
-# Google Play Closed Testing CI/CD Implementation Plan
+# Google Play Testing CI/CD Implementation Plan
+
+> **Current release path (2026-07-17):** publish the first bundle to Play `internal` with `release_target=android-internal`. The `alpha` closed-test tasks below are deferred until Tripline starts the personal-account production-access period.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver signed Tripline Android builds to the Google Play `alpha` closed-testing track from a manually triggered GitHub Actions workflow, then prove that an invited tester can install, launch, and render Google Maps in the Play Store build.
+**Goal:** Deliver signed Tripline Android builds to Google Play internal testing from a manually triggered GitHub Actions workflow, then prove that a development-team tester can install, launch, and render Google Maps in the Play Store build.
 
-**Architecture:** Extend the existing `.github/workflows/mobile.yml` instead of adding another workflow or release framework. A guarded `android_closed` job validates repository secrets, reconstructs the upload keystore, derives a Play-safe version code, builds one signed AAB, and publishes it with a commit-pinned upload action. Google Play App Signing holds the production signing key; the local machine and GitHub hold only the upload key.
+**Architecture:** Extend the existing `.github/workflows/mobile.yml` instead of adding another workflow or release framework. A guarded `android_internal` job validates repository secrets, reconstructs the upload keystore, derives a Play-safe version code, builds one signed AAB, and publishes it with a commit-pinned upload action. Google Play App Signing holds the production signing key; the local machine and GitHub hold only the upload key.
 
-**Tech Stack:** Flutter 3.44.6, Gradle Kotlin DSL, GitHub Actions, Google Play Console closed testing, Google Play Developer API, `r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5`, macOS Keychain, GitHub CLI.
+**Tech Stack:** Flutter 3.44.6, Gradle Kotlin DSL, GitHub Actions, Google Play Console internal testing, Google Play Developer API, `r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5`, macOS Keychain, GitHub CLI.
 
 ## Global Constraints
 
-- Keep the package name `com.raychiu.tripline` and the Play track name `alpha` unchanged.
+- Keep the package name `com.raychiu.tripline` and current Play track name `internal` unchanged.
 - Keep TestFlight as the default manual release target.
 - Restrict the Android Maps key to Maps SDK for Android and package `com.raychiu.tripline`; authorize both the local upload-certificate SHA-1 and the Google Play app-signing certificate SHA-1.
 - Never print, commit, paste into a patch, or store in a tracked file any keystore password, Maps key, or service-account JSON.
@@ -23,8 +25,8 @@
 
 | Path | Action | Responsibility |
 |---|---|---|
-| `.github/workflows/mobile.yml` | Modify | Add the manual Android closed-testing target and its signed AAB publishing job. |
-| `test/platform/google_maps_configuration_test.dart` | Modify | Lock the Android release workflow, secret names, safe version-code formula, `alpha` track, and lack of production publishing. |
+| `.github/workflows/mobile.yml` | Modify | Add the manual Android internal-testing target and its signed AAB publishing job. |
+| `test/platform/google_maps_configuration_test.dart` | Modify | Lock the Android release workflow, secret names, safe version-code formula, `internal` track, and lack of production publishing. |
 | `android/upload-keystore.jks` | Create locally; ignored | Hold the Play upload key; never commit it. |
 | `docs/superpowers/specs/2026-07-16-android-play-closed-testing-design.md` | Already present | Record the approved architecture and security decisions. |
 | `docs/superpowers/plans/2026-07-16-android-play-closed-testing.md` | Track during execution | Record the exact implementation and verification sequence. |

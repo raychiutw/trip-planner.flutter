@@ -80,13 +80,13 @@ void main() {
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 
-  test('workflow 手動發布 Android closed testing 且沒有 production 權限', () {
+  test('workflow 手動發布 Android internal testing 且沒有 production 權限', () {
     final workflow = read('.github/workflows/mobile.yml');
 
     expect(workflow, contains('release_target:'));
-    expect(workflow, contains('- android-closed'));
-    expect(workflow, contains('android_closed:'));
-    expect(workflow, contains(r"inputs.release_target == 'android-closed'"));
+    expect(workflow, contains('- android-internal'));
+    expect(workflow, contains('android_internal:'));
+    expect(workflow, contains(r"inputs.release_target == 'android-internal'"));
     expect(workflow, contains('secrets.ANDROID_KEYSTORE_BASE64'));
     expect(workflow, contains('secrets.ANDROID_KEYSTORE_PASSWORD'));
     expect(workflow, contains('secrets.ANDROID_KEY_ALIAS'));
@@ -110,8 +110,8 @@ void main() {
         'ea165f8d65b6e75b540449e92b4886f43607fa02',
       ),
     );
-    expect(workflow, contains('tripline-android-closed-'));
-    expect(workflow, contains('tracks: alpha'));
+    expect(workflow, contains('tripline-android-internal-'));
+    expect(workflow, contains('tracks: internal'));
     expect(workflow, contains('status: completed'));
     expect(workflow, isNot(contains('track: production')));
     expect(workflow, isNot(contains('tracks: production')));

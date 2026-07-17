@@ -14,7 +14,7 @@ on:
         type: choice
         options:
           - testflight
-          - android-closed
+          - android-internal
       runner:
         description: Runner used for the manual TestFlight release
         required: true
@@ -147,13 +147,13 @@ jobs:
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
           wait-for-processing: 'true'
 
-  android_closed:
-    name: Upload to Google Play closed testing
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-closed' }}
+  android_internal:
+    name: Upload to Google Play internal testing
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-internal' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     concurrency:
-      group: android-closed-${{ github.repository }}
+      group: android-internal-${{ github.repository }}
       cancel-in-progress: false
     steps:
       - name: Check out source
@@ -218,16 +218,16 @@ jobs:
       - name: Preserve signed Android App Bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: tripline-android-closed-${{ github.run_number }}-${{ github.run_attempt }}
+          name: tripline-android-internal-${{ github.run_number }}-${{ github.run_attempt }}
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload AAB to Google Play closed testing
+      - name: Upload AAB to Google Play internal testing
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.raychiu.tripline
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          tracks: alpha
+          tracks: internal
           status: completed
