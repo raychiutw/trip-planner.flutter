@@ -153,6 +153,27 @@ void main() {
       verifyNever(() => googleMap.moveCamera(any()));
     });
 
+    test('fitPoints 多點不把底部 overlay padding 套到四邊', () async {
+      final googleMap = _MockGoogleMapController();
+      when(() => googleMap.animateCamera(any())).thenAnswer((_) async {});
+      when(() => googleMap.getZoomLevel()).thenAnswer((_) async => 12);
+      final controller = GoogleTripMapController()..attach(googleMap);
+      addTearDown(controller.dispose);
+
+      await controller.fitPoints(
+        const [TripMapPoint(26.217, 127.719), TripMapPoint(26.214, 127.688)],
+        padding: const EdgeInsets.fromLTRB(40, 100, 40, 250),
+        maxZoom: 12,
+      );
+
+      final update =
+          verify(() => googleMap.animateCamera(captureAny())).captured.single
+              as CameraUpdate;
+      final json = update.toJson() as List<Object?>;
+      expect(json[0], 'newLatLngBounds');
+      expect(json[2], 40);
+    });
+
     test('開啟後 move 改用 moveCamera', () async {
       final googleMap = _MockGoogleMapController();
       when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});

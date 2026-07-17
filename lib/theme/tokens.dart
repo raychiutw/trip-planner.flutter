@@ -8,18 +8,6 @@ abstract final class TpColorsLight {
   static const accentSubtle = Color(0xFFF4EDE3);
   static const accentBg = Color(0xFFE9DBC8);
 
-  // sage 綠（住/移動）
-  static const sage = Color(0xFFA8BAAA);
-  static const sageDeep = Color(0xFF7E9580);
-  static const sageSubtle = Color(0xFFECF0ED);
-  static const sageBg = Color(0xFFD4DDD5);
-
-  // 玫瑰粉（吃）
-  static const pink = Color(0xFFE78C99);
-  static const pinkDeep = Color(0xFFC66B78);
-  static const pinkSubtle = Color(0xFFFAF1F3);
-  static const pinkBg = Color(0xFFF2DBE0);
-
   // 表面
   static const background = Color(0xFFFFFBF5);
   static const secondary = Color(0xFFFAF4EA);
@@ -30,6 +18,16 @@ abstract final class TpColorsLight {
   static const foreground = Color(0xFF2A1F18);
   static const muted = Color(0xFF6F5A47);
   static const accentForeground = Color(0xFFFFFFFF);
+
+  // 舊 API 相容別名：三色分類已退場，全部映射到中性暖白階。
+  static const sage = muted;
+  static const sageDeep = foreground;
+  static const sageSubtle = tertiary;
+  static const sageBg = tertiary;
+  static const pink = muted;
+  static const pinkDeep = foreground;
+  static const pinkSubtle = tertiary;
+  static const pinkBg = tertiary;
 
   // 線條
   static const border = Color(0xFFEADFCF);
@@ -54,16 +52,6 @@ abstract final class TpColorsDark {
   static const accentSubtle = Color(0xFF33271A);
   static const accentBg = Color(0xFF44341F);
 
-  static const sage = Color(0xFF8FBE9C);
-  static const sageDeep = Color(0xFFA8D0B4);
-  static const sageSubtle = Color(0xFF243A2C);
-  static const sageBg = Color(0xFF2E3D30);
-
-  static const pink = Color(0xFFE8A0AB);
-  static const pinkDeep = Color(0xFFF0B8C0);
-  static const pinkSubtle = Color(0xFF4A2A3A);
-  static const pinkBg = Color(0xFF6B3F52);
-
   static const background = Color(0xFF121214);
   static const secondary = Color(0xFF1C1C1E);
   static const tertiary = Color(0xFF2C2C2E);
@@ -72,6 +60,16 @@ abstract final class TpColorsDark {
   static const foreground = Color(0xFFF5F5F7);
   static const muted = Color(0xFFA1A1A6);
   static const accentForeground = Color(0xFF121214);
+
+  // 舊 API 相容別名：三色分類已退場，全部映射到中性深色階。
+  static const sage = muted;
+  static const sageDeep = foreground;
+  static const sageSubtle = tertiary;
+  static const sageBg = tertiary;
+  static const pink = muted;
+  static const pinkDeep = foreground;
+  static const pinkSubtle = tertiary;
+  static const pinkBg = tertiary;
 
   static const border = Color(0xFF38383A);
   static const lineStrong = Color(0xFF48484A);
@@ -115,17 +113,22 @@ abstract final class TpSpacing {
   static const navHeight = 88.0;
 }
 
-/// 浮動五分頁的實際佔位；地圖 accessory 與 root scroll 共用。
+/// 浮動四分頁的實際佔位；地圖 accessory 與 root scroll 共用。
 abstract final class TpRootTabGeometry {
-  static const expandedBarHeight = 64.0;
-  static const minimizedBarHeight = 50.0;
-  static const bottomSpacing = TpSpacing.s2;
+  static const expandedBarHeight = 56.0;
+  static const bottomSpacing = 18.0;
 
   static double expandedHeightFor(double bottomInset) =>
       bottomInset + bottomSpacing + expandedBarHeight;
 
   static double expandedHeight(BuildContext context) =>
       expandedHeightFor(MediaQuery.viewPaddingOf(context).bottom);
+
+  static double clearance(BuildContext context) {
+    final shellInset = MediaQuery.paddingOf(context).bottom;
+    final fallback = expandedHeight(context);
+    return shellInset > fallback ? shellInset : fallback;
+  }
 }
 
 /// Motion token（Apple 曲線體系）。

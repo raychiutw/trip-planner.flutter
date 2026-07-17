@@ -4,6 +4,28 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-17
+
+### 新增
+
+- **Apple Music／HIG 四分頁主流程**：root tab 固定為聊天、行程、地圖、收藏；帳號改為四個主畫面右上圓形 avatar，並保留 `/account` deep link。
+- **共用行程切換 sheet**：聊天、行程與地圖的標題直接顯示目前行程；點擊後以含搜尋、目前 checkmark 與最近項目的 bottom sheet 切換。
+- **Android closed testing 發佈路徑**：同一套 Mobile workflow 可手動選擇 TestFlight 或 Google Play closed track，並使用各平台獨立簽章與唯一 build number。
+
+### 變更
+
+- **行程／地圖 selector 攤平成單層**：行程頁使用「地圖＋DAY」，地圖頁使用「行程＋DAY」，互切時保留目前天數；筆記收進右上功能區。
+- **中性淺／深色系統定版**：Light 使用暖白色階，Dark 使用 Apple 中性深色階，POI、收藏、行程卡與設定列不再以 sage／pink／brown 分類上色。
+- **地圖城市尺度與 POI rail 定版**：每日 zoom 固定 12，明確 POI focus 使用 16；所有 POI 卡使用相同 surface，水平露出相鄰卡並避讓浮動 tab。
+- **設定頁對齊 HIG grouped list**：外觀與通知改用無外框、無陰影、內縮 separator 的共用設定群組；字級統一使用 HIG semantic roles 與 Dynamic Type。
+- **設計文件收斂**：移除過程 SVG、舊三色／五分頁規格與重複計畫，最終 mockup 集中到 `2026-07-17-tripline-final.html`。
+
+### 修正
+
+- 修正水平 selector 在 route branch 尚未完成 layout 時呼叫 `ensureVisible`，造成 deep link／快速切頁測試出現 `RenderBox was not laid out`。
+- 修正無座標日期以全行程 bounds 縮成全日本；現在仍以城市尺度 zoom 12 顯示。
+- 修正行程切到地圖後 root tab 仍選中「行程」，並補上帳號 deep link 的右上關閉動作。
+
 ## [0.8.2] - 2026-07-16
 
 ### 修正

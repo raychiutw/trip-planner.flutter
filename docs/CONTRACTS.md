@@ -18,14 +18,14 @@
 
 ```dart
 // tokens.dart — design token 常數（值來自 docs/discovery/design.md 的 tokens 表）
-abstract final class TpColorsLight { static const background = Color(0xFFFFFBF5); /* accent, accentDeep, accentSubtle, accentBg, sage 4 階, pink 4 階, secondary, tertiary, hover, foreground, muted, accentForeground, border, lineStrong, destructive, destructiveBg, success, warning, disabled, overlay … */ }
+abstract final class TpColorsLight { static const background = Color(0xFFFFFBF5); /* group, tertiary, selected, accent, foreground, muted, separator, semantic status colors …；legacy sage/pink 名稱僅可 alias 到中性 surface */ }
 abstract final class TpColorsDark { /* 同名 dark 值 */ }
 abstract final class TpRadius { static const xs = 4.0; sm = 6.0; md = 8.0; lg = 12.0; xl = 16.0; }
 abstract final class TpSpacing { /* 4px grid: s1=4 … s10=40; tapMin=44.0; navHeight=88.0 */ }
 abstract final class TpMotion { static const fast = Duration(milliseconds: 150); normal = 250ms; slow = 350ms; static const appleEase = Cubic(0.2, 0.8, 0.2, 1); }
 
 // app_theme.dart
-class TpTones extends ThemeExtension<TpTones> { /* accent/sage/pink 各 4 階（base deep subtle bg）+ success warning */ }
+class TpTones extends ThemeExtension<TpTones> { /* accent + neutral surface aliases + semantic success/warning；不得以 sage/pink 區分內容類型 */ }
 abstract final class AppTheme {
   static ThemeData light();
   static ThemeData dark();
@@ -147,16 +147,18 @@ final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserInfo?>(AuthNot
 
 ```dart
 // app/router.dart
-GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 5 branches：
-// /chat(ChatPlaceholderScreen) /trips(TripsListScreen) /map(GlobalMapPlaceholderScreen) /favorites(FavoritesPlaceholderScreen) /account(AccountScreen)
-// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/map（TripMapScreen）、/trips/:tripId/notes（TripNotesScreen）、
+GoRouter createAppRouter(WidgetRef ref); // 或接受 Ref —— StatefulShellRoute.indexedStack 4 branches：
+// /chat(ChatScreen) /trips(TripsListScreen) /map(GlobalMapScreen) /favorites(FavoritesScreen)
+// AccountScreen 位於 shell 外；四個 root 畫面的右上 avatar 以 /account 開啟。
+// trips branch 子路由：/trips/:tripId（TripTimelineScreen）、/trips/:tripId/notes（TripNotesScreen）、
+// 舊 /trips/:tripId/map 會 redirect 到 tab 3 的 /map?tripId=:tripId（GlobalMapScreen → TripMapScreen）、
 // /trips/:tripId/entries/new（EntryAddRouteScreen,搜尋 POI / 自訂停留點）、
 // /trips/:tripId/entries/:eid/edit（EntryEditRouteScreen）、/trips/:tripId/entries/:eid/copy|move（EntryActionRouteScreen）、
 // /trips/:tripId/entries/:eid/pois（EntryPoiScreen）
 // /login 在 shell 外；redirect：未登入(authState data null) 且非 /login → /login；已登入在 /login → /trips
 
 // features/shell/app_shell.dart
-class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // Liquid Glass 浮動根 tab：聊天/行程/地圖/收藏/帳號
+class AppShell extends StatelessWidget { const AppShell({required this.navigationShell}); }  // Liquid Glass 浮動根 tab：聊天/行程/地圖/收藏
 class PlaceholderScreen extends StatelessWidget { const PlaceholderScreen({required this.title}); } // 「即將推出」
 
 // features/trip_detail/trip_providers.dart（由 timeline agent 實作，map/notes agent 只 import）

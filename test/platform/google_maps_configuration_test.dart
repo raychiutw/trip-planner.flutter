@@ -79,4 +79,33 @@ void main() {
     expect('flutter test'.allMatches(workflow).length, greaterThanOrEqualTo(2));
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
+
+  test('workflow 手動發布 Android closed testing 且沒有 production 權限', () {
+    final workflow = read('.github/workflows/mobile.yml');
+
+    expect(workflow, contains('release_target:'));
+    expect(workflow, contains('- android-closed'));
+    expect(workflow, contains('android_closed:'));
+    expect(workflow, contains(r"inputs.release_target == 'android-closed'"));
+    expect(workflow, contains('secrets.ANDROID_KEYSTORE_BASE64'));
+    expect(workflow, contains('secrets.ANDROID_KEYSTORE_PASSWORD'));
+    expect(workflow, contains('secrets.ANDROID_KEY_ALIAS'));
+    expect(workflow, contains('secrets.ANDROID_KEY_PASSWORD'));
+    expect(workflow, contains('secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON'));
+    expect(workflow, contains('flutter build appbundle'));
+    expect(workflow, contains('GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT'));
+    expect(workflow, contains('GITHUB_RUN_ATTEMPT >= 100'));
+    expect(workflow, contains('2100000000'));
+    expect(
+      workflow,
+      contains(
+        'r0adkll/upload-google-play@'
+        'e738b9dd8f2476ea806d921b64aacd24f34515a5',
+      ),
+    );
+    expect(workflow, contains('track: alpha'));
+    expect(workflow, contains('status: completed'));
+    expect(workflow, isNot(contains('track: production')));
+    expect(workflow, isNot(contains('tracks: production')));
+  });
 }

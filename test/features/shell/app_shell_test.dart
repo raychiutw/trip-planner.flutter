@@ -22,7 +22,6 @@ GoRouter buildShellRouter() {
           probe('/trips', 'PROBE-TRIPS'),
           probe('/map', 'PROBE-MAP'),
           probe('/favorites', 'PROBE-FAV'),
-          probe('/account', 'PROBE-ACCOUNT'),
         ],
       ),
     ],
@@ -52,7 +51,6 @@ GoRouter buildScrollableShellRouter() {
           probe('/trips', const Text('PROBE-TRIPS')),
           probe('/map', const Text('PROBE-MAP')),
           probe('/favorites', const Text('PROBE-FAV')),
-          probe('/account', const Text('PROBE-ACCOUNT')),
         ],
       ),
     ],
@@ -60,8 +58,8 @@ GoRouter buildScrollableShellRouter() {
 }
 
 void main() {
-  group('AppShell 5-tab 導航', () {
-    testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
+  group('AppShell 4-tab 導航', () {
+    testWidgets('4 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -83,10 +81,11 @@ void main() {
       expect(find.text('PROBE-MAP'), findsOneWidget);
       expect(find.text('PROBE-CHAT'), findsNothing);
 
-      // 點「帳號」→ branch 4
-      await tester.tap(find.text('帳號'));
+      // 點「收藏」→ branch 3
+      await tester.tap(find.text('收藏'));
       await tester.pumpAndSettle();
-      expect(find.text('PROBE-ACCOUNT'), findsOneWidget);
+      expect(find.text('PROBE-FAV'), findsOneWidget);
+      expect(find.text('帳號'), findsNothing);
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
@@ -134,7 +133,7 @@ void main() {
 
       expect(tester.getSize(bar), restingSize);
       expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('帳號'), findsOneWidget);
+      expect(find.text('收藏'), findsOneWidget);
 
       await tester.drag(
         find.byKey(const ValueKey('root-vertical-list')),
@@ -146,7 +145,7 @@ void main() {
       expect(find.text('聊天'), findsOneWidget);
     });
 
-    testWidgets('五個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
+    testWidgets('四個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         ProviderScope(
@@ -158,9 +157,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+      for (final label in ['聊天', '行程', '地圖', '收藏']) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
+      expect(find.bySemanticsLabel('帳號'), findsNothing);
       final selected = tester.getSemantics(
         find.byKey(const ValueKey('root-tab-聊天')),
       );
@@ -169,6 +169,29 @@ void main() {
         Tristate.isTrue,
       );
       semantics.dispose();
+    });
+
+    testWidgets('root tab 使用定版 24/56/18 幾何', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      final padding = tester.widget<Padding>(
+        find.descendant(of: bar, matching: find.byType(Padding)).first,
+      );
+      expect(padding.padding, const EdgeInsets.fromLTRB(24, 0, 24, 18));
+      final glass = find.descendant(
+        of: bar,
+        matching: find.byType(BackdropFilter),
+      );
+      expect(tester.getSize(glass).height, 56);
     });
   });
 }

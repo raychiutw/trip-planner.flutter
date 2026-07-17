@@ -35,6 +35,8 @@ void main() {
       expect(tones.pinkBg, TpColorsLight.pinkBg);
       expect(tones.success, TpColorsLight.success);
       expect(tones.warning, TpColorsLight.warning);
+      expect(tones.sageSubtle, TpColorsLight.tertiary);
+      expect(tones.pinkSubtle, TpColorsLight.tertiary);
     });
   });
 
@@ -73,6 +75,8 @@ void main() {
       expect(tones!.accent, TpColorsDark.accent);
       expect(tones.sage, TpColorsDark.sage);
       expect(tones.pinkSubtle, TpColorsDark.pinkSubtle);
+      expect(tones.sageSubtle, TpColorsDark.tertiary);
+      expect(tones.pinkSubtle, TpColorsDark.tertiary);
     });
   });
 
@@ -93,14 +97,14 @@ void main() {
   });
 
   group('元件 theme 規格', () {
-    test('NavigationBar：active=accent、indicator=accentSubtle、label 11', () {
+    test('NavigationBar：active=accent、indicator=accentSubtle、label 12', () {
       final lightTheme = AppTheme.light();
       final navigationBarTheme = lightTheme.navigationBarTheme;
       expect(navigationBarTheme.indicatorColor, TpColorsLight.accentSubtle);
       final selectedLabelStyle = navigationBarTheme.labelTextStyle!.resolve({
         WidgetState.selected,
       });
-      expect(selectedLabelStyle!.fontSize, 11);
+      expect(selectedLabelStyle!.fontSize, 12);
       expect(selectedLabelStyle.color, TpColorsLight.accent);
       final selectedIconTheme = navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,

@@ -105,7 +105,7 @@ class TimelineEntryTile extends StatelessWidget {
                   child: Text(
                     '$number',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: theme.colorScheme.onPrimary,
                       height: 1,

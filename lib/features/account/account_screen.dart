@@ -1,4 +1,4 @@
-/// 帳號 hub 畫面（tab 5）：profile hero、統計、設定 rows、登出。
+/// 帳號 hub 畫面：由 root 畫面右上 avatar 進入，包含 profile、設定與登出。
 library;
 
 import 'dart:async';
@@ -69,6 +69,23 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
     return TpRootScrollScaffold(
       title: '帳號',
+      actions: [
+        IconButton(
+          key: const ValueKey('account-close-button'),
+          tooltip: '關閉',
+          onPressed: () {
+            final router = GoRouter.maybeOf(context);
+            if (router == null) {
+              Navigator.of(context).maybePop();
+            } else if (router.canPop()) {
+              router.pop();
+            } else {
+              router.go('/trips');
+            }
+          },
+          icon: const Icon(CupertinoIcons.xmark),
+        ),
+      ],
       slivers: [
         SliverPadding(
           padding: EdgeInsets.zero,

@@ -39,44 +39,37 @@ class AppleRootTabBar extends StatelessWidget {
       icon: CupertinoIcons.heart,
       selectedIcon: CupertinoIcons.heart_fill,
     ),
-    (
-      label: '帳號',
-      icon: CupertinoIcons.person,
-      selectedIcon: CupertinoIcons.person_fill,
-    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            12,
-            0,
-            12,
-            TpRootTabGeometry.bottomSpacing,
-          ),
-          child: TpGlassSurface(
-            borderRadius: const BorderRadius.all(Radius.circular(32)),
-            child: Material(
-              color: Colors.transparent,
-              child: SizedBox(
-                height: TpRootTabGeometry.expandedBarHeight,
-                child: Row(
-                  children: [
-                    for (var index = 0; index < _destinations.length; index++)
-                      Expanded(
-                        child: _RootTabItem(
-                          destination: _destinations[index],
-                          selected: selectedIndex == index,
-                          onTap: () => onSelected(index),
-                        ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          24,
+          MediaQuery.viewPaddingOf(context).bottom +
+              TpRootTabGeometry.bottomSpacing,
+        ),
+        child: TpGlassSurface(
+          borderRadius: const BorderRadius.all(Radius.circular(28)),
+          child: Material(
+            color: Colors.transparent,
+            child: SizedBox(
+              height: TpRootTabGeometry.expandedBarHeight,
+              child: Row(
+                children: [
+                  for (var index = 0; index < _destinations.length; index++)
+                    Expanded(
+                      child: _RootTabItem(
+                        destination: _destinations[index],
+                        selected: selectedIndex == index,
+                        onTap: () => onSelected(index),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
           ),

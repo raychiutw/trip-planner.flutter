@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
-/// 三色系統 ThemeExtension：accent/sage/pink 各 4 階 + success/warning。
-/// subtle 階沒有 ColorScheme 對應欄位，元件一律從這裡取 tone 色。
+/// 共用色階 ThemeExtension。sage/pink 僅保留舊 API 相容性，實際映射中性色。
 class TpTones extends ThemeExtension<TpTones> {
   const TpTones({
     required this.accent,
@@ -324,7 +323,7 @@ abstract final class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             letterSpacing: 0,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: isSelected

@@ -6,6 +6,7 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
+import 'package:tripline/ui/tp_horizontal_selector.dart';
 import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
 import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
@@ -231,21 +232,108 @@ void main() {
     expect(selected, 1);
   });
 
-  testWidgets('TpBottomAccessory 維持固定高度並不處理垂直收合', (tester) async {
+  testWidgets('TpHorizontalSelector 提供玻璃水平選項與 44pt target', (tester) async {
+    var selected = 0;
     await tester.pumpWidget(
       app(
-        const Scaffold(
-          body: Align(
-            alignment: Alignment.bottomCenter,
-            child: TpBottomAccessory(child: Text('horizontal pages')),
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('day-selector'),
+            value: selected,
+            options: const [
+              TpScopeOption(
+                value: 0,
+                label: '總覽',
+                key: ValueKey('day-overview'),
+              ),
+              TpScopeOption(value: 1, label: 'DAY 01', key: ValueKey('day-1')),
+            ],
+            onSelected: (value) => selected = value,
           ),
         ),
       ),
     );
 
+    final selector = find.byKey(const ValueKey('day-selector'));
     expect(
-      tester.getSize(find.byType(TpBottomAccessory)).height,
-      TpBottomAccessory.height,
+      find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('day-overview'))).height,
+      greaterThanOrEqualTo(TpSpacing.tapMin),
+    );
+    await tester.tap(find.byKey(const ValueKey('day-1')));
+    expect(selected, 1);
+  });
+
+  testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
+    tester.view.physicalSize = const Size(240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('long-day-selector'),
+            value: 8,
+            options: [
+              for (var day = 0; day < 10; day++)
+                TpScopeOption(
+                  value: day,
+                  label: day == 0
+                      ? '總覽'
+                      : 'DAY ${day.toString().padLeft(2, '0')}',
+                  key: ValueKey('long-day-$day'),
+                ),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final selector = tester.getRect(
+      find.byKey(const ValueKey('long-day-selector')),
+    );
+    final selected = tester.getRect(find.byKey(const ValueKey('long-day-8')));
+    expect(selected.left, greaterThanOrEqualTo(selector.left));
+    expect(selected.right, lessThanOrEqualTo(selector.right));
+  });
+
+  testWidgets('TpBottomAccessory 自行避讓 root tab 並維持固定高度', (tester) async {
+    const bottomInset = 34.0;
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(
+              padding: EdgeInsets.only(
+                bottom:
+                    TpRootTabGeometry.expandedBarHeight +
+                    TpRootTabGeometry.bottomSpacing +
+                    bottomInset,
+              ),
+              viewPadding: EdgeInsets.only(bottom: bottomInset),
+            ),
+            child: const Stack(
+              children: [TpBottomAccessory(child: Text('horizontal pages'))],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final accessory = find.byType(TpBottomAccessory);
+    expect(tester.getSize(accessory).height, TpBottomAccessory.height);
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(
+      screenHeight - tester.getRect(accessory).bottom,
+      TpRootTabGeometry.expandedHeightFor(bottomInset) + TpSpacing.s3,
     );
     expect(find.text('horizontal pages'), findsOneWidget);
     expect(find.byType(AnimatedContainer), findsNothing);

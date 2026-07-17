@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/trips_list_screen.dart';
@@ -20,8 +21,18 @@ import 'map_location.dart';
 const _lastMapTripCacheKey = 'ui:last-map-trip';
 
 class GlobalMapScreen extends ConsumerStatefulWidget {
-  const GlobalMapScreen({super.key, this.mapBuilder, this.locationService});
+  const GlobalMapScreen({
+    super.key,
+    this.initialTripId,
+    this.initialEntryId,
+    this.initialDayNum,
+    this.mapBuilder,
+    this.locationService,
+  });
 
+  final String? initialTripId;
+  final int? initialEntryId;
+  final int? initialDayNum;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
 
@@ -35,7 +46,22 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadLastTrip());
+    _selectedTripId = widget.initialTripId;
+    if (_selectedTripId == null) {
+      unawaited(_loadLastTrip());
+    } else {
+      unawaited(_rememberTrip(_selectedTripId!));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant GlobalMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final explicitTripId = widget.initialTripId;
+    if (explicitTripId != null && explicitTripId != _selectedTripId) {
+      setState(() => _selectedTripId = explicitTripId);
+      unawaited(_rememberTrip(explicitTripId));
+    }
   }
 
   Future<void> _loadLastTrip() async {
@@ -43,12 +69,21 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         .read(cacheStoreProvider)
         .readResponse(_lastMapTripCacheKey);
     final value = cached?.data;
-    if (!mounted || value is! String || value.isEmpty) return;
+    if (!mounted ||
+        _selectedTripId != null ||
+        value is! String ||
+        value.isEmpty) {
+      return;
+    }
     setState(() => _selectedTripId = value);
   }
 
   Future<void> _selectTrip(String tripId) async {
     setState(() => _selectedTripId = tripId);
+    await _rememberTrip(tripId);
+  }
+
+  Future<void> _rememberTrip(String tripId) async {
     await ref
         .read(cacheStoreProvider)
         .writeResponse(_lastMapTripCacheKey, tripId);
@@ -96,6 +131,8 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         return TripMapScreen(
           key: ValueKey('global-trip-map-${selected.tripId}'),
           tripId: selected.tripId,
+          initialEntryId: widget.initialEntryId,
+          initialDayNum: widget.initialDayNum,
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
           onTripSelected: (tripId) => unawaited(_selectTrip(tripId)),
@@ -123,7 +160,11 @@ class _MapRootAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const TpAppBar(automaticallyImplyLeading: false, title: Text('地圖'));
+    return const TpAppBar(
+      automaticallyImplyLeading: false,
+      title: Text('地圖'),
+      actions: [TpAccountAvatarButton()],
+    );
   }
 }
 

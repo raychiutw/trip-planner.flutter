@@ -70,7 +70,7 @@ class DayHeader extends StatelessWidget {
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
                 color: tones.accent,

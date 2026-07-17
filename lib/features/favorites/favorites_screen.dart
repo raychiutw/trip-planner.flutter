@@ -9,6 +9,7 @@ import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_root_scroll_scaffold.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
@@ -34,7 +35,7 @@ final _regionRules = [
   MapEntry(RegExp('台北', caseSensitive: false), '台北'),
 ];
 
-/// 收藏清單（5-tab「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
+/// 收藏清單（root「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
 class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
 
@@ -71,6 +72,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           icon: const Icon(CupertinoIcons.search),
           onPressed: () => context.go('/favorites/explore'),
         ),
+        const TpAccountAvatarButton(),
       ],
       slivers: [
         ...favoritesAsync.when(

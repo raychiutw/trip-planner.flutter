@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tokens.dart';
+
 /// Root tab 上方的單一固定高度 accessory host。
 ///
 /// 這個 primitive 只管理材質與幾何；水平分頁由內層 [PageView] 負責，
@@ -19,10 +21,15 @@ class TpBottomAccessory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      key: const ValueKey('tp-bottom-accessory'),
-      height: accessoryHeight,
-      child: child,
+    return Positioned(
+      left: TpSpacing.s3,
+      right: TpSpacing.s3,
+      bottom: TpRootTabGeometry.clearance(context) + TpSpacing.s3,
+      child: SizedBox(
+        key: const ValueKey('tp-bottom-accessory'),
+        height: accessoryHeight,
+        child: child,
+      ),
     );
   }
 }

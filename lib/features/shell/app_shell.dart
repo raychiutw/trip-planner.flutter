@@ -1,4 +1,4 @@
-/// App shell：5-tab root navigation（StatefulShellRoute 的外殼）。
+/// App shell：4-tab root navigation（StatefulShellRoute 的外殼）。
 library;
 
 import 'package:flutter/material.dart';
@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../offline/offline_status_banner.dart';
 import 'apple_root_tab_bar.dart';
 
-/// 5-tab 底部導航外殼：聊天／行程／地圖／收藏／帳號。
+/// 4-tab 底部導航外殼：聊天／行程／地圖／收藏。
 ///
 /// `extendBody` 讓內容延伸到浮動玻璃 tab bar 底下（玻璃要有東西可糊才成立）。
 /// 代價是 root tab 畫面的底部錨定內容會被蓋住 — Flutter 會把 tab bar 高度灌進

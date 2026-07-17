@@ -58,7 +58,7 @@ class PoiSearchCard extends StatelessWidget {
                   onPressed: isSaving ? null : onToggleFavorite,
                   icon: Icon(
                     isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                    color: tones.pink,
+                    color: tones.accent,
                   ),
                 ),
               ),
@@ -84,7 +84,7 @@ class PoiSearchCard extends StatelessWidget {
                   Text(
                     categoryLabel,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: tone.deep,
                     ),
@@ -94,7 +94,7 @@ class PoiSearchCard extends StatelessWidget {
                     poi.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
+                    style: theme.textTheme.titleMedium,
                   ),
                   if (poi.address != null && poi.address!.isNotEmpty)
                     Padding(

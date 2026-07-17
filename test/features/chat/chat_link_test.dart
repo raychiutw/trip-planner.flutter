@@ -6,8 +6,8 @@ void main() {
     test('/trip/:id/notes → /trips/:id/notes', () {
       expect(mapReplyLink('/trip/abc/notes', 'abc'), '/trips/abc/notes');
     });
-    test('/trip/:id/map → /trips/:id/map', () {
-      expect(mapReplyLink('/trip/abc/map', 'abc'), '/trips/abc/map');
+    test('/trip/:id/map → map root branch', () {
+      expect(mapReplyLink('/trip/abc/map', 'abc'), '/map?tripId=abc');
     });
     test('/trip/:id（無 sub）→ /trips/:id', () {
       expect(mapReplyLink('/trip/abc', 'abc'), '/trips/abc');
@@ -22,7 +22,7 @@ void main() {
       expect(mapReplyLink('/trip/other/notes', 'abc'), '/trips/abc/notes');
     });
     test('帶 query 仍能解析 sub', () {
-      expect(mapReplyLink('/trip/abc/map?z=1', 'abc'), '/trips/abc/map');
+      expect(mapReplyLink('/trip/abc/map?z=1', 'abc'), '/map?tripId=abc');
     });
   });
 }

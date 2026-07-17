@@ -2,12 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../models/trip.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
-
-/// 卡片 cover 色調：依清單 index 輪替 accent → sage → pink。
-enum TripCardTone { accent, sage, pink }
 
 /// TripSummary 顯示名稱：title 優先（人類可讀），空值退回 name。
 extension TripSummaryDisplay on TripSummary {
@@ -24,7 +20,6 @@ class TripCard extends StatelessWidget {
   const TripCard({
     super.key,
     required this.trip,
-    required this.tone,
     this.currentUserId,
     this.onTap,
     this.onLongPress,
@@ -32,7 +27,6 @@ class TripCard extends StatelessWidget {
   });
 
   final TripSummary trip;
-  final TripCardTone tone;
 
   /// 當前登入使用者 id；用於判斷是否「由你建立」。null 時一律當作他人行程。
   final String? currentUserId;
@@ -64,12 +58,8 @@ class TripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
-    final (coverBackground, coverForeground) = switch (tone) {
-      TripCardTone.accent => (tones.accentSubtle, tones.accentDeep),
-      TripCardTone.sage => (tones.sageSubtle, tones.sageDeep),
-      TripCardTone.pink => (tones.pinkSubtle, tones.pinkDeep),
-    };
+    final coverBackground = theme.colorScheme.surfaceContainerHigh;
+    final coverForeground = theme.colorScheme.onSurfaceVariant;
     final eyebrowText = _eyebrowText;
     final dateRangeText = _dateRangeText;
 
@@ -81,6 +71,7 @@ class TripCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
+            key: ValueKey('trip-card-cover-${trip.tripId}'),
             width: 48,
             height: 48,
             decoration: BoxDecoration(
@@ -103,7 +94,7 @@ class TripCard extends StatelessWidget {
                   Text(
                     eyebrowText,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.8,
                       color: theme.colorScheme.onSurfaceVariant,

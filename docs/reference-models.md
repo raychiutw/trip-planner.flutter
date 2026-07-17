@@ -91,7 +91,7 @@ getter `displayTitle`:`title ?? label ?? 'Day $dayNum'`。
 
 除 `poiId: int` 外全 nullable:`name`、`lat: double?`、`lng: double?`、`type`(poi_type enum 字串:`hotel`/`restaurant`/`shopping`/`parking`/`attraction`/`transport`/`activity`/`other`)、`category`、`hours`、`rating: double?`、`price`、`note`、`sortOrder: int?`。
 
-`type` 決定 UI 三色 tone,對照表見 [Theme 參考](reference-theme.md#poi-type--tone-對照)。
+`type` 決定 POI 的圖示與文字分類，不再改變卡片底色；取色規則見 [Theme 參考](reference-theme.md#取色)。
 
 ### TimelineEntry — 時間軸停留點(trip_entries)
 

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_settings_group.dart';
 
 import 'theme_mode_controller.dart';
 
@@ -26,16 +27,22 @@ class AppearanceScreen extends ConsumerWidget {
       appBar: const TpAppBar(title: Text('外觀')),
       body: ListView(
         children: [
-          for (final (m, label) in _options)
-            ListTile(
-              key: ValueKey('theme-${themeModeToString(m)}'),
-              title: Text(label),
-              trailing: mode == m ? const Icon(CupertinoIcons.checkmark) : null,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                ref.read(themeModeProvider.notifier).setMode(m);
-              },
-            ),
+          TpSettingsGroup(
+            children: [
+              for (final (m, label) in _options)
+                ListTile(
+                  key: ValueKey('theme-${themeModeToString(m)}'),
+                  title: Text(label),
+                  trailing: mode == m
+                      ? const Icon(CupertinoIcons.checkmark)
+                      : null,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    ref.read(themeModeProvider.notifier).setMode(m);
+                  },
+                ),
+            ],
+          ),
         ],
       ),
     );

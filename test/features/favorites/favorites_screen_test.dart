@@ -76,6 +76,10 @@ void main() {
         find.byKey(const ValueKey('favorites-filter-button')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('account-avatar-button')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('搜尋收藏會比對名稱、地址與備註', (tester) async {
