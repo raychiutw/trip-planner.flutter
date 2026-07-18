@@ -89,21 +89,30 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
-          body: TpSheetHeader(
-            title: '選擇行程',
-            leading: SizedBox.square(
-              dimension: TpSpacing.tapMin,
-              child: Text('取消'),
-            ),
-            trailing: SizedBox.square(
-              dimension: TpSpacing.tapMin,
-              child: Icon(CupertinoIcons.xmark),
-            ),
+          body: Column(
+            children: [
+              TpSheetHeader(
+                title: '選擇行程',
+                leading: SizedBox.square(
+                  dimension: TpSpacing.tapMin,
+                  child: Text('取消'),
+                ),
+                trailing: SizedBox.square(
+                  dimension: TpSpacing.tapMin,
+                  child: Icon(CupertinoIcons.xmark),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
 
+    final header = tester.getRect(find.byType(TpSheetHeader));
+    final screen = tester.getRect(find.byType(Scaffold));
+    final trailing = tester.getRect(find.byIcon(CupertinoIcons.xmark));
+    expect(header.width, screen.width);
+    expect(trailing.right, closeTo(header.right - TpSpacing.s4, 0.1));
     expect(tester.getSize(find.byType(TpSheetHeader)).height, 56);
     expect(
       tester.getCenter(find.text('選擇行程')).dx,
