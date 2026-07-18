@@ -28,6 +28,14 @@ void main() {
       expect(e2eWorkflow, contains('gcloud firebase test ios run'));
     });
 
+    test('scheduled Android matrix runs on Taipei weekdays', () {
+      expect(
+        e2eWorkflow,
+        contains("cron: '30 18 * * 0-4'"),
+        reason: '18:30 UTC Sunday-Thursday is 02:30 Monday-Friday in Taipei',
+      );
+    });
+
     test('raw Test Lab evidence is copied into GitHub artifacts', () {
       expect(e2eWorkflow, contains('FIREBASE_TEST_RESULTS_BUCKET'));
       expect(e2eWorkflow, contains('--results-bucket'));

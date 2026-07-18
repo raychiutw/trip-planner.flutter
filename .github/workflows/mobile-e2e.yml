@@ -44,7 +44,7 @@ on:
           - all
   schedule:
     # Weekdays at 02:30 Asia/Taipei. Scheduled runs use the Android matrix only.
-    - cron: '30 18 * * 1-5'
+    - cron: '30 18 * * 0-4'
 
 permissions:
   contents: read
