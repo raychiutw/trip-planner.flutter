@@ -313,7 +313,10 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
           child: buildApp(),
         ),
       );
@@ -336,6 +339,27 @@ void main() {
       expect(fetchCount, 3);
     });
 
+    testWidgets('restore API 未啟用時刪除後不顯示復原', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('已移除收藏'), findsOneWidget);
+      expect(find.text('復原'), findsNothing);
+      verifyNever(() => mockRepo.restoreFavorite(any()));
+    });
+
     testWidgets('取消收藏立即隱藏卡片，失敗時恢復', (tester) async {
       final mockRepo = MockFavoritesRepository();
       final deletion = Completer<void>();
@@ -344,7 +368,10 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
           child: buildApp(),
         ),
       );
@@ -374,7 +401,10 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
           child: buildApp(),
         ),
       );
@@ -386,6 +416,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('復原期限已過'), findsOneWidget);
+    });
+
+    testWidgets('restore 回應遺失時先解除本地隱藏再與伺服器對帳', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+      when(
+        () => mockRepo.restoreFavorite(any()),
+      ).thenThrow(Exception('response lost after commit'));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('復原'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
+      expect(find.text('無法復原收藏，請稍後再試'), findsOneWidget);
     });
 
     testWidgets('排序選單顯示目前勾選並切換為最早加入', (tester) async {

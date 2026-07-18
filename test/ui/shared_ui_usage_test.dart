@@ -108,6 +108,16 @@ void main() {
     }
   });
 
+  test('root and routed headers share title and action geometry owners', () {
+    final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
+    final rootHeader = File('lib/ui/tp_root_scaffold.dart').readAsStringSync();
+
+    expect(appBar, contains('class TpHeaderTitle'));
+    expect(appBar, contains('class TpHeaderActionRow'));
+    expect(rootHeader, contains('TpHeaderTitle('));
+    expect(rootHeader, contains('TpHeaderActionRow('));
+  });
+
   test('removed compatibility symbols cannot return', () {
     const removed = [
       'TpRootScrollScaffold',

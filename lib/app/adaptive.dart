@@ -150,8 +150,9 @@ Future<T?> showAppActionSheet<T>(
     builder: (sheetContext) {
       final error = Theme.of(sheetContext).colorScheme.error;
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
           children: [
             for (final action in actions) ...[
               if (action.dividerBefore) const Divider(height: 1),
@@ -242,6 +243,7 @@ class AppUnsavedChangesGuard extends StatefulWidget {
 
 class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
   bool _allowPop = false;
+  Future<void>? _requestPopInFlight;
 
   @override
   void initState() {
@@ -264,7 +266,10 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
     super.dispose();
   }
 
-  Future<void> _requestPop() async {
+  Future<void> _requestPop() => _requestPopInFlight ??= _performRequestPop()
+      .whenComplete(() => _requestPopInFlight = null);
+
+  Future<void> _performRequestPop() async {
     if (!widget.dismissalEnabled) return;
     if (!widget.hasChanges) {
       await _popOrCloseSheet();

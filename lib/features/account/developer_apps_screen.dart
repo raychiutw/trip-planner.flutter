@@ -342,7 +342,19 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
       HapticFeedback.lightImpact();
       setState(() {
         _isSubmitting = false;
+        _clientType = 'public';
+        _selectedScopes
+          ..clear()
+          ..addAll(const {'openid', 'profile'});
       });
+      for (final controller in [
+        _nameController,
+        _descriptionController,
+        _homepageController,
+        _redirectUrisController,
+      ]) {
+        controller.clear();
+      }
       await _showCreatedDialog(created);
     } catch (error) {
       if (!mounted) return;
@@ -408,7 +420,11 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
           FilledButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              GoRouter.maybeOf(context)?.go('/settings/developer-apps');
+              if (TpLargeSheetNavigationScope.maybeOf(context) != null) {
+                unawaited(Navigator.of(context).maybePop());
+              } else {
+                GoRouter.maybeOf(context)?.go('/settings/developer-apps');
+              }
             },
             key: const Key('developer-app-secret-acknowledge'),
             child: const Text('我已複製，繼續'),

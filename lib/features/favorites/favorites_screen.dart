@@ -472,24 +472,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('確定刪除收藏？'),
-        content: Text('即將刪除 ${ids.length} 個收藏景點，此操作無法復原。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('保留'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('刪除'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirm(
+      context,
+      title: '確定刪除收藏？',
+      message: '即將刪除 ${ids.length} 個收藏景點，此操作無法復原。',
+      confirmLabel: '刪除',
+      cancelLabel: '保留',
+      isDestructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _deletingSelected = true);
     final repository = ref.read(favoritesRepositoryProvider);
@@ -531,6 +522,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       ref.invalidate(favoritesProvider);
       HapticFeedback.selectionClick();
       if (!context.mounted) return;
+      if (!ref.read(favoriteRestoreEnabledProvider)) {
+        showAppNotice(context, '已移除收藏');
+        return;
+      }
       showAppUndoNotice(
         context,
         message: '已移除收藏',
@@ -550,13 +545,11 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       setState(() => _hiddenFavoriteIds.remove(favoriteId));
       ref.invalidate(favoritesProvider);
       HapticFeedback.selectionClick();
-    } on ApiError catch (error) {
+    } on Exception catch (error) {
       if (!mounted) return;
-      showAppNotice(context, error.status == 410 ? '復原期限已過' : '無法復原收藏，請稍後再試');
-      ref.invalidate(favoritesProvider);
-    } on Exception {
-      if (!mounted) return;
-      showAppNotice(context, '無法復原收藏，請稍後再試');
+      final expired = error is ApiError && error.status == 410;
+      if (!expired) setState(() => _hiddenFavoriteIds.remove(favoriteId));
+      showAppNotice(context, expired ? '復原期限已過' : '無法復原收藏，請稍後再試');
       ref.invalidate(favoritesProvider);
     }
   }

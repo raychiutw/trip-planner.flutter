@@ -84,7 +84,6 @@ class TpRootGlassHeader extends StatelessWidget {
       config.actions.length <= 4,
       'Root header supports at most four actions.',
     );
-    final theme = Theme.of(context);
     return SizedBox(
       key: const ValueKey('tp-root-glass-header'),
       height: TpRootGeometry.headerHeight,
@@ -102,34 +101,30 @@ class TpRootGlassHeader extends StatelessWidget {
               Expanded(
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: DefaultTextStyle.merge(
+                  child: TpHeaderTitle(
                     key: const ValueKey('tp-root-header-title'),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     child: config.title,
                   ),
                 ),
               ),
               if (config.actions.isNotEmpty) ...[
                 const SizedBox(width: TpSpacing.s2),
-                for (var index = 0; index < config.actions.length; index++) ...[
-                  if (index > 0)
-                    const SizedBox(width: TpRootGeometry.actionGap),
-                  if (config.actions[index] is TpToolbarTextButton)
-                    KeyedSubtree(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      child: config.actions[index],
-                    )
-                  else
-                    SizedBox.square(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      dimension: TpSpacing.tapMin,
-                      child: config.actions[index],
-                    ),
-                ],
+                TpHeaderActionRow(
+                  children: [
+                    for (var index = 0; index < config.actions.length; index++)
+                      if (config.actions[index] is TpToolbarTextButton)
+                        KeyedSubtree(
+                          key: ValueKey('tp-root-header-action-$index'),
+                          child: config.actions[index],
+                        )
+                      else
+                        SizedBox.square(
+                          key: ValueKey('tp-root-header-action-$index'),
+                          dimension: TpSpacing.tapMin,
+                          child: config.actions[index],
+                        ),
+                  ],
+                ),
               ],
             ],
           ),

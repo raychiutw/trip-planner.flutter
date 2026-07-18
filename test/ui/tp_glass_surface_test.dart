@@ -6,6 +6,31 @@ import 'package:tripline/ui/tp_glass_expansion_section.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  testWidgets('navigation glass becomes opaque when contrast is increased', (
+    tester,
+  ) async {
+    LiquidGlassSettings? resolved;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(highContrast: true),
+          child: Builder(
+            builder: (context) {
+              resolved = tpNavigationGlassSettings(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(resolved!.glassColor.a, greaterThanOrEqualTo(0.95));
+    expect(resolved!.platformViewFallbackColor!.a, greaterThanOrEqualTo(0.95));
+    expect(resolved!.blur, 0);
+    expect(resolved!.thickness, 0);
+    expect(resolved!.refractiveIndex, 1);
+  });
+
   testWidgets('light glass matches the final warm Liquid Glass tokens', (
     tester,
   ) async {

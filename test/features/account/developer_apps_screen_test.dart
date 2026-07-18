@@ -9,6 +9,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
@@ -227,5 +228,61 @@ void main() {
     await tester.tap(find.byKey(const Key('developer-app-copy-client-secret')));
     final copied = await Clipboard.getData('text/plain');
     expect(copied?.text, 'secret-once');
+  });
+
+  testWidgets('sheet 內建立成功後回到 developer apps 清單', (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: TpLargeSheetNavigationScope(
+            onClose: () {},
+            child: Navigator(
+              onGenerateRoute: (_) => MaterialPageRoute<void>(
+                builder: (routeContext) => Scaffold(
+                  body: Center(
+                    child: FilledButton(
+                      key: const Key('open-developer-app-form'),
+                      onPressed: () => Navigator.of(routeContext).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DeveloperAppNewScreen(),
+                        ),
+                      ),
+                      child: const Text('開啟表單'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('open-developer-app-form')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('developer-app-name')),
+      'New App',
+    );
+    await tester.enterText(
+      find.byKey(const Key('developer-app-redirect-uris')),
+      'https://new.example.com/callback',
+    );
+    await tester.tap(find.byKey(const Key('developer-app-create-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('developer-app-secret-acknowledge')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('open-developer-app-form')), findsOneWidget);
+    expect(find.byType(DeveloperAppNewScreen), findsNothing);
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
   });
 }

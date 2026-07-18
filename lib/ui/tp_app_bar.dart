@@ -8,6 +8,36 @@ import 'tp_glass_surface.dart';
 
 enum TpAppBarRole { standalone, detail, modalContent, modalForm }
 
+/// The single typography owner for titles rendered inside compact headers.
+class TpHeaderTitle extends StatelessWidget {
+  const TpHeaderTitle({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DefaultTextStyle.merge(
+    style: Theme.of(context).textTheme.headlineSmall,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    child: child,
+  );
+}
+
+/// The single spacing owner for one or more compact header actions.
+class TpHeaderActionRow extends StatelessWidget {
+  const TpHeaderActionRow({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.end,
+    spacing: TpSpacing.s2,
+    children: children,
+  );
+}
+
 class TpToolbarTextButton extends StatelessWidget {
   const TpToolbarTextButton({
     super.key,
@@ -110,7 +140,22 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
 }
 
 abstract final class TpToolbarSlots {
-  static const double _textActionWidth = 64;
+  static double textActionWidth(
+    BuildContext context,
+    TpToolbarTextButton action,
+  ) {
+    final textStyle = Theme.of(context).textTheme.labelLarge;
+    final painter = TextPainter(
+      text: TextSpan(text: action.label, style: textStyle),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final intrinsicWidth = painter.width + 20;
+    return intrinsicWidth < TpSpacing.tapMin
+        ? TpSpacing.tapMin
+        : intrinsicWidth;
+  }
 
   static double sideWidth({
     required int actionCount,
@@ -136,20 +181,21 @@ abstract final class TpToolbarSlots {
     );
   }
 
-  static double actionsWidth(List<Widget> children) {
+  static double actionsWidth(BuildContext context, List<Widget> children) {
     if (children.isEmpty) return 0;
     return children.fold<double>(
           0,
           (width, child) =>
               width +
               (child is TpToolbarTextButton
-                  ? _textActionWidth
+                  ? textActionWidth(context, child)
                   : TpSpacing.tapMin),
         ) +
         (children.length - 1) * TpSpacing.s2;
   }
 
   static List<Widget> actions({
+    required BuildContext context,
     required double width,
     required List<Widget> children,
   }) {
@@ -157,19 +203,13 @@ abstract final class TpToolbarSlots {
     return [
       SizedBox(
         width: width,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        child: TpHeaderActionRow(
           children: [
-            for (var index = 0; index < children.length; index++) ...[
-              if (index > 0) const SizedBox(width: TpSpacing.s2),
-              if (children[index] is TpToolbarTextButton)
-                SizedBox(width: _textActionWidth, child: children[index])
+            for (final child in children)
+              if (child is TpToolbarTextButton)
+                SizedBox(width: textActionWidth(context, child), child: child)
               else
-                SizedBox.square(
-                  dimension: TpSpacing.tapMin,
-                  child: children[index],
-                ),
-            ],
+                SizedBox.square(dimension: TpSpacing.tapMin, child: child),
           ],
         ),
       ),
@@ -201,16 +241,7 @@ class TpSheetHeader extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 88),
-            child: Text(
-              title,
-              key: titleKey,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: TpHeaderTitle(key: titleKey, child: Text(title)),
           ),
           if (leading != null) Positioned(left: TpSpacing.s4, child: leading!),
           if (trailing != null)
@@ -276,18 +307,25 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     final leadingWidth = leadingAction == null
         ? 0.0
         : role == TpAppBarRole.modalForm
-        ? TpToolbarSlots._textActionWidth
+        ? TpToolbarSlots.textActionWidth(
+            context,
+            leadingAction as TpToolbarTextButton,
+          )
         : TpSpacing.tapMin;
-    final actionsWidth = TpToolbarSlots.actionsWidth(resolvedActions);
+    final actionsWidth = TpToolbarSlots.actionsWidth(context, resolvedActions);
     if (largeSheetScope != null) {
       final colors = Theme.of(context).colorScheme;
       final showsScopeClose = role != TpAppBarRole.modalForm;
       final sheetActionWidths = <double>[
         for (final action in actions)
           action is TpToolbarTextButton
-              ? TpToolbarSlots._textActionWidth
+              ? TpToolbarSlots.textActionWidth(context, action)
               : TpSpacing.tapMin,
-        if (primaryActionLabel != null) TpToolbarSlots._textActionWidth,
+        if (primaryActionLabel != null)
+          TpToolbarSlots.textActionWidth(
+            context,
+            resolvedActions.last as TpToolbarTextButton,
+          ),
         if (showsScopeClose) TpSpacing.tapMin,
       ];
       final sheetActionsWidth = sheetActionWidths.isEmpty
@@ -320,14 +358,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
         ),
-        title: DefaultTextStyle.merge(
+        title: TpHeaderTitle(
           key: const ValueKey('tp-app-bar-title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           child: title,
         ),
         actions: [
@@ -335,20 +367,10 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
             width: sheetActionsWidth + TpSpacing.s4,
             child: Padding(
               padding: const EdgeInsets.only(right: TpSpacing.s4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: TpHeaderActionRow(
                 children: [
-                  for (
-                    var index = 0;
-                    index < resolvedActions.length;
-                    index++
-                  ) ...[
-                    if (index > 0) const SizedBox(width: TpSpacing.s2),
-                    resolvedActions[index],
-                  ],
-                  if (showsScopeClose) ...[
-                    if (resolvedActions.isNotEmpty)
-                      const SizedBox(width: TpSpacing.s2),
+                  ...resolvedActions,
+                  if (showsScopeClose)
                     KeyedSubtree(
                       key: const ValueKey('app-sheet-close'),
                       child: TpToolbarGlassButton(
@@ -364,7 +386,6 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
@@ -380,14 +401,13 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         width: leadingWidth,
         action: leadingAction,
       ),
-      title: DefaultTextStyle.merge(
+      title: TpHeaderTitle(
         key: const ValueKey('tp-app-bar-title'),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         child: title,
       ),
       actions: primaryActionLabel == null
           ? TpToolbarSlots.actions(
+              context: context,
               width: actionsWidth,
               children: resolvedActions,
             )

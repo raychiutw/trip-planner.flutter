@@ -231,9 +231,17 @@ void main() {
       ),
     );
 
-    final titleStyle = tester.widget<DefaultTextStyle>(
-      find.byKey(const ValueKey('tp-app-bar-title')),
-    );
+    final titleStyle = tester
+        .widgetList<DefaultTextStyle>(
+          find.descendant(
+            of: find.byKey(const ValueKey('tp-app-bar-title')),
+            matching: find.byType(DefaultTextStyle),
+          ),
+        )
+        .firstWhere(
+          (style) =>
+              style.maxLines == 1 && style.overflow == TextOverflow.ellipsis,
+        );
     expect(titleStyle.maxLines, 1);
     expect(titleStyle.overflow, TextOverflow.ellipsis);
     expect(tester.takeException(), isNull);

@@ -1,6 +1,8 @@
 /// showAppConfirm 平台自適應行為測試(iOS → Cupertino、Android → Material)。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -149,6 +151,60 @@ void main() {
     expect(tester.getSize(find.widgetWithText(ListTile, '刪除')).height, 56);
   });
 
+  testWidgets(
+    'Android action sheet scrolls long command lists on short screens',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      late Future<String?> future;
+      await tester.pumpWidget(
+        host(TargetPlatform.android, (context) {
+          future = showAppActionSheet<String>(
+            context,
+            actions: const [
+              TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+              TpActionItem(label: '共編設定', value: 'collab', icon: Icons.group),
+              TpActionItem(
+                label: 'AI 健檢',
+                value: 'health',
+                icon: Icons.health_and_safety,
+              ),
+              TpActionItem(
+                label: '匯出 JSON',
+                value: 'export',
+                icon: Icons.download,
+              ),
+              TpActionItem(
+                label: '刪除行程',
+                value: 'delete',
+                icon: CupertinoIcons.delete,
+                dividerBefore: true,
+                role: TpActionRole.destructive,
+              ),
+            ],
+          );
+        }),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('刪除行程'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+
+      expect(await future, 'delete');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('action sheets render the shared selected checkmark', (
     tester,
   ) async {
@@ -230,6 +286,35 @@ void main() {
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('已刪除'), findsOneWidget);
+  });
+
+  testWidgets('unsaved guard coalesces concurrent close requests', (
+    tester,
+  ) async {
+    final controller = AppUnsavedChangesController();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: AppUnsavedChangesGuard(
+          controller: controller,
+          hasChanges: true,
+          child: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                unawaited(controller.requestPop());
+                unawaited(controller.requestPop());
+              },
+              child: const Text('close twice'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('close twice'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
   });
 
   testWidgets('Undo notice renders one six-second action and dispatches it', (

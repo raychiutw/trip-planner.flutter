@@ -416,9 +416,19 @@ void main() {
   testWidgets('large sheet modal form fits Cancel and its submit action', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
         home: Builder(
           builder: (context) => Scaffold(
             body: FilledButton(
@@ -449,6 +459,16 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('tp-app-bar-cancel')), findsOneWidget);
     expect(find.text('儲存'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('tp-app-bar-cancel'))).width,
+      greaterThan(64),
+    );
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('tp-app-bar-primary-action')))
+          .width,
+      greaterThan(64),
+    );
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
   });
 }
