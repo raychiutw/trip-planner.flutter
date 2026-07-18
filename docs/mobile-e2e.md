@@ -55,10 +55,13 @@ gcloud firebase test ios models describe MODEL_ID --project PROJECT_ID
 
 ## One-time Apple setup for Firebase iOS devices
 
-1. Register the explicit App ID `com.raychiu.tripline.RunnerUITests` in Apple Developer.
+1. Register the explicit XCTest runner App ID
+   `com.raychiu.tripline.RunnerUITests.xctrunner` in Apple Developer. Xcode
+   appends `.xctrunner` to the UI test target bundle identifier when it builds
+   the runner application.
 2. Create iOS App Development provisioning profiles for both:
    - `com.raychiu.tripline`
-   - `com.raychiu.tripline.RunnerUITests`
+   - `com.raychiu.tripline.RunnerUITests.xctrunner`
 3. Export an Apple Development certificate as a password-protected P12.
 4. Add repository secrets:
    - `APPLE_DEVELOPMENT_CERTIFICATE_P12`
@@ -67,7 +70,22 @@ gcloud firebase test ios models describe MODEL_ID --project PROJECT_ID
    - existing `APPSTORE_API_KEY_ID`
    - existing `APPSTORE_API_PRIVATE_KEY`
 
-The workflow downloads both development profiles, builds a release XCTest bundle, verifies the signatures of `Runner.app` and `RunnerUITests-Runner.app`, and only then uploads it to Test Lab. Firebase re-signs valid inputs for its own physical devices.
+The workflow validates and downloads both development profiles before any
+repository build script runs. `ios/Flutter/TestLabSigning.xcconfig` then uses
+manual signing and selects the matching profile by Xcode target: `Runner` uses
+`Tripline App Development CI 2026-07-19`, while `RunnerUITests` uses
+`Tripline XCTest Runner Development CI 2026-07-19`. The signing identity is
+also pinned to the certificate embedded by those profiles, so runner keychain
+ordering cannot select a different Development certificate. The App Store
+Connect key is provided only to the pinned profile-download actions; Patrol,
+Xcode build phases, CocoaPods scripts, and repository code never receive the
+key or its path. CI builds a release XCTest bundle, verifies the signatures of
+`Runner.app` and `RunnerUITests-Runner.app`, packages the result, and uploads it
+to Test Lab. Firebase re-signs valid inputs for its own physical devices.
+
+When rotating the Development certificate or either profile, update the exact
+certificate and profile names in `ios/Flutter/TestLabSigning.xcconfig` in the
+same change as the protected GitHub secrets.
 
 ## Run and interpret
 

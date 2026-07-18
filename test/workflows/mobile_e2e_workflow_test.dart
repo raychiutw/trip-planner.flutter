@@ -19,6 +19,9 @@ void main() {
   final evidenceSanitizer = File(
     'tool/sanitize_test_lab_evidence.sh',
   ).readAsStringSync();
+  final testLabSigning = File(
+    'ios/Flutter/TestLabSigning.xcconfig',
+  ).readAsStringSync();
 
   group('external mobile integration test gate', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
@@ -92,6 +95,118 @@ void main() {
         );
       },
     );
+
+    test('iOS Test Lab manually signs each target with its own profile', () {
+      expect(
+        e2eWorkflow,
+        contains(
+          'IOS_TEST_RUNNER_BUNDLE_ID: '
+          'com.raychiu.tripline.RunnerUITests.xctrunner',
+        ),
+      );
+      expect(
+        e2eWorkflow,
+        contains('bundle-id: \${{ env.IOS_TEST_RUNNER_BUNDLE_ID }}'),
+      );
+      expect(
+        setupGuide,
+        contains('com.raychiu.tripline.RunnerUITests.xctrunner'),
+      );
+      expect(testLabSigning, contains('CODE_SIGN_STYLE = Manual'));
+      expect(
+        testLabSigning,
+        contains(
+          'CODE_SIGN_IDENTITY = '
+          'Apple Development: Created via API (XSY38R3689)',
+        ),
+      );
+      expect(
+        testLabSigning,
+        contains(
+          'TRIPLINE_TESTLAB_PROFILE_Runner = '
+          'Tripline App Development CI 2026-07-19',
+        ),
+      );
+      expect(
+        testLabSigning,
+        contains(
+          'TRIPLINE_TESTLAB_PROFILE_RunnerUITests = '
+          'Tripline XCTest Runner Development CI 2026-07-19',
+        ),
+      );
+      expect(
+        testLabSigning,
+        contains(
+          'PROVISIONING_PROFILE_SPECIFIER = '
+          '\$(TRIPLINE_TESTLAB_PROFILE_\$(TARGET_NAME))',
+        ),
+      );
+    });
+
+    test('repository build scripts cannot read the App Store signing key', () {
+      final validation = e2eWorkflow.indexOf(
+        '- name: Validate Test Lab and Apple signing configuration',
+      );
+      final authentication = e2eWorkflow.indexOf(
+        '- name: Authenticate to Google Cloud with OIDC',
+        validation,
+      );
+      final prepare = e2eWorkflow.indexOf(
+        '- name: Prepare iOS build dependencies',
+      );
+      final build = e2eWorkflow.indexOf(
+        '- name: Build and package signed Patrol XCTest',
+      );
+      final matrix = e2eWorkflow.indexOf('- name: Run iOS matrix');
+
+      expect(validation, greaterThan(-1));
+      expect(validation, lessThan(authentication));
+      expect(authentication, lessThan(prepare));
+      expect(prepare, lessThan(build));
+      expect(build, lessThan(matrix));
+      expect(
+        e2eWorkflow.substring(validation, authentication),
+        allOf(
+          contains('APPSTORE_API_PRIVATE_KEY_CONFIGURED'),
+          isNot(
+            contains(
+              'APPSTORE_API_PRIVATE_KEY: '
+              '\${{ secrets.APPSTORE_API_PRIVATE_KEY }}',
+            ),
+          ),
+        ),
+      );
+      expect(
+        e2eWorkflow.substring(prepare, build),
+        contains('dart pub global activate patrol_cli'),
+      );
+      expect(
+        e2eWorkflow.substring(build, matrix),
+        allOf(
+          contains(
+            'XCODE_XCCONFIG_FILE: '
+            '\${{ github.workspace }}/ios/Flutter/TestLabSigning.xcconfig',
+          ),
+          contains('patrol build ios'),
+        ),
+      );
+      expect(
+        e2eWorkflow.substring(build, matrix),
+        isNot(
+          anyOf(
+            contains('APPSTORE_API_PRIVATE_KEY'),
+            contains('APPSTORE_API_KEY_PATH'),
+            contains('authenticationKeyPath'),
+            contains('xcodebuild-wrapper'),
+          ),
+        ),
+      );
+      expect(e2eWorkflow, isNot(contains('"\$GITHUB_PATH"')));
+      expect(
+        File('tool/xcodebuild_authenticated_wrapper.sh').existsSync(),
+        isFalse,
+      );
+    });
 
     test(
       'release fails closed on the real staging favorite restore contract',
