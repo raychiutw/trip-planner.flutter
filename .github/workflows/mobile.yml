@@ -120,10 +120,15 @@ jobs:
       - name: Build IPA
         run: |
           set -euo pipefail
+          if (( GITHUB_RUN_ATTEMPT >= 100 )); then
+            echo "GITHUB_RUN_ATTEMPT must be below 100; start a new workflow run" >&2
+            exit 1
+          fi
+          build_number=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
           xcodebuild -version
           flutter build ipa \
             --release \
-            --build-number="$GITHUB_RUN_ID" \
+            --build-number="$build_number" \
             --export-options-plist=ios/ExportOptions.plist
 
       - name: Resolve IPA path
