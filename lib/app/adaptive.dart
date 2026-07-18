@@ -562,19 +562,6 @@ Future<bool?> showAppFormSheet(
   );
 }
 
-/// Deprecated compatibility adapter. Migrate callers to a semantic wrapper.
-Future<T?> showAppLargeSheet<T>(
-  BuildContext context, {
-  required String title,
-  required WidgetBuilder builder,
-}) => showAppContentSheet<T>(context, title: title, builder: builder);
-
-/// Deprecated compatibility adapter. Migrate callers to a semantic wrapper.
-Future<T?> showAppLargeScreenSheet<T>(
-  BuildContext context, {
-  required WidgetBuilder builder,
-}) => showAppScreenSheet<T>(context, builder: builder);
-
 class _AppContentSheet<T> extends StatelessWidget {
   const _AppContentSheet({
     required this.title,

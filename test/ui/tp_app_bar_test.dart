@@ -306,7 +306,7 @@ void main() {
               body: Center(
                 child: FilledButton(
                   onPressed: () => unawaited(
-                    showAppLargeScreenSheet<void>(
+                    showAppScreenSheet<void>(
                       context,
                       builder: (_) => const Scaffold(
                         appBar: TpAppBar(
@@ -364,7 +364,7 @@ void main() {
           builder: (context) => Scaffold(
             body: FilledButton(
               onPressed: () => unawaited(
-                showAppLargeScreenSheet<void>(
+                showAppScreenSheet<void>(
                   context,
                   builder: (_) => Scaffold(
                     appBar: TpAppBar(

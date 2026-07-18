@@ -37,4 +37,25 @@ void main() {
     }
     expect(offenders, isEmpty);
   });
+
+  test('features use only semantic app sheet wrappers', () {
+    const forbidden = [
+      'showModalBottomSheet',
+      'showCupertinoModalPopup',
+      'showGeneralDialog',
+      'showAppLargeSheet',
+      'showAppLargeScreenSheet',
+    ];
+    final violations = <String>[];
+
+    for (final entity in Directory('lib/features').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final source = entity.readAsStringSync();
+      for (final token in forbidden) {
+        if (source.contains(token)) violations.add('${entity.path}: $token');
+      }
+    }
+
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
 }

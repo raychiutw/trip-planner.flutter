@@ -89,12 +89,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       case _TripMoreAction.notes:
         _openActionSheet(TripNotesScreen(tripId: widget.tripId));
       case _TripMoreAction.editInfo:
-        unawaited(
-          showAppLargeScreenSheet<void>(
-            context,
-            builder: (_) => EditTripScreen(tripId: widget.tripId),
-          ),
-        );
+        _openActionSheet(EditTripScreen(tripId: widget.tripId));
       case _TripMoreAction.print:
         _openActionSheet(TripPrintScreen(tripId: widget.tripId));
       case _TripMoreAction.audit:
