@@ -66,8 +66,9 @@ env:
 jobs:
   android_test_lab:
     name: Android / Firebase Test Lab
-    if: ${{ github.event_name == 'schedule' || inputs.platform == 'android' || inputs.platform == 'all' }}
+    if: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || inputs.platform == 'android' || inputs.platform == 'all') }}
     runs-on: ubuntu-24.04
+    environment: mobile-e2e
     timeout-minutes: 35
     env:
       FIREBASE_ANDROID_MODEL: ${{ vars.FIREBASE_ANDROID_MODEL || 'MediumPhone.arm' }}
@@ -182,8 +183,9 @@ jobs:
 
   ios_test_lab:
     name: iOS / Firebase Test Lab
-    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'all') }}
+    if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'all') }}
     runs-on: macos-26
+    environment: mobile-e2e
     timeout-minutes: 60
     env:
       FIREBASE_IOS_MODEL: ${{ vars.FIREBASE_IOS_MODEL }}

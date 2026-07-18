@@ -51,6 +51,21 @@ void main() {
   );
 
   test(
+    'rejects the committed production API host even when allowlisted',
+    () async {
+      final result = await _runContract({
+        ...baseEnvironment,
+        'STAGING_API_BASE_URL': 'https://trip-planner-dby.pages.dev',
+        'STAGING_ALLOWED_HOST': 'trip-planner-dby.pages.dev',
+      });
+
+      expect(result.exitCode, 2);
+      expect(result.stderr, contains('production hostname'));
+      expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    },
+  );
+
+  test(
     'verifies owner containment, timestamp preservation, and cleanup',
     () async {
       final result = await _runContract(baseEnvironment);

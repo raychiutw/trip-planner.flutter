@@ -139,6 +139,17 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
   bool updateShouldNotify(TpLargeSheetNavigationScope oldWidget) => false;
 }
 
+/// Pops the current nested route, or closes its owning near-full-height sheet
+/// when the nested navigator is already at its root page.
+Future<void> closeAppRouteOrSheet(BuildContext context) async {
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    await navigator.maybePop();
+    return;
+  }
+  TpLargeSheetNavigationScope.maybeOf(context)?.onClose();
+}
+
 abstract final class TpToolbarSlots {
   static double textActionWidth(
     BuildContext context,
@@ -426,7 +437,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         return TpToolbarGlassButton(
           key: const ValueKey('tp-app-bar-back'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: () => closeAppRouteOrSheet(context),
           child: const Icon(CupertinoIcons.back, size: 22),
         );
       case TpAppBarRole.modalContent:

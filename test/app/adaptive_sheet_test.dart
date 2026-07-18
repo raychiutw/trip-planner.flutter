@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
   testWidgets('selection sheet has Cancel, no Done, and distinct detents', (
@@ -239,6 +240,37 @@ void main() {
       );
     },
   );
+
+  testWidgets('screen sheet root detail Back closes the whole sheet', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppScreenSheet<void>(
+              context,
+              builder: (_) => const Scaffold(
+                appBar: TpAppBar(
+                  role: TpAppBarRole.detail,
+                  title: Text('行程筆記'),
+                ),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('行程筆記'), findsNothing);
+    expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
+  });
 
   testWidgets('routed form cannot dismiss while submission is active', (
     tester,

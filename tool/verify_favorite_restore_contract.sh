@@ -19,6 +19,15 @@ if [[ ! "$base_url" =~ ^https://([^/:?#]+)(:[0-9]+)?(/.*)?$ ]]; then
   exit 2
 fi
 staging_host=${BASH_REMATCH[1]}
+readonly production_hosts=(
+  'trip-planner-dby.pages.dev'
+)
+for production_host in "${production_hosts[@]}"; do
+  if [[ "$staging_host" == "$production_host" ]]; then
+    echo 'Refusing mutations: staging API uses a committed production hostname.' >&2
+    exit 2
+  fi
+done
 if [[ "${CI:-false}" == true ]]; then
   : "${STAGING_ALLOWED_HOST:?Set the exact non-production API hostname}"
   if [[ "$staging_host" != "$STAGING_ALLOWED_HOST" ]]; then

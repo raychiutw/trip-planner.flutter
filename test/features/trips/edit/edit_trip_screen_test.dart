@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/poi_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/features/favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import 'package:tripline/features/trips/edit/edit_trip_screen.dart';
@@ -100,6 +101,27 @@ void main() {
     );
   }
 
+  Widget buildSheetApp() => ProviderScope(
+    overrides: [
+      tripRepositoryProvider.overrideWithValue(tripRepo),
+      poiRepositoryProvider.overrideWithValue(poiRepo),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: FilledButton(
+            onPressed: () => showAppScreenSheet<void>(
+              context,
+              builder: (_) => const EditTripScreen(tripId: 'okinawa'),
+            ),
+            child: const Text('開啟編輯'),
+          ),
+        ),
+      ),
+    ),
+  );
+
   testWidgets('帶入初值（標題/發布）', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -157,6 +179,21 @@ void main() {
         destinations: any(named: 'destinations'),
       ),
     ).called(1);
+  });
+
+  testWidgets('近滿版編輯儲存後關閉整個 screen sheet', (tester) async {
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '新標題');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditTripScreen), findsNothing);
+    expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
+    expect(find.text('開啟編輯'), findsOneWidget);
   });
 
   testWidgets('移除目的地 + 儲存 → updateTrip(destinations)', (tester) async {

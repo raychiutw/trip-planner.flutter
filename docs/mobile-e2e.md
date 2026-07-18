@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix, Play Internal dispatches run the Android matrix, and neither upload proceeds when its external-device gate fails.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix, Play Internal dispatches run the Android matrix, and neither upload proceeds when its external-device gate fails. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
 The Patrol bundle contains two independent release gates:
 
@@ -83,7 +83,7 @@ Before Test Lab, the release workflow runs `tool/verify_favorite_restore_contrac
 - `STAGING_FAVORITE_POI_ID`
 - `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1`
 
-The smoke verifies create → delete → active-list exclusion → second-user containment → restore → one active row → cleanup. Missing secrets, a production-looking URL, an absent migration, or any contract mismatch fails closed. Only after this gate succeeds do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent Patrol suites do not toggle a feature they do not exercise.
+The smoke verifies create → delete → active-list exclusion → second-user containment → restore → one active row → cleanup. Missing secrets, the committed production host `trip-planner-dby.pages.dev`, a mismatched allowlist, an absent migration, or any contract mismatch fails closed. Only after this gate succeeds do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent Patrol suites do not toggle a feature they do not exercise.
 
 Test Lab exit codes are not swallowed:
 

@@ -67,6 +67,22 @@ void main() {
     });
 
     test(
+      'direct Test Lab dispatch is master-only and environment protected',
+      () {
+        expect(
+          RegExp(
+            "github.ref == 'refs/heads/master'",
+          ).allMatches(e2eWorkflow).length,
+          greaterThanOrEqualTo(2),
+        );
+        expect(
+          RegExp(r'environment: mobile-e2e').allMatches(e2eWorkflow).length,
+          greaterThanOrEqualTo(2),
+        );
+      },
+    );
+
+    test(
       'release fails closed on the real staging favorite restore contract',
       () {
         expect(releaseWorkflow, contains('Verify staging favorite restore'));

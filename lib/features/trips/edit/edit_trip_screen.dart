@@ -5,7 +5,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
@@ -39,7 +38,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
       if (next.saved && !(prev?.saved ?? false)) {
         HapticFeedback.lightImpact();
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && context.canPop()) context.pop();
+          if (mounted) closeAppRouteOrSheet(context);
         });
       }
     });
