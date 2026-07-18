@@ -62,6 +62,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  patrol: 4.6.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -84,6 +85,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+patrol:
+  app_name: Tripline
+  android:
+    package_name: com.raychiu.tripline
+  ios:
+    bundle_id: com.raychiu.tripline
 
   # To add assets to your application, add an assets section, like this:
   # assets:

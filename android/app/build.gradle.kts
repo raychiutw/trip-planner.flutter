@@ -37,6 +37,7 @@ val hasReleaseSigning = listOf(
     androidKeyAlias,
     androidKeyPassword,
 ).all { !it.isNullOrBlank() }
+val signDebugWithRelease = System.getenv("ANDROID_SIGN_DEBUG_WITH_RELEASE") == "true"
 
 android {
     namespace = "com.raychiu.tripline"
@@ -59,6 +60,8 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["googleMapsApiKey"] = googleMapsAndroidApiKey
+        testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     signingConfigs {
@@ -73,11 +76,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (hasReleaseSigning && signDebugWithRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+    }
+
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 }
 
@@ -93,4 +105,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
 }

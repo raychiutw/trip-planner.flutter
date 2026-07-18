@@ -45,4 +45,16 @@ void main() {
       );
     }
   });
+
+  test('Test Lab Patrol build keeps the Maps signing identity', () {
+    final androidApp = File('android/app/build.gradle.kts').readAsStringSync();
+    final workflow = File(
+      '.github/workflows/mobile-e2e.yml',
+    ).readAsStringSync();
+
+    expect(androidApp, contains('ANDROID_SIGN_DEBUG_WITH_RELEASE'));
+    expect(workflow, contains('ANDROID_SIGN_DEBUG_WITH_RELEASE: \'true\''));
+    expect(workflow, contains('ANDROID_KEYSTORE_BASE64'));
+    expect(workflow, contains('E2E_EXPECT_GOOGLE_POI=true'));
+  });
 }
