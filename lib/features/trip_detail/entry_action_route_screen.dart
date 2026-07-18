@@ -15,7 +15,7 @@ enum EntryRouteAction { copy, move }
 extension _EntryRouteActionX on EntryRouteAction {
   String get title => switch (this) {
     EntryRouteAction.copy => '複製停留點',
-    EntryRouteAction.move => '移動停留點',
+    EntryRouteAction.move => '移到其他 Day',
   };
 
   String get submitLabel => switch (this) {

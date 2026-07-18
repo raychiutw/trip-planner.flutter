@@ -77,12 +77,16 @@ class ReorderDragHandle extends StatelessWidget {
       index: index,
       child: Listener(
         onPointerDown: (_) => HapticFeedback.selectionClick(),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Icon(
-            CupertinoIcons.line_horizontal_3,
-            key: iconKey,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: Semantics(
+          key: iconKey,
+          button: true,
+          label: '拖曳調整順序',
+          child: SizedBox.square(
+            dimension: TpSpacing.tapMin,
+            child: Icon(
+              CupertinoIcons.line_horizontal_3,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),

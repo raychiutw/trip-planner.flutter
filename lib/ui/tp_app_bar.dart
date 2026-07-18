@@ -124,6 +124,8 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
 }
 
 abstract final class TpToolbarSlots {
+  static const double _textActionWidth = 64;
+
   static double sideWidth({
     required int actionCount,
     required bool hasLeading,
@@ -148,6 +150,19 @@ abstract final class TpToolbarSlots {
     );
   }
 
+  static double actionsWidth(List<Widget> children) {
+    if (children.isEmpty) return 0;
+    return children.fold<double>(
+          0,
+          (width, child) =>
+              width +
+              (child is TpToolbarTextButton
+                  ? _textActionWidth
+                  : TpSpacing.tapMin),
+        ) +
+        (children.length - 1) * TpSpacing.s2;
+  }
+
   static List<Widget> actions({
     required double width,
     required List<Widget> children,
@@ -161,10 +176,13 @@ abstract final class TpToolbarSlots {
           children: [
             for (var index = 0; index < children.length; index++) ...[
               if (index > 0) const SizedBox(width: TpSpacing.s2),
-              SizedBox.square(
-                dimension: TpSpacing.tapMin,
-                child: children[index],
-              ),
+              if (children[index] is TpToolbarTextButton)
+                SizedBox(width: _textActionWidth, child: children[index])
+              else
+                SizedBox.square(
+                  dimension: TpSpacing.tapMin,
+                  child: children[index],
+                ),
             ],
           ],
         ),
@@ -268,15 +286,13 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         : role == TpAppBarRole.modalForm
         ? 64.0
         : TpSpacing.tapMin;
-    final actionsWidth = TpToolbarSlots.sideWidth(
-      actionCount: resolvedActions.length,
-      hasLeading: false,
-    );
+    final actionsWidth = TpToolbarSlots.actionsWidth(resolvedActions);
     if (largeSheetScope != null) {
       final colors = Theme.of(context).colorScheme;
       final showsScopeClose = role != TpAppBarRole.modalForm;
       final sheetActionWidths = <double>[
-        for (var index = 0; index < actions.length; index++) TpSpacing.tapMin,
+        for (final action in actions)
+          action is TpToolbarTextButton ? 64 : TpSpacing.tapMin,
         if (primaryActionLabel != null) 64,
         if (showsScopeClose) TpSpacing.tapMin,
       ];

@@ -453,10 +453,79 @@ void main() {
 
     expect(find.byKey(const ValueKey('entry-menu-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('tp-root-header-primary-action')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('trip menu enters reorder mode and Done exits directly', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester);
+
     await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
     await tester.pumpAndSettle();
-    expect(find.text('完成編輯'), findsOneWidget);
+
+    final reorderAction = find.byKey(const ValueKey('trip-edit-mode'));
+    expect(reorderAction, findsOneWidget);
+    expect(
+      find.descendant(
+        of: reorderAction,
+        matching: find.byIcon(CupertinoIcons.line_horizontal_3),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('調整順序'), findsOneWidget);
+    expect(find.text('編輯行程'), findsNothing);
+    expect(find.text('移動行程'), findsNothing);
+
+    await tester.tap(reorderAction);
+    await _pumpGlassMenuClose(tester);
+
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('tp-root-header-primary-action')),
+      findsOneWidget,
+    );
+    expect(find.text('完成'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('tp-root-header-primary-action')),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
   });
+
+  testWidgets(
+    'entry menu labels Move To Day and keeps drag as an alternative',
+    (tester) async {
+      await _pumpTimeline(tester);
+      await _enableTimelineEditing(tester);
+
+      final dragHandle = find.byKey(const ValueKey('entry-drag-11'));
+      expect(tester.getSize(dragHandle), const Size(44, 44));
+      expect(tester.getSemantics(dragHandle).label, '拖曳調整順序');
+
+      await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
+      await tester.pumpAndSettle();
+
+      final moveAction = find.byKey(const ValueKey('entry-move-to-day-11'));
+      expect(moveAction, findsOneWidget);
+      expect(find.text('移到其他 Day'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: moveAction,
+          matching: find.byIcon(CupertinoIcons.folder),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('更多選單的分享連結使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
@@ -918,6 +987,40 @@ void main() {
     expect(tester.getTopLeft(daySection).dy, before);
   });
 
+  testWidgets(
+    'cross-Day drag lifts the full card and marks only the insertion point',
+    (tester) async {
+      tester.view.physicalSize =
+          const Size(800, 1200) * tester.view.devicePixelRatio;
+      addTearDown(tester.view.resetPhysicalSize);
+      await _pumpTimeline(tester);
+      await _enableTimelineEditing(tester);
+
+      final drag = find.byKey(const ValueKey('entry-cross-drag-11'));
+      final gesture = await tester.startGesture(tester.getCenter(drag));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+
+      expect(
+        find.byKey(const ValueKey('entry-drag-feedback-11')),
+        findsOneWidget,
+      );
+      expect(find.text('美麗海水族館'), findsWidgets);
+
+      final target = find.byKey(const ValueKey('entry-drop-21'));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        find.byKey(const ValueKey('entry-drop-indicator-21')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('day-drop-outline-2')), findsNothing);
+
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
@@ -1071,6 +1174,8 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-11')));
+    await _pumpGlassMenuClose(tester);
     await tester.tap(find.byKey(const ValueKey('move-day-2')));
     await tester.pumpAndSettle();
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -47,6 +48,8 @@ enum _TripMoreAction {
   health,
 }
 
+enum _EntryEditAction { moveToDay }
+
 /// 行程時間軸畫面：AppBar（可切換 trip + 功能選單 + 帳號）→ 單層地圖／DAY selector →
 /// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
@@ -76,6 +79,32 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     unawaited(showAppScreenSheet<void>(context, builder: (_) => screen));
   }
 
+  void _handleTripAction(_TripMoreAction action) {
+    switch (action) {
+      case _TripMoreAction.editMode:
+        setState(() => _isEditing = true);
+      case _TripMoreAction.notes:
+        _openActionSheet(TripNotesScreen(tripId: widget.tripId));
+      case _TripMoreAction.editInfo:
+        unawaited(
+          showAppLargeScreenSheet<void>(
+            context,
+            builder: (_) => EditTripScreen(tripId: widget.tripId),
+          ),
+        );
+      case _TripMoreAction.print:
+        _openActionSheet(TripPrintScreen(tripId: widget.tripId));
+      case _TripMoreAction.audit:
+        _openActionSheet(TripAuditScreen(tripId: widget.tripId));
+      case _TripMoreAction.share:
+        _openActionSheet(ShareScreen(tripId: widget.tripId));
+      case _TripMoreAction.collab:
+        _openActionSheet(CollabScreen(tripId: widget.tripId));
+      case _TripMoreAction.health:
+        _openActionSheet(TripHealthScreen(tripId: widget.tripId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
@@ -99,87 +128,68 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
               context.go('/trips/${Uri.encodeComponent(tripId)}'),
         ),
         actions: [
-          TpMoreMenuButton<_TripMoreAction>(
-            key: const ValueKey('trip-actions-menu'),
-            onSelected: (action) {
-              switch (action) {
-                case _TripMoreAction.editMode:
-                  setState(() => _isEditing = !_isEditing);
-                case _TripMoreAction.notes:
-                  _openActionSheet(TripNotesScreen(tripId: widget.tripId));
-                case _TripMoreAction.editInfo:
-                  unawaited(
-                    showAppLargeScreenSheet<void>(
-                      context,
-                      builder: (_) => EditTripScreen(tripId: widget.tripId),
-                    ),
-                  );
-                case _TripMoreAction.print:
-                  _openActionSheet(TripPrintScreen(tripId: widget.tripId));
-                case _TripMoreAction.audit:
-                  _openActionSheet(TripAuditScreen(tripId: widget.tripId));
-                case _TripMoreAction.share:
-                  _openActionSheet(ShareScreen(tripId: widget.tripId));
-                case _TripMoreAction.collab:
-                  _openActionSheet(CollabScreen(tripId: widget.tripId));
-                case _TripMoreAction.health:
-                  _openActionSheet(TripHealthScreen(tripId: widget.tripId));
-              }
-            },
-            items: [
-              TpActionItem(
-                key: const ValueKey('trip-edit-mode'),
-                value: _TripMoreAction.editMode,
-                icon: _isEditing
-                    ? CupertinoIcons.check_mark
-                    : CupertinoIcons.pencil,
-                label: _isEditing ? '完成編輯' : '編輯行程',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-notes'),
-                value: _TripMoreAction.notes,
-                icon: CupertinoIcons.doc_text,
-                label: '筆記',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-edit-info'),
-                value: _TripMoreAction.editInfo,
-                icon: CupertinoIcons.pencil,
-                label: '行程資料',
-                dividerBefore: true,
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-print'),
-                value: _TripMoreAction.print,
-                icon: CupertinoIcons.printer,
-                label: '列印',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-audit'),
-                value: _TripMoreAction.audit,
-                icon: Icons.history_outlined,
-                label: '異動紀錄',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-share'),
-                value: _TripMoreAction.share,
-                icon: Icons.ios_share_outlined,
-                label: '分享連結',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-collab'),
-                value: _TripMoreAction.collab,
-                icon: Icons.group_outlined,
-                label: '共編設定',
-              ),
-              const TpActionItem(
-                key: ValueKey('trip-action-health'),
-                value: _TripMoreAction.health,
-                icon: Icons.health_and_safety_outlined,
-                label: 'AI 健檢',
-              ),
-            ],
-          ),
+          if (_isEditing)
+            TpToolbarTextButton(
+              key: const ValueKey('tp-root-header-primary-action'),
+              label: '完成',
+              onPressed: () => setState(() => _isEditing = false),
+            )
+          else
+            TpMoreMenuButton<_TripMoreAction>(
+              key: const ValueKey('trip-actions-menu'),
+              onSelected: _handleTripAction,
+              items: const [
+                TpActionItem(
+                  key: ValueKey('trip-edit-mode'),
+                  value: _TripMoreAction.editMode,
+                  icon: CupertinoIcons.line_horizontal_3,
+                  label: '調整順序',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-notes'),
+                  value: _TripMoreAction.notes,
+                  icon: CupertinoIcons.doc_text,
+                  label: '筆記',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-edit-info'),
+                  value: _TripMoreAction.editInfo,
+                  icon: CupertinoIcons.pencil,
+                  label: '行程資料',
+                  dividerBefore: true,
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-print'),
+                  value: _TripMoreAction.print,
+                  icon: CupertinoIcons.printer,
+                  label: '列印',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-audit'),
+                  value: _TripMoreAction.audit,
+                  icon: Icons.history_outlined,
+                  label: '異動紀錄',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-share'),
+                  value: _TripMoreAction.share,
+                  icon: Icons.ios_share_outlined,
+                  label: '分享連結',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-collab'),
+                  value: _TripMoreAction.collab,
+                  icon: Icons.group_outlined,
+                  label: '共編設定',
+                ),
+                TpActionItem(
+                  key: ValueKey('trip-action-health'),
+                  value: _TripMoreAction.health,
+                  icon: Icons.health_and_safety_outlined,
+                  label: 'AI 健檢',
+                ),
+              ],
+            ),
           const TpAccountAvatarButton(),
         ],
       ),
@@ -554,6 +564,7 @@ class _DaySection extends ConsumerWidget {
       await _recomputeDay(ref, target.dayNum);
     }
     if (context.mounted) {
+      HapticFeedback.selectionClick();
       showAppNotice(context, '已移到 DAY ${target.dayNum}');
     }
   }
@@ -565,22 +576,18 @@ class _DaySection extends ConsumerWidget {
   ) async {
     final targets = allDays.where((d) => d.dayNum != day.dayNum).toList();
     if (targets.isEmpty) return;
-    final targetDayId = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(title: Text('移到其他天')),
-            for (final d in targets)
-              ListTile(
-                key: ValueKey('move-day-${d.id}'),
-                title: Text('DAY ${d.dayNum} · ${d.displayTitle}'),
-                onTap: () => Navigator.of(sheetContext).pop(d.id),
-              ),
-          ],
-        ),
+    final targetDayId = await showAppSelectionSheet<int>(
+      context,
+      title: '移到其他 Day',
+      builder: (sheetContext, select) => ListView(
+        children: [
+          for (final target in targets)
+            ListTile(
+              key: ValueKey('move-day-${target.id}'),
+              title: Text('DAY ${target.dayNum} · ${target.displayTitle}'),
+              onTap: () => select(target.id),
+            ),
+        ],
       ),
     );
     if (targetDayId == null) return;
@@ -663,164 +670,195 @@ class _DaySection extends ConsumerWidget {
         );
       },
       builder: (context, candidateData, rejectedData) {
-        final highlight = candidateData.isNotEmpty;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            border: highlight
-                ? Border.all(color: Theme.of(context).colorScheme.primary)
-                : null,
-            borderRadius: BorderRadius.circular(TpRadius.md),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DayHeader(day: day, segments: segments),
-              const SizedBox(height: TpSpacing.s3),
-              DayWeatherPreview(dayNum: day.dayNum),
-              const SizedBox(height: TpSpacing.s3),
-              ReorderableListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                buildDefaultDragHandles: false,
-                itemCount: timeline.length,
-                onReorderItem: (oldIndex, newIndex) =>
-                    _reorder(context, ref, oldIndex, newIndex),
-                itemBuilder: (context, i) {
-                  final entry = timeline[i];
-                  final previous = i > 0 ? timeline[i - 1] : null;
-                  final travel = previous?.travel;
-                  final travelSegment = previous == null
-                      ? null
-                      : _findSegment(segments, previous.id, entry.id);
-                  final tile = TimelineEntryTile(
-                    entry: entry,
-                    number: i + 1,
-                    isFirst: i == 0,
-                    isLast: i == timeline.length - 1,
-                    isFocused: entry.id == focusedEntryId,
-                    onTap: () => showEntryEditSheet(
-                      context,
-                      tripId: tripId,
-                      args: EntryEditExisting(entry),
-                    ),
-                    trailing: isEditing
-                        ? _EntryTrailing(
-                            entryId: entry.id,
-                            index: i,
-                            onMove: () => _moveToDay(context, ref, entry),
-                          )
-                        : null,
-                  );
-                  final draggableTile = isEditing
-                      ? LongPressDraggable<_EntryDragPayload>(
-                          key: ValueKey('entry-cross-drag-${entry.id}'),
-                          data: _EntryDragPayload(
-                            entry: entry,
-                            sourceDayId: day.id,
-                            sourceDayNum: day.dayNum,
-                          ),
-                          dragAnchorStrategy: pointerDragAnchorStrategy,
-                          onDragStarted: _captureDragScroll,
-                          onDragUpdate: (details) => _autoScrollDuringDrag(
-                            context,
-                            details.globalPosition,
-                          ),
-                          onDragEnd: (_) => _restoreDragScroll(),
-                          onDraggableCanceled: (velocity, offset) =>
-                              _restoreDragScroll(),
-                          onDragCompleted: _restoreDragScroll,
-                          feedback: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(TpRadius.md),
-                            child: Padding(
-                              padding: const EdgeInsets.all(TpSpacing.s3),
-                              child: Text(entry.title),
-                            ),
-                          ),
-                          childWhenDragging: Opacity(
-                            opacity: 0.35,
-                            child: tile,
-                          ),
-                          child: tile,
-                        )
-                      : tile;
-                  final row = isEditing
-                      ? SwipeToDelete(
-                          dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                          onDelete: () => _confirmDelete(context, ref, entry),
-                          child: draggableTile,
-                        )
-                      : draggableTile;
-                  final dropRow = isEditing
-                      ? DragTarget<_EntryDragPayload>(
-                          key: ValueKey('entry-drop-${entry.id}'),
-                          onWillAcceptWithDetails: (details) =>
-                              details.data.sourceDayId != day.id,
-                          onAcceptWithDetails: (details) {
-                            unawaited(
-                              _moveEntryToDay(
-                                context,
-                                ref,
-                                entry: details.data.entry,
-                                sourceDayId: details.data.sourceDayId,
-                                sourceDayNum: details.data.sourceDayNum,
-                                target: day,
-                                targetEntryId: entry.id,
-                              ),
-                            );
-                          },
-                          builder: (context, candidateData, rejectedData) =>
-                              row,
-                        )
-                      : row;
-                  return Container(
-                    key: entryKeys[entry.id],
-                    child: Column(
-                      key: ValueKey('entry-${entry.id}'),
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (previous != null &&
-                            (travel != null || segmentsReady))
-                          _TravelRow(
-                            travel: travel,
-                            segment: travelSegment,
-                            tripId: tripId,
-                            fromEntryId: previous.id,
-                            toEntryId: entry.id,
-                            segmentsReady: segmentsReady,
-                            missingSegment:
-                                segmentsReady &&
-                                travelSegment == null &&
-                                travel != null,
-                            recomputeStalled: _stalledTravelRecomputeScopes
-                                .contains('$tripId:${day.dayNum}'),
-                            missingCoords: _missingTravelCoords(
-                              previous,
-                              entry,
-                            ),
-                          ),
-                        dropRow,
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: TpSpacing.s2),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: ValueKey('add-entry-${day.dayNum}'),
-                  onPressed: () => context.push(
-                    '/trips/${Uri.encodeComponent(tripId)}/entries/new'
-                    '?day=${day.dayNum}&mode=search',
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DayHeader(day: day, segments: segments),
+            const SizedBox(height: TpSpacing.s3),
+            DayWeatherPreview(dayNum: day.dayNum),
+            const SizedBox(height: TpSpacing.s3),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: timeline.length,
+              onReorderItem: (oldIndex, newIndex) =>
+                  _reorder(context, ref, oldIndex, newIndex),
+              itemBuilder: (context, i) {
+                final entry = timeline[i];
+                final previous = i > 0 ? timeline[i - 1] : null;
+                final travel = previous?.travel;
+                final travelSegment = previous == null
+                    ? null
+                    : _findSegment(segments, previous.id, entry.id);
+                final tile = TimelineEntryTile(
+                  entry: entry,
+                  number: i + 1,
+                  isFirst: i == 0,
+                  isLast: i == timeline.length - 1,
+                  isFocused: entry.id == focusedEntryId,
+                  onTap: () => showEntryEditSheet(
+                    context,
+                    tripId: tripId,
+                    args: EntryEditExisting(entry),
                   ),
-                  icon: const Icon(CupertinoIcons.add),
-                  label: const Text('新增停留點'),
+                  trailing: isEditing
+                      ? _EntryTrailing(
+                          entryId: entry.id,
+                          index: i,
+                          onMove: () => _moveToDay(context, ref, entry),
+                        )
+                      : null,
+                );
+                final draggableTile = isEditing
+                    ? LongPressDraggable<_EntryDragPayload>(
+                        key: ValueKey('entry-cross-drag-${entry.id}'),
+                        data: _EntryDragPayload(
+                          entry: entry,
+                          sourceDayId: day.id,
+                          sourceDayNum: day.dayNum,
+                        ),
+                        dragAnchorStrategy: pointerDragAnchorStrategy,
+                        onDragStarted: () {
+                          HapticFeedback.mediumImpact();
+                          _captureDragScroll();
+                        },
+                        onDragUpdate: (details) => _autoScrollDuringDrag(
+                          context,
+                          details.globalPosition,
+                        ),
+                        onDragEnd: (_) => _restoreDragScroll(),
+                        onDraggableCanceled: (velocity, offset) =>
+                            _restoreDragScroll(),
+                        onDragCompleted: _restoreDragScroll,
+                        feedback: Material(
+                          key: ValueKey('entry-drag-feedback-${entry.id}'),
+                          type: MaterialType.transparency,
+                          child: Opacity(
+                            opacity: 0.92,
+                            child: Transform.scale(
+                              scale: MediaQuery.disableAnimationsOf(context)
+                                  ? 1
+                                  : 0.98,
+                              alignment: Alignment.topCenter,
+                              child: SizedBox(
+                                width:
+                                    MediaQuery.sizeOf(context).width -
+                                    (TpSpacing.s4 * 2) -
+                                    kTimelineTimeColumnWidth -
+                                    kTimelineRailWidth,
+                                child: IgnorePointer(child: tile),
+                              ),
+                            ),
+                          ),
+                        ),
+                        childWhenDragging: Opacity(opacity: 0.35, child: tile),
+                        child: tile,
+                      )
+                    : tile;
+                final row = isEditing
+                    ? SwipeToDelete(
+                        dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+                        onDelete: () => _confirmDelete(context, ref, entry),
+                        child: draggableTile,
+                      )
+                    : draggableTile;
+                final dropRow = isEditing
+                    ? DragTarget<_EntryDragPayload>(
+                        key: ValueKey('entry-drop-${entry.id}'),
+                        onWillAcceptWithDetails: (details) =>
+                            details.data.sourceDayId != day.id,
+                        onAcceptWithDetails: (details) {
+                          unawaited(
+                            _moveEntryToDay(
+                              context,
+                              ref,
+                              entry: details.data.entry,
+                              sourceDayId: details.data.sourceDayId,
+                              sourceDayNum: details.data.sourceDayNum,
+                              target: day,
+                              targetEntryId: entry.id,
+                            ),
+                          );
+                        },
+                        builder: (context, candidateData, rejectedData) =>
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                AnimatedSize(
+                                  duration: TpMotion.resolve(
+                                    context,
+                                    TpMotion.fast,
+                                  ),
+                                  curve: TpMotion.appleEase,
+                                  child: candidateData.isEmpty
+                                      ? const SizedBox.shrink()
+                                      : Container(
+                                          key: ValueKey(
+                                            'entry-drop-indicator-${entry.id}',
+                                          ),
+                                          height: 3,
+                                          margin: const EdgeInsets.only(
+                                            bottom: TpSpacing.s2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                                row,
+                              ],
+                            ),
+                      )
+                    : row;
+                return Container(
+                  key: entryKeys[entry.id],
+                  child: Column(
+                    key: ValueKey('entry-${entry.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (previous != null && (travel != null || segmentsReady))
+                        _TravelRow(
+                          travel: travel,
+                          segment: travelSegment,
+                          tripId: tripId,
+                          fromEntryId: previous.id,
+                          toEntryId: entry.id,
+                          segmentsReady: segmentsReady,
+                          missingSegment:
+                              segmentsReady &&
+                              travelSegment == null &&
+                              travel != null,
+                          recomputeStalled: _stalledTravelRecomputeScopes
+                              .contains('$tripId:${day.dayNum}'),
+                          missingCoords: _missingTravelCoords(previous, entry),
+                        ),
+                      dropRow,
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: TpSpacing.s2),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('add-entry-${day.dayNum}'),
+                onPressed: () => context.push(
+                  '/trips/${Uri.encodeComponent(tripId)}/entries/new'
+                  '?day=${day.dayNum}&mode=search',
                 ),
+                icon: const Icon(CupertinoIcons.add),
+                label: const Text('新增停留點'),
               ),
-              const SizedBox(height: TpSpacing.s6),
-            ],
-          ),
+            ),
+            const SizedBox(height: TpSpacing.s6),
+          ],
         );
       },
     );
@@ -873,22 +911,24 @@ class _DaySection extends ConsumerWidget {
     if (!scrollController.hasClients) return;
     final height = MediaQuery.sizeOf(context).height;
     const edge = 72.0;
-    const step = 32.0;
-    final delta = globalPosition.dy < edge
-        ? -step
+    final distance = globalPosition.dy < edge
+        ? globalPosition.dy - edge
         : globalPosition.dy > height - edge
-        ? step
+        ? globalPosition.dy - (height - edge)
         : 0.0;
-    if (delta == 0) return;
+    if (distance == 0) return;
+    final delta = (distance / edge * 48).clamp(-48.0, 48.0);
 
     final position = scrollController.position;
     final target = (position.pixels + delta).clamp(
       position.minScrollExtent,
       position.maxScrollExtent,
     );
-    if (target != position.pixels) {
-      scrollController.jumpTo(target);
-    }
+    if (target == position.pixels) return;
+    // Drag updates arrive every frame. A new animateTo would cancel the
+    // previous 48 ms animation before it advances, so use distance-scaled
+    // frame steps for continuous, pointer-coupled scrolling.
+    scrollController.jumpTo(target);
   }
 }
 
@@ -909,12 +949,23 @@ class _EntryTrailing extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
+        TpMoreMenuButton<_EntryEditAction>(
           key: ValueKey('entry-menu-$entryId'),
-          icon: const Icon(CupertinoIcons.folder),
-          tooltip: '移到其他天',
-          visualDensity: VisualDensity.compact,
-          onPressed: onMove,
+          tooltip: '停留點操作',
+          triggerChild: Icon(
+            CupertinoIcons.ellipsis,
+            size: 20,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          items: [
+            TpActionItem(
+              key: ValueKey('entry-move-to-day-$entryId'),
+              value: _EntryEditAction.moveToDay,
+              icon: CupertinoIcons.folder,
+              label: '移到其他 Day',
+            ),
+          ],
+          onSelected: (_) => onMove(),
         ),
         ReorderDragHandle(
           index: index,

@@ -45,6 +45,15 @@ Widget _buildScreen(_MockTripRepository repo, EntryRouteAction action) {
 }
 
 void main() {
+  testWidgets('move route uses the same Move To Day wording', (tester) async {
+    final repo = _MockTripRepository();
+    await tester.pumpWidget(_buildScreen(repo, EntryRouteAction.move));
+    await tester.pumpAndSettle();
+    expect(find.text('移到其他 Day'), findsOneWidget);
+    expect(find.text('移動停留點'), findsNothing);
+    expect(find.text('移動行程'), findsNothing);
+  });
+
   testWidgets('copy：選目標 day 後呼叫 copyEntry 並回行程頁', (tester) async {
     final repo = _MockTripRepository();
     when(
