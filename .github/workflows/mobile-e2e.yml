@@ -1,6 +1,13 @@
 name: Mobile E2E / Firebase Test Lab
 
 on:
+  workflow_call:
+    inputs:
+      platform:
+        description: External device matrix to run
+        required: false
+        default: android
+        type: string
   workflow_dispatch:
     inputs:
       platform:

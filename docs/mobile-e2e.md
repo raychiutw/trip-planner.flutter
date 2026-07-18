@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight and Play Internal dispatches call its Android matrix first and do not upload when the external-device gate fails.
 
 The Patrol bundle contains two independent release gates:
 
@@ -60,6 +60,8 @@ The workflow downloads both development profiles, builds a release XCTest bundle
 ## Run and interpret
 
 In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, and JUnit results in the matrix result. GitHub also retains the submitted APK/XCTest bundle and the matrix command log for seven days.
+
+Manual **Mobile CI / Releases** dispatches do not bypass this matrix. The release job waits for `external_device_gate`; a test, configuration, quota, or Test Lab infrastructure failure leaves the upload job skipped instead of publishing an unverified build.
 
 Test Lab exit codes are not swallowed:
 

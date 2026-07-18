@@ -57,4 +57,24 @@ void main() {
     expect(workflow, contains('ANDROID_KEYSTORE_BASE64'));
     expect(workflow, contains('E2E_EXPECT_GOOGLE_POI=true'));
   });
+
+  test('mobile releases are gated by the reusable Test Lab workflow', () {
+    final e2eWorkflow = File(
+      '.github/workflows/mobile-e2e.yml',
+    ).readAsStringSync();
+    final releaseWorkflow = File(
+      '.github/workflows/mobile.yml',
+    ).readAsStringSync();
+
+    expect(e2eWorkflow, contains('workflow_call:'));
+    expect(
+      releaseWorkflow,
+      contains('uses: ./.github/workflows/mobile-e2e.yml'),
+    );
+    expect(releaseWorkflow, contains('needs: external_device_gate'));
+    expect(
+      releaseWorkflow,
+      contains("needs.external_device_gate.result == 'success'"),
+    );
+  });
 }

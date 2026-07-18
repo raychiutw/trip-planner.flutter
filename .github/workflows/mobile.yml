@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   FLUTTER_VERSION: '3.44.6'
@@ -65,9 +66,18 @@ jobs:
           : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
           flutter build apk --debug
 
+  external_device_gate:
+    name: External device release gate
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/mobile-e2e.yml
+    with:
+      platform: android
+    secrets: inherit
+
   testflight:
     name: Upload to TestFlight
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'testflight' }}
+    needs: external_device_gate
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.release_target == 'testflight' && needs.external_device_gate.result == 'success' }}
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 75
     concurrency:
@@ -154,7 +164,8 @@ jobs:
 
   android_internal:
     name: Upload to Google Play internal testing
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-internal' }}
+    needs: external_device_gate
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-internal' && needs.external_device_gate.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     concurrency:
