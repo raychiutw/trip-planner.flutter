@@ -161,10 +161,41 @@ Future<PoiFavorite> restoreFavorite(int favoriteId);
 
 Undo 流程：DELETE 成功後顯示 6 秒 `復原`；點擊時呼叫 restore endpoint，成功後 invalidate favorites provider。`410 UNDO_EXPIRED` 顯示「復原期限已過」，其他錯誤顯示「無法復原收藏，請稍後再試」。App 不再用 `poiId`／`note` 重送 `POST /poi-favorites`。
 
-## 9. Definition of Done
+## 9. Release 環境身分端點
+
+Firebase Test Lab 與 TestFlight release gate 會在任何收藏寫入前驗證後端環境，避免 staging hostname 的 DNS／Cloudflare route 誤指向 production。新增唯讀端點：
+
+```http
+GET /api/environment-identity
+Cookie: session=...
+Origin: https://...
+
+HTTP/1.1 200 OK
+Cache-Control: no-store
+Content-Type: application/json
+
+{
+  "environmentId": "tripline-staging",
+  "mutationGuard": "expected-environment-id-v1"
+}
+```
+
+規則：
+
+- `environmentId` 必須來自部署環境設定，staging 與 production 使用不同且穩定的值。
+- `mutationGuard` 只有在所有收藏 mutation 已支援下述 server-side header 檢查時才回 `expected-environment-id-v1`；尚未完整部署時不得宣告此值。
+- 不可由 request header、query、cookie 或 hostname 推導／覆寫。
+- 端點只讀，不可寫 D1、KV 或 audit log；回應必須 `no-store`。
+- release repository 會把 staging 的精確 HTTPS origin 與預期 `environmentId` 提交在 `tool/staging-release-environments.txt`，不使用可變 secret 作為期望值。
+- identity 不符、端點不存在、非 200 或 JSON 缺欄位時，release workflow 必須在任何 create／delete／restore 前失敗。
+- release client 會在每個 request 傳 `X-Expected-Environment-ID: tripline-staging`。本任務涉及的收藏 create／delete／restore handler 必須在寫入 transaction 前檢查：header 有值且與實際部署環境 ID 不符時，回 `412 ENVIRONMENT_MISMATCH` 且不得執行任何寫入；header 缺漏時維持既有 App／Web client 相容行為。這項 server-side 檢查用來關閉 identity preflight 與後續 mutation 之間的 DNS／route TOCTOU，不得擴張成要求目前所有一般 client 都傳 release-only header。
+- 後端整合測試至少覆蓋 staging／production 回傳不同 ID、client 輸入無法改變回傳值、現有無 header mutation 維持相容，以及 production handler 收到 staging ID 時回 412 且資料完全未變更。
+
+## 10. Definition of Done
 
 - migration 可在 production D1 向前套用，且有 rollback／forward-fix 說明。
 - 所有 active 查詢排除 deleted rows。
 - 新舊收藏建立、刪除、restore 整合測試全部通過。
 - 既有 API regression suite、typecheck、lint 全綠。
 - API reference 更新並提供後端 commit SHA 給 Flutter 開發。
+- `/api/environment-identity` 已部署，staging／production 身分不同，收藏 mutation 會拒絕不相符的 `X-Expected-Environment-ID` 且不影響無 header 的一般 App，release preflight 測試通過。

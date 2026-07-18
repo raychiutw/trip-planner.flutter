@@ -4574,28 +4574,40 @@ CI uploads the directory even on failure. Geometry remains assertion-based; scre
 Keep `.github/workflows/mobile.yml` as the fast PR gate. Add `.github/workflows/mobile-e2e.yml` to build Patrol's native test bundles in GitHub Actions and execute them on the external Firebase Test Lab device farm:
 
 - `workflow_dispatch` for `ios`, `android`, or `all`;
-- a nightly schedule for native smoke;
+- a weekday Android native-smoke schedule at 02:30 Asia/Taipei;
 - Android build on `ubuntu-24.04`, followed by `gcloud firebase test android run --type instrumentation --use-orchestrator` against an ARM virtual or physical device with Google Play services;
-- iOS build on `macos-26` or `tripline-release`, followed by `gcloud firebase test ios run` against a Firebase physical iPhone using the packaged `.xctestrun` and `Release-iphoneos` products;
+- iOS build on `macos-26`, followed by `gcloud firebase test ios run` against a Firebase physical iPhone using the packaged `.xctestrun` and `Release-iphoneos` products;
 - pinned `patrol_cli 4.4.0`;
 - Google Cloud authentication through GitHub OIDC Workload Identity Federation, not a long-lived service-account JSON key;
 - repository variables `FIREBASE_TEST_LAB_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, and `GCP_TEST_LAB_SERVICE_ACCOUNT`; map keys remain GitHub secrets;
 - `patrol build android --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true`, then upload `app-debug.apk` and `app-debug-androidTest.apk` to Test Lab;
 - `patrol build ios --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true --release`, zip `Release-iphoneos` plus the generated `.xctestrun`, then upload the archive to Test Lab;
-- one stable low-cost device per nightly run; broader physical-device matrices are manual release gates only;
+- one stable low-cost device per scheduled run; broader physical-device matrices are manual release gates only;
 - Test Lab video, screenshot, JUnit/native report, matrix URL, and failure-log artifact uploads;
 - concurrency cancellation for stale E2E runs;
 - a release-gate output consumed before TestFlight/Play internal upload.
 
 The job must preserve Test Lab's non-zero exit code: `0` is PASS, `10` is a test failure, and infrastructure/unsupported-matrix exit codes remain BLOCKED/FAIL rather than being swallowed. Spark quota is sufficient for a one-device smoke matrix (up to 10 virtual and 5 physical runs per day); Blaze overage must be protected by the one-device default and a Google Cloud budget alert.
 
-- [ ] **Step 8: Gate release on the real favorite-restore backend contract**
+- [x] **Step 8: Gate release on the real favorite-restore backend contract**
 
 The release workflow must perform an authenticated staging contract smoke before mobile upload: create a disposable favorite, delete it, call `POST /poi-favorites/:id/restore`, verify owner scoping and successful restore, delete the fixture, and fail closed when the endpoint or migration is absent. Do not point this smoke at production and do not enable the Flutter Undo affordance solely because mocks pass.
 
 The backend implementation remains owned by `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`. If staging credentials are absent, TestFlight and Play upload remain blocked with an explicit contract-gate message.
 
-- [ ] **Step 9: Run and record the automated replacement matrix**
+Implementation evidence (2026-07-19): `.github/workflows/mobile.yml` invokes
+`tool/verify_favorite_restore_contract.sh` before external-device and upload
+jobs, validates an exact HTTPS origin/environment pair plus server-side mutation
+binding, and fails closed when protected values are missing. Runtime status is **BLOCKED**, not
+PASS: the backend must deploy `GET /api/environment-identity` plus the
+server-side `X-Expected-Environment-ID` mutation guard, a reviewed commit must
+add the exact deployed origin and stable environment ID to
+`tool/staging-release-environments.txt`, and the `mobile-release` environment
+still needs the staging URL/origin, two disposable account cookie sets, fixture POI ID, and
+`STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1` after the backend
+migration is deployed.
+
+- [x] **Step 9: Run and record the automated replacement matrix**
 
 Run:
 
@@ -4613,6 +4625,15 @@ git diff --check
 ```
 
 Manual QA is no longer an unrecorded release condition. Any case that cannot run must be reported as BLOCKED with its missing device, API key, staging credential, or runner label; it may not be silently counted as PASS.
+
+Execution record (2026-07-19): the canonical command, run, SHA, artifact-count,
+and blocker table is
+[`docs/mobile-e2e.md`](../../mobile-e2e.md#2026-07-19-verification-record).
+Local deterministic, visual, iOS simulator, and native-map checks pass; the
+exact-master Android build and product-equivalent Firebase Android device run
+also pass. Firebase iOS, the staging favorite-restore contract, and the
+current-master TestFlight upload remain explicitly BLOCKED by the credentials
+listed in that record.
 
 Commit:
 

@@ -12,10 +12,11 @@ if [[ "$STAGING_CONTRACT_GUARD" != 'tripline-staging-favorite-restore-v1' ]]; th
   echo 'Refusing mutations: STAGING_CONTRACT_GUARD is invalid.' >&2
   exit 2
 fi
+readonly expected_mutation_guard='expected-environment-id-v1'
 
 base_url=${STAGING_API_BASE_URL%/}
-if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)(:[0-9]+)?(/.*)?$ ]]; then
-  echo 'Refusing mutations: STAGING_API_BASE_URL must use HTTPS with a plain hostname.' >&2
+if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)$ ]]; then
+  echo 'Refusing mutations: STAGING_API_BASE_URL must match an exact committed HTTPS origin without a port or path.' >&2
   exit 2
 fi
 canonical_host() {
@@ -24,6 +25,7 @@ canonical_host() {
   printf '%s' "${host%.}"
 }
 staging_host=$(canonical_host "${BASH_REMATCH[1]}")
+readonly staging_origin="https://$staging_host"
 readonly production_hosts=(
   'trip-planner-dby.pages.dev'
 )
@@ -33,23 +35,40 @@ for production_host in "${production_hosts[@]}"; do
     exit 2
   fi
 done
-if [[ "${CI:-false}" == true ]]; then
-  : "${STAGING_ALLOWED_HOST:?Set the exact non-production API hostname}"
-  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    echo 'Refusing mutations: STAGING_ALLOWED_HOST must be a plain hostname.' >&2
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly staging_environments_file="$script_dir/staging-release-environments.txt"
+if [[ ! -r "$staging_environments_file" ]]; then
+  echo 'Refusing mutations: committed staging environment allowlist is missing.' >&2
+  exit 2
+fi
+expected_environment_id=''
+while IFS= read -r line || [[ -n "$line" ]]; do
+  line=${line%%#*}
+  [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+  if [[ ! "$line" =~ ^[[:space:]]*https://([A-Za-z0-9.-]+)[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*$ ]]; then
+    echo 'Refusing mutations: committed staging environment allowlist is invalid.' >&2
     exit 2
   fi
-  allowed_host=$(canonical_host "$STAGING_ALLOWED_HOST")
-  if [[ "$staging_host" != "$allowed_host" ]]; then
-    echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
-    exit 2
+  candidate_host=$(canonical_host "${BASH_REMATCH[1]}")
+  candidate_environment_id=${BASH_REMATCH[2]}
+  for production_host in "${production_hosts[@]}"; do
+    if [[ "$candidate_host" == "$production_host" ]]; then
+      echo 'Refusing mutations: committed staging environment contains a production hostname.' >&2
+      exit 2
+    fi
+  done
+  if [[ "$staging_origin" == "https://$candidate_host" ]]; then
+    if [[ -n "$expected_environment_id" ]]; then
+      echo 'Refusing mutations: committed staging origin is duplicated.' >&2
+      exit 2
+    fi
+    expected_environment_id=$candidate_environment_id
   fi
-elif [[ -n "${STAGING_ALLOWED_HOST:-}" ]]; then
-  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]] ||
-      [[ "$staging_host" != "$(canonical_host "$STAGING_ALLOWED_HOST")" ]]; then
-    echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
-    exit 2
-  fi
+done < "$staging_environments_file"
+if [[ -z "$expected_environment_id" ]]; then
+  echo 'Refusing mutations: API origin is not in the committed staging environment allowlist.' >&2
+  exit 2
 fi
 
 if [[ ! "$STAGING_FAVORITE_POI_ID" =~ ^[0-9]+$ ]]; then
@@ -77,6 +96,7 @@ request() {
     --header 'Accept: application/json'
     --header "Origin: $STAGING_ORIGIN"
     --header "Cookie: $cookie"
+    --header "X-Expected-Environment-ID: $expected_environment_id"
   )
   if [[ -n "$csrf_token" ]]; then
     args+=(--header "X-CSRF-Token: $csrf_token")
@@ -93,9 +113,30 @@ cleanup() {
       "$STAGING_SESSION_COOKIE" "${STAGING_CSRF_TOKEN:-}" \
       "$tmp_dir/cleanup.json" >/dev/null || true
   fi
-  rm -rf "$tmp_dir"
+  rm -r -- "$tmp_dir"
 }
 trap cleanup EXIT
+
+# Verify backend identity before any create/delete/restore request. This catches
+# a reviewed staging hostname whose DNS or proxy route drifts to production.
+status=$(request GET /api/environment-identity "$STAGING_SESSION_COOKIE" '' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$status" != 200 ]]; then
+  echo "Staging environment identity check failed with HTTP $status." >&2
+  exit 2
+fi
+actual_environment_id=$(jq -r '.environmentId // empty' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$actual_environment_id" != "$expected_environment_id" ]]; then
+  echo 'Refusing mutations: backend environment identity does not match the committed staging environment.' >&2
+  exit 2
+fi
+actual_mutation_guard=$(jq -r '.mutationGuard // empty' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$actual_mutation_guard" != "$expected_mutation_guard" ]]; then
+  echo 'Refusing mutations: backend environment mutation guard is unavailable.' >&2
+  exit 2
+fi
 
 # Recover safely from a previous interrupted smoke that left the fixture active.
 status=$(request GET /api/poi-favorites "$STAGING_SESSION_COOKIE" '' \
