@@ -198,7 +198,6 @@ jobs:
       FIREBASE_IOS_VERSION: ${{ vars.FIREBASE_IOS_VERSION }}
       IOS_APP_BUNDLE_ID: com.raychiu.tripline
       IOS_TEST_RUNNER_BUNDLE_ID: com.raychiu.tripline.RunnerUITests.xctrunner
-      APPLE_TEAM_ID: 8Z6WVFJ574
       TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-ios
     steps:
       - name: Check out source
@@ -212,7 +211,7 @@ jobs:
           APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD }}
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          APPSTORE_API_PRIVATE_KEY_CONFIGURED: ${{ secrets.APPSTORE_API_PRIVATE_KEY != '' }}
         run: |
           set -euo pipefail
           : "${FIREBASE_PROJECT_ID:?Set FIREBASE_TEST_LAB_PROJECT_ID repository variable}"
@@ -226,7 +225,10 @@ jobs:
           : "${APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD:?Set APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD repository secret}"
           : "${APPSTORE_ISSUER_ID:?Set APPSTORE_ISSUER_ID repository secret}"
           : "${APPSTORE_API_KEY_ID:?Set APPSTORE_API_KEY_ID repository secret}"
-          : "${APPSTORE_API_PRIVATE_KEY:?Set APPSTORE_API_PRIVATE_KEY repository secret}"
+          if [[ "$APPSTORE_API_PRIVATE_KEY_CONFIGURED" != "true" ]]; then
+            echo "Set APPSTORE_API_PRIVATE_KEY repository secret" >&2
+            exit 1
+          fi
 
       - name: Authenticate to Google Cloud with OIDC
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
@@ -254,7 +256,7 @@ jobs:
           flutter pub get
           dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
 
-      - name: Write iOS map secret and Test Lab signing override
+      - name: Write iOS map secret
         shell: bash
         env:
           GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
@@ -262,12 +264,6 @@ jobs:
           set -euo pipefail
           umask 077
           printf 'GOOGLE_MAPS_IOS_API_KEY=%s\n' "$GOOGLE_MAPS_IOS_API_KEY" > ios/Flutter/Secrets.xcconfig
-          printf '%s\n' \
-            'CODE_SIGN_STYLE = Automatic' \
-            'CODE_SIGN_IDENTITY = Apple Development' \
-            "DEVELOPMENT_TEAM = ${APPLE_TEAM_ID}" \
-            'PROVISIONING_PROFILE_SPECIFIER =' \
-            > "$RUNNER_TEMP/testlab-signing.xcconfig"
 
       - name: Import Apple Development certificate
         uses: Apple-Actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
@@ -296,28 +292,9 @@ jobs:
       - name: Build and package signed Patrol XCTest
         shell: bash
         env:
-          XCODE_XCCONFIG_FILE: ${{ runner.temp }}/testlab-signing.xcconfig
-          APPSTORE_API_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
-          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          XCODE_XCCONFIG_FILE: ${{ github.workspace }}/ios/Flutter/TestLabSigning.xcconfig
         run: |
           set -euo pipefail
-          umask 077
-          wrapper_dir="$RUNNER_TEMP/xcodebuild-wrapper"
-          cleanup() {
-            rm -f "$APPSTORE_API_KEY_PATH"
-            rm -rf "$wrapper_dir"
-          }
-          trap cleanup EXIT
-          mkdir -p "$wrapper_dir"
-          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$APPSTORE_API_KEY_PATH"
-          unset APPSTORE_API_PRIVATE_KEY
-          ln -s \
-            "$GITHUB_WORKSPACE/tool/xcodebuild_authenticated_wrapper.sh" \
-            "$wrapper_dir/xcodebuild"
-          export PATH="$wrapper_dir:$PATH"
-
           patrol build ios \
             --target patrol_test/native_map_smoke_test.dart \
             --target patrol_test/app_owned_flow_test.dart \

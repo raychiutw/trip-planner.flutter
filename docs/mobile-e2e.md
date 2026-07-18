@@ -70,16 +70,22 @@ gcloud firebase test ios models describe MODEL_ID --project PROJECT_ID
    - existing `APPSTORE_API_KEY_ID`
    - existing `APPSTORE_API_PRIVATE_KEY`
 
-The workflow validates and downloads both development profiles. Because Patrol
-4.4.0 owns the final `xcodebuild build-for-testing` invocation, CI places the
-checked-in authenticated xcodebuild wrapper first on `PATH`. The wrapper adds
-Xcode's non-interactive App Store Connect API-key provisioning flags only to
-`build-for-testing`; all other xcodebuild calls pass through unchanged. CI
-resolves Flutter and Patrol dependencies before materializing the API key,
-builds a release XCTest bundle, verifies the signatures of `Runner.app` and
-`RunnerUITests-Runner.app`, packages the result, and then unconditionally
-deletes the key and wrapper before uploading to Test Lab. Firebase re-signs
-valid inputs for its own physical devices.
+The workflow validates and downloads both development profiles before any
+repository build script runs. `ios/Flutter/TestLabSigning.xcconfig` then uses
+manual signing and selects the matching profile by Xcode target: `Runner` uses
+`Tripline App Development CI 2026-07-19`, while `RunnerUITests` uses
+`Tripline XCTest Runner Development CI 2026-07-19`. The signing identity is
+also pinned to the certificate embedded by those profiles, so runner keychain
+ordering cannot select a different Development certificate. The App Store
+Connect key is provided only to the pinned profile-download actions; Patrol,
+Xcode build phases, CocoaPods scripts, and repository code never receive the
+key or its path. CI builds a release XCTest bundle, verifies the signatures of
+`Runner.app` and `RunnerUITests-Runner.app`, packages the result, and uploads it
+to Test Lab. Firebase re-signs valid inputs for its own physical devices.
+
+When rotating the Development certificate or either profile, update the exact
+certificate and profile names in `ios/Flutter/TestLabSigning.xcconfig` in the
+same change as the protected GitHub secrets.
 
 ## Run and interpret
 
