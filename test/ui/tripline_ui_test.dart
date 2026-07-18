@@ -12,7 +12,7 @@ import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
-import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 import 'package:tripline/ui/tp_state_view.dart';
@@ -138,18 +138,22 @@ void main() {
     );
   });
 
-  testWidgets('TpRootScrollScaffold 頁首恆為 inline 56，不放大也不收合', (tester) async {
+  testWidgets('TpRootScaffold 頁首固定為單一 56pt glass 膠囊', (tester) async {
     // 大標題吃掉 96-108pt 卻只重複 tab bar 已經講過的頁名。root 頁改為 inline，
     // 省下的高度換成內容（同一螢幕多看到一張卡）。
     await tester.pumpWidget(
       app(
-        const TpRootScrollScaffold(
-          title: '我的行程',
-          actions: [
-            IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
-            IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
-          ],
-          slivers: [SliverToBoxAdapter(child: Text('內容'))],
+        const TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: Text('我的行程'),
+            actions: [
+              IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
+              IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
+            ],
+          ),
+          body: TpRootScrollView(
+            slivers: [SliverToBoxAdapter(child: Text('內容'))],
+          ),
         ),
       ),
     );
@@ -159,21 +163,12 @@ void main() {
       find.byKey(const ValueKey('root-scroll-bottom-inset')),
       findsOneWidget,
     );
-    final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-    expect(appBar.toolbarHeight, 56);
-    expect(appBar.collapsedHeight, 56);
-    // 展開高度必須等於 collapsed —— 有落差就是大標題還在。
-    expect(appBar.expandedHeight, 56);
-    expect(appBar.centerTitle, isFalse);
-    expect(appBar.leading, isNull);
-    expect(appBar.actions, hasLength(1));
+    expect(find.byType(SliverAppBar), findsNothing);
+    expect(find.byType(AppBar), findsNothing);
     expect(
-      (appBar.actions!.single as SizedBox).width,
-      TpSpacing.tapMin * 2 + TpSpacing.s2,
+      tester.getSize(find.byKey(const ValueKey('tp-root-glass-header'))),
+      const Size(768, 56),
     );
-
-    // 實測頁首佔用高度：inline 56，不是 large 的 108。
-    expect(tester.getSize(find.byType(AppBar)).height, 56);
   });
 
   testWidgets('TpAppBar more 使用水平 ellipsis 且維持 44pt target', (tester) async {

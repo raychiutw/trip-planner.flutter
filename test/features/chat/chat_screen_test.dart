@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
@@ -16,8 +15,8 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 class _MockRequestsRepo extends Mock implements RequestsRepository {}
 
@@ -95,7 +94,7 @@ void main() {
     );
   }
 
-  testWidgets('AppBar 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
+  testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -104,9 +103,11 @@ void main() {
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.byType(PopupMenuButton<String>), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
-    expect(find.byType(TpAppBar), findsOneWidget);
-    final appBar = tester.widget<GlassAppBar>(find.byType(GlassAppBar));
-    expect(appBar.preferredSize.height, kToolbarHeight);
+    expect(find.byType(TpRootScaffold), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
     expect(find.byIcon(Icons.more_vert), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
@@ -143,7 +144,8 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(TpGlassSurface), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-composer-glass')), findsOneWidget);
+    expect(find.byType(TpGlassSurface), findsNWidgets(2));
 
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '改午餐');
     await tester.pump();

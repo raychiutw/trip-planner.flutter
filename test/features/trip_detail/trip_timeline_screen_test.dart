@@ -353,9 +353,13 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('AppBar 顯示行程選擇、功能選單與帳號入口', (tester) async {
+  testWidgets('Root Glass Header 顯示行程選擇、功能選單與帳號入口', (tester) async {
     await _pumpTimeline(tester);
 
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
     expect(find.text('沖繩自駕五日'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('trip-timeline-trip-picker')),

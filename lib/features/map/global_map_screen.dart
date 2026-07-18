@@ -12,7 +12,7 @@ import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
-import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_root_scaffold.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/trips_list_screen.dart';
 import 'map_adapter.dart';
@@ -93,13 +93,13 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
     return tripsAsync.when(
-      loading: () => const Scaffold(
-        appBar: _MapRootAppBar(),
-        body: Center(child: CircularProgressIndicator.adaptive()),
+      loading: () => _rootState(
+        context,
+        const Center(child: CircularProgressIndicator.adaptive()),
       ),
-      error: (error, stackTrace) => Scaffold(
-        appBar: const _MapRootAppBar(),
-        body: _MapState(
+      error: (error, stackTrace) => _rootState(
+        context,
+        _MapState(
           icon: CupertinoIcons.exclamationmark_triangle,
           title: '載入失敗',
           body: '無法取得行程，請稍後再試。',
@@ -109,9 +109,9 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
       ),
       data: (trips) {
         if (trips.isEmpty) {
-          return Scaffold(
-            appBar: const _MapRootAppBar(),
-            body: _MapState(
+          return _rootState(
+            context,
+            _MapState(
               icon: CupertinoIcons.map,
               title: '先建立行程',
               body: '建立行程並加入地點後，就能在地圖上查看每日路線。',
@@ -141,6 +141,21 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     );
   }
 
+  Widget _rootState(BuildContext context, Widget body) {
+    return TpRootScaffold(
+      header: const TpRootHeaderConfig(
+        title: Text('地圖'),
+        actions: [TpAccountAvatarButton()],
+      ),
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: TpRootGeometry.initialContentTop(context),
+        ),
+        child: body,
+      ),
+    );
+  }
+
   TripSummary _resolveSelectedTrip(List<TripSummary> trips) {
     final selectedId = _selectedTripId;
     if (selectedId != null) {
@@ -149,22 +164,6 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
       }
     }
     return trips.first;
-  }
-}
-
-class _MapRootAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _MapRootAppBar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  @override
-  Widget build(BuildContext context) {
-    return const TpAppBar(
-      role: TpAppBarRole.standalone,
-      title: Text('地圖'),
-      actions: [TpAccountAvatarButton()],
-    );
   }
 }
 

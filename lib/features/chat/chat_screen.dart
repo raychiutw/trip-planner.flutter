@@ -17,8 +17,8 @@ import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
-import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_glass_surface.dart';
+import '../../ui/tp_root_scaffold.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'ai_consent_sheet.dart';
@@ -80,9 +80,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? null
         : trips.firstWhere((trip) => trip.tripId == tripId);
 
-    return Scaffold(
-      appBar: TpAppBar(
-        role: TpAppBarRole.standalone,
+    return TpRootScaffold(
+      header: TpRootHeaderConfig(
         title: currentTrip == null
             ? const Text('行程')
             : TripTitleButton(
@@ -96,25 +95,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
         actions: const [TpAccountAvatarButton()],
       ),
-      body: tripsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
-        error: (e, _) =>
-            const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
-        data: (trips) {
-          if (trips.isEmpty) {
-            return const _CenteredHint(
-              title: '先建立行程',
-              body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: TpRootGeometry.initialContentTop(context),
+        ),
+        child: tripsAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator.adaptive()),
+          error: (e, _) =>
+              const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+          data: (trips) {
+            if (trips.isEmpty) {
+              return const _CenteredHint(
+                title: '先建立行程',
+                body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+              );
+            }
+            return _ChatBody(
+              key: ValueKey(tripId),
+              tripId: tripId!,
+              initialPrefill: _pendingPrefill,
+              onInitialPrefillConsumed: _consumePrefill,
             );
-          }
-          return _ChatBody(
-            key: ValueKey(tripId),
-            tripId: tripId!,
-            initialPrefill: _pendingPrefill,
-            onInitialPrefillConsumed: _consumePrefill,
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -466,6 +470,7 @@ class _ComposerState extends ConsumerState<_Composer> {
           TpSpacing.s2,
         ),
         child: TpGlassSurface(
+          key: const ValueKey('chat-composer-glass'),
           padding: const EdgeInsets.all(TpSpacing.s2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,

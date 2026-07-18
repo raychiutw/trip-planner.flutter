@@ -229,6 +229,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
+
     final daySelector = find.byKey(const ValueKey('trip-map-day-selector'));
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);

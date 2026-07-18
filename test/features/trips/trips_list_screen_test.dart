@@ -11,7 +11,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
-import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
@@ -173,18 +173,20 @@ void main() {
       await tester.pump();
 
       expect(find.byKey(const ValueKey('trips-create-fab')), findsNothing);
-      expect(find.byType(TpRootScrollScaffold), findsOneWidget);
+      expect(find.byType(TpRootScaffold), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('tp-root-glass-header')),
+        findsOneWidget,
+      );
+      expect(find.text('我的行程'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+      expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
       expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('account-avatar-button')),
         findsOneWidget,
       );
-      final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-      expect(appBar.actions, hasLength(1));
-      final actionGroup = appBar.actions!.single as SizedBox;
-      final actionChildren = (actionGroup.child! as Row).children;
-      expect(actionChildren, hasLength(3));
-      expect((actionChildren[1] as SizedBox).width, 8);
+      expect(find.byType(SliverAppBar), findsNothing);
       expect(find.byTooltip('更多'), findsOneWidget);
       expect(
         find.byWidgetPredicate((widget) => widget is TpMoreMenuButton),

@@ -17,6 +17,7 @@ import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_horizontal_selector.dart';
+import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
@@ -116,9 +117,9 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
 
-    return Scaffold(
-      appBar: TpAppBar(
-        role: TpAppBarRole.standalone,
+    return TpRootScaffold(
+      showSoftEdge: true,
+      header: TpRootHeaderConfig(
         title: TripTitleButton(
           key: const ValueKey('trip-timeline-trip-picker'),
           currentTripId: widget.tripId,
@@ -193,22 +194,27 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           const TpAccountAvatarButton(),
         ],
       ),
-      body: daysAsync.when(
-        data: (days) => days.isEmpty
-            ? const _EmptyTimeline()
-            : _TimelineBody(
-                days: days,
-                tripId: widget.tripId,
-                initialEntryId: widget.initialEntryId,
-                initialDayNum: widget.initialDayNum,
-                isEditing: _isEditing,
-              ),
-        loading: () => const _TimelineSkeleton(),
-        error: (error, stackTrace) => _TimelineError(
-          onRetry: () {
-            ref.invalidate(tripDetailProvider(widget.tripId));
-            ref.invalidate(tripDaysProvider(widget.tripId));
-          },
+      body: Padding(
+        padding: EdgeInsets.only(
+          top: TpRootGeometry.initialContentTop(context),
+        ),
+        child: daysAsync.when(
+          data: (days) => days.isEmpty
+              ? const _EmptyTimeline()
+              : _TimelineBody(
+                  days: days,
+                  tripId: widget.tripId,
+                  initialEntryId: widget.initialEntryId,
+                  initialDayNum: widget.initialDayNum,
+                  isEditing: _isEditing,
+                ),
+          loading: () => const _TimelineSkeleton(),
+          error: (error, stackTrace) => _TimelineError(
+            onRetry: () {
+              ref.invalidate(tripDetailProvider(widget.tripId));
+              ref.invalidate(tripDaysProvider(widget.tripId));
+            },
+          ),
         ),
       ),
     );

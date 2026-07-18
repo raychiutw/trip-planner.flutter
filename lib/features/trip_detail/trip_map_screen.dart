@@ -16,6 +16,7 @@ import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_bottom_accessory.dart';
 import '../../ui/tp_horizontal_selector.dart';
+import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../map/map_adapter.dart';
 import '../map/map_location.dart';
@@ -78,9 +79,9 @@ class TripMapScreen extends ConsumerWidget {
       key: const ValueKey('trip-map-status-style'),
       value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
           .copyWith(statusBarColor: Colors.transparent),
-      child: Scaffold(
-        appBar: TpAppBar(
-          role: TpAppBarRole.standalone,
+      child: TpRootScaffold(
+        header: TpRootHeaderConfig(
+          platformViewBackdrop: true,
           title: TripTitleButton(
             key: const ValueKey('trip-map-trip-picker'),
             currentTripId: tripId,
@@ -213,7 +214,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   EdgeInsets get _mapPadding => EdgeInsets.fromLTRB(
     TpSpacing.s10,
-    TpSpacing.s3 +
+    TpRootGeometry.headerBottom(context) +
+        TpSpacing.s2 +
         TpSpacing.tapMin +
         TpSpacing.s2 +
         TpSpacing.tapMin +
@@ -597,16 +599,16 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           ),
         ),
         if (_loadingRoutes)
-          const Positioned(
+          Positioned(
             left: TpSpacing.s4,
-            top: TpSpacing.s10,
-            child: SizedBox.square(
+            top: TpRootGeometry.headerBottom(context) + TpSpacing.s3,
+            child: const SizedBox.square(
               dimension: 24,
               child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             ),
           ),
         Positioned(
-          top: TpSpacing.s2,
+          top: TpRootGeometry.headerBottom(context) + TpSpacing.s2,
           left: TpSpacing.s3,
           right: TpSpacing.s3,
           child: TpHorizontalSelector<int>(
@@ -637,7 +639,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           ),
         ),
         Positioned(
-          top: TpSpacing.s2 + TpSpacing.tapMin + TpSpacing.s2,
+          top:
+              TpRootGeometry.headerBottom(context) +
+              TpSpacing.s2 +
+              TpSpacing.tapMin +
+              TpSpacing.s2,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
             key: const ValueKey('trip-map-locate-button'),
@@ -648,6 +654,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         if (visiblePins.isEmpty)
           Positioned(
             top:
+                TpRootGeometry.headerBottom(context) +
                 TpSpacing.s2 +
                 TpSpacing.tapMin +
                 TpSpacing.s2 +

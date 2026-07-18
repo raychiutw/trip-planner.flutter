@@ -8,8 +8,9 @@ void main() {
     for (final entity in Directory('lib/features').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
       final source = entity.readAsStringSync();
-      if (RegExp(r'\bAppBar\s*\(').hasMatch(source) ||
-          source.contains('SliverAppBar.large(')) {
+      if (RegExp(
+        r'\b(?:AppBar|SliverAppBar|GlassAppBar)\s*\(',
+      ).hasMatch(source)) {
         offenders.add(entity.path);
       }
     }
@@ -18,7 +19,22 @@ void main() {
       offenders,
       isEmpty,
       reason:
-          'Root/detail title geometry must come from TpRootScrollScaffold or TpAppBar.',
+          'Root/detail title geometry must come from TpRootScaffold or TpAppBar.',
     );
+  });
+
+  test('legacy root scaffold and feature-owned map app bar cannot return', () {
+    expect(File('lib/ui/tp_root_scroll_scaffold.dart').existsSync(), isFalse);
+
+    final offenders = <String>[];
+    for (final entity in Directory('lib/features').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final source = entity.readAsStringSync();
+      if (source.contains('TpRootScrollScaffold') ||
+          source.contains('_MapRootAppBar')) {
+        offenders.add(entity.path);
+      }
+    }
+    expect(offenders, isEmpty);
   });
 }

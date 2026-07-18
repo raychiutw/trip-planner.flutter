@@ -15,7 +15,7 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
-import '../../ui/tp_root_scroll_scaffold.dart';
+import '../../ui/tp_root_scaffold.dart';
 import 'trip_card.dart';
 
 const int _maxTripImportBytes = 512 * 1024;
@@ -263,109 +263,117 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final currentUserId = ref.watch(authStateProvider).value?.id;
     final theme = Theme.of(context);
 
-    return TpRootScrollScaffold(
-      title: '我的行程',
-      onRefresh: () => ref.refresh(myTripsProvider.future),
-      actions: [
-        TpMoreMenuButton<_TripsToolbarAction>(
-          key: const ValueKey('trips-sort-button'),
-          tooltip: '更多',
-          enabled: !_isImporting,
-          triggerChild: _isImporting
-              ? SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator.adaptive(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(
-                      theme.colorScheme.primary,
+    return TpRootScaffold(
+      showSoftEdge: true,
+      header: TpRootHeaderConfig(
+        title: const Text('我的行程'),
+        actions: [
+          TpMoreMenuButton<_TripsToolbarAction>(
+            key: const ValueKey('trips-sort-button'),
+            tooltip: '更多',
+            enabled: !_isImporting,
+            triggerChild: _isImporting
+                ? SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator.adaptive(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(
+                        theme.colorScheme.primary,
+                      ),
                     ),
-                  ),
-                )
-              : null,
-          onSelected: _handleToolbarAction,
-          items: [
-            const TpActionItem(
-              key: ValueKey('trips-create-button'),
-              value: _TripsToolbarAction.create,
-              icon: CupertinoIcons.add,
-              label: '新增行程',
-            ),
-            const TpActionItem(
-              key: ValueKey('trips-list-import-trigger'),
-              value: _TripsToolbarAction.importJson,
-              icon: CupertinoIcons.cloud_upload,
-              label: '匯入行程 JSON',
-              dividerBefore: true,
-            ),
-            _buildSortMenuAction(
-              action: _TripsToolbarAction.defaultOrder,
-              order: TripSortOrder.defaultOrder,
-              label: '預設順序',
-              dividerBefore: true,
-            ),
-            _buildSortMenuAction(
-              action: _TripsToolbarAction.nameAsc,
-              order: TripSortOrder.nameAsc,
-              label: '名稱 A→Z',
-            ),
-            _buildSortMenuAction(
-              action: _TripsToolbarAction.updatedDesc,
-              order: TripSortOrder.updatedDesc,
-              label: '最新編輯',
-            ),
-            _buildSortMenuAction(
-              action: _TripsToolbarAction.startDateAsc,
-              order: TripSortOrder.startDateAsc,
-              label: '出發日',
-            ),
-          ],
-        ),
-        const TpAccountAvatarButton(),
-      ],
-      slivers: [
-        SliverToBoxAdapter(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TpSpacing.s4,
-                  TpSpacing.s2,
-                  TpSpacing.s4,
-                  TpSpacing.s2,
-                ),
-                child: AppSearchField(
-                  fieldKey: const ValueKey('trips-search-field'),
-                  controller: _searchController,
-                  placeholder: '搜尋行程',
-                ),
+                  )
+                : null,
+            onSelected: _handleToolbarAction,
+            items: [
+              const TpActionItem(
+                key: ValueKey('trips-create-button'),
+                value: _TripsToolbarAction.create,
+                icon: CupertinoIcons.add,
+                label: '新增行程',
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TpSpacing.s4,
-                  0,
-                  TpSpacing.s4,
-                  TpSpacing.s2,
-                ),
-                child: SegmentedButton<TripFilter>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: TripFilter.all, label: Text('全部')),
-                    ButtonSegment(value: TripFilter.mine, label: Text('我的')),
-                    ButtonSegment(value: TripFilter.shared, label: Text('共編')),
-                  ],
-                  selected: {_filterTab},
-                  onSelectionChanged: (selection) {
-                    setState(() {
-                      _filterTab = selection.first;
-                    });
-                  },
-                ),
+              const TpActionItem(
+                key: ValueKey('trips-list-import-trigger'),
+                value: _TripsToolbarAction.importJson,
+                icon: CupertinoIcons.cloud_upload,
+                label: '匯入行程 JSON',
+                dividerBefore: true,
+              ),
+              _buildSortMenuAction(
+                action: _TripsToolbarAction.defaultOrder,
+                order: TripSortOrder.defaultOrder,
+                label: '預設順序',
+                dividerBefore: true,
+              ),
+              _buildSortMenuAction(
+                action: _TripsToolbarAction.nameAsc,
+                order: TripSortOrder.nameAsc,
+                label: '名稱 A→Z',
+              ),
+              _buildSortMenuAction(
+                action: _TripsToolbarAction.updatedDesc,
+                order: TripSortOrder.updatedDesc,
+                label: '最新編輯',
+              ),
+              _buildSortMenuAction(
+                action: _TripsToolbarAction.startDateAsc,
+                order: TripSortOrder.startDateAsc,
+                label: '出發日',
               ),
             ],
           ),
-        ),
-        ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
-      ],
+          const TpAccountAvatarButton(),
+        ],
+      ),
+      body: TpRootScrollView(
+        onRefresh: () => ref.refresh(myTripsProvider.future),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    TpSpacing.s2,
+                    TpSpacing.s4,
+                    TpSpacing.s2,
+                  ),
+                  child: AppSearchField(
+                    fieldKey: const ValueKey('trips-search-field'),
+                    controller: _searchController,
+                    placeholder: '搜尋行程',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    0,
+                    TpSpacing.s4,
+                    TpSpacing.s2,
+                  ),
+                  child: SegmentedButton<TripFilter>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: TripFilter.all, label: Text('全部')),
+                      ButtonSegment(value: TripFilter.mine, label: Text('我的')),
+                      ButtonSegment(
+                        value: TripFilter.shared,
+                        label: Text('共編'),
+                      ),
+                    ],
+                    selected: {_filterTab},
+                    onSelectionChanged: (selection) {
+                      setState(() {
+                        _filterTab = selection.first;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ..._buildBodySlivers(context, myTripsAsync, currentUserId, theme),
+        ],
+      ),
     );
   }
 
@@ -527,7 +535,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     List<TripSummary> trips,
     String? currentUserId,
   ) {
-    // 底部淨空由 TpRootScrollScaffold 統一提供，這裡不再自行處理。
+    // 底部淨空由 TpRootScrollView 統一提供，這裡不再自行處理。
     return SliverPadding(
       padding: const EdgeInsets.all(TpSpacing.s4),
       sliver: SliverList.separated(

@@ -76,6 +76,10 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
     expect(find.text('沖繩旅行'), findsOneWidget);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);

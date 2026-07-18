@@ -17,7 +17,6 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_settings_group.dart';
-import '../../ui/tp_root_scroll_scaffold.dart';
 import 'account_sessions_screen.dart';
 import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
@@ -148,26 +147,34 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       );
     }
 
-    return TpRootScrollScaffold(
-      title: '帳號',
-      actions: [
-        TpToolbarIconButton(
-          key: const ValueKey('account-close-button'),
-          tooltip: '關閉',
-          onPressed: () {
-            final router = GoRouter.maybeOf(context);
-            if (router == null) {
-              Navigator.of(context).maybePop();
-            } else if (router.canPop()) {
-              router.pop();
-            } else {
-              router.go('/trips');
-            }
-          },
-          icon: CupertinoIcons.xmark,
-        ),
-      ],
-      slivers: slivers,
+    return Scaffold(
+      appBar: TpAppBar(
+        role: TpAppBarRole.standalone,
+        title: const Text('帳號'),
+        actions: [
+          TpToolbarIconButton(
+            key: const ValueKey('account-close-button'),
+            tooltip: '關閉',
+            onPressed: () {
+              final router = GoRouter.maybeOf(context);
+              if (router == null) {
+                Navigator.of(context).maybePop();
+              } else if (router.canPop()) {
+                router.pop();
+              } else {
+                router.go('/trips');
+              }
+            },
+            icon: CupertinoIcons.xmark,
+          ),
+        ],
+      ),
+      body: CustomScrollView(
+        slivers: [
+          ...slivers,
+          const SliverToBoxAdapter(child: SizedBox(height: TpSpacing.s6)),
+        ],
+      ),
     );
   }
 

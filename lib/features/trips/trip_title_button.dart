@@ -35,27 +35,33 @@ class TripTitleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: trips.isEmpty ? null : () => _openPicker(context),
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        minimumSize: const Size(44, 44),
-        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              currentTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
+    return KeyedSubtree(
+      key: const ValueKey('trip-title-button'),
+      child: TextButton(
+        onPressed: trips.isEmpty ? null : () => _openPicker(context),
+        style: TextButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          minimumSize: const Size(44, 44),
+          padding: EdgeInsets.zero,
+          alignment: Alignment.centerLeft,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                currentTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
-          ),
-          const SizedBox(width: TpSpacing.s1),
-          const Icon(CupertinoIcons.chevron_down, size: 14),
-        ],
+            const SizedBox(width: TpSpacing.s1),
+            const Icon(CupertinoIcons.chevron_down, size: 14),
+          ],
+        ),
       ),
     );
   }
