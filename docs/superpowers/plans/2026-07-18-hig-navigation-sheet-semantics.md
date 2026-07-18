@@ -4,29 +4,31 @@
 
 **Goal:** Make every Tripline root page, detail page, bottom sheet, itinerary Timeline, movement workflow, compact navigation capsule, and map interaction use the correct HIG semantics and one shared implementation source for its role, including a fixed full-width Root Glass Header and clickable native Google POIs.
 
-**Architecture:** Keep `liquid_glass_widgets` and `lib/app/adaptive.dart` as the single material/presentation boundaries. Replace Root `SliverAppBar` and feature-owned app bars with one full-bleed `TpRootScaffold` that overlays a fixed `TpRootGlassHeader`; keep role-aware `TpAppBar` only for detail routes and sheet navigation. Replace generic large-sheet functions with one private engine plus semantic wrappers, and migrate call sites by task type. Keep `AppleRootTabBar` and `TpHorizontalSelector` semantically separate while sharing one compact-navigation glass recipe. Convert the itinerary to one native section-linked `CustomScrollView` with adaptive rows and explicit movement semantics. Replace `google_maps_flutter` with mobile-only `google_navigation_flutter` behind an app-owned `TripMapController`/canvas boundary, preserve Tripline markers, routes, clustering, zoom 12, and accessories, and add native Google POI selection plus Universal URL external opening. Use a web external-map fallback instead of retaining a second embedded Google Maps SDK. This is a whole-plan structural refactor: remove duplicate compatibility paths after migration, while preserving product behavior, API/data contracts, accessibility, and tests.
+**Architecture:** Keep `liquid_glass_widgets` and `lib/app/adaptive.dart` as the single material/presentation boundaries. Replace Root `SliverAppBar` and feature-owned app bars with one full-bleed `TpRootScaffold` that overlays a fixed `TpRootGlassHeader`; keep role-aware `TpAppBar` only for detail routes and sheet navigation. Replace generic large-sheet functions with one private engine plus semantic wrappers, and migrate call sites by task type. Keep `AppleRootTabBar` and `TpHorizontalSelector` semantically separate while sharing one compact-navigation glass recipe. Convert the itinerary to one native section-linked `CustomScrollView` with adaptive rows and explicit movement semantics. Replace `google_maps_flutter` with mobile-only `google_navigation_flutter` behind an app-owned `TripMapController`/canvas boundary, preserve Tripline markers, routes, clustering, zoom 12, and accessories, and add native Google POI selection plus Universal URL external opening. Use a web external-map fallback instead of retaining a second embedded Google Maps SDK. This is a whole-plan structural refactor: remove duplicate compatibility paths after migration, while preserving product behavior, accessibility, and tests. The only planned API change is the owner-scoped favorite restore contract in `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`.
 
 **Tech Stack:** Flutter, Dart, Riverpod, GoRouter, `liquid_glass_widgets`, `google_navigation_flutter ^0.10.0`, `url_launcher`, Flutter widget tests, Mocktail.
 
 ## Global Constraints
 
 - This constraint applies to the entire plan: optimize for the correct shared architecture, not the smallest diff. The implementation may reorganize Root Shell, Header, Sheet, compact navigation, Timeline, map adapter, and tests when that removes duplicate ownership or package leakage.
-- Preserve user-visible workflows, API/data contracts, deep links, accessibility, and rollback behavior. Remove old compatibility-only widgets and adapters once all consumers migrate; do not keep two production paths “temporarily” without a dated removal gate.
+- Preserve user-visible workflows, deep links, accessibility, and rollback behavior. Preserve API/data contracts except for the explicitly approved favorite soft-delete/restore endpoint. Remove old compatibility-only widgets and adapters once all consumers migrate; do not keep two production paths “temporarily” without a dated removal gate.
 - Root destinations (`聊天`, `行程`, `地圖`, `收藏`) show neither Back nor Close.
 - All four Root destinations use one fixed, full-width `TpRootGlassHeader` over full-bleed content. Root pages do not build `AppBar`, `SliverAppBar`, `GlassAppBar`, or a second page-specific header surface.
 - Chat, itinerary content, and map root headers show the current trip title as a trip-selection control. Favorites shows `收藏`; the no-selected-trip list fallback shows `我的行程`.
-- Root headers expose at most two 44pt trailing actions. Overflow commands move into More; action gap is 8pt and the outer horizontal inset is 16pt.
+- Root header icon actions are 44×44pt; text actions use intrinsic width with a 44pt minimum height. All actions use an 8pt gap and 16pt outer inset. General Root pages expose at most two trailing actions; Favorites may show search, sort, add, and account together because its fixed two-character title leaves enough measured width, and must pass the 200% Dynamic Type layout test.
 - Back moves one level within the current navigation hierarchy; it never dismisses the whole sheet.
 - Close dismisses a content sheet and returns to the covered screen.
 - Selection sheets use leading `取消`, no `完成`, current-value checkmark, and immediate selection.
 - Form sheets use leading `取消` and trailing `完成` or a specific verb; dirty forms intercept Cancel, barrier dismiss, swipe down, and system back.
 - A content-sheet child may show leading Back and trailing Close; it must not also show Done.
 - The trip-level command is named `調整順序`, not `編輯行程` or `移動行程`; it enters a reorder mode and uses `CupertinoIcons.line_horizontal_3`.
-- The item-level command is named `移到其他 Day`; it uses the HIG Move To symbol `CupertinoIcons.folder` only inside a labeled item menu, never as an unlabeled compact button.
+- The item-level command is named `移到其他 Day`; it uses the HIG Move To symbol `CupertinoIcons.folder` as a direct 44pt button with tooltip and accessibility label, never as an unlabeled compact button.
 - Reorder mode keeps the drag handle and the explicit Move To Day command. Drag is not the only way to move an item.
-- Reorder mode exposes `完成` directly in the trailing app bar; users must not reopen the More menu to leave the mode.
+- Reorder mode changes the Header task title to `調整順序` and exposes the complete text `完成` directly in the trailing app bar; the text action has intrinsic width with a 44pt minimum height and must never be constrained to the 44pt square icon slot or truncate to `完`.
+- `移到其他 Day` uses a direct `folder` inline action because it is the only command in its current ellipsis menu. It and the `line_horizontal_3` drag handle share one 44pt inline-control geometry, foreground, pressed state, tooltip, and semantics; the drag gesture remains distinct.
 - Toolbar, row-menu, Back, Close, Cancel, Done, and drag controls use a minimum `44x44 pt` hit region and an explicit accessibility label.
 - The trip More menu may contain `調整順序`; `移到其他 Day` stays scoped to the selected itinerary entry and never appears as a trip-level command.
+- `TpMoreMenuButton` normal rows use Light `colorScheme.onSurface` and Dark `colorScheme.primary`; destructive rows use `colorScheme.error`. A selected menu item replaces its leading icon with a checkmark.
 - Fixed-height sheets do not show a resize grabber. Resizable sheets use distinct `0.62` medium and `0.93` large detents.
 - All bottom-up presentations route through `lib/app/adaptive.dart`; `lib/features/**` must not call `showModalBottomSheet`, `showCupertinoModalPopup`, or `showGeneralDialog` directly.
 - Reuse the installed `liquid_glass_widgets` package. The only new production dependency in this plan is `google_navigation_flutter ^0.10.0`, replacing `google_maps_flutter`; do not keep both Google Maps packages.
@@ -72,7 +74,7 @@
 
 ## File Map
 
-- `lib/ui/tp_action_item.dart`: the single typed command model consumed by both compact More menus and bottom action sheets; owns destructive role, divider intent, key, label, icon, and returned value.
+- `lib/ui/tp_action_item.dart`: the single typed command model consumed by both compact More menus and bottom action sheets; owns destructive role, selected state, divider intent, key, label, icon, and returned value.
 - `lib/ui/tp_app_bar.dart`: explicit page roles, shared Back/Close/Cancel/Done controls, shared sheet header, and sheet navigation scope.
 - `lib/ui/tp_root_scaffold.dart`: the only Root full-bleed layout, fixed full-width Glass Header, scroll-body insets, soft edge, and Root Tab clearance.
 - `lib/ui/tp_root_scroll_scaffold.dart`: remove after all consumers migrate to `TpRootScaffold`.
@@ -85,7 +87,7 @@
 - `lib/features/chat/chat_screen.dart`: migrate to Root full-bleed scroll/body and fixed trip-title Glass Header without changing composer behavior.
 - `lib/features/trips/trips_list_screen.dart`: migrate the no-selected-trip fallback to the shared Root Header.
 - `lib/features/map/global_map_screen.dart`: remove `_MapRootAppBar`; provide current-trip title/actions to `TpRootScaffold`.
-- `lib/features/favorites/favorites_screen.dart`: migrate `收藏`, explore, and account actions to the shared Root Header.
+- `lib/features/favorites/favorites_screen.dart`: keep `收藏` and add in the shared Root Header; move search into the same capsule, render sorting/filtering through the shared menu, and keep account at the trailing edge.
 - `lib/features/map/map_adapter.dart`: package-neutral map models, callbacks, controller interface, and conditional canvas factory; no Google plugin import.
 - `lib/features/map/map_canvas_mobile.dart`: the only `google_navigation_flutter` renderer, controller bridge, native POI event adapter, appearance, padding, and overlay synchronization.
 - `lib/features/map/map_canvas_web.dart`: non-embedded web fallback with a labeled Google Maps Web action.
@@ -98,6 +100,7 @@
 - `lib/features/trip_detail/day_weather.dart`: one weather state surface that keeps the sample layout until live forecast data is available.
 - `lib/features/trip_detail/widgets/timeline_entry_tile.dart`: start/end time, localized Google category, and standard/accessibility Timeline layouts.
 - `lib/features/trip_detail/widgets/reorderable_row.dart`: shared 44pt reorder handle and accessibility semantics.
+- `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`: backend handoff for favorite soft delete, owner-scoped restore, migration, idempotency, expiry, and integration tests.
 - `lib/features/trip_detail/entry_action_route_screen.dart`: web-compatible Move To Day wording that matches the in-app command.
 - `lib/app/adaptive.dart`: the only sheet presentation engine, semantic wrappers, detents, glass, keyboard/safe-area behavior, and dirty dismissal interception.
 - `lib/app/router.dart`: modal page transitions and explicit root/detail route intent where a route remains full screen.
@@ -108,7 +111,7 @@
 - `ios/Runner/Info.plist`: retain truthful foreground location purpose strings; do not claim background navigation for map-only usage.
 - `lib/features/**`: replace generic or direct sheet calls and declare the correct semantic role; no sheet geometry or platform presentation code remains here.
 - `test/ui/tp_app_bar_test.dart`: header role and control semantics.
-- `test/ui/tp_root_scaffold_test.dart`: fixed overlay geometry, title semantics, two-action cap, top/bottom clearance, and Dynamic Type.
+- `test/ui/tp_root_scaffold_test.dart`: fixed overlay geometry, title semantics, four-action Favorites capacity, top/bottom clearance, and Dynamic Type.
 - `test/app/adaptive_sheet_test.dart`: selection, content, form, nested navigation, detent, and dismissal behavior.
 - Existing feature tests: preserve each workflow while asserting the new visible controls and return path.
 - `test/features/trip_detail/day_weather_test.dart`: preview, loading, live data, error, and transition behavior.
@@ -129,12 +132,33 @@ The numeric task labels preserve the discussion history, but implementation must
 1. Task 0: establish the single typed action model and migrate both existing renderers before any feature adds commands.
 2. Tasks 1–2: establish semantic detail/sheet headers and the shared sheet engine.
 3. Task 10: establish the compact-navigation glass recipe before any Root/map surface consumes it.
-4. Task 13: replace all Root headers/scaffolds before Timeline reorder work targets the new Root action slots.
+4. Task 13: replace all Root headers/scaffolds and add the Favorites search/sort/add states before Timeline reorder work targets the new Root action slots; its action layout must support intrinsic-width `完成`.
 5. Tasks 3–8: migrate sheet, action, movement, routed-task, detail, modal, and standalone semantics.
 6. Tasks 11–12: finish the weather, adaptive Timeline, and section-linked scroll on the new Root scaffold.
 7. Task 14: replace the map SDK and package boundary; Task 15 then adds native Google POI state and external opening.
 8. Task 9: remove legacy sheet APIs only after all call sites are migrated.
-9. Task 16: simplify, remove compatibility code, verify, screenshot, run gstack `/review` plus its Codex gates, and only then allow a remote push.
+9. External Backend Task B1 can proceed in parallel, but Flutter favorite-undo integration and Task 16 release verification require its contract tests to pass.
+10. Task 16: simplify, remove compatibility code, verify, screenshot, run gstack `/review` plus its Codex gates, and only then allow a remote push.
+
+---
+
+### External Backend Task B1: Add owner-scoped favorite restore
+
+**Handoff:** `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`
+
+**Backend repository:** `/Users/ray/Projects/trip-planner`
+
+**Produces:** soft-delete migration, active-only favorite queries/index, idempotent `POST /api/poi-favorites/:id/restore`, 10-minute server retry window, audit/cache invalidation, and integration tests.
+
+**Blocks:** Flutter replacement of recreate-on-undo with `FavoritesRepository.restoreFavorite(id)`, and Task 16 release verification.
+
+- [ ] Backend applies the migration and active-only query audit.
+- [ ] DELETE remains backward-compatible `204` but soft-deletes the owner row.
+- [ ] Restore passes owner, idempotency, expiry, duplicate-race, audit, cache, CSRF, and rate-limit tests.
+- [ ] Backend provides a commit SHA and a test environment where Flutter can verify DELETE → restore → GET.
+- [ ] Flutter adds a failing repository test for `POST /poi-favorites/:id/restore`, replaces `addFavorite(poiId, note)` in the Undo callback, handles `410 UNDO_EXPIRED`, and retains the local snapshot only for optimistic rollback.
+
+Do not silently retain the old recreate-on-undo path after this task lands. If the backend task is unavailable during UI development, keep the Flutter test skipped with the backend issue reference; do not ship a second production restore strategy.
 
 ---
 
@@ -155,7 +179,7 @@ The numeric task labels preserve the discussion history, but implementation must
 
 **Interfaces:**
 - Produces: `enum TpActionRole { normal, destructive }`
-- Produces: immutable `TpActionItem<T>` with required `value`, `label`, and `icon`, plus `key`, `dividerBefore`, `role`, and `enabled`
+- Produces: immutable `TpActionItem<T>` with required `value`, `label`, and `icon`, plus `key`, `selected`, `dividerBefore`, `role`, and `enabled`
 - Changes: `TpMoreMenuButton<T>.items` and `showAppActionSheet<T>(actions:)` both accept `List<TpActionItem<T>>`
 - Preserves: each renderer's presentation role; the compact More menu stays a menu and the bottom action sheet stays a sheet
 - Removes immediately after migration: `TpMenuAction<T>` and `AppSheetAction<T>`; no typedef, deprecated alias, or parallel compatibility constructor
@@ -193,6 +217,7 @@ Add widget tests proving:
 - each renderer returns the typed `value` rather than invoking feature logic inside the UI primitive;
 - `destructive` uses the theme error role, normal rows use title-level foreground contrast, and neither renderer hard-codes black;
 - `dividerBefore`, disabled state, icon, label, key, 44pt hit target, tooltip, and accessibility label are retained in both Light and Dark;
+- `selected: true` uses a checkmark in both renderers without making feature code build a custom menu row;
 - the action-sheet title is centered directly above its separator with no decorative blank block.
 
 - [ ] **Step 2: Run focused tests and confirm they fail**
@@ -221,6 +246,7 @@ class TpActionItem<T> {
     required this.label,
     required this.icon,
     this.key,
+    this.selected = false,
     this.dividerBefore = false,
     this.role = TpActionRole.normal,
     this.enabled = true,
@@ -230,6 +256,7 @@ class TpActionItem<T> {
   final String label;
   final IconData icon;
   final Key? key;
+  final bool selected;
   final bool dividerBefore;
   final TpActionRole role;
   final bool enabled;
@@ -242,7 +269,7 @@ This file must not import `adaptive.dart`, `tp_app_bar.dart`, feature code, or a
 
 Update `TpMoreMenuButton<T>` and `showAppActionSheet<T>` to consume `List<TpActionItem<T>>`. Both return/dispatch the selected typed value after their presentation closes. The renderer decides layout; feature screens decide what the returned value does.
 
-Migrate every code and test call site listed above in the same commit. Convert `isDestructive: true` to `role: TpActionRole.destructive`, add `dividerBefore` where HIG grouping requires it, and supply a meaningful icon for every action-sheet item. Do not add conversion extensions or a temporary adapter list.
+Migrate every code and test call site listed above in the same commit. Convert `isDestructive: true` to `role: TpActionRole.destructive`, add `dividerBefore` where HIG grouping requires it, and supply a meaningful icon for every action-sheet item. When `selected` is true, the shared renderer replaces the leading icon with `CupertinoIcons.check_mark`; feature code must not build a custom selected row. Do not add conversion extensions or a temporary adapter list.
 
 Run the graph/static check before deleting the old definitions:
 
@@ -1166,7 +1193,7 @@ git commit -m "refactor: migrate trip and account sheets"
 **Interfaces:**
 - Consumes: `TpRootScaffold`/`TpRootGlassHeader` from Task 13 and `showAppSelectionSheet<int>()` from Task 2
 - Reuses: `TpMoreMenuButton<T>` and `TpActionItem<T>`; no second menu implementation
-- Produces: trip-level `調整順序`, direct trailing `完成`, per-entry `移到其他 Day`, a labeled 44pt reorder handle, full-card drag feedback, and local insertion feedback
+- Produces: trip-level `調整順序`, intrinsic-width trailing `完成`, direct per-entry `移到其他 Day`, matching 44pt inline move/reorder controls, full-card drag feedback, and local insertion feedback
 - Preserves: same-Day reorder, cross-Day drag, explicit Day selection, repository calls, and travel recomputation
 
 - [ ] **Step 1: Add failing movement-semantics tests**
@@ -1215,31 +1242,43 @@ testWidgets('trip menu enters reorder mode and Done exits directly', (
   expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
 });
 
-testWidgets('entry menu labels Move To Day and keeps drag as an alternative', (
+testWidgets('Move To Day and reorder use matching direct inline controls', (
   tester,
 ) async {
   await _pumpTimeline(tester);
   await _enableTimelineEditing(tester);
 
+  final moveButton = find.byKey(const ValueKey('entry-move-to-day-11'));
   final dragHandle = find.byKey(const ValueKey('entry-drag-11'));
+  expect(tester.getSize(moveButton), const Size(44, 44));
   expect(tester.getSize(dragHandle), const Size(44, 44));
+  expect(tester.getSemantics(moveButton).label, '移到其他 Day');
   expect(tester.getSemantics(dragHandle).label, '拖曳調整順序');
-
-  await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
-  await tester.pumpAndSettle();
-
-  final moveAction = find.byKey(
-    const ValueKey('entry-move-to-day-11'),
-  );
-  expect(moveAction, findsOneWidget);
-  expect(find.text('移到其他 Day'), findsOneWidget);
   expect(
-    find.descendant(
-      of: moveAction,
-      matching: find.byIcon(CupertinoIcons.folder),
-    ),
+    find.descendant(of: moveButton, matching: find.byIcon(CupertinoIcons.folder)),
     findsOneWidget,
   );
+  expect(find.byKey(const ValueKey('entry-menu-11')), findsNothing);
+
+  await tester.tap(moveButton);
+  await tester.pumpAndSettle();
+  expect(find.text('移到其他 Day'), findsOneWidget);
+});
+
+testWidgets('Done keeps its full label and intrinsic width at 200 percent text', (
+  tester,
+) async {
+  await _pumpTimeline(tester, textScaler: const TextScaler.linear(2));
+  await _enableTimelineEditing(tester);
+
+  final done = find.byKey(
+    const ValueKey('tp-root-header-primary-action'),
+  );
+  expect(find.descendant(of: done, matching: find.text('完成')), findsOneWidget);
+  expect(tester.getSize(done).height, greaterThanOrEqualTo(44));
+  expect(tester.getSize(done).width, greaterThan(44));
+  expect(find.text('完'), findsNothing);
+  expect(tester.takeException(), isNull);
 });
 ```
 
@@ -1268,19 +1307,21 @@ Expected: FAIL because the More menu still says `編輯行程`, uses `pencil`, h
 
 - [ ] **Step 3: Make reorder mode a trip-level command with direct Done**
 
-Update `TripTimelineScreen` so the shared Root Glass Header shows More plus account in normal mode, while reorder mode replaces More with a direct Done action and keeps the account button:
+Update `TripTimelineScreen` so the shared Root Glass Header shows More plus account in normal mode. In reorder mode the title becomes `調整順序`, More becomes a direct full-width Done text action, and the account button stays available:
 
 ```dart
 return TpRootScaffold(
   header: TpRootHeaderConfig(
-    title: TripTitleButton(
-      key: const ValueKey('trip-timeline-trip-picker'),
-      currentTripId: widget.tripId,
-      currentTitle: tripTitle,
-      trips: trips,
-      onSelected: (tripId) =>
-          context.go('/trips/${Uri.encodeComponent(tripId)}'),
-    ),
+    title: _isEditing
+        ? const Text('調整順序')
+        : TripTitleButton(
+            key: const ValueKey('trip-timeline-trip-picker'),
+            currentTripId: widget.tripId,
+            currentTitle: tripTitle,
+            trips: trips,
+            onSelected: (tripId) =>
+                context.go('/trips/${Uri.encodeComponent(tripId)}'),
+          ),
     actions: [
       if (_isEditing)
         TpToolbarTextButton(
@@ -1365,9 +1406,10 @@ return TpRootScaffold(
       },
     ),
   ),
-  body: _buildTimelineBody(context),
 );
 ```
+
+`TpRootGlassHeader` must pass text actions through the same shared toolbar slot logic as `TpAppBar`: `TpToolbarTextButton` receives intrinsic/flexible width and a minimum 44pt height; only icon actions use a 44×44pt square. Do not abbreviate the localized label or special-case Chinese text.
 
 Extract the current switch body without changing behavior:
 
@@ -1394,15 +1436,9 @@ void _handleTripAction(_TripMoreAction action) {
 }
 ```
 
-- [ ] **Step 4: Replace the compact folder button with a labeled shared menu**
+- [ ] **Step 4: Unify Move To Day and reorder as direct inline controls**
 
-Add beside `_TripMoreAction`:
-
-```dart
-enum _EntryEditAction { moveToDay }
-```
-
-Replace `_EntryTrailing` with:
+The ellipsis currently contains one command and adds an unnecessary interaction. Replace `_EntryTrailing` with two direct 44pt controls that share `TpInlineEditActionStyle` (or the existing equivalent shared style). Use the folder as a button that opens the labeled selection sheet; keep the three-line control as the drag source:
 
 ```dart
 class _EntryTrailing extends StatelessWidget {
@@ -1421,23 +1457,11 @@ class _EntryTrailing extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TpMoreMenuButton<_EntryEditAction>(
-          key: ValueKey('entry-menu-$entryId'),
-          tooltip: '停留點操作',
-          triggerChild: Icon(
-            CupertinoIcons.ellipsis,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          items: [
-            TpActionItem(
-              key: ValueKey('entry-move-to-day-$entryId'),
-              value: _EntryEditAction.moveToDay,
-              icon: CupertinoIcons.folder,
-              label: '移到其他 Day',
-            ),
-          ],
-          onSelected: (_) => onMove(),
+        TpInlineEditActionButton(
+          key: ValueKey('entry-move-to-day-$entryId'),
+          tooltip: '移到其他 Day',
+          icon: CupertinoIcons.folder,
+          onPressed: onMove,
         ),
         ReorderDragHandle(
           index: index,
@@ -1449,7 +1473,7 @@ class _EntryTrailing extends StatelessWidget {
 }
 ```
 
-The menu trigger remains the shared 44pt glass More button. The `folder` symbol appears only next to the `移到其他 Day` label, so the action does not depend on interpreting the symbol alone.
+`TpInlineEditActionButton` and `ReorderDragHandle` both use the same 44×44pt transparent image-button surface, primary foreground, pressed/highlight state, tooltip, and semantics. They do not add nested glass or bordered circles inside the Timeline card. `ReorderDragHandle` owns pointer/drag behavior but consumes the same visual builder. Keep the existing vertical rail if it preserves Timeline text width at 200% Dynamic Type; format consistency does not require turning the two actions into a wide horizontal toolbar.
 
 - [ ] **Step 5: Give the drag handle a 44pt target and accessibility label**
 
@@ -1466,13 +1490,9 @@ Widget build(BuildContext context) {
         key: iconKey,
         button: true,
         label: '拖曳調整順序',
-        child: SizedBox.square(
-          dimension: TpSpacing.tapMin,
-          child: Icon(
-            CupertinoIcons.line_horizontal_3,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          child: TpInlineEditControlVisual(
+            icon: CupertinoIcons.line_horizontal_3,
           ),
-        ),
       ),
     ),
   );
@@ -1657,7 +1677,7 @@ dart format lib/features/trip_detail/trip_timeline_screen.dart lib/features/trip
 flutter test test/ui/tp_app_bar_test.dart test/features/trip_detail/trip_timeline_screen_test.dart test/features/trip_detail/entry_action_route_screen_test.dart
 ```
 
-Expected: PASS; same-Day reorder, cross-Day drag, explicit Move To Day, and direct Done all remain available.
+Expected: PASS; same-Day reorder, cross-Day drag, direct Move To Day, full `完成`, and matching inline action visuals all remain available at standard and 200% text.
 
 Commit:
 
@@ -3515,6 +3535,7 @@ git commit -m "refactor: link itinerary days to sliver scroll"
 - Modify: `lib/ui/tp_glass_surface.dart`
 - Delete: `lib/ui/tp_root_scroll_scaffold.dart`
 - Modify: `lib/features/chat/chat_screen.dart`
+- Verify: `lib/features/chat/chat_message.dart`
 - Modify: `lib/features/trips/trips_list_screen.dart`
 - Modify: `lib/features/trip_detail/trip_timeline_screen.dart`
 - Modify: `lib/features/map/global_map_screen.dart`
@@ -3533,7 +3554,7 @@ git commit -m "refactor: link itinerary days to sliver scroll"
 - Produces: `TpRootHeaderConfig`, `TpRootGeometry`, `TpRootScaffold`, `TpRootGlassHeader`, and `TpRootScrollView`
 - Reuses: `TpHeaderTitle`, `TpHeaderActionRow`, `TpToolbarGlassButton`, `TpAccountAvatarButton`, `TripTitleButton`, and Task 10's shared glass settings
 - Removes: `TpRootScrollScaffold`, `_MapRootAppBar`, root `TpAppBar` usage, and feature-owned header padding
-- Preserves: current chat composer, Timeline state, map overlays, favorites filters, Root Tab routing, and account/sheet actions
+- Preserves: current chat composer, existing `ChatMessage.submittedBy`／`senderName` data flow, Timeline state, map overlays, favorites filters, Root Tab routing, and account/sheet actions
 
 - [ ] **Step 1: Add failing Root geometry and semantics tests**
 
@@ -3571,10 +3592,10 @@ testWidgets('root header is one fixed capsule over full bleed content', (
   );
 });
 
-testWidgets('root header has one glass surface and at most two actions', (
+testWidgets('root header has one glass surface and supports Favorites actions', (
   tester,
 ) async {
-  await tester.pumpWidget(_rootHarness(actionCount: 2));
+  await tester.pumpWidget(_rootHarness(actionCount: 4));
   expect(
     find.descendant(
       of: find.byKey(const ValueKey('tp-root-glass-header')),
@@ -3583,8 +3604,8 @@ testWidgets('root header has one glass surface and at most two actions', (
     findsOneWidget,
   );
   expect(find.byKey(const ValueKey('tp-root-header-action-0')), findsOneWidget);
-  expect(find.byKey(const ValueKey('tp-root-header-action-1')), findsOneWidget);
-  expect(() => _buildRoot(actionCount: 3), throwsAssertionError);
+  expect(find.byKey(const ValueKey('tp-root-header-action-3')), findsOneWidget);
+  expect(() => _buildRoot(actionCount: 5), throwsAssertionError);
 });
 
 testWidgets('scroll content starts clear then passes under fixed header', (
@@ -3620,6 +3641,70 @@ expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
 
 Add a Dynamic Type test at 200% and an action-spacing assertion: every action has a 44pt target, the gap is 8pt, and the final action ends 16pt from the capsule's content edge.
 
+Extend `favorites_screen_test.dart` with the approved HIG behavior:
+
+```dart
+expect(find.byKey(const ValueKey('favorites-search-action')), findsOneWidget);
+expect(find.byKey(const ValueKey('favorites-sort-menu')), findsOneWidget);
+expect(find.byKey(const ValueKey('favorites-add-action')), findsOneWidget);
+
+await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
+await tester.pump();
+expect(find.byKey(const ValueKey('favorites-search-input')), findsOneWidget);
+expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
+expect(find.byKey(const ValueKey('favorites-search-close')), findsOneWidget);
+
+await tester.tap(find.byKey(const ValueKey('favorites-sort-menu')));
+await tester.pumpAndSettle();
+expect(find.text('最近加入'), findsOneWidget);
+expect(find.text('最早加入'), findsOneWidget);
+expect(find.text('名稱'), findsOneWidget);
+expect(find.text('地區'), findsOneWidget);
+expect(find.text('篩選條件'), findsOneWidget);
+```
+
+Extend `chat_screen_test.dart` with the approved participant identity and full-bleed contracts:
+
+```dart
+expect(find.text('Ray Chiu'), findsOneWidget); // current-account display name
+expect(find.text('lean'), findsOneWidget); // collaborator email fallback
+
+final collaborator = find.byKey(
+  const ValueKey('chat-message-collaborator'),
+);
+final collaboratorContext = tester.element(collaborator);
+final collaboratorAccent = CupertinoColors.systemIndigo.resolveFrom(
+  collaboratorContext,
+);
+final collaboratorLabel = tester.widget<Text>(
+  find.byKey(const ValueKey('chat-message-collaborator-label')),
+);
+expect(collaboratorLabel.style?.color, collaboratorAccent);
+
+final collaboratorBox = tester.widget<DecoratedBox>(collaborator);
+final decoration = collaboratorBox.decoration as BoxDecoration;
+expect(
+  decoration.color,
+  Color.alphaBlend(
+    collaboratorAccent.withValues(alpha: 0.10),
+    Theme.of(collaboratorContext).colorScheme.surfaceContainerHigh,
+  ),
+);
+
+final headerBefore = tester.getRect(
+  find.byKey(const ValueKey('tp-root-glass-header')),
+);
+await tester.drag(find.byType(Scrollable).first, const Offset(0, -320));
+await tester.pump();
+expect(
+  tester.getRect(find.byKey(const ValueKey('tp-root-glass-header'))),
+  headerBefore,
+);
+expect(find.text('較早的訊息'), findsOneWidget);
+```
+
+Repeat the collaborator color assertion under Dark with alpha `0.18`. The test resolves `CupertinoColors.systemIndigo` through the current context instead of hard-coding one appearance's value.
+
 - [ ] **Step 2: Run the focused tests and confirm they fail**
 
 Run:
@@ -3640,7 +3725,7 @@ class TpRootHeaderConfig {
   const TpRootHeaderConfig({
     required this.title,
     this.actions = const <Widget>[],
-  }) : assert(actions.length <= 2);
+  }) : assert(actions.length <= 4);
 
   final Widget title;
   final List<Widget> actions;
@@ -3702,7 +3787,7 @@ class TpRootScaffold extends StatelessWidget {
 }
 ```
 
-`TpRootGlassHeader` must render one `TpGlassSurface`, a left-aligned `TpHeaderTitle`, and one `TpHeaderActionRow`. It must not wrap each action in another glass unless the action itself is the shared circular `TpToolbarGlassButton`; the outer capsule owns the refraction layer.
+`TpRootGlassHeader` must render one `TpGlassSurface`, a left-aligned `TpHeaderTitle`, and one `TpHeaderActionRow`. It must not wrap each action in another glass unless the action itself is the shared circular `TpToolbarGlassButton`; the outer capsule owns the refraction layer. `TpHeaderActionRow` distinguishes icon and text actions: icon actions occupy 44×44pt, while `TpToolbarTextButton` uses intrinsic/flexible width with a minimum 44pt height. This prevents `完成` from being clipped to `完` and keeps the same spacing logic in Root, detail, and sheet headers.
 
 `TpRootScrollView` builds the one `CustomScrollView`, inserts `SliverToBoxAdapter(height: TpRootGeometry.initialContentTop(context))` before feature slivers, and appends `TpRootTabGeometry.clearance(context) + TpSpacing.s4`. Its refresh variant owns `RefreshIndicator.adaptive`; feature pages do not recreate these insets.
 
@@ -3713,12 +3798,17 @@ Apply these title/action rules:
 | Screen | Header title | Trailing actions |
 |---|---|---|
 | Chat | current `TripTitleButton` | account; a second action only if the existing chat behavior requires it |
-| Selected itinerary | current `TripTitleButton` | More/Done, account |
+| Selected itinerary | current `TripTitleButton`; reorder mode uses `調整順序` | More or intrinsic-width `完成`, account |
 | Global/selected map | current `TripTitleButton` | map action/More, account |
-| Favorites | text `收藏` | explore, account |
+| Favorites normal | text `收藏` | search, sort menu, add, account |
+| Favorites searching | autofocus `AppSearchField` | sort menu, close search, account |
 | No-selected-trip list | text `我的行程` | add/More, account according to the existing workflow, max two |
 
-Keep Chat's composer and map controls as body overlays. Position the map Day selector from `TpRootGeometry.headerBottom(context) + TpSpacing.s2`, not a duplicated top formula. Remove `_MapRootAppBar`, all root `Scaffold.appBar` values, root `TpAppBar` calls, `TpRootScrollScaffold`, and feature-owned 16pt/8pt action spacing.
+Keep Chat's composer and map controls as body overlays. Chat messages and the Timeline use their one vertical scroll surface with `TpRootGeometry.initialContentTop(context)` as initial scroll padding instead of wrapping the whole body below the Header, so their content passes under the fixed capsule like Favorites. Position the map Day selector from `TpRootGeometry.headerBottom(context) + TpSpacing.s2`, not a duplicated top formula. Remove `_MapRootAppBar`, all root `Scaffold.appBar` values, root `TpAppBar` calls, `TpRootScrollScaffold`, and feature-owned 16pt/8pt action spacing.
+
+In Chat, reuse the already populated `ChatMessage.senderName` and `submittedBy`; do not change API models. Pass the authenticated account display name and email into the bubble renderer. Resolve each label in this order: self display name → self email local part → `你`; collaborator message sender name → submitted email local part → `協作者`; assistant → `Tripline AI`. Keep self on Tripline accent and AI on a neutral surface. Resolve `CupertinoColors.systemIndigo` from the current context for collaborator label/tint, then alpha-blend it onto the current surface (subtle Light tint, slightly stronger Dark tint). Do not add a new ThemeExtension, dependency, or reusable content-category palette.
+
+Favorites uses `CupertinoIcons.search`, `CupertinoIcons.line_horizontal_3_decrease`, `CupertinoIcons.add`, and the shared account avatar. The sort trigger is `TpMoreMenuButton<_FavoriteSort>` with `triggerChild` set to the three-line icon. Its menu contains newest, oldest, name, and region choices plus a separated Filter entry that opens the existing filter sheet. The selected `TpActionItem` has `selected: true`. Add uses `context.push('/favorites/explore')`; do not duplicate the Explore implementation. Search mode replaces the title with the existing `AppSearchField`, hides Add, keeps account trailing, and removes the former inline search field from the list.
 
 Extend `test/ui/shared_ui_usage_test.dart` so `lib/features/**` cannot instantiate `AppBar`, `SliverAppBar`, or `GlassAppBar`, and so `tp_root_scroll_scaffold.dart` cannot return.
 
@@ -3733,7 +3823,7 @@ flutter test test/features/chat test/features/trips/trips_list_screen_test.dart 
 flutter analyze
 ```
 
-Capture all four Root destinations in Light, Dark, 200% text, Reduce Transparency, and a map PlatformView. Reject a centered title, duplicate glass layer, opaque map gradient, header movement, fewer than 44pt targets, action drift, content hidden on initial load, or Root Tab overlap.
+Capture all four Root destinations in Light, Dark, 200% text, Reduce Transparency, and a map PlatformView. Capture Chat with self, collaborator, and AI messages; verify author fallback and dynamic Indigo contrast in Light/Dark. Capture Favorites in normal, search-active, and sort-menu states. Reject a centered title, duplicate glass layer, opaque map gradient, header movement, fewer than 44pt targets, action drift, chat/Timeline content that cannot pass under the Header, content hidden on initial load, or Root Tab overlap.
 
 Commit only these files:
 

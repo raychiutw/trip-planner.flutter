@@ -2,7 +2,7 @@
 
 日期：2026-07-18
 
-狀態：已確認，待實作
+狀態：已確認，實作中
 
 適用：`trip-planner.flutter` App、`trip-planner` API
 
@@ -12,7 +12,7 @@
 
 本規格適用於整份後續實作計畫，不受「只做最小改動」限制。允許重整 Root Shell、頁面結構、共用元件邊界、地圖 adapter 與測試架構；保留使用者可見行為、API／資料契約與可存取性，不保留只為舊結構相容而存在的重複 UI 路徑。
 
-本次不改資料模型、不新增 restore endpoint、不導入 soft delete。收藏復原沿用現有 API：先刪除收藏，使用者點「復原」時以原本的 `poiId` 與 `note` 重新建立收藏。
+單筆收藏復原改為後端 owner-scoped restore API 與 soft delete；Flutter 不再以 `poiId`／`note` 重建收藏。完整後端交付契約為 `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`。
 
 ## 2. 已決定的語意
 
@@ -30,6 +30,7 @@
 | 功能 | 目前入口 | 定版 UI 行為 | 確認／復原 |
 |---|---|---|---|
 | 新增行程 | 行程 Header／空狀態 | 右上 `plus` 或空狀態主按鈕，進入建立行程頁 | 不確認；成功後顯示新行程 |
+| 新增收藏 | 收藏 Header | 右上 `plus` 開啟既有 Google POI 探索／收藏流程；不得以搜尋圖示代表新增 | 不確認；成功後回到收藏並顯示新項目 |
 | 新增停留點 | 每日行程底部 | 開啟 Google 地圖搜尋／收藏／自訂三種來源 | 不確認；按「完成」後加入 |
 | 新增筆記 | 筆記區塊 | `新增{分類}` 開啟共用 Sheet | 不確認；按「新增」送出 |
 | 新增 Day | 編輯行程 | 明確顯示加到最前或最後 | 不確認；完成後通知 |
@@ -51,7 +52,7 @@
 ### 4.1 正常移除
 
 1. 使用者點 Heart 或選單的「取消收藏」。
-2. App 保留該筆 `PoiFavorite` snapshot，至少包含 `poiId`、`note` 與顯示資料。
+2. App 保留該筆 `PoiFavorite` snapshot 供 optimistic UI 失敗回復，不把 snapshot 當作 restore request。
 3. App 呼叫 `DELETE /api/poi-favorites/:id`。
 4. 成功收到 `204 No Content` 後，從畫面移除卡片。
 5. 顯示 SnackBar：`已移除收藏`，動作為 `復原`。
@@ -61,46 +62,40 @@
 
 ### 4.2 復原
 
-使用者點 `復原` 時呼叫：
+使用者點 `復原` 時呼叫 owner-scoped restore endpoint：
 
 ```http
-POST /api/poi-favorites
+POST /api/poi-favorites/:id/restore
 Content-Type: application/json
 
-{
-  "poiId": 123,
-  "note": "原收藏備註"
-}
+{}
 ```
 
-成功回應維持現有契約：
+成功回應保留原 favorite id 與資料：
 
 ```http
-HTTP/1.1 201 Created
+HTTP/1.1 200 OK
 Content-Type: application/json
 
 {
-  "id": 987,
+  "id": 7,
   "user_id": "user-id",
   "poi_id": 123,
   "note": "原收藏備註",
-  "favorited_at": "2026-07-18 12:00:00"
+  "favorited_at": "2026-07-18 12:00:00",
+  "deleted_at": null
 }
 ```
 
-復原後的 `id` 可以與刪除前不同；App 必須重新整理收藏並採用伺服器回傳的新資料，不得繼續使用舊 `id`。
-
-若 `POST` 回傳 `409 DATA_CONFLICT`，代表同一使用者與 `poiId` 已經存在。App 重新整理收藏後視為最終狀態已復原，不重複顯示錯誤。
-
-其他錯誤顯示 `無法復原收藏，請稍後再試`，並重新整理伺服器狀態。
+Restore 重送必須 idempotent；成功後 App 重新整理收藏。`410 UNDO_EXPIRED` 顯示「復原期限已過」，其他錯誤顯示 `無法復原收藏，請稍後再試`，並重新整理伺服器狀態。
 
 ## 5. 後端契約與工作項目
 
-### 5.1 沿用的端點
+### 5.1 端點
 
 - `DELETE /api/poi-favorites/:id`
   - 僅收藏 owner 可操作。
-  - 成功：`204 No Content`。
+  - 成功：soft delete 並回 `204 No Content`。
   - 不存在：`404 DATA_NOT_FOUND`。
   - 非 owner：`403`。
 - `POST /api/poi-favorites`
@@ -109,34 +104,32 @@ Content-Type: application/json
   - 同一使用者已收藏相同 POI：`409 DATA_CONFLICT`。
   - POI 不存在：`404 DATA_NOT_FOUND`。
   - 保留既有驗證、companion containment、rate limit 與 audit log。
+- `POST /api/poi-favorites/:id/restore`
+  - Request：空 JSON body。
+  - 成功：`200 OK`，回傳同一 favorite row 並令 `deleted_at = null`。
+  - 重送：idempotent `200`。
+  - 超過取消後 10 分鐘：`410 UNDO_EXPIRED`。
+  - 只能由 owner 操作，保留既有 containment、rate limit、CSRF、audit 與 cache invalidation。
 
 ### 5.2 後端需要完成
 
-不需新增 migration 或 route。後端開發只需補強並鎖定以下整合測試：
-
-1. 建立含 `note` 的收藏，刪除後以相同 `poiId`／`note` 重建，回傳新的有效 `id`。
-2. 復原後 `GET /api/poi-favorites` 只出現一筆相同 `poiId`，且 `note` 完整保留。
-3. 重複 `POST` 維持 `409 DATA_CONFLICT`，不建立重複 row。
-4. 非 owner 刪除維持 `403`；不存在的收藏維持 `404`。
-5. DELETE 與復原 POST 都寫入既有 audit log；不能繞過 rate limit 或 companion gate。
-6. 刪除收藏不得刪除 POI、行程停留點或 `trip_entry_pois` 關聯；收藏只是使用者層級關聯。
+後端新增 `deleted_at` migration、active-only unique index、restore route 與完整 race／ownership／expiry tests；Definition of Done 與所有檔案範圍以獨立後端任務文件為準。
 
 後端對應檔案：
 
 - `trip-planner/functions/api/poi-favorites.ts`
 - `trip-planner/functions/api/poi-favorites/[id].ts`
+- `trip-planner/functions/api/poi-favorites/[id]/restore.ts`
 - `trip-planner/tests/api/poi-favorites-post.integration.test.ts`
 - `trip-planner/tests/api/poi-favorites-delete.integration.test.ts`
+- `trip-planner/tests/api/poi-favorites-restore.integration.test.ts`
 
 ### 5.3 不做的項目
 
-- 不新增 `POST /poi-favorites/:id/restore`。
-- 不新增 `deleted_at` 或回收桶。
-- 不要求保留舊 favorite `id`。
+- 不做通用回收桶、最近刪除頁或批次 restore。
+- 不把 restore API 擴張到行程、Day、停留點或筆記。
 - 不為單筆取消收藏增加確認 Alert。
 - 不讓永久刪除使用 Tripline 主色；破壞性動作固定使用 system red。
-
-只有未來需要跨裝置長時間復原、最近刪除清單或稽核還原時，才考慮 soft delete。
 
 ## 6. 徹底共用的 UI 架構
 
@@ -163,7 +156,7 @@ Content-Type: application/json
 
 - 位於 `safeArea.top + 8pt`，左右各 `16pt`，視覺高度 `56pt`。
 - 整條 Header 是**單一** Liquid Glass 膠囊；標題與右側 actions 不各自再包第二層 glass。
-- 標題靠左、單行省略；右側最多兩個 44×44pt actions，actions 間距 `8pt`。
+- 標題靠左、單行省略；圖示 action 固定 44×44pt，文字 action 採內容寬度且至少 44pt 高，actions 間距 `8pt`。一般 Root 頁維持最多兩個 actions；收藏因標題固定且短，可在同一膠囊內顯示搜尋、排序、新增與帳號四個明確動作，並以 200% Dynamic Type 測試證明不破版。
 - Header 固定浮在內容上方；聊天、Timeline、收藏清單與地圖本體皆延伸到 Header 下方。
 - 可捲動內容的第一筆需有足夠初始 top inset，進入捲動後可從 Header 下方通過；交界只允許一層 soft scroll edge。
 - 地圖頁不得在 Header 後方另加不透明漸層或假 toolbar，讓地圖直接成為 glass 的背景內容。
@@ -178,7 +171,18 @@ Root 標題語意固定如下：
 
 除上述公開入口外，`lib/features/**` 不得直接建立 `AppBar`、`SliverAppBar` 或 `GlassAppBar`。返回、關閉與帳號也不得以裸 `IconButton`、`CircleAvatar` 或各頁 `Container` 模擬。
 
-收藏頁右側排列固定為「探索、帳號」。收藏頁不再設定自己的 padding；共用 `TpHeaderActionRow` 讓所有 Root Header 的最右側固定保留 16pt、兩顆圓形按鈕固定間距 8pt。
+收藏頁一般狀態固定為「收藏｜搜尋｜排序｜新增｜帳號」。搜尋使用 `CupertinoIcons.search`；排序按鈕使用 Apple 圖庫同語意的 `CupertinoIcons.line_horizontal_3_decrease`，點擊後由 `TpMoreMenuButton` 顯示錨定選單，當前排序以 checkmark 表示。新增使用 `CupertinoIcons.add` 並開啟既有收藏探索流程；帳號維持最右側。
+
+點搜尋後，搜尋欄在同一條 Root Glass Header 膠囊內取代「收藏」標題並自動聚焦；排序與帳號維持可見，新增暫時隱藏，另提供 44pt「結束搜尋」動作。搜尋欄的清除只清空文字，結束搜尋會清空查詢、收起鍵盤並恢復一般狀態。頁內不得再保留第二條搜尋欄。
+
+排序選單至少提供「最近加入、最早加入、名稱、地區」，下方以 separator 分組提供「篩選條件」並沿用既有篩選 Sheet。沒有第二種收藏版面，因此不實作參考圖的「顯示方式選項」。收藏頁不再設定 Header padding；共用 Root Header 仍讓最右側 action 固定保留 16pt、所有 action 固定間距 8pt。
+
+聊天作者識別沿用既有 `submittedBy` 與 `submittedByDisplayName`，不新增 API 或第二份參與者模型：
+
+- 自己的訊息顯示目前帳號 display name；缺少時依序 fallback 到自己的 email local part（`@` 前）與「你」。
+- 協作者訊息顯示該訊息的 `submittedByDisplayName`；缺少時依序 fallback 到 `submittedBy` 的 email local part 與「協作者」。
+- AI 訊息固定顯示「Tripline AI」。
+- 自己維持 Tripline 柔褐 accent，AI 使用中性 surface；協作者只用 HIG dynamic system Indigo（Light `#5856D6`、Dark `#5E5CE6`）做作者文字與低透明度 bubble tint。這是單一作者識別色，不可擴張成已退場的三色內容分類。
 
 ### 6.2 動作資料與選單單一來源
 
@@ -215,7 +219,7 @@ class TpActionItem<T> {
 
 選單的一般文字與圖示改用標題同階的主題色：
 
-- Light：`colorScheme.onPrimaryContainer`
+- Light：`colorScheme.onSurface`（Tripline 暖深色，不是純黑）
 - Dark：`colorScheme.primary`
 - Destructive：`colorScheme.error`
 
@@ -461,7 +465,7 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 
 1. 全專案可點擊文案符合「新增／加入／移除／刪除」定義。
 2. 單筆取消收藏沒有 Alert，成功後出現含 `復原` 的 SnackBar。
-3. 復原會送出原 `poiId` 與 `note`，並接受伺服器的新 favorite `id`。
+3. 復原呼叫 `POST /api/poi-favorites/:id/restore`，不送 `poiId`／`note`，成功後保留同一 favorite id 與原資料。
 4. 批次移除收藏、共編成員、分享連結、停留點、筆記、Day、行程等不可逆操作仍有明確確認。
 5. 收藏、聊天、行程、地圖等 Root Header 的 action 尺寸、間距與右側邊距一致。
 6. 選單一般文字在 Light／Dark 都與 Header 標題色系一致；破壞性動作維持 system red。
@@ -481,7 +485,7 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 20. Light、Dark、Google Map PlatformView 與 Reduce Transparency fallback 都要實機／模擬器擷圖比對；允許背景造成自然差異，不允許元件配方不同。
 21. 行程 Timeline 符合第 7.6 節全部驗收項目，且沒有新增捲動套件或第二套 Day selector。
 22. 聊天、行程、地圖、收藏全部使用 `TpRootScaffold`＋單一 `TpRootGlassHeader`；`TpRootScrollScaffold`、`_MapRootAppBar` 與 Root `TpAppBar` 退場。
-23. Root Header 位於 safe area 下 8pt、左右 16pt、高 56pt，最多兩個 44pt actions；Chat／行程／地圖標題可切換目前行程，收藏固定顯示「收藏」。
+23. Root Header 位於 safe area 下 8pt、左右 16pt、高 56pt；所有 action 為 44pt 且間距 8pt。Chat／行程／地圖標題可切換目前行程；收藏一般狀態顯示「收藏｜搜尋｜排序｜新增｜帳號」，搜尋狀態在同一膠囊內顯示搜尋欄並保持帳號最右。
 24. Mobile 只保留 `google_navigation_flutter`，Feature 不直接 import plugin，`google_maps_flutter` dependency／import／controller／cluster types 全部為零。
 25. Android API 24、Kotlin 2.3.0、iOS 16.0、CI 與本機 build target 一致；Android debug APK 與 iOS simulator build 都通過。
 26. Google 原生 POI 可點，選取後在既有 bottom accessory slot 顯示 Google 卡；關閉、點空白或點 Tripline marker 會回復原 Tripline 卡與頁次。
@@ -491,6 +495,11 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 30. Tripline 編號 marker、使用者 marker、加粗 route、12+ POI clustering 與橫滑卡片在套件遷移後維持功能與視覺；overlay 更新不得 clear 全圖閃爍。
 31. Map-only 實作不初始化 navigation session，不為未使用的背景導航擴張權限；若套件實際要求背景定位，必須先回到依賴決策，不可直接加入不實用途說明。
 32. 遠端 push 前完成 scoped simplification、完整 merge-base diff code review、全量測試／analyze／雙平台 build、Light／Dark screenshot QA、gstack `/review` 與 Codex gate；P0／P1 必須清零，已接受問題修正後必須重跑受影響的 review／verification gate。
+33. 聊天訊息與行程 Timeline 的唯一垂直捲動面必須和地圖／收藏一樣延伸到固定 Root Header 後方；初始內容避開 Header，捲動後內容可從 glass 下方通過，Header 本身不移動。
+34. 收藏排序按鈕使用 `line_horizontal_3_decrease`，由共用 `TpMoreMenuButton` 顯示最近加入／最早加入／名稱／地區及既有篩選入口；目前排序有 checkmark，沒有未實作的顯示方式選單。
+35. 每則自己與協作者聊天訊息都顯示正確作者名稱；display name 缺少時 fallback 到該帳號 email 的 `@` 前文字。協作者使用 dynamic system Indigo 的單一語意 tint，自己維持 Tripline accent，AI 維持中性 surface。
+36. 進入調整順序模式後 Header 顯示任務標題「調整順序」與完整 trailing「完成」；文字 action 寬度大於 44pt 且支援 200% Dynamic Type，不得截成「完」。
+37. 停留點的 `folder` 移到其他 Day 與 `line_horizontal_3` 拖曳排序共用同一套 44pt inline control 規格；單一動作 ellipsis menu 退場，兩者的 semantics 分別為「移到其他 Day」與「拖曳調整順序」。
 
 ## 9. 參考
 
