@@ -24,7 +24,14 @@ class TpToolbarTextButton extends StatelessWidget {
         minWidth: TpSpacing.tapMin,
         minHeight: TpSpacing.tapMin,
       ),
-      child: TextButton(onPressed: onPressed, child: Text(label, maxLines: 1)),
+      child: TextButton(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(TpSpacing.tapMin, TpSpacing.tapMin),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        ),
+        onPressed: onPressed,
+        child: Text(label, maxLines: 1),
+      ),
     );
   }
 }
@@ -289,7 +296,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     final leadingWidth = leadingAction == null
         ? 0.0
         : role == TpAppBarRole.modalForm
-        ? 64.0
+        ? TpToolbarSlots._textActionWidth
         : TpSpacing.tapMin;
     final actionsWidth = TpToolbarSlots.actionsWidth(resolvedActions);
     if (largeSheetScope != null) {
@@ -297,8 +304,10 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       final showsScopeClose = role != TpAppBarRole.modalForm;
       final sheetActionWidths = <double>[
         for (final action in actions)
-          action is TpToolbarTextButton ? 64 : TpSpacing.tapMin,
-        if (primaryActionLabel != null) 64,
+          action is TpToolbarTextButton
+              ? TpToolbarSlots._textActionWidth
+              : TpSpacing.tapMin,
+        if (primaryActionLabel != null) TpToolbarSlots._textActionWidth,
         if (showsScopeClose) TpSpacing.tapMin,
       ];
       final sheetActionsWidth = sheetActionWidths.isEmpty

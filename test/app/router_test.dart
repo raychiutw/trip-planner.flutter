@@ -278,6 +278,28 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
+  testWidgets('cold-start public deep links do not show a fake Back', (
+    tester,
+  ) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final location in ['/invite?token=abc', '/s/public-token']) {
+      container.read(appRouterProvider).go(location);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    }
+  });
+
   testWidgets('未登入可進入 signup、忘記密碼與 email 驗證 routes', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);

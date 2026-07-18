@@ -353,4 +353,43 @@ void main() {
       );
     },
   );
+
+  testWidgets('large sheet modal form fits Cancel and its submit action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => unawaited(
+                showAppLargeScreenSheet<void>(
+                  context,
+                  builder: (_) => Scaffold(
+                    appBar: TpAppBar(
+                      role: TpAppBarRole.modalForm,
+                      title: const Text('編輯行程'),
+                      onCancel: () {},
+                      primaryActionLabel: '儲存',
+                      onPrimaryAction: () {},
+                    ),
+                  ),
+                ),
+              ),
+              child: const Text('展開表單'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('展開表單'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('tp-app-bar-cancel')), findsOneWidget);
+    expect(find.text('儲存'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
+  });
 }

@@ -417,16 +417,30 @@ void main() {
     );
   });
 
-  testWidgets('更多選單的筆記與行程資料都使用共用可關閉 sheet', (tester) async {
+  testWidgets('更多選單的筆記用內容 sheet，行程資料用表單 sheet', (tester) async {
     await _pumpTimeline(tester);
     await _expectTripActionOpensClosableSheet(
       tester,
       const ValueKey('trip-action-notes'),
     );
-    await _expectTripActionOpensClosableSheet(
-      tester,
-      const ValueKey('trip-action-edit-info'),
+
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-edit-info')));
+    await tester.pump();
+    await _pumpGlassMenuClose(tester);
+
+    expect(
+      find.byKey(const ValueKey('app-large-screen-sheet')),
+      findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('tp-app-bar-cancel')), findsOneWidget);
+    expect(find.byKey(const ValueKey('edit-save')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
   });
 
   testWidgets('更多選單收納行程資料、列印、異動紀錄、分享、共編與 AI 健檢', (tester) async {
