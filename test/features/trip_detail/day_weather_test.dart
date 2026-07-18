@@ -176,4 +176,50 @@ void main() {
     expect(find.text('天氣示意'), findsOneWidget);
     expect(find.text('天氣預報將於出發前 16 天開放'), findsOneWidget);
   });
+
+  testWidgets('provider failure stays in a labeled preview state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue(
+            (request) => Future.error(StateError('forecast unavailable')),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('天氣示意'), findsOneWidget);
+    expect(find.text('暫時無法取得預報'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty hourly data never renders a misleading live forecast', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue(
+            (request) async => TripWeatherHourly.empty(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('天氣示意'), findsOneWidget);
+    expect(find.text('目前沒有可用預報'), findsOneWidget);
+    expect(find.byKey(const ValueKey('day-weather-live-1')), findsNothing);
+  });
 }

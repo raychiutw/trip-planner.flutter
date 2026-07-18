@@ -4,18 +4,23 @@ import 'google_maps_external_launcher.dart';
 import 'map_adapter.dart';
 
 Widget buildPlatformTripMapCanvas(TripMapCanvasConfig config) =>
-    _TripMapWebFallback(config: config);
+    TripMapWebFallback(config: config);
 
-class _TripMapWebFallback extends StatefulWidget {
-  const _TripMapWebFallback({required this.config});
+class TripMapWebFallback extends StatefulWidget {
+  const TripMapWebFallback({
+    super.key,
+    required this.config,
+    this.launcher = const GoogleMapsExternalLauncher(),
+  });
 
   final TripMapCanvasConfig config;
+  final GoogleMapsExternalLauncher launcher;
 
   @override
-  State<_TripMapWebFallback> createState() => _TripMapWebFallbackState();
+  State<TripMapWebFallback> createState() => _TripMapWebFallbackState();
 }
 
-class _TripMapWebFallbackState extends State<_TripMapWebFallback> {
+class _TripMapWebFallbackState extends State<TripMapWebFallback> {
   bool _opening = false;
   bool _failed = false;
 
@@ -37,7 +42,7 @@ class _TripMapWebFallbackState extends State<_TripMapWebFallback> {
       _failed = false;
     });
     try {
-      final opened = await const GoogleMapsExternalLauncher().open(
+      final opened = await widget.launcher.open(
         GoogleMapPoiSelection(placeId: '', name: '', point: point),
       );
       if (!opened && mounted) setState(() => _failed = true);

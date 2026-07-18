@@ -59,6 +59,18 @@ void main() {
     expect(platform.fits.single.animate, isFalse);
   });
 
+  test('failed camera work does not poison later queued operations', () async {
+    final platform = _FailingFirstTripMapPlatformController();
+    final controller = TripMapController()..attach(platform);
+
+    final first = controller.move(const TripMapPoint(35, 135), 12);
+    final second = controller.move(const TripMapPoint(34, 136), 12);
+
+    await expectLater(first, throwsStateError);
+    await second;
+    expect(platform.moves.single.point, const TripMapPoint(34, 136));
+  });
+
   test('overlay reconciliation updates only changed semantic IDs', () async {
     final platform = _FakeTripMapOverlayPlatform();
     final sync = TripMapOverlaySynchronizer(platform);
@@ -149,6 +161,24 @@ class _FakeTripMapPlatformController implements TripMapPlatformController {
     required bool animate,
   }) async {
     moves.add(_CameraMove(point, zoom, animate));
+  }
+}
+
+class _FailingFirstTripMapPlatformController
+    extends _FakeTripMapPlatformController {
+  var _shouldFail = true;
+
+  @override
+  Future<void> move(
+    TripMapPoint point,
+    double zoom, {
+    required bool animate,
+  }) async {
+    if (_shouldFail) {
+      _shouldFail = false;
+      throw StateError('camera unavailable');
+    }
+    await super.move(point, zoom, animate: animate);
   }
 }
 
