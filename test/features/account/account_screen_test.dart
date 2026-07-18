@@ -210,6 +210,24 @@ void main() {
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
   });
 
+  testWidgets('account child uses Back while Close dismisses the whole sheet', (
+    tester,
+  ) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-appearance')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('帳號'), findsOneWidget);
+  });
+
   testWidgets('帳號大型 sheet 在外觀切換後同步更新 glass 與頁面亮度', (tester) async {
     await pumpAccountEntry(tester);
 

@@ -32,7 +32,7 @@ class TpAccountAvatarButton extends ConsumerWidget {
       onPressed:
           onPressed ??
           () {
-            showAppLargeSheet<void>(
+            showAppContentSheet<void>(
               context,
               title: '帳號',
               builder: (_) => const AccountScreen(embedded: true),

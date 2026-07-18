@@ -21,11 +21,14 @@ class TripTitleButton extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   Future<void> _openPicker(BuildContext context) async {
-    final selected = await showAppLargeSheet<String>(
+    final selected = await showAppSelectionSheet<String>(
       context,
       title: '切換行程',
-      builder: (_) =>
-          _TripPickerSheet(currentTripId: currentTripId, trips: trips),
+      builder: (sheetContext, select) => _TripPickerSheet(
+        currentTripId: currentTripId,
+        trips: trips,
+        onSelected: select,
+      ),
     );
     if (selected != null && selected != currentTripId) onSelected(selected);
   }
@@ -59,10 +62,15 @@ class TripTitleButton extends StatelessWidget {
 }
 
 class _TripPickerSheet extends StatefulWidget {
-  const _TripPickerSheet({required this.currentTripId, required this.trips});
+  const _TripPickerSheet({
+    required this.currentTripId,
+    required this.trips,
+    required this.onSelected,
+  });
 
   final String currentTripId;
   final List<TripSummary> trips;
+  final ValueChanged<String> onSelected;
 
   @override
   State<_TripPickerSheet> createState() => _TripPickerSheetState();
@@ -166,10 +174,7 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
                               color: colors.primary,
                             )
                           : null,
-                      onTap: () => Navigator.of(
-                        context,
-                        rootNavigator: true,
-                      ).pop(trip.tripId),
+                      onTap: () => widget.onSelected(trip.tripId),
                     );
                   },
                 ),

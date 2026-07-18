@@ -339,16 +339,19 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                   if (showsScopeClose) ...[
                     if (resolvedActions.isNotEmpty)
                       const SizedBox(width: TpSpacing.s2),
-                    TpToolbarGlassButton(
-                      key: const ValueKey('app-large-sheet-close'),
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).closeButtonTooltip,
-                      onPressed: largeSheetScope.onClose,
-                      child: Icon(
-                        CupertinoIcons.xmark,
-                        size: 19,
-                        color: colors.primary,
+                    KeyedSubtree(
+                      key: const ValueKey('app-sheet-close'),
+                      child: TpToolbarGlassButton(
+                        key: const ValueKey('app-large-sheet-close'),
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).closeButtonTooltip,
+                        onPressed: largeSheetScope.onClose,
+                        child: Icon(
+                          CupertinoIcons.xmark,
+                          size: 19,
+                          color: colors.primary,
+                        ),
                       ),
                     ),
                   ],

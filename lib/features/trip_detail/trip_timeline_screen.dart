@@ -73,7 +73,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   var _isEditing = false;
 
   void _openActionSheet(Widget screen) {
-    unawaited(showAppLargeScreenSheet<void>(context, builder: (_) => screen));
+    unawaited(showAppScreenSheet<void>(context, builder: (_) => screen));
   }
 
   @override
@@ -108,7 +108,12 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 case _TripMoreAction.notes:
                   _openActionSheet(TripNotesScreen(tripId: widget.tripId));
                 case _TripMoreAction.editInfo:
-                  _openActionSheet(EditTripScreen(tripId: widget.tripId));
+                  unawaited(
+                    showAppLargeScreenSheet<void>(
+                      context,
+                      builder: (_) => EditTripScreen(tripId: widget.tripId),
+                    ),
+                  );
                 case _TripMoreAction.print:
                   _openActionSheet(TripPrintScreen(tripId: widget.tripId));
                 case _TripMoreAction.audit:
