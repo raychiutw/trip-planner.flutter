@@ -197,7 +197,7 @@ jobs:
       FIREBASE_IOS_MODEL: ${{ vars.FIREBASE_IOS_MODEL }}
       FIREBASE_IOS_VERSION: ${{ vars.FIREBASE_IOS_VERSION }}
       IOS_APP_BUNDLE_ID: com.raychiu.tripline
-      IOS_TEST_BUNDLE_ID: com.raychiu.tripline.RunnerUITests
+      IOS_TEST_RUNNER_BUNDLE_ID: com.raychiu.tripline.RunnerUITests.xctrunner
       APPLE_TEAM_ID: 8Z6WVFJ574
       TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-ios
     steps:
@@ -280,16 +280,34 @@ jobs:
       - name: Download UI test development provisioning profile
         uses: Apple-Actions/download-provisioning-profiles@c62019de00bb4395ed414e4a17c98f4e279636de # v6.0.0
         with:
-          bundle-id: ${{ env.IOS_TEST_BUNDLE_ID }}
+          bundle-id: ${{ env.IOS_TEST_RUNNER_BUNDLE_ID }}
           profile-type: IOS_APP_DEVELOPMENT
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
+      - name: Configure authenticated xcodebuild
+        shell: bash
+        env:
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          wrapper_dir="$RUNNER_TEMP/xcodebuild-wrapper"
+          mkdir -p "$wrapper_dir"
+          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          ln -s \
+            "$GITHUB_WORKSPACE/tool/xcodebuild_authenticated_wrapper.sh" \
+            "$wrapper_dir/xcodebuild"
+          printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
+
       - name: Build and package signed Patrol XCTest
         shell: bash
         env:
           XCODE_XCCONFIG_FILE: ${{ runner.temp }}/testlab-signing.xcconfig
+          APPSTORE_API_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
           set -euo pipefail
           flutter pub get

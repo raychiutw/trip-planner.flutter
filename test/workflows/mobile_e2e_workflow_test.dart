@@ -19,6 +19,9 @@ void main() {
   final evidenceSanitizer = File(
     'tool/sanitize_test_lab_evidence.sh',
   ).readAsStringSync();
+  final authenticatedXcodebuild = File(
+    'tool/xcodebuild_authenticated_wrapper.sh',
+  );
 
   group('external mobile integration test gate', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
@@ -92,6 +95,39 @@ void main() {
         );
       },
     );
+
+    test('iOS Test Lab installs profiles for the actual XCTest runner', () {
+      expect(
+        e2eWorkflow,
+        contains(
+          'IOS_TEST_RUNNER_BUNDLE_ID: '
+          'com.raychiu.tripline.RunnerUITests.xctrunner',
+        ),
+      );
+      expect(
+        e2eWorkflow,
+        contains('bundle-id: \${{ env.IOS_TEST_RUNNER_BUNDLE_ID }}'),
+      );
+      expect(
+        setupGuide,
+        contains('com.raychiu.tripline.RunnerUITests.xctrunner'),
+      );
+      expect(e2eWorkflow, contains('Configure authenticated xcodebuild'));
+      expect(e2eWorkflow, contains('xcodebuild-wrapper'));
+      expect(authenticatedXcodebuild.existsSync(), isTrue);
+      if (!authenticatedXcodebuild.existsSync()) return;
+      final wrapper = authenticatedXcodebuild.readAsStringSync();
+      expect(wrapper, contains('-allowProvisioningUpdates'));
+      expect(
+        wrapper,
+        contains('-authenticationKeyPath "\$APPSTORE_API_KEY_PATH"'),
+      );
+      expect(wrapper, contains('-authenticationKeyID "\$APPSTORE_API_KEY_ID"'));
+      expect(
+        wrapper,
+        contains('-authenticationKeyIssuerID "\$APPSTORE_ISSUER_ID"'),
+      );
+    });
 
     test(
       'release fails closed on the real staging favorite restore contract',

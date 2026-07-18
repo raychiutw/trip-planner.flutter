@@ -55,10 +55,13 @@ gcloud firebase test ios models describe MODEL_ID --project PROJECT_ID
 
 ## One-time Apple setup for Firebase iOS devices
 
-1. Register the explicit App ID `com.raychiu.tripline.RunnerUITests` in Apple Developer.
+1. Register the explicit XCTest runner App ID
+   `com.raychiu.tripline.RunnerUITests.xctrunner` in Apple Developer. Xcode
+   appends `.xctrunner` to the UI test target bundle identifier when it builds
+   the runner application.
 2. Create iOS App Development provisioning profiles for both:
    - `com.raychiu.tripline`
-   - `com.raychiu.tripline.RunnerUITests`
+   - `com.raychiu.tripline.RunnerUITests.xctrunner`
 3. Export an Apple Development certificate as a password-protected P12.
 4. Add repository secrets:
    - `APPLE_DEVELOPMENT_CERTIFICATE_P12`
@@ -67,7 +70,14 @@ gcloud firebase test ios models describe MODEL_ID --project PROJECT_ID
    - existing `APPSTORE_API_KEY_ID`
    - existing `APPSTORE_API_PRIVATE_KEY`
 
-The workflow downloads both development profiles, builds a release XCTest bundle, verifies the signatures of `Runner.app` and `RunnerUITests-Runner.app`, and only then uploads it to Test Lab. Firebase re-signs valid inputs for its own physical devices.
+The workflow validates and downloads both development profiles. Because Patrol
+4.4.0 owns the final `xcodebuild build-for-testing` invocation, CI places the
+checked-in authenticated xcodebuild wrapper first on `PATH`. The wrapper adds
+Xcode's non-interactive App Store Connect API-key provisioning flags only to
+`build-for-testing`; all other xcodebuild calls pass through unchanged. CI then
+builds a release XCTest bundle, verifies the signatures of `Runner.app` and
+`RunnerUITests-Runner.app`, and only then uploads it to Test Lab. Firebase
+re-signs valid inputs for its own physical devices.
 
 ## Run and interpret
 
