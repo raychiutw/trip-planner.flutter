@@ -3793,6 +3793,11 @@ test('map SDK and platform floors are locked consistently', () {
   expect(pubspec, contains('google_navigation_flutter: ^0.10.0'));
   expect(pubspec, isNot(contains('google_maps_flutter:')));
   expect(androidApp, contains('minSdk = 24'));
+  expect(androidApp, contains('desugar_jdk_libs_nio:2.1.5'));
+  expect(
+    androidSettings,
+    contains('com.android.application") version "8.13.2"'),
+  );
   expect(androidSettings, contains('version "2.3.0"'));
   expect(podfile, contains("platform :ios, '16.0'"));
   expect(xcode, isNot(contains('IPHONEOS_DEPLOYMENT_TARGET = 14.0')));
@@ -3818,7 +3823,7 @@ Run `flutter test test/features/map/map_platform_config_test.dart`; expected: FA
 
 Change `pubspec.yaml` to remove `google_maps_flutter` and add `google_navigation_flutter: ^0.10.0`. Run `flutter pub get` and commit the resolved version in `pubspec.lock`.
 
-In `android/settings.gradle.kts`, update the Kotlin Android plugin from `2.2.20` to `2.3.0`, matching the 0.10.0 breaking-change requirement. In `android/app/build.gradle.kts`:
+In `android/settings.gradle.kts`, update the Android Gradle Plugin to `8.13.2` and the Kotlin Android plugin from `2.2.20` to `2.3.0`. These are the minimums enforced by the resolved 0.10.0 Android AAR metadata, which is stricter than the package README. In `android/app/build.gradle.kts`:
 
 ```kotlin
 defaultConfig {
@@ -3831,7 +3836,7 @@ compileOptions {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }
 ```
 
@@ -3980,7 +3985,7 @@ flutter test test/features/map test/features/trip_detail
 flutter analyze
 flutter build apk --debug
 flutter build ios --simulator --no-codesign
-rg -n "google_maps_flutter|GoogleTripMapController|ClusterManager" pubspec.yaml lib test android ios && exit 1 || true
+rg -n "google_maps_flutter|GoogleTripMapController|ClusterManager" pubspec.yaml lib android ios && exit 1 || true
 ```
 
 Manually verify iOS and Android: native POI labels visible, Day and POI zoom exactly 12, route width/style intact, Tripline numbered markers intact, 12+ markers cluster, cluster tap fits members, map light/dark follows App appearance, and Root/Day/POI/Tab glass overlays do not steal map gestures.

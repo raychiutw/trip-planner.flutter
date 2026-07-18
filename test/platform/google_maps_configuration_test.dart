@@ -21,14 +21,14 @@ void main() {
     expect(example, contains('GOOGLE_MAPS_IOS_API_KEY='));
   });
 
-  test('iOS deployment target 符合 Google Maps 外掛最低版本', () {
+  test('iOS deployment target 符合 Google Navigation 外掛最低版本', () {
     final podfile = read('ios/Podfile');
     final project = read('ios/Runner.xcodeproj/project.pbxproj');
 
-    expect(podfile, contains("platform :ios, '14.0'"));
-    expect(project, isNot(contains('IPHONEOS_DEPLOYMENT_TARGET = 13.0;')));
+    expect(podfile, contains("platform :ios, '16.0'"));
+    expect(project, isNot(contains('IPHONEOS_DEPLOYMENT_TARGET = 14.0;')));
     expect(
-      'IPHONEOS_DEPLOYMENT_TARGET = 14.0;'.allMatches(project).length,
+      'IPHONEOS_DEPLOYMENT_TARGET = 16.0;'.allMatches(project).length,
       greaterThanOrEqualTo(3),
     );
   });

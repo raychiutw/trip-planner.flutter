@@ -201,7 +201,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   static const _dayZoom = 12.0;
   static const _poiFocusZoom = 12.0;
 
-  final GoogleTripMapController _mapController = GoogleTripMapController();
+  final TripMapController _mapController = TripMapController();
   late final PageController _pageController;
   TripMapPoint? _userLocation;
   bool _locating = false;
