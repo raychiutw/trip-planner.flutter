@@ -257,7 +257,7 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
   Future<void> _requestPop() async {
     if (!widget.dismissalEnabled) return;
     if (!widget.hasChanges) {
-      await Navigator.of(context).maybePop();
+      await _popOrCloseSheet();
       return;
     }
     final discard = await showAppConfirm(
@@ -269,7 +269,19 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
     );
     if (!mounted || !discard) return;
     setState(() => _allowPop = true);
-    await Navigator.of(context).maybePop();
+    await _popOrCloseSheet();
+  }
+
+  Future<void> _popOrCloseSheet() async {
+    final navigator = Navigator.of(context);
+    final sheetScope = TpLargeSheetNavigationScope.maybeOf(context);
+    if (sheetScope != null &&
+        (identical(navigator, Navigator.of(context, rootNavigator: true)) ||
+            !navigator.canPop())) {
+      sheetScope.onClose();
+      return;
+    }
+    await navigator.maybePop();
   }
 
   @override
