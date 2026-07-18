@@ -56,6 +56,7 @@ class _EntryActionRouteScreenState
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _targetDayId != null,
+      dismissalEnabled: !_submitting,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,

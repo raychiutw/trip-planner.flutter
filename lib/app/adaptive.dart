@@ -217,11 +217,13 @@ class AppUnsavedChangesGuard extends StatefulWidget {
     super.key,
     required this.controller,
     required this.hasChanges,
+    this.dismissalEnabled = true,
     required this.child,
   });
 
   final AppUnsavedChangesController controller;
   final bool hasChanges;
+  final bool dismissalEnabled;
   final Widget child;
 
   @override
@@ -253,6 +255,7 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
   }
 
   Future<void> _requestPop() async {
+    if (!widget.dismissalEnabled) return;
     if (!widget.hasChanges) {
       await Navigator.of(context).maybePop();
       return;
@@ -271,7 +274,7 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: _allowPop || !widget.hasChanges,
+    canPop: widget.dismissalEnabled && (_allowPop || !widget.hasChanges),
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) unawaited(_requestPop());
     },

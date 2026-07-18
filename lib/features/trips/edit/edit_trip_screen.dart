@@ -47,6 +47,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: !state.saved && ctrl.hasChanges,
+      dismissalEnabled: !state.saving,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,

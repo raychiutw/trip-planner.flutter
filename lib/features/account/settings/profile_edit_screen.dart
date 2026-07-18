@@ -68,6 +68,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _hasChanges,
+      dismissalEnabled: !_saving,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,

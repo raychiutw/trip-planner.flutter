@@ -241,6 +241,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _dirty,
+      dismissalEnabled: !_submitting,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,

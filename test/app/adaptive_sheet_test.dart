@@ -134,4 +134,42 @@ void main() {
 
     expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
   });
+
+  testWidgets('routed form cannot dismiss while submission is active', (
+    tester,
+  ) async {
+    final controller = AppUnsavedChangesController();
+    var submitting = true;
+    late StateSetter updateHost;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return AppUnsavedChangesGuard(
+              controller: controller,
+              hasChanges: true,
+              dismissalEnabled: !submitting,
+              child: Scaffold(
+                body: FilledButton(
+                  onPressed: controller.requestPop,
+                  child: const Text('取消'),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
+
+    updateHost(() => submitting = false);
+    await tester.pump();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+  });
 }

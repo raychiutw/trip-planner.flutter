@@ -60,6 +60,7 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
       builder: (context, _) => AppUnsavedChangesGuard(
         controller: _dismissController,
         hasChanges: _formController.isDirty,
+        dismissalEnabled: !_formController.isSubmitting,
         child: Scaffold(
           appBar: TpAppBar(
             role: TpAppBarRole.modalForm,

@@ -158,6 +158,7 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _hasChanges,
+      dismissalEnabled: !_isSubmitting,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,
