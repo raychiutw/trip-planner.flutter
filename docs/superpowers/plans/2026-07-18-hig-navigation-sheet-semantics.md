@@ -4455,7 +4455,7 @@ Only after all gates are green may the implementation session run the explicit p
 - Preserves: no production test mode, no authentication bypass in shipping code, no backend writes, zoom 12, native Google POIs, Tripline marker precedence, and existing Light/Dark theme ownership
 - Pins: `patrol: 4.6.1` with `patrol_cli 4.4.0`, matching the official `google_navigation_flutter` example and Patrol compatibility table for Flutter 3.44.6
 
-- [ ] **Step 1: Turn review-discovered regressions into failing tests first**
+- [x] **Step 1: Turn review-discovered regressions into failing tests first**
 
 Add a chat widget test that makes `fetchRequests` throw a 401 `ApiError`, pumps `ChatScreen`, and asserts the auth-expired banner's top is at or below `TpRootGeometry.initialContentTop(context)`. Run:
 
@@ -4476,7 +4476,7 @@ await expectLater(second, completes);
 
 Run `flutter test test/features/map/map_adapter_test.dart`; verify the new case fails for the intended reason before changing production code, then implement only the queue-recovery behavior required by the test.
 
-- [ ] **Step 2: Automate the deterministic HIG matrix without a native PlatformView**
+- [x] **Step 2: Automate the deterministic HIG matrix without a native PlatformView**
 
 Create `test/flows/hig_regression_matrix_test.dart`. Pump the approved root pages and reusable sheet/form controls with fake repositories and `fakeTripMapBuilder`, then iterate these exact `MediaQueryData`/theme states:
 
@@ -4502,7 +4502,7 @@ For every state assert:
 
 Run `flutter test test/flows/hig_regression_matrix_test.dart` after each new assertion. A test that passes before its assertion is added is not evidence; each regression assertion must be observed failing against a deliberately incomplete harness or the current defect before going green.
 
-- [ ] **Step 3: Close the pure-Dart and web gaps reported by the testing review**
+- [x] **Step 3: Close the pure-Dart and web gaps reported by the testing review**
 
 Add focused tests, one failing behavior at a time, for:
 
@@ -4520,7 +4520,7 @@ flutter test test/features/map test/api/cache/conflict_resolve_test.dart test/fe
 
 Expected: all PASS with no skipped branch that is available on the current host.
 
-- [ ] **Step 4: Expand the real app integration flow without production services**
+- [x] **Step 4: Expand the real app integration flow without production services**
 
 Extend `integration_test/app_smoke_test.dart` with provider-owned fixtures only. The suite must:
 
@@ -4539,7 +4539,7 @@ flutter test integration_test/app_smoke_test.dart -d "$DEVICE_ID"
 
 Expected: PASS and no request to the production API host.
 
-- [ ] **Step 5: Add Patrol for native Google Map and system-boundary smoke tests**
+- [x] **Step 5: Add Patrol for native Google Map and system-boundary smoke tests**
 
 Add exact Patrol package/native runner configuration, keep tests under `patrol_test/`, and ignore generated `patrol_test/test_bundle.dart`. `native_map_smoke_test.dart` must pump a standalone `MaterialApp` containing `buildTripMapCanvas` so it needs neither login nor backend state. It must verify:
 

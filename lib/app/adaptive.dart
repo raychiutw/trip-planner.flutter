@@ -545,14 +545,23 @@ Future<T?> showAppScreenSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
 }) {
+  final sheetNavigatorKey = GlobalKey<NavigatorState>();
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
     mediumSize: 0.93,
     largeSize: 0.93,
     resizable: false,
-    builder: (sheetContext, close) =>
-        _AppScreenSheet<T>(contentBuilder: builder, onClose: close),
+    onSystemBack: () async {
+      final navigator = sheetNavigatorKey.currentState;
+      if (navigator == null) return false;
+      return navigator.maybePop();
+    },
+    builder: (sheetContext, close) => _AppScreenSheet<T>(
+      contentBuilder: builder,
+      onClose: close,
+      navigatorKey: sheetNavigatorKey,
+    ),
   );
 }
 
@@ -684,10 +693,15 @@ class _AppContentSheet<T> extends StatelessWidget {
 }
 
 class _AppScreenSheet<T> extends StatelessWidget {
-  const _AppScreenSheet({required this.contentBuilder, required this.onClose});
+  const _AppScreenSheet({
+    required this.contentBuilder,
+    required this.onClose,
+    required this.navigatorKey,
+  });
 
   final WidgetBuilder contentBuilder;
   final Future<void> Function([T? result]) onClose;
+  final GlobalKey<NavigatorState> navigatorKey;
 
   @override
   Widget build(BuildContext context) {
@@ -703,7 +717,12 @@ class _AppScreenSheet<T> extends StatelessWidget {
             child: MediaQuery.removePadding(
               context: context,
               removeTop: true,
-              child: contentBuilder(context),
+              child: Navigator(
+                key: navigatorKey,
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (pageContext) => contentBuilder(pageContext),
+                ),
+              ),
             ),
           ),
         ),

@@ -6,10 +6,21 @@
 
 ## [0.9.1] - 2026-07-18
 
+### 新增
+
+- 以 Patrol 4.6.1 和 Firebase Test Lab 建立 Android／iOS 外部實機整合測試，GitHub Actions 會在行動版本上傳前收集影片、擷圖、日誌與 JUnit 結果。
+- 新增可重現的 Light／Dark、100%／200% Dynamic Type、Reduce Motion 與 Reduce Transparency 自動化 HIG 回歸矩陣，並產出命名的 CI 畫面證據。
+- 新增原生 Google Maps 邊界的 Patrol smoke，驗證 map ready、主題切換、路線／marker、zoom 12 與 Google 原生 POI callback。
+
+### 變更
+
+- 行程、聊天、地圖、收藏、帳號與近滿版 Sheet 收旂到共用 HIG／Liquid Glass 元件，地圖引擎改由 `google_navigation_flutter` 與 app-owned adapter 邊界統一管理。
+
 ### 修正
 
 - iOS 與 Android CI 共用同一套 Play-safe build number，並切換到新的 TestFlight `0.9.1` 版本序列。
 - Android 系統返回鍵會先離開近滿版 Sheet 的內層設定頁，再關閉整個 Sheet。
+- 近滿版畫面的系統返回鍵現在會尊重內層未儲存變更，不會在子頁拒絕 pop 時仍關閉整個 Sheet。
 
 ## [0.9.0] - 2026-07-17
 
