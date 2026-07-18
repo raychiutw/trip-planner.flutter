@@ -3,6 +3,24 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
 
+LiquidGlassSettings tpNavigationGlassSettings(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return LiquidGlassSettings(
+    glassColor: isDark ? const Color(0x70121214) : const Color(0x70FFFBF5),
+    thickness: 16,
+    blur: 16,
+    chromaticAberration: 0,
+    lightIntensity: isDark ? 0.56 : 0.62,
+    ambientStrength: isDark ? 0.06 : 0.10,
+    refractiveIndex: 1.06,
+    saturation: 1.02,
+    standardOpacityMultiplier: isDark ? 0.52 : 0.40,
+    platformViewFallbackColor: isDark
+        ? const Color(0x66121214)
+        : const Color(0x5CFFFBF5),
+  );
+}
+
 class TpGlassSurface extends StatelessWidget {
   const TpGlassSurface({
     super.key,

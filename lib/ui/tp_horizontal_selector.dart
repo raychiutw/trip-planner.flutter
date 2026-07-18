@@ -3,6 +3,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
+import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
 
 /// 行程／地圖頁共用的一階切換器。
@@ -94,32 +95,13 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final tones = theme.extension<TpTones>()!;
-    final glassColor = isDark
-        ? const Color(0x70121214)
-        : const Color(0x70FFFBF5);
-    final fallbackColor = isDark
-        ? const Color(0x66121214)
-        : const Color(0x5CFFFBF5);
-    final trackSettings = LiquidGlassSettings(
-      glassColor: glassColor,
-      thickness: 16,
-      blur: widget.platformViewBackdrop ? 16 : 20,
-      chromaticAberration: 0,
-      lightIntensity: isDark ? 0.56 : 0.64,
-      ambientStrength: isDark ? 0.06 : 0.12,
-      refractiveIndex: widget.platformViewBackdrop ? 1.06 : 1.08,
-      saturation: 1.02,
-      standardOpacityMultiplier: isDark ? 0.52 : 0.40,
-      platformViewFallbackColor: fallbackColor,
-    );
+    final trackSettings = tpNavigationGlassSettings(context);
     final selectedColor = isDark
-        ? TpColorsDark.dayThumb
-        : TpColorsLight.dayThumb;
+        ? TpColorsDark.navigationSelection
+        : TpColorsLight.navigationSelection;
     final selectedSettings = trackSettings.copyWith(
       glassColor: selectedColor,
-      platformViewFallbackColor: selectedColor.withValues(alpha: 0.72),
-      blur: 10,
-      refractiveIndex: 1.04,
+      platformViewFallbackColor: selectedColor,
     );
     final actionOptions = widget.options
         .where((option) => option.isAction)

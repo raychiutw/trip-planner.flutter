@@ -365,6 +365,76 @@ void main() {
     },
   );
 
+  testWidgets(
+    'navigation selector keeps one optical recipe over a platform view',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: Column(
+              children: [
+                TpHorizontalSelector<int>(
+                  key: const ValueKey('standard-navigation-selector'),
+                  value: 1,
+                  options: const [
+                    TpScopeOption(value: 0, label: '總覽'),
+                    TpScopeOption(value: 1, label: 'DAY 1'),
+                  ],
+                  onSelected: (_) {},
+                ),
+                TpHorizontalSelector<int>(
+                  key: const ValueKey('map-navigation-selector'),
+                  platformViewBackdrop: true,
+                  value: 1,
+                  options: const [
+                    TpScopeOption(value: 0, label: '總覽'),
+                    TpScopeOption(value: 1, label: 'DAY 1'),
+                  ],
+                  onSelected: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      GlassContainer trackFor(String key) => tester.widget<GlassContainer>(
+        find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.byType(GlassContainer),
+        ),
+      );
+
+      final standard = trackFor('standard-navigation-selector');
+      final map = trackFor('map-navigation-selector');
+      expect(standard.platformViewBackdrop, isFalse);
+      expect(map.platformViewBackdrop, isTrue);
+      expect(map.settings?.glassColor, standard.settings?.glassColor);
+      expect(map.settings?.thickness, standard.settings?.thickness);
+      expect(map.settings?.blur, standard.settings?.blur);
+      expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
+      expect(map.settings?.ambientStrength, standard.settings?.ambientStrength);
+      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
+      expect(map.settings?.saturation, standard.settings?.saturation);
+      expect(
+        map.settings?.standardOpacityMultiplier,
+        standard.settings?.standardOpacityMultiplier,
+      );
+
+      final selected = tester.widget<GlassButton>(
+        find.descendant(
+          of: find.byKey(const ValueKey('standard-navigation-selector')),
+          matching: find.byType(GlassButton),
+        ),
+      );
+      expect(selected.settings?.blur, standard.settings?.blur);
+      expect(
+        selected.settings?.refractiveIndex,
+        standard.settings?.refractiveIndex,
+      );
+    },
+  );
+
   testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
     tester.view.physicalSize = const Size(240, 400);
     tester.view.devicePixelRatio = 1;

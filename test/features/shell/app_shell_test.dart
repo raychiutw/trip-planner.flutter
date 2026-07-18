@@ -119,6 +119,52 @@ void main() {
       expect(glass.selectedIconColor, TpColorsDark.accentDeep);
     });
 
+    testWidgets('root branches keep one navigation glass recipe', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      GlassTabBar rootBar() => tester.widget<GlassTabBar>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(GlassTabBar),
+        ),
+      );
+
+      final standard = rootBar();
+      expect(standard.platformViewBackdrop, isFalse);
+
+      await tester.tap(find.bySemanticsLabel('地圖'));
+      await tester.pumpAndSettle();
+
+      final map = rootBar();
+      expect(map.platformViewBackdrop, isTrue);
+      expect(map.settings?.glassColor, standard.settings?.glassColor);
+      expect(map.settings?.thickness, standard.settings?.thickness);
+      expect(map.settings?.blur, standard.settings?.blur);
+      expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
+      expect(map.settings?.ambientStrength, standard.settings?.ambientStrength);
+      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
+      expect(
+        map.settings?.standardOpacityMultiplier,
+        standard.settings?.standardOpacityMultiplier,
+      );
+      expect(map.indicatorSettings?.blur, map.settings?.blur);
+      expect(
+        map.indicatorSettings?.refractiveIndex,
+        map.settings?.refractiveIndex,
+      );
+      expect(TpColorsLight.rootTabSelection, TpColorsLight.dayThumb);
+    });
+
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

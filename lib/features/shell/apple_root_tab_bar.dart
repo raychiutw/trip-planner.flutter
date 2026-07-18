@@ -4,6 +4,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_glass_surface.dart';
 
 /// Root tab bar：固定尺寸、恆顯 label。
 ///
@@ -47,24 +48,10 @@ class AppleRootTabBar extends StatelessWidget {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
     final isDark = theme.brightness == Brightness.dark;
-    final glassTint = isDark
-        ? const Color(0x70121214)
-        : const Color(0x70FFFBF5);
-    final fallbackTint = isDark
-        ? const Color(0x66121214)
-        : const Color(0x5CFFFBF5);
-    final glassSettings = LiquidGlassSettings(
-      glassColor: glassTint,
-      thickness: 16,
-      blur: 16,
-      chromaticAberration: 0,
-      lightIntensity: isDark ? 0.56 : 0.62,
-      ambientStrength: isDark ? 0.06 : 0.10,
-      refractiveIndex: 1.06,
-      saturation: 1.02,
-      standardOpacityMultiplier: isDark ? 0.52 : 0.40,
-      platformViewFallbackColor: fallbackTint,
-    );
+    final glassSettings = tpNavigationGlassSettings(context);
+    final selectionTint = isDark
+        ? TpColorsDark.navigationSelection
+        : TpColorsLight.navigationSelection;
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
       child: Padding(
@@ -115,15 +102,10 @@ class AppleRootTabBar extends StatelessWidget {
           unselectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w500,
           ),
-          indicatorColor: isDark
-              ? TpColorsDark.rootTabSelection
-              : TpColorsLight.rootTabSelection,
+          indicatorColor: selectionTint,
           indicatorSettings: glassSettings.copyWith(
-            glassColor: isDark
-                ? TpColorsDark.rootTabSelection
-                : TpColorsLight.rootTabSelection,
-            blur: 10,
-            refractiveIndex: 1.04,
+            glassColor: selectionTint,
+            platformViewFallbackColor: selectionTint,
           ),
           magnification: 1,
           blendAmount: 4,
