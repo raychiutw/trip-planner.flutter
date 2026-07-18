@@ -63,7 +63,7 @@ void main() {
         isNot(contains('permissions:\n  contents: read\n  id-token: write')),
       );
       expect(releaseWorkflow, contains('raven-actions/actionlint@'));
-      expect(releaseWorkflow, contains('version: 1.7.7'));
+      expect(releaseWorkflow, contains('version: 1.7.12'));
     });
 
     test(
