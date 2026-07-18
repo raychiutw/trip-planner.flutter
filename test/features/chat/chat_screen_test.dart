@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
@@ -104,8 +105,8 @@ void main() {
     expect(find.byType(PopupMenuButton<String>), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byType(TpAppBar), findsOneWidget);
-    final appBar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(appBar.toolbarHeight, isNull);
+    final appBar = tester.widget<GlassAppBar>(find.byType(GlassAppBar));
+    expect(appBar.preferredSize.height, kToolbarHeight);
     expect(find.byIcon(Icons.more_vert), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));

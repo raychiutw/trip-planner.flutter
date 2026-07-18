@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/ui/tp_action_item.dart';
 
 void main() {
   Widget host(TargetPlatform platform, void Function(BuildContext) onTap) {
@@ -72,8 +73,13 @@ void main() {
         future = showAppActionSheet<String>(
           context,
           actions: const [
-            AppSheetAction(label: '分享', value: 'share'),
-            AppSheetAction(label: '刪除', value: 'delete', isDestructive: true),
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(
+              label: '刪除',
+              value: 'delete',
+              icon: CupertinoIcons.delete,
+              role: TpActionRole.destructive,
+            ),
           ],
         );
       }),
@@ -96,7 +102,7 @@ void main() {
         future = showAppActionSheet<String>(
           context,
           actions: const [
-            AppSheetAction(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
           ],
         );
       }),
@@ -110,6 +116,66 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
     expect(await future, isNull);
+  });
+
+  testWidgets('Android action sheet preserves divider and disabled state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(
+              label: '刪除',
+              value: 'delete',
+              icon: CupertinoIcons.delete,
+              dividerBefore: true,
+              role: TpActionRole.destructive,
+              enabled: false,
+            ),
+          ],
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Divider), findsOneWidget);
+    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '刪除'));
+    expect(tile.enabled, isFalse);
+    expect(tester.getSize(find.widgetWithText(ListTile, '刪除')).height, 56);
+  });
+
+  testWidgets('iOS action sheet does not dispatch a disabled action', (
+    tester,
+  ) async {
+    var completed = false;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(
+              label: '暫不可用',
+              value: 'disabled',
+              icon: CupertinoIcons.lock,
+              enabled: false,
+            ),
+          ],
+        ).then((_) => completed = true);
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('暫不可用'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(completed, isFalse);
   });
 
   testWidgets('iOS → 頂部橫幅顯示訊息(非 SnackBar);結束不留 pending timer', (tester) async {

@@ -13,17 +13,24 @@ import '../../models/segment.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
+import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
+import '../trips/audit/trip_audit_screen.dart';
+import '../trips/collab/collab_screen.dart';
+import '../trips/edit/edit_trip_screen.dart';
+import '../trips/health/trip_health_screen.dart';
+import '../trips/share/share_screen.dart';
 import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
+import 'trip_notes_screen.dart';
+import 'trip_print_screen.dart';
 import 'widgets/day_header.dart';
 import 'widgets/entry_edit_sheet.dart';
-import 'widgets/hotel_card.dart';
 import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
@@ -41,7 +48,7 @@ enum _TripMoreAction {
 }
 
 /// 行程時間軸畫面：AppBar（可切換 trip + 功能選單 + 帳號）→ 單層地圖／DAY selector →
-/// 逐日 section（day header → hotel 卡 → timeline rail + travel pill）。
+/// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
     super.key,
@@ -65,9 +72,8 @@ class TripTimelineScreen extends ConsumerStatefulWidget {
 class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   var _isEditing = false;
 
-  void _goTo(BuildContext context, String location) {
-    // 測試環境可能未掛 GoRouter，maybeOf 避免 crash
-    GoRouter.maybeOf(context)?.go(location);
+  void _openActionSheet(Widget screen) {
+    unawaited(showAppLargeScreenSheet<void>(context, builder: (_) => screen));
   }
 
   @override
@@ -99,88 +105,72 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 case _TripMoreAction.editMode:
                   setState(() => _isEditing = !_isEditing);
                 case _TripMoreAction.notes:
-                  _goTo(context, '/trips/${widget.tripId}/notes');
+                  _openActionSheet(TripNotesScreen(tripId: widget.tripId));
                 case _TripMoreAction.editInfo:
-                  context.push('/edit-trip/${widget.tripId}');
+                  _openActionSheet(EditTripScreen(tripId: widget.tripId));
                 case _TripMoreAction.print:
-                  _goTo(context, '/trips/${widget.tripId}/print');
+                  _openActionSheet(TripPrintScreen(tripId: widget.tripId));
                 case _TripMoreAction.audit:
-                  _goTo(context, '/trips/${widget.tripId}/audit');
+                  _openActionSheet(TripAuditScreen(tripId: widget.tripId));
                 case _TripMoreAction.share:
-                  _goTo(context, '/share-trip/${widget.tripId}');
+                  _openActionSheet(ShareScreen(tripId: widget.tripId));
                 case _TripMoreAction.collab:
-                  _goTo(context, '/collab/${widget.tripId}');
+                  _openActionSheet(CollabScreen(tripId: widget.tripId));
                 case _TripMoreAction.health:
-                  _goTo(context, '/trips/${widget.tripId}/health');
+                  _openActionSheet(TripHealthScreen(tripId: widget.tripId));
               }
             },
             items: [
-              PopupMenuItem(
+              TpActionItem(
                 key: const ValueKey('trip-edit-mode'),
                 value: _TripMoreAction.editMode,
-                child: _TripActionMenuItem(
-                  icon: _isEditing
-                      ? CupertinoIcons.check_mark
-                      : CupertinoIcons.pencil,
-                  label: _isEditing ? '完成編輯' : '編輯行程',
-                ),
+                icon: _isEditing
+                    ? CupertinoIcons.check_mark
+                    : CupertinoIcons.pencil,
+                label: _isEditing ? '完成編輯' : '編輯行程',
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-notes'),
                 value: _TripMoreAction.notes,
-                child: _TripActionMenuItem(
-                  icon: CupertinoIcons.doc_text,
-                  label: '筆記',
-                ),
+                icon: CupertinoIcons.doc_text,
+                label: '筆記',
               ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-edit-info'),
                 value: _TripMoreAction.editInfo,
-                child: _TripActionMenuItem(
-                  icon: CupertinoIcons.pencil,
-                  label: '行程資料',
-                ),
+                icon: CupertinoIcons.pencil,
+                label: '行程資料',
+                dividerBefore: true,
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-print'),
                 value: _TripMoreAction.print,
-                child: _TripActionMenuItem(
-                  icon: CupertinoIcons.printer,
-                  label: '列印',
-                ),
+                icon: CupertinoIcons.printer,
+                label: '列印',
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-audit'),
                 value: _TripMoreAction.audit,
-                child: _TripActionMenuItem(
-                  icon: Icons.history_outlined,
-                  label: '異動紀錄',
-                ),
+                icon: Icons.history_outlined,
+                label: '異動紀錄',
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-share'),
                 value: _TripMoreAction.share,
-                child: _TripActionMenuItem(
-                  icon: Icons.ios_share_outlined,
-                  label: '分享連結',
-                ),
+                icon: Icons.ios_share_outlined,
+                label: '分享連結',
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-collab'),
                 value: _TripMoreAction.collab,
-                child: _TripActionMenuItem(
-                  icon: Icons.group_outlined,
-                  label: '共編設定',
-                ),
+                icon: Icons.group_outlined,
+                label: '共編設定',
               ),
-              const PopupMenuItem(
+              const TpActionItem(
                 key: ValueKey('trip-action-health'),
                 value: _TripMoreAction.health,
-                child: _TripActionMenuItem(
-                  icon: Icons.health_and_safety_outlined,
-                  label: 'AI 健檢',
-                ),
+                icon: Icons.health_and_safety_outlined,
+                label: 'AI 健檢',
               ),
             ],
           ),
@@ -205,25 +195,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           },
         ),
       ),
-    );
-  }
-}
-
-class _TripActionMenuItem extends StatelessWidget {
-  const _TripActionMenuItem({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: TpSpacing.s3),
-        Text(label),
-      ],
     );
   }
 }
@@ -699,14 +670,8 @@ class _DaySection extends ConsumerWidget {
             children: [
               DayHeader(day: day, segments: segments),
               const SizedBox(height: TpSpacing.s3),
-              if (hasWeatherDay(day)) ...[
-                DayWeatherCard(day: day),
-                const SizedBox(height: TpSpacing.s3),
-              ],
-              if (day.hotel != null) ...[
-                HotelCard(hotel: day.hotel!),
-                const SizedBox(height: TpSpacing.s3),
-              ],
+              DayWeatherPreview(dayNum: day.dayNum),
+              const SizedBox(height: TpSpacing.s3),
               ReorderableListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),

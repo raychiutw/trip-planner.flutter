@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -303,11 +304,47 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
+Future<void> _pumpGlassMenuClose(WidgetTester tester) async {
+  // TpMoreMenuButton intentionally waits until the package morph overlay has
+  // fully left before dispatching a route action. Pump individual frames so
+  // both the spring and the 16 ms close-state polling timer can advance.
+  for (var frame = 0; frame < 150; frame++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  await tester.pumpAndSettle();
+}
+
 Future<void> _enableTimelineEditing(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+  await _pumpGlassMenuClose(tester);
+}
+
+Future<void> _expectTripActionOpensClosableSheet(
+  WidgetTester tester,
+  Key actionKey,
+) async {
+  await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
   await tester.pumpAndSettle();
+  await tester.tap(find.byKey(actionKey));
+  await tester.pump();
+  await _pumpGlassMenuClose(tester);
+
+  expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsOneWidget);
+  expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+  expect(
+    find.descendant(
+      of: find.byKey(const ValueKey('app-large-sheet-close')),
+      matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+    ),
+    findsOneWidget,
+  );
+
+  await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
+  expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
 }
 
 void main() {
@@ -328,7 +365,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('trip-actions-menu')),
-        matching: find.byKey(const ValueKey('tp-toolbar-action-surface')),
+        matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
       ),
       findsOneWidget,
     );
@@ -364,26 +401,32 @@ void main() {
     expect(find.text('map-page-$_tripId-1'), findsOneWidget);
   });
 
-  testWidgets('更多選單的列印可導向列印預覽頁', (tester) async {
+  testWidgets('更多選單的列印由下往上開啟共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-action-print')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('print-page'), findsOneWidget);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-print'),
+    );
   });
 
-  testWidgets('更多選單的異動紀錄可導向 audit 頁', (tester) async {
+  testWidgets('更多選單的異動紀錄由下往上開啟共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-audit'),
+    );
+  });
 
-    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-action-audit')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('audit-page'), findsOneWidget);
+  testWidgets('更多選單的筆記與行程資料都使用共用可關閉 sheet', (tester) async {
+    await _pumpTimeline(tester);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-notes'),
+    );
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-edit-info'),
+    );
   });
 
   testWidgets('更多選單收納行程資料、列印、異動紀錄、分享、共編與 AI 健檢', (tester) async {
@@ -415,37 +458,28 @@ void main() {
     expect(find.text('完成編輯'), findsOneWidget);
   });
 
-  testWidgets('更多選單可導向分享連結頁', (tester) async {
+  testWidgets('更多選單的分享連結使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-action-share')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('share-page'), findsOneWidget);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-share'),
+    );
   });
 
-  testWidgets('更多選單可導向共編設定頁', (tester) async {
+  testWidgets('更多選單的共編設定使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-action-collab')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('collab-page'), findsOneWidget);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-collab'),
+    );
   });
 
-  testWidgets('更多選單可導向 AI 健檢頁', (tester) async {
+  testWidgets('更多選單的 AI 健檢使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-action-health')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('health-page'), findsOneWidget);
+    await _expectTripActionOpensClosableSheet(
+      tester,
+      const ValueKey('trip-action-health'),
+    );
   });
 
   testWidgets('渲染 2 天 day headers（eyebrow + displayTitle）與 day pills', (
@@ -753,26 +787,14 @@ void main() {
     );
   });
 
-  testWidgets('hotel 卡以 sage tone 渲染（subtle 底 + bed icon）', (tester) async {
+  testWidgets('行程每日不再顯示飯店摘要卡', (tester) async {
     await _pumpTimeline(tester);
 
-    expect(find.text('美國村海濱飯店'), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.bed_double), findsOneWidget);
-
-    final hotelCardContainer = tester.widget<Container>(
-      find.byKey(const ValueKey('hotel-card-9')),
-    );
-    final hotelCardDecoration = hotelCardContainer.decoration! as BoxDecoration;
-    expect(hotelCardDecoration.color, TpColorsLight.sageSubtle);
+    expect(find.text('美國村海濱飯店'), findsNothing);
+    expect(find.byKey(const ValueKey('hotel-card-9')), findsNothing);
   });
 
-  testWidgets('entry 有 POI 座標時顯示行程日天氣摘要', (tester) async {
-    final hourly = TripWeatherHourly(
-      temps: [for (var h = 0; h < 24; h++) 22.0 + h / 4],
-      rains: [for (var h = 0; h < 24; h++) h < 12 ? 10 : 60],
-      codes: [for (var h = 0; h < 24; h++) h < 12 ? 0 : 61],
-    );
-
+  testWidgets('行程每日使用明確標示的天氣示意資料樣式', (tester) async {
     await _pumpTimeline(
       tester,
       fetchDays: () => const [
@@ -799,18 +821,14 @@ void main() {
           ],
         ),
       ],
-      dayWeatherFetcher: (request) async {
-        expect(request.dayDate, '2026-04-23');
-        expect(request.weatherDay.locations.single.name, '沖繩美麗海水族館');
-        return hourly;
-      },
+      dayWeatherFetcher: (request) =>
+          throw StateError('timeline 天氣示意不應呼叫遠端 weather API'),
     );
-    await tester.pump();
-    await tester.pump();
 
-    expect(find.text('天氣'), findsOneWidget);
-    expect(find.text('22~28°C'), findsOneWidget);
-    expect(find.text('降雨 10~60%'), findsOneWidget);
+    expect(find.text('天氣示意'), findsOneWidget);
+    expect(find.text('晴時多雲'), findsOneWidget);
+    expect(find.text('28°C'), findsOneWidget);
+    expect(find.text('降雨 20%'), findsOneWidget);
   });
 
   testWidgets('點 day pill 捲動至該日 section', (tester) async {
@@ -830,16 +848,13 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
-    final selected = tester.widget<AnimatedContainer>(
+    final selected = tester.widget<GlassButton>(
       find.descendant(
         of: find.byKey(const ValueKey('day-pill-2')),
-        matching: find.byType(AnimatedContainer),
+        matching: find.byType(GlassButton),
       ),
     );
-    expect(
-      (selected.decoration! as BoxDecoration).color,
-      TpColorsLight.accent.withValues(alpha: 0.20),
-    );
+    expect(selected.settings?.glassColor, TpColorsLight.dayThumb);
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -1100,7 +1115,10 @@ void main() {
       await gesture.moveBy(Offset(0, i.isEven ? -1 : 1));
       await tester.pump(const Duration(milliseconds: 16));
     }
-    final target = tester.getCenter(find.byKey(const ValueKey('day-drop-2')));
+    // 點在 DAY 2 的天氣示意空白區，避免誤落到內層 entry DragTarget。
+    final target = tester.getCenter(
+      find.byKey(const ValueKey('day-weather-preview-2')),
+    );
     await gesture.moveTo(target);
     await tester.pump(const Duration(milliseconds: 50));
     await gesture.up();

@@ -50,13 +50,13 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       appBar: TpAppBar(
         title: const Text('登入裝置'),
         actions: [
-          IconButton(
+          TpToolbarGlassButton(
             key: const Key('account-sessions-revoke-others'),
             tooltip: '登出其他裝置',
             onPressed: canRevokeOthers && !_isRevokingOthers
                 ? () => unawaited(_confirmRevokeOtherSessions())
                 : null,
-            icon: _isRevokingOthers
+            child: _isRevokingOthers
                 ? const SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),

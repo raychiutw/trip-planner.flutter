@@ -67,23 +67,6 @@ typedef TripMapCanvasBuilder = Widget Function(TripMapCanvasConfig config);
 
 const _tripClusterManagerId = ClusterManagerId('trip-stops');
 
-const _tripMapDarkStyle = '''
-[
-  {"elementType":"geometry","stylers":[{"color":"#1c1c1e"}]},
-  {"elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#a1a1a6"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#121214"}]},
-  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#48484a"}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#242426"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2e"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#38383a"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3a3a3c"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#242426"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#101b24"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#636366"}]}
-]
-''';
-
 class TripMapRoute {
   const TripMapRoute({
     required this.id,
@@ -359,6 +342,7 @@ class _GoogleTripMapCanvasState extends State<GoogleTripMapCanvas> {
     // 在 build 同步而非只在 initState:使用者可能在 app 執行中才打開「減少動態
     // 效果」,MediaQuery 變動會觸發 rebuild,這裡跟著更新才不會停在舊值。
     config.controller.reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final initialTarget =
         config.initialCenter ??
         (config.initialFitPoints.isEmpty
@@ -366,14 +350,12 @@ class _GoogleTripMapCanvasState extends State<GoogleTripMapCanvas> {
             : config.initialFitPoints.first);
     return GoogleMap(
       key: config.mapKey,
-      style: Theme.of(context).brightness == Brightness.dark
-          ? _tripMapDarkStyle
-          : null,
       initialCameraPosition: CameraPosition(
         target: initialTarget.toGoogleLatLng(),
         zoom: config.initialZoom,
       ),
       mapType: config.tilePreset.mapType,
+      style: isDark ? kTripMapDarkStyle : null,
       compassEnabled: true,
       mapToolbarEnabled: false,
       myLocationButtonEnabled: false,

@@ -10,6 +10,8 @@ import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
+import '../../ui/tp_action_item.dart';
+import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scroll_scaffold.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
@@ -66,10 +68,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       title: '收藏',
       onRefresh: () => ref.refresh(favoritesProvider.future),
       actions: [
-        IconButton(
+        TpToolbarIconButton(
           key: const ValueKey('favorites-explore-action'),
           tooltip: '探索',
-          icon: const Icon(CupertinoIcons.search),
+          icon: CupertinoIcons.search,
           onPressed: () => context.go('/favorites/explore'),
         ),
         const TpAccountAvatarButton(),
@@ -364,21 +366,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final action = await showAppActionSheet<_FavoriteContextAction>(
       context,
       actions: const [
-        AppSheetAction(
+        TpActionItem(
           label: '加入行程',
           value: _FavoriteContextAction.addToTrip,
           icon: CupertinoIcons.calendar_badge_plus,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: '選取',
           value: _FavoriteContextAction.select,
           icon: CupertinoIcons.check_mark_circled,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: '取消收藏',
           value: _FavoriteContextAction.remove,
           icon: CupertinoIcons.heart_slash,
-          isDestructive: true,
+          dividerBefore: true,
+          role: TpActionRole.destructive,
         ),
       ],
     );

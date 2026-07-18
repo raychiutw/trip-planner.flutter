@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -284,6 +285,106 @@ class DayWeatherCard extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<DayWeatherCard> createState() => _DayWeatherCardState();
+}
+
+/// 行程時間軸用的靜態天氣示意。
+///
+/// 目前產品尚未承諾即時天氣正確性，時間軸明確標示「示意」且不發網路請求；
+/// 真實逐時預報元件 [DayWeatherCard] 保留給日後接回資料來源時使用。
+class DayWeatherPreview extends StatelessWidget {
+  const DayWeatherPreview({super.key, required this.dayNum});
+
+  final int dayNum;
+
+  ({String temperature, String condition, String rain, IconData icon})
+  get _sample => switch ((dayNum - 1) % 4) {
+    0 => (
+      temperature: '28°C',
+      condition: '晴時多雲',
+      rain: '降雨 20%',
+      icon: CupertinoIcons.cloud_sun_fill,
+    ),
+    1 => (
+      temperature: '27°C',
+      condition: '多雲',
+      rain: '降雨 30%',
+      icon: CupertinoIcons.cloud_fill,
+    ),
+    2 => (
+      temperature: '29°C',
+      condition: '晴朗',
+      rain: '降雨 10%',
+      icon: CupertinoIcons.sun_max_fill,
+    ),
+    _ => (
+      temperature: '26°C',
+      condition: '短暫陣雨',
+      rain: '降雨 40%',
+      icon: CupertinoIcons.cloud_rain_fill,
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    final sample = _sample;
+    return Container(
+      key: ValueKey('day-weather-preview-$dayNum'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s3,
+        vertical: TpSpacing.s2,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(TpRadius.lg),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(sample.icon, size: 22, color: tones.accentDeep),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '天氣示意',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: tones.accentDeep,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      sample.condition,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: TpSpacing.s2),
+                    Text(
+                      sample.rain,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Text(
+            sample.temperature,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {

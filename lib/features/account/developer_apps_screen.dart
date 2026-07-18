@@ -30,12 +30,28 @@ class DeveloperAppsScreen extends ConsumerWidget {
       appBar: TpAppBar(
         title: const Text('開發者應用'),
         actions: [
-          IconButton(
+          TpToolbarIconButton(
             key: const Key('developer-apps-new'),
             tooltip: '新增 OAuth 應用',
-            onPressed: () =>
-                GoRouter.maybeOf(context)?.go('/settings/developer-apps/new'),
-            icon: const Icon(CupertinoIcons.add),
+            onPressed: () {
+              if (TpLargeSheetNavigationScope.maybeOf(context) != null) {
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DeveloperAppNewScreen(),
+                    ),
+                  ),
+                );
+              } else {
+                unawaited(
+                  GoRouter.maybeOf(
+                        context,
+                      )?.push<void>('/settings/developer-apps/new') ??
+                      Future<void>.value(),
+                );
+              }
+            },
+            icon: CupertinoIcons.add,
           ),
         ],
       ),

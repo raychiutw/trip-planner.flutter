@@ -33,7 +33,7 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final shell = Scaffold(
       extendBody: showRootTab,
       // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
       body: Column(
@@ -49,5 +49,6 @@ class AppShell extends StatelessWidget {
             )
           : null,
     );
+    return shell;
   }
 }

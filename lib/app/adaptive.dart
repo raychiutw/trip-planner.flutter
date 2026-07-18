@@ -9,8 +9,11 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
+import '../ui/tp_action_item.dart';
+import '../ui/tp_app_bar.dart';
 
 /// 顯示自適應「確認 / 取消」對話框,回傳使用者是否確認。
 ///
@@ -81,28 +84,6 @@ Future<bool> showAppConfirm(
   return result ?? false;
 }
 
-/// 自適應 action sheet 的單一動作。
-class AppSheetAction<T> {
-  const AppSheetAction({
-    required this.label,
-    required this.value,
-    this.isDestructive = false,
-    this.icon,
-  });
-
-  /// 動作文字。
-  final String label;
-
-  /// 選中此動作時 [showAppActionSheet] 回傳的值。
-  final T value;
-
-  /// 破壞性動作(iOS 紅字;Android 紅色 icon/文字)。
-  final bool isDestructive;
-
-  /// Android 清單樣式的 leading icon(iOS 不顯示)。
-  final IconData? icon;
-}
-
 /// 顯示自適應動作選單,回傳使用者選擇的動作值(取消回傳 `null`)。
 ///
 /// - iOS/macOS → [CupertinoActionSheet](底部彈出、破壞性紅字、獨立取消鈕)。
@@ -111,7 +92,7 @@ Future<T?> showAppActionSheet<T>(
   BuildContext context, {
   String? title,
   String? message,
-  required List<AppSheetAction<T>> actions,
+  required List<TpActionItem<T>> actions,
   String cancelLabel = '取消',
 }) {
   final platform = Theme.of(context).platform;
@@ -126,11 +107,24 @@ Future<T?> showAppActionSheet<T>(
         message: message == null ? null : Text(message),
         actions: [
           for (final action in actions)
-            CupertinoActionSheetAction(
-              isDestructiveAction: action.isDestructive,
-              onPressed: () => Navigator.of(sheetContext).pop(action.value),
-              child: Text(action.label),
-            ),
+            if (action.enabled)
+              CupertinoActionSheetAction(
+                isDestructiveAction: action.role == TpActionRole.destructive,
+                onPressed: () => Navigator.of(sheetContext).pop(action.value),
+                child: Text(action.label),
+              )
+            else
+              Semantics(
+                button: true,
+                enabled: false,
+                label: action.label,
+                child: ExcludeSemantics(
+                  child: CupertinoActionSheetAction(
+                    onPressed: () {},
+                    child: Opacity(opacity: 0.45, child: Text(action.label)),
+                  ),
+                ),
+              ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
@@ -149,22 +143,26 @@ Future<T?> showAppActionSheet<T>(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final action in actions)
+            for (final action in actions) ...[
+              if (action.dividerBefore) const Divider(height: 1),
               ListTile(
-                leading: action.icon == null
-                    ? null
-                    : Icon(
-                        action.icon,
-                        color: action.isDestructive ? error : null,
-                      ),
+                key: action.key,
+                enabled: action.enabled,
+                leading: Icon(
+                  action.icon,
+                  color: action.role == TpActionRole.destructive ? error : null,
+                ),
                 title: Text(
                   action.label,
-                  style: action.isDestructive
+                  style: action.role == TpActionRole.destructive
                       ? TextStyle(color: error, fontWeight: FontWeight.w600)
                       : null,
                 ),
-                onTap: () => Navigator.of(sheetContext).pop(action.value),
+                onTap: action.enabled
+                    ? () => Navigator.of(sheetContext).pop(action.value)
+                    : null,
               ),
+            ],
           ],
         ),
       );
@@ -178,75 +176,314 @@ Future<T?> showAppLargeSheet<T>(
   required String title,
   required WidgetBuilder builder,
 }) {
-  return showModalBottomSheet<T>(
+  final sheetNavigatorKey = GlobalKey<NavigatorState>();
+  return _showThemeAwareAppLargeSheet<T>(
+    context: context,
+    sheetBuilder: (sheetContext, onClose) => _AppLargeSheetContent(
+      title: title,
+      contentBuilder: builder,
+      onClose: onClose,
+      navigatorKey: sheetNavigatorKey,
+    ),
+  );
+}
+
+/// 顯示自身已含 [TpAppBar] 的功能頁；共用 93% 高度、上滑動線與右上關閉。
+///
+/// 行程選單的筆記、資料、列印、異動、分享、共編與健檢皆走這個入口，
+/// 不再以 `go()` 取代目前頁面而留下沒有出口的畫面。
+Future<T?> showAppLargeScreenSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) {
+  return _showThemeAwareAppLargeSheet<T>(
+    context: context,
+    sheetBuilder: (sheetContext, onClose) =>
+        _AppLargeScreenSheetContent(contentBuilder: builder, onClose: onClose),
+  );
+}
+
+typedef _AppLargeSheetBuilder =
+    Widget Function(BuildContext context, VoidCallback onClose);
+
+LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return LiquidGlassSettings(
+    glassColor: isDark ? const Color(0xB3121214) : const Color(0xC7FFFBF5),
+    thickness: isDark ? 28 : 24,
+    blur: 24,
+    chromaticAberration: isDark ? 0.003 : 0.004,
+    lightIntensity: isDark ? 0.68 : 0.76,
+    ambientStrength: isDark ? 0.08 : 0.14,
+    refractiveIndex: 1.10,
+    saturation: isDark ? 1.04 : 1.06,
+    platformViewFallbackColor: isDark
+        ? const Color(0xF21C1C1E)
+        : const Color(0xF2FFFBF5),
+  );
+}
+
+Future<T?> _showThemeAwareAppLargeSheet<T>({
+  required BuildContext context,
+  required _AppLargeSheetBuilder sheetBuilder,
+}) {
+  final controller = GlassModalSheetController();
+  return showGeneralDialog<T>(
     context: context,
     useRootNavigator: true,
-    isScrollControlled: true,
-    useSafeArea: false,
-    backgroundColor: Colors.transparent,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.38),
-    builder: (sheetContext) => FractionallySizedBox(
-      heightFactor: 0.93,
+    transitionDuration: const Duration(milliseconds: 500),
+    transitionBuilder: (context, animation, secondaryAnimation, child) =>
+        SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutQuart),
+              ),
+          child: child,
+        ),
+    pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+        _ThemeAwareAppLargeSheet(
+          controller: controller,
+          onClose: () => Navigator.of(dialogContext, rootNavigator: true).pop(),
+          sheetBuilder: sheetBuilder,
+        ),
+  );
+}
+
+class _ThemeAwareAppLargeSheet extends StatefulWidget {
+  const _ThemeAwareAppLargeSheet({
+    required this.controller,
+    required this.onClose,
+    required this.sheetBuilder,
+  });
+
+  final GlassModalSheetController controller;
+  final VoidCallback onClose;
+  final _AppLargeSheetBuilder sheetBuilder;
+
+  @override
+  State<_ThemeAwareAppLargeSheet> createState() =>
+      _ThemeAwareAppLargeSheetState();
+}
+
+class _ThemeAwareAppLargeSheetState extends State<_ThemeAwareAppLargeSheet> {
+  var _isClosing = false;
+  Widget? _sheet;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 保留同一個 child widget identity，避免外觀切換重建 dialog page 時把
+    // sheet 內部 Navigator 的子頁（例如「外觀」）退回帳號首頁。
+    _sheet ??= widget.sheetBuilder(context, _close);
+  }
+
+  void _close() {
+    if (_isClosing) return;
+    _isClosing = true;
+    widget.onClose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 必須在 build 內依賴 Theme；外觀切換後 sheet 材質與內容才會同一幀更新。
+    final settings = _appLargeSheetSettings(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GlassModalSheetScaffold(
+      controller: widget.controller,
+      body: const SizedBox.expand(),
+      sheet: _sheet!,
+      initialState: GlassSheetState.full,
+      halfSize: 0.93,
+      fullSize: 0.93,
+      settings: settings,
+      halfSettings: settings,
+      fullSettings: settings,
+      expandedColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFBF5),
+      quality: GlassQuality.standard,
+      fillThreshold: 1,
+      fillTransition: GlassFillTransition.gradual,
+      topBorderRadius: 28,
+      fullTopBorderRadius: 28,
+      bottomBorderRadius: 0,
+      fullBottomBorderRadius: 0,
+      horizontalMargin: 0,
+      bottomMargin: 0,
+      padding: EdgeInsets.zero,
+      showDragIndicator: false,
+      onStateChanged: (state) {
+        if (state == GlassSheetState.hidden) _close();
+      },
+    );
+  }
+}
+
+class _AppLargeSheetContent extends StatelessWidget {
+  const _AppLargeSheetContent({
+    required this.title,
+    required this.contentBuilder,
+    required this.onClose,
+    required this.navigatorKey,
+  });
+
+  final String title;
+  final WidgetBuilder contentBuilder;
+  final VoidCallback onClose;
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox.expand(
+      key: const ValueKey('app-large-sheet'),
       child: Material(
-        key: const ValueKey('app-large-sheet'),
-        color: Theme.of(sheetContext).colorScheme.surface,
-        clipBehavior: Clip.antiAlias,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              SizedBox(
-                height: TpSpacing.s5,
-                child: Center(
-                  child: Container(
-                    key: const ValueKey('app-large-sheet-drag-indicator'),
-                    width: 36,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        sheetContext,
-                      ).colorScheme.onSurface.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(99),
+        color: Colors.transparent,
+        child: TpLargeSheetNavigationScope(
+          onClose: onClose,
+          child: Theme(
+            data: theme.copyWith(scaffoldBackgroundColor: Colors.transparent),
+            child: Column(
+              children: [
+                // Drag indicator belongs to the sheet, not its first route. Keep
+                // it visible when account/settings pushes a nested screen.
+                SizedBox(
+                  height: TpSpacing.s5,
+                  child: Center(
+                    child: Container(
+                      key: const ValueKey('app-large-sheet-drag-indicator'),
+                      width: 36,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.22,
+                        ),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              SizedBox(
-                height: 56,
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    left: TpSpacing.s5,
-                    right: TpSpacing.s3,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(sheetContext).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                Expanded(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: Navigator(
+                      key: navigatorKey,
+                      onGenerateRoute: (_) => MaterialPageRoute<void>(
+                        builder: (pageContext) => SafeArea(
+                          top: false,
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: 56,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: TpSpacing.s5,
+                                    right: TpSpacing.s3,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(pageContext)
+                                              .textTheme
+                                              .titleLarge
+                                              ?.copyWith(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                      ),
+                                      TpToolbarGlassButton(
+                                        key: const ValueKey(
+                                          'app-large-sheet-close',
+                                        ),
+                                        tooltip: MaterialLocalizations.of(
+                                          pageContext,
+                                        ).closeButtonTooltip,
+                                        onPressed: onClose,
+                                        child: const Icon(
+                                          CupertinoIcons.xmark,
+                                          size: 19,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: contentBuilder(pageContext)),
+                            ],
+                          ),
                         ),
                       ),
-                      IconButton.filledTonal(
-                        key: const ValueKey('app-large-sheet-close'),
-                        tooltip: '關閉',
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        icon: const Icon(CupertinoIcons.xmark, size: 18),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              Expanded(child: builder(sheetContext)),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _AppLargeScreenSheetContent extends StatelessWidget {
+  const _AppLargeScreenSheetContent({
+    required this.contentBuilder,
+    required this.onClose,
+  });
+
+  final WidgetBuilder contentBuilder;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox.expand(
+      key: const ValueKey('app-large-screen-sheet'),
+      child: Material(
+        color: Colors.transparent,
+        child: TpLargeSheetNavigationScope(
+          onClose: onClose,
+          child: Theme(
+            data: theme.copyWith(scaffoldBackgroundColor: Colors.transparent),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: TpSpacing.s5,
+                  child: Center(
+                    child: Container(
+                      key: const ValueKey('app-large-sheet-drag-indicator'),
+                      width: 36,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.22,
+                        ),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: contentBuilder(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 平台自適應搜尋輸入列。

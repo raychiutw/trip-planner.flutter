@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/map_adapter.dart';
@@ -53,6 +57,10 @@ class _StubMapRepository implements MapRepository {
     );
   }
 }
+
+class _MockGoogleMapController extends Mock implements GoogleMapController {}
+
+class _FakeCameraUpdate extends Fake implements CameraUpdate {}
 
 TimelineEntry _entry({
   required int id,
@@ -115,6 +123,7 @@ Widget _buildScreen(
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
   bool withRootTab = false,
+  ThemeData? theme,
 }) {
   final router = GoRouter(
     routes: [
@@ -156,7 +165,7 @@ Widget _buildScreen(
       ),
     ],
     child: MaterialApp.router(
-      theme: AppTheme.light(),
+      theme: theme ?? AppTheme.light(),
       routerConfig: router,
       builder: (context, child) {
         Widget content = child!;
@@ -184,6 +193,32 @@ Widget _buildScreen(
 }
 
 void main() {
+  setUpAll(() => registerFallbackValue(_FakeCameraUpdate()));
+
+  testWidgets('白天地圖固定使用深色 status bar 圖示', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('trip-map-status-style')),
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.dark);
+    expect(region.value.statusBarBrightness, Brightness.light);
+  });
+
+  testWidgets('深色地圖固定使用淺色 status bar 圖示', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], theme: AppTheme.dark()),
+    );
+    await tester.pumpAndSettle();
+
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('trip-map-status-style')),
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.light);
+    expect(region.value.statusBarBrightness, Brightness.dark);
+  });
+
   testWidgets('DAY 1：單層行程/DAY selector、固定城市 zoom 與當日 POI', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
@@ -202,7 +237,7 @@ void main() {
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
-      find.descendant(of: daySelector, matching: find.byType(BackdropFilter)),
+      find.descendant(of: daySelector, matching: find.byType(GlassContainer)),
       findsOneWidget,
     );
     expect(find.byType(PageView), findsOneWidget);
@@ -228,9 +263,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('trip-map-poi-drawer')),
-        matching: find.byType(BackdropFilter),
+        matching: find.byType(GlassContainer),
       ),
-      findsAtLeastNWidgets(2),
+      findsOneWidget,
     );
 
     // pins：只顯示 DAY 1 且 master 座標非 null 的 2 筆
@@ -276,7 +311,23 @@ void main() {
 
     expect(
       find.descendant(of: neighbor, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
+      findsNothing,
+    );
+  });
+
+  testWidgets('POI 卡片與玻璃膠囊保留水平 8pt、垂直 4pt 空白', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    final padding = tester.widget<Padding>(
+      find.byKey(const ValueKey('trip-map-poi-card-padding-11')),
+    );
+    expect(
+      padding.padding,
+      const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s2,
+        vertical: TpSpacing.s1,
+      ),
     );
   });
 
@@ -385,6 +436,37 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
+  testWidgets('點選 POI 後鏡頭維持城市 zoom 12', (tester) async {
+    final nativeController = _MockGoogleMapController();
+    when(() => nativeController.animateCamera(any())).thenAnswer((_) async {});
+    var attached = false;
+
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        onMapConfig: (config) {
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    clearInteractions(nativeController);
+
+    await tester.tap(find.byKey(const ValueKey('entry-card-11')));
+    await tester.pumpAndSettle();
+
+    final update =
+        verify(
+              () => nativeController.animateCamera(captureAny()),
+            ).captured.single
+            as CameraUpdate;
+    final json = update.toJson() as List<Object?>;
+    expect(json[0], 'newLatLngZoom');
+    expect(json[2], 12);
   });
 
   testWidgets('marker 點擊與左右滑卡共用 active POI', (tester) async {

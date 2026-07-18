@@ -166,7 +166,10 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
                               color: colors.primary,
                             )
                           : null,
-                      onTap: () => Navigator.of(context).pop(trip.tripId),
+                      onTap: () => Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pop(trip.tripId),
                     );
                   },
                 ),

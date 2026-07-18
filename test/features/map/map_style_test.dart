@@ -63,11 +63,11 @@ void main() {
   });
 
   group('tripMapRouteStyle', () {
-    test('奇數天：日別色實線、粗細 3、透明度 0.6', () {
+    test('奇數天：日別色實線、粗細 5、透明度 0.6', () {
       final style = tripMapRouteStyle(dayNum: 1, isActive: false);
 
       expect(style.color, const Color(0xFF0EA5E9));
-      expect(style.strokeWidth, 3);
+      expect(style.strokeWidth, 5);
       expect(style.dashed, isFalse);
       expect(style.opacity, 0.6);
     });
@@ -77,10 +77,10 @@ void main() {
       expect(tripMapRouteStyle(dayNum: 3, isActive: false).dashed, isFalse);
     });
 
-    test('聚焦段：加粗到 4、透明度 0.85', () {
+    test('聚焦段：加粗到 6、透明度 0.85', () {
       final style = tripMapRouteStyle(dayNum: 1, isActive: true);
 
-      expect(style.strokeWidth, 4);
+      expect(style.strokeWidth, 6);
       expect(style.opacity, 0.85);
     });
   });

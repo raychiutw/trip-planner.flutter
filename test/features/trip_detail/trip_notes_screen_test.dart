@@ -14,6 +14,7 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_glass_expansion_section.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -129,6 +130,7 @@ void main() {
     expect(find.text('預訂'), findsOneWidget);
     expect(find.text('行前須知'), findsOneWidget);
     expect(find.text('緊急聯絡'), findsOneWidget);
+    expect(find.byType(TpGlassExpansionSection), findsNWidgets(5));
 
     const expectedCounts = {
       'flights': '1',

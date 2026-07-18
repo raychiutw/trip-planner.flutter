@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/features/shell/app_shell.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
@@ -77,16 +78,45 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
 
       // 點「地圖」→ branch 2
-      await tester.tap(find.text('地圖'));
+      await tester.tap(find.bySemanticsLabel('地圖'));
       await tester.pumpAndSettle();
       expect(find.text('PROBE-MAP'), findsOneWidget);
       expect(find.text('PROBE-CHAT'), findsNothing);
 
       // 點「收藏」→ branch 3
-      await tester.tap(find.text('收藏'));
+      await tester.tap(find.bySemanticsLabel('收藏'));
       await tester.pumpAndSettle();
       expect(find.text('PROBE-FAV'), findsOneWidget);
       expect(find.text('帳號'), findsNothing);
+    });
+
+    testWidgets('地圖 branch 跟隨深色主題並使用深色 Liquid Glass', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: ThemeMode.dark,
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('地圖'));
+      await tester.pumpAndSettle();
+
+      expect(
+        Theme.of(tester.element(find.text('PROBE-MAP'))).brightness,
+        Brightness.dark,
+      );
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(of: bar, matching: find.byType(GlassTabBar)),
+      );
+      expect(glass.platformViewBackdrop, isTrue);
+      expect(glass.indicatorColor, TpColorsDark.rootTabSelection);
+      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
@@ -103,7 +133,7 @@ void main() {
       final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
       expect(bar, findsOneWidget);
       expect(
-        find.descendant(of: bar, matching: find.byType(BackdropFilter)),
+        find.descendant(of: bar, matching: find.byType(GlassTabBar)),
         findsOneWidget,
       );
       expect(tester.widget<Scaffold>(find.byType(Scaffold)).extendBody, isTrue);
@@ -124,7 +154,7 @@ void main() {
 
       final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
       final restingSize = tester.getSize(bar);
-      expect(find.text('聊天'), findsOneWidget);
+      expect(find.bySemanticsLabel('聊天'), findsOneWidget);
 
       await tester.drag(
         find.byKey(const ValueKey('root-vertical-list')),
@@ -133,8 +163,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.getSize(bar), restingSize);
-      expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('收藏'), findsOneWidget);
+      expect(find.bySemanticsLabel('聊天'), findsOneWidget);
+      expect(find.bySemanticsLabel('收藏'), findsOneWidget);
 
       await tester.drag(
         find.byKey(const ValueKey('root-vertical-list')),
@@ -143,7 +173,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.getSize(bar), restingSize);
-      expect(find.text('聊天'), findsOneWidget);
+      expect(find.bySemanticsLabel('聊天'), findsOneWidget);
     });
 
     testWidgets('四個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
@@ -162,9 +192,7 @@ void main() {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
       expect(find.bySemanticsLabel('帳號'), findsNothing);
-      final selected = tester.getSemantics(
-        find.byKey(const ValueKey('root-tab-聊天')),
-      );
+      final selected = tester.getSemantics(find.bySemanticsLabel('聊天'));
       expect(
         selected.getSemanticsData().flagsCollection.isSelected,
         Tristate.isTrue,
@@ -172,7 +200,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('root tab 對齊定版 mockup 的 30/44/8 幾何與透明玻璃色', (tester) async {
+    testWidgets('root tab 對齊定版 mockup 的 30/44/16 幾何與透明玻璃色', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -187,29 +215,18 @@ void main() {
       final padding = tester.widget<Padding>(
         find.descendant(of: bar, matching: find.byType(Padding)).first,
       );
-      expect(padding.padding, const EdgeInsets.fromLTRB(30, 0, 30, 8));
-      final glass = find.descendant(
-        of: bar,
-        matching: find.byType(BackdropFilter),
+      expect(padding.padding, const EdgeInsets.fromLTRB(30, 0, 30, 16));
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
-      expect(tester.getSize(glass).height, 44);
-
-      final glassDecoration = tester.widget<DecoratedBox>(
-        find.descendant(of: bar, matching: find.byType(DecoratedBox)).first,
-      );
-      expect(
-        (glassDecoration.decoration as BoxDecoration).color,
-        TpColorsLight.background.withValues(alpha: 0.42),
-      );
-      expect(
-        find.byKey(const ValueKey('root-tab-selected-surface-聊天')),
-        findsOneWidget,
-      );
+      expect(glass.barHeight, 44);
+      expect(glass.platformViewBackdrop, isFalse);
+      expect(glass.indicatorColor, TpColorsLight.rootTabSelection);
+      expect(glass.settings?.chromaticAberration, 0);
+      expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
     });
 
-    testWidgets('深色 root tab 使用更透的 Liquid Glass rgba(40,40,42,.38)', (
-      tester,
-    ) async {
+    testWidgets('深色 root tab 使用中性黑玻璃與暖褐選取色', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -221,17 +238,16 @@ void main() {
       await tester.pumpAndSettle();
 
       final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
-      final glassDecoration = tester.widget<DecoratedBox>(
-        find.descendant(of: bar, matching: find.byType(DecoratedBox)).first,
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
-      expect(
-        (glassDecoration.decoration as BoxDecoration).color,
-        TpColorsDark.glass.withValues(alpha: 0.38),
-      );
+      expect(glass.indicatorColor, TpColorsDark.rootTabSelection);
+      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
+      expect(glass.settings?.chromaticAberration, 0);
     });
 
-    test('iPhone safe area 與膠囊重疊 24pt，底部仍保留 10pt', () {
-      expect(TpRootTabGeometry.expandedHeightFor(34), 54);
+    test('iPhone safe area 與膠囊重疊後，底部至少保留 16pt', () {
+      expect(TpRootTabGeometry.expandedHeightFor(34), 60);
     });
   });
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_glass_surface.dart';
 
 /// Root tab bar：固定尺寸、恆顯 label。
 ///
@@ -44,10 +44,27 @@ class AppleRootTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tintColor = isDark
-        ? TpColorsDark.glass.withValues(alpha: 0.38)
-        : TpColorsLight.background.withValues(alpha: 0.42);
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassTint = isDark
+        ? const Color(0x70121214)
+        : const Color(0x70FFFBF5);
+    final fallbackTint = isDark
+        ? const Color(0x66121214)
+        : const Color(0x5CFFFBF5);
+    final glassSettings = LiquidGlassSettings(
+      glassColor: glassTint,
+      thickness: 16,
+      blur: 16,
+      chromaticAberration: 0,
+      lightIntensity: isDark ? 0.56 : 0.62,
+      ambientStrength: isDark ? 0.06 : 0.10,
+      refractiveIndex: 1.06,
+      saturation: 1.02,
+      standardOpacityMultiplier: isDark ? 0.52 : 0.40,
+      platformViewFallbackColor: fallbackTint,
+    );
     return KeyedSubtree(
       key: const ValueKey('apple-root-tab-bar'),
       child: Padding(
@@ -57,90 +74,62 @@ class AppleRootTabBar extends StatelessWidget {
           TpRootTabGeometry.horizontalMargin,
           TpRootTabGeometry.bottomOffset(context),
         ),
-        child: TpGlassSurface(
-          borderRadius: const BorderRadius.all(Radius.circular(22)),
-          tintColor: tintColor,
-          child: Material(
-            color: Colors.transparent,
-            child: SizedBox(
-              height: TpRootTabGeometry.expandedBarHeight,
-              child: Row(
-                children: [
-                  for (var index = 0; index < _destinations.length; index++)
-                    Expanded(
-                      child: _RootTabItem(
-                        destination: _destinations[index],
-                        selected: selectedIndex == index,
-                        onTap: () => onSelected(index),
-                      ),
-                    ),
-                ],
+        child: GlassTabBar.bottom(
+          tabs: [
+            for (final destination in _destinations)
+              GlassTab(
+                icon: Icon(
+                  destination.icon,
+                  key: ValueKey('root-tab-${destination.label}'),
+                ),
+                activeIcon: Icon(
+                  destination.selectedIcon,
+                  key: ValueKey('root-tab-${destination.label}'),
+                ),
+                label: destination.label,
+                semanticLabel: destination.label,
+                glowColor: tones.accentDeep,
               ),
-            ),
+          ],
+          selectedIndex: selectedIndex,
+          onTabSelected: onSelected,
+          horizontalPadding: 0,
+          verticalPadding: 0,
+          barHeight: TpRootTabGeometry.expandedBarHeight,
+          barBorderRadius: 22,
+          indicatorBorderRadius: 17,
+          indicatorExpansion: EdgeInsets.zero,
+          tabPadding: const EdgeInsets.symmetric(horizontal: 2),
+          spacing: 0,
+          iconSize: 20,
+          iconLabelSpacing: 0,
+          labelFontSize: 11,
+          settings: glassSettings,
+          selectedIconColor: tones.accentDeep,
+          selectedLabelColor: tones.accentDeep,
+          unselectedIconColor: theme.colorScheme.onSurfaceVariant,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+          selectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RootTabItem extends StatelessWidget {
-  const _RootTabItem({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ({String label, IconData icon, IconData selectedIcon}) destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final color = selected ? colors.primary : colors.onSurfaceVariant;
-    return Semantics(
-      key: ValueKey('root-tab-${destination.label}'),
-      button: true,
-      selected: selected,
-      label: destination.label,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(3),
-            child: DecoratedBox(
-              key: selected
-                  ? ValueKey('root-tab-selected-surface-${destination.label}')
-                  : null,
-              decoration: BoxDecoration(
-                color: selected
-                    ? Theme.of(context).extension<TpTones>()!.accentSubtle
-                    : Colors.transparent,
-                borderRadius: const BorderRadius.all(Radius.circular(19)),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    selected ? destination.selectedIcon : destination.icon,
-                    size: 20,
-                    color: color,
-                  ),
-                  Text(
-                    destination.label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          unselectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w500,
           ),
+          indicatorColor: isDark
+              ? TpColorsDark.rootTabSelection
+              : TpColorsLight.rootTabSelection,
+          indicatorSettings: glassSettings.copyWith(
+            glassColor: isDark
+                ? TpColorsDark.rootTabSelection
+                : TpColorsLight.rootTabSelection,
+            blur: 10,
+            refractiveIndex: 1.04,
+          ),
+          magnification: 1,
+          blendAmount: 4,
+          glowOpacity: 0.18,
+          quality: GlassQuality.standard,
+          platformViewBackdrop: selectedIndex == 2,
         ),
       ),
     );

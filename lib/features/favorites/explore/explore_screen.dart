@@ -12,6 +12,7 @@ import '../../../models/add_to_trip.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'explore_controller.dart';
 import 'poi_search_card.dart';
@@ -247,9 +248,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       title: '更多分類',
       actions: [
         for (final category in categories)
-          AppSheetAction(
+          TpActionItem(
             label: '${category.label}  ${category.count}',
             value: category.label,
+            icon: CupertinoIcons.tag,
           ),
       ],
     );

@@ -13,6 +13,7 @@ import '../../models/trip_request.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_glass_expansion_section.dart';
 import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -458,133 +459,114 @@ class _NotesSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    return Container(
+    return TpGlassExpansionSection(
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: ExpansionTile(
-        initiallyExpanded: initiallyExpanded,
-        // hairline 樣式：取消 ExpansionTile 展開時的預設上下分隔線
-        shape: const Border(),
-        collapsedShape: const Border(),
-        tilePadding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-        childrenPadding: const EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          0,
-          TpSpacing.s4,
-          TpSpacing.s4,
-        ),
-        iconColor: theme.colorScheme.onSurfaceVariant,
-        collapsedIconColor: theme.colorScheme.onSurfaceVariant,
-        leading: Icon(icon, size: 20, color: iconColor),
-        title: Row(
-          children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            const SizedBox(width: TpSpacing.s2),
-            Container(
-              key: ValueKey('notes-count-${section.name}'),
-              padding: const EdgeInsets.symmetric(
-                horizontal: TpSpacing.s2,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: tones.accentSubtle,
-                borderRadius: const BorderRadius.all(Radius.circular(999)),
-              ),
-              child: Text(
-                '${rows.length}',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: tones.accentDeep,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ],
-        ),
+      initiallyExpanded: initiallyExpanded,
+      iconColor: theme.colorScheme.onSurfaceVariant,
+      leading: Icon(icon, size: 20, color: iconColor),
+      title: Row(
         children: [
-          if (aiActions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: TpSpacing.s2,
-                  runSpacing: TpSpacing.s2,
-                  children: [
-                    for (final action in aiActions) ...[
-                      OutlinedButton.icon(
-                        key: ValueKey('note-ai-${action.type.pathSegment}'),
-                        onPressed:
-                            aiBusy || !action.enabled || onGenerateNotes == null
-                            ? null
-                            : () => onGenerateNotes!(action.type),
-                        icon: const Icon(Icons.auto_awesome_outlined),
-                        label: Text(
-                          activeAiType == action.type ? '生成中...' : action.label,
-                        ),
-                      ),
-                      if (!action.enabled && action.disabledText != null)
-                        Padding(
-                          padding: const EdgeInsets.only(right: TpSpacing.s2),
-                          child: Text(
-                            action.disabledText!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ],
-                ),
-              ),
+          Text(title, style: theme.textTheme.titleMedium),
+          const SizedBox(width: TpSpacing.s2),
+          Container(
+            key: ValueKey('notes-count-${section.name}'),
+            padding: const EdgeInsets.symmetric(
+              horizontal: TpSpacing.s2,
+              vertical: 2,
             ),
-          if (rows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '尚無資料',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            )
-          else
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              itemCount: rows.length,
-              onReorderItem: (oldIndex, newIndex) =>
-                  _reorder(context, ref, oldIndex, newIndex),
-              itemBuilder: (context, i) => _NoteRowTile(
-                key: ValueKey('note-row-${section.name}-${rows[i].id}'),
-                section: section,
-                tripId: tripId,
-                row: rows[i],
-                index: i,
-                onDelete: () => _delete(context, ref, rows[i].id),
-              ),
+            decoration: BoxDecoration(
+              color: tones.accentSubtle,
+              borderRadius: const BorderRadius.all(Radius.circular(999)),
             ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: ValueKey('note-add-${section.name}'),
-              onPressed: () =>
-                  showNoteEditSheet(context, tripId: tripId, section: section),
-              icon: const Icon(CupertinoIcons.add),
-              label: Text('新增$title'),
+            child: Text(
+              '${rows.length}',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: tones.accentDeep,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
       ),
+      children: [
+        if (aiActions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: TpSpacing.s2,
+                runSpacing: TpSpacing.s2,
+                children: [
+                  for (final action in aiActions) ...[
+                    OutlinedButton.icon(
+                      key: ValueKey('note-ai-${action.type.pathSegment}'),
+                      onPressed:
+                          aiBusy || !action.enabled || onGenerateNotes == null
+                          ? null
+                          : () => onGenerateNotes!(action.type),
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: Text(
+                        activeAiType == action.type ? '生成中...' : action.label,
+                      ),
+                    ),
+                    if (!action.enabled && action.disabledText != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: TpSpacing.s2),
+                        child: Text(
+                          action.disabledText!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        if (rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '尚無資料',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          )
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: rows.length,
+            onReorderItem: (oldIndex, newIndex) =>
+                _reorder(context, ref, oldIndex, newIndex),
+            itemBuilder: (context, i) => _NoteRowTile(
+              key: ValueKey('note-row-${section.name}-${rows[i].id}'),
+              section: section,
+              tripId: tripId,
+              row: rows[i],
+              index: i,
+              onDelete: () => _delete(context, ref, rows[i].id),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('note-add-${section.name}'),
+            onPressed: () =>
+                showNoteEditSheet(context, tripId: tripId, section: section),
+            icon: const Icon(CupertinoIcons.add),
+            label: Text('新增$title'),
+          ),
+        ),
+      ],
     );
   }
 }

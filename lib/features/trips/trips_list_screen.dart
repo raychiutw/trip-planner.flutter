@@ -13,6 +13,8 @@ import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
+import '../../ui/tp_action_item.dart';
+import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scroll_scaffold.dart';
 import 'trip_card.dart';
 
@@ -265,49 +267,53 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       title: '我的行程',
       onRefresh: () => ref.refresh(myTripsProvider.future),
       actions: [
-        PopupMenuButton<_TripsToolbarAction>(
+        TpMoreMenuButton<_TripsToolbarAction>(
           key: const ValueKey('trips-sort-button'),
-          icon: _isImporting
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                )
-              : const Icon(CupertinoIcons.ellipsis_circle),
           tooltip: '更多',
           enabled: !_isImporting,
+          triggerChild: _isImporting
+              ? SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator.adaptive(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(
+                      theme.colorScheme.primary,
+                    ),
+                  ),
+                )
+              : null,
           onSelected: _handleToolbarAction,
-          itemBuilder: (context) => [
-            const PopupMenuItem(
+          items: [
+            const TpActionItem(
               key: ValueKey('trips-create-button'),
               value: _TripsToolbarAction.create,
-              child: _TripsMenuRow(icon: CupertinoIcons.add, label: '新增行程'),
+              icon: CupertinoIcons.add,
+              label: '新增行程',
             ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
+            const TpActionItem(
               key: ValueKey('trips-list-import-trigger'),
               value: _TripsToolbarAction.importJson,
-              child: _TripsMenuRow(
-                icon: CupertinoIcons.cloud_upload,
-                label: '匯入行程 JSON',
-              ),
+              icon: CupertinoIcons.cloud_upload,
+              label: '匯入行程 JSON',
+              dividerBefore: true,
             ),
-            const PopupMenuDivider(),
-            _buildSortMenuItem(
+            _buildSortMenuAction(
               action: _TripsToolbarAction.defaultOrder,
               order: TripSortOrder.defaultOrder,
               label: '預設順序',
+              dividerBefore: true,
             ),
-            _buildSortMenuItem(
+            _buildSortMenuAction(
               action: _TripsToolbarAction.nameAsc,
               order: TripSortOrder.nameAsc,
               label: '名稱 A→Z',
             ),
-            _buildSortMenuItem(
+            _buildSortMenuAction(
               action: _TripsToolbarAction.updatedDesc,
               order: TripSortOrder.updatedDesc,
               label: '最新編輯',
             ),
-            _buildSortMenuItem(
+            _buildSortMenuAction(
               action: _TripsToolbarAction.startDateAsc,
               order: TripSortOrder.startDateAsc,
               label: '出發日',
@@ -363,19 +369,19 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  PopupMenuItem<_TripsToolbarAction> _buildSortMenuItem({
+  TpActionItem<_TripsToolbarAction> _buildSortMenuAction({
     required _TripsToolbarAction action,
     required TripSortOrder order,
     required String label,
+    bool dividerBefore = false,
   }) {
-    return PopupMenuItem(
+    return TpActionItem(
       value: action,
-      child: _TripsMenuRow(
-        icon: _sortOrder == order
-            ? CupertinoIcons.check_mark
-            : CupertinoIcons.arrow_up_arrow_down,
-        label: label,
-      ),
+      icon: _sortOrder == order
+          ? CupertinoIcons.check_mark
+          : CupertinoIcons.arrow_up_arrow_down,
+      label: label,
+      dividerBefore: dividerBefore,
     );
   }
 
@@ -547,31 +553,32 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final selectedAction = await showAppActionSheet<_TripListAction>(
       context,
       actions: [
-        AppSheetAction(
+        TpActionItem(
           label: '分享',
           value: _TripListAction.share,
           icon: CupertinoIcons.share,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: '共編設定',
           value: _TripListAction.collab,
           icon: CupertinoIcons.person_2,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: 'AI 健檢',
           value: _TripListAction.health,
           icon: CupertinoIcons.heart,
         ),
         if (_exportingTripId == null)
-          AppSheetAction(
+          TpActionItem(
             label: '匯出 JSON',
             value: _TripListAction.exportJson,
             icon: CupertinoIcons.cloud_download,
           ),
-        AppSheetAction(
+        TpActionItem(
           label: '刪除行程',
           value: _TripListAction.delete,
-          isDestructive: true,
+          dividerBefore: true,
+          role: TpActionRole.destructive,
           icon: CupertinoIcons.delete,
         ),
       ],
@@ -624,24 +631,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 }
 
 enum _TripListAction { share, collab, health, exportJson, delete }
-
-class _TripsMenuRow extends StatelessWidget {
-  const _TripsMenuRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: TpSpacing.s3),
-        Text(label),
-      ],
-    );
-  }
-}
 
 /// 空清單 hero 文案。
 class _EmptyHero extends StatelessWidget {

@@ -49,6 +49,7 @@ class TpSettingsGroup extends StatelessWidget {
                     Divider(
                       height: 1,
                       indent: TpSpacing.s4,
+                      endIndent: TpSpacing.s4,
                       color: theme.colorScheme.outlineVariant,
                     ),
                   children[index],

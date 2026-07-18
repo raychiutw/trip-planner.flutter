@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_screen.dart';
+import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_account_avatar_button.dart';
@@ -56,6 +59,7 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           accountStatsProvider.overrideWith((ref) => Future.value(stats)),
         ],
@@ -97,21 +101,41 @@ void main() {
             (ref) => Future.value(defaultStats),
           ),
         ],
-        child: MaterialApp.router(
-          theme: AppTheme.light(),
-          routerConfig: router,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              padding: const EdgeInsets.only(top: 59, bottom: 34),
-              viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+        child: Consumer(
+          builder: (context, ref, _) => MaterialApp.router(
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: ref.watch(themeModeProvider),
+            routerConfig: router,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.only(top: 59, bottom: 34),
+                viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+              ),
+              child: child!,
             ),
-            child: child!,
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('帳號入口顯示帳號首字母並和 toolbar 功能鍵同為 44pt glass', (tester) async {
+    await pumpAccountEntry(tester);
+
+    final accountButton = find.byKey(const ValueKey('account-avatar-button'));
+    expect(
+      find.descendant(of: accountButton, matching: find.text('R')),
+      findsOneWidget,
+    );
+    final glass = find.descendant(
+      of: accountButton,
+      matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+    );
+    expect(glass, findsOneWidget);
+    expect(tester.getSize(glass), const Size(44, 44));
+  });
 
   testWidgets('帳號 avatar 開啟共用近滿版 HIG sheet 並可由右上關閉', (tester) async {
     await pumpAccountEntry(tester);
@@ -121,6 +145,7 @@ void main() {
 
     final sheet = find.byKey(const ValueKey('app-large-sheet'));
     expect(sheet, findsOneWidget);
+    expect(find.byType(GlassModalSheetScaffold), findsOneWidget);
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-sheet-profile')), findsOneWidget);
     expect(find.text('帳號資訊與個人資料'), findsOneWidget);
@@ -139,6 +164,92 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
     await tester.pumpAndSettle();
     expect(sheet, findsNothing);
+  });
+
+  testWidgets('帳號 sheet 子頁維持在圓角面板內並使用圓形返回鍵', (tester) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-appearance')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+    expect(find.text('外觀'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+    final backGlass = find.descendant(
+      of: find.byKey(const ValueKey('app-large-sheet-back')),
+      matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+    );
+    final closeGlass = find.descendant(
+      of: find.byKey(const ValueKey('app-large-sheet-close')),
+      matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+    );
+    expect(backGlass, findsOneWidget);
+    expect(closeGlass, findsOneWidget);
+    expect(tester.getSize(backGlass), const Size(44, 44));
+    expect(tester.getSize(closeGlass), const Size(44, 44));
+    final titleRect = tester.getRect(find.text('外觀'));
+    final dragRect = tester.getRect(
+      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
+    );
+    final screenCenter = tester.getCenter(find.byType(MaterialApp)).dx;
+    expect(titleRect.center.dx, closeTo(screenCenter, 1));
+    expect(titleRect.top - dragRect.bottom, lessThanOrEqualTo(36));
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+  });
+
+  testWidgets('帳號大型 sheet 在外觀切換後同步更新 glass 與頁面亮度', (tester) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('settings-appearance')));
+    await tester.pumpAndSettle();
+
+    var sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.settings?.glassColor, const Color(0xC7FFFBF5));
+    expect(
+      Theme.of(
+        tester.element(find.byKey(const ValueKey('theme-light'))),
+      ).brightness,
+      Brightness.light,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('theme-dark')));
+    await tester.pumpAndSettle();
+
+    sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.settings?.glassColor, const Color(0xB3121214));
+    expect(
+      Theme.of(
+        tester.element(find.byKey(const ValueKey('theme-dark'))),
+      ).brightness,
+      Brightness.dark,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('theme-light')));
+    await tester.pumpAndSettle();
+
+    sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.settings?.glassColor, const Color(0xC7FFFBF5));
+    expect(
+      Theme.of(
+        tester.element(find.byKey(const ValueKey('theme-light'))),
+      ).brightness,
+      Brightness.light,
+    );
   });
 
   testWidgets('顯示 displayName、email、avatar 首字母與三個統計值', (tester) async {

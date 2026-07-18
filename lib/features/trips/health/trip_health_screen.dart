@@ -141,11 +141,11 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       appBar: TpAppBar(
         title: const Text('AI 健檢'),
         actions: [
-          IconButton(
+          TpToolbarIconButton(
             key: const ValueKey('trip-health-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
+            icon: Icons.refresh,
           ),
         ],
       ),

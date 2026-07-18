@@ -44,7 +44,7 @@ void main() {
     for (final tabLabel in ['聊天', '行程', '地圖', '收藏']) {
       expect(
         find.descendant(of: rootBar, matching: find.text(tabLabel)),
-        findsOneWidget,
+        findsAtLeast(1),
         reason: 'Root tab bar 應包含「$tabLabel」tab',
       );
     }

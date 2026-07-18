@@ -25,7 +25,7 @@ class TpRootScrollScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(actions.length <= 2, 'Root toolbar supports at most two actions.');
-    final sideWidth = TpToolbarSlots.sideWidth(
+    final actionsWidth = TpToolbarSlots.sideWidth(
       actionCount: actions.length,
       hasLeading: false,
     );
@@ -38,11 +38,12 @@ class TpRootScrollScaffold extends StatelessWidget {
           toolbarHeight: 56,
           collapsedHeight: 56,
           expandedHeight: 56,
-          centerTitle: true,
-          leadingWidth: sideWidth == 0 ? null : sideWidth,
-          leading: TpToolbarSlots.leading(width: sideWidth),
+          centerTitle: false,
           title: Text(title),
-          actions: TpToolbarSlots.actions(width: sideWidth, children: actions),
+          actions: TpToolbarSlots.actions(
+            width: actionsWidth,
+            children: actions,
+          ),
         ),
         ...slivers,
         SliverToBoxAdapter(

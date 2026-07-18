@@ -10,6 +10,7 @@ import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
@@ -181,8 +182,28 @@ void main() {
       final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
       expect(appBar.actions, hasLength(1));
       final actionGroup = appBar.actions!.single as SizedBox;
-      expect((actionGroup.child! as Row).children, hasLength(2));
+      final actionChildren = (actionGroup.child! as Row).children;
+      expect(actionChildren, hasLength(3));
+      expect((actionChildren[1] as SizedBox).width, 8);
       expect(find.byTooltip('更多'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate((widget) => widget is TpMoreMenuButton),
+        findsOneWidget,
+      );
+      final moreGlass = find.descendant(
+        of: find.byKey(const ValueKey('trips-sort-button')),
+        matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+      );
+      final accountGlass = find.descendant(
+        of: find.byKey(const ValueKey('account-avatar-button')),
+        matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+      );
+      expect(tester.getSize(moreGlass), const Size(44, 44));
+      expect(tester.getSize(accountGlass), const Size(44, 44));
+      expect(
+        tester.getRect(accountGlass).left - tester.getRect(moreGlass).right,
+        8,
+      );
 
       await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
       await tester.pumpAndSettle();

@@ -28,6 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _loginAttempted = false;
   bool _oauthLoading = false;
   String? _oauthError;
 
@@ -50,6 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _submit() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
+    setState(() => _loginAttempted = true);
     // 失敗訊息由 authStateProvider 的 AsyncError 呈現，不在此 throw
     await ref
         .read(authStateProvider.notifier)
@@ -154,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: TpSpacing.s4),
                       ],
-                      if (authState.hasError) ...[
+                      if (_loginAttempted && authState.hasError) ...[
                         Container(
                           key: const ValueKey('login-error-banner'),
                           padding: const EdgeInsets.symmetric(

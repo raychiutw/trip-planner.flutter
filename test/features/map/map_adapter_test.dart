@@ -67,7 +67,7 @@ void main() {
     expect(googleMap.polylines.single.points, hasLength(2));
   });
 
-  testWidgets('深色模式套用中性 Google Maps style', (tester) async {
+  testWidgets('深色 app 使用深色 Google Maps 樣式並保留原生 POI 標示', (tester) async {
     final controller = GoogleTripMapController();
     addTearDown(controller.dispose);
 
@@ -85,9 +85,9 @@ void main() {
     );
 
     final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
-    expect(googleMap.style, isNotNull);
-    expect(googleMap.style, contains('#1c1c1e'));
-    expect(googleMap.style, contains('#2c2c2e'));
+    expect(googleMap.mapType, MapType.normal);
+    expect(googleMap.style, kTripMapDarkStyle);
+    expect(googleMap.style, contains('poi'));
   });
 
   testWidgets('路線虛線與透明度轉接到原生 Polyline', (tester) async {
