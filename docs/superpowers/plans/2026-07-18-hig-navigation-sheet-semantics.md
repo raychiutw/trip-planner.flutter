@@ -4424,6 +4424,205 @@ Before any `git push`, show the user:
 
 Only after all gates are green may the implementation session run the explicit push command. A request to “push” does not authorize skipping any gate recorded here.
 
+### Task 17: Convert the manual HIG and native-map verification matrix into automated release gates
+
+**Files:**
+- Create: `test/flows/hig_regression_matrix_test.dart`
+- Create: `test/features/map/trip_map_marker_icon_registry_test.dart`
+- Create: `patrol_test/native_map_smoke_test.dart`
+- Create: `android/app/src/androidTest/java/com/raychiu/tripline/MainActivityTest.java`
+- Create: `ios/RunnerUITests/RunnerUITests.m`
+- Create: `.github/workflows/mobile-e2e.yml`
+- Modify: `integration_test/app_smoke_test.dart`
+- Modify: `test/features/chat/chat_screen_test.dart`
+- Modify: `test/features/map/map_adapter_test.dart`
+- Modify: `test/features/map/map_canvas_web_test.dart`
+- Modify: `test/api/cache/conflict_resolve_test.dart`
+- Modify: `test/features/trip_detail/day_weather_test.dart`
+- Modify: `test/features/trips/create/create_trip_controller_test.dart`
+- Modify: `pubspec.yaml`
+- Modify: `pubspec.lock`
+- Modify: `.gitignore`
+- Modify: `android/app/build.gradle.kts`
+- Modify: `ios/Podfile`
+- Modify: `ios/Runner.xcodeproj/project.pbxproj`
+- Modify: `lib/features/chat/chat_screen.dart`
+- Modify: `.github/workflows/mobile.yml`
+
+**Interfaces:**
+- Produces: a fast deterministic PR gate, a device-level Patrol smoke suite, and named screenshot artifacts for every approved appearance/accessibility state
+- Consumes: the existing `TriplineApp`, `TpRootScaffold`, semantic sheet wrappers, `TripMapCanvasConfig`, `TripMapController`, package-neutral map callbacks, and provider overrides
+- Preserves: no production test mode, no authentication bypass in shipping code, no backend writes, zoom 12, native Google POIs, Tripline marker precedence, and existing Light/Dark theme ownership
+- Pins: `patrol: 4.6.1` with `patrol_cli 4.4.0`, matching the official `google_navigation_flutter` example and Patrol compatibility table for Flutter 3.44.6
+
+- [ ] **Step 1: Turn review-discovered regressions into failing tests first**
+
+Add a chat widget test that makes `fetchRequests` throw a 401 `ApiError`, pumps `ChatScreen`, and asserts the auth-expired banner's top is at or below `TpRootGeometry.initialContentTop(context)`. Run:
+
+```bash
+flutter test test/features/chat/chat_screen_test.dart --plain-name '登入過期 banner 不會被 Root Header 遮住'
+```
+
+Expected: FAIL because the banner currently starts at the top of the Stack. Then add the smallest shared top inset around the banner region and rerun until PASS.
+
+Add a map-controller queue test that attaches a platform whose first camera operation throws and whose second succeeds:
+
+```dart
+final first = controller.move(const TripMapPoint(25, 121), 12);
+final second = controller.move(const TripMapPoint(26, 122), 12);
+await expectLater(first, throwsStateError);
+await expectLater(second, completes);
+```
+
+Run `flutter test test/features/map/map_adapter_test.dart`; verify the new case fails for the intended reason before changing production code, then implement only the queue-recovery behavior required by the test.
+
+- [ ] **Step 2: Automate the deterministic HIG matrix without a native PlatformView**
+
+Create `test/flows/hig_regression_matrix_test.dart`. Pump the approved root pages and reusable sheet/form controls with fake repositories and `fakeTripMapBuilder`, then iterate these exact `MediaQueryData`/theme states:
+
+```dart
+const matrix = <({Brightness brightness, double textScale, bool reduceMotion, bool reduceTransparency})>[
+  (brightness: Brightness.light, textScale: 1, reduceMotion: false, reduceTransparency: false),
+  (brightness: Brightness.dark, textScale: 1, reduceMotion: false, reduceTransparency: false),
+  (brightness: Brightness.light, textScale: 2, reduceMotion: false, reduceTransparency: false),
+  (brightness: Brightness.dark, textScale: 2, reduceMotion: false, reduceTransparency: false),
+  (brightness: Brightness.light, textScale: 1, reduceMotion: true, reduceTransparency: true),
+  (brightness: Brightness.dark, textScale: 1, reduceMotion: true, reduceTransparency: true),
+];
+```
+
+For every state assert:
+
+- Root Header remains fixed while Chat and Timeline content scroll behind it.
+- Root actions, Back, Close, Cancel, Done, reorder, search, sort, and add expose at least 44×44 logical-point hit regions.
+- trip picker, account, notes, print, audit, share, collaboration, health, edit, and destructive confirmation can open and dismiss through their documented semantic action.
+- no `FlutterError`, overflow indicator, hidden initial content, or Root Tab overlap occurs.
+- map Day and POI focus requests remain exactly zoom 12.
+- native Google POI selection replaces only the accessory, blank-map tap restores the Tripline accessory, and Tripline marker selection remains authoritative.
+
+Run `flutter test test/flows/hig_regression_matrix_test.dart` after each new assertion. A test that passes before its assertion is added is not evidence; each regression assertion must be observed failing against a deliberately incomplete harness or the current defect before going green.
+
+- [ ] **Step 3: Close the pure-Dart and web gaps reported by the testing review**
+
+Add focused tests, one failing behavior at a time, for:
+
+- `TripMapMarkerIconRegistry`: same effective style reuses one bitmap; different glyph/style/DPR yields a different bitmap.
+- web map canvas: blank tap, Google POI fallback, external URL callback, and absent web API fallback remain non-crashing.
+- conflict resolver: ours, multi-field, repository error, and retry paths.
+- `DayWeatherCard`: provider error and empty-hourly fallback.
+- create-trip controller: edits set `hasChanges`; reset/submission clears it.
+
+Run each file directly during RED/GREEN, then run:
+
+```bash
+flutter test test/features/map test/api/cache/conflict_resolve_test.dart test/features/trip_detail/day_weather_test.dart test/features/trips/create/create_trip_controller_test.dart
+```
+
+Expected: all PASS with no skipped branch that is available on the current host.
+
+- [ ] **Step 4: Expand the real app integration flow without production services**
+
+Extend `integration_test/app_smoke_test.dart` with provider-owned fixtures only. The suite must:
+
+1. launch logged out and stop at Login without a production request;
+2. log in through the visible fields and reach the trip list;
+3. open a trip, switch itinerary/map Day, open/close Notes, and return;
+4. visit Chat, Itinerary, Map, and Favorites through the shared Root Tab;
+5. open trip picker and account sheets, navigate one nested detail with Back, then close the sheet with Close;
+6. verify favorite search/sort and the current Undo capability state without mutating production data.
+
+Run on a booted simulator/emulator:
+
+```bash
+flutter test integration_test/app_smoke_test.dart -d "$DEVICE_ID"
+```
+
+Expected: PASS and no request to the production API host.
+
+- [ ] **Step 5: Add Patrol for native Google Map and system-boundary smoke tests**
+
+Add exact Patrol package/native runner configuration, keep tests under `patrol_test/`, and ignore generated `patrol_test/test_bundle.dart`. `native_map_smoke_test.dart` must pump a standalone `MaterialApp` containing `buildTripMapCanvas` so it needs neither login nor backend state. It must verify:
+
+- `onMapReady` fires on the real `GoogleMapsMapView`;
+- Light and Dark app theme changes update the native map color scheme without switching to clock-based night mode;
+- Tripline numbered markers and route overlays render without a platform exception;
+- Day and Tripline POI actions keep camera zoom 12;
+- location permission can be accepted through Patrol when displayed;
+- native map gestures are still accepted around Root/Day/POI/Tab overlays;
+- tapping one stable, fixed-coordinate native POI can produce `GoogleMapPoiSelection`, and the external-open action changes apps/web without an in-app confirmation. The POI callback assertion is enabled with `E2E_EXPECT_GOOGLE_POI=true` on Test Lab; local runs without a valid Maps key still exercise the native view, overlays, zoom, and theme lifecycle.
+
+The native-POI case is a smoke signal, not the sole contract assertion: POI name text is not pinned because Google map data and localization can change. The deterministic callback/accessory/URL assertions remain in Flutter tests.
+
+Run:
+
+```bash
+dart pub global activate patrol_cli 4.4.0
+patrol doctor
+patrol test -t patrol_test/native_map_smoke_test.dart --device "$DEVICE_ID"
+```
+
+Expected: PASS on one iOS simulator and one Android device/emulator with Google Play services.
+
+- [ ] **Step 6: Replace ad-hoc screenshots with named CI artifacts**
+
+During deterministic and Patrol suites, capture these names: `chat`, `itinerary`, `map-tripline-poi`, `map-native-google-poi`, `favorites`, `trip-picker`, `account`, `form`, and `destructive-confirm`. Suffix each with platform, Light/Dark, text scale, Reduce Motion, and Reduce Transparency state. Store run output only under `build/test-artifacts/`; do not commit process screenshots or unstable PlatformView goldens.
+
+CI uploads the directory even on failure. Geometry remains assertion-based; screenshots are review evidence, not pixel-perfect gates for the native map tiles.
+
+- [ ] **Step 7: Add fast PR and Firebase Test Lab device E2E workflows**
+
+Keep `.github/workflows/mobile.yml` as the fast PR gate. Add `.github/workflows/mobile-e2e.yml` to build Patrol's native test bundles in GitHub Actions and execute them on the external Firebase Test Lab device farm:
+
+- `workflow_dispatch` for `ios`, `android`, or `all`;
+- a nightly schedule for native smoke;
+- Android build on `ubuntu-24.04`, followed by `gcloud firebase test android run --type instrumentation --use-orchestrator` against an ARM virtual or physical device with Google Play services;
+- iOS build on `macos-26` or `tripline-release`, followed by `gcloud firebase test ios run` against a Firebase physical iPhone using the packaged `.xctestrun` and `Release-iphoneos` products;
+- pinned `patrol_cli 4.4.0`;
+- Google Cloud authentication through GitHub OIDC Workload Identity Federation, not a long-lived service-account JSON key;
+- repository variables `FIREBASE_TEST_LAB_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, and `GCP_TEST_LAB_SERVICE_ACCOUNT`; map keys remain GitHub secrets;
+- `patrol build android --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true`, then upload `app-debug.apk` and `app-debug-androidTest.apk` to Test Lab;
+- `patrol build ios --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true --release`, zip `Release-iphoneos` plus the generated `.xctestrun`, then upload the archive to Test Lab;
+- one stable low-cost device per nightly run; broader physical-device matrices are manual release gates only;
+- Test Lab video, screenshot, JUnit/native report, matrix URL, and failure-log artifact uploads;
+- concurrency cancellation for stale E2E runs;
+- a release-gate output consumed before TestFlight/Play internal upload.
+
+The job must preserve Test Lab's non-zero exit code: `0` is PASS, `10` is a test failure, and infrastructure/unsupported-matrix exit codes remain BLOCKED/FAIL rather than being swallowed. Spark quota is sufficient for a one-device smoke matrix (up to 10 virtual and 5 physical runs per day); Blaze overage must be protected by the one-device default and a Google Cloud budget alert.
+
+- [ ] **Step 8: Gate release on the real favorite-restore backend contract**
+
+The release workflow must perform an authenticated staging contract smoke before mobile upload: create a disposable favorite, delete it, call `POST /poi-favorites/:id/restore`, verify owner scoping and successful restore, delete the fixture, and fail closed when the endpoint or migration is absent. Do not point this smoke at production and do not enable the Flutter Undo affordance solely because mocks pass.
+
+The backend implementation remains owned by `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`. If staging credentials are absent, TestFlight and Play upload remain blocked with an explicit contract-gate message.
+
+- [ ] **Step 9: Run and record the automated replacement matrix**
+
+Run:
+
+```bash
+dart format --output=none --set-exit-if-changed lib test integration_test patrol_test
+flutter test test/ui test/app test/flows
+flutter test
+flutter test integration_test/app_smoke_test.dart -d "$IOS_SIMULATOR_ID"
+patrol test -t patrol_test/native_map_smoke_test.dart --device "$IOS_SIMULATOR_ID"
+patrol test -t patrol_test/native_map_smoke_test.dart --device "$ANDROID_DEVICE_ID"
+flutter analyze
+flutter build apk --debug
+flutter build ios --simulator --no-codesign
+git diff --check
+```
+
+Manual QA is no longer an unrecorded release condition. Any case that cannot run must be reported as BLOCKED with its missing device, API key, staging credential, or runner label; it may not be silently counted as PASS.
+
+Commit:
+
+```bash
+git add docs/superpowers/plans/2026-07-18-hig-navigation-sheet-semantics.md pubspec.yaml pubspec.lock .gitignore android/app/build.gradle.kts android/app/src/androidTest ios/Podfile ios/Runner.xcodeproj/project.pbxproj ios/RunnerUITests lib/features/chat/chat_screen.dart integration_test patrol_test test .github/workflows/mobile.yml .github/workflows/mobile-e2e.yml
+git commit -m "test: automate Tripline release verification"
+```
+
+---
+
 ## Self-Review
 
 - Spec coverage: Back, Close, Cancel, Done, fixed Root Glass Header, root-title trip switching, nested content sheets, form sheets, immediate selection, dirty dismissal, distinct detents, feature-call-site migration, legacy API removal, reorder mode, Move To Day, HIG symbols, direct Done, the non-drag movement alternative, shared compact-navigation glass, weather state replacement, start/end time, Google category, Dynamic Type, pinned Sliver scrolling, Day synchronization, drag representation, insertion feedback, optimistic settle, map-engine migration, native Google POI selection, external opening, and rollback each have a task and a runnable check.
