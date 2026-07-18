@@ -29,29 +29,6 @@ const List<Color> kDayPinPalette = [
 /// 品牌 accent（design.md soft brown）：聚焦 marker 的填色。
 const Color kTripMapFocusColor = Color(0xFFA97A4A);
 
-/// 深色地圖配色：保留 Google 原生 POI／道路資訊，以 Apple Maps 深色模式的
-/// 深藍灰底、冷灰道路與低彩度綠地為方向。浮動控制仍使用 Tripline 的暖褐 accent。
-const String kTripMapDarkStyle = r'''[
-  {"elementType":"geometry","stylers":[{"color":"#1B2533"}]},
-  {"elementType":"labels.icon","stylers":[{"visibility":"on"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#D7E1EA"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#17202B"}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#526579"}]},
-  {"featureType":"landscape.man_made","elementType":"geometry","stylers":[{"color":"#222F3E"}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#223341"}]},
-  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#C7D5E1"}]},
-  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#174338"}]},
-  {"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#9FD5BD"}]},
-  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#34475A"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1A2633"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#CFDAE4"}]},
-  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#49647F"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#6583A1"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#31506F"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#102C49"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#91B9D6"}]}
-]''';
-
 /// 取第 N 天（1-based）的色；超過 10 天輪回 day 1，無效值回 day 1。
 ///
 /// 以 `dayNum` 而非陣列 index 取色 —— 對齊 web `dayColor(dayNum)`，天數有

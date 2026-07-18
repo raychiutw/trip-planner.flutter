@@ -4,6 +4,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
 import 'tp_action_item.dart';
+import 'tp_glass_surface.dart';
 
 enum TpAppBarRole { standalone, detail, modalContent, modalForm }
 
@@ -34,28 +35,6 @@ class TpToolbarTextButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 所有 header 圓形功能共用同一組 Liquid Glass 材質。
-///
-/// 參數刻意與 root tab／DAY selector 同源：暖白或中性深色低透明 tint、
-/// 亮邊與 44pt HIG 點擊範圍，避免各頁 header 看起來像不同套 UI。
-LiquidGlassSettings tpToolbarGlassSettings(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return LiquidGlassSettings(
-    glassColor: isDark ? const Color(0x70121214) : const Color(0x70FFFBF5),
-    thickness: 16,
-    blur: 16,
-    chromaticAberration: 0,
-    lightIntensity: isDark ? 0.56 : 0.62,
-    ambientStrength: isDark ? 0.06 : 0.10,
-    refractiveIndex: 1.06,
-    saturation: 1.02,
-    standardOpacityMultiplier: isDark ? 0.52 : 0.40,
-    platformViewFallbackColor: isDark
-        ? const Color(0x66121214)
-        : const Color(0x5CFFFBF5),
-  );
 }
 
 /// Header 共用的 44pt 圓形套件 Liquid Glass 按鈕。
@@ -105,7 +84,7 @@ class TpToolbarGlassButton extends StatelessWidget {
                   Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
             ),
           ),
-          settings: glassSettings ?? tpToolbarGlassSettings(context),
+          settings: glassSettings ?? tpNavigationGlassSettings(context),
           child: child,
         ),
       ),
@@ -472,7 +451,7 @@ class TpToolbarActionSurface extends StatelessWidget {
             color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
           ),
         ),
-        settings: tpToolbarGlassSettings(context),
+        settings: tpNavigationGlassSettings(context),
         child:
             child ?? Icon(icon, size: 20, color: theme.colorScheme.onSurface),
       ),
