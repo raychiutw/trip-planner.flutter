@@ -61,6 +61,7 @@ void main() {
 
   test('shared boundaries own platform presentation and map SDK imports', () {
     final violations = <String>[];
+    final mapSdkOwners = <String>[];
 
     for (final entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
@@ -72,10 +73,9 @@ void main() {
         violations.add('${entity.path}: platform sheet API');
       }
       if (source.contains(
-            "package:google_navigation_flutter/google_navigation_flutter.dart",
-          ) &&
-          entity.path != 'lib/features/map/map_canvas_mobile.dart') {
-        violations.add('${entity.path}: google_navigation_flutter import');
+        "package:google_navigation_flutter/google_navigation_flutter.dart",
+      )) {
+        mapSdkOwners.add(entity.path);
       }
     }
 
@@ -86,15 +86,26 @@ void main() {
     if (pubspec.contains('google_maps_flutter:')) {
       violations.add('pubspec.yaml: legacy google_maps_flutter');
     }
+    expect(mapSdkOwners, ['lib/features/map/map_canvas_mobile.dart']);
 
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
   test('compact navigation glass has one settings source', () {
     final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
+    const consumers = [
+      'lib/features/shell/apple_root_tab_bar.dart',
+      'lib/ui/tp_horizontal_selector.dart',
+      'lib/ui/tp_root_scaffold.dart',
+    ];
 
     expect(appBar, contains('tpNavigationGlassSettings(context)'));
     expect(appBar, isNot(contains('tpToolbarGlassSettings')));
+    for (final path in consumers) {
+      final source = File(path).readAsStringSync();
+      expect(source, contains('tpNavigationGlassSettings(context)'));
+      expect(source, isNot(contains('LiquidGlassSettings(')));
+    }
   });
 
   test('removed compatibility symbols cannot return', () {

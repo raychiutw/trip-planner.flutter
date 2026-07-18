@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -16,6 +17,7 @@ class SequencedResponseAdapter implements HttpClientAdapter {
 
   final List<ResponseBody> scriptedResponses;
   final List<RequestOptions> recordedRequests = [];
+  final firstRequest = Completer<void>();
 
   @override
   Future<ResponseBody> fetch(
@@ -24,6 +26,7 @@ class SequencedResponseAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     recordedRequests.add(options);
+    if (!firstRequest.isCompleted) firstRequest.complete();
     final responseIndex = (recordedRequests.length - 1).clamp(
       0,
       scriptedResponses.length - 1,
@@ -292,7 +295,7 @@ void main() {
       );
       final cancelToken = CancelToken();
       final request = client.get('/trips', cancelToken: cancelToken);
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await adapter.firstRequest.future;
 
       cancelToken.cancel('route disposed');
 
