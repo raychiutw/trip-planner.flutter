@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoColors;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,9 +28,12 @@ class _MockSpeechService extends Mock implements SpeechService {}
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _StubAuth extends AuthNotifier {
+  _StubAuth(this.user);
+
+  final UserInfo user;
+
   @override
-  Future<UserInfo?> build() async =>
-      const UserInfo(id: '1', email: 'me@x.com', displayName: 'Me');
+  Future<UserInfo?> build() async => user;
 }
 
 const _trips = [TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩')];
@@ -39,12 +43,16 @@ TripRequest _req({
   String message = 'hi',
   String? reply,
   required RequestStatus status,
+  String? submittedBy,
+  String? submittedByDisplayName,
 }) => TripRequest(
   id: id,
   tripId: 'okinawa',
   message: message,
   reply: reply,
   status: status,
+  submittedBy: submittedBy,
+  submittedByDisplayName: submittedByDisplayName,
 );
 
 void main() {
@@ -75,17 +83,23 @@ void main() {
     SpeechService? speech,
     String? initialTripId,
     String? initialPrefill,
+    UserInfo currentUser = const UserInfo(
+      id: '1',
+      email: 'ray@example.com',
+      displayName: 'Ray Chiu',
+    ),
+    ThemeData? theme,
   }) {
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
         authRepositoryProvider.overrideWithValue(authRepo),
-        authStateProvider.overrideWith(_StubAuth.new),
+        authStateProvider.overrideWith(() => _StubAuth(currentUser)),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
       child: MaterialApp(
-        theme: AppTheme.light(),
+        theme: theme ?? AppTheme.light(),
         home: ChatScreen(
           initialTripId: initialTripId,
           initialPrefill: initialPrefill,
@@ -120,6 +134,145 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('最近的行程'), findsOneWidget);
+  });
+
+  testWidgets('聊天顯示自己名稱與協作者 email fallback，並使用動態 Indigo', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 1,
+            message: '自己的訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+          _req(
+            id: 2,
+            message: '協作者訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'lean@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ray Chiu'), findsOneWidget);
+    expect(find.text('lean'), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('chat-list'))).dy, 0);
+
+    final collaborator = find.byKey(
+      const ValueKey('chat-message-collaborator'),
+    );
+    final collaboratorContext = tester.element(collaborator);
+    final accent = CupertinoColors.systemIndigo.resolveFrom(
+      collaboratorContext,
+    );
+    final label = tester.widget<Text>(
+      find.byKey(const ValueKey('chat-message-collaborator-label')),
+    );
+    expect(label.style?.color, accent);
+    final decoration =
+        tester.widget<DecoratedBox>(collaborator).decoration as BoxDecoration;
+    expect(
+      decoration.color,
+      Color.alphaBlend(
+        accent.withValues(alpha: 0.10),
+        Theme.of(collaboratorContext).colorScheme.surfaceContainerHigh,
+      ),
+    );
+  });
+
+  testWidgets('聊天自己名稱缺少時使用 email local part', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 3,
+            message: '自己的訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        currentUser: const UserInfo(id: '1', email: 'ray@example.com'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ray'), findsOneWidget);
+  });
+
+  testWidgets('深色協作者氣泡使用較強的動態 Indigo tint', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 4,
+            message: '協作者訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'lean@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp(theme: AppTheme.dark()));
+    await tester.pumpAndSettle();
+
+    final collaborator = find.byKey(
+      const ValueKey('chat-message-collaborator'),
+    );
+    final collaboratorContext = tester.element(collaborator);
+    final accent = CupertinoColors.systemIndigo.resolveFrom(
+      collaboratorContext,
+    );
+    final decoration =
+        tester.widget<DecoratedBox>(collaborator).decoration as BoxDecoration;
+    expect(
+      decoration.color,
+      Color.alphaBlend(
+        accent.withValues(alpha: 0.18),
+        Theme.of(collaboratorContext).colorScheme.surfaceContainerHigh,
+      ),
+    );
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {

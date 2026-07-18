@@ -5,7 +5,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,6 +69,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Widget initiallyBelowHeader(Widget child) => Padding(
+      padding: EdgeInsets.only(top: TpRootGeometry.initialContentTop(context)),
+      child: child,
+    );
+
     final tripsAsync = ref.watch(myTripsProvider);
     final trips = tripsAsync.value ?? const <TripSummary>[];
     final tripId = trips.isEmpty
@@ -95,30 +100,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
         actions: const [TpAccountAvatarButton()],
       ),
-      body: Padding(
-        padding: EdgeInsets.only(
-          top: TpRootGeometry.initialContentTop(context),
+      body: tripsAsync.when(
+        loading: () => initiallyBelowHeader(
+          const Center(child: CircularProgressIndicator.adaptive()),
         ),
-        child: tripsAsync.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator.adaptive()),
-          error: (e, _) =>
-              const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
-          data: (trips) {
-            if (trips.isEmpty) {
-              return const _CenteredHint(
+        error: (e, _) => initiallyBelowHeader(
+          const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+        ),
+        data: (trips) {
+          if (trips.isEmpty) {
+            return initiallyBelowHeader(
+              const _CenteredHint(
                 title: '先建立行程',
                 body: '建立行程後,就能在這裡用 AI 助手調整行程。',
-              );
-            }
-            return _ChatBody(
-              key: ValueKey(tripId),
-              tripId: tripId!,
-              initialPrefill: _pendingPrefill,
-              onInitialPrefillConsumed: _consumePrefill,
+              ),
             );
-          },
-        ),
+          }
+          return _ChatBody(
+            key: ValueKey(tripId),
+            tripId: tripId!,
+            initialPrefill: _pendingPrefill,
+            onInitialPrefillConsumed: _consumePrefill,
+          );
+        },
       ),
     );
   }
@@ -228,9 +232,14 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
 
   @override
   Widget build(BuildContext context) {
+    Widget initiallyBelowHeader(Widget child) => Padding(
+      padding: EdgeInsets.only(top: TpRootGeometry.initialContentTop(context)),
+      child: child,
+    );
+
     final state = ref.watch(chatControllerProvider(widget.tripId));
-    final myEmail = switch (ref.watch(authStateProvider)) {
-      AsyncData(:final value) => value?.email,
+    final currentUser = switch (ref.watch(authStateProvider)) {
+      AsyncData(:final value) => value,
       _ => null,
     };
     final msgs = state.messages;
@@ -244,31 +253,43 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
         Expanded(
           child: state.initialLoading
-              ? const Center(child: CircularProgressIndicator.adaptive())
+              ? initiallyBelowHeader(
+                  const Center(child: CircularProgressIndicator.adaptive()),
+                )
               : (state.error != null && msgs.isEmpty)
-              ? _CenteredHint(
-                  title: '載入失敗',
-                  body: '無法取得對話,請稍後再試。',
-                  onRetry: () => unawaited(controller.reload()),
+              ? initiallyBelowHeader(
+                  _CenteredHint(
+                    title: '載入失敗',
+                    body: '無法取得對話,請稍後再試。',
+                    onRetry: () => unawaited(controller.reload()),
+                  ),
                 )
               : msgs.isEmpty
-              ? _EmptyStatePrompts(
-                  sending: state.sending,
-                  onSelect: (prompt) =>
-                      unawaited(_sendText(prompt, clearComposer: false)),
+              ? initiallyBelowHeader(
+                  _EmptyStatePrompts(
+                    sending: state.sending,
+                    onSelect: (prompt) =>
+                        unawaited(_sendText(prompt, clearComposer: false)),
+                  ),
                 )
               : ListView.builder(
                   key: const ValueKey('chat-list'),
                   controller: _scroll,
                   reverse: true,
-                  padding: const EdgeInsets.all(TpSpacing.s4),
+                  padding: EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    TpRootGeometry.initialContentTop(context),
+                    TpSpacing.s4,
+                    TpSpacing.s4,
+                  ),
                   itemCount: msgs.length,
                   itemBuilder: (context, i) {
                     final m = msgs[msgs.length - 1 - i];
                     return _MessageBubble(
                       message: m,
                       tripId: widget.tripId,
-                      myEmail: myEmail,
+                      myEmail: currentUser?.email,
+                      myDisplayName: currentUser?.displayName,
                     );
                   },
                 ),
@@ -279,17 +300,26 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   }
 }
 
-/// 三方氣泡:自己(accent,右)/ 協作者(pink,左+名字)/ AI(sage,左+「Tripline AI」)。
+String? _emailLocalPart(String? email) {
+  final value = email?.trim();
+  if (value == null || value.isEmpty) return null;
+  final local = value.split('@').first.trim();
+  return local.isEmpty ? null : local;
+}
+
+/// 三方氣泡:自己(accent,右)/ 協作者(indigo,左+名字)/ AI(neutral,左+名稱)。
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.tripId,
     required this.myEmail,
+    required this.myDisplayName,
   });
 
   final ChatMessage message;
   final String tripId;
   final String? myEmail;
+  final String? myDisplayName;
 
   @override
   Widget build(BuildContext context) {
@@ -298,33 +328,53 @@ class _MessageBubble extends StatelessWidget {
     final tones = theme.extension<TpTones>()!;
 
     final isAssistant = message.role == ChatRole.assistant;
+    final normalizedMyEmail = myEmail?.trim().toLowerCase();
+    final normalizedSenderEmail = message.submittedBy?.trim().toLowerCase();
     // submittedBy 為空(樂觀 temp / 認證未解析)視為自己。
     final isSelf =
         !isAssistant &&
-        (message.submittedBy == null || message.submittedBy == myEmail);
+        (normalizedSenderEmail == null ||
+            normalizedSenderEmail == normalizedMyEmail);
+    final collaboratorAccent = CupertinoColors.systemIndigo.resolveFrom(
+      context,
+    );
 
     final Color bg;
     if (message.isFailed) {
       bg = scheme.errorContainer;
     } else if (isAssistant) {
-      bg = tones.sageSubtle;
+      bg = scheme.surfaceContainerHigh;
     } else if (isSelf) {
       bg = tones.accentSubtle;
     } else {
-      bg = tones.pinkSubtle;
+      bg = Color.alphaBlend(
+        collaboratorAccent.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.18 : 0.10,
+        ),
+        scheme.surfaceContainerHigh,
+      );
     }
     final textColor = message.isFailed
         ? scheme.onErrorContainer
         : scheme.onSurface;
 
-    String? label;
-    Color? labelColor;
+    late final String label;
+    late final Color labelColor;
     if (isAssistant) {
       label = 'Tripline AI';
-      labelColor = tones.sageDeep;
-    } else if (!isSelf) {
-      label = message.senderName ?? '協作者';
-      labelColor = tones.pinkDeep;
+      labelColor = scheme.onSurfaceVariant;
+    } else if (isSelf) {
+      final displayName = myDisplayName?.trim();
+      label = displayName?.isNotEmpty == true
+          ? displayName!
+          : _emailLocalPart(myEmail) ?? '你';
+      labelColor = tones.accentDeep;
+    } else {
+      final senderName = message.senderName?.trim();
+      label = senderName?.isNotEmpty == true
+          ? senderName!
+          : _emailLocalPart(message.submittedBy) ?? '協作者';
+      labelColor = collaboratorAccent;
     }
 
     final Widget content;
@@ -360,37 +410,52 @@ class _MessageBubble extends StatelessWidget {
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
         children: [
-          if (label != null)
-            Padding(
-              padding: const EdgeInsets.only(
-                left: TpSpacing.s1,
-                right: TpSpacing.s1,
-                bottom: 2,
+          Padding(
+            padding: const EdgeInsets.only(
+              left: TpSpacing.s1,
+              right: TpSpacing.s1,
+              bottom: 2,
+            ),
+            child: Text(
+              label,
+              key: ValueKey(
+                isAssistant
+                    ? 'chat-message-assistant-label'
+                    : isSelf
+                    ? 'chat-message-self-label'
+                    : 'chat-message-collaborator-label',
               ),
-              child: Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: labelColor,
-                  fontWeight: FontWeight.w600,
-                ),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: labelColor,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
           ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TpSpacing.s3,
-                vertical: TpSpacing.s2,
+            child: DecoratedBox(
+              key: ValueKey(
+                isAssistant
+                    ? 'chat-message-assistant'
+                    : isSelf
+                    ? 'chat-message-self'
+                    : 'chat-message-collaborator',
               ),
               decoration: BoxDecoration(
                 color: bg,
                 borderRadius: BorderRadius.circular(TpRadius.lg),
               ),
-              child: DefaultTextStyle.merge(
-                style: TextStyle(color: textColor),
-                child: content,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TpSpacing.s3,
+                  vertical: TpSpacing.s2,
+                ),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: textColor),
+                  child: content,
+                ),
               ),
             ),
           ),

@@ -996,6 +996,7 @@ void main() {
     final timelineScroll = find.byKey(const ValueKey('trip-timeline-scroll'));
     expect(timelineScroll, findsOneWidget);
     expect(tester.widget(timelineScroll), isA<CustomScrollView>());
+    expect(tester.getTopLeft(timelineScroll).dy, 0);
     expect(find.byType(PageView), findsNothing);
     expect(
       find.byKey(const ValueKey('trip-timeline-day-overview')),

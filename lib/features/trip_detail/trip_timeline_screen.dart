@@ -103,6 +103,11 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Widget initiallyBelowHeader(Widget child) => Padding(
+      padding: EdgeInsets.only(top: TpRootGeometry.initialContentTop(context)),
+      child: child,
+    );
+
     final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final trips = switch (ref.watch(myTripsProvider)) {
@@ -191,22 +196,19 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           const TpAccountAvatarButton(),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.only(
-          top: TpRootGeometry.initialContentTop(context),
-        ),
-        child: daysAsync.when(
-          data: (days) => days.isEmpty
-              ? const _EmptyTimeline()
-              : _TimelineBody(
-                  days: days,
-                  tripId: widget.tripId,
-                  initialEntryId: widget.initialEntryId,
-                  initialDayNum: widget.initialDayNum,
-                  isEditing: _isEditing,
-                ),
-          loading: () => const _TimelineSkeleton(),
-          error: (error, stackTrace) => _TimelineError(
+      body: daysAsync.when(
+        data: (days) => days.isEmpty
+            ? initiallyBelowHeader(const _EmptyTimeline())
+            : _TimelineBody(
+                days: days,
+                tripId: widget.tripId,
+                initialEntryId: widget.initialEntryId,
+                initialDayNum: widget.initialDayNum,
+                isEditing: _isEditing,
+              ),
+        loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
+        error: (error, stackTrace) => initiallyBelowHeader(
+          _TimelineError(
             onRetry: () {
               ref.invalidate(tripDetailProvider(widget.tripId));
               ref.invalidate(tripDaysProvider(widget.tripId));
@@ -439,9 +441,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
     final viewport = RenderAbstractViewport.of(object);
     final reveal = viewport.getOffsetToReveal(object, 0).offset;
     final position = _scrollController.position;
-    final target = (reveal - _selectorExtent)
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
+    final target =
+        (reveal -
+                TpRootGeometry.initialContentTop(targetContext) -
+                _selectorExtent)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
     final generation = ++_programmaticScrollGeneration;
     _programmaticDayNum = dayNum;
     setState(() => _activeDayNum = dayNum);
@@ -477,6 +482,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
             pinned: true,
             delegate: _DaySelectorHeaderDelegate(
               extent: _selectorExtent,
+              topInset: TpRootGeometry.initialContentTop(context),
               child: KeyedSubtree(
                 key: _selectorAnchorKey,
                 child: _buildDaySelector(context),
@@ -509,7 +515,11 @@ class _TimelineBodyState extends State<_TimelineBody> {
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: TpSpacing.s8)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+            ),
+          ),
         ],
       ),
     );
@@ -561,16 +571,21 @@ class _TimelineBodyState extends State<_TimelineBody> {
 }
 
 class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _DaySelectorHeaderDelegate({required this.extent, required this.child});
+  const _DaySelectorHeaderDelegate({
+    required this.extent,
+    required this.topInset,
+    required this.child,
+  });
 
   final double extent;
+  final double topInset;
   final Widget child;
 
   @override
-  double get minExtent => extent;
+  double get minExtent => topInset + extent;
 
   @override
-  double get maxExtent => extent;
+  double get maxExtent => topInset + extent;
 
   @override
   Widget build(
@@ -582,7 +597,13 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
       fit: StackFit.expand,
       clipBehavior: Clip.none,
       children: [
-        child,
+        Positioned(
+          top: topInset,
+          left: 0,
+          right: 0,
+          height: extent,
+          child: child,
+        ),
         if (overlapsContent)
           const Positioned(
             left: 0,
@@ -597,7 +618,9 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _DaySelectorHeaderDelegate oldDelegate) {
-    return oldDelegate.extent != extent || oldDelegate.child != child;
+    return oldDelegate.extent != extent ||
+        oldDelegate.topInset != topInset ||
+        oldDelegate.child != child;
   }
 }
 
