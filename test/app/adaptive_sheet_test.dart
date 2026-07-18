@@ -111,4 +111,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('編輯停留點'), findsOneWidget);
   });
+
+  testWidgets('dirty routed form asks before explicit Cancel', (tester) async {
+    final controller = AppUnsavedChangesController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppUnsavedChangesGuard(
+          controller: controller,
+          hasChanges: true,
+          child: Scaffold(
+            body: FilledButton(
+              onPressed: controller.requestPop,
+              child: const Text('取消'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+  });
 }

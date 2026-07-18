@@ -93,11 +93,13 @@ class AddToTripScreen extends ConsumerStatefulWidget {
 }
 
 class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
+  final _dismissController = AppUnsavedChangesController();
   String? _tripId;
   int? _dayNum;
   TimeOfDay _start = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _end = const TimeOfDay(hour: 11, minute: 0);
   bool _submitting = false;
+  bool _dirty = false;
 
   String get _title => switch (widget.args) {
     AddToTripFavorite(:final displayName) => displayName,
@@ -126,7 +128,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       initialTime: isStart ? _start : _end,
     );
     if (picked != null) {
-      setState(() => isStart ? _start = picked : _end = picked);
+      setState(() {
+        isStart ? _start = picked : _end = picked;
+        _dirty = true;
+      });
     }
   }
 
@@ -177,7 +182,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       if (!mounted) return;
       HapticFeedback.lightImpact();
       showAppNotice(context, '已加入行程');
-      Navigator.of(context).pop();
+      setState(() => _dirty = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
     } on Exception catch (error) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -214,26 +222,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   @override
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
-
-    return Scaffold(
-      appBar: TpAppBar(role: TpAppBarRole.detail, title: Text('加入行程：$_title')),
-      body: tripsAsync.when(
-        loading: () =>
-            const AppListLoadingSkeleton(key: ValueKey('add-to-trip-loading')),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('無法載入行程清單:$e', textAlign: TextAlign.center),
-          ),
-        ),
-        data: (trips) => _form(context, trips),
-      ),
-    );
-  }
-
-  Widget _form(BuildContext context, List<TripSummary> trips) {
-    // 純讀 fallback：不在 build() 內寫入 state（_tripId/_dayNum 仍為 null 直到使用者選），
-    // 以衍生「有效值」驅動 dropdown initialValue 與送出鈕啟用條件。
+    final trips = switch (tripsAsync) {
+      AsyncData<List<TripSummary>>(:final value) => value,
+      _ => const <TripSummary>[],
+    };
     final tripId = _tripId ?? (trips.isEmpty ? null : trips.first.tripId);
     final daysAsync = tripId == null
         ? null
@@ -243,7 +235,53 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       _ => const <TripDay>[],
     };
     final dayNum = _dayNum ?? (days.isEmpty ? null : days.first.dayNum);
+    final canSubmit =
+        !_submitting && _timeValid && tripId != null && dayNum != null;
 
+    return AppUnsavedChangesGuard(
+      controller: _dismissController,
+      hasChanges: _dirty,
+      child: Scaffold(
+        appBar: TpAppBar(
+          role: TpAppBarRole.modalForm,
+          title: Text('加入行程：$_title'),
+          onCancel: _dismissController.requestPop,
+          primaryActionLabel: '加入',
+          primaryActionKey: const ValueKey('add-to-trip-submit'),
+          primaryActionEnabled: canSubmit,
+          onPrimaryAction: () => _submit(tripId!, dayNum!),
+        ),
+        body: tripsAsync.when(
+          loading: () => const AppListLoadingSkeleton(
+            key: ValueKey('add-to-trip-loading'),
+          ),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(TpSpacing.s6),
+              child: Text('無法載入行程清單:$e', textAlign: TextAlign.center),
+            ),
+          ),
+          data: (trips) => _form(
+            context,
+            trips: trips,
+            tripId: tripId,
+            daysAsync: daysAsync,
+            days: days,
+            dayNum: dayNum,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _form(
+    BuildContext context, {
+    required List<TripSummary> trips,
+    required String? tripId,
+    required AsyncValue<List<TripDay>>? daysAsync,
+    required List<TripDay> days,
+    required int? dayNum,
+  }) {
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
@@ -258,6 +296,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           onChanged: (v) => setState(() {
             _tripId = v;
             _dayNum = null;
+            _dirty = true;
           }),
         ),
         const SizedBox(height: TpSpacing.s4),
@@ -276,7 +315,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                     child: Text('DAY ${d.dayNum} · ${d.displayTitle}'),
                   ),
               ],
-              onChanged: (v) => setState(() => _dayNum = v),
+              onChanged: (v) => setState(() {
+                _dayNum = v;
+                _dirty = true;
+              }),
             ),
           ),
         const SizedBox(height: TpSpacing.s4),
@@ -311,14 +353,6 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             ),
           ),
         const SizedBox(height: TpSpacing.s6),
-        FilledButton(
-          key: const ValueKey('add-to-trip-submit'),
-          onPressed:
-              (!_submitting && _timeValid && tripId != null && dayNum != null)
-              ? () => _submit(tripId, dayNum)
-              : null,
-          child: Text(_submitting ? '加入中…' : '加入行程'),
-        ),
       ],
     );
   }
@@ -333,7 +367,14 @@ class _AddToTripRouteState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('加入行程')),
+      appBar: TpAppBar(
+        role: TpAppBarRole.modalForm,
+        title: const Text('加入行程'),
+        onCancel: () => Navigator.of(context).maybePop(),
+        primaryActionLabel: '加入',
+        primaryActionEnabled: false,
+        onPrimaryAction: () {},
+      ),
       body: loading
           ? const AppListLoadingSkeleton(
               key: ValueKey('add-to-trip-route-loading'),

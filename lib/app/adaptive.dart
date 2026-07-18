@@ -204,6 +204,81 @@ class AppSheetFormController extends ChangeNotifier {
   }
 }
 
+/// Connects a routed form's explicit Cancel action to the shared dirty guard.
+class AppUnsavedChangesController {
+  Future<void> Function()? _requestPop;
+
+  Future<void> requestPop() => _requestPop?.call() ?? Future<void>.value();
+}
+
+/// Protects routed task pages from losing edits through Cancel or system Back.
+class AppUnsavedChangesGuard extends StatefulWidget {
+  const AppUnsavedChangesGuard({
+    super.key,
+    required this.controller,
+    required this.hasChanges,
+    required this.child,
+  });
+
+  final AppUnsavedChangesController controller;
+  final bool hasChanges;
+  final Widget child;
+
+  @override
+  State<AppUnsavedChangesGuard> createState() => _AppUnsavedChangesGuardState();
+}
+
+class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
+  bool _allowPop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller._requestPop = _requestPop;
+  }
+
+  @override
+  void didUpdateWidget(covariant AppUnsavedChangesGuard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller._requestPop = null;
+      widget.controller._requestPop = _requestPop;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller._requestPop = null;
+    super.dispose();
+  }
+
+  Future<void> _requestPop() async {
+    if (!widget.hasChanges) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    final discard = await showAppConfirm(
+      context,
+      title: '捨棄未儲存的變更？',
+      message: '離開後，本次修改不會保留。',
+      confirmLabel: '捨棄',
+      isDestructive: true,
+    );
+    if (!mounted || !discard) return;
+    setState(() => _allowPop = true);
+    await Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: _allowPop || !widget.hasChanges,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) unawaited(_requestPop());
+    },
+    child: widget.child,
+  );
+}
+
 typedef _AppSheetBuilder<T> =
     Widget Function(
       BuildContext context,

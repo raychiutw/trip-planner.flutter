@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -25,6 +26,7 @@ class CreateTripScreen extends ConsumerStatefulWidget {
 
 class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
   final _desc = TextEditingController();
+  final _dismissController = AppUnsavedChangesController();
 
   @override
   void dispose() {
@@ -49,83 +51,89 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     final state = ref.watch(createTripControllerProvider);
     final basicsReady = state.destinations.isNotEmpty && state.totalDays > 0;
 
-    return Scaffold(
-      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('建立行程')),
-      body: AppAdaptiveContent(
-        maxWidth: AppContentWidth.form,
-        contentKey: const ValueKey('create-trip-content'),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(TpSpacing.s4),
-                children: [
-                  _sectionTitle(context, '目的地'),
-                  DestinationPicker(
-                    destinations: state.destinations,
-                    onAdd: _ctrl.addDestination,
-                    onRemove: _ctrl.removeDestination,
-                    onReorder: _ctrl.reorderDestination,
-                  ),
-                  const SizedBox(height: TpSpacing.s5),
-                  _sectionTitle(context, '日期'),
-                  _DateModeSection(state: state, ctrl: _ctrl),
-                  if (state.destinations.length >= 2) ...[
-                    const SizedBox(height: TpSpacing.s5),
-                    _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
-                    _DayQuotaSection(state: state, ctrl: _ctrl),
-                  ],
-                  if (!basicsReady) ...[
-                    const SizedBox(height: TpSpacing.s4),
-                    Text(
-                      '先選好目的地與日期，接著可補充偏好並設定 AI。',
-                      key: const ValueKey('create-next-step-hint'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                  if (basicsReady) ...[
-                    const SizedBox(height: TpSpacing.s5),
-                    ExpansionTile(
-                      key: const ValueKey('create-more-needs'),
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(
-                        bottom: TpSpacing.s2,
-                      ),
-                      title: Text(
-                        '更多需求（選填）',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
-                      children: [
-                        TextField(
-                          key: const ValueKey('create-desc'),
-                          controller: _desc,
-                          minLines: 2,
-                          maxLines: 5,
-                          maxLength: 2000,
-                          decoration: const InputDecoration(
-                            hintText: '例如：想吃道地拉麵、逛二手書店…',
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: _ctrl.setDescription,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: TpSpacing.s3),
-                    const AiAuthorizeCard(),
-                  ],
-                  const SizedBox(height: TpSpacing.s4),
-                ],
+    return AppUnsavedChangesGuard(
+      controller: _dismissController,
+      hasChanges: _ctrl.hasChanges,
+      child: Scaffold(
+        appBar: TpAppBar(
+          role: TpAppBarRole.modalForm,
+          title: const Text('建立行程'),
+          onCancel: _dismissController.requestPop,
+          primaryActionLabel: '建立',
+          primaryActionKey: const ValueKey('create-submit'),
+          primaryActionEnabled: state.canSubmit,
+          onPrimaryAction: _submit,
+        ),
+        body: AppAdaptiveContent(
+          maxWidth: AppContentWidth.form,
+          contentKey: const ValueKey('create-trip-content'),
+          child: ListView(
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            children: [
+              _sectionTitle(context, '目的地'),
+              DestinationPicker(
+                destinations: state.destinations,
+                onAdd: _ctrl.addDestination,
+                onRemove: _ctrl.removeDestination,
+                onReorder: _ctrl.reorderDestination,
               ),
-            ),
-            _SubmitBar(
-              error: state.error,
-              submitting: state.submitting,
-              onSubmit: state.canSubmit ? _submit : null,
-            ),
-          ],
+              const SizedBox(height: TpSpacing.s5),
+              _sectionTitle(context, '日期'),
+              _DateModeSection(state: state, ctrl: _ctrl),
+              if (state.destinations.length >= 2) ...[
+                const SizedBox(height: TpSpacing.s5),
+                _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
+                _DayQuotaSection(state: state, ctrl: _ctrl),
+              ],
+              if (!basicsReady) ...[
+                const SizedBox(height: TpSpacing.s4),
+                Text(
+                  '先選好目的地與日期，接著可補充偏好並設定 AI。',
+                  key: const ValueKey('create-next-step-hint'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              if (basicsReady) ...[
+                const SizedBox(height: TpSpacing.s5),
+                ExpansionTile(
+                  key: const ValueKey('create-more-needs'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: TpSpacing.s2),
+                  title: Text(
+                    '更多需求（選填）',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
+                  children: [
+                    TextField(
+                      key: const ValueKey('create-desc'),
+                      controller: _desc,
+                      minLines: 2,
+                      maxLines: 5,
+                      maxLength: 2000,
+                      decoration: const InputDecoration(
+                        hintText: '例如：想吃道地拉麵、逛二手書店…',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: _ctrl.setDescription,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: TpSpacing.s3),
+                const AiAuthorizeCard(),
+              ],
+              if (state.error != null) ...[
+                const SizedBox(height: TpSpacing.s3),
+                Text(
+                  state.error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: TpSpacing.s4),
+            ],
+          ),
         ),
       ),
     );
@@ -287,63 +295,6 @@ class _DayQuotaSection extends StatelessWidget {
             ],
           ),
       ],
-    );
-  }
-}
-
-/// 底部固定送出列(error + 建立鈕)。
-class _SubmitBar extends StatelessWidget {
-  const _SubmitBar({
-    required this.error,
-    required this.submitting,
-    required this.onSubmit,
-  });
-
-  final String? error;
-  final bool submitting;
-  final VoidCallback? onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          TpSpacing.s2,
-          TpSpacing.s4,
-          TpSpacing.s2,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-                child: Text(
-                  error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: const ValueKey('create-submit'),
-                onPressed: onSubmit,
-                child: submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('建立行程'),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

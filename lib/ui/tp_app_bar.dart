@@ -242,6 +242,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions = const [],
     this.onCancel,
     this.primaryActionLabel,
+    this.primaryActionKey,
     this.onPrimaryAction,
     this.primaryActionEnabled = true,
   }) : assert(
@@ -261,6 +262,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget> actions;
   final VoidCallback? onCancel;
   final String? primaryActionLabel;
+  final Key? primaryActionKey;
   final VoidCallback? onPrimaryAction;
   final bool primaryActionEnabled;
 
@@ -275,7 +277,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       ...actions,
       if (primaryActionLabel != null)
         TpToolbarTextButton(
-          key: const ValueKey('tp-app-bar-primary-action'),
+          key: primaryActionKey ?? const ValueKey('tp-app-bar-primary-action'),
           label: primaryActionLabel!,
           onPressed: primaryActionEnabled ? onPrimaryAction : null,
         ),

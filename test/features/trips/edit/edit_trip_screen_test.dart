@@ -14,6 +14,7 @@ import 'package:tripline/models/day.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockTripRepo extends Mock implements TripRepository {}
 
@@ -104,6 +105,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('原標題'), findsOneWidget);
     expect(find.text('那霸'), findsWidgets);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('儲存'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(
+      tester
+          .widget<TpToolbarTextButton>(find.byKey(const ValueKey('edit-save')))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('改標題後取消會確認捨棄未儲存變更', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('edit-title')), '京都七日行');
+    await tester.pump();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
   });
 
   testWidgets('行程標題欄位在目的地上方', (tester) async {
@@ -121,6 +143,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const ValueKey('edit-title')), '新標題');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('edit-save')));
     await tester.pumpAndSettle();
 

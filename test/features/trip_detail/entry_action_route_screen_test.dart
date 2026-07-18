@@ -50,6 +50,9 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, EntryRouteAction.move));
     await tester.pumpAndSettle();
     expect(find.text('移到其他 Day'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('移動'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(find.text('移動停留點'), findsNothing);
     expect(find.text('移動行程'), findsNothing);
   });

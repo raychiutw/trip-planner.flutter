@@ -37,6 +37,7 @@ import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
+import 'package:tripline/features/trips/edit/edit_trip_screen.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
@@ -88,6 +89,9 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'print-trip'));
   when(
     () => mockTripRepository.fetchDays(any()),
+  ).thenAnswer((_) async => <TripDay>[]);
+  when(
+    () => mockTripRepository.fetchDaySummaries(any()),
   ).thenAnswer((_) async => <TripDay>[]);
   when(mockTripRepository.watchMyTrips).thenAnswer(
     (_) => Stream.value(const [TripSummary(tripId: 'trip-1', name: '沖繩')]),
@@ -692,7 +696,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('移動停留點'), findsOneWidget);
+    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -788,6 +792,21 @@ void main() {
 
     expect(find.byType(CreateTripScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+    final createPage = ModalRoute.of(
+      tester.element(find.byType(CreateTripScreen)),
+    )!.settings;
+    expect(createPage, isA<MaterialPage<void>>());
+    expect((createPage as MaterialPage<void>).fullscreenDialog, isTrue);
+
+    container.read(appRouterProvider).go('/edit-trip/trip-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    final editPage = ModalRoute.of(
+      tester.element(find.byType(EditTripScreen)),
+    )!.settings;
+    expect(editPage, isA<MaterialPage<void>>());
+    expect((editPage as MaterialPage<void>).fullscreenDialog, isTrue);
 
     container.read(appRouterProvider).go('/account/appearance');
     await tester.pumpAndSettle();

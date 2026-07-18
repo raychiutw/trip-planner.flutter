@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
@@ -16,160 +17,172 @@ import 'edit_trip_controller.dart';
 
 const _langs = {'zh-TW': '繁體中文', 'en': 'English', 'ja': '日本語'};
 
-class EditTripScreen extends ConsumerWidget {
+class EditTripScreen extends ConsumerStatefulWidget {
   const EditTripScreen({super.key, required this.tripId});
 
   final String tripId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(editTripControllerProvider(tripId));
-    final ctrl = ref.read(editTripControllerProvider(tripId).notifier);
+  ConsumerState<EditTripScreen> createState() => _EditTripScreenState();
+}
+
+class _EditTripScreenState extends ConsumerState<EditTripScreen> {
+  final _dismissController = AppUnsavedChangesController();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(editTripControllerProvider(widget.tripId));
+    final ctrl = ref.read(editTripControllerProvider(widget.tripId).notifier);
 
     // 儲存成功 → 返回。
-    ref.listen(editTripControllerProvider(tripId), (prev, next) {
+    ref.listen(editTripControllerProvider(widget.tripId), (prev, next) {
       if (next.saved && !(prev?.saved ?? false)) {
         HapticFeedback.lightImpact();
-        if (context.canPop()) {
-          context.pop();
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && context.canPop()) context.pop();
+        });
       }
     });
 
-    return Scaffold(
-      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('編輯行程')),
-      body: state.loading
-          ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(TpSpacing.s4),
-                    children: [
-                      _title(context, '行程標題'),
-                      TextFormField(
-                        key: const ValueKey('edit-title'),
-                        initialValue: state.title,
-                        decoration: const InputDecoration(
-                          hintText: '例如:2026 沖繩自駕',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: ctrl.setTitle,
-                      ),
-                      const SizedBox(height: TpSpacing.s5),
-                      _title(context, '目的地'),
-                      DestinationPicker(
-                        destinations: state.destinations,
-                        onAdd: ctrl.addDestination,
-                        onRemove: ctrl.removeDestination,
-                        onReorder: ctrl.reorderDestination,
-                      ),
-                      const SizedBox(height: TpSpacing.s5),
-                      _title(context, '出發日期'),
-                      _ShiftDateSection(
-                        startDate: state.startDate,
-                        endDate: state.endDate,
-                        shifting: state.shifting,
-                        onShift: () async {
-                          final nextDate = await _showShiftDateDialog(
-                            context,
-                            state.startDate,
-                          );
-                          if (nextDate == null) return;
-                          final ok = await ctrl.shiftStartDate(nextDate);
-                          if (context.mounted && ok) {
-                            _showSnackBar(context, '出發日期已變更');
-                          }
-                        },
-                      ),
-                      const SizedBox(height: TpSpacing.s5),
-                      _title(context, '行程天數'),
-                      _DayManagementSection(
-                        days: state.days,
-                        mutating: state.daysMutating,
-                        onAddStart: () async {
-                          final ok = await ctrl.addDay('start');
-                          if (context.mounted && ok) {
-                            _showSnackBar(context, '已在最前加入一天');
-                          }
-                        },
-                        onAddEnd: () async {
-                          final ok = await ctrl.addDay('end');
-                          if (context.mounted && ok) {
-                            _showSnackBar(context, '已在最後加入一天');
-                          }
-                        },
-                        onRestore: (date) async {
-                          final ok = await ctrl.restoreDay(date);
-                          if (context.mounted && ok) {
-                            _showSnackBar(context, '已加回 $date');
-                          }
-                        },
-                        onDelete: (day) async {
-                          final confirmed = await _confirmDeleteDay(
-                            context,
-                            day,
-                          );
-                          if (!confirmed) return;
-                          final removed = await ctrl.deleteDay(day.dayNum);
-                          if (context.mounted && removed != null) {
-                            final message = removed > 0
-                                ? 'Day ${day.dayNum} 已刪除（連同 $removed 個景點）'
-                                : 'Day ${day.dayNum} 已刪除';
-                            _showSnackBar(context, message);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: TpSpacing.s5),
-                      _title(context, '描述（用於 SEO,選填）'),
-                      TextFormField(
-                        key: const ValueKey('edit-desc'),
-                        initialValue: state.description,
-                        minLines: 2,
-                        maxLines: 5,
-                        maxLength: 2000,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: ctrl.setDescription,
-                      ),
-                      const SizedBox(height: TpSpacing.s4),
-                      DropdownButtonFormField<String>(
-                        key: const ValueKey('edit-lang'),
-                        initialValue: state.lang,
-                        decoration: const InputDecoration(
-                          labelText: '顯示語言',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: [
-                          for (final e in _langs.entries)
-                            DropdownMenuItem(
-                              value: e.key,
-                              child: Text(e.value),
-                            ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) ctrl.setLang(v);
-                        },
-                      ),
-                      const SizedBox(height: TpSpacing.s2),
-                      SwitchListTile.adaptive(
-                        key: const ValueKey('edit-published'),
-                        title: const Text('發布（公開上線）'),
-                        contentPadding: EdgeInsets.zero,
-                        value: state.published,
-                        onChanged: ctrl.setPublished,
-                      ),
-                    ],
+    return AppUnsavedChangesGuard(
+      controller: _dismissController,
+      hasChanges: !state.saved && ctrl.hasChanges,
+      child: Scaffold(
+        appBar: TpAppBar(
+          role: TpAppBarRole.modalForm,
+          title: const Text('編輯行程'),
+          onCancel: _dismissController.requestPop,
+          primaryActionLabel: '儲存',
+          primaryActionKey: const ValueKey('edit-save'),
+          primaryActionEnabled: ctrl.hasChanges && !state.saving,
+          onPrimaryAction: ctrl.save,
+        ),
+        body: state.loading
+            ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
+            : ListView(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                children: [
+                  _title(context, '行程標題'),
+                  TextFormField(
+                    key: const ValueKey('edit-title'),
+                    initialValue: state.title,
+                    decoration: const InputDecoration(
+                      hintText: '例如:2026 沖繩自駕',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: ctrl.setTitle,
                   ),
-                ),
-                _SaveBar(
-                  error: state.error,
-                  saving: state.saving,
-                  onSave: () => ctrl.save(),
-                ),
-              ],
-            ),
+                  const SizedBox(height: TpSpacing.s5),
+                  _title(context, '目的地'),
+                  DestinationPicker(
+                    destinations: state.destinations,
+                    onAdd: ctrl.addDestination,
+                    onRemove: ctrl.removeDestination,
+                    onReorder: ctrl.reorderDestination,
+                  ),
+                  const SizedBox(height: TpSpacing.s5),
+                  _title(context, '出發日期'),
+                  _ShiftDateSection(
+                    startDate: state.startDate,
+                    endDate: state.endDate,
+                    shifting: state.shifting,
+                    onShift: () async {
+                      final nextDate = await _showShiftDateDialog(
+                        context,
+                        state.startDate,
+                      );
+                      if (nextDate == null) return;
+                      final ok = await ctrl.shiftStartDate(nextDate);
+                      if (context.mounted && ok) {
+                        _showSnackBar(context, '出發日期已變更');
+                      }
+                    },
+                  ),
+                  const SizedBox(height: TpSpacing.s5),
+                  _title(context, '行程天數'),
+                  _DayManagementSection(
+                    days: state.days,
+                    mutating: state.daysMutating,
+                    onAddStart: () async {
+                      final ok = await ctrl.addDay('start');
+                      if (context.mounted && ok) {
+                        _showSnackBar(context, '已在最前加入一天');
+                      }
+                    },
+                    onAddEnd: () async {
+                      final ok = await ctrl.addDay('end');
+                      if (context.mounted && ok) {
+                        _showSnackBar(context, '已在最後加入一天');
+                      }
+                    },
+                    onRestore: (date) async {
+                      final ok = await ctrl.restoreDay(date);
+                      if (context.mounted && ok) {
+                        _showSnackBar(context, '已加回 $date');
+                      }
+                    },
+                    onDelete: (day) async {
+                      final confirmed = await _confirmDeleteDay(context, day);
+                      if (!confirmed) return;
+                      final removed = await ctrl.deleteDay(day.dayNum);
+                      if (context.mounted && removed != null) {
+                        final message = removed > 0
+                            ? 'Day ${day.dayNum} 已刪除（連同 $removed 個景點）'
+                            : 'Day ${day.dayNum} 已刪除';
+                        _showSnackBar(context, message);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: TpSpacing.s5),
+                  _title(context, '描述（用於 SEO,選填）'),
+                  TextFormField(
+                    key: const ValueKey('edit-desc'),
+                    initialValue: state.description,
+                    minLines: 2,
+                    maxLines: 5,
+                    maxLength: 2000,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: ctrl.setDescription,
+                  ),
+                  const SizedBox(height: TpSpacing.s4),
+                  DropdownButtonFormField<String>(
+                    key: const ValueKey('edit-lang'),
+                    initialValue: state.lang,
+                    decoration: const InputDecoration(
+                      labelText: '顯示語言',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final e in _langs.entries)
+                        DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) ctrl.setLang(v);
+                    },
+                  ),
+                  const SizedBox(height: TpSpacing.s2),
+                  SwitchListTile.adaptive(
+                    key: const ValueKey('edit-published'),
+                    title: const Text('發布（公開上線）'),
+                    contentPadding: EdgeInsets.zero,
+                    value: state.published,
+                    onChanged: ctrl.setPublished,
+                  ),
+                  if (state.error != null) ...[
+                    const SizedBox(height: TpSpacing.s2),
+                    Text(
+                      state.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: TpSpacing.s4),
+                ],
+              ),
+      ),
     );
   }
 
@@ -532,60 +545,4 @@ void _showSnackBar(BuildContext context, String message) {
   messenger
     ..removeCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
-}
-
-class _SaveBar extends StatelessWidget {
-  const _SaveBar({
-    required this.error,
-    required this.saving,
-    required this.onSave,
-  });
-
-  final String? error;
-  final bool saving;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          TpSpacing.s2,
-          TpSpacing.s4,
-          TpSpacing.s2,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-                child: Text(
-                  error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: const ValueKey('edit-save'),
-                onPressed: saving ? null : onSave,
-                child: saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('儲存'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

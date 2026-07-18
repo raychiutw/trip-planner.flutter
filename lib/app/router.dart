@@ -1,7 +1,7 @@
 /// 全 app 路由：StatefulShellRoute 5 branches + 認證 redirect。
 library;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -218,12 +218,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // 建立/編輯行程:shell 外全螢幕表單(避開 /trips/:tripId 衝突)
       GoRoute(
         path: '/new-trip',
-        builder: (context, state) => const CreateTripScreen(),
+        pageBuilder: (context, state) => const MaterialPage<void>(
+          fullscreenDialog: true,
+          child: CreateTripScreen(),
+        ),
       ),
       GoRoute(
         path: '/edit-trip/:tripId',
-        builder: (context, state) =>
-            EditTripScreen(tripId: state.pathParameters['tripId']!),
+        pageBuilder: (context, state) => MaterialPage<void>(
+          fullscreenDialog: true,
+          child: EditTripScreen(tripId: state.pathParameters['tripId']!),
+        ),
       ),
       GoRoute(
         path: '/collab/:tripId',

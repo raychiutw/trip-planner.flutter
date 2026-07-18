@@ -19,6 +19,7 @@ import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
@@ -115,6 +116,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('加入行程：首里城'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('加入'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     verify(favRepo.fetchFavorites).called(1);
   });
 
@@ -306,7 +310,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final button = tester.widget<FilledButton>(
+    final button = tester.widget<TpToolbarTextButton>(
       find.byKey(const ValueKey('add-to-trip-submit')),
     );
     expect(button.onPressed, isNull);

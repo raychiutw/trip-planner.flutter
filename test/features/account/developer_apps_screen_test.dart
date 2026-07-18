@@ -99,6 +99,10 @@ void main() {
   testWidgets('新增 app 表單送出 redirect URI 與 scopes', (tester) async {
     await pumpForm(tester);
 
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('建立'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+
     await tester.enterText(
       find.byKey(const Key('developer-app-name')),
       'New App',
@@ -130,6 +134,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('tp_new'), findsOneWidget);
+  });
+
+  testWidgets('新增 app 填寫後取消會確認捨棄未儲存變更', (tester) async {
+    await pumpForm(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('developer-app-name')),
+      'New App',
+    );
+    await tester.pump();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
   });
 
   testWidgets('confidential app 成功後顯示一次性 secret 提醒與複製操作', (tester) async {
