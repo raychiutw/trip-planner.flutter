@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -221,7 +223,9 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   }
 }
 
-/// 日程主體：單層「地圖／DAY」selector + 可捲動逐日 sections。
+typedef _EntriesSnapshot = Map<int, List<TimelineEntry>>;
+
+/// 日程主體：固定「地圖／DAY」selector + 單一逐日 Sliver 捲動。
 class _TimelineBody extends StatefulWidget {
   const _TimelineBody({
     required this.days,
@@ -242,15 +246,23 @@ class _TimelineBody extends StatefulWidget {
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
+  static const _selectorExtent = 64.0;
+
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
+  late _EntriesSnapshot _visibleEntriesByDayId;
   late int _activeDayNum;
   final _scrollController = ScrollController();
+  final _selectorAnchorKey = GlobalKey();
+  bool _daySyncScheduled = false;
+  int? _programmaticDayNum;
+  var _programmaticScrollGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _rebuildKeys();
+    _visibleEntriesByDayId = _entriesFromDays(widget.days);
     _activeDayNum =
         _initialDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
@@ -260,7 +272,11 @@ class _TimelineBodyState extends State<_TimelineBody> {
   @override
   void didUpdateWidget(covariant _TimelineBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.days, widget.days) ||
+    final daysChanged = !identical(oldWidget.days, widget.days);
+    if (daysChanged) {
+      _visibleEntriesByDayId = _entriesFromDays(widget.days);
+    }
+    if (daysChanged ||
         oldWidget.initialEntryId != widget.initialEntryId ||
         oldWidget.initialDayNum != widget.initialDayNum) {
       _rebuildKeys();
@@ -275,13 +291,71 @@ class _TimelineBodyState extends State<_TimelineBody> {
   }
 
   void _rebuildKeys() {
+    final oldDayKeys = _daySectionKeys;
     final oldEntryKeys = _entryKeys;
-    _daySectionKeys = {for (final day in widget.days) day.dayNum: GlobalKey()};
+    _daySectionKeys = {
+      for (final day in widget.days)
+        day.dayNum: oldDayKeys[day.dayNum] ?? GlobalKey(),
+    };
     _entryKeys = {
       for (final day in widget.days)
         for (final entry in day.timeline)
           entry.id: oldEntryKeys[entry.id] ?? GlobalKey(),
     };
+  }
+
+  _EntriesSnapshot _entriesFromDays(List<TripDay> days) => {
+    for (final day in days) day.id: List<TimelineEntry>.of(day.timeline),
+  };
+
+  _EntriesSnapshot _snapshotEntries() => {
+    for (final entry in _visibleEntriesByDayId.entries)
+      entry.key: List<TimelineEntry>.of(entry.value),
+  };
+
+  void _restoreEntries(_EntriesSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() => _visibleEntriesByDayId = snapshot);
+  }
+
+  _EntriesSnapshot _previewReorder(int dayId, int oldIndex, int newIndex) {
+    final snapshot = _snapshotEntries();
+    final entries = List<TimelineEntry>.of(
+      _visibleEntriesByDayId[dayId] ?? const [],
+    );
+    final moved = entries.removeAt(oldIndex);
+    entries.insert(newIndex, moved);
+    setState(() {
+      _visibleEntriesByDayId = {..._visibleEntriesByDayId, dayId: entries};
+    });
+    return snapshot;
+  }
+
+  _EntriesSnapshot _previewCrossDayMove({
+    required TimelineEntry entry,
+    required int sourceDayId,
+    required int targetDayId,
+    int? beforeEntryId,
+  }) {
+    final snapshot = _snapshotEntries();
+    final source = List<TimelineEntry>.of(
+      _visibleEntriesByDayId[sourceDayId] ?? const [],
+    )..removeWhere((item) => item.id == entry.id);
+    final target = List<TimelineEntry>.of(
+      _visibleEntriesByDayId[targetDayId] ?? const [],
+    );
+    final index = beforeEntryId == null
+        ? target.length
+        : target.indexWhere((item) => item.id == beforeEntryId);
+    target.insert(index < 0 ? target.length : index, entry);
+    setState(() {
+      _visibleEntriesByDayId = {
+        ..._visibleEntriesByDayId,
+        sourceDayId: source,
+        targetDayId: target,
+      };
+    });
+    return snapshot;
   }
 
   int? _initialDayNum() {
@@ -320,26 +394,74 @@ class _TimelineBodyState extends State<_TimelineBody> {
     });
   }
 
-  void _scrollToDay(int dayNum) {
-    setState(() => _activeDayNum = dayNum);
-    if (dayNum == 0) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: TpMotion.resolve(context, TpMotion.normal),
-          curve: TpMotion.appleEase,
-        );
+  bool _handleTimelineScroll(ScrollNotification notification) {
+    if (notification.depth != 0 || _programmaticDayNum != null) return false;
+    if (_daySyncScheduled) return false;
+    _daySyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _daySyncScheduled = false;
+      if (mounted && _programmaticDayNum == null) {
+        _syncActiveDayFromViewport();
       }
+    });
+    return false;
+  }
+
+  void _syncActiveDayFromViewport() {
+    final selectorBox =
+        _selectorAnchorKey.currentContext?.findRenderObject() as RenderBox?;
+    if (selectorBox == null || !selectorBox.hasSize || widget.days.isEmpty) {
       return;
     }
-    final sectionContext = _daySectionKeys[dayNum]?.currentContext;
-    if (sectionContext != null) {
-      Scrollable.ensureVisible(
-        sectionContext,
-        duration: TpMotion.resolve(context, TpMotion.normal),
+    final activationY = selectorBox
+        .localToGlobal(Offset(0, selectorBox.size.height))
+        .dy;
+    final position = _scrollController.position;
+    var next = widget.days.first.dayNum;
+    if (position.pixels > position.minScrollExtent + 1 &&
+        position.extentAfter <= 1) {
+      next = widget.days.last.dayNum;
+    } else {
+      for (final day in widget.days) {
+        final box = _daySectionKeys[day.dayNum]?.currentContext
+            ?.findRenderObject();
+        if (box is! RenderBox || !box.hasSize) continue;
+        if (box.localToGlobal(Offset.zero).dy <= activationY + 1) {
+          next = day.dayNum;
+        } else {
+          break;
+        }
+      }
+    }
+    if (next != _activeDayNum) setState(() => _activeDayNum = next);
+  }
+
+  Future<void> _scrollToDay(int dayNum) async {
+    final targetContext = _daySectionKeys[dayNum]?.currentContext;
+    if (targetContext == null || !_scrollController.hasClients) return;
+    final object = targetContext.findRenderObject();
+    if (object == null) return;
+    final viewport = RenderAbstractViewport.of(object);
+    final reveal = viewport.getOffsetToReveal(object, 0).offset;
+    final position = _scrollController.position;
+    final target = (reveal - _selectorExtent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    final generation = ++_programmaticScrollGeneration;
+    _programmaticDayNum = dayNum;
+    setState(() => _activeDayNum = dayNum);
+    final duration = TpMotion.resolve(targetContext, TpMotion.normal);
+    if (duration == Duration.zero) {
+      _scrollController.jumpTo(target);
+    } else {
+      await _scrollController.animateTo(
+        target,
+        duration: duration,
         curve: TpMotion.appleEase,
       );
     }
+    if (!mounted || generation != _programmaticScrollGeneration) return;
+    _programmaticDayNum = null;
   }
 
   @override
@@ -350,80 +472,164 @@ class _TimelineBodyState extends State<_TimelineBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            TpSpacing.s3,
-            TpSpacing.s2,
-            TpSpacing.s3,
-            TpSpacing.s1,
-          ),
-          child: TpHorizontalSelector<int>(
-            key: const ValueKey('trip-timeline-view-day-selector'),
-            value: _activeDayNum,
-            options: [
-              const TpScopeOption(
-                value: -1,
-                label: '地圖',
-                icon: CupertinoIcons.map,
-                isAction: true,
-                key: ValueKey('trip-timeline-map'),
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handleTimelineScroll,
+      child: CustomScrollView(
+        key: const ValueKey('trip-timeline-scroll'),
+        controller: _scrollController,
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _DaySelectorHeaderDelegate(
+              extent: _selectorExtent,
+              child: KeyedSubtree(
+                key: _selectorAnchorKey,
+                child: _buildDaySelector(context),
               ),
-              const TpScopeOption(
-                value: 0,
-                label: '總覽',
-                key: ValueKey('trip-timeline-day-overview'),
-              ),
-              for (final day in widget.days)
-                TpScopeOption(
-                  value: day.dayNum,
-                  label: 'DAY ${day.dayNum}',
-                  key: ValueKey('day-pill-${day.dayNum}'),
-                ),
-            ],
-            onSelected: (value) {
-              if (value == -1) {
-                final dayNum = _activeDayNum > 0
-                    ? _activeDayNum
-                    : widget.days.firstOrNull?.dayNum;
-                GoRouter.maybeOf(context)?.go(
-                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}${dayNum == null ? '' : '&day=$dayNum'}',
-                );
-                return;
-              }
-              _scrollToDay(value);
-            },
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              TpSpacing.s4,
-              TpSpacing.s4,
-              TpSpacing.s8,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final day in widget.days)
-                  _DaySection(
+          ),
+          for (final day in widget.days)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+              sliver: SliverToBoxAdapter(
+                child: KeyedSubtree(
+                  key: ValueKey('day-section-${day.dayNum}'),
+                  child: _DaySection(
                     key: _daySectionKeys[day.dayNum],
                     day: day,
+                    timeline:
+                        _visibleEntriesByDayId[day.id] ??
+                        const <TimelineEntry>[],
+                    visibleEntriesByDayId: _visibleEntriesByDayId,
                     allDays: widget.days,
                     tripId: widget.tripId,
                     entryKeys: _entryKeys,
                     focusedEntryId: widget.initialEntryId,
                     scrollController: _scrollController,
                     isEditing: widget.isEditing,
+                    previewReorder: _previewReorder,
+                    previewCrossDayMove: _previewCrossDayMove,
+                    restoreEntries: _restoreEntries,
                   ),
-              ],
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: TpSpacing.s8)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDaySelector(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s3,
+        TpSpacing.s2,
+        TpSpacing.s3,
+        TpSpacing.s1,
+      ),
+      child: TpHorizontalSelector<int>(
+        key: const ValueKey('trip-timeline-view-day-selector'),
+        value: _activeDayNum,
+        options: [
+          const TpScopeOption(
+            value: -1,
+            label: '地圖',
+            icon: CupertinoIcons.map,
+            isAction: true,
+            key: ValueKey('trip-timeline-map'),
+          ),
+          for (final day in widget.days)
+            TpScopeOption(
+              value: day.dayNum,
+              label: 'DAY ${day.dayNum}',
+              key: ValueKey('day-pill-${day.dayNum}'),
+            ),
+        ],
+        onSelected: (value) {
+          if (value == -1) {
+            final dayNum = _activeDayNum > 0
+                ? _activeDayNum
+                : widget.days.firstOrNull?.dayNum;
+            GoRouter.maybeOf(context)?.go(
+              '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
+              '${dayNum == null ? '' : '&day=$dayNum'}',
+            );
+            return;
+          }
+          HapticFeedback.selectionClick();
+          unawaited(_scrollToDay(value));
+        },
+      ),
+    );
+  }
+}
+
+class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _DaySelectorHeaderDelegate({required this.extent, required this.child});
+
+  final double extent;
+  final Widget child;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        if (overlapsContent)
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: -12,
+            height: 12,
+            child: _TimelineScrollEdge(),
+          ),
+      ],
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _DaySelectorHeaderDelegate oldDelegate) {
+    return oldDelegate.extent != extent || oldDelegate.child != child;
+  }
+}
+
+class _TimelineScrollEdge extends StatelessWidget {
+  const _TimelineScrollEdge();
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return IgnorePointer(
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  surface.withValues(alpha: 0.12),
+                  surface.withValues(alpha: 0),
+                ],
+              ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -479,20 +685,37 @@ class _DaySection extends ConsumerWidget {
     super.key,
     required this.tripId,
     required this.day,
+    required this.timeline,
+    required this.visibleEntriesByDayId,
     required this.allDays,
     required this.entryKeys,
     this.focusedEntryId,
     required this.scrollController,
     required this.isEditing,
+    required this.previewReorder,
+    required this.previewCrossDayMove,
+    required this.restoreEntries,
   });
 
   final String tripId;
   final TripDay day;
+  final List<TimelineEntry> timeline;
+  final _EntriesSnapshot visibleEntriesByDayId;
   final List<TripDay> allDays;
   final Map<int, GlobalKey> entryKeys;
   final int? focusedEntryId;
   final ScrollController scrollController;
   final bool isEditing;
+  final _EntriesSnapshot Function(int dayId, int oldIndex, int newIndex)
+  previewReorder;
+  final _EntriesSnapshot Function({
+    required TimelineEntry entry,
+    required int sourceDayId,
+    required int targetDayId,
+    int? beforeEntryId,
+  })
+  previewCrossDayMove;
+  final void Function(_EntriesSnapshot snapshot) restoreEntries;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -520,14 +743,16 @@ class _DaySection extends ConsumerWidget {
     int newIndex,
   ) async {
     final updates = computeReorderUpdates(
-      [for (final e in day.timeline) e.id],
+      [for (final e in timeline) e.id],
       oldIndex,
       newIndex,
     );
+    final snapshot = previewReorder(day.id, oldIndex, newIndex);
     final repo = ref.read(tripRepositoryProvider);
     try {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
+      restoreEntries(snapshot);
       if (context.mounted) {
         showAppNotice(context, '排序失敗，請稍後再試');
       }
@@ -551,13 +776,24 @@ class _DaySection extends ConsumerWidget {
     final updates = computeCrossDayMoveUpdates(
       activeEntryId: entry.id,
       targetDayId: target.id,
-      targetEntryIds: [for (final e in target.timeline) e.id],
+      targetEntryIds: [
+        for (final e
+            in visibleEntriesByDayId[target.id] ?? const <TimelineEntry>[])
+          e.id,
+      ],
       overEntryId: targetEntryId,
+    );
+    final snapshot = previewCrossDayMove(
+      entry: entry,
+      sourceDayId: sourceDayId,
+      targetDayId: target.id,
+      beforeEntryId: targetEntryId,
     );
     final repo = ref.read(tripRepositoryProvider);
     try {
       await repo.reorderEntries(tripId: tripId, updates: updates);
     } on Exception {
+      restoreEntries(snapshot);
       if (context.mounted) {
         showAppNotice(context, '搬移失敗，請稍後再試');
       }
@@ -648,7 +884,6 @@ class _DaySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final timeline = day.timeline;
     final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
     final segments = switch (segmentsAsync) {
       AsyncData(:final value) => value,

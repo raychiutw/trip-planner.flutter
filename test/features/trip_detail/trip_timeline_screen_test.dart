@@ -19,6 +19,7 @@ import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 const _tripId = 'okinawa-2026';
 
@@ -178,6 +179,7 @@ Future<void> _pumpTimeline(
   int? initialEntryId,
   int? initialDayNum,
   DayWeatherFetcher? dayWeatherFetcher,
+  bool disableAnimations = false,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$tripId',
@@ -265,7 +267,16 @@ Future<void> _pumpTimeline(
         if (dayWeatherFetcher != null)
           dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
       ],
-      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: disableAnimations),
+          child: child!,
+        ),
+      ),
     ),
   );
   await tester.pump();
@@ -296,6 +307,27 @@ List<TripDay> _longDays(String label) {
     ),
   ];
 }
+
+List<TripDay> _scrollSpyDays() => [
+  for (var day = 1; day <= 2; day++)
+    TripDay(
+      id: day,
+      dayNum: day,
+      date: '2026-07-${(17 + day).toString().padLeft(2, '0')}',
+      version: 1,
+      timeline: [
+        for (var index = 0; index < 12; index++)
+          TimelineEntry(
+            id: day * 100 + index,
+            sortOrder: index,
+            startTime: '${(8 + index).toString().padLeft(2, '0')}:00',
+            endTime: '${(9 + index).toString().padLeft(2, '0')}:00',
+            title: 'DAY $day 景點 $index',
+            version: 1,
+          ),
+      ],
+    ),
+];
 
 Color _entryDotColor(WidgetTester tester, int entryId) {
   final dotContainer = tester.widget<Container>(
@@ -383,7 +415,7 @@ void main() {
     expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('trip-timeline-day-overview')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byKey(const ValueKey('trip-secondary-map')), findsNothing);
     expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
@@ -578,9 +610,21 @@ void main() {
     expect(find.text('DAY 1'), findsOneWidget);
     expect(find.text('DAY 2'), findsOneWidget);
     expect(find.text('DAY 01'), findsOneWidget);
-    expect(find.text('DAY 02'), findsOneWidget);
     expect(find.text('2026-04-23（四）'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DAY 02'), findsOneWidget);
     expect(find.text('2026-04-24（五）'), findsOneWidget);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
   });
 
   testWidgets('entry tile 依 master.type 顯示對應 tone 圓點', (tester) async {
@@ -589,6 +633,10 @@ void main() {
     // attraction → accent、restaurant → pink、transport → sage
     expect(_entryDotColor(tester, 11), TpColorsLight.accentDeep);
     expect(_entryDotColor(tester, 12), TpColorsLight.pinkDeep);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
     expect(_entryDotColor(tester, 21), TpColorsLight.sageDeep);
   });
 
@@ -631,9 +679,13 @@ void main() {
     expect(find.text('15 分鐘'), findsOneWidget);
     expect(find.text('10 分鐘'), findsOneWidget);
     expect(find.text('8 分鐘'), findsOneWidget);
-    expect(find.text('20 分鐘'), findsOneWidget);
     expect(find.byIcon(Icons.directions_car), findsNWidgets(2));
     expect(find.byIcon(Icons.directions_walk), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('20 分鐘'), findsOneWidget);
   });
 
   testWidgets('stale travel segment 顯示重算中並隱藏舊分鐘數', (tester) async {
@@ -918,17 +970,95 @@ void main() {
     expect(find.text('降雨 20%'), findsOneWidget);
   });
 
-  testWidgets('點 day pill 捲動至該日 section', (tester) async {
-    await _pumpTimeline(tester);
-
-    final day2Title = find.text('2026-04-24（五）');
-    final day2TitleTopBeforeTap = tester.getTopLeft(day2Title).dy;
-
-    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+  testWidgets('itinerary uses one pinned Sliver selector without overview', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
     await tester.pumpAndSettle();
 
-    final day2TitleTopAfterTap = tester.getTopLeft(day2Title).dy;
-    expect(day2TitleTopAfterTap, lessThan(day2TitleTopBeforeTap));
+    final timelineScroll = find.byKey(const ValueKey('trip-timeline-scroll'));
+    expect(timelineScroll, findsOneWidget);
+    expect(tester.widget(timelineScroll), isA<CustomScrollView>());
+    expect(find.byType(PageView), findsNothing);
+    expect(
+      find.byKey(const ValueKey('trip-timeline-day-overview')),
+      findsNothing,
+    );
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final topBefore = tester.getTopLeft(selector).dy;
+    await tester.drag(timelineScroll, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(selector).dy, closeTo(topBefore, 0.5));
+  });
+
+  testWidgets(
+    'vertical scroll updates Day selection and tapping Day scrolls back',
+    (tester) async {
+      await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('day-section-2')),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('trip-timeline-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+
+      var selector = tester.widget<TpHorizontalSelector<int>>(
+        find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+      );
+      expect(selector.value, 2);
+
+      await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+      await tester.pumpAndSettle();
+      selector = tester.widget<TpHorizontalSelector<int>>(
+        find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+      );
+      expect(selector.value, 1);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('day-section-1'))).dy,
+        greaterThanOrEqualTo(
+          tester
+                  .getBottomLeft(
+                    find.byKey(
+                      const ValueKey('trip-timeline-view-day-selector'),
+                    ),
+                  )
+                  .dy -
+              1,
+        ),
+      );
+    },
+  );
+
+  testWidgets('Reduce Motion 直接切換 Day，不建立零秒捲動動畫', (tester) async {
+    await _pumpTimeline(
+      tester,
+      fetchDays: _scrollSpyDays,
+      disableAnimations: true,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
   });
 
   testWidgets('指定 initialDayNum：初始啟用該日 pill', (tester) async {
@@ -967,7 +1097,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.text('景點 before-29'),
-      find.byType(SingleChildScrollView),
+      find.byKey(const ValueKey('trip-timeline-scroll')),
       const Offset(0, -300),
     );
     await tester.pumpAndSettle();
@@ -1173,6 +1303,39 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
 
+  testWidgets('同日排序的樂觀畫面與 onReorderItem API 順序一致', (tester) async {
+    final repo = _MockTripRepository();
+    final pendingReorder = Completer<void>();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) => pendingReorder.future);
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    tester
+        .widget<ReorderableListView>(find.byType(ReorderableListView).first)
+        .onReorderItem!(0, 2);
+    await tester.pump();
+
+    final item12Top = tester.getTopLeft(find.text('海人食堂')).dy;
+    final item13Top = tester.getTopLeft(find.text('美國村購物')).dy;
+    final item11Top = tester.getTopLeft(find.text('美麗海水族館')).dy;
+    expect(item12Top, lessThan(item13Top));
+    expect(item13Top, lessThan(item11Top));
+
+    pendingReorder.complete();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('點搬移鈕 → 選其他天 → reorderEntries 帶 day_id', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -1209,6 +1372,64 @@ void main() {
     expect(captured.single.dayId, 2);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+  });
+
+  testWidgets('跨日搬移先更新畫面，儲存失敗後回復原 Day', (tester) async {
+    final repo = _MockTripRepository();
+    final pendingMove = Completer<void>();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) => pendingMove.future);
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-11')));
+    await _pumpGlassMenuClose(tester);
+    await tester.tap(find.byKey(const ValueKey('move-day-2')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('day-drop-1')),
+        matching: find.text('美麗海水族館'),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('day-drop-2')),
+        matching: find.text('美麗海水族館'),
+      ),
+      findsOneWidget,
+    );
+
+    pendingMove.completeError(Exception('save failed'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('day-drop-2')),
+        matching: find.text('美麗海水族館'),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('day-drop-1')),
+        matching: find.text('美麗海水族館'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('搬移失敗，請稍後再試'), findsOneWidget);
   });
 
   testWidgets('拖曳 entry 到其他天 → reorderEntries 帶 day_id 並重算兩天', (tester) async {
