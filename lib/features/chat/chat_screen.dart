@@ -232,22 +232,29 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
 
   @override
   Widget build(BuildContext context) {
-    Widget initiallyBelowHeader(Widget child) => Padding(
-      padding: EdgeInsets.only(top: TpRootGeometry.initialContentTop(context)),
-      child: child,
-    );
-
     final state = ref.watch(chatControllerProvider(widget.tripId));
     final currentUser = switch (ref.watch(authStateProvider)) {
       AsyncData(:final value) => value,
       _ => null,
     };
     final msgs = state.messages;
+    final hasBanner =
+        state.authExpired || (state.error != null && msgs.isNotEmpty);
+    final contentTop = hasBanner
+        ? TpSpacing.s4
+        : TpRootGeometry.initialContentTop(context);
+
+    Widget initiallyBelowHeader(Widget child) => Padding(
+      padding: EdgeInsets.only(top: contentTop),
+      child: child,
+    );
 
     final controller = ref.read(chatControllerProvider(widget.tripId).notifier);
 
     return Column(
       children: [
+        if (hasBanner)
+          SizedBox(height: TpRootGeometry.initialContentTop(context)),
         if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
         // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
         if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
@@ -278,7 +285,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                   reverse: true,
                   padding: EdgeInsets.fromLTRB(
                     TpSpacing.s4,
-                    TpRootGeometry.initialContentTop(context),
+                    contentTop,
                     TpSpacing.s4,
                     TpSpacing.s4,
                   ),

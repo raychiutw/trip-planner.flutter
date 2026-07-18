@@ -6,6 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -134,6 +135,31 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('最近的行程'), findsOneWidget);
+  });
+
+  testWidgets('登入過期 banner 不會被 Root Header 遮住', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenThrow(
+      const ApiError(status: 401, code: 'UNAUTHORIZED', message: 'expired'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final banner = find.text('登入已過期,請重新登入後再試。');
+    expect(banner, findsOneWidget);
+    final context = tester.element(find.byType(TpRootScaffold));
+    expect(
+      tester.getTopLeft(banner).dy,
+      greaterThanOrEqualTo(TpRootGeometry.initialContentTop(context)),
+    );
   });
 
   testWidgets('聊天顯示自己名稱與協作者 email fallback，並使用動態 Indigo', (tester) async {
