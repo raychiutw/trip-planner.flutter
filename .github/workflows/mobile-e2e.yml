@@ -101,6 +101,7 @@ jobs:
           dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
           patrol build android \
             --target patrol_test/native_map_smoke_test.dart \
+            --target patrol_test/app_owned_flow_test.dart \
             --dart-define E2E_EXPECT_GOOGLE_POI=true
           test -f build/app/outputs/apk/debug/app-debug.apk
           test -f build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -240,6 +241,7 @@ jobs:
           dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
           patrol build ios \
             --target patrol_test/native_map_smoke_test.dart \
+            --target patrol_test/app_owned_flow_test.dart \
             --dart-define E2E_EXPECT_GOOGLE_POI=true \
             --release
 

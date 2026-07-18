@@ -7,11 +7,16 @@ Tripline uses two complementary test layers:
 
 The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing.
 
-The Patrol test has two levels. A local run checks the native map lifecycle, zoom 12, overlays, and theme switching even when the developer machine has no production Maps key. The Test Lab workflow builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI additionally fails unless a real Google native POI produces the platform callback. This keeps local setup useful without weakening the external gate.
+The Patrol bundle contains two independent release gates:
+
+- `app_owned_flow_test.dart` runs login, itinerary/day switching, notes, map/itinerary switching, trip selection, account/appearance, chat, and favorites search/sort against deterministic repository fixtures. It never calls production services.
+- `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 12, overlays, and theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
+
+Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
 ## One-time Google Cloud setup
 
-1. Enable Firebase Test Lab and Cloud Tool Results in the Firebase/Google Cloud project.
+1. Enable Firebase Test Lab, Cloud Tool Results, Maps SDK for Android/iOS, and Navigation SDK (`navigationsdk.googleapis.com`) in the Firebase/Google Cloud project.
 2. Create a dedicated service account and grant both:
    - `roles/cloudtestservice.testAdmin`
    - `roles/firebase.analyticsViewer`
@@ -24,7 +29,7 @@ The Patrol test has two levels. A local run checks the native map lifecycle, zoo
    - `FIREBASE_ANDROID_VERSION` (optional; default `34`)
    - `FIREBASE_IOS_MODEL` (required for iOS)
    - `FIREBASE_IOS_VERSION` (required for iOS and supported by the selected model)
-5. Keep `GOOGLE_MAPS_ANDROID_API_KEY` and `GOOGLE_MAPS_IOS_API_KEY` as repository secrets.
+5. Keep `GOOGLE_MAPS_ANDROID_API_KEY` and `GOOGLE_MAPS_IOS_API_KEY` as repository secrets. Restricted keys must allow both the platform Maps SDK and Navigation SDK service while retaining the app package/bundle restriction.
 
 The Android job reuses the existing upload-keystore secrets to sign Patrol's debug APK. This is required because the Maps key is restricted to the Tripline package and signing SHA-1; an ephemeral GitHub debug key would render an unauthorized blank map.
 
@@ -68,8 +73,19 @@ Use one device per default matrix to protect quota. Before increasing the matrix
 
 ```bash
 dart pub global activate patrol_cli 4.4.0
-patrol build android --target patrol_test/native_map_smoke_test.dart
-patrol build ios --target patrol_test/native_map_smoke_test.dart --debug --simulator
+patrol build android \
+  --target patrol_test/native_map_smoke_test.dart \
+  --target patrol_test/app_owned_flow_test.dart
+patrol build ios \
+  --target patrol_test/native_map_smoke_test.dart \
+  --target patrol_test/app_owned_flow_test.dart \
+  --debug --simulator
+```
+
+Run the deterministic product flow directly on a local Flutter device:
+
+```bash
+flutter test integration_test/app_smoke_test.dart -d DEVICE_ID
 ```
 
 To run the same strict native-POI assertion locally, supply a valid platform Maps key and add:
@@ -86,3 +102,4 @@ Official references:
 - [Patrol Firebase Test Lab integration](https://patrol.leancode.co/documentation/integrations/firebase-test-lab)
 - [Firebase Android command line testing](https://firebase.google.com/docs/test-lab/android/command-line)
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
+- [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
