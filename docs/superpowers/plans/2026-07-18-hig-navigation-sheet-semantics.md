@@ -4597,10 +4597,11 @@ The backend implementation remains owned by `docs/backend-tasks/2026-07-18-poi-f
 
 Implementation evidence (2026-07-19): `.github/workflows/mobile.yml` invokes
 `tool/verify_favorite_restore_contract.sh` before external-device and upload
-jobs, validates an explicit non-production HTTPS host allowlist, and fails
-closed when protected values are missing. Runtime status is **BLOCKED**, not
-PASS: the backend must deploy `GET /api/environment-identity`, a reviewed commit
-must add the exact deployed origin and stable environment ID to
+jobs, validates an exact HTTPS origin/environment pair plus server-side mutation
+binding, and fails closed when protected values are missing. Runtime status is **BLOCKED**, not
+PASS: the backend must deploy `GET /api/environment-identity` plus the
+server-side `X-Expected-Environment-ID` mutation guard, a reviewed commit must
+add the exact deployed origin and stable environment ID to
 `tool/staging-release-environments.txt`, and the `mobile-release` environment
 still needs the staging URL/origin, two disposable account cookie sets, fixture POI ID, and
 `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1` after the backend

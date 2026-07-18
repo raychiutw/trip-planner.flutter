@@ -18,6 +18,7 @@ void main() {
       'PATH': '${sandbox.path}:${Platform.environment['PATH']}',
       'MOCK_CURL_STATE': '${sandbox.path}/curl-state',
       'MOCK_ENVIRONMENT_ID': 'tripline-staging-test',
+      'MOCK_MUTATION_GUARD': 'expected-environment-id-v1',
       'STAGING_API_BASE_URL': 'https://staging.tripline.test',
       'STAGING_ORIGIN': 'https://staging-app.tripline.test',
       'STAGING_SESSION_COOKIE': 'session=owner-fixture',
@@ -93,6 +94,17 @@ void main() {
 
     expect(result.exitCode, 2);
     expect(result.stderr, contains('environment identity'));
+    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+  });
+
+  test('rejects a backend without the environment mutation guard', () async {
+    final result = await _runContract({
+      ...baseEnvironment,
+      'MOCK_MUTATION_GUARD': 'disabled',
+    });
+
+    expect(result.exitCode, 2);
+    expect(result.stderr, contains('mutation guard'));
     expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
   });
 
@@ -185,20 +197,35 @@ state_file=${MOCK_CURL_STATE:?}
 output=''
 body=''
 url=''
+expected_environment_header=''
 while (($#)); do
   case "$1" in
     --output) output=$2; shift 2 ;;
     --data) body=$2; shift 2 ;;
-    --request|--write-out|--header|--connect-timeout|--max-time) shift 2 ;;
+    --header)
+      if [[ "$2" == 'X-Expected-Environment-ID: '* ]]; then
+        expected_environment_header=${2#X-Expected-Environment-ID: }
+      fi
+      shift 2
+      ;;
+    --request|--write-out|--connect-timeout|--max-time) shift 2 ;;
     --silent|--show-error) shift ;;
     *) url=$1; shift ;;
   esac
 done
 
 if [[ "$url" == */api/environment-identity ]]; then
-  jq -nc --arg environmentId "${MOCK_ENVIRONMENT_ID:-tripline-staging-test}" \
-    '{environmentId:$environmentId}' > "$output"
+  jq -nc \
+    --arg environmentId "${MOCK_ENVIRONMENT_ID:-tripline-staging-test}" \
+    --arg mutationGuard "${MOCK_MUTATION_GUARD:-expected-environment-id-v1}" \
+    '{environmentId:$environmentId,mutationGuard:$mutationGuard}' > "$output"
   printf '200'
+  exit 0
+fi
+
+if [[ "$expected_environment_header" != "${MOCK_ENVIRONMENT_ID:-tripline-staging-test}" ]]; then
+  printf '{"code":"ENVIRONMENT_MISMATCH"}' > "$output"
+  printf '412'
   exit 0
 fi
 

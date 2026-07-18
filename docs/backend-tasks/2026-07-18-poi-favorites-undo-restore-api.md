@@ -175,18 +175,21 @@ Cache-Control: no-store
 Content-Type: application/json
 
 {
-  "environmentId": "tripline-staging"
+  "environmentId": "tripline-staging",
+  "mutationGuard": "expected-environment-id-v1"
 }
 ```
 
 規則：
 
 - `environmentId` 必須來自部署環境設定，staging 與 production 使用不同且穩定的值。
+- `mutationGuard` 只有在所有收藏 mutation 已支援下述 server-side header 檢查時才回 `expected-environment-id-v1`；尚未完整部署時不得宣告此值。
 - 不可由 request header、query、cookie 或 hostname 推導／覆寫。
 - 端點只讀，不可寫 D1、KV 或 audit log；回應必須 `no-store`。
 - release repository 會把 staging 的精確 HTTPS origin 與預期 `environmentId` 提交在 `tool/staging-release-environments.txt`，不使用可變 secret 作為期望值。
 - identity 不符、端點不存在、非 200 或 JSON 缺欄位時，release workflow 必須在任何 create／delete／restore 前失敗。
-- 後端整合測試至少覆蓋 staging／production 回傳不同 ID，且 client 輸入無法改變回傳值。
+- release client 會在每個 request 傳 `X-Expected-Environment-ID: tripline-staging`。所有 `POST`／`PATCH`／`PUT`／`DELETE` handler 必須在寫入 transaction 前，以實際部署環境 ID 比對此 header；缺漏或不符回 `412 ENVIRONMENT_MISMATCH`，不得執行任何寫入。這項 server-side 檢查用來關閉 identity preflight 與後續 mutation 之間的 DNS／route TOCTOU。
+- 後端整合測試至少覆蓋 staging／production 回傳不同 ID、client 輸入無法改變回傳值，以及 production handler 收到 staging ID 時回 412 且資料完全未變更。
 
 ## 10. Definition of Done
 
@@ -195,4 +198,4 @@ Content-Type: application/json
 - 新舊收藏建立、刪除、restore 整合測試全部通過。
 - 既有 API regression suite、typecheck、lint 全綠。
 - API reference 更新並提供後端 commit SHA 給 Flutter 開發。
-- `/api/environment-identity` 已部署，staging／production 身分不同，release preflight 測試通過。
+- `/api/environment-identity` 已部署，staging／production 身分不同，所有 mutation 強制檢查 `X-Expected-Environment-ID`，release preflight 測試通過。

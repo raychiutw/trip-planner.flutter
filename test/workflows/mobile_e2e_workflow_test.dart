@@ -111,6 +111,8 @@ void main() {
         expect(restoreContract, contains('STAGING_CONTRACT_GUARD'));
         expect(restoreContract, contains('staging-release-environments.txt'));
         expect(restoreContract, contains('/api/environment-identity'));
+        expect(restoreContract, contains('X-Expected-Environment-ID'));
+        expect(restoreContract, contains('expected-environment-id-v1'));
         expect(restoreContract, contains('--connect-timeout'));
         expect(restoreContract, contains('--max-time'));
         expect(releaseWorkflow, contains('favorite-restore-contract-'));

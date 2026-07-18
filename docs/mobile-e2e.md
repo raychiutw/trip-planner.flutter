@@ -91,8 +91,11 @@ and cannot resolve on the public Internet. The backend must implement the
 read-only `GET /api/environment-identity` contract documented in
 `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`.
 
-Before its first mutation, the smoke verifies that the exact origin is committed
-and the backend identity matches. It then verifies create → delete → active-list
+Before its first mutation, the smoke verifies that the exact origin is committed,
+the backend identity matches, and the backend advertises the
+`expected-environment-id-v1` mutation guard. Every request carries the committed
+ID in `X-Expected-Environment-ID`, which the backend must verify again inside
+each write path. It then verifies create → delete → active-list
 exclusion → second-user containment → restore → one active row → cleanup.
 Missing secrets, an uncommitted origin, an explicit port or path, an identity
 mismatch, the committed production host `trip-planner-dby.pages.dev`, an absent
@@ -186,7 +189,7 @@ counted as a pass.
 | Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281), SHA `fec66f90` |
 | Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097), SHA `d47e88d0` |
 | iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
-| Favorite restore staging contract | BLOCKED | Backend identity endpoint is not deployed; the deployed origin/environment pair is not committed to `tool/staging-release-environments.txt`; protected staging URL, account cookies, fixture POI, and contract guard are not configured |
+| Favorite restore staging contract | BLOCKED | Backend identity endpoint and server-side expected-environment mutation guard are not deployed; the deployed origin/environment pair is not committed to `tool/staging-release-environments.txt`; protected staging URL, account cookies, fixture POI, and contract guard are not configured |
 | Current-master TestFlight upload | BLOCKED | Release correctly waits for both blocked gates above |
 
 The last successful TestFlight upload predates the HIG/map merge and is not

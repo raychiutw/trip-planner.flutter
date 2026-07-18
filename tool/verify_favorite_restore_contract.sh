@@ -12,6 +12,7 @@ if [[ "$STAGING_CONTRACT_GUARD" != 'tripline-staging-favorite-restore-v1' ]]; th
   echo 'Refusing mutations: STAGING_CONTRACT_GUARD is invalid.' >&2
   exit 2
 fi
+readonly expected_mutation_guard='expected-environment-id-v1'
 
 base_url=${STAGING_API_BASE_URL%/}
 if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)$ ]]; then
@@ -95,6 +96,7 @@ request() {
     --header 'Accept: application/json'
     --header "Origin: $STAGING_ORIGIN"
     --header "Cookie: $cookie"
+    --header "X-Expected-Environment-ID: $expected_environment_id"
   )
   if [[ -n "$csrf_token" ]]; then
     args+=(--header "X-CSRF-Token: $csrf_token")
@@ -127,6 +129,12 @@ actual_environment_id=$(jq -r '.environmentId // empty' \
   "$tmp_dir/environment-identity.json")
 if [[ "$actual_environment_id" != "$expected_environment_id" ]]; then
   echo 'Refusing mutations: backend environment identity does not match the committed staging environment.' >&2
+  exit 2
+fi
+actual_mutation_guard=$(jq -r '.mutationGuard // empty' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$actual_mutation_guard" != "$expected_mutation_guard" ]]; then
+  echo 'Refusing mutations: backend environment mutation guard is unavailable.' >&2
   exit 2
 fi
 
