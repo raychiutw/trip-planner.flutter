@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-18
+
+### 修正
+
+- iOS 與 Android CI 共用同一套 Play-safe build number，並切換到新的 TestFlight `0.9.1` 版本序列。
+- Android 系統返回鍵會先離開近滿版 Sheet 的內層設定頁，再關閉整個 Sheet。
+
 ## [0.9.0] - 2026-07-17
 
 ### 新增

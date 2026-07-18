@@ -11,13 +11,17 @@ void main() {
     expect(workflow, isNot(contains('--build-number="\$GITHUB_RUN_ID"')));
   });
 
-  test('共用較小 build number 前已離開舊 TestFlight 0.9.0 train', () {
+  test('共用較小 build number 前已離開舊 TestFlight train且版本一致', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     final version = RegExp(
       r'^version:\s*([^+\s]+)\+',
       multiLine: true,
     ).firstMatch(pubspec)?.group(1);
+    final releaseVersion = File('VERSION').readAsStringSync().trim();
+    final changelog = File('CHANGELOG.md').readAsStringSync();
 
     expect(version, isNot('0.9.0'));
+    expect(version, releaseVersion);
+    expect(changelog, contains('## [$releaseVersion] - '));
   });
 }
