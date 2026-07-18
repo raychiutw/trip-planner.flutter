@@ -16,6 +16,9 @@ void main() {
   final restoreContract = File(
     'tool/verify_favorite_restore_contract.sh',
   ).readAsStringSync();
+  final evidenceSanitizer = File(
+    'tool/sanitize_test_lab_evidence.sh',
+  ).readAsStringSync();
 
   group('external mobile integration test gate', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
@@ -106,6 +109,22 @@ void main() {
 
     test('public GitHub artifacts exclude signed device test binaries', () {
       expect(
+        'tool/sanitize_test_lab_evidence.sh'.allMatches(e2eWorkflow).length,
+        2,
+      );
+      expect(
+        e2eWorkflow,
+        contains(
+          "if: \${{ always() && steps.sanitize_android_evidence.outcome == 'success' }}",
+        ),
+      );
+      expect(
+        e2eWorkflow,
+        contains(
+          "if: \${{ always() && steps.sanitize_ios_evidence.outcome == 'success' }}",
+        ),
+      );
+      expect(
         e2eWorkflow,
         isNot(
           contains(
@@ -121,6 +140,59 @@ void main() {
           ),
         ),
       );
+      expect(evidenceSanitizer, contains("-iname '*.apk'"));
+      expect(evidenceSanitizer, contains("-iname '*.ipa'"));
+      expect(evidenceSanitizer, contains("-iname '*.zip'"));
+    });
+
+    test('Test Lab evidence sanitizer keeps diagnostics only', () {
+      final root = Directory.systemTemp.createTempSync(
+        'tripline-test-lab-evidence-',
+      );
+      addTearDown(() => root.deleteSync(recursive: true));
+      File('${root.path}/.tripline-test-lab-evidence-root').createSync();
+
+      final resultXml = File('${root.path}/result/test_result.xml')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('<testsuite/>');
+      final video = File('${root.path}/result/video.mp4')
+        ..writeAsBytesSync(const [0, 1, 2]);
+      final app = File('${root.path}/result/app-debug.apk')
+        ..writeAsBytesSync(const [3, 4, 5]);
+      final testBundle = File('${root.path}/result/ios_tests.zip')
+        ..writeAsBytesSync(const [6, 7, 8]);
+      final executable = File('${root.path}/result/Runner.app/Runner')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(const [9, 10, 11]);
+
+      final result = Process.runSync('bash', [
+        'tool/sanitize_test_lab_evidence.sh',
+        root.path,
+      ]);
+
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      expect(resultXml.existsSync(), isTrue);
+      expect(video.existsSync(), isTrue);
+      expect(app.existsSync(), isFalse);
+      expect(testBundle.existsSync(), isFalse);
+      expect(executable.existsSync(), isFalse);
+    });
+
+    test('Test Lab evidence sanitizer refuses an unmarked directory', () {
+      final root = Directory.systemTemp.createTempSync(
+        'tripline-unmarked-evidence-',
+      );
+      addTearDown(() => root.deleteSync(recursive: true));
+      final binary = File('${root.path}/must-not-delete.apk')
+        ..writeAsBytesSync(const [1, 2, 3]);
+
+      final result = Process.runSync('bash', [
+        'tool/sanitize_test_lab_evidence.sh',
+        root.path,
+      ]);
+
+      expect(result.exitCode, 64);
+      expect(binary.existsSync(), isTrue);
     });
 
     test(
