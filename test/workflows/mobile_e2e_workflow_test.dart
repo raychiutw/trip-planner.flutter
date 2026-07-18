@@ -98,7 +98,7 @@ void main() {
       () {
         expect(releaseWorkflow, contains('Verify staging favorite restore'));
         expect(releaseWorkflow, contains('STAGING_API_BASE_URL'));
-        expect(releaseWorkflow, contains('STAGING_ALLOWED_HOST'));
+        expect(releaseWorkflow, isNot(contains('STAGING_ALLOWED_HOST')));
         expect(releaseWorkflow, contains('STAGING_SESSION_COOKIE'));
         expect(releaseWorkflow, contains('STAGING_OTHER_SESSION_COOKIE'));
         expect(
@@ -109,6 +109,7 @@ void main() {
         expect(restoreContract, contains('/api/poi-favorites/'));
         expect(restoreContract, contains('/restore'));
         expect(restoreContract, contains('STAGING_CONTRACT_GUARD'));
+        expect(restoreContract, contains('staging-release-hosts.txt'));
         expect(restoreContract, contains('--connect-timeout'));
         expect(restoreContract, contains('--max-time'));
         expect(releaseWorkflow, contains('favorite-restore-contract-'));

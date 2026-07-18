@@ -45,7 +45,7 @@ void main() {
         'STAGING_API_BASE_URL': 'https://production.tripline.test/staging',
       });
       expect(wrongHost.exitCode, 2);
-      expect(wrongHost.stderr, contains('not allowlisted'));
+      expect(wrongHost.stderr, contains('committed staging host allowlist'));
       expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
     },
   );
@@ -61,6 +61,21 @@ void main() {
 
       expect(result.exitCode, 2);
       expect(result.stderr, contains('production hostname'));
+      expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    },
+  );
+
+  test(
+    'rejects an uncommitted production alias even when both secrets match',
+    () async {
+      final result = await _runContract({
+        ...baseEnvironment,
+        'STAGING_API_BASE_URL': 'https://production-alias.example',
+        'STAGING_ALLOWED_HOST': 'production-alias.example',
+      });
+
+      expect(result.exitCode, 2);
+      expect(result.stderr, contains('committed staging host allowlist'));
       expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
     },
   );

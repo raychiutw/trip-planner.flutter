@@ -77,13 +77,18 @@ Manual **Mobile CI / Releases** dispatches are accepted only from `master` and r
 
 Before Test Lab, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
 
-- `STAGING_API_BASE_URL` (HTTPS only), `STAGING_ALLOWED_HOST` (exact hostname), `STAGING_ORIGIN`
+- `STAGING_API_BASE_URL` (HTTPS only), `STAGING_ORIGIN`
 - `STAGING_SESSION_COOKIE`, optional `STAGING_CSRF_TOKEN`
 - `STAGING_OTHER_SESSION_COOKIE`, optional `STAGING_OTHER_CSRF_TOKEN`
 - `STAGING_FAVORITE_POI_ID`
 - `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1`
 
-The smoke verifies create → delete → active-list exclusion → second-user containment → restore → one active row → cleanup. Missing secrets, the committed production host `trip-planner-dby.pages.dev`, a mismatched allowlist, an absent migration, or any contract mismatch fails closed. Only after this gate succeeds do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent Patrol suites do not toggle a feature they do not exercise.
+Before adding those secrets, add the deployed API hostname to the reviewed
+`tool/staging-release-hosts.txt` file. The environment cannot override that
+file. The checked-in `.test` entry is reserved for the isolated script test and
+cannot resolve on the public Internet.
+
+The smoke verifies create → delete → active-list exclusion → second-user containment → restore → one active row → cleanup. Missing secrets, a hostname absent from the committed allowlist, the committed production host `trip-planner-dby.pages.dev`, an absent migration, or any contract mismatch fails closed. Only after this gate succeeds do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent Patrol suites do not toggle a feature they do not exercise.
 
 Test Lab exit codes are not swallowed:
 
@@ -119,6 +124,9 @@ patrol build ios \
   --target patrol_test/native_map_smoke_test.dart \
   --target patrol_test/app_owned_flow_test.dart \
   --debug --simulator
+
+patrol test -t patrol_test/app_owned_flow_test.dart --device DEVICE_ID
+patrol test -t patrol_test/native_map_smoke_test.dart --device DEVICE_ID
 ```
 
 Run the deterministic product flow directly on a local Flutter device:
@@ -152,8 +160,9 @@ Official references:
 
 ## 2026-07-19 verification record
 
-The current `master` implementation was verified with the following layered
-evidence. A blocked external gate is deliberately not counted as a pass.
+Source SHA `fec66f90` (the `master` head at verification time) was verified with
+the following layered evidence. A blocked external gate is deliberately not
+counted as a pass.
 
 | Layer | Result | Evidence |
 | --- | --- | --- |
@@ -162,12 +171,12 @@ evidence. A blocked external gate is deliberately not counted as a pass.
 | Full Flutter tests and analyzer | PASS | local worktree run |
 | iOS simulator build | PASS | unsigned `Runner.app` built locally |
 | Deterministic iOS integration flow | PASS | `integration_test/app_smoke_test.dart`, 1 test |
-| Native iOS map smoke | PASS | `patrol_cli` 4.4.0, 1 passing UI test covering ready, zoom 12, theme, gesture, and location; result bundle retained locally |
-| Deterministic visual matrix | PASS | 54 named Light/Dark, 100%/200% text, accessibility screenshots |
+| Native iOS map smoke | PASS | `patrol_cli` 4.4.0, 1 passing UI test covering ready, zoom 12, theme, gesture, and location; `build/ios_results_1784405657116.xcresult` |
+| Deterministic visual matrix | PASS | 54 named Light/Dark, 100%/200% text, accessibility screenshots under `build/test-artifacts/app-owned/` |
 | Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281), SHA `fec66f90` |
 | Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097), SHA `d47e88d0` |
 | iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
-| Favorite restore staging contract | BLOCKED | Protected staging URL, account cookies, fixture POI, and contract guard are not configured |
+| Favorite restore staging contract | BLOCKED | Deployed hostname is not committed to `tool/staging-release-hosts.txt`; protected staging URL, account cookies, fixture POI, and contract guard are not configured |
 | Current-master TestFlight upload | BLOCKED | Release correctly waits for both blocked gates above |
 
 The last successful TestFlight upload predates the HIG/map merge and is not

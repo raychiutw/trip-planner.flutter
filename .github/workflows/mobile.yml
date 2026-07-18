@@ -92,7 +92,6 @@ jobs:
       cancel-in-progress: false
     env:
       STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
-      STAGING_ALLOWED_HOST: ${{ secrets.STAGING_ALLOWED_HOST }}
       STAGING_ORIGIN: ${{ secrets.STAGING_ORIGIN }}
       STAGING_SESSION_COOKIE: ${{ secrets.STAGING_SESSION_COOKIE }}
       STAGING_CSRF_TOKEN: ${{ secrets.STAGING_CSRF_TOKEN }}

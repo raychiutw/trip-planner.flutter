@@ -33,23 +33,30 @@ for production_host in "${production_hosts[@]}"; do
     exit 2
   fi
 done
-if [[ "${CI:-false}" == true ]]; then
-  : "${STAGING_ALLOWED_HOST:?Set the exact non-production API hostname}"
-  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    echo 'Refusing mutations: STAGING_ALLOWED_HOST must be a plain hostname.' >&2
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly staging_hosts_file="$script_dir/staging-release-hosts.txt"
+if [[ ! -r "$staging_hosts_file" ]]; then
+  echo 'Refusing mutations: committed staging host allowlist is missing.' >&2
+  exit 2
+fi
+host_is_committed=false
+while IFS= read -r candidate || [[ -n "$candidate" ]]; do
+  candidate=${candidate%%#*}
+  candidate=$(printf '%s' "$candidate" | tr -d '[:space:]')
+  [[ -z "$candidate" ]] && continue
+  if [[ ! "$candidate" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    echo 'Refusing mutations: committed staging host allowlist is invalid.' >&2
     exit 2
   fi
-  allowed_host=$(canonical_host "$STAGING_ALLOWED_HOST")
-  if [[ "$staging_host" != "$allowed_host" ]]; then
-    echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
-    exit 2
+  if [[ "$staging_host" == "$(canonical_host "$candidate")" ]]; then
+    host_is_committed=true
+    break
   fi
-elif [[ -n "${STAGING_ALLOWED_HOST:-}" ]]; then
-  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]] ||
-      [[ "$staging_host" != "$(canonical_host "$STAGING_ALLOWED_HOST")" ]]; then
-    echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
-    exit 2
-  fi
+done < "$staging_hosts_file"
+if [[ "$host_is_committed" != true ]]; then
+  echo 'Refusing mutations: API hostname is not in the committed staging host allowlist.' >&2
+  exit 2
 fi
 
 if [[ ! "$STAGING_FAVORITE_POI_ID" =~ ^[0-9]+$ ]]; then

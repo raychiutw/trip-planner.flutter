@@ -4599,8 +4599,9 @@ Implementation evidence (2026-07-19): `.github/workflows/mobile.yml` invokes
 `tool/verify_favorite_restore_contract.sh` before external-device and upload
 jobs, validates an explicit non-production HTTPS host allowlist, and fails
 closed when protected values are missing. Runtime status is **BLOCKED**, not
-PASS: the `mobile-release` environment still needs the staging URL/host/origin,
-two disposable account cookie sets, fixture POI ID, and
+PASS: a reviewed commit must add the deployed hostname to
+`tool/staging-release-hosts.txt`, and the `mobile-release` environment still
+needs the staging URL/origin, two disposable account cookie sets, fixture POI ID, and
 `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1` after the backend
 migration is deployed.
 
