@@ -10,4 +10,14 @@ void main() {
     expect(formula.allMatches(workflow), hasLength(2));
     expect(workflow, isNot(contains('--build-number="\$GITHUB_RUN_ID"')));
   });
+
+  test('共用較小 build number 前已離開舊 TestFlight 0.9.0 train', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final version = RegExp(
+      r'^version:\s*([^+\s]+)\+',
+      multiLine: true,
+    ).firstMatch(pubspec)?.group(1);
+
+    expect(version, isNot('0.9.0'));
+  });
 }

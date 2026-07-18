@@ -76,6 +76,45 @@ void main() {
     expect(sheet.showDragIndicator, isFalse);
   });
 
+  testWidgets('system Back returns from a nested content-sheet page first', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (sheetContext) => FilledButton(
+                onPressed: () => Navigator.of(sheetContext).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Scaffold(body: Text('外觀設定')),
+                  ),
+                ),
+                child: const Text('外觀'),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('外觀'));
+    await tester.pumpAndSettle();
+    expect(find.text('外觀設定'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('外觀設定'), findsNothing);
+    expect(find.text('帳號'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
+  });
+
   testWidgets('dirty form asks before Cancel and stays open when kept', (
     tester,
   ) async {

@@ -313,6 +313,7 @@ Future<T?> _showAppSheet<T>({
   required double largeSize,
   required bool resizable,
   Future<bool> Function()? canDismiss,
+  Future<bool> Function()? onSystemBack,
 }) {
   final controller = GlassModalSheetController();
   return showGeneralDialog<T>(
@@ -338,6 +339,7 @@ Future<T?> _showAppSheet<T>({
           largeSize: largeSize,
           resizable: resizable,
           canDismiss: canDismiss,
+          onSystemBack: onSystemBack,
           onClosed: (value) =>
               Navigator.of(dialogContext, rootNavigator: true).pop(value),
           builder: builder,
@@ -353,6 +355,7 @@ class _ThemeAwareAppSheet<T> extends StatefulWidget {
     required this.largeSize,
     required this.resizable,
     required this.canDismiss,
+    required this.onSystemBack,
     required this.onClosed,
     required this.builder,
   });
@@ -363,6 +366,7 @@ class _ThemeAwareAppSheet<T> extends StatefulWidget {
   final double largeSize;
   final bool resizable;
   final Future<bool> Function()? canDismiss;
+  final Future<bool> Function()? onSystemBack;
   final ValueChanged<T?> onClosed;
   final _AppSheetBuilder<T> builder;
 
@@ -373,6 +377,7 @@ class _ThemeAwareAppSheet<T> extends StatefulWidget {
 class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
   bool _isClosing = false;
   bool _checkingDismiss = false;
+  bool _handlingSystemBack = false;
   Widget? _sheet;
 
   @override
@@ -398,6 +403,15 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
     widget.onClosed(result);
   }
 
+  Future<void> _handleSystemBack([T? result]) async {
+    if (_isClosing || _handlingSystemBack) return;
+    _handlingSystemBack = true;
+    final handled = await (widget.onSystemBack?.call() ?? Future.value(false));
+    _handlingSystemBack = false;
+    if (!mounted || handled) return;
+    await _requestClose(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     // 必須在 build 內依賴 Theme；外觀切換後 sheet 材質與內容才會同一幀更新。
@@ -406,7 +420,7 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
     return PopScope<T>(
       canPop: _isClosing,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) unawaited(_requestClose(result));
+        if (!didPop) unawaited(_handleSystemBack(result));
       },
       child: GlassModalSheetScaffold(
         controller: widget.controller,
@@ -486,6 +500,11 @@ Future<T?> showAppContentSheet<T>(
     mediumSize: 0.93,
     largeSize: 0.93,
     resizable: false,
+    onSystemBack: () async {
+      final navigator = sheetNavigatorKey.currentState;
+      if (navigator == null) return false;
+      return navigator.maybePop();
+    },
     builder: (sheetContext, close) => _AppContentSheet<T>(
       title: title,
       contentBuilder: builder,
