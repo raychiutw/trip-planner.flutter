@@ -6,7 +6,9 @@ import 'package:patrol/patrol.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 
 const _taipei101 = TripMapPoint(25.033968, 121.564468);
-const _zoomCheckPoint = TripMapPoint(25.0382, 121.5701);
+// Keep this outside the initial Taipei 101 viewport so the native SDK cannot
+// coalesce the camera update and skip its idle callback.
+const _zoomCheckPoint = TripMapPoint(25.1676, 121.4450);
 const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
 const _poiTapOffsets = <Offset>[
   Offset(0.5, 0.5),
