@@ -9,6 +9,7 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
   testWidgets('standalone app bar never implies a leading action', (
@@ -163,7 +164,7 @@ void main() {
   );
 
   testWidgets(
-    'TpMoreMenuButton waits for glass menu to close before dispatching a route action',
+    'TpMoreMenuButton uses a native anchored menu and dispatches once',
     (tester) async {
       String? selected;
       await tester.pumpWidget(
@@ -193,11 +194,9 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('more-menu')));
       await tester.pumpAndSettle();
+      expect(find.byType(MenuAnchor), findsOneWidget);
+      expect(find.byType(GlassMenu), findsNothing);
       await tester.tap(find.byKey(const ValueKey('open-sheet')));
-      await tester.pump();
-
-      expect(selected, isNull);
-      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
       expect(selected, 'sheet');
 
@@ -242,21 +241,21 @@ void main() {
           matching: find.byType(GlassButton),
         ),
       );
-      final menu = tester.widget<GlassMenu>(find.byType(GlassMenu));
-      expect(trigger.settings, same(menu.settings));
-      expect(
-        menu.settings?.glassColor,
-        TpColorsLight.accentBg.withValues(alpha: 0.68),
-      );
-
       await tester.tap(find.byKey(const ValueKey('primary-more-menu')));
       await tester.pumpAndSettle();
-      final item = tester.widget<GlassMenuItem>(find.byType(GlassMenuItem));
-      expect(item.iconColor, TpColorsLight.foreground);
-      expect(item.titleStyle?.color, TpColorsLight.foreground);
+      expect(find.byType(TpGlassSurface), findsOneWidget);
+      final menuSurface = tester.widget<TpGlassSurface>(
+        find.byType(TpGlassSurface),
+      );
+      expect(trigger.settings, same(menuSurface.glassSettings));
+      final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
+      expect(
+        item.style?.foregroundColor?.resolve(<WidgetState>{}),
+        TpColorsLight.foreground,
+      );
       expect(
         find.descendant(
-          of: find.byType(GlassMenuItem),
+          of: find.byType(MenuItemButton),
           matching: find.byIcon(CupertinoIcons.check_mark),
         ),
         findsOneWidget,
@@ -294,9 +293,11 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('dark-more-menu')));
     await tester.pumpAndSettle();
-    final item = tester.widget<GlassMenuItem>(find.byType(GlassMenuItem));
-    expect(item.iconColor, TpColorsDark.accent);
-    expect(item.titleStyle?.color, TpColorsDark.accent);
+    final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
+    expect(
+      item.style?.foregroundColor?.resolve(<WidgetState>{}),
+      TpColorsDark.accent,
+    );
   });
 
   testWidgets(
@@ -337,14 +338,20 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('semantic-more-menu')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(GlassMenuDivider), findsOneWidget);
-      final items = tester.widgetList<GlassMenuItem>(
-        find.byType(GlassMenuItem),
+      expect(find.byType(Divider), findsOneWidget);
+      final items = tester.widgetList<MenuItemButton>(
+        find.byType(MenuItemButton),
       );
       expect(items, hasLength(2));
-      expect(items.last.isDestructive, isTrue);
-      expect(items.last.enabled, isFalse);
-      expect(items.last.height, TpSpacing.tapMin);
+      expect(
+        items.last.style?.foregroundColor?.resolve(<WidgetState>{}),
+        Theme.of(tester.element(find.byType(MenuAnchor))).colorScheme.error,
+      );
+      expect(items.last.onPressed, isNull);
+      expect(
+        items.last.style?.minimumSize?.resolve(<WidgetState>{})?.height,
+        TpSpacing.tapMin,
+      );
     },
   );
 

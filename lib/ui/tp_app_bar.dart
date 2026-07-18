@@ -503,33 +503,13 @@ class TpMoreMenuButton<T> extends StatefulWidget {
 }
 
 class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
-  final _menuController = GlassMenuController();
-  _PendingMenuSelection<T>? _pendingSelection;
+  final _menuController = MenuController();
 
-  void _queueSelection(T value) {
-    _pendingSelection = _PendingMenuSelection(value);
-  }
-
-  void _dispatchSelectionAfterClose() {
-    final pending = _pendingSelection;
-    if (pending == null) return;
-    _pendingSelection = null;
-    _dispatchWhenMenuClosed(pending.value);
-  }
-
-  void _dispatchWhenMenuClosed(T value) {
-    // GlassMenu invokes the item callback before beginning its close morph.
-    // Opening a route at that moment disables the underlying route's ticker,
-    // leaving the full-screen dismiss barrier alive and making the page appear
-    // stuck. Wait until the overlay has actually left before opening a sheet.
-    if (!mounted) return;
-    if (!_menuController.isOpen) {
-      widget.onSelected(value);
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _dispatchWhenMenuClosed(value),
-    );
+  void _select(T value) {
+    _menuController.close();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onSelected(value);
+    });
   }
 
   @override
@@ -555,60 +535,101 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
         alpha: isDark ? 0.84 : 0.90,
       ),
     );
+    final menuStyle = MenuStyle(
+      alignment: AlignmentDirectional.topEnd,
+      backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+      elevation: const WidgetStatePropertyAll(0),
+      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+      minimumSize: const WidgetStatePropertyAll(Size(248, 0)),
+      maximumSize: const WidgetStatePropertyAll(Size(248, double.infinity)),
+    );
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
-      child: GlassMenu(
+      child: MenuAnchor(
         controller: _menuController,
-        onClose: _dispatchSelectionAfterClose,
-        menuWidth: 248,
-        menuBorderRadius: 24,
-        itemBorderRadius: 16,
-        menuAlignment: GlassMenuAlignment.topRight,
-        autoAdjustToScreen: true,
-        menuPadding: const EdgeInsets.all(TpSpacing.s3),
-        settings: settings,
-        quality: GlassQuality.standard,
-        selectionColor: triggerForeground.withValues(alpha: 0.18),
-        triggerBuilder: (menuContext, toggleMenu) => TpToolbarGlassButton(
+        useRootOverlay: true,
+        consumeOutsideTap: true,
+        style: menuStyle,
+        alignmentOffset: const Offset(0, 8),
+        builder: (menuContext, controller, _) => TpToolbarGlassButton(
           tooltip: widget.tooltip,
-          onPressed: widget.enabled ? toggleMenu : null,
+          onPressed: widget.enabled
+              ? () => controller.isOpen ? controller.close() : controller.open()
+              : null,
           glassSettings: settings,
           rimColor: triggerForeground.withValues(alpha: isDark ? 0.56 : 0.46),
           child:
               widget.triggerChild ??
               Icon(CupertinoIcons.ellipsis, size: 22, color: triggerForeground),
         ),
-        items: [
-          for (final item in widget.items) ...[
-            if (item.dividerBefore)
-              GlassMenuDivider(
-                indent: 12,
-                color: menuForeground.withValues(alpha: 0.18),
+        menuChildren: [
+          SizedBox(
+            width: 248,
+            child: TpGlassSurface(
+              borderRadius: const BorderRadius.all(Radius.circular(24)),
+              padding: const EdgeInsets.all(TpSpacing.s3),
+              glassSettings: settings,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final item in widget.items) ...[
+                    if (item.dividerBefore)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Divider(
+                          height: TpSpacing.s4,
+                          color: menuForeground.withValues(alpha: 0.18),
+                        ),
+                      ),
+                    MenuItemButton(
+                      key: item.key,
+                      leadingIcon: Icon(
+                        item.selected ? CupertinoIcons.check_mark : item.icon,
+                        size: 22,
+                      ),
+                      closeOnActivate: false,
+                      style: ButtonStyle(
+                        alignment: AlignmentDirectional.centerStart,
+                        minimumSize: const WidgetStatePropertyAll(
+                          Size(0, TpSpacing.tapMin),
+                        ),
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        foregroundColor: WidgetStatePropertyAll(
+                          item.role == TpActionRole.destructive
+                              ? scheme.error
+                              : menuForeground,
+                        ),
+                        backgroundColor: const WidgetStatePropertyAll(
+                          Colors.transparent,
+                        ),
+                        overlayColor: WidgetStatePropertyAll(
+                          triggerForeground.withValues(alpha: 0.18),
+                        ),
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        textStyle: WidgetStatePropertyAll(
+                          theme.textTheme.bodyLarge,
+                        ),
+                      ),
+                      onPressed: item.enabled
+                          ? () => _select(item.value)
+                          : null,
+                      child: Text(item.label),
+                    ),
+                  ],
+                ],
               ),
-            GlassMenuItem(
-              key: item.key,
-              title: item.label,
-              icon: Icon(item.selected ? CupertinoIcons.check_mark : item.icon),
-              iconColor: item.role == TpActionRole.destructive
-                  ? null
-                  : menuForeground,
-              titleStyle: item.role == TpActionRole.destructive
-                  ? null
-                  : theme.textTheme.bodyLarge?.copyWith(color: menuForeground),
-              isDestructive: item.role == TpActionRole.destructive,
-              enabled: item.enabled,
-              height: TpSpacing.tapMin,
-              onTap: () => _queueSelection(item.value),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
-}
-
-class _PendingMenuSelection<T> {
-  const _PendingMenuSelection(this.value);
-
-  final T value;
 }

@@ -338,21 +338,13 @@ Color _entryDotColor(WidgetTester tester, int entryId) {
   return (dotContainer.decoration! as BoxDecoration).color!;
 }
 
-Future<void> _pumpGlassMenuClose(WidgetTester tester) async {
-  // TpMoreMenuButton intentionally waits until the package morph overlay has
-  // fully left before dispatching a route action. Pump individual frames so
-  // both the spring and the 16 ms close-state polling timer can advance.
-  for (var frame = 0; frame < 150; frame++) {
-    await tester.pump(const Duration(milliseconds: 16));
-  }
-  await tester.pumpAndSettle();
-}
+Future<void> _pumpMenuClose(WidgetTester tester) => tester.pumpAndSettle();
 
 Future<void> _enableTimelineEditing(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
-  await _pumpGlassMenuClose(tester);
+  await _pumpMenuClose(tester);
 }
 
 Future<void> _expectTripActionOpensClosableSheet(
@@ -363,7 +355,7 @@ Future<void> _expectTripActionOpensClosableSheet(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(actionKey));
   await tester.pump();
-  await _pumpGlassMenuClose(tester);
+  await _pumpMenuClose(tester);
 
   expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsOneWidget);
   expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
@@ -466,7 +458,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('trip-action-edit-info')));
     await tester.pump();
-    await _pumpGlassMenuClose(tester);
+    await _pumpMenuClose(tester);
 
     expect(
       find.byKey(const ValueKey('app-large-screen-sheet')),
@@ -534,7 +526,7 @@ void main() {
     expect(find.text('移動行程'), findsNothing);
 
     await tester.tap(reorderAction);
-    await _pumpGlassMenuClose(tester);
+    await _pumpMenuClose(tester);
 
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsNothing);
     expect(

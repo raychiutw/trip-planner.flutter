@@ -197,15 +197,14 @@ void main() {
       tester.getSize(find.byType(TpMoreMenuButton<int>)).height,
       greaterThanOrEqualTo(44),
     );
-    final menu = tester.widget<GlassMenu>(
+    final menu = tester.widget<MenuAnchor>(
       find.descendant(
         of: find.byType(TpMoreMenuButton<int>),
-        matching: find.byType(GlassMenu),
+        matching: find.byType(MenuAnchor),
       ),
     );
-    expect(menu.menuWidth, 248);
-    expect(menu.menuBorderRadius, 24);
-    expect(menu.items.whereType<GlassMenuItem>(), hasLength(1));
+    expect(menu.useRootOverlay, isTrue);
+    expect(find.byType(GlassMenu), findsNothing);
     final toolbarGlass = find.descendant(
       of: find.byType(TpMoreMenuButton<int>),
       matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
