@@ -146,8 +146,14 @@ class AppFlowFixture {
       () => trips.watchTrip('okinawa'),
     ).thenAnswer((_) => Stream.value(releaseSmokeTrip));
     when(
+      () => trips.fetchTrip('okinawa'),
+    ).thenAnswer((_) async => releaseSmokeTrip);
+    when(
       () => trips.watchDays('okinawa'),
     ).thenAnswer((_) => Stream.value(releaseSmokeDays));
+    when(
+      () => trips.fetchDaySummaries('okinawa'),
+    ).thenAnswer((_) async => releaseSmokeDays);
     when(
       () => trips.watchNotes('okinawa'),
     ).thenAnswer((_) => Stream.value(const TripNotes()));
@@ -222,10 +228,21 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
   }
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    key: const ValueKey('fake-trip-map-canvas'),
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
-    child: const Center(child: Text('Google Map fixture')),
+  Widget build(BuildContext context) => GestureDetector(
+    key: const ValueKey('fake-google-poi-trigger'),
+    behavior: HitTestBehavior.opaque,
+    onTap: () => widget.config.onGooglePoiSelected?.call(
+      const GoogleMapPoiSelection(
+        placeId: 'ChIJ-release-fixture',
+        name: '首里城公園',
+        point: TripMapPoint(26.217, 127.719),
+      ),
+    ),
+    child: ColoredBox(
+      key: const ValueKey('fake-trip-map-canvas'),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: const Center(child: Text('Google Map fixture')),
+    ),
   );
 }
 
@@ -234,9 +251,21 @@ Finder _rootTab(String label) => find.descendant(
   matching: find.bySemanticsLabel(label),
 );
 
-Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
+typedef AppFlowCapture = Future<void> Function(String name);
+typedef AppFlowAppWrapper = Widget Function(Widget child);
+
+Future<void> runAppOwnedReleaseFlow(
+  WidgetTester tester, {
+  AppFlowCapture? capture,
+  AppFlowAppWrapper? appWrapper,
+}) async {
+  Future<void> captureState(String name) async {
+    if (capture != null) await capture(name);
+  }
+
   final fixture = AppFlowFixture.loggedOut();
-  await tester.pumpWidget(fixture.app);
+  final app = fixture.app;
+  await tester.pumpWidget(appWrapper?.call(app) ?? app);
   await tester.pumpAndSettle();
 
   expect(find.byType(LoginScreen), findsOneWidget);
@@ -256,13 +285,25 @@ Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
     () => fixture.auth.login(email: 'ray@example.com', password: 'secret'),
   ).called(1);
 
+  await tester.tap(find.byKey(const ValueKey('trip-card-more-okinawa')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('刪除行程'));
+  await tester.pumpAndSettle();
+  expect(find.textContaining('此動作無法復原'), findsOneWidget);
+  await captureState('destructive-confirm');
+  await tester.tap(find.text('取消'));
+  await tester.pumpAndSettle();
+
   await tester.tap(find.text('沖繩家族之旅').first);
   await tester.pumpAndSettle();
   expect(find.text('那霸機場'), findsOneWidget);
 
+  await tester.ensureVisible(find.byKey(const ValueKey('day-pill-2')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('day-pill-2')));
   await tester.pumpAndSettle();
   expect(find.text('首里城'), findsOneWidget);
+  await captureState('itinerary');
 
   await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
   await tester.pumpAndSettle();
@@ -272,11 +313,31 @@ Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
   await tester.pumpAndSettle();
 
+  await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('trip-action-edit-info')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('edit-save')), findsOneWidget);
+  await captureState('form');
+  await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+  await tester.pumpAndSettle();
+
   await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
+  await captureState('map-tripline-poi');
+  await tester.tap(find.byKey(const ValueKey('fake-google-poi-trigger')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+  await captureState('map-native-google-poi');
+  await tester.tap(find.byKey(const ValueKey('google-poi-close')));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.byKey(const ValueKey('trip-map-day-1')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.byKey(const ValueKey('trip-map-itinerary')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-map-itinerary')));
   await tester.pumpAndSettle();
@@ -288,12 +349,14 @@ Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('trip-title-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('trip-picker-sheet')), findsOneWidget);
+  await captureState('trip-picker');
   await tester.tap(find.text('取消'));
   await tester.pumpAndSettle();
 
   await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  await captureState('account');
   await tester.tap(find.byKey(const ValueKey('settings-appearance')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
@@ -310,6 +373,7 @@ Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
     'device smoke draft',
   );
   expect(find.text('device smoke draft'), findsOneWidget);
+  await captureState('chat');
 
   await tester.tap(_rootTab('行程'));
   await tester.pumpAndSettle();
@@ -325,6 +389,7 @@ Future<void> runAppOwnedReleaseFlow(WidgetTester tester) async {
   await tester.tap(_rootTab('收藏'));
   await tester.pumpAndSettle();
   expect(find.text('美麗海水族館'), findsOneWidget);
+  await captureState('favorites');
   await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
   await tester.pump();
   await tester.enterText(
