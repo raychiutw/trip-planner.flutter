@@ -232,7 +232,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     _poiAccessoryHeight + TpRootTabGeometry.clearance(context) + TpSpacing.s6,
   );
 
-  /// -1 = 行程 action、0 = 總覽、i = 第 i 日（widget.days[i - 1]）。
+  /// -1 = 行程 action、0 = 無行程日 fallback、i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
@@ -253,7 +253,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         ? null
         : initialStops[initialPage].entry.id;
     _pageController = PageController(
-      viewportFraction: 0.72,
+      viewportFraction: 0.80,
       initialPage: initialPage,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -656,11 +656,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                 icon: CupertinoIcons.calendar,
                 isAction: true,
                 key: ValueKey('trip-map-itinerary'),
-              ),
-              const TpScopeOption(
-                value: 0,
-                label: '總覽',
-                key: ValueKey('trip-map-day-overview'),
               ),
               for (final (index, day) in widget.days.indexed)
                 TpScopeOption(

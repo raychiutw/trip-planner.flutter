@@ -363,7 +363,7 @@ void main() {
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
@@ -373,7 +373,7 @@ void main() {
     expect(find.byType(PageView), findsOneWidget);
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.scrollDirection, Axis.horizontal);
-    expect(pageView.controller!.viewportFraction, 0.72);
+    expect(pageView.controller!.viewportFraction, 0.80);
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
       TpBottomAccessory.height,
@@ -435,9 +435,16 @@ void main() {
     );
     final neighbor = find.byKey(const ValueKey('entry-card-12'));
     expect(neighbor, findsOneWidget);
+    final currentRect = tester.getRect(
+      find.byKey(const ValueKey('entry-card-11')),
+    );
     final neighborRect = tester.getRect(neighbor);
     expect(neighborRect.left, lessThan(drawer.right));
     expect(neighborRect.right, greaterThan(drawer.right));
+    expect(
+      (drawer.right - neighborRect.left) / currentRect.width,
+      closeTo(0.25, 0.03),
+    );
 
     expect(
       find.descendant(of: neighbor, matching: find.byType(BackdropFilter)),
@@ -501,15 +508,23 @@ void main() {
     expect(mapConfig?.initialCenter?.longitude, 127.719);
   });
 
-  testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
+  testWidgets('切到 DAY 02：只顯示該日內容且鏡頭維持 zoom 12', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
     TripMapCanvasConfig? mapConfig;
+    var attached = false;
     await tester.pumpWidget(
-      _buildScreen([
-        _dayOne,
-        _dayTwo,
-      ], onMapConfig: (config) => mapConfig = config),
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
     );
     await tester.pumpAndSettle();
+    nativeController.moves.clear();
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
     await tester.pumpAndSettle();
@@ -521,6 +536,10 @@ void main() {
     expect(mapConfig?.initialZoom, 12);
     expect(mapConfig?.initialCenter?.latitude, 26.694);
     expect(mapConfig?.initialCenter?.longitude, 127.878);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.zoom, 12);
+    expect(nativeController.moves.last.point.latitude, 26.694);
+    expect(nativeController.moves.last.point.longitude, 127.878);
   });
 
   testWidgets('地圖的行程選項切回同一天 timeline', (tester) async {
