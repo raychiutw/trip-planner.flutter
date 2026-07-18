@@ -144,6 +144,7 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
 Future<void> closeAppRouteOrSheet(BuildContext context) async {
   final navigator = Navigator.of(context);
   if (await navigator.maybePop()) return;
+  if (!context.mounted) return;
   TpLargeSheetNavigationScope.maybeOf(context)?.onClose();
 }
 
