@@ -51,6 +51,7 @@ void main() {
     List<TripDay>? days,
     InMemoryCacheStore? cacheStore,
     TripMapLocationService? locationService,
+    ValueChanged<TripMapCanvasConfig>? onMapConfig,
   }) {
     return ProviderScope(
       overrides: [
@@ -65,7 +66,10 @@ void main() {
       child: MaterialApp(
         theme: AppTheme.light(),
         home: GlobalMapScreen(
-          mapBuilder: fakeTripMapBuilder,
+          mapBuilder: (config) {
+            onMapConfig?.call(config);
+            return fakeTripMapBuilder(config);
+          },
           locationService: locationService,
         ),
       ),
@@ -87,6 +91,26 @@ void main() {
       find.byKey(const ValueKey('global-trip-map-okinawa')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('根地圖的原生 Google POI 使用同一個底部 accessory', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      buildApp(onMapConfig: (config) => mapConfig = config),
+    );
+    await tester.pumpAndSettle();
+
+    mapConfig!.onGooglePoiSelected!(
+      const GoogleMapPoiSelection(
+        placeId: 'ChIJ-test',
+        name: '清水寺',
+        point: TripMapPoint(34.9948, 135.785),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-bottom-accessory')), findsOneWidget);
   });
 
   testWidgets('切換行程會留在根地圖並更新目前行程', (tester) async {

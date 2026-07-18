@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/features/map/google_maps_external_launcher.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
@@ -133,6 +134,12 @@ final _dayTwo = TripDay(
   ],
 );
 
+const _googlePoi = GoogleMapPoiSelection(
+  placeId: 'ChIJ-test',
+  name: '清水寺',
+  point: TripMapPoint(34.9948, 135.785),
+);
+
 Widget _buildScreen(
   List<TripDay> days, {
   int? initialEntryId,
@@ -147,6 +154,8 @@ Widget _buildScreen(
   ],
   bool withRootTab = false,
   ThemeData? theme,
+  GoogleMapsExternalLauncher externalLauncher =
+      const GoogleMapsExternalLauncher(),
 }) {
   final router = GoRouter(
     routes: [
@@ -161,6 +170,7 @@ Widget _buildScreen(
             return fakeTripMapBuilder(config);
           },
           locationService: locationService,
+          externalLauncher: externalLauncher,
         ),
       ),
       GoRoute(
@@ -216,6 +226,100 @@ Widget _buildScreen(
 }
 
 void main() {
+  testWidgets('Google POI 暫時取代 Tripline accessory 並可關閉還原', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], onMapConfig: (config) => mapConfig = config),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsOneWidget);
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+    expect(find.text('在 Google 地圖開啟'), findsOneWidget);
+    expect(find.byType(PageView), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('google-poi-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+  });
+
+  testWidgets('空白地圖與 Tripline marker 還原原頁且 marker 維持 zoom 12', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    TripMapCanvasConfig? mapConfig;
+    var attached = false;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne],
+        initialEntryId: 13,
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (!attached) {
+            attached = true;
+            config.controller.attach(nativeController);
+          }
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pump();
+    mapConfig!.onTap!(const TripMapPoint(35, 135));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pump();
+    nativeController.moves.clear();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-12')
+        .onTap!();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.zoom, 12);
+  });
+
+  testWidgets('選取 Google POI 不移動鏡頭，外開失敗保留卡片並顯示錯誤', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    TripMapCanvasConfig? mapConfig;
+    var attached = false;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne],
+        externalLauncher: GoogleMapsExternalLauncher(
+          launch: (_, {required mode}) async => false,
+        ),
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (!attached) {
+            attached = true;
+            config.controller.attach(nativeController);
+          }
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    nativeController.moves.clear();
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pumpAndSettle();
+    expect(nativeController.moves, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('google-poi-open')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+    expect(find.text('無法開啟 Google 地圖，請稍後再試'), findsOneWidget);
+  });
+
   testWidgets('白天地圖固定使用深色 status bar 圖示', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
