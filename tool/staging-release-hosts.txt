@@ -1,6 +1,0 @@
-# One exact hostname per line. This file is the reviewed mutation boundary for
-# mobile release contract tests. Add the deployed staging API hostname in a
-# dedicated commit before enabling the release environment.
-
-# Reserved test-only hostname used by favorite_restore_contract_script_test.dart.
-staging.tripline.test

@@ -109,10 +109,29 @@ void main() {
         expect(restoreContract, contains('/api/poi-favorites/'));
         expect(restoreContract, contains('/restore'));
         expect(restoreContract, contains('STAGING_CONTRACT_GUARD'));
-        expect(restoreContract, contains('staging-release-hosts.txt'));
+        expect(restoreContract, contains('staging-release-environments.txt'));
+        expect(restoreContract, contains('/api/environment-identity'));
         expect(restoreContract, contains('--connect-timeout'));
         expect(restoreContract, contains('--max-time'));
         expect(releaseWorkflow, contains('favorite-restore-contract-'));
+        expect(
+          releaseWorkflow,
+          contains(
+            'external_device_gate:\n'
+            '    name: External device release gate\n'
+            '    needs: favorite_restore_contract',
+          ),
+        );
+        expect(
+          'needs: external_device_gate'.allMatches(releaseWorkflow).length,
+          2,
+        );
+        expect(
+          "needs.external_device_gate.result == 'success'"
+              .allMatches(releaseWorkflow)
+              .length,
+          2,
+        );
       },
     );
 

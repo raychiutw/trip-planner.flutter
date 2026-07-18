@@ -14,8 +14,8 @@ if [[ "$STAGING_CONTRACT_GUARD" != 'tripline-staging-favorite-restore-v1' ]]; th
 fi
 
 base_url=${STAGING_API_BASE_URL%/}
-if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)(:[0-9]+)?(/.*)?$ ]]; then
-  echo 'Refusing mutations: STAGING_API_BASE_URL must use HTTPS with a plain hostname.' >&2
+if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)$ ]]; then
+  echo 'Refusing mutations: STAGING_API_BASE_URL must match an exact committed HTTPS origin without a port or path.' >&2
   exit 2
 fi
 canonical_host() {
@@ -24,6 +24,7 @@ canonical_host() {
   printf '%s' "${host%.}"
 }
 staging_host=$(canonical_host "${BASH_REMATCH[1]}")
+readonly staging_origin="https://$staging_host"
 readonly production_hosts=(
   'trip-planner-dby.pages.dev'
 )
@@ -35,27 +36,37 @@ for production_host in "${production_hosts[@]}"; do
 done
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-readonly staging_hosts_file="$script_dir/staging-release-hosts.txt"
-if [[ ! -r "$staging_hosts_file" ]]; then
-  echo 'Refusing mutations: committed staging host allowlist is missing.' >&2
+readonly staging_environments_file="$script_dir/staging-release-environments.txt"
+if [[ ! -r "$staging_environments_file" ]]; then
+  echo 'Refusing mutations: committed staging environment allowlist is missing.' >&2
   exit 2
 fi
-host_is_committed=false
-while IFS= read -r candidate || [[ -n "$candidate" ]]; do
-  candidate=${candidate%%#*}
-  candidate=$(printf '%s' "$candidate" | tr -d '[:space:]')
-  [[ -z "$candidate" ]] && continue
-  if [[ ! "$candidate" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    echo 'Refusing mutations: committed staging host allowlist is invalid.' >&2
+expected_environment_id=''
+while IFS= read -r line || [[ -n "$line" ]]; do
+  line=${line%%#*}
+  [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+  if [[ ! "$line" =~ ^[[:space:]]*https://([A-Za-z0-9.-]+)[[:space:]]+([A-Za-z0-9._-]+)[[:space:]]*$ ]]; then
+    echo 'Refusing mutations: committed staging environment allowlist is invalid.' >&2
     exit 2
   fi
-  if [[ "$staging_host" == "$(canonical_host "$candidate")" ]]; then
-    host_is_committed=true
-    break
+  candidate_host=$(canonical_host "${BASH_REMATCH[1]}")
+  candidate_environment_id=${BASH_REMATCH[2]}
+  for production_host in "${production_hosts[@]}"; do
+    if [[ "$candidate_host" == "$production_host" ]]; then
+      echo 'Refusing mutations: committed staging environment contains a production hostname.' >&2
+      exit 2
+    fi
+  done
+  if [[ "$staging_origin" == "https://$candidate_host" ]]; then
+    if [[ -n "$expected_environment_id" ]]; then
+      echo 'Refusing mutations: committed staging origin is duplicated.' >&2
+      exit 2
+    fi
+    expected_environment_id=$candidate_environment_id
   fi
-done < "$staging_hosts_file"
-if [[ "$host_is_committed" != true ]]; then
-  echo 'Refusing mutations: API hostname is not in the committed staging host allowlist.' >&2
+done < "$staging_environments_file"
+if [[ -z "$expected_environment_id" ]]; then
+  echo 'Refusing mutations: API origin is not in the committed staging environment allowlist.' >&2
   exit 2
 fi
 
@@ -100,9 +111,24 @@ cleanup() {
       "$STAGING_SESSION_COOKIE" "${STAGING_CSRF_TOKEN:-}" \
       "$tmp_dir/cleanup.json" >/dev/null || true
   fi
-  rm -rf "$tmp_dir"
+  rm -r -- "$tmp_dir"
 }
 trap cleanup EXIT
+
+# Verify backend identity before any create/delete/restore request. This catches
+# a reviewed staging hostname whose DNS or proxy route drifts to production.
+status=$(request GET /api/environment-identity "$STAGING_SESSION_COOKIE" '' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$status" != 200 ]]; then
+  echo "Staging environment identity check failed with HTTP $status." >&2
+  exit 2
+fi
+actual_environment_id=$(jq -r '.environmentId // empty' \
+  "$tmp_dir/environment-identity.json")
+if [[ "$actual_environment_id" != "$expected_environment_id" ]]; then
+  echo 'Refusing mutations: backend environment identity does not match the committed staging environment.' >&2
+  exit 2
+fi
 
 # Recover safely from a previous interrupted smoke that left the fixture active.
 status=$(request GET /api/poi-favorites "$STAGING_SESSION_COOKIE" '' \
