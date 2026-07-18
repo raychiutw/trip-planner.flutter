@@ -678,18 +678,17 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
     await tester.pumpAndSettle();
-    final sheet = find.byKey(const ValueKey('app-large-sheet'));
-    expect(sheet, findsOneWidget);
-    expect(find.text('切換行程'), findsOneWidget);
-    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
-      findsOneWidget,
+    final sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
     );
+    expect(find.text('切換行程'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
     expect(find.byType(TabBar), findsNothing);
-    final screenHeight =
-        tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    expect(tester.getSize(sheet).height, closeTo(screenHeight * 0.93, 1));
+    expect(sheet.initialState, GlassSheetState.full);
+    expect(sheet.halfSize, 0.62);
+    expect(sheet.fullSize, 0.93);
+    expect(sheet.showDragIndicator, isTrue);
 
     await tester.tap(find.byKey(const ValueKey('trip-picker-item-trip-2')));
     await tester.pumpAndSettle();

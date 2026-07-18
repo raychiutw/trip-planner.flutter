@@ -428,6 +428,9 @@ Future<bool?> showAppFormSheet(
   required String submitLabel,
   required AppSheetFormController controller,
   required WidgetBuilder builder,
+  Key? submitKey,
+  Key? titleKey,
+  Key? cancelKey,
 }) {
   return _showAppSheet<bool>(
     context: context,
@@ -436,6 +439,7 @@ Future<bool?> showAppFormSheet(
     largeSize: 0.93,
     resizable: true,
     canDismiss: () async {
+      if (controller.isSubmitting) return false;
       if (!controller.isDirty) return true;
       return showAppConfirm(
         context,
@@ -453,11 +457,16 @@ Future<bool?> showAppFormSheet(
           children: [
             TpSheetHeader(
               title: title,
+              titleKey: titleKey,
               leading: TpToolbarTextButton(
+                key: cancelKey,
                 label: '取消',
-                onPressed: () => unawaited(close()),
+                onPressed: controller.isSubmitting
+                    ? null
+                    : () => unawaited(close()),
               ),
               trailing: TpToolbarTextButton(
+                key: submitKey,
                 label: submitLabel,
                 onPressed: controller.canSubmit
                     ? () async {

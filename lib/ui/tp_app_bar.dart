@@ -195,11 +195,13 @@ class TpSheetHeader extends StatelessWidget {
   const TpSheetHeader({
     super.key,
     required this.title,
+    this.titleKey,
     this.leading,
     this.trailing,
   });
 
   final String title;
+  final Key? titleKey;
   final Widget? leading;
   final Widget? trailing;
 
@@ -214,6 +216,7 @@ class TpSheetHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 88),
             child: Text(
               title,
+              key: titleKey,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(

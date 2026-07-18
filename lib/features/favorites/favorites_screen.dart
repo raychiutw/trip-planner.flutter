@@ -251,111 +251,34 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     Map<String, int> regionCounts,
     List<String> regionOptions,
   ) async {
-    var pendingType = _typeFilter;
-    var pendingRegion = _regionFilter;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                TpSpacing.s4,
-                0,
-                TpSpacing.s4,
-                MediaQuery.viewInsetsOf(context).bottom + TpSpacing.s4,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('篩選收藏', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: TpSpacing.s4),
-                    Text('類型', style: Theme.of(context).textTheme.labelLarge),
-                    const SizedBox(height: TpSpacing.s2),
-                    Wrap(
-                      spacing: TpSpacing.s2,
-                      runSpacing: TpSpacing.s2,
-                      children: [
-                        for (final option in _typeFilterOptions)
-                          FilterChip(
-                            key: ValueKey('favorites-type-${option.key}'),
-                            label: Text(option.label),
-                            selected: pendingType == option.key,
-                            onSelected: (_) =>
-                                setSheetState(() => pendingType = option.key),
-                          ),
-                      ],
-                    ),
-                    if (regionOptions.isNotEmpty) ...[
-                      const SizedBox(height: TpSpacing.s5),
-                      Text('地區', style: Theme.of(context).textTheme.labelLarge),
-                      const SizedBox(height: TpSpacing.s2),
-                      Wrap(
-                        spacing: TpSpacing.s2,
-                        runSpacing: TpSpacing.s2,
-                        children: [
-                          FilterChip(
-                            key: const ValueKey('favorites-region-all'),
-                            label: Text('全部 ${regionCounts['all'] ?? 0}'),
-                            selected: pendingRegion == 'all',
-                            onSelected: (_) =>
-                                setSheetState(() => pendingRegion = 'all'),
-                          ),
-                          for (final region in regionOptions)
-                            FilterChip(
-                              key: ValueKey('favorites-region-$region'),
-                              label: Text(
-                                '$region ${regionCounts[region] ?? 0}',
-                              ),
-                              selected: pendingRegion == region,
-                              onSelected: (_) =>
-                                  setSheetState(() => pendingRegion = region),
-                            ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: TpSpacing.s5),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            key: const ValueKey('favorites-filter-reset'),
-                            onPressed: () => setSheetState(() {
-                              pendingType = 'all';
-                              pendingRegion = 'all';
-                            }),
-                            child: const Text('重設'),
-                          ),
-                        ),
-                        const SizedBox(width: TpSpacing.s3),
-                        Expanded(
-                          child: FilledButton(
-                            key: const ValueKey('favorites-filter-apply'),
-                            onPressed: () {
-                              setState(() {
-                                _typeFilter = pendingType;
-                                _regionFilter = pendingRegion;
-                                _page = 1;
-                              });
-                              Navigator.of(sheetContext).pop();
-                            },
-                            child: const Text('套用'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
+    final controller = AppSheetFormController();
+    try {
+      await showAppFormSheet(
+        context,
+        title: '篩選收藏',
+        submitLabel: '套用',
+        submitKey: const ValueKey('favorites-filter-apply'),
+        controller: controller,
+        builder: (_) => _FavoritesFilterForm(
+          controller: controller,
+          initialType: _typeFilter,
+          initialRegion: _regionFilter,
+          regionCounts: regionCounts,
+          regionOptions: regionOptions,
+          onApply: (type, region) async {
+            if (!mounted) return false;
+            setState(() {
+              _typeFilter = type;
+              _regionFilter = region;
+              _page = 1;
+            });
+            return true;
+          },
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _showFavoriteActions(
@@ -515,6 +438,123 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       if (!context.mounted) return;
       showAppNotice(context, '取消收藏失敗，請稍後再試');
     }
+  }
+}
+
+class _FavoritesFilterForm extends StatefulWidget {
+  const _FavoritesFilterForm({
+    required this.controller,
+    required this.initialType,
+    required this.initialRegion,
+    required this.regionCounts,
+    required this.regionOptions,
+    required this.onApply,
+  });
+
+  final AppSheetFormController controller;
+  final String initialType;
+  final String initialRegion;
+  final Map<String, int> regionCounts;
+  final List<String> regionOptions;
+  final Future<bool> Function(String type, String region) onApply;
+
+  @override
+  State<_FavoritesFilterForm> createState() => _FavoritesFilterFormState();
+}
+
+class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
+  late String _pendingType;
+  late String _pendingRegion;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingType = widget.initialType;
+    _pendingRegion = widget.initialRegion;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.controller.attach(_apply);
+      _syncFormState();
+    });
+  }
+
+  Future<bool> _apply() => widget.onApply(_pendingType, _pendingRegion);
+
+  void _syncFormState() {
+    widget.controller.update(
+      dirty:
+          _pendingType != widget.initialType ||
+          _pendingRegion != widget.initialRegion,
+      canSubmit: true,
+    );
+  }
+
+  void _select({String? type, String? region}) {
+    setState(() {
+      _pendingType = type ?? _pendingType;
+      _pendingRegion = region ?? _pendingRegion;
+    });
+    _syncFormState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        children: [
+          Text('類型', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: TpSpacing.s2),
+          Wrap(
+            spacing: TpSpacing.s2,
+            runSpacing: TpSpacing.s2,
+            children: [
+              for (final option in _typeFilterOptions)
+                FilterChip(
+                  key: ValueKey('favorites-type-${option.key}'),
+                  label: Text(option.label),
+                  selected: _pendingType == option.key,
+                  onSelected: (_) => _select(type: option.key),
+                ),
+            ],
+          ),
+          if (widget.regionOptions.isNotEmpty) ...[
+            const SizedBox(height: TpSpacing.s5),
+            Text('地區', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: TpSpacing.s2),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s2,
+              children: [
+                FilterChip(
+                  key: const ValueKey('favorites-region-all'),
+                  label: Text('全部 ${widget.regionCounts['all'] ?? 0}'),
+                  selected: _pendingRegion == 'all',
+                  onSelected: (_) => _select(region: 'all'),
+                ),
+                for (final region in widget.regionOptions)
+                  FilterChip(
+                    key: ValueKey('favorites-region-$region'),
+                    label: Text('$region ${widget.regionCounts[region] ?? 0}'),
+                    selected: _pendingRegion == region,
+                    onSelected: (_) => _select(region: region),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: TpSpacing.s5),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const ValueKey('favorites-filter-reset'),
+              onPressed: () => _select(type: 'all', region: 'all'),
+              child: const Text('重設'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

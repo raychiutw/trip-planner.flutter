@@ -1,5 +1,4 @@
-/// 衝突解決 bottom sheet:逐筆同步衝突讓使用者二選一(保留你的 / 用對方的)。
-/// 真相源是持久化 conflict store(syncConflictRecordsProvider);解完反應式更新。
+/// 衝突解決表單：先逐筆選擇保留版本，再一次套用。
 library;
 
 import 'package:flutter/material.dart';
@@ -12,17 +11,27 @@ import '../../theme/tokens.dart';
 import '../trip_detail/trip_providers.dart';
 import 'offline_sync.dart';
 
-/// 開啟衝突解決 bottom sheet。
-Future<void> showConflictResolveSheet(BuildContext context, WidgetRef ref) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (_) => const _ConflictResolveSheet(),
-  );
+enum _ConflictChoice { ours, theirs }
+
+Future<void> showConflictResolveSheet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final controller = AppSheetFormController();
+  try {
+    await showAppFormSheet(
+      context,
+      title: '同步衝突',
+      submitLabel: '套用所選版本',
+      submitKey: const ValueKey('conflict-apply'),
+      controller: controller,
+      builder: (_) => _ConflictResolveForm(controller: controller),
+    );
+  } finally {
+    controller.dispose();
+  }
 }
 
-/// 解完衝突後讓行程相關讀取重跑,套用 server 真相(對齊 offline_sync.dart 清單)。
 void _invalidateTripFamilies(WidgetRef ref) {
   ref.invalidate(tripDetailProvider);
   ref.invalidate(tripDaysProvider);
@@ -31,7 +40,6 @@ void _invalidateTripFamilies(WidgetRef ref) {
   ref.invalidate(entryDetailProvider);
 }
 
-/// 衝突欄位 → 人話標籤;未列的原樣顯示。
 String _fieldLabel(String field) {
   switch (field) {
     case 'title':
@@ -47,13 +55,12 @@ String _fieldLabel(String field) {
   }
 }
 
-/// 衝突卡標題:優先用 args/ours 的 title;否則退回 type/path 摘要。
-String _conflictTitle(ConflictRecord c) {
-  final argTitle = c.args['title'];
+String _conflictTitle(ConflictRecord conflict) {
+  final argTitle = conflict.args['title'];
   if (argTitle is String && argTitle.isNotEmpty) return argTitle;
-  final oursTitle = c.ours['title'];
+  final oursTitle = conflict.ours['title'];
   if (oursTitle is String && oursTitle.isNotEmpty) return oursTitle;
-  return '${c.type} · ${c.path}';
+  return '${conflict.type} · ${conflict.path}';
 }
 
 String _displayValue(Object? value) {
@@ -62,95 +69,120 @@ String _displayValue(Object? value) {
   return text.isEmpty ? '(空)' : text;
 }
 
-class _ConflictResolveSheet extends ConsumerWidget {
-  const _ConflictResolveSheet();
+class _ConflictResolveForm extends ConsumerStatefulWidget {
+  const _ConflictResolveForm({required this.controller});
+
+  final AppSheetFormController controller;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final conflicts = ref.watch(syncConflictRecordsProvider).value ?? [];
+  ConsumerState<_ConflictResolveForm> createState() =>
+      _ConflictResolveFormState();
+}
 
-    // 清單空(已全解決)→ 關閉 sheet。
-    if (conflicts.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
-      });
-      return Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Text(
-          '沒有待解決衝突',
-          key: const ValueKey('conflict-empty'),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      );
+class _ConflictResolveFormState extends ConsumerState<_ConflictResolveForm> {
+  final Map<String, _ConflictChoice> _choices = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.controller.attach(_apply);
+      _syncFormState();
+    });
+  }
+
+  void _syncFormState() {
+    widget.controller.update(
+      dirty: _choices.isNotEmpty,
+      canSubmit: _choices.isNotEmpty,
+    );
+  }
+
+  void _select(String id, _ConflictChoice choice) {
+    setState(() => _choices[id] = choice);
+    _syncFormState();
+  }
+
+  Future<bool> _apply() async {
+    final conflicts = ref.read(syncConflictRecordsProvider).value ?? const [];
+    try {
+      for (final conflict in conflicts) {
+        switch (_choices[conflict.id]) {
+          case _ConflictChoice.ours:
+            await ref.read(apiClientProvider).resolveConflictKeepOurs(conflict);
+          case _ConflictChoice.theirs:
+            await ref
+                .read(apiClientProvider)
+                .resolveConflictKeepTheirs(conflict);
+          case null:
+            continue;
+        }
+      }
+      _invalidateTripFamilies(ref);
+      return true;
+    } on Exception {
+      if (mounted) showAppNotice(context, '仍離線，稍後重試');
+      return false;
     }
+  }
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          0,
-          TpSpacing.s4,
-          TpSpacing.s4,
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final conflicts = ref.watch(syncConflictRecordsProvider).value ?? const [];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s4,
+        TpSpacing.s2,
+        TpSpacing.s4,
+        TpSpacing.s4,
+      ),
+      children: [
+        Text(
+          '這些變更與雲端版本不一致，請逐筆選擇要保留的版本。',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('同步衝突', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: TpSpacing.s1),
-            Text(
-              '這些變更與雲端版本不一致,請逐筆選擇要保留的版本。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: conflicts.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: TpSpacing.s3),
-                itemBuilder: (_, i) => _ConflictCard(conflict: conflicts[i]),
-              ),
+        const SizedBox(height: TpSpacing.s4),
+        if (conflicts.isEmpty)
+          Text(
+            '沒有待解決衝突',
+            key: const ValueKey('conflict-empty'),
+            style: Theme.of(context).textTheme.bodyMedium,
+          )
+        else
+          for (var index = 0; index < conflicts.length; index++) ...[
+            if (index > 0) const SizedBox(height: TpSpacing.s3),
+            _ConflictCard(
+              conflict: conflicts[index],
+              choice: _choices[conflicts[index].id],
+              onSelected: (choice) => _select(conflicts[index].id, choice),
             ),
           ],
-        ),
-      ),
+      ],
     );
   }
 }
 
-class _ConflictCard extends ConsumerWidget {
-  const _ConflictCard({required this.conflict});
+class _ConflictCard extends StatelessWidget {
+  const _ConflictCard({
+    required this.conflict,
+    required this.choice,
+    required this.onSelected,
+  });
 
   final ConflictRecord conflict;
-
-  Future<void> _keepOurs(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(apiClientProvider).resolveConflictKeepOurs(conflict);
-      _invalidateTripFamilies(ref);
-    } on Exception {
-      if (context.mounted) {
-        showAppNotice(context, '仍離線,稍後重試');
-      }
-    }
-  }
-
-  Future<void> _keepTheirs(BuildContext context, WidgetRef ref) async {
-    await ref.read(apiClientProvider).resolveConflictKeepTheirs(conflict);
-    _invalidateTripFamilies(ref);
-  }
+  final _ConflictChoice? choice;
+  final ValueChanged<_ConflictChoice> onSelected;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final c = conflict;
-
+    final conflict = this.conflict;
     return Card(
-      key: ValueKey('conflict-card-${c.id}'),
+      key: ValueKey('conflict-card-${conflict.id}'),
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(TpSpacing.s4),
@@ -158,11 +190,11 @@ class _ConflictCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _conflictTitle(c),
+              _conflictTitle(conflict),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: TpSpacing.s3),
-            for (final field in c.conflictFields) ...[
+            for (final field in conflict.conflictFields) ...[
               Text(
                 _fieldLabel(field),
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -176,14 +208,14 @@ class _ConflictCard extends ConsumerWidget {
                   Expanded(
                     child: _SideValue(
                       label: '你的',
-                      value: _displayValue(c.ours[field]),
+                      value: _displayValue(conflict.ours[field]),
                     ),
                   ),
                   const SizedBox(width: TpSpacing.s2),
                   Expanded(
                     child: _SideValue(
                       label: '對方',
-                      value: _displayValue(c.theirs[field]),
+                      value: _displayValue(conflict.theirs[field]),
                     ),
                   ),
                 ],
@@ -193,17 +225,29 @@ class _ConflictCard extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
-                  key: ValueKey('conflict-keep-theirs-${c.id}'),
-                  onPressed: () => _keepTheirs(context, ref),
-                  child: const Text('用對方的'),
-                ),
+                choice == _ConflictChoice.theirs
+                    ? FilledButton(
+                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
+                        onPressed: () => onSelected(_ConflictChoice.theirs),
+                        child: const Text('用對方的'),
+                      )
+                    : OutlinedButton(
+                        key: ValueKey('conflict-keep-theirs-${conflict.id}'),
+                        onPressed: () => onSelected(_ConflictChoice.theirs),
+                        child: const Text('用對方的'),
+                      ),
                 const SizedBox(width: TpSpacing.s2),
-                FilledButton(
-                  key: ValueKey('conflict-keep-ours-${c.id}'),
-                  onPressed: () => _keepOurs(context, ref),
-                  child: const Text('保留你的'),
-                ),
+                choice == _ConflictChoice.ours
+                    ? FilledButton(
+                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
+                        onPressed: () => onSelected(_ConflictChoice.ours),
+                        child: const Text('保留你的'),
+                      )
+                    : OutlinedButton(
+                        key: ValueKey('conflict-keep-ours-${conflict.id}'),
+                        onPressed: () => onSelected(_ConflictChoice.ours),
+                        child: const Text('保留你的'),
+                      ),
               ],
             ),
           ],
@@ -213,7 +257,6 @@ class _ConflictCard extends ConsumerWidget {
   }
 }
 
-/// 單側(你的 / 對方)欄位值,弱化標籤 + 值。
 class _SideValue extends StatelessWidget {
   const _SideValue({required this.label, required this.value});
 

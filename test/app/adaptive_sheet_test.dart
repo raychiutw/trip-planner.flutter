@@ -75,4 +75,40 @@ void main() {
     expect(sheet.fullSize, 0.93);
     expect(sheet.showDragIndicator, isFalse);
   });
+
+  testWidgets('dirty form asks before Cancel and stays open when kept', (
+    tester,
+  ) async {
+    final controller = AppSheetFormController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯停留點',
+              submitLabel: '儲存',
+              controller: controller,
+              builder: (_) => TextField(
+                onChanged: (_) =>
+                    controller.update(dirty: true, canSubmit: true),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '京都');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(find.text('編輯停留點'), findsOneWidget);
+  });
 }

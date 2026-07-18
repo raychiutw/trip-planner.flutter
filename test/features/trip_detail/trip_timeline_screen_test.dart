@@ -1429,7 +1429,12 @@ void main() {
     await tester.pump();
     expect(
       tester
-          .widget<FilledButton>(find.byKey(const ValueKey('travel-submit')))
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('travel-submit')),
+              matching: find.byType(TextButton),
+            ),
+          )
           .onPressed,
       isNotNull,
     );

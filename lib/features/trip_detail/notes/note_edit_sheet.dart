@@ -21,24 +21,29 @@ Future<void> showNoteEditSheet(
   Map<String, dynamic>? initialFields,
   int? rowId,
   int? version,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-      ),
-      child: NoteEditSheet(
+}) async {
+  final controller = AppSheetFormController();
+  final isEdit = rowId != null;
+  final title = noteSectionTitles[section] ?? '筆記';
+  try {
+    await showAppFormSheet(
+      context,
+      title: isEdit ? '編輯$title' : '新增$title',
+      submitLabel: isEdit ? '儲存' : '新增',
+      submitKey: const ValueKey('note-edit-submit'),
+      controller: controller,
+      builder: (_) => NoteEditSheet(
         tripId: tripId,
         section: section,
         initialFields: initialFields,
         rowId: rowId,
         version: version,
+        formController: controller,
       ),
-    ),
-  );
+    );
+  } finally {
+    controller.dispose();
+  }
 }
 
 /// spec-driven 筆記表單：依 noteSectionSpecs[section] 渲染欄位,5 區共用一個 widget。
@@ -50,6 +55,7 @@ class NoteEditSheet extends ConsumerStatefulWidget {
     this.initialFields,
     this.rowId,
     this.version,
+    this.formController,
   });
 
   final String tripId;
@@ -57,6 +63,7 @@ class NoteEditSheet extends ConsumerStatefulWidget {
   final Map<String, dynamic>? initialFields;
   final int? rowId;
   final int? version;
+  final AppSheetFormController? formController;
 
   bool get isEdit => rowId != null;
 
@@ -70,6 +77,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
   final Map<String, String> _enums = {};
   final Map<String, String> _dts = {};
   bool _submitting = false;
+  bool _dirty = false;
 
   @override
   void initState() {
@@ -87,13 +95,30 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         case NoteFieldType.multiline:
         case NoteFieldType.integer:
           final controller = TextEditingController(text: initial);
-          if (spec.required) controller.addListener(_onRequiredChanged);
+          controller.addListener(_markChanged);
           _ctrls[spec.key] = controller;
       }
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.formController?.attach(_submitForSheet);
+      _syncFormState();
+    });
   }
 
-  void _onRequiredChanged() => setState(() {});
+  void _markChanged() {
+    _dirty = true;
+    setState(() {});
+    _syncFormState();
+  }
+
+  void _syncFormState() {
+    widget.formController?.update(
+      dirty: _dirty,
+      canSubmit: _canSubmit,
+      submitting: _submitting,
+    );
+  }
 
   /// 各區主要識別欄位（required）需非空才可送出,避免建立全空 row。
   bool get _canSubmit {
@@ -132,10 +157,9 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
           : TimeOfDay(hour: current.hour, minute: current.minute),
     );
     if (time == null) return;
-    setState(
-      () => _dts[key] =
-          '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}T${_pad2(time.hour)}:${_pad2(time.minute)}',
-    );
+    _dts[key] =
+        '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}T${_pad2(time.hour)}:${_pad2(time.minute)}';
+    _markChanged();
   }
 
   Map<String, dynamic> _collect() {
@@ -156,9 +180,18 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
     return out;
   }
 
-  Future<void> _submit() async {
+  Future<bool> _submitForSheet() => _save();
+
+  Future<void> _submitLegacy() async {
+    final saved = await _save();
+    if (!saved || !mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<bool> _save() async {
     final fields = _collect();
     setState(() => _submitting = true);
+    _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
     try {
       if (widget.isEdit) {
@@ -177,24 +210,32 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         );
       }
       ref.invalidate(tripNotesProvider(widget.tripId));
-      if (!mounted) return;
+      if (!mounted) return false;
       HapticFeedback.lightImpact();
-      Navigator.of(context).pop();
+      _dirty = false;
+      _submitting = false;
+      _syncFormState();
       showAppNotice(context, widget.isEdit ? '已儲存' : '已新增');
+      return true;
     } on ApiError catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       if (error.status == 409) {
         ref.invalidate(tripNotesProvider(widget.tripId));
-        Navigator.of(context).pop();
         showAppError(context, '此筆記已更新，請重新編輯');
-        return;
+        setState(() => _submitting = false);
+        _syncFormState();
+        return false;
       }
       setState(() => _submitting = false);
+      _syncFormState();
       showAppError(context, '儲存失敗，請稍後再試');
+      return false;
     } on Exception {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _submitting = false);
+      _syncFormState();
       showAppError(context, '儲存失敗，請稍後再試');
+      return false;
     }
   }
 
@@ -209,23 +250,27 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                widget.isEdit ? '編輯$title' : '新增$title',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: TpSpacing.s4),
+              if (widget.formController == null) ...[
+                Text(
+                  widget.isEdit ? '編輯$title' : '新增$title',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: TpSpacing.s4),
+              ],
               for (final spec in _specs) ...[
                 _field(spec),
                 const SizedBox(height: TpSpacing.s3),
               ],
-              const SizedBox(height: TpSpacing.s2),
-              FilledButton(
-                key: const ValueKey('note-edit-submit'),
-                onPressed: _canSubmit ? _submit : null,
-                child: Text(
-                  _submitting ? '處理中…' : (widget.isEdit ? '儲存' : '新增'),
+              if (widget.formController == null) ...[
+                const SizedBox(height: TpSpacing.s2),
+                FilledButton(
+                  key: const ValueKey('note-edit-submit'),
+                  onPressed: _canSubmit ? _submitLegacy : null,
+                  child: Text(
+                    _submitting ? '處理中…' : (widget.isEdit ? '儲存' : '新增'),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -272,7 +317,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                     key: ValueKey('note-enum-${spec.key}-$value'),
                     label: Text(label),
                     selected: _enums[spec.key] == value,
-                    onSelected: (_) => setState(() => _enums[spec.key] = value),
+                    onSelected: (_) {
+                      _enums[spec.key] = value;
+                      _markChanged();
+                    },
                   ),
               ],
             ),
@@ -297,7 +345,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                 key: ValueKey('note-datetime-clear-${spec.key}'),
                 tooltip: '清除',
                 icon: const Icon(CupertinoIcons.xmark, size: 18),
-                onPressed: () => setState(() => _dts[spec.key] = ''),
+                onPressed: () {
+                  _dts[spec.key] = '';
+                  _markChanged();
+                },
               ),
           ],
         );

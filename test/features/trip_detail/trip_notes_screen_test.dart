@@ -292,7 +292,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('note-edit-submit')), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '新增'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '新增'), findsOneWidget);
   });
 
   testWidgets('flight row 有 drag handle', (tester) async {

@@ -22,20 +22,20 @@ Future<void> showTravelEditSheet(
   int? initialMin,
   String? initialSource,
   bool initialNoTravel = false,
-}) {
+}) async {
   assert(
     segment != null || (fromEntryId != null && toEntryId != null),
     'Missing segment creation requires fromEntryId and toEntryId.',
   );
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-      ),
-      child: TravelEditSheet(
+  final controller = AppSheetFormController();
+  try {
+    await showAppFormSheet(
+      context,
+      title: '交通方式',
+      submitLabel: '儲存',
+      submitKey: const ValueKey('travel-submit'),
+      controller: controller,
+      builder: (_) => TravelEditSheet(
         tripId: tripId,
         segment: segment,
         fromEntryId: fromEntryId,
@@ -45,9 +45,12 @@ Future<void> showTravelEditSheet(
         initialMin: initialMin,
         initialSource: initialSource,
         initialNoTravel: initialNoTravel,
+        formController: controller,
       ),
-    ),
-  );
+    );
+  } finally {
+    controller.dispose();
+  }
 }
 
 /// 交通方式編輯：固定方式可自動估算並覆寫分鐘；「其他」需填 1–1440 分鐘。
@@ -64,6 +67,7 @@ class TravelEditSheet extends ConsumerStatefulWidget {
     this.initialMin,
     this.initialSource,
     this.initialNoTravel = false,
+    this.formController,
   }) : assert(
          segment != null || (fromEntryId != null && toEntryId != null),
          'Missing segment creation requires fromEntryId and toEntryId.',
@@ -78,6 +82,7 @@ class TravelEditSheet extends ConsumerStatefulWidget {
   final int? initialMin;
   final String? initialSource;
   final bool initialNoTravel;
+  final AppSheetFormController? formController;
 
   @override
   ConsumerState<TravelEditSheet> createState() => _TravelEditSheetState();
@@ -92,6 +97,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   late final TextEditingController _other;
   late bool _noTravel;
   bool _submitting = false;
+  bool _dirty = false;
 
   @override
   void initState() {
@@ -116,8 +122,13 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
           ? (submode?.trim().isNotEmpty == true ? submode!.trim() : '大眾運輸')
           : '大眾運輸',
     );
-    _min.addListener(() => setState(() {}));
-    _other.addListener(() => setState(() {}));
+    _min.addListener(_markChanged);
+    _other.addListener(_markChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.formController?.attach(_submitForSheet);
+      _syncFormState();
+    });
   }
 
   @override
@@ -147,12 +158,25 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     return _minuteIsValid;
   }
 
+  void _markChanged() {
+    _dirty = true;
+    setState(() {});
+    _syncFormState();
+  }
+
+  void _syncFormState() {
+    widget.formController?.update(
+      dirty: _dirty,
+      canSubmit: _canSubmit,
+      submitting: _submitting,
+    );
+  }
+
   void _selectMethod(TravelMethodOption option) {
     final changed = _methodKey != option.key;
-    setState(() {
-      _noTravel = false;
-      _methodKey = option.key;
-    });
+    _noTravel = false;
+    _methodKey = option.key;
+    _markChanged();
     if (!changed) return;
     if (option.automatic &&
         option.key == _initialMethodKey &&
@@ -163,11 +187,20 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     }
   }
 
-  Future<void> _submit() async {
+  Future<bool> _submitForSheet() => _save();
+
+  Future<void> _submitLegacy() async {
+    final saved = await _save();
+    if (!saved || !mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<bool> _save() async {
     final min = _min.text.trim().isEmpty ? null : _minuteValue;
     final option = _selected;
     final submode = _methodKey == 'other' ? _other.text.trim() : option.submode;
     setState(() => _submitting = true);
+    _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
     try {
       final segment = widget.segment;
@@ -200,24 +233,32 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
       }
       ref.invalidate(tripDaysProvider(widget.tripId));
       ref.invalidate(tripSegmentsProvider(widget.tripId));
-      if (!mounted) return;
+      if (!mounted) return false;
       HapticFeedback.lightImpact();
-      Navigator.of(context).pop();
+      _dirty = false;
+      _submitting = false;
+      _syncFormState();
       showAppNotice(context, '已更新交通');
+      return true;
     } on ApiError catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       if (error.status == 409) {
         ref.invalidate(tripSegmentsProvider(widget.tripId));
-        Navigator.of(context).pop();
         showAppError(context, '交通已更新，已重新載入');
-        return;
+        setState(() => _submitting = false);
+        _syncFormState();
+        return false;
       }
       setState(() => _submitting = false);
+      _syncFormState();
       showAppError(context, '更新失敗，請稍後再試');
+      return false;
     } on Exception {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _submitting = false);
+      _syncFormState();
       showAppError(context, '更新失敗，請稍後再試');
+      return false;
     }
   }
 
@@ -232,8 +273,10 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('交通方式', style: theme.textTheme.titleLarge),
-              const SizedBox(height: TpSpacing.s4),
+              if (widget.formController == null) ...[
+                Text('交通方式', style: theme.textTheme.titleLarge),
+                const SizedBox(height: TpSpacing.s4),
+              ],
               Wrap(
                 spacing: TpSpacing.s2,
                 runSpacing: TpSpacing.s2,
@@ -253,7 +296,10 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
                     key: const ValueKey('travel-mode-no-travel'),
                     label: const Text('不需計算路程'),
                     selected: _noTravel,
-                    onSelected: (_) => setState(() => _noTravel = true),
+                    onSelected: (_) {
+                      _noTravel = true;
+                      _markChanged();
+                    },
                   ),
                 ],
               ),
@@ -298,12 +344,14 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-              const SizedBox(height: TpSpacing.s5),
-              FilledButton(
-                key: const ValueKey('travel-submit'),
-                onPressed: _canSubmit ? _submit : null,
-                child: Text(_submitting ? '更新中…' : '儲存'),
-              ),
+              if (widget.formController == null) ...[
+                const SizedBox(height: TpSpacing.s5),
+                FilledButton(
+                  key: const ValueKey('travel-submit'),
+                  onPressed: _canSubmit ? _submitLegacy : null,
+                  child: Text(_submitting ? '更新中…' : '儲存'),
+                ),
+              ],
             ],
           ),
         ),
