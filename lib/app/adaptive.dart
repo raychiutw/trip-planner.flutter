@@ -724,6 +724,7 @@ class AppSearchField extends StatefulWidget {
     this.onSubmitted,
     this.autofocus = false,
     this.enabled = true,
+    this.embedded = false,
   });
 
   /// 掛在底層 TextField/CupertinoSearchTextField 上的 key(供測試定位)。
@@ -734,6 +735,7 @@ class AppSearchField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final bool autofocus;
   final bool enabled;
+  final bool embedded;
 
   @override
   State<AppSearchField> createState() => _AppSearchFieldState();
@@ -777,6 +779,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
         onSubmitted: widget.onSubmitted,
         autofocus: widget.autofocus,
         enabled: widget.enabled,
+        backgroundColor: widget.embedded ? Colors.transparent : null,
       );
     }
 
@@ -798,7 +801,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
                 icon: const Icon(CupertinoIcons.clear),
                 onPressed: _clear,
               ),
-        border: const OutlineInputBorder(),
+        border: widget.embedded ? InputBorder.none : const OutlineInputBorder(),
       ),
     );
   }
@@ -837,6 +840,34 @@ void showAppNotice(BuildContext context, String message) {
     ),
   );
   overlay.insert(entry);
+}
+
+/// 顯示可復原的單一動作通知。
+///
+/// Undo 必須在使用者仍可看到原畫面時立即操作，因此所有平台都使用固定在
+/// Root tab 上方的浮動 SnackBar，而不使用無 action 的 iOS 頂部橫幅。
+void showAppUndoNotice(
+  BuildContext context, {
+  required String message,
+  required VoidCallback onUndo,
+}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(
+          TpSpacing.s4,
+          0,
+          TpSpacing.s4,
+          TpRootTabGeometry.clearance(context) + TpSpacing.s2,
+        ),
+        duration: const Duration(seconds: 6),
+        content: Text(message),
+        action: SnackBarAction(label: '復原', onPressed: onUndo),
+      ),
+    );
 }
 
 /// iOS 頂部通知橫幅:下一幀滑入、停留約 2.5 秒後滑出,結束時呼叫 [onDismissed]。

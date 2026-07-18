@@ -232,6 +232,30 @@ void main() {
     expect(find.text('已刪除'), findsOneWidget);
   });
 
+  testWidgets('Undo notice renders one six-second action and dispatches it', (
+    tester,
+  ) async {
+    var undoCount = 0;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        showAppUndoNotice(context, message: '已移除收藏', onUndo: () => undoCount++);
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(snackBar.duration, const Duration(seconds: 6));
+    expect(find.text('已移除收藏'), findsOneWidget);
+    expect(find.text('復原'), findsOneWidget);
+
+    await tester.tap(find.text('復原'));
+    await tester.pump();
+    expect(undoCount, 1);
+  });
+
   Widget searchHost(TargetPlatform platform, TextEditingController controller) {
     return MaterialApp(
       theme: ThemeData(platform: platform),

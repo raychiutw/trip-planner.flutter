@@ -53,6 +53,26 @@ void main() {
     await expectLater(favoritesRepository.deleteFavorite(7), completes);
   });
 
+  test('restoreFavorite：POST /poi-favorites/:id/restore 並解析原收藏', () async {
+    dioAdapter.onPost(
+      '/poi-favorites/7/restore',
+      (server) => server.reply(200, {
+        'id': 7,
+        'user_id': 'u-1',
+        'poi_id': 501,
+        'favorited_at': '2026-06-01T10:00:00Z',
+        'note': '雨天備案',
+        'poi_name': '美麗海水族館',
+      }),
+      data: <String, dynamic>{},
+    );
+
+    final restored = await favoritesRepository.restoreFavorite(7);
+
+    expect(restored.id, 7);
+    expect(restored.note, '雨天備案');
+  });
+
   test('addFavorite：POST /poi-favorites camelCase {poiId}', () async {
     dioAdapter.onPost(
       '/poi-favorites',
