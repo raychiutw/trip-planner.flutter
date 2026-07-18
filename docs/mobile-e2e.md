@@ -95,12 +95,14 @@ Use one device per default matrix to protect quota. Before increasing the matrix
 
 ## Local build checks
 
-`ios/Flutter/Secrets.xcconfig` is intentionally gitignored. Before a local iOS
-build or simulator test, create it from the private template or copy the
-existing developer-machine file without logging the key value. A missing file
-causes `AppDelegate` to stop at launch because the native map key is required.
+`ios/Flutter/Secrets.xcconfig` and `android/maps.properties` are intentionally
+gitignored. Before a local platform build, copy the corresponding checked-in
+`ios/Flutter/Secrets.xcconfig.example` or
+`android/maps.properties.example`, fill it privately, and never log the key
+value. A missing iOS file causes `AppDelegate` to stop at launch because the
+native map key is required.
 
-Patrol 4.4.0 can automate the iOS location permission dialog only when the
+`patrol_cli` 4.4.0 can automate the iOS location permission dialog only when the
 simulator uses one of its supported languages. CI pins the Firebase iOS matrix
 to `en_US`. For a local run, use an English simulator or temporarily switch the
 simulator to `en-US`, then restore the developer's original locale after the
@@ -109,6 +111,7 @@ requirement.
 
 ```bash
 dart pub global activate patrol_cli 4.4.0
+export PATH="$PATH:$HOME/.pub-cache/bin"
 patrol build android \
   --target patrol_test/native_map_smoke_test.dart \
   --target patrol_test/app_owned_flow_test.dart
@@ -159,10 +162,10 @@ evidence. A blocked external gate is deliberately not counted as a pass.
 | Full Flutter tests and analyzer | PASS | local worktree run |
 | iOS simulator build | PASS | unsigned `Runner.app` built locally |
 | Deterministic iOS integration flow | PASS | `integration_test/app_smoke_test.dart`, 1 test |
-| Native iOS map smoke | PASS | Patrol 4.4.0, 11 native interaction checks; result bundle retained locally |
+| Native iOS map smoke | PASS | `patrol_cli` 4.4.0, 1 passing UI test covering ready, zoom 12, theme, gesture, and location; result bundle retained locally |
 | Deterministic visual matrix | PASS | 54 named Light/Dark, 100%/200% text, accessibility screenshots |
-| Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281) |
-| Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097) |
+| Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281), SHA `fec66f90` |
+| Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097), SHA `d47e88d0` |
 | iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
 | Favorite restore staging contract | BLOCKED | Protected staging URL, account cookies, fixture POI, and contract guard are not configured |
 | Current-master TestFlight upload | BLOCKED | Release correctly waits for both blocked gates above |
@@ -171,3 +174,10 @@ The last successful TestFlight upload predates the HIG/map merge and is not
 accepted as current-release evidence. Do not dispatch the TestFlight workflow
 until the two blocked rows are configured; the workflow is intentionally
 fail-closed.
+
+The Android Test Lab run is one CI-only scheduling commit behind the recorded
+master SHA. The diff from `d47e88d0` to `fec66f90` changes only
+`.github/workflows/mobile-e2e.yml` and its workflow contract test; Flutter,
+native runner, and Patrol test sources are identical. It therefore proves the
+current product/test binaries, but it is not described as exact-commit
+evidence.

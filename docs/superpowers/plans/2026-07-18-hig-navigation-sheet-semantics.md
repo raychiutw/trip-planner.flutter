@@ -4574,15 +4574,15 @@ CI uploads the directory even on failure. Geometry remains assertion-based; scre
 Keep `.github/workflows/mobile.yml` as the fast PR gate. Add `.github/workflows/mobile-e2e.yml` to build Patrol's native test bundles in GitHub Actions and execute them on the external Firebase Test Lab device farm:
 
 - `workflow_dispatch` for `ios`, `android`, or `all`;
-- a nightly schedule for native smoke;
+- a weekday Android native-smoke schedule at 02:30 Asia/Taipei;
 - Android build on `ubuntu-24.04`, followed by `gcloud firebase test android run --type instrumentation --use-orchestrator` against an ARM virtual or physical device with Google Play services;
-- iOS build on `macos-26` or `tripline-release`, followed by `gcloud firebase test ios run` against a Firebase physical iPhone using the packaged `.xctestrun` and `Release-iphoneos` products;
+- iOS build on `macos-26`, followed by `gcloud firebase test ios run` against a Firebase physical iPhone using the packaged `.xctestrun` and `Release-iphoneos` products;
 - pinned `patrol_cli 4.4.0`;
 - Google Cloud authentication through GitHub OIDC Workload Identity Federation, not a long-lived service-account JSON key;
 - repository variables `FIREBASE_TEST_LAB_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, and `GCP_TEST_LAB_SERVICE_ACCOUNT`; map keys remain GitHub secrets;
 - `patrol build android --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true`, then upload `app-debug.apk` and `app-debug-androidTest.apk` to Test Lab;
 - `patrol build ios --target patrol_test/native_map_smoke_test.dart --dart-define E2E_EXPECT_GOOGLE_POI=true --release`, zip `Release-iphoneos` plus the generated `.xctestrun`, then upload the archive to Test Lab;
-- one stable low-cost device per nightly run; broader physical-device matrices are manual release gates only;
+- one stable low-cost device per scheduled run; broader physical-device matrices are manual release gates only;
 - Test Lab video, screenshot, JUnit/native report, matrix URL, and failure-log artifact uploads;
 - concurrency cancellation for stale E2E runs;
 - a release-gate output consumed before TestFlight/Play internal upload.
@@ -4623,32 +4623,14 @@ git diff --check
 
 Manual QA is no longer an unrecorded release condition. Any case that cannot run must be reported as BLOCKED with its missing device, API key, staging credential, or runner label; it may not be silently counted as PASS.
 
-Execution record (2026-07-19):
-
-- PASS — Dart formatting (335 files), focused UI/app/flow tests (109 tests),
-  full Flutter tests, `flutter analyze`, and `git diff --check`.
-- PASS — iOS simulator build and deterministic app integration flow (1 test).
-- PASS — iOS Patrol native-map smoke (11 interaction checks): ready callback,
-  zoom 12, theme, gestures, overlays, and location permission. Patrol 4.4.0
-  requires a supported simulator language for permission automation; CI pins
-  `en_US` and the local `zh-Hant-TW` preference was restored after the run.
-- PASS — 54 deterministic screenshot artifacts covering nine product states,
-  Light/Dark, 100%/200% text, and reduced motion/transparency variants.
-- PASS — current-master Mobile CI run
-  [29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281)
-  and Android Firebase Test Lab run
-  [29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097).
-- BLOCKED — local Android rebuild exhausted host disk during Gradle packaging;
-  the same commit's authoritative GitHub Android build and Firebase device run
-  passed, so this is recorded as a host-resource block rather than a product
-  failure.
-- BLOCKED — Firebase iOS physical-device execution needs an Apple Development
-  certificate P12 for team `8Z6WVFJ574`; the machine and protected environment
-  do not currently contain that matching identity.
-- BLOCKED — current-master TestFlight upload awaits both the iOS external-device
-  gate and the protected staging favorite-restore contract secrets. The last
-  successful TestFlight run used a pre-HIG/map commit and is not current
-  evidence.
+Execution record (2026-07-19): the canonical command, run, SHA, artifact-count,
+and blocker table is
+[`docs/mobile-e2e.md`](../../mobile-e2e.md#2026-07-19-verification-record).
+Local deterministic, visual, iOS simulator, and native-map checks pass; the
+exact-master Android build and product-equivalent Firebase Android device run
+also pass. Firebase iOS, the staging favorite-restore contract, and the
+current-master TestFlight upload remain explicitly BLOCKED by the credentials
+listed in that record.
 
 Commit:
 
