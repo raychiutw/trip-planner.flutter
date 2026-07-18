@@ -166,12 +166,18 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p test-lab-results/android
+          touch test-lab-results/android/.tripline-test-lab-evidence-root
           gcloud storage cp --recursive \
             "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
             test-lab-results/android
 
-      - name: Preserve Android test inputs and matrix log
+      - name: Sanitize Android Test Lab evidence
+        id: sanitize_android_evidence
         if: ${{ always() }}
+        run: tool/sanitize_test_lab_evidence.sh test-lab-results/android
+
+      - name: Preserve Android Test Lab evidence
+        if: ${{ always() && steps.sanitize_android_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mobile-e2e-android-${{ github.run_id }}-${{ github.run_attempt }}
@@ -339,12 +345,18 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p test-lab-results/ios
+          touch test-lab-results/ios/.tripline-test-lab-evidence-root
           gcloud storage cp --recursive \
             "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
             test-lab-results/ios
 
-      - name: Preserve iOS XCTest bundle and matrix log
+      - name: Sanitize iOS Test Lab evidence
+        id: sanitize_ios_evidence
         if: ${{ always() }}
+        run: tool/sanitize_test_lab_evidence.sh test-lab-results/ios
+
+      - name: Preserve iOS Test Lab evidence
+        if: ${{ always() && steps.sanitize_ios_evidence.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mobile-e2e-ios-${{ github.run_id }}-${{ github.run_attempt }}

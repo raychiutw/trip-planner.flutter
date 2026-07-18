@@ -71,7 +71,7 @@ The workflow downloads both development profiles, builds a release XCTest bundle
 
 ## Run and interpret
 
-In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. GitHub retains only the matrix log and downloaded device evidence for seven days; signed APK/XCTest inputs are deliberately excluded from public-repository artifacts.
+In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. Before GitHub uploads the seven-day artifact, `tool/sanitize_test_lab_evidence.sh` applies an evidence-only allowlist and removes signed APK/XCTest archives plus unknown binary formats. GitHub therefore retains the matrix log, JUnit/XML results, logcat, video, screenshots, and text metadata without republishing installable test inputs.
 
 Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. They do not bypass the matching platform matrix. The release job waits for `external_device_gate`; a test, configuration, quota, or Test Lab infrastructure failure leaves the upload job skipped instead of publishing an unverified build. Google Workload Identity Federation is also restricted to this repository's `mobile-e2e.yml` on `master`.
 
