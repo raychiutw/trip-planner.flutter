@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight and Play Internal dispatches call its Android matrix first and do not upload when the external-device gate fails.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix, Play Internal dispatches run the Android matrix, and neither upload proceeds when its external-device gate fails.
 
 The Patrol bundle contains two independent release gates:
 
@@ -13,6 +13,8 @@ The Patrol bundle contains two independent release gates:
 - `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 12, overlays, and theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
+
+The regular PR/push CI also runs the same app-owned flow on the host runner. It writes named geometry-review PNGs for chat, itinerary, Tripline POI, native-Google-POI callback state, favorites, trip picker, account, form, and destructive confirmation to `build/test-artifacts/app-owned/`. Every state is captured in Light/Dark, 100%/200% text, and Reduce Motion/Reduce Transparency coverage, then uploaded as the seven-day `tripline-ui-evidence-*` artifact even when a later CI step fails. Flutter host tests use the deterministic Ahem font, so these PNGs validate layout and state coverage; use Test Lab's device screenshots/video for readable platform typography and native map tiles. Screenshots are evidence, not pixel-perfect pass/fail goldens.
 
 ## One-time Google Cloud setup
 
@@ -25,11 +27,21 @@ Separating the deterministic product flow from the native map boundary makes fai
    - `FIREBASE_TEST_LAB_PROJECT_ID`
    - `GCP_WORKLOAD_IDENTITY_PROVIDER`
    - `GCP_TEST_LAB_SERVICE_ACCOUNT`
+   - `FIREBASE_TEST_RESULTS_BUCKET` (bucket name only, without `gs://`)
    - `FIREBASE_ANDROID_MODEL` (optional; default `MediumPhone.arm`)
    - `FIREBASE_ANDROID_VERSION` (optional; default `34`)
    - `FIREBASE_IOS_MODEL` (required for iOS)
    - `FIREBASE_IOS_VERSION` (required for iOS and supported by the selected model)
 5. Keep `GOOGLE_MAPS_ANDROID_API_KEY` and `GOOGLE_MAPS_IOS_API_KEY` as repository secrets. Restricted keys must allow both the platform Maps SDK and Navigation SDK service while retaining the app package/bundle restriction.
+
+Create the dedicated result bucket with uniform access, grant the Test Lab CI service account object-admin access on that bucket, and apply the checked-in 14-day lifecycle policy:
+
+```bash
+gcloud storage buckets update gs://BUCKET_NAME \
+  --lifecycle-file=.github/test-lab-results-lifecycle.json
+```
+
+The current Tripline bucket is `trip-planner-490413-test-lab-results` in `ASIA-EAST1`. Its soft-delete retention is disabled so the lifecycle rule actually caps raw Test Lab storage. GitHub artifacts retain the same evidence for seven days.
 
 The Android job reuses the existing upload-keystore secrets to sign Patrol's debug APK. This is required because the Maps key is restricted to the Tripline package and signing SHA-1; an ephemeral GitHub debug key would render an unauthorized blank map.
 
@@ -59,9 +71,19 @@ The workflow downloads both development profiles, builds a release XCTest bundle
 
 ## Run and interpret
 
-In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, and JUnit results in the matrix result. GitHub also retains the submitted APK/XCTest bundle and the matrix command log for seven days.
+In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. GitHub retains only the matrix log and downloaded device evidence for seven days; signed APK/XCTest inputs are deliberately excluded from public-repository artifacts.
 
-Manual **Mobile CI / Releases** dispatches do not bypass this matrix. The release job waits for `external_device_gate`; a test, configuration, quota, or Test Lab infrastructure failure leaves the upload job skipped instead of publishing an unverified build.
+Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. They do not bypass the matching platform matrix. The release job waits for `external_device_gate`; a test, configuration, quota, or Test Lab infrastructure failure leaves the upload job skipped instead of publishing an unverified build. Google Workload Identity Federation is also restricted to this repository's `mobile-e2e.yml` on `master`.
+
+Before Test Lab, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
+
+- `STAGING_API_BASE_URL` (HTTPS only), `STAGING_ALLOWED_HOST` (exact hostname), `STAGING_ORIGIN`
+- `STAGING_SESSION_COOKIE`, optional `STAGING_CSRF_TOKEN`
+- `STAGING_OTHER_SESSION_COOKIE`, optional `STAGING_OTHER_CSRF_TOKEN`
+- `STAGING_FAVORITE_POI_ID`
+- `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1`
+
+The smoke verifies create → delete → active-list exclusion → second-user containment → restore → one active row → cleanup. Missing secrets, a production-looking URL, an absent migration, or any contract mismatch fails closed. Only after this gate succeeds do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent Patrol suites do not toggle a feature they do not exercise.
 
 Test Lab exit codes are not swallowed:
 
@@ -88,6 +110,13 @@ Run the deterministic product flow directly on a local Flutter device:
 
 ```bash
 flutter test integration_test/app_smoke_test.dart -d DEVICE_ID
+```
+
+Run the host flow and regenerate its review artifact locally:
+
+```bash
+flutter test test/flows/app_owned_release_flow_test.dart
+flutter test test/flows/app_owned_release_flow_artifacts_test.dart
 ```
 
 To run the same strict native-POI assertion locally, supply a valid platform Maps key and add:

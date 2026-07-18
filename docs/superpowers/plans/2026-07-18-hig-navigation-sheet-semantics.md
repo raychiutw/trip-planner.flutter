@@ -4563,13 +4563,13 @@ patrol test -t patrol_test/native_map_smoke_test.dart --device "$DEVICE_ID"
 
 Expected: PASS on one iOS simulator and one Android device/emulator with Google Play services.
 
-- [ ] **Step 6: Replace ad-hoc screenshots with named CI artifacts**
+- [x] **Step 6: Replace ad-hoc screenshots with named CI artifacts**
 
-During deterministic and Patrol suites, capture these names: `chat`, `itinerary`, `map-tripline-poi`, `map-native-google-poi`, `favorites`, `trip-picker`, `account`, `form`, and `destructive-confirm`. Suffix each with platform, Light/Dark, text scale, Reduce Motion, and Reduce Transparency state. Store run output only under `build/test-artifacts/`; do not commit process screenshots or unstable PlatformView goldens.
+The deterministic app-owned suite captures these names: `chat`, `itinerary`, `map-tripline-poi`, `map-native-google-poi`, `favorites`, `trip-picker`, `account`, `form`, and `destructive-confirm`. It suffixes each with host platform, Light/Dark, text scale, Reduce Motion, and Reduce Transparency state. Patrol/Test Lab retains the native device video, screenshots, logs, and matrix result without pretending unstable PlatformView frames are deterministic goldens. Store run output only under `build/test-artifacts/` or the private Test Lab result directory; do not commit process screenshots or unstable PlatformView goldens.
 
 CI uploads the directory even on failure. Geometry remains assertion-based; screenshots are review evidence, not pixel-perfect gates for the native map tiles.
 
-- [ ] **Step 7: Add fast PR and Firebase Test Lab device E2E workflows**
+- [x] **Step 7: Add fast PR and Firebase Test Lab device E2E workflows**
 
 Keep `.github/workflows/mobile.yml` as the fast PR gate. Add `.github/workflows/mobile-e2e.yml` to build Patrol's native test bundles in GitHub Actions and execute them on the external Firebase Test Lab device farm:
 
