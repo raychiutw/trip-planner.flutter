@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'map_adapter.dart';
@@ -17,7 +19,10 @@ class TripMapOverlaySynchronizer {
   final TripMapOverlayPlatform _platform;
   final Map<String, TripMapMarker> _markers = {};
   final Map<String, TripMapRoute> _routes = {};
-  Future<void> _tail = Future<void>.value();
+  _OverlaySnapshot? _pendingSnapshot;
+  final List<Completer<void>> _pendingWaiters = [];
+  Future<void>? _drainFuture;
+  Future<void>? _disposeFuture;
   bool _disposed = false;
 
   Future<void> sync({
@@ -25,7 +30,38 @@ class TripMapOverlaySynchronizer {
     required List<TripMapRoute> routes,
   }) {
     if (_disposed) return Future<void>.value();
-    return _enqueue(() => _sync(markers: markers, routes: routes));
+    final waiter = Completer<void>();
+    _pendingSnapshot = _OverlaySnapshot(
+      markers: List<TripMapMarker>.of(markers),
+      routes: List<TripMapRoute>.of(routes),
+    );
+    _pendingWaiters.add(waiter);
+    _drainFuture ??= _drain();
+    return waiter.future;
+  }
+
+  Future<void> _drain() async {
+    while (!_disposed) {
+      final snapshot = _pendingSnapshot;
+      if (snapshot == null) break;
+      final waiters = List<Completer<void>>.of(_pendingWaiters);
+      _pendingSnapshot = null;
+      _pendingWaiters.clear();
+      try {
+        await _sync(markers: snapshot.markers, routes: snapshot.routes);
+        for (final waiter in waiters) {
+          if (!waiter.isCompleted) waiter.complete();
+        }
+      } catch (error, stackTrace) {
+        for (final waiter in waiters) {
+          if (!waiter.isCompleted) waiter.completeError(error, stackTrace);
+        }
+      }
+    }
+    _drainFuture = null;
+    if (!_disposed && _pendingSnapshot != null) {
+      _drainFuture = _drain();
+    }
   }
 
   Future<void> _sync({
@@ -67,9 +103,19 @@ class TripMapOverlaySynchronizer {
   }
 
   Future<void> dispose() {
-    if (_disposed) return _tail;
+    final existing = _disposeFuture;
+    if (existing != null) return existing;
     _disposed = true;
-    return _enqueue(_dispose);
+    _pendingSnapshot = null;
+    for (final waiter in _pendingWaiters) {
+      if (!waiter.isCompleted) waiter.complete();
+    }
+    _pendingWaiters.clear();
+    final activeDrain = _drainFuture;
+    return _disposeFuture = () async {
+      if (activeDrain != null) await activeDrain;
+      await _dispose();
+    }();
   }
 
   Future<void> _dispose() async {
@@ -82,12 +128,13 @@ class TripMapOverlaySynchronizer {
     _markers.clear();
     _routes.clear();
   }
+}
 
-  Future<void> _enqueue(Future<void> Function() operation) {
-    final result = _tail.then((_) => operation());
-    _tail = result.catchError((Object _, StackTrace _) {});
-    return result;
-  }
+class _OverlaySnapshot {
+  const _OverlaySnapshot({required this.markers, required this.routes});
+
+  final List<TripMapMarker> markers;
+  final List<TripMapRoute> routes;
 }
 
 bool _sameMarker(TripMapMarker a, TripMapMarker b) =>

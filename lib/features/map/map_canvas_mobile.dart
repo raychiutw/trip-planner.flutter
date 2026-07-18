@@ -54,11 +54,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
       _brightness = brightness;
       final controller = _nativeController;
       if (controller != null) {
-        unawaited(
-          controller
-              .setMapColorScheme(_mapColorScheme(brightness))
-              .catchError(_reportPlatformError),
-        );
+        unawaited(_applyColorScheme(controller, brightness));
       }
     }
   }
@@ -143,6 +139,8 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
     _overlaySynchronizer = TripMapOverlaySynchronizer(overlayPlatform);
     widget.config.controller.attach(cameraPlatform);
 
+    await _applyColorScheme(controller, _brightness ?? Brightness.light);
+    if (_disposed) return;
     await _syncOverlays();
     if (_disposed) return;
     await widget.config.controller.fitPoints(
@@ -206,8 +204,28 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   void _handleCameraIdle(nav.CameraPosition position) {
     final previousBucket = _zoom.floor();
     _zoom = position.zoom;
+    widget.config.onCameraIdle?.call(
+      TripMapCameraPosition(
+        target: _fromNative(position.target),
+        zoom: position.zoom,
+      ),
+    );
     if (widget.config.clusterMarkers && _zoom.floor() != previousBucket) {
       _scheduleOverlaySync();
+    }
+  }
+
+  Future<void> _applyColorScheme(
+    nav.GoogleMapViewController controller,
+    Brightness brightness,
+  ) async {
+    try {
+      await controller.setMapColorScheme(_mapColorScheme(brightness));
+      if (!_disposed && _brightness == brightness) {
+        widget.config.onMapStyleApplied?.call(brightness);
+      }
+    } catch (error, stackTrace) {
+      _reportPlatformError(error, stackTrace);
     }
   }
 
@@ -258,14 +276,27 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   Future<void> _disposeOwnedOverlays() async {
     try {
       await _overlaySynchronizer?.dispose();
-      for (final image in _registeredIcons.values) {
-        await nav.unregisterImage(image);
-      }
     } catch (_) {
       // Native PlatformView teardown may win the race; it already releases
-      // the map-owned overlays in that case.
+      // map-owned overlays in that case. Bitmap cleanup must still continue.
     }
+
+    var pending = Map<String, nav.ImageDescriptor>.of(_registeredIcons);
     _registeredIcons.clear();
+    for (var attempt = 0; attempt < 3 && pending.isNotEmpty; attempt++) {
+      final failed = <String, nav.ImageDescriptor>{};
+      for (final entry in pending.entries) {
+        try {
+          await nav.unregisterImage(entry.value);
+        } catch (_) {
+          failed[entry.key] = entry.value;
+        }
+      }
+      pending = failed;
+      if (pending.isNotEmpty && attempt < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    }
   }
 }
 

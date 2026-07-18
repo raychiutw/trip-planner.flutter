@@ -221,6 +221,14 @@ class _PendingCameraOperation {
 }
 
 @immutable
+class TripMapCameraPosition {
+  const TripMapCameraPosition({required this.target, required this.zoom});
+
+  final TripMapPoint target;
+  final double zoom;
+}
+
+@immutable
 class TripMapCanvasConfig {
   const TripMapCanvasConfig({
     required this.controller,
@@ -234,6 +242,8 @@ class TripMapCanvasConfig {
     this.markers = const [],
     this.clusterMarkers = false,
     this.onMapReady,
+    this.onCameraIdle,
+    this.onMapStyleApplied,
     this.onTap,
     this.onGooglePoiSelected,
     this.mapKey = const ValueKey('google-trip-map-canvas'),
@@ -250,6 +260,8 @@ class TripMapCanvasConfig {
   final List<TripMapMarker> markers;
   final bool clusterMarkers;
   final VoidCallback? onMapReady;
+  final ValueChanged<TripMapCameraPosition>? onCameraIdle;
+  final ValueChanged<Brightness>? onMapStyleApplied;
   final TripMapTapCallback? onTap;
   final ValueChanged<GoogleMapPoiSelection>? onGooglePoiSelected;
   final Key mapKey;

@@ -27,20 +27,6 @@ import '../trips/trips_list_screen.dart';
 import 'google_poi_accessory_card.dart';
 import 'trip_providers.dart';
 
-/// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
-const List<Color> kDayPinPalette = [
-  Color(0xFFEF4444), // red
-  Color(0xFFF97316), // orange
-  Color(0xFFF59E0B), // amber
-  Color(0xFF10B981), // emerald
-  Color(0xFF14B8A6), // teal
-  Color(0xFF0EA5E9), // sky
-  Color(0xFF3B82F6), // blue
-  Color(0xFF8B5CF6), // violet
-  Color(0xFFD946EF), // fuchsia
-  Color(0xFFF43F5E), // rose
-];
-
 /// 行程地圖：行程 action + DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
   const TripMapScreen({

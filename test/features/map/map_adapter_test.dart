@@ -106,6 +106,26 @@ void main() {
     expect(platform.removedMarkerSemanticIds, ['a']);
     expect(platform.maxConcurrentCalls, 1);
   });
+
+  test(
+    'overlay reconciliation coalesces queued updates to the latest snapshot',
+    () async {
+      final platform = _BlockingTripMapOverlayPlatform();
+      final sync = TripMapOverlaySynchronizer(platform);
+      final first = sync.sync(markers: [_marker('a')], routes: const []);
+      await platform.firstAddStarted.future;
+
+      final superseded = sync.sync(markers: [_marker('b')], routes: const []);
+      final latest = sync.sync(markers: [_marker('c')], routes: const []);
+      platform.releaseFirstAdd.complete();
+
+      await Future.wait([first, superseded, latest]);
+
+      expect(platform.addedMarkerSemanticIds, ['a', 'c']);
+      expect(platform.removedMarkerSemanticIds, ['a']);
+      expect(platform.maxConcurrentCalls, 1);
+    },
+  );
 }
 
 TripMapMarker _marker(String id) => TripMapMarker(
