@@ -155,7 +155,13 @@ void main() {
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      tester
+          .widget<GlassModalSheetScaffold>(find.byType(GlassModalSheetScaffold))
+          .showDragIndicator,
+      isFalse,
     );
     final screenHeight =
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
@@ -191,12 +197,12 @@ void main() {
     expect(tester.getSize(backGlass), const Size(44, 44));
     expect(tester.getSize(closeGlass), const Size(44, 44));
     final titleRect = tester.getRect(find.text('外觀'));
-    final dragRect = tester.getRect(
-      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
-    );
     final screenCenter = tester.getCenter(find.byType(MaterialApp)).dx;
     expect(titleRect.center.dx, closeTo(screenCenter, 1));
-    expect(titleRect.top - dragRect.bottom, lessThanOrEqualTo(36));
+    expect(
+      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
+      findsNothing,
+    );
 
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
     await tester.pumpAndSettle();

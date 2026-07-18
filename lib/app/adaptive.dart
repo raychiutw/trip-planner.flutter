@@ -170,41 +170,45 @@ Future<T?> showAppActionSheet<T>(
   );
 }
 
-/// 顯示可共用的 HIG 近滿版下方視窗。
-Future<T?> showAppLargeSheet<T>(
-  BuildContext context, {
-  required String title,
-  required WidgetBuilder builder,
-}) {
-  final sheetNavigatorKey = GlobalKey<NavigatorState>();
-  return _showThemeAwareAppLargeSheet<T>(
-    context: context,
-    sheetBuilder: (sheetContext, onClose) => _AppLargeSheetContent(
-      title: title,
-      contentBuilder: builder,
-      onClose: onClose,
-      navigatorKey: sheetNavigatorKey,
-    ),
-  );
+class AppSheetFormController extends ChangeNotifier {
+  Future<bool> Function()? _submit;
+  bool _dirty = false;
+  bool _canSubmit = false;
+  bool _submitting = false;
+
+  bool get isDirty => _dirty;
+  bool get canSubmit => _canSubmit && !_submitting && _submit != null;
+  bool get isSubmitting => _submitting;
+
+  void attach(Future<bool> Function() submit) {
+    _submit = submit;
+    notifyListeners();
+  }
+
+  void update({bool? dirty, bool? canSubmit, bool? submitting}) {
+    _dirty = dirty ?? _dirty;
+    _canSubmit = canSubmit ?? _canSubmit;
+    _submitting = submitting ?? _submitting;
+    notifyListeners();
+  }
+
+  Future<bool> submit() async {
+    final callback = _submit;
+    if (!canSubmit || callback == null) return false;
+    update(submitting: true);
+    try {
+      return await callback();
+    } finally {
+      update(submitting: false);
+    }
+  }
 }
 
-/// 顯示自身已含 [TpAppBar] 的功能頁；共用 93% 高度、上滑動線與右上關閉。
-///
-/// 行程選單的筆記、資料、列印、異動、分享、共編與健檢皆走這個入口，
-/// 不再以 `go()` 取代目前頁面而留下沒有出口的畫面。
-Future<T?> showAppLargeScreenSheet<T>(
-  BuildContext context, {
-  required WidgetBuilder builder,
-}) {
-  return _showThemeAwareAppLargeSheet<T>(
-    context: context,
-    sheetBuilder: (sheetContext, onClose) =>
-        _AppLargeScreenSheetContent(contentBuilder: builder, onClose: onClose),
-  );
-}
-
-typedef _AppLargeSheetBuilder =
-    Widget Function(BuildContext context, VoidCallback onClose);
+typedef _AppSheetBuilder<T> =
+    Widget Function(
+      BuildContext context,
+      Future<void> Function([T? result]) close,
+    );
 
 LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -223,18 +227,23 @@ LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
   );
 }
 
-Future<T?> _showThemeAwareAppLargeSheet<T>({
+Future<T?> _showAppSheet<T>({
   required BuildContext context,
-  required _AppLargeSheetBuilder sheetBuilder,
+  required _AppSheetBuilder<T> builder,
+  required GlassSheetState initialState,
+  required double mediumSize,
+  required double largeSize,
+  required bool resizable,
+  Future<bool> Function()? canDismiss,
 }) {
   final controller = GlassModalSheetController();
   return showGeneralDialog<T>(
     context: context,
     useRootNavigator: true,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.38),
-    transitionDuration: const Duration(milliseconds: 500),
+    transitionDuration: const Duration(milliseconds: 300),
     transitionBuilder: (context, animation, secondaryAnimation, child) =>
         SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
@@ -244,32 +253,48 @@ Future<T?> _showThemeAwareAppLargeSheet<T>({
           child: child,
         ),
     pageBuilder: (dialogContext, animation, secondaryAnimation) =>
-        _ThemeAwareAppLargeSheet(
+        _ThemeAwareAppSheet<T>(
           controller: controller,
-          onClose: () => Navigator.of(dialogContext, rootNavigator: true).pop(),
-          sheetBuilder: sheetBuilder,
+          initialState: initialState,
+          mediumSize: mediumSize,
+          largeSize: largeSize,
+          resizable: resizable,
+          canDismiss: canDismiss,
+          onClosed: (value) =>
+              Navigator.of(dialogContext, rootNavigator: true).pop(value),
+          builder: builder,
         ),
   );
 }
 
-class _ThemeAwareAppLargeSheet extends StatefulWidget {
-  const _ThemeAwareAppLargeSheet({
+class _ThemeAwareAppSheet<T> extends StatefulWidget {
+  const _ThemeAwareAppSheet({
     required this.controller,
-    required this.onClose,
-    required this.sheetBuilder,
+    required this.initialState,
+    required this.mediumSize,
+    required this.largeSize,
+    required this.resizable,
+    required this.canDismiss,
+    required this.onClosed,
+    required this.builder,
   });
 
   final GlassModalSheetController controller;
-  final VoidCallback onClose;
-  final _AppLargeSheetBuilder sheetBuilder;
+  final GlassSheetState initialState;
+  final double mediumSize;
+  final double largeSize;
+  final bool resizable;
+  final Future<bool> Function()? canDismiss;
+  final ValueChanged<T?> onClosed;
+  final _AppSheetBuilder<T> builder;
 
   @override
-  State<_ThemeAwareAppLargeSheet> createState() =>
-      _ThemeAwareAppLargeSheetState();
+  State<_ThemeAwareAppSheet<T>> createState() => _ThemeAwareAppSheetState<T>();
 }
 
-class _ThemeAwareAppLargeSheetState extends State<_ThemeAwareAppLargeSheet> {
-  var _isClosing = false;
+class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
+  bool _isClosing = false;
+  bool _checkingDismiss = false;
   Widget? _sheet;
 
   @override
@@ -277,13 +302,20 @@ class _ThemeAwareAppLargeSheetState extends State<_ThemeAwareAppLargeSheet> {
     super.didChangeDependencies();
     // 保留同一個 child widget identity，避免外觀切換重建 dialog page 時把
     // sheet 內部 Navigator 的子頁（例如「外觀」）退回帳號首頁。
-    _sheet ??= widget.sheetBuilder(context, _close);
+    _sheet ??= widget.builder(context, _requestClose);
   }
 
-  void _close() {
-    if (_isClosing) return;
+  Future<void> _requestClose([T? result]) async {
+    if (_isClosing || _checkingDismiss) return;
+    _checkingDismiss = true;
+    final allowed = await (widget.canDismiss?.call() ?? Future.value(true));
+    _checkingDismiss = false;
+    if (!mounted || !allowed) {
+      widget.controller.snapToState(widget.initialState);
+      return;
+    }
     _isClosing = true;
-    widget.onClose();
+    widget.onClosed(result);
   }
 
   @override
@@ -295,9 +327,9 @@ class _ThemeAwareAppLargeSheetState extends State<_ThemeAwareAppLargeSheet> {
       controller: widget.controller,
       body: const SizedBox.expand(),
       sheet: _sheet!,
-      initialState: GlassSheetState.full,
-      halfSize: 0.93,
-      fullSize: 0.93,
+      initialState: widget.initialState,
+      halfSize: widget.mediumSize,
+      fullSize: widget.largeSize,
       settings: settings,
       halfSettings: settings,
       fullSettings: settings,
@@ -312,16 +344,155 @@ class _ThemeAwareAppLargeSheetState extends State<_ThemeAwareAppLargeSheet> {
       horizontalMargin: 0,
       bottomMargin: 0,
       padding: EdgeInsets.zero,
-      showDragIndicator: false,
+      showDragIndicator: widget.resizable,
       onStateChanged: (state) {
-        if (state == GlassSheetState.hidden) _close();
+        if (state == GlassSheetState.hidden) {
+          widget.controller.snapToState(widget.initialState, animate: false);
+          unawaited(_requestClose());
+        }
       },
     );
   }
 }
 
-class _AppLargeSheetContent extends StatelessWidget {
-  const _AppLargeSheetContent({
+Future<T?> showAppSelectionSheet<T>(
+  BuildContext context, {
+  required String title,
+  required Widget Function(BuildContext, ValueChanged<T>) builder,
+}) {
+  return _showAppSheet<T>(
+    context: context,
+    initialState: GlassSheetState.full,
+    mediumSize: 0.62,
+    largeSize: 0.93,
+    resizable: true,
+    builder: (sheetContext, close) => Material(
+      color: Colors.transparent,
+      child: Column(
+        children: [
+          TpSheetHeader(
+            title: title,
+            leading: TpToolbarTextButton(
+              label: '取消',
+              onPressed: () => unawaited(close()),
+            ),
+          ),
+          Expanded(
+            child: builder(sheetContext, (value) => unawaited(close(value))),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<T?> showAppContentSheet<T>(
+  BuildContext context, {
+  required String title,
+  required WidgetBuilder builder,
+}) {
+  final sheetNavigatorKey = GlobalKey<NavigatorState>();
+  return _showAppSheet<T>(
+    context: context,
+    initialState: GlassSheetState.full,
+    mediumSize: 0.93,
+    largeSize: 0.93,
+    resizable: false,
+    builder: (sheetContext, close) => _AppContentSheet<T>(
+      title: title,
+      contentBuilder: builder,
+      onClose: close,
+      navigatorKey: sheetNavigatorKey,
+    ),
+  );
+}
+
+Future<T?> showAppScreenSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) {
+  return _showAppSheet<T>(
+    context: context,
+    initialState: GlassSheetState.full,
+    mediumSize: 0.93,
+    largeSize: 0.93,
+    resizable: false,
+    builder: (sheetContext, close) =>
+        _AppScreenSheet<T>(contentBuilder: builder, onClose: close),
+  );
+}
+
+Future<bool?> showAppFormSheet(
+  BuildContext context, {
+  required String title,
+  required String submitLabel,
+  required AppSheetFormController controller,
+  required WidgetBuilder builder,
+}) {
+  return _showAppSheet<bool>(
+    context: context,
+    initialState: GlassSheetState.full,
+    mediumSize: 0.62,
+    largeSize: 0.93,
+    resizable: true,
+    canDismiss: () async {
+      if (!controller.isDirty) return true;
+      return showAppConfirm(
+        context,
+        title: '捨棄未儲存的變更？',
+        message: '離開後，本次修改不會保留。',
+        confirmLabel: '捨棄',
+        isDestructive: true,
+      );
+    },
+    builder: (sheetContext, close) => Material(
+      color: Colors.transparent,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (_, child) => Column(
+          children: [
+            TpSheetHeader(
+              title: title,
+              leading: TpToolbarTextButton(
+                label: '取消',
+                onPressed: () => unawaited(close()),
+              ),
+              trailing: TpToolbarTextButton(
+                label: submitLabel,
+                onPressed: controller.canSubmit
+                    ? () async {
+                        if (await controller.submit()) {
+                          controller.update(dirty: false);
+                          await close(true);
+                        }
+                      }
+                    : null,
+              ),
+            ),
+            Expanded(child: child!),
+          ],
+        ),
+        child: builder(sheetContext),
+      ),
+    ),
+  );
+}
+
+/// Deprecated compatibility adapter. Migrate callers to a semantic wrapper.
+Future<T?> showAppLargeSheet<T>(
+  BuildContext context, {
+  required String title,
+  required WidgetBuilder builder,
+}) => showAppContentSheet<T>(context, title: title, builder: builder);
+
+/// Deprecated compatibility adapter. Migrate callers to a semantic wrapper.
+Future<T?> showAppLargeScreenSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+}) => showAppScreenSheet<T>(context, builder: builder);
+
+class _AppContentSheet<T> extends StatelessWidget {
+  const _AppContentSheet({
     required this.title,
     required this.contentBuilder,
     required this.onClose,
@@ -330,7 +501,7 @@ class _AppLargeSheetContent extends StatelessWidget {
 
   final String title;
   final WidgetBuilder contentBuilder;
-  final VoidCallback onClose;
+  final Future<void> Function([T? result]) onClose;
   final GlobalKey<NavigatorState> navigatorKey;
 
   @override
@@ -344,86 +515,36 @@ class _AppLargeSheetContent extends StatelessWidget {
           onClose: onClose,
           child: Theme(
             data: theme.copyWith(scaffoldBackgroundColor: Colors.transparent),
-            child: Column(
-              children: [
-                // Drag indicator belongs to the sheet, not its first route. Keep
-                // it visible when account/settings pushes a nested screen.
-                SizedBox(
-                  height: TpSpacing.s5,
-                  child: Center(
-                    child: Container(
-                      key: const ValueKey('app-large-sheet-drag-indicator'),
-                      width: 36,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.22,
-                        ),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: MediaQuery.removePadding(
-                    context: context,
-                    removeTop: true,
-                    child: Navigator(
-                      key: navigatorKey,
-                      onGenerateRoute: (_) => MaterialPageRoute<void>(
-                        builder: (pageContext) => SafeArea(
-                          top: false,
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 56,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: TpSpacing.s5,
-                                    right: TpSpacing.s3,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(pageContext)
-                                              .textTheme
-                                              .titleLarge
-                                              ?.copyWith(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                      ),
-                                      TpToolbarGlassButton(
-                                        key: const ValueKey(
-                                          'app-large-sheet-close',
-                                        ),
-                                        tooltip: MaterialLocalizations.of(
-                                          pageContext,
-                                        ).closeButtonTooltip,
-                                        onPressed: onClose,
-                                        child: const Icon(
-                                          CupertinoIcons.xmark,
-                                          size: 19,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Expanded(child: contentBuilder(pageContext)),
-                            ],
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: Navigator(
+                key: navigatorKey,
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (pageContext) => SafeArea(
+                    top: false,
+                    child: Column(
+                      children: [
+                        TpSheetHeader(
+                          title: title,
+                          trailing: KeyedSubtree(
+                            key: const ValueKey('app-large-sheet-close'),
+                            child: TpToolbarGlassButton(
+                              key: const ValueKey('app-sheet-close'),
+                              tooltip: MaterialLocalizations.of(
+                                pageContext,
+                              ).closeButtonTooltip,
+                              onPressed: () => unawaited(onClose()),
+                              child: const Icon(CupertinoIcons.xmark, size: 19),
+                            ),
                           ),
                         ),
-                      ),
+                        Expanded(child: contentBuilder(pageContext)),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -432,14 +553,11 @@ class _AppLargeSheetContent extends StatelessWidget {
   }
 }
 
-class _AppLargeScreenSheetContent extends StatelessWidget {
-  const _AppLargeScreenSheetContent({
-    required this.contentBuilder,
-    required this.onClose,
-  });
+class _AppScreenSheet<T> extends StatelessWidget {
+  const _AppScreenSheet({required this.contentBuilder, required this.onClose});
 
   final WidgetBuilder contentBuilder;
-  final VoidCallback onClose;
+  final Future<void> Function([T? result]) onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -449,35 +567,13 @@ class _AppLargeScreenSheetContent extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: TpLargeSheetNavigationScope(
-          onClose: onClose,
+          onClose: () => unawaited(onClose()),
           child: Theme(
             data: theme.copyWith(scaffoldBackgroundColor: Colors.transparent),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: TpSpacing.s5,
-                  child: Center(
-                    child: Container(
-                      key: const ValueKey('app-large-sheet-drag-indicator'),
-                      width: 36,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.22,
-                        ),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: MediaQuery.removePadding(
-                    context: context,
-                    removeTop: true,
-                    child: contentBuilder(context),
-                  ),
-                ),
-              ],
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: contentBuilder(context),
             ),
           ),
         ),

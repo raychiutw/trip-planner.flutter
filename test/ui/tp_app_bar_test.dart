@@ -334,11 +334,19 @@ void main() {
 
       final screenCenter = tester.getCenter(find.byType(MaterialApp)).dx;
       final titleRect = tester.getRect(find.text('隱私權與存取'));
-      final dragRect = tester.getRect(
-        find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
-      );
       expect(titleRect.center.dx, closeTo(screenCenter, 1));
-      expect(titleRect.top - dragRect.bottom, lessThanOrEqualTo(36));
+      expect(
+        find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<GlassModalSheetScaffold>(
+              find.byType(GlassModalSheetScaffold),
+            )
+            .showDragIndicator,
+        isFalse,
+      );
       expect(
         DefaultTextStyle.of(tester.element(find.text('隱私權與存取'))).style.fontSize,
         greaterThanOrEqualTo(20),
