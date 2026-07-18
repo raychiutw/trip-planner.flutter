@@ -139,6 +139,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     final tripTitle = _trip?.title ?? _trip?.name ?? '行程';
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('AI 健檢'),
         actions: [
           TpToolbarIconButton(

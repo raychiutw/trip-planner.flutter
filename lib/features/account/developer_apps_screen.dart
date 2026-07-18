@@ -28,6 +28,7 @@ class DeveloperAppsScreen extends ConsumerWidget {
     final appsAsync = ref.watch(developerAppsProvider);
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('開發者應用'),
         actions: [
           TpToolbarIconButton(
@@ -128,7 +129,10 @@ class _DeveloperAppNewScreenState extends ConsumerState<DeveloperAppNewScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: const TpAppBar(title: Text('新增 OAuth 應用')),
+      appBar: const TpAppBar(
+        role: TpAppBarRole.detail,
+        title: Text('新增 OAuth 應用'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

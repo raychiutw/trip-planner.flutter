@@ -11,6 +11,110 @@ import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('standalone app bar never implies a leading action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(role: TpAppBarRole.standalone, title: Text('邀請')),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
+    expect(find.text('取消'), findsNothing);
+  });
+
+  testWidgets('detail app bar pops one route', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const Scaffold(
+                  appBar: TpAppBar(
+                    role: TpAppBarRole.detail,
+                    title: Text('外觀'),
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('開啟'), findsOneWidget);
+    expect(find.text('外觀'), findsNothing);
+  });
+
+  testWidgets('modal form exposes Cancel and the explicit submit verb', (
+    tester,
+  ) async {
+    var cancelled = false;
+    var saved = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.modalForm,
+            title: const Text('編輯行程'),
+            onCancel: () => cancelled = true,
+            primaryActionLabel: '儲存',
+            onPrimaryAction: () => saved = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('取消'));
+    await tester.tap(find.text('儲存'));
+
+    expect(cancelled, isTrue);
+    expect(saved, isTrue);
+  });
+
+  testWidgets('sheet header centers its title between optional controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: TpSheetHeader(
+            title: '選擇行程',
+            leading: SizedBox.square(
+              dimension: TpSpacing.tapMin,
+              child: Text('取消'),
+            ),
+            trailing: SizedBox.square(
+              dimension: TpSpacing.tapMin,
+              child: Icon(CupertinoIcons.xmark),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.getSize(find.byType(TpSheetHeader)).height, 56);
+    expect(
+      tester.getCenter(find.text('選擇行程')).dx,
+      closeTo(tester.getCenter(find.byType(TpSheetHeader)).dx, 0.1),
+    );
+    expect(
+      tester.getSize(find.byIcon(CupertinoIcons.xmark)).height,
+      lessThanOrEqualTo(TpSpacing.tapMin),
+    );
+  });
+
   testWidgets(
     'TpAppBar delegates layout to GlassAppBar and keeps title left aligned',
     (tester) async {
@@ -18,6 +122,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             appBar: TpAppBar(
+              role: TpAppBarRole.standalone,
               title: const Text('行程'),
               actions: [
                 IconButton(
@@ -56,6 +161,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             appBar: TpAppBar(
+              role: TpAppBarRole.standalone,
               title: const Text('行程'),
               actions: [
                 TpMoreMenuButton<String>(
@@ -100,6 +206,7 @@ void main() {
           theme: AppTheme.light(),
           home: Scaffold(
             appBar: TpAppBar(
+              role: TpAppBarRole.standalone,
               title: const Text('行程'),
               actions: [
                 TpMoreMenuButton<String>(
@@ -147,6 +254,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             appBar: TpAppBar(
+              role: TpAppBarRole.standalone,
               title: const Text('行程'),
               actions: [
                 TpMoreMenuButton<String>(
@@ -201,7 +309,10 @@ void main() {
                     showAppLargeScreenSheet<void>(
                       context,
                       builder: (_) => const Scaffold(
-                        appBar: TpAppBar(title: Text('隱私權與存取')),
+                        appBar: TpAppBar(
+                          role: TpAppBarRole.standalone,
+                          title: Text('隱私權與存取'),
+                        ),
                         body: Text('展開內容'),
                       ),
                     ),

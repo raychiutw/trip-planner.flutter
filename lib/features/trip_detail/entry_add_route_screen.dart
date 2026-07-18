@@ -287,6 +287,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     return Scaffold(
       appBar: const TpAppBar(
+        role: TpAppBarRole.detail,
         title: Text('新增停留點'),
         actions: [TpAccountAvatarButton()],
       ),

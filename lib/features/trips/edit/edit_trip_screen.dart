@@ -37,7 +37,7 @@ class EditTripScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('編輯行程')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('編輯行程')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
           : Column(

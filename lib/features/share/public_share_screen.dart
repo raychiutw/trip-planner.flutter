@@ -52,7 +52,10 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
     final shareAsync = ref.watch(publicTripShareProvider(_token));
     final currentUser = ref.watch(authStateProvider).value;
     return Scaffold(
-      appBar: const TpAppBar(title: Text('行程分享')),
+      appBar: const TpAppBar(
+        role: TpAppBarRole.standalone,
+        title: Text('行程分享'),
+      ),
       body: SafeArea(
         child: shareAsync.when(
           loading: () => const AppListLoadingSkeleton(

@@ -65,6 +65,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
     final busy = _busyAction != null;
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('列印預覽'),
         actions: [
           TpToolbarGlassButton(

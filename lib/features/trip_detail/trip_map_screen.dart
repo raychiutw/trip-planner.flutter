@@ -80,6 +80,7 @@ class TripMapScreen extends ConsumerWidget {
           .copyWith(statusBarColor: Colors.transparent),
       child: Scaffold(
         appBar: TpAppBar(
+          role: TpAppBarRole.standalone,
           title: TripTitleButton(
             key: const ValueKey('trip-map-trip-picker'),
             currentTripId: tripId,

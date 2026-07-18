@@ -96,7 +96,7 @@ class EntryPoiScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final entryAsync = ref.watch(entryDetailProvider(_key));
     return Scaffold(
-      appBar: const TpAppBar(title: Text('地點管理')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('地點管理')),
       body: entryAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('entry-poi-loading')),

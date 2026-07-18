@@ -216,7 +216,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     final tripsAsync = ref.watch(myTripsProvider);
 
     return Scaffold(
-      appBar: TpAppBar(title: Text('加入行程：$_title')),
+      appBar: TpAppBar(role: TpAppBarRole.detail, title: Text('加入行程：$_title')),
       body: tripsAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('add-to-trip-loading')),
@@ -333,7 +333,7 @@ class _AddToTripRouteState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const TpAppBar(title: Text('加入行程')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('加入行程')),
       body: loading
           ? const AppListLoadingSkeleton(
               key: ValueKey('add-to-trip-route-loading'),

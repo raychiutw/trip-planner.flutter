@@ -50,7 +50,7 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     final basicsReady = state.destinations.isNotEmpty && state.totalDays > 0;
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('建立行程')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('建立行程')),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,
         contentKey: const ValueKey('create-trip-content'),

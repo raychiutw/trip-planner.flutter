@@ -89,6 +89,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
 
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.standalone,
         title: TripTitleButton(
           key: const ValueKey('trip-timeline-trip-picker'),
           currentTripId: widget.tripId,

@@ -48,6 +48,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
 
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('登入裝置'),
         actions: [
           TpToolbarGlassButton(

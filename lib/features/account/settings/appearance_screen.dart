@@ -24,7 +24,7 @@ class AppearanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);
     return Scaffold(
-      appBar: const TpAppBar(title: Text('外觀')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('外觀')),
       body: ListView(
         children: [
           TpSettingsGroup(

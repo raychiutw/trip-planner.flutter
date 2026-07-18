@@ -53,7 +53,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('個人資料')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('個人資料')),
       body: switch (authState) {
         AsyncData(:final value?) => _form(context, value.displayName ?? ''),
         AsyncError() => const Center(child: Text('無法載入個人資料')),

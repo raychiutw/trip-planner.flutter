@@ -181,6 +181,7 @@ void main() {
       app(
         Scaffold(
           appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
             title: const Text('行程'),
             actions: [
               TpMoreMenuButton<int>(
@@ -227,6 +228,7 @@ void main() {
       app(
         const Scaffold(
           appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
             title: Text('沖繩家族旅行超長名稱與完整行程設定'),
             actions: [IconButton(onPressed: null, icon: Icon(Icons.edit))],
           ),
@@ -252,7 +254,7 @@ void main() {
       app(
         const Scaffold(
           appBar: TpAppBar(
-            automaticallyImplyLeading: false,
+            role: TpAppBarRole.standalone,
             title: Text('行程標題'),
             actions: [
               IconButton(onPressed: null, icon: Icon(Icons.edit)),

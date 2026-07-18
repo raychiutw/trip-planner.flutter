@@ -24,7 +24,7 @@ class EntryEditRouteScreen extends ConsumerWidget {
       entryDetailProvider((tripId: tripId, entryId: entryId)),
     );
     return Scaffold(
-      appBar: const TpAppBar(title: Text('編輯停留點')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('編輯停留點')),
       body: entryAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('entry-edit-loading'),

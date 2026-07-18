@@ -122,7 +122,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     });
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('探索')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('探索')),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.conversation,
         contentKey: const ValueKey('explore-content'),

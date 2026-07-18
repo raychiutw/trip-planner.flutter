@@ -46,7 +46,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(tripNotesProvider(widget.tripId));
     return Scaffold(
-      appBar: const TpAppBar(title: Text('行程筆記')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('行程筆記')),
       body: notesAsync.when(
         loading: () =>
             const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),

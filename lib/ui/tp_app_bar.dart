@@ -5,6 +5,30 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../theme/tokens.dart';
 import 'tp_action_item.dart';
 
+enum TpAppBarRole { standalone, detail, modalContent, modalForm }
+
+class TpToolbarTextButton extends StatelessWidget {
+  const TpToolbarTextButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: TpSpacing.tapMin,
+        minHeight: TpSpacing.tapMin,
+      ),
+      child: TextButton(onPressed: onPressed, child: Text(label, maxLines: 1)),
+    );
+  }
+}
+
 /// 所有 header 圓形功能共用同一組 Liquid Glass 材質。
 ///
 /// 參數刻意與 root tab／DAY selector 同源：暖白或中性深色低透明 tint、
@@ -149,82 +173,143 @@ abstract final class TpToolbarSlots {
   }
 }
 
+class TpSheetHeader extends StatelessWidget {
+  const TpSheetHeader({
+    super.key,
+    required this.title,
+    this.leading,
+    this.trailing,
+  });
+
+  final String title;
+  final Widget? leading;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 88),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (leading != null) Positioned(left: TpSpacing.s4, child: leading!),
+          if (trailing != null)
+            Positioned(right: TpSpacing.s4, child: trailing!),
+        ],
+      ),
+    );
+  }
+}
+
 class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   const TpAppBar({
     super.key,
     required this.title,
+    required this.role,
     this.actions = const [],
-    this.automaticallyImplyLeading = true,
-  });
+    this.onCancel,
+    this.primaryActionLabel,
+    this.onPrimaryAction,
+    this.primaryActionEnabled = true,
+  }) : assert(
+         role != TpAppBarRole.modalForm ||
+             (onCancel != null &&
+                 primaryActionLabel != null &&
+                 onPrimaryAction != null),
+         'modalForm requires Cancel and a primary action.',
+       ),
+       assert(
+         (primaryActionLabel == null) == (onPrimaryAction == null),
+         'primaryActionLabel and onPrimaryAction must be supplied together.',
+       );
 
   final Widget title;
+  final TpAppBarRole role;
   final List<Widget> actions;
-  final bool automaticallyImplyLeading;
+  final VoidCallback? onCancel;
+  final String? primaryActionLabel;
+  final VoidCallback? onPrimaryAction;
+  final bool primaryActionEnabled;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
-    assert(actions.length <= 2, 'Toolbar supports at most two actions.');
-    final route = ModalRoute.of(context);
-    final scaffold = Scaffold.maybeOf(context);
     final largeSheetScope = TpLargeSheetNavigationScope.maybeOf(context);
-    final Widget? leadingAction;
-    if (!automaticallyImplyLeading) {
-      leadingAction = null;
-    } else if (scaffold?.hasDrawer ?? false) {
-      leadingAction = TpToolbarGlassButton(
-        tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-        onPressed: scaffold!.openDrawer,
-        child: const Icon(CupertinoIcons.bars, size: 20),
-      );
-    } else if (route?.impliesAppBarDismissal ?? false) {
-      final isClose = route is PageRoute<dynamic> && route.fullscreenDialog;
-      leadingAction = TpToolbarGlassButton(
-        tooltip: isClose
-            ? MaterialLocalizations.of(context).closeButtonTooltip
-            : MaterialLocalizations.of(context).backButtonTooltip,
-        onPressed: () => Navigator.of(context).maybePop(),
-        child: Icon(
-          isClose ? CupertinoIcons.xmark : CupertinoIcons.back,
-          size: isClose ? 19 : 22,
+    final leadingAction = _semanticLeading(context, largeSheetScope);
+    final resolvedActions = <Widget>[
+      ...actions,
+      if (primaryActionLabel != null)
+        TpToolbarTextButton(
+          key: const ValueKey('tp-app-bar-primary-action'),
+          label: primaryActionLabel!,
+          onPressed: primaryActionEnabled ? onPrimaryAction : null,
         ),
-      );
-    } else {
-      leadingAction = null;
-    }
-    final leadingWidth = leadingAction == null ? 0.0 : TpSpacing.tapMin;
+    ];
+    assert(
+      resolvedActions.length <= 2,
+      'Toolbar supports at most two actions.',
+    );
+    final leadingWidth = leadingAction == null
+        ? 0.0
+        : role == TpAppBarRole.modalForm
+        ? 64.0
+        : TpSpacing.tapMin;
     final actionsWidth = TpToolbarSlots.sideWidth(
-      actionCount: actions.length,
+      actionCount: resolvedActions.length,
       hasLeading: false,
     );
     if (largeSheetScope != null) {
       final colors = Theme.of(context).colorScheme;
-      final sheetActionsWidth = TpToolbarSlots.sideWidth(
-        actionCount: actions.length + 1,
-        hasLeading: false,
-      );
+      final showsScopeClose = role != TpAppBarRole.modalForm;
+      final sheetActionWidths = <double>[
+        for (var index = 0; index < actions.length; index++) TpSpacing.tapMin,
+        if (primaryActionLabel != null) 64,
+        if (showsScopeClose) TpSpacing.tapMin,
+      ];
+      final sheetActionsWidth = sheetActionWidths.isEmpty
+          ? 0.0
+          : sheetActionWidths.reduce((sum, width) => sum + width) +
+                (sheetActionWidths.length - 1) * TpSpacing.s2;
       return GlassAppBar(
         preferredSize: preferredSize,
         backgroundColor: Colors.transparent,
         centerTitle: true,
-        leading: leadingAction == null
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(left: TpSpacing.s4),
-                child: SizedBox(
-                  key: const ValueKey('app-large-sheet-back'),
-                  width: leadingWidth,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconTheme(
-                      data: IconThemeData(color: colors.primary),
-                      child: leadingAction,
+        leading: SizedBox(
+          width: sheetActionsWidth + TpSpacing.s4,
+          child: Padding(
+            padding: const EdgeInsets.only(left: TpSpacing.s4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: leadingAction == null
+                  ? null
+                  : SizedBox(
+                      key: const ValueKey('app-large-sheet-back'),
+                      width: leadingWidth,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconTheme(
+                          data: IconThemeData(color: colors.primary),
+                          child: leadingAction,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
+            ),
+          ),
+        ),
         title: DefaultTextStyle.merge(
           key: const ValueKey('tp-app-bar-title'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -243,26 +328,30 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  for (var index = 0; index < actions.length; index++) ...[
+                  for (
+                    var index = 0;
+                    index < resolvedActions.length;
+                    index++
+                  ) ...[
                     if (index > 0) const SizedBox(width: TpSpacing.s2),
-                    SizedBox.square(
-                      dimension: TpSpacing.tapMin,
-                      child: actions[index],
+                    resolvedActions[index],
+                  ],
+                  if (showsScopeClose) ...[
+                    if (resolvedActions.isNotEmpty)
+                      const SizedBox(width: TpSpacing.s2),
+                    TpToolbarGlassButton(
+                      key: const ValueKey('app-large-sheet-close'),
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
+                      onPressed: largeSheetScope.onClose,
+                      child: Icon(
+                        CupertinoIcons.xmark,
+                        size: 19,
+                        color: colors.primary,
+                      ),
                     ),
                   ],
-                  if (actions.isNotEmpty) const SizedBox(width: TpSpacing.s2),
-                  TpToolbarGlassButton(
-                    key: const ValueKey('app-large-sheet-close'),
-                    tooltip: MaterialLocalizations.of(
-                      context,
-                    ).closeButtonTooltip,
-                    onPressed: largeSheetScope.onClose,
-                    child: Icon(
-                      CupertinoIcons.xmark,
-                      size: 19,
-                      color: colors.primary,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -284,8 +373,44 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         overflow: TextOverflow.ellipsis,
         child: title,
       ),
-      actions: TpToolbarSlots.actions(width: actionsWidth, children: actions),
+      actions: primaryActionLabel == null
+          ? TpToolbarSlots.actions(
+              width: actionsWidth,
+              children: resolvedActions,
+            )
+          : resolvedActions,
     );
+  }
+
+  Widget? _semanticLeading(
+    BuildContext context,
+    TpLargeSheetNavigationScope? largeSheetScope,
+  ) {
+    switch (role) {
+      case TpAppBarRole.standalone:
+        return null;
+      case TpAppBarRole.detail:
+        return TpToolbarGlassButton(
+          key: const ValueKey('tp-app-bar-back'),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: const Icon(CupertinoIcons.back, size: 22),
+        );
+      case TpAppBarRole.modalContent:
+        if (largeSheetScope != null) return null;
+        return TpToolbarGlassButton(
+          key: const ValueKey('tp-app-bar-close'),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: const Icon(CupertinoIcons.xmark, size: 19),
+        );
+      case TpAppBarRole.modalForm:
+        return TpToolbarTextButton(
+          key: const ValueKey('tp-app-bar-cancel'),
+          label: '取消',
+          onPressed: onCancel,
+        );
+    }
   }
 }
 

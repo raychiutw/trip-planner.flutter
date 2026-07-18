@@ -161,7 +161,7 @@ class _MapRootAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return const TpAppBar(
-      automaticallyImplyLeading: false,
+      role: TpAppBarRole.standalone,
       title: Text('地圖'),
       actions: [TpAccountAvatarButton()],
     );

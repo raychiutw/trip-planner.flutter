@@ -82,7 +82,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: TpAppBar(
-        automaticallyImplyLeading: false,
+        role: TpAppBarRole.standalone,
         title: currentTrip == null
             ? const Text('行程')
             : TripTitleButton(

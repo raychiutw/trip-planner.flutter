@@ -52,7 +52,10 @@ class _EntryActionRouteScreenState
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     return Scaffold(
-      appBar: TpAppBar(title: Text(widget.action.title)),
+      appBar: TpAppBar(
+        role: TpAppBarRole.detail,
+        title: Text(widget.action.title),
+      ),
       body: daysAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('entry-action-loading'),
