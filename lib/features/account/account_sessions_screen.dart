@@ -470,58 +470,15 @@ class _SessionTile extends StatelessWidget {
     );
   }
 
-  Future<void> _showDetails(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            TpSpacing.s5,
-            TpSpacing.s2,
-            TpSpacing.s5,
-            TpSpacing.s5,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                session.uaSummary ?? '未知裝置',
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-              const SizedBox(height: TpSpacing.s3),
-              Text(_subtitle),
-              if (session.ipHashPrefix != null) ...[
-                const SizedBox(height: TpSpacing.s2),
-                Text(
-                  '安全識別碼：${session.ipHashPrefix}',
-                  style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (!session.isCurrent) ...[
-                const SizedBox(height: TpSpacing.s5),
-                FilledButton.icon(
-                  key: Key('account-session-revoke-${session.sid}'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(sheetContext).colorScheme.error,
-                    foregroundColor: Theme.of(sheetContext).colorScheme.onError,
-                  ),
-                  onPressed: isBusy
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          onRevoke();
-                        },
-                  icon: const Icon(CupertinoIcons.square_arrow_right),
-                  label: const Text('登出此裝置'),
-                ),
-              ],
-            ],
-          ),
-        ),
+  Future<void> _showDetails(BuildContext context) async {
+    await showAppContentSheet<void>(
+      context,
+      title: '登入裝置',
+      builder: (_) => _SessionDetails(
+        session: session,
+        subtitle: _subtitle,
+        isBusy: isBusy,
+        onRevoke: onRevoke,
       ),
     );
   }
@@ -534,6 +491,67 @@ class _SessionTile extends StatelessWidget {
         '首次登入：${humanAccountTime(session.createdAt)}',
     ];
     return parts.isEmpty ? '沒有活動時間' : parts.join('\n');
+  }
+}
+
+class _SessionDetails extends StatelessWidget {
+  const _SessionDetails({
+    required this.session,
+    required this.subtitle,
+    required this.isBusy,
+    required this.onRevoke,
+  });
+
+  final AccountSession session;
+  final String subtitle;
+  final bool isBusy;
+  final VoidCallback onRevoke;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s5,
+        TpSpacing.s2,
+        TpSpacing.s5,
+        TpSpacing.s5,
+      ),
+      children: [
+        Text(
+          session.uaSummary ?? '未知裝置',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: TpSpacing.s3),
+        Text(subtitle),
+        if (session.ipHashPrefix != null) ...[
+          const SizedBox(height: TpSpacing.s2),
+          Text(
+            '安全識別碼：${session.ipHashPrefix}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (!session.isCurrent) ...[
+          const SizedBox(height: TpSpacing.s5),
+          FilledButton.icon(
+            key: Key('account-session-revoke-${session.sid}'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: isBusy
+                ? null
+                : () {
+                    TpLargeSheetNavigationScope.maybeOf(context)?.onClose();
+                    onRevoke();
+                  },
+            icon: const Icon(CupertinoIcons.square_arrow_right),
+            label: const Text('登出此裝置'),
+          ),
+        ],
+      ],
+    );
   }
 }
 

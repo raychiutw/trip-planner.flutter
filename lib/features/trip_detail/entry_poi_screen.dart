@@ -366,16 +366,11 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showModalBottomSheet<_EntryPoiPick>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: const _AlternateSearchSheet(),
-      ),
+    final selected = await showAppSelectionSheet<_EntryPoiPick>(
+      context,
+      title: '選擇地點',
+      builder: (sheetContext, select) =>
+          _AlternateSearchSheet(onSelected: select),
     );
     if (selected == null || !context.mounted) return;
     await _run(
@@ -400,15 +395,11 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showModalBottomSheet<_EntryPoiPick>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-        ),
-        child: const _AlternateSearchSheet(hintText: '搜尋地點置換正選'),
-      ),
+    final selected = await showAppSelectionSheet<_EntryPoiPick>(
+      context,
+      title: '選擇地點',
+      builder: (sheetContext, select) =>
+          _AlternateSearchSheet(hintText: '搜尋地點置換正選', onSelected: select),
     );
     if (selected == null || !context.mounted) return;
     await _run(context, ref, () async {
@@ -730,8 +721,12 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
 
 /// Entry POI 操作共用搜尋 sheet（複用探索的 poiRepositoryProvider.searchPois）。
 class _AlternateSearchSheet extends ConsumerStatefulWidget {
-  const _AlternateSearchSheet({this.hintText = '搜尋地點加入備選'});
+  const _AlternateSearchSheet({
+    required this.onSelected,
+    this.hintText = '搜尋地點加入備選',
+  });
 
+  final ValueChanged<_EntryPoiPick> onSelected;
   final String hintText;
 
   @override
@@ -846,7 +841,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
       setState(() => _customError = '請輸入名稱與有效座標');
       return;
     }
-    Navigator.of(context).pop(
+    widget.onSelected(
       _EntryPoiPick.custom(
         CustomEntryPoi(name: name, lat: lat, lng: lng, poiType: _customPoiType),
       ),
@@ -916,9 +911,8 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                         subtitle: poi.address == null
                             ? null
                             : Text(poi.address!),
-                        onTap: () => Navigator.of(
-                          context,
-                        ).pop(_EntryPoiPick.search(poi)),
+                        onTap: () =>
+                            widget.onSelected(_EntryPoiPick.search(poi)),
                       ),
                   ],
                 ),
@@ -955,9 +949,9 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                           subtitle: favorite.poiAddress == null
                               ? null
                               : Text(favorite.poiAddress!),
-                          onTap: () => Navigator.of(
-                            context,
-                          ).pop(_EntryPoiPick.favorite(favorite.poiId)),
+                          onTap: () => widget.onSelected(
+                            _EntryPoiPick.favorite(favorite.poiId),
+                          ),
                         ),
                     ],
                   ),

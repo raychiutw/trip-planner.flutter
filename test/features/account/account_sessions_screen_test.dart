@@ -120,6 +120,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
+    expect(find.text('取消'), findsNothing);
     expect(
       find.byKey(const Key('account-session-revoke-sid-phone')),
       findsOneWidget,
