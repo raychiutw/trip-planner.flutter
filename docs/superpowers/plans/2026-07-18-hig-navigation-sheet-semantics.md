@@ -4589,13 +4589,22 @@ Keep `.github/workflows/mobile.yml` as the fast PR gate. Add `.github/workflows/
 
 The job must preserve Test Lab's non-zero exit code: `0` is PASS, `10` is a test failure, and infrastructure/unsupported-matrix exit codes remain BLOCKED/FAIL rather than being swallowed. Spark quota is sufficient for a one-device smoke matrix (up to 10 virtual and 5 physical runs per day); Blaze overage must be protected by the one-device default and a Google Cloud budget alert.
 
-- [ ] **Step 8: Gate release on the real favorite-restore backend contract**
+- [x] **Step 8: Gate release on the real favorite-restore backend contract**
 
 The release workflow must perform an authenticated staging contract smoke before mobile upload: create a disposable favorite, delete it, call `POST /poi-favorites/:id/restore`, verify owner scoping and successful restore, delete the fixture, and fail closed when the endpoint or migration is absent. Do not point this smoke at production and do not enable the Flutter Undo affordance solely because mocks pass.
 
 The backend implementation remains owned by `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`. If staging credentials are absent, TestFlight and Play upload remain blocked with an explicit contract-gate message.
 
-- [ ] **Step 9: Run and record the automated replacement matrix**
+Implementation evidence (2026-07-19): `.github/workflows/mobile.yml` invokes
+`tool/verify_favorite_restore_contract.sh` before external-device and upload
+jobs, validates an explicit non-production HTTPS host allowlist, and fails
+closed when protected values are missing. Runtime status is **BLOCKED**, not
+PASS: the `mobile-release` environment still needs the staging URL/host/origin,
+two disposable account cookie sets, fixture POI ID, and
+`STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1` after the backend
+migration is deployed.
+
+- [x] **Step 9: Run and record the automated replacement matrix**
 
 Run:
 
@@ -4613,6 +4622,33 @@ git diff --check
 ```
 
 Manual QA is no longer an unrecorded release condition. Any case that cannot run must be reported as BLOCKED with its missing device, API key, staging credential, or runner label; it may not be silently counted as PASS.
+
+Execution record (2026-07-19):
+
+- PASS — Dart formatting (335 files), focused UI/app/flow tests (109 tests),
+  full Flutter tests, `flutter analyze`, and `git diff --check`.
+- PASS — iOS simulator build and deterministic app integration flow (1 test).
+- PASS — iOS Patrol native-map smoke (11 interaction checks): ready callback,
+  zoom 12, theme, gestures, overlays, and location permission. Patrol 4.4.0
+  requires a supported simulator language for permission automation; CI pins
+  `en_US` and the local `zh-Hant-TW` preference was restored after the run.
+- PASS — 54 deterministic screenshot artifacts covering nine product states,
+  Light/Dark, 100%/200% text, and reduced motion/transparency variants.
+- PASS — current-master Mobile CI run
+  [29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281)
+  and Android Firebase Test Lab run
+  [29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097).
+- BLOCKED — local Android rebuild exhausted host disk during Gradle packaging;
+  the same commit's authoritative GitHub Android build and Firebase device run
+  passed, so this is recorded as a host-resource block rather than a product
+  failure.
+- BLOCKED — Firebase iOS physical-device execution needs an Apple Development
+  certificate P12 for team `8Z6WVFJ574`; the machine and protected environment
+  do not currently contain that matching identity.
+- BLOCKED — current-master TestFlight upload awaits both the iOS external-device
+  gate and the protected staging favorite-restore contract secrets. The last
+  successful TestFlight run used a pre-HIG/map commit and is not current
+  evidence.
 
 Commit:
 

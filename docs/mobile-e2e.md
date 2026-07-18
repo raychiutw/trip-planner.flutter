@@ -95,6 +95,18 @@ Use one device per default matrix to protect quota. Before increasing the matrix
 
 ## Local build checks
 
+`ios/Flutter/Secrets.xcconfig` is intentionally gitignored. Before a local iOS
+build or simulator test, create it from the private template or copy the
+existing developer-machine file without logging the key value. A missing file
+causes `AppDelegate` to stop at launch because the native map key is required.
+
+Patrol 4.4.0 can automate the iOS location permission dialog only when the
+simulator uses one of its supported languages. CI pins the Firebase iOS matrix
+to `en_US`. For a local run, use an English simulator or temporarily switch the
+simulator to `en-US`, then restore the developer's original locale after the
+test. This is a Patrol automation limitation, not a Tripline localization
+requirement.
+
 ```bash
 dart pub global activate patrol_cli 4.4.0
 patrol build android \
@@ -134,3 +146,28 @@ Official references:
 - [Firebase Android command line testing](https://firebase.google.com/docs/test-lab/android/command-line)
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
+
+## 2026-07-19 verification record
+
+The current `master` implementation was verified with the following layered
+evidence. A blocked external gate is deliberately not counted as a pass.
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Dart formatting | PASS | 335 files checked, no changes |
+| Focused UI/app/flow tests | PASS | 109 tests |
+| Full Flutter tests and analyzer | PASS | local worktree run |
+| iOS simulator build | PASS | unsigned `Runner.app` built locally |
+| Deterministic iOS integration flow | PASS | `integration_test/app_smoke_test.dart`, 1 test |
+| Native iOS map smoke | PASS | Patrol 4.4.0, 11 native interaction checks; result bundle retained locally |
+| Deterministic visual matrix | PASS | 54 named Light/Dark, 100%/200% text, accessibility screenshots |
+| Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281) |
+| Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097) |
+| iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
+| Favorite restore staging contract | BLOCKED | Protected staging URL, account cookies, fixture POI, and contract guard are not configured |
+| Current-master TestFlight upload | BLOCKED | Release correctly waits for both blocked gates above |
+
+The last successful TestFlight upload predates the HIG/map merge and is not
+accepted as current-release evidence. Do not dispatch the TestFlight workflow
+until the two blocked rows are configured; the workflow is intentionally
+fail-closed.
