@@ -272,6 +272,46 @@ void main() {
     expect(find.byKey(const ValueKey('app-large-screen-sheet')), findsNothing);
   });
 
+  testWidgets('screen sheet detail Back honors a dirty child guard', (
+    tester,
+  ) async {
+    final controller = AppUnsavedChangesController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppScreenSheet<void>(
+              context,
+              builder: (_) => AppUnsavedChangesGuard(
+                controller: controller,
+                hasChanges: true,
+                child: const Scaffold(
+                  appBar: TpAppBar(
+                    role: TpAppBarRole.detail,
+                    title: Text('編輯行程'),
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('編輯行程'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('app-large-screen-sheet')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('routed form cannot dismiss while submission is active', (
     tester,
   ) async {

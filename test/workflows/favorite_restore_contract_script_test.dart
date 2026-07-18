@@ -65,6 +65,36 @@ void main() {
     },
   );
 
+  test('canonicalizes production hosts and rejects URL userinfo', () async {
+    for (final variant in <({String url, String host})>[
+      (
+        url: 'https://TRIP-PLANNER-DBY.PAGES.DEV',
+        host: 'TRIP-PLANNER-DBY.PAGES.DEV',
+      ),
+      (
+        url: 'https://trip-planner-dby.pages.dev.',
+        host: 'trip-planner-dby.pages.dev.',
+      ),
+    ]) {
+      final result = await _runContract({
+        ...baseEnvironment,
+        'STAGING_API_BASE_URL': variant.url,
+        'STAGING_ALLOWED_HOST': variant.host,
+      });
+      expect(result.exitCode, 2);
+      expect(result.stderr, contains('production hostname'));
+    }
+
+    final userInfo = await _runContract({
+      ...baseEnvironment,
+      'STAGING_API_BASE_URL': 'https://staging-user@trip-planner-dby.pages.dev',
+      'STAGING_ALLOWED_HOST': 'staging-user@trip-planner-dby.pages.dev',
+    });
+    expect(userInfo.exitCode, 2);
+    expect(userInfo.stderr, contains('plain hostname'));
+    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+  });
+
   test(
     'verifies owner containment, timestamp preservation, and cleanup',
     () async {

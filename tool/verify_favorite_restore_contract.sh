@@ -14,11 +14,16 @@ if [[ "$STAGING_CONTRACT_GUARD" != 'tripline-staging-favorite-restore-v1' ]]; th
 fi
 
 base_url=${STAGING_API_BASE_URL%/}
-if [[ ! "$base_url" =~ ^https://([^/:?#]+)(:[0-9]+)?(/.*)?$ ]]; then
-  echo 'Refusing mutations: STAGING_API_BASE_URL must use HTTPS.' >&2
+if [[ ! "$base_url" =~ ^https://([A-Za-z0-9.-]+)(:[0-9]+)?(/.*)?$ ]]; then
+  echo 'Refusing mutations: STAGING_API_BASE_URL must use HTTPS with a plain hostname.' >&2
   exit 2
 fi
-staging_host=${BASH_REMATCH[1]}
+canonical_host() {
+  local host
+  host=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  printf '%s' "${host%.}"
+}
+staging_host=$(canonical_host "${BASH_REMATCH[1]}")
 readonly production_hosts=(
   'trip-planner-dby.pages.dev'
 )
@@ -30,13 +35,21 @@ for production_host in "${production_hosts[@]}"; do
 done
 if [[ "${CI:-false}" == true ]]; then
   : "${STAGING_ALLOWED_HOST:?Set the exact non-production API hostname}"
-  if [[ "$staging_host" != "$STAGING_ALLOWED_HOST" ]]; then
+  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    echo 'Refusing mutations: STAGING_ALLOWED_HOST must be a plain hostname.' >&2
+    exit 2
+  fi
+  allowed_host=$(canonical_host "$STAGING_ALLOWED_HOST")
+  if [[ "$staging_host" != "$allowed_host" ]]; then
     echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
     exit 2
   fi
-elif [[ -n "${STAGING_ALLOWED_HOST:-}" && "$staging_host" != "$STAGING_ALLOWED_HOST" ]]; then
-  echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
-  exit 2
+elif [[ -n "${STAGING_ALLOWED_HOST:-}" ]]; then
+  if [[ ! "$STAGING_ALLOWED_HOST" =~ ^[A-Za-z0-9.-]+$ ]] ||
+      [[ "$staging_host" != "$(canonical_host "$STAGING_ALLOWED_HOST")" ]]; then
+    echo 'Refusing mutations: staging API hostname is not allowlisted.' >&2
+    exit 2
+  fi
 fi
 
 if [[ ! "$STAGING_FAVORITE_POI_ID" =~ ^[0-9]+$ ]]; then
