@@ -247,6 +247,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Prepare iOS build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
+
       - name: Write iOS map secret and Test Lab signing override
         shell: bash
         env:
@@ -286,21 +293,6 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
-      - name: Configure authenticated xcodebuild
-        shell: bash
-        env:
-          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          wrapper_dir="$RUNNER_TEMP/xcodebuild-wrapper"
-          mkdir -p "$wrapper_dir"
-          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey.p8"
-          ln -s \
-            "$GITHUB_WORKSPACE/tool/xcodebuild_authenticated_wrapper.sh" \
-            "$wrapper_dir/xcodebuild"
-          printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
-
       - name: Build and package signed Patrol XCTest
         shell: bash
         env:
@@ -308,10 +300,24 @@ jobs:
           APPSTORE_API_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          flutter pub get
-          dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
+          umask 077
+          wrapper_dir="$RUNNER_TEMP/xcodebuild-wrapper"
+          cleanup() {
+            rm -f "$APPSTORE_API_KEY_PATH"
+            rm -rf "$wrapper_dir"
+          }
+          trap cleanup EXIT
+          mkdir -p "$wrapper_dir"
+          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$APPSTORE_API_KEY_PATH"
+          unset APPSTORE_API_PRIVATE_KEY
+          ln -s \
+            "$GITHUB_WORKSPACE/tool/xcodebuild_authenticated_wrapper.sh" \
+            "$wrapper_dir/xcodebuild"
+          export PATH="$wrapper_dir:$PATH"
+
           patrol build ios \
             --target patrol_test/native_map_smoke_test.dart \
             --target patrol_test/app_owned_flow_test.dart \

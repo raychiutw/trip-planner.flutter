@@ -74,10 +74,12 @@ The workflow validates and downloads both development profiles. Because Patrol
 4.4.0 owns the final `xcodebuild build-for-testing` invocation, CI places the
 checked-in authenticated xcodebuild wrapper first on `PATH`. The wrapper adds
 Xcode's non-interactive App Store Connect API-key provisioning flags only to
-`build-for-testing`; all other xcodebuild calls pass through unchanged. CI then
+`build-for-testing`; all other xcodebuild calls pass through unchanged. CI
+resolves Flutter and Patrol dependencies before materializing the API key,
 builds a release XCTest bundle, verifies the signatures of `Runner.app` and
-`RunnerUITests-Runner.app`, and only then uploads it to Test Lab. Firebase
-re-signs valid inputs for its own physical devices.
+`RunnerUITests-Runner.app`, packages the result, and then unconditionally
+deletes the key and wrapper before uploading to Test Lab. Firebase re-signs
+valid inputs for its own physical devices.
 
 ## Run and interpret
 

@@ -112,7 +112,6 @@ void main() {
         setupGuide,
         contains('com.raychiu.tripline.RunnerUITests.xctrunner'),
       );
-      expect(e2eWorkflow, contains('Configure authenticated xcodebuild'));
       expect(e2eWorkflow, contains('xcodebuild-wrapper'));
       expect(authenticatedXcodebuild.existsSync(), isTrue);
       if (!authenticatedXcodebuild.existsSync()) return;
@@ -127,6 +126,44 @@ void main() {
         wrapper,
         contains('-authenticationKeyIssuerID "\$APPSTORE_ISSUER_ID"'),
       );
+    });
+
+    test('iOS signing key is scoped to the signed XCTest build step', () {
+      final prepare = e2eWorkflow.indexOf(
+        '- name: Prepare iOS build dependencies',
+      );
+      final build = e2eWorkflow.indexOf(
+        '- name: Build and package signed Patrol XCTest',
+      );
+      final matrix = e2eWorkflow.indexOf('- name: Run iOS matrix');
+
+      expect(prepare, greaterThan(-1));
+      expect(prepare, lessThan(build));
+      expect(build, lessThan(matrix));
+      expect(
+        e2eWorkflow.substring(prepare, build),
+        contains('dart pub global activate patrol_cli'),
+      );
+      expect(
+        e2eWorkflow.substring(build, matrix),
+        allOf(
+          contains('APPSTORE_API_PRIVATE_KEY'),
+          contains('trap cleanup EXIT'),
+          contains('unset APPSTORE_API_PRIVATE_KEY'),
+          contains('export PATH="\$wrapper_dir:\$PATH"'),
+          contains('rm -rf "\$wrapper_dir"'),
+          contains('patrol build ios'),
+        ),
+      );
+      expect(
+        e2eWorkflow,
+        isNot(contains('Configure authenticated xcodebuild')),
+      );
+      expect(
+        e2eWorkflow,
+        isNot(contains('Remove App Store Connect signing key')),
+      );
+      expect(e2eWorkflow, isNot(contains('"\$GITHUB_PATH"')));
     });
 
     test(
