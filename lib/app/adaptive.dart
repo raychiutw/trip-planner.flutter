@@ -392,7 +392,9 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
       widget.controller.snapToState(widget.initialState);
       return;
     }
-    _isClosing = true;
+    setState(() => _isClosing = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
     widget.onClosed(result);
   }
 
@@ -401,34 +403,42 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
     // 必須在 build 內依賴 Theme；外觀切換後 sheet 材質與內容才會同一幀更新。
     final settings = _appLargeSheetSettings(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GlassModalSheetScaffold(
-      controller: widget.controller,
-      body: const SizedBox.expand(),
-      sheet: _sheet!,
-      initialState: widget.initialState,
-      halfSize: widget.mediumSize,
-      fullSize: widget.largeSize,
-      settings: settings,
-      halfSettings: settings,
-      fullSettings: settings,
-      expandedColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFFFFBF5),
-      quality: GlassQuality.standard,
-      fillThreshold: 1,
-      fillTransition: GlassFillTransition.gradual,
-      topBorderRadius: 28,
-      fullTopBorderRadius: 28,
-      bottomBorderRadius: 0,
-      fullBottomBorderRadius: 0,
-      horizontalMargin: 0,
-      bottomMargin: 0,
-      padding: EdgeInsets.zero,
-      showDragIndicator: widget.resizable,
-      onStateChanged: (state) {
-        if (state == GlassSheetState.hidden) {
-          widget.controller.snapToState(widget.initialState, animate: false);
-          unawaited(_requestClose());
-        }
+    return PopScope<T>(
+      canPop: _isClosing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_requestClose(result));
       },
+      child: GlassModalSheetScaffold(
+        controller: widget.controller,
+        body: const SizedBox.expand(),
+        sheet: _sheet!,
+        initialState: widget.initialState,
+        halfSize: widget.mediumSize,
+        fullSize: widget.largeSize,
+        settings: settings,
+        halfSettings: settings,
+        fullSettings: settings,
+        expandedColor: isDark
+            ? const Color(0xFF1C1C1E)
+            : const Color(0xFFFFFBF5),
+        quality: GlassQuality.standard,
+        fillThreshold: 1,
+        fillTransition: GlassFillTransition.gradual,
+        topBorderRadius: 28,
+        fullTopBorderRadius: 28,
+        bottomBorderRadius: 0,
+        fullBottomBorderRadius: 0,
+        horizontalMargin: 0,
+        bottomMargin: 0,
+        padding: EdgeInsets.zero,
+        showDragIndicator: widget.resizable,
+        onStateChanged: (state) {
+          if (state == GlassSheetState.hidden) {
+            widget.controller.snapToState(widget.initialState, animate: false);
+            unawaited(_requestClose());
+          }
+        },
+      ),
     );
   }
 }

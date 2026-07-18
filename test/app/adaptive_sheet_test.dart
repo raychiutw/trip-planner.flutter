@@ -112,6 +112,36 @@ void main() {
     expect(find.text('編輯停留點'), findsOneWidget);
   });
 
+  testWidgets('dirty form asks before system Back', (tester) async {
+    final controller = AppSheetFormController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯停留點',
+              submitLabel: '儲存',
+              controller: controller,
+              builder: (_) =>
+                  TextField(onChanged: (_) => controller.update(dirty: true)),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '京都');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsOneWidget);
+  });
+
   testWidgets('dirty routed form asks before explicit Cancel', (tester) async {
     final controller = AppUnsavedChangesController();
     await tester.pumpWidget(
