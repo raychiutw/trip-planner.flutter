@@ -17,6 +17,7 @@ void main() {
     baseEnvironment = {
       'PATH': '${sandbox.path}:${Platform.environment['PATH']}',
       'MOCK_CURL_STATE': '${sandbox.path}/curl-state',
+      'MOCK_MUTATION_LOG': '${sandbox.path}/mutation-log',
       'MOCK_ENVIRONMENT_ID': 'tripline-staging-test',
       'MOCK_MUTATION_GUARD': 'expected-environment-id-v1',
       'STAGING_API_BASE_URL': 'https://staging.tripline.test',
@@ -108,6 +109,17 @@ void main() {
     expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
   });
 
+  test('rejects a route switch after identity without mutating', () async {
+    final result = await _runContract({
+      ...baseEnvironment,
+      'MOCK_MUTATION_ENVIRONMENT_ID': 'tripline-production',
+    });
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr, contains('HTTP 412'));
+    expect(File(baseEnvironment['MOCK_MUTATION_LOG']!).existsSync(), isFalse);
+  });
+
   test(
     'rejects internal whitespace in a committed environment entry',
     () async {
@@ -197,6 +209,7 @@ state_file=${MOCK_CURL_STATE:?}
 output=''
 body=''
 url=''
+method=''
 expected_environment_header=''
 while (($#)); do
   case "$1" in
@@ -208,7 +221,8 @@ while (($#)); do
       fi
       shift 2
       ;;
-    --request|--write-out|--connect-timeout|--max-time) shift 2 ;;
+    --request) method=$2; shift 2 ;;
+    --write-out|--connect-timeout|--max-time) shift 2 ;;
     --silent|--show-error) shift ;;
     *) url=$1; shift ;;
   esac
@@ -223,10 +237,14 @@ if [[ "$url" == */api/environment-identity ]]; then
   exit 0
 fi
 
-if [[ "$expected_environment_header" != "${MOCK_ENVIRONMENT_ID:-tripline-staging-test}" ]]; then
+mutation_environment_id=${MOCK_MUTATION_ENVIRONMENT_ID:-${MOCK_ENVIRONMENT_ID:-tripline-staging-test}}
+if [[ "$method" != GET && "$expected_environment_header" != "$mutation_environment_id" ]]; then
   printf '{"code":"ENVIRONMENT_MISMATCH"}' > "$output"
   printf '412'
   exit 0
+fi
+if [[ "$method" != GET ]]; then
+  printf '%s\n' "$method" >> "${MOCK_MUTATION_LOG:?}"
 fi
 
 count=0
