@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoColors;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -15,8 +17,8 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 class _MockRequestsRepo extends Mock implements RequestsRepository {}
 
@@ -27,9 +29,12 @@ class _MockSpeechService extends Mock implements SpeechService {}
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
 class _StubAuth extends AuthNotifier {
+  _StubAuth(this.user);
+
+  final UserInfo user;
+
   @override
-  Future<UserInfo?> build() async =>
-      const UserInfo(id: '1', email: 'me@x.com', displayName: 'Me');
+  Future<UserInfo?> build() async => user;
 }
 
 const _trips = [TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩')];
@@ -39,12 +44,16 @@ TripRequest _req({
   String message = 'hi',
   String? reply,
   required RequestStatus status,
+  String? submittedBy,
+  String? submittedByDisplayName,
 }) => TripRequest(
   id: id,
   tripId: 'okinawa',
   message: message,
   reply: reply,
   status: status,
+  submittedBy: submittedBy,
+  submittedByDisplayName: submittedByDisplayName,
 );
 
 void main() {
@@ -75,17 +84,23 @@ void main() {
     SpeechService? speech,
     String? initialTripId,
     String? initialPrefill,
+    UserInfo currentUser = const UserInfo(
+      id: '1',
+      email: 'ray@example.com',
+      displayName: 'Ray Chiu',
+    ),
+    ThemeData? theme,
   }) {
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
         authRepositoryProvider.overrideWithValue(authRepo),
-        authStateProvider.overrideWith(_StubAuth.new),
+        authStateProvider.overrideWith(() => _StubAuth(currentUser)),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
       ],
       child: MaterialApp(
-        theme: AppTheme.light(),
+        theme: theme ?? AppTheme.light(),
         home: ChatScreen(
           initialTripId: initialTripId,
           initialPrefill: initialPrefill,
@@ -94,7 +109,7 @@ void main() {
     );
   }
 
-  testWidgets('AppBar 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
+  testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -103,9 +118,11 @@ void main() {
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.byType(PopupMenuButton<String>), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
-    expect(find.byType(TpAppBar), findsOneWidget);
-    final appBar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(appBar.toolbarHeight, isNull);
+    expect(find.byType(TpRootScaffold), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
     expect(find.byIcon(Icons.more_vert), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
@@ -118,6 +135,170 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('最近的行程'), findsOneWidget);
+  });
+
+  testWidgets('登入過期 banner 不會被 Root Header 遮住', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenThrow(
+      const ApiError(status: 401, code: 'UNAUTHORIZED', message: 'expired'),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final banner = find.text('登入已過期,請重新登入後再試。');
+    expect(banner, findsOneWidget);
+    final context = tester.element(find.byType(TpRootScaffold));
+    expect(
+      tester.getTopLeft(banner).dy,
+      greaterThanOrEqualTo(TpRootGeometry.initialContentTop(context)),
+    );
+  });
+
+  testWidgets('聊天顯示自己名稱與協作者 email fallback，並使用動態 Indigo', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 1,
+            message: '自己的訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+          _req(
+            id: 2,
+            message: '協作者訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'lean@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ray Chiu'), findsOneWidget);
+    expect(find.text('lean'), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('chat-list'))).dy, 0);
+
+    final collaborator = find.byKey(
+      const ValueKey('chat-message-collaborator'),
+    );
+    final collaboratorContext = tester.element(collaborator);
+    final accent = CupertinoColors.systemIndigo.resolveFrom(
+      collaboratorContext,
+    );
+    final label = tester.widget<Text>(
+      find.byKey(const ValueKey('chat-message-collaborator-label')),
+    );
+    expect(label.style?.color, accent);
+    final decoration =
+        tester.widget<DecoratedBox>(collaborator).decoration as BoxDecoration;
+    expect(
+      decoration.color,
+      Color.alphaBlend(
+        accent.withValues(alpha: 0.10),
+        Theme.of(collaboratorContext).colorScheme.surfaceContainerHigh,
+      ),
+    );
+  });
+
+  testWidgets('聊天自己名稱缺少時使用 email local part', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 3,
+            message: '自己的訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        currentUser: const UserInfo(id: '1', email: 'ray@example.com'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ray'), findsOneWidget);
+  });
+
+  testWidgets('深色協作者氣泡使用較強的動態 Indigo tint', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 4,
+            message: '協作者訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'lean@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp(theme: AppTheme.dark()));
+    await tester.pumpAndSettle();
+
+    final collaborator = find.byKey(
+      const ValueKey('chat-message-collaborator'),
+    );
+    final collaboratorContext = tester.element(collaborator);
+    final accent = CupertinoColors.systemIndigo.resolveFrom(
+      collaboratorContext,
+    );
+    final decoration =
+        tester.widget<DecoratedBox>(collaborator).decoration as BoxDecoration;
+    expect(
+      decoration.color,
+      Color.alphaBlend(
+        accent.withValues(alpha: 0.18),
+        Theme.of(collaboratorContext).colorScheme.surfaceContainerHigh,
+      ),
+    );
   });
 
   testWidgets('送訊息:輸入 + 點送出 → 樂觀顯示 + verify sendRequest', (tester) async {
@@ -142,7 +323,8 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.byType(TpGlassSurface), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-composer-glass')), findsOneWidget);
+    expect(find.byType(TpGlassSurface), findsNWidgets(2));
 
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '改午餐');
     await tester.pump();

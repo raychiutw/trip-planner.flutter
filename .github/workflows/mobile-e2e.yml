@@ -1,0 +1,355 @@
+name: Mobile E2E / Firebase Test Lab
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: External device matrix to run
+        required: false
+        default: android
+        type: string
+    secrets:
+      GOOGLE_MAPS_ANDROID_API_KEY:
+        required: false
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+      GOOGLE_MAPS_IOS_API_KEY:
+        required: false
+      APPLE_DEVELOPMENT_CERTIFICATE_P12:
+        required: false
+      APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD:
+        required: false
+      APPSTORE_ISSUER_ID:
+        required: false
+      APPSTORE_API_KEY_ID:
+        required: false
+      APPSTORE_API_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: External device matrix to run
+        required: true
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+  schedule:
+    # Weekdays at 02:30 Asia/Taipei. Scheduled runs use the Android matrix only.
+    - cron: '30 18 * * 1-5'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mobile-e2e-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+  PATROL_CLI_VERSION: '4.4.0'
+  PATROL_ANALYTICS_ENABLED: 'false'
+  FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_TEST_LAB_PROJECT_ID }}
+  GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+  GCP_TEST_LAB_SERVICE_ACCOUNT: ${{ vars.GCP_TEST_LAB_SERVICE_ACCOUNT }}
+  FIREBASE_TEST_RESULTS_BUCKET: ${{ vars.FIREBASE_TEST_RESULTS_BUCKET }}
+
+jobs:
+  android_test_lab:
+    name: Android / Firebase Test Lab
+    if: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || inputs.platform == 'android' || inputs.platform == 'all') }}
+    runs-on: ubuntu-24.04
+    environment: mobile-e2e
+    timeout-minutes: 35
+    env:
+      FIREBASE_ANDROID_MODEL: ${{ vars.FIREBASE_ANDROID_MODEL || 'MediumPhone.arm' }}
+      FIREBASE_ANDROID_VERSION: ${{ vars.FIREBASE_ANDROID_VERSION || '34' }}
+      TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-android
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate Test Lab configuration
+        shell: bash
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${FIREBASE_PROJECT_ID:?Set FIREBASE_TEST_LAB_PROJECT_ID repository variable}"
+          : "${GCP_WORKLOAD_IDENTITY_PROVIDER:?Set GCP_WORKLOAD_IDENTITY_PROVIDER repository variable}"
+          : "${GCP_TEST_LAB_SERVICE_ACCOUNT:?Set GCP_TEST_LAB_SERVICE_ACCOUNT repository variable}"
+          : "${FIREBASE_TEST_RESULTS_BUCKET:?Set FIREBASE_TEST_RESULTS_BUCKET repository variable to a GCS bucket name}"
+          : "${GOOGLE_MAPS_ANDROID_API_KEY:?Set GOOGLE_MAPS_ANDROID_API_KEY repository secret}"
+          : "${ANDROID_KEYSTORE_BASE64:?Set ANDROID_KEYSTORE_BASE64 repository secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Set ANDROID_KEYSTORE_PASSWORD repository secret}"
+          : "${ANDROID_KEY_ALIAS:?Set ANDROID_KEY_ALIAS repository secret}"
+          : "${ANDROID_KEY_PASSWORD:?Set ANDROID_KEY_PASSWORD repository secret}"
+          : "${FIREBASE_ANDROID_MODEL:?Set FIREBASE_ANDROID_MODEL repository variable}"
+          : "${FIREBASE_ANDROID_VERSION:?Set FIREBASE_ANDROID_VERSION repository variable}"
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+
+      - name: Authenticate to Google Cloud with OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_TEST_LAB_SERVICE_ACCOUNT }}
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build Patrol instrumentation APKs
+        shell: bash
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+          ANDROID_KEYSTORE_PATH: upload-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_SIGN_DEBUG_WITH_RELEASE: 'true'
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
+          patrol build android \
+            --target patrol_test/native_map_smoke_test.dart \
+            --target patrol_test/app_owned_flow_test.dart \
+            --dart-define E2E_EXPECT_GOOGLE_POI=true
+          test -f build/app/outputs/apk/debug/app-debug.apk
+          test -f build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+      - name: Run Android matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          gcloud firebase test android run \
+            --project "$FIREBASE_PROJECT_ID" \
+            --type instrumentation \
+            --use-orchestrator \
+            --app build/app/outputs/apk/debug/app-debug.apk \
+            --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+            --device "model=${FIREBASE_ANDROID_MODEL},version=${FIREBASE_ANDROID_VERSION},locale=en,orientation=portrait" \
+            --environment-variables clearPackageData=true \
+            --timeout 5m \
+            --record-video \
+            --results-history-name tripline-mobile-e2e \
+            --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
+            --results-dir "$TEST_LAB_RESULTS_DIR" \
+            2>&1 | tee test-lab-android.log
+
+      - name: Download Android Test Lab evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-lab-results/android
+          gcloud storage cp --recursive \
+            "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
+            test-lab-results/android
+
+      - name: Preserve Android test inputs and matrix log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-e2e-android-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-lab-android.log
+            test-lab-results/android
+          if-no-files-found: warn
+          retention-days: 7
+
+  ios_test_lab:
+    name: iOS / Firebase Test Lab
+    if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'all') }}
+    runs-on: macos-26
+    environment: mobile-e2e
+    timeout-minutes: 60
+    env:
+      FIREBASE_IOS_MODEL: ${{ vars.FIREBASE_IOS_MODEL }}
+      FIREBASE_IOS_VERSION: ${{ vars.FIREBASE_IOS_VERSION }}
+      IOS_APP_BUNDLE_ID: com.raychiu.tripline
+      IOS_TEST_BUNDLE_ID: com.raychiu.tripline.RunnerUITests
+      APPLE_TEAM_ID: 8Z6WVFJ574
+      TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-ios
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate Test Lab and Apple signing configuration
+        shell: bash
+        env:
+          GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
+          APPLE_DEVELOPMENT_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_P12 }}
+          APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          : "${FIREBASE_PROJECT_ID:?Set FIREBASE_TEST_LAB_PROJECT_ID repository variable}"
+          : "${GCP_WORKLOAD_IDENTITY_PROVIDER:?Set GCP_WORKLOAD_IDENTITY_PROVIDER repository variable}"
+          : "${GCP_TEST_LAB_SERVICE_ACCOUNT:?Set GCP_TEST_LAB_SERVICE_ACCOUNT repository variable}"
+          : "${FIREBASE_TEST_RESULTS_BUCKET:?Set FIREBASE_TEST_RESULTS_BUCKET repository variable to a GCS bucket name}"
+          : "${FIREBASE_IOS_MODEL:?Set FIREBASE_IOS_MODEL repository variable from gcloud firebase test ios models list}"
+          : "${FIREBASE_IOS_VERSION:?Set FIREBASE_IOS_VERSION to a version supported by the selected model}"
+          : "${GOOGLE_MAPS_IOS_API_KEY:?Set GOOGLE_MAPS_IOS_API_KEY repository secret}"
+          : "${APPLE_DEVELOPMENT_CERTIFICATE_P12:?Set APPLE_DEVELOPMENT_CERTIFICATE_P12 repository secret}"
+          : "${APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD:?Set APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD repository secret}"
+          : "${APPSTORE_ISSUER_ID:?Set APPSTORE_ISSUER_ID repository secret}"
+          : "${APPSTORE_API_KEY_ID:?Set APPSTORE_API_KEY_ID repository secret}"
+          : "${APPSTORE_API_PRIVATE_KEY:?Set APPSTORE_API_PRIVATE_KEY repository secret}"
+
+      - name: Authenticate to Google Cloud with OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_TEST_LAB_SERVICE_ACCOUNT }}
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Write iOS map secret and Test Lab signing override
+        shell: bash
+        env:
+          GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf 'GOOGLE_MAPS_IOS_API_KEY=%s\n' "$GOOGLE_MAPS_IOS_API_KEY" > ios/Flutter/Secrets.xcconfig
+          printf '%s\n' \
+            'CODE_SIGN_STYLE = Automatic' \
+            'CODE_SIGN_IDENTITY = Apple Development' \
+            "DEVELOPMENT_TEAM = ${APPLE_TEAM_ID}" \
+            'PROVISIONING_PROFILE_SPECIFIER =' \
+            > "$RUNNER_TEMP/testlab-signing.xcconfig"
+
+      - name: Import Apple Development certificate
+        uses: Apple-Actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD }}
+
+      - name: Download app development provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@c62019de00bb4395ed414e4a17c98f4e279636de # v6.0.0
+        with:
+          bundle-id: ${{ env.IOS_APP_BUNDLE_ID }}
+          profile-type: IOS_APP_DEVELOPMENT
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Download UI test development provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@c62019de00bb4395ed414e4a17c98f4e279636de # v6.0.0
+        with:
+          bundle-id: ${{ env.IOS_TEST_BUNDLE_ID }}
+          profile-type: IOS_APP_DEVELOPMENT
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      - name: Build and package signed Patrol XCTest
+        shell: bash
+        env:
+          XCODE_XCCONFIG_FILE: ${{ runner.temp }}/testlab-signing.xcconfig
+        run: |
+          set -euo pipefail
+          flutter pub get
+          dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
+          patrol build ios \
+            --target patrol_test/native_map_smoke_test.dart \
+            --target patrol_test/app_owned_flow_test.dart \
+            --dart-define E2E_EXPECT_GOOGLE_POI=true \
+            --release
+
+          products=build/ios_integ/Build/Products
+          xctestruns=("$products"/Runner_iphoneos*.xctestrun)
+          if [[ ! -e "${xctestruns[0]}" || "${#xctestruns[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Runner_iphoneos*.xctestrun" >&2
+            exit 1
+          fi
+
+          codesign --verify --deep --strict "$products/Release-iphoneos/Runner.app"
+          codesign --verify --deep --strict "$products/Release-iphoneos/RunnerUITests-Runner.app"
+
+          source_xctestrun=${xctestruns[0]}
+          source_name=$(basename "$source_xctestrun")
+          suffix=${source_name#Runner_iphoneos}
+          suffix=-${suffix#*-}
+          target_name="Runner_iphoneos${FIREBASE_IOS_VERSION}${suffix}"
+          if [[ "$source_name" != "$target_name" ]]; then
+            mv "$source_xctestrun" "$products/$target_name"
+          fi
+
+          (
+            cd "$products"
+            zip -qry ios_tests.zip Release-iphoneos "$target_name"
+          )
+          test -f "$products/ios_tests.zip"
+
+      - name: Run iOS matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          gcloud firebase test ios run \
+            --project "$FIREBASE_PROJECT_ID" \
+            --test build/ios_integ/Build/Products/ios_tests.zip \
+            --device "model=${FIREBASE_IOS_MODEL},version=${FIREBASE_IOS_VERSION},locale=en_US,orientation=portrait" \
+            --timeout 5m \
+            --results-history-name tripline-mobile-e2e \
+            --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
+            --results-dir "$TEST_LAB_RESULTS_DIR" \
+            2>&1 | tee test-lab-ios.log
+
+      - name: Download iOS Test Lab evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-lab-results/ios
+          gcloud storage cp --recursive \
+            "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
+            test-lab-results/ios
+
+      - name: Preserve iOS XCTest bundle and matrix log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-e2e-ios-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-lab-ios.log
+            test-lab-results/ios
+          if-no-files-found: warn
+          retention-days: 7

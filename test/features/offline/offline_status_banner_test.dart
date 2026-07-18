@@ -143,8 +143,12 @@ void main() {
       findsOneWidget,
     );
 
-    // 用對方的 → 純本機 removeConflict;store 變空。
+    // 選「用對方的」只更新 pending choice，不直接呼叫 API。
     await tester.tap(find.byKey(const ValueKey('conflict-keep-theirs-c1')));
+    await tester.pump();
+    expect(await cache.readConflicts(), isNotEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('conflict-apply')));
     await tester.pumpAndSettle();
 
     expect(await cache.readConflicts(), isEmpty);

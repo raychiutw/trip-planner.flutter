@@ -90,15 +90,36 @@ class CreateTripState {
 
 class CreateTripController extends Notifier<CreateTripState> {
   bool _disposed = false;
+  late int _initialFlexYear;
+  late int _initialFlexMonth;
 
   @override
   CreateTripState build() {
     ref.onDispose(() => _disposed = true);
     final now = DateTime.now();
+    _initialFlexYear = now.year;
+    _initialFlexMonth = now.month;
     return CreateTripState(flexYear: now.year, flexMonth: now.month);
   }
 
   TripRepository get _repo => ref.read(tripRepositoryProvider);
+
+  bool get hasChanges =>
+      state.destinations.isNotEmpty ||
+      state.dateMode != TripDateMode.fixed ||
+      state.fixedStart != null ||
+      state.fixedEnd != null ||
+      state.flexYear != _initialFlexYear ||
+      state.flexMonth != _initialFlexMonth ||
+      state.flexDayCount != 5 ||
+      state.description.isNotEmpty;
+
+  void reset() {
+    state = CreateTripState(
+      flexYear: _initialFlexYear,
+      flexMonth: _initialFlexMonth,
+    );
+  }
 
   void addDestination(DestinationInput d) =>
       state = state.copyWith(destinations: [...state.destinations, d]);
@@ -146,6 +167,7 @@ class CreateTripController extends Notifier<CreateTripState> {
         countries: deriveCountries(dests),
         destinations: dests,
       );
+      if (!_disposed) reset();
       return r.tripId;
     } on ApiError catch (e) {
       if (_disposed) return null;

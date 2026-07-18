@@ -65,33 +65,34 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
     final busy = _busyAction != null;
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('列印預覽'),
         actions: [
-          IconButton(
+          TpToolbarGlassButton(
             key: const ValueKey('trip-print-do'),
             tooltip: '列印',
-            icon: _busyAction == _PrintAction.print
+            onPressed: data == null || busy
+                ? null
+                : () => unawaited(_runAction(_PrintAction.print, data)),
+            child: _busyAction == _PrintAction.print
                 ? const SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(CupertinoIcons.printer),
-            onPressed: data == null || busy
-                ? null
-                : () => unawaited(_runAction(_PrintAction.print, data)),
           ),
-          IconButton(
+          TpToolbarGlassButton(
             key: const ValueKey('trip-print-pdf'),
             tooltip: '匯出 PDF',
-            icon: _busyAction == _PrintAction.pdf
+            onPressed: data == null || busy
+                ? null
+                : () => unawaited(_runAction(_PrintAction.pdf, data)),
+            child: _busyAction == _PrintAction.pdf
                 ? const SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_outlined),
-            onPressed: data == null || busy
-                ? null
-                : () => unawaited(_runAction(_PrintAction.pdf, data)),
           ),
         ],
       ),

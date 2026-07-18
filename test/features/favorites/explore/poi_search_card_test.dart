@@ -38,7 +38,7 @@ void main() {
   testWidgets('顯示名稱/類型label/評分;未收藏 = border heart', (tester) async {
     await pumpCard(tester, isSaved: false);
     expect(find.text('暖暮拉麵'), findsOneWidget);
-    expect(find.text('拉麵'), findsOneWidget);
+    expect(find.text('拉麵店'), findsOneWidget);
     expect(find.text('4.5'), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.heart), findsOneWidget);
     expect(find.byKey(const ValueKey('poi-card-p1')), findsOneWidget);

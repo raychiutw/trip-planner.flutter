@@ -21,48 +21,62 @@ class TripTitleButton extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   Future<void> _openPicker(BuildContext context) async {
-    final selected = await showAppLargeSheet<String>(
+    final selected = await showAppSelectionSheet<String>(
       context,
       title: '切換行程',
-      builder: (_) =>
-          _TripPickerSheet(currentTripId: currentTripId, trips: trips),
+      builder: (sheetContext, select) => _TripPickerSheet(
+        currentTripId: currentTripId,
+        trips: trips,
+        onSelected: select,
+      ),
     );
     if (selected != null && selected != currentTripId) onSelected(selected);
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: trips.isEmpty ? null : () => _openPicker(context),
-      style: TextButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        minimumSize: const Size(44, 44),
-        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              currentTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge,
+    return KeyedSubtree(
+      key: const ValueKey('trip-title-button'),
+      child: TextButton(
+        onPressed: trips.isEmpty ? null : () => _openPicker(context),
+        style: TextButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          minimumSize: const Size(44, 44),
+          padding: EdgeInsets.zero,
+          alignment: Alignment.centerLeft,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                currentTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
-          ),
-          const SizedBox(width: TpSpacing.s1),
-          const Icon(CupertinoIcons.chevron_down, size: 14),
-        ],
+            const SizedBox(width: TpSpacing.s1),
+            const Icon(CupertinoIcons.chevron_down, size: 14),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _TripPickerSheet extends StatefulWidget {
-  const _TripPickerSheet({required this.currentTripId, required this.trips});
+  const _TripPickerSheet({
+    required this.currentTripId,
+    required this.trips,
+    required this.onSelected,
+  });
 
   final String currentTripId;
   final List<TripSummary> trips;
+  final ValueChanged<String> onSelected;
 
   @override
   State<_TripPickerSheet> createState() => _TripPickerSheetState();
@@ -166,7 +180,7 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
                               color: colors.primary,
                             )
                           : null,
-                      onTap: () => Navigator.of(context).pop(trip.tripId),
+                      onTap: () => widget.onSelected(trip.tripId),
                     );
                   },
                 ),

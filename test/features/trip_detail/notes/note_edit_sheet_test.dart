@@ -170,8 +170,11 @@ void main() {
       _MockTripRepository(),
       section: NoteSection.reservations,
     );
-    final button = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('note-edit-submit')),
+    final button = tester.widget<TextButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('note-edit-submit')),
+        matching: find.byType(TextButton),
+      ),
     );
     expect(button.onPressed, isNull);
   });

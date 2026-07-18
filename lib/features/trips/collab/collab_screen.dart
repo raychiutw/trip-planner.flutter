@@ -59,7 +59,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     final state = ref.watch(collabControllerProvider(widget.tripId));
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('共編設定')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('共編設定')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('collab-loading'))
           : !state.canManage

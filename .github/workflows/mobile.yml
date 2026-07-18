@@ -41,6 +41,13 @@ jobs:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Lint GitHub Actions workflows
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          version: 1.7.12
+          shellcheck: true
+          pyflakes: false
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -57,6 +64,15 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Preserve deterministic UI evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tripline-ui-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/test-artifacts
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Build Android debug
         env:
           GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
@@ -65,10 +81,61 @@ jobs:
           : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
           flutter build apk --debug
 
+  favorite_restore_contract:
+    name: Verify staging favorite restore
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-24.04
+    environment: mobile-release
+    timeout-minutes: 10
+    concurrency:
+      group: favorite-restore-contract-${{ github.repository }}
+      cancel-in-progress: false
+    env:
+      STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+      STAGING_ALLOWED_HOST: ${{ secrets.STAGING_ALLOWED_HOST }}
+      STAGING_ORIGIN: ${{ secrets.STAGING_ORIGIN }}
+      STAGING_SESSION_COOKIE: ${{ secrets.STAGING_SESSION_COOKIE }}
+      STAGING_CSRF_TOKEN: ${{ secrets.STAGING_CSRF_TOKEN }}
+      STAGING_OTHER_SESSION_COOKIE: ${{ secrets.STAGING_OTHER_SESSION_COOKIE }}
+      STAGING_OTHER_CSRF_TOKEN: ${{ secrets.STAGING_OTHER_CSRF_TOKEN }}
+      STAGING_FAVORITE_POI_ID: ${{ secrets.STAGING_FAVORITE_POI_ID }}
+      STAGING_CONTRACT_GUARD: ${{ secrets.STAGING_CONTRACT_GUARD }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Verify staging favorite restore
+        run: tool/verify_favorite_restore_contract.sh
+
+  external_device_gate:
+    name: External device release gate
+    needs: favorite_restore_contract
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/mobile-e2e.yml
+    with:
+      platform: ${{ inputs.release_target == 'testflight' && 'ios' || 'android' }}
+    secrets:
+      GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
+      APPLE_DEVELOPMENT_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_P12 }}
+      APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD }}
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
   testflight:
     name: Upload to TestFlight
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'testflight' }}
+    needs: external_device_gate
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'testflight' && needs.external_device_gate.result == 'success' }}
     runs-on: ${{ inputs.runner }}
+    environment: mobile-release
     timeout-minutes: 75
     concurrency:
       group: testflight-${{ github.repository }}
@@ -120,10 +187,16 @@ jobs:
       - name: Build IPA
         run: |
           set -euo pipefail
+          if (( GITHUB_RUN_ATTEMPT >= 100 )); then
+            echo "GITHUB_RUN_ATTEMPT must be below 100; start a new workflow run" >&2
+            exit 1
+          fi
+          build_number=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
           xcodebuild -version
           flutter build ipa \
             --release \
-            --build-number="$GITHUB_RUN_ID" \
+            --build-number="$build_number" \
+            --dart-define=FAVORITE_RESTORE_ENABLED=true \
             --export-options-plist=ios/ExportOptions.plist
 
       - name: Resolve IPA path
@@ -149,8 +222,10 @@ jobs:
 
   android_internal:
     name: Upload to Google Play internal testing
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_target == 'android-internal' }}
+    needs: external_device_gate
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'android-internal' && needs.external_device_gate.result == 'success' }}
     runs-on: ubuntu-24.04
+    environment: mobile-release
     timeout-minutes: 45
     concurrency:
       group: android-internal-${{ github.repository }}
@@ -212,7 +287,10 @@ jobs:
             echo "Android version code exceeds the Google Play limit" >&2
             exit 1
           fi
-          flutter build appbundle --release --build-number="$version_code"
+          flutter build appbundle \
+            --release \
+            --build-number="$version_code" \
+            --dart-define=FAVORITE_RESTORE_ENABLED=true
           test -f build/app/outputs/bundle/release/app-release.aab
 
       - name: Preserve signed Android App Bundle

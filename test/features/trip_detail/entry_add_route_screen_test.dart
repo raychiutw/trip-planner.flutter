@@ -138,7 +138,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('新增停留點'), findsWidgets);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('加入'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(find.text('DAY 2'), findsOneWidget);
 
     await tester.enterText(

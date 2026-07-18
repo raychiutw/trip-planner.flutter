@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -286,6 +287,111 @@ class DayWeatherCard extends ConsumerStatefulWidget {
   ConsumerState<DayWeatherCard> createState() => _DayWeatherCardState();
 }
 
+/// 真實預報尚未可用時顯示的明確示意狀態。
+class DayWeatherPreview extends StatelessWidget {
+  const DayWeatherPreview({super.key, required this.dayNum, this.statusText});
+
+  final int dayNum;
+  final String? statusText;
+
+  ({String temperature, String condition, String rain, IconData icon})
+  get _sample => switch ((dayNum - 1) % 4) {
+    0 => (
+      temperature: '28°C',
+      condition: '晴時多雲',
+      rain: '降雨 20%',
+      icon: CupertinoIcons.cloud_sun_fill,
+    ),
+    1 => (
+      temperature: '27°C',
+      condition: '多雲',
+      rain: '降雨 30%',
+      icon: CupertinoIcons.cloud_fill,
+    ),
+    2 => (
+      temperature: '29°C',
+      condition: '晴朗',
+      rain: '降雨 10%',
+      icon: CupertinoIcons.sun_max_fill,
+    ),
+    _ => (
+      temperature: '26°C',
+      condition: '短暫陣雨',
+      rain: '降雨 40%',
+      icon: CupertinoIcons.cloud_rain_fill,
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tones = theme.extension<TpTones>()!;
+    final sample = _sample;
+    return Container(
+      key: ValueKey('day-weather-preview-$dayNum'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s3,
+        vertical: TpSpacing.s2,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(TpRadius.lg),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(sample.icon, size: 22, color: tones.accentDeep),
+          const SizedBox(width: TpSpacing.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '天氣示意',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: tones.accentDeep,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Wrap(
+                  spacing: TpSpacing.s2,
+                  children: [
+                    Text(
+                      sample.condition,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      sample.rain,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                if (statusText != null)
+                  Text(
+                    statusText!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            sample.temperature,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
   bool _expanded = false;
 
@@ -294,15 +400,17 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
     final dayDate = widget.day.date;
     final weatherDay = buildWeatherDay(widget.day);
     if (dayDate == null || weatherDay == null) {
-      return const SizedBox.shrink();
+      return DayWeatherPreview(
+        dayNum: widget.day.dayNum,
+        statusText: '尚無可用預報位置',
+      );
     }
 
     final diff = _daysUntil(dayDate);
-    final tooFarAway = diff != null && diff > 16;
-    if (tooFarAway) {
-      return const _WeatherMessageRow(
-        icon: Icons.wb_sunny_outlined,
-        text: '天氣預報將於出發前 16 天開放',
+    if (diff != null && diff > 16) {
+      return DayWeatherPreview(
+        dayNum: widget.day.dayNum,
+        statusText: '天氣預報將於出發前 16 天開放',
       );
     }
 
@@ -315,39 +423,48 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
       timezone: widget.timezone,
     );
 
-    return ref
+    final content = ref
         .watch(dayWeatherProvider(request))
-        .when(
-          loading: () => const _WeatherMessageRow(
-            icon: Icons.hourglass_empty_rounded,
-            text: '正在載入逐時天氣預報...',
+        .when<Widget>(
+          loading: () => DayWeatherPreview(
+            dayNum: widget.day.dayNum,
+            statusText: '正在更新預報',
           ),
-          error: (error, stackTrace) => _WeatherMessageRow(
-            icon: Icons.cloud_off_outlined,
-            text: '天氣資料載入失敗',
-            detail: error.toString(),
+          error: (error, stackTrace) => DayWeatherPreview(
+            dayNum: widget.day.dayNum,
+            statusText: '暫時無法取得預報',
           ),
           data: (hourly) {
             if (!hourly.hasData) {
-              return const _WeatherMessageRow(
-                icon: Icons.cloud_queue_outlined,
-                text: '超出預報範圍，暫無資料',
+              return DayWeatherPreview(
+                dayNum: widget.day.dayNum,
+                statusText: '目前沒有可用預報',
               );
             }
             final summary = _WeatherSummary.fromHourly(hourly);
-            return _WeatherForecastPanel(
-              dayNum: widget.day.dayNum,
-              hourly: hourly,
-              summary: summary,
-              locationCount: weatherDay.locations
-                  .map((location) => location.name)
-                  .toSet()
-                  .length,
-              expanded: _expanded,
-              onToggle: () => setState(() => _expanded = !_expanded),
+            return KeyedSubtree(
+              key: ValueKey('day-weather-live-${widget.day.dayNum}'),
+              child: _WeatherForecastPanel(
+                dayNum: widget.day.dayNum,
+                hourly: hourly,
+                summary: summary,
+                locationCount: weatherDay.locations
+                    .map((location) => location.name)
+                    .toSet()
+                    .length,
+                expanded: _expanded,
+                onToggle: () => setState(() => _expanded = !_expanded),
+              ),
             );
           },
         );
+
+    return AnimatedSwitcher(
+      duration: TpMotion.resolve(context, const Duration(milliseconds: 200)),
+      switchInCurve: TpMotion.appleEase,
+      switchOutCurve: TpMotion.appleEase,
+      child: content,
+    );
   }
 }
 
@@ -537,51 +654,6 @@ class _HourlyWeatherTile extends StatelessWidget {
             style: theme.textTheme.labelSmall?.copyWith(
               color: rainy ? theme.colorScheme.onSurface : tones.accent,
               fontWeight: rainy ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeatherMessageRow extends StatelessWidget {
-  const _WeatherMessageRow({
-    required this.icon,
-    required this.text,
-    this.detail,
-  });
-
-  final IconData icon;
-  final String text;
-  final String? detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: TpSpacing.s3,
-        vertical: TpSpacing.s2,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: muted),
-          const SizedBox(width: TpSpacing.s2),
-          Expanded(
-            child: Text(
-              detail == null ? text : '$text：$detail',
-              style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

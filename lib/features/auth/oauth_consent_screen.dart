@@ -38,7 +38,10 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
   Widget build(BuildContext context) {
     final request = widget.request;
     return Scaffold(
-      appBar: const TpAppBar(title: Text('授權請求')),
+      appBar: const TpAppBar(
+        role: TpAppBarRole.standalone,
+        title: Text('授權請求'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [

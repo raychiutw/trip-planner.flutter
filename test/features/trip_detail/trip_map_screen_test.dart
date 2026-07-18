@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/features/map/google_maps_external_launcher.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
@@ -51,6 +54,35 @@ class _StubMapRepository implements MapRepository {
       durationSeconds: 600,
       distanceMeters: 4200,
     );
+  }
+}
+
+class _RecordedMove {
+  const _RecordedMove(this.point, this.zoom, this.animate);
+
+  final TripMapPoint point;
+  final double zoom;
+  final bool animate;
+}
+
+class _FakeTripMapPlatformController implements TripMapPlatformController {
+  final moves = <_RecordedMove>[];
+
+  @override
+  Future<void> fitPoints(
+    List<TripMapPoint> points, {
+    required double padding,
+    required bool animate,
+    double? maxZoom,
+  }) async {}
+
+  @override
+  Future<void> move(
+    TripMapPoint point,
+    double zoom, {
+    required bool animate,
+  }) async {
+    moves.add(_RecordedMove(point, zoom, animate));
   }
 }
 
@@ -102,6 +134,12 @@ final _dayTwo = TripDay(
   ],
 );
 
+const _googlePoi = GoogleMapPoiSelection(
+  placeId: 'ChIJ-test',
+  name: '清水寺',
+  point: TripMapPoint(34.9948, 135.785),
+);
+
 Widget _buildScreen(
   List<TripDay> days, {
   int? initialEntryId,
@@ -115,6 +153,9 @@ Widget _buildScreen(
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
   bool withRootTab = false,
+  ThemeData? theme,
+  GoogleMapsExternalLauncher externalLauncher =
+      const GoogleMapsExternalLauncher(),
 }) {
   final router = GoRouter(
     routes: [
@@ -129,6 +170,7 @@ Widget _buildScreen(
             return fakeTripMapBuilder(config);
           },
           locationService: locationService,
+          externalLauncher: externalLauncher,
         ),
       ),
       GoRoute(
@@ -156,7 +198,7 @@ Widget _buildScreen(
       ),
     ],
     child: MaterialApp.router(
-      theme: AppTheme.light(),
+      theme: theme ?? AppTheme.light(),
       routerConfig: router,
       builder: (context, child) {
         Widget content = child!;
@@ -184,6 +226,124 @@ Widget _buildScreen(
 }
 
 void main() {
+  testWidgets('Google POI 暫時取代 Tripline accessory 並可關閉還原', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], onMapConfig: (config) => mapConfig = config),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsOneWidget);
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+    expect(find.text('在 Google 地圖開啟'), findsOneWidget);
+    expect(find.byType(PageView), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('google-poi-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PageView), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+  });
+
+  testWidgets('空白地圖與 Tripline marker 還原原頁且 marker 維持 zoom 12', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    TripMapCanvasConfig? mapConfig;
+    var attached = false;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne],
+        initialEntryId: 13,
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (!attached) {
+            attached = true;
+            config.controller.attach(nativeController);
+          }
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pump();
+    mapConfig!.onTap!(const TripMapPoint(35, 135));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pump();
+    nativeController.moves.clear();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-12')
+        .onTap!();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.zoom, 12);
+  });
+
+  testWidgets('選取 Google POI 不移動鏡頭，外開失敗保留卡片並顯示錯誤', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    TripMapCanvasConfig? mapConfig;
+    var attached = false;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne],
+        externalLauncher: GoogleMapsExternalLauncher(
+          launch: (_, {required mode}) async => false,
+        ),
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (!attached) {
+            attached = true;
+            config.controller.attach(nativeController);
+          }
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    nativeController.moves.clear();
+
+    mapConfig!.onGooglePoiSelected!(_googlePoi);
+    await tester.pumpAndSettle();
+    expect(nativeController.moves, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('google-poi-open')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+    expect(find.text('無法開啟 Google 地圖，請稍後再試'), findsOneWidget);
+  });
+
+  testWidgets('白天地圖固定使用深色 status bar 圖示', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('trip-map-status-style')),
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.dark);
+    expect(region.value.statusBarBrightness, Brightness.light);
+  });
+
+  testWidgets('深色地圖固定使用淺色 status bar 圖示', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], theme: AppTheme.dark()),
+    );
+    await tester.pumpAndSettle();
+
+    final region = tester.widget<AnnotatedRegion<SystemUiOverlayStyle>>(
+      find.byKey(const ValueKey('trip-map-status-style')),
+    );
+    expect(region.value.statusBarIconBrightness, Brightness.light);
+    expect(region.value.statusBarBrightness, Brightness.dark);
+  });
+
   testWidgets('DAY 1：單層行程/DAY selector、固定城市 zoom 與當日 POI', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
@@ -194,21 +354,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
+
     final daySelector = find.byKey(const ValueKey('trip-map-day-selector'));
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
-      find.descendant(of: daySelector, matching: find.byType(BackdropFilter)),
+      find.descendant(of: daySelector, matching: find.byType(GlassContainer)),
       findsOneWidget,
     );
     expect(find.byType(PageView), findsOneWidget);
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.scrollDirection, Axis.horizontal);
-    expect(pageView.controller!.viewportFraction, 0.72);
+    expect(pageView.controller!.viewportFraction, 0.80);
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
       TpBottomAccessory.height,
@@ -228,9 +393,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('trip-map-poi-drawer')),
-        matching: find.byType(BackdropFilter),
+        matching: find.byType(GlassContainer),
       ),
-      findsAtLeastNWidgets(2),
+      findsOneWidget,
     );
 
     // pins：只顯示 DAY 1 且 master 座標非 null 的 2 筆
@@ -270,13 +435,36 @@ void main() {
     );
     final neighbor = find.byKey(const ValueKey('entry-card-12'));
     expect(neighbor, findsOneWidget);
+    final currentRect = tester.getRect(
+      find.byKey(const ValueKey('entry-card-11')),
+    );
     final neighborRect = tester.getRect(neighbor);
     expect(neighborRect.left, lessThan(drawer.right));
     expect(neighborRect.right, greaterThan(drawer.right));
+    expect(
+      (drawer.right - neighborRect.left) / currentRect.width,
+      closeTo(0.25, 0.03),
+    );
 
     expect(
       find.descendant(of: neighbor, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
+      findsNothing,
+    );
+  });
+
+  testWidgets('POI 卡片與玻璃膠囊保留水平 8pt、垂直 4pt 空白', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    final padding = tester.widget<Padding>(
+      find.byKey(const ValueKey('trip-map-poi-card-padding-11')),
+    );
+    expect(
+      padding.padding,
+      const EdgeInsets.symmetric(
+        horizontal: TpSpacing.s2,
+        vertical: TpSpacing.s1,
+      ),
     );
   });
 
@@ -320,15 +508,23 @@ void main() {
     expect(mapConfig?.initialCenter?.longitude, 127.719);
   });
 
-  testWidgets('切到 DAY 02：只顯示該日 pins 與 entry cards', (tester) async {
+  testWidgets('切到 DAY 02：只顯示該日內容且鏡頭維持 zoom 12', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
     TripMapCanvasConfig? mapConfig;
+    var attached = false;
     await tester.pumpWidget(
-      _buildScreen([
-        _dayOne,
-        _dayTwo,
-      ], onMapConfig: (config) => mapConfig = config),
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
     );
     await tester.pumpAndSettle();
+    nativeController.moves.clear();
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
     await tester.pumpAndSettle();
@@ -340,6 +536,10 @@ void main() {
     expect(mapConfig?.initialZoom, 12);
     expect(mapConfig?.initialCenter?.latitude, 26.694);
     expect(mapConfig?.initialCenter?.longitude, 127.878);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.zoom, 12);
+    expect(nativeController.moves.last.point.latitude, 26.694);
+    expect(nativeController.moves.last.point.longitude, 127.878);
   });
 
   testWidgets('地圖的行程選項切回同一天 timeline', (tester) async {
@@ -385,6 +585,29 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
+  testWidgets('點選 POI 後鏡頭維持城市 zoom 12', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    var attached = false;
+
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        onMapConfig: (config) {
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    nativeController.moves.clear();
+
+    await tester.tap(find.byKey(const ValueKey('entry-card-11')));
+    await tester.pumpAndSettle();
+
+    expect(nativeController.moves.single.zoom, 12);
   });
 
   testWidgets('marker 點擊與左右滑卡共用 active POI', (tester) async {
@@ -596,18 +819,17 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
     await tester.pumpAndSettle();
-    final sheet = find.byKey(const ValueKey('app-large-sheet'));
-    expect(sheet, findsOneWidget);
-    expect(find.text('切換行程'), findsOneWidget);
-    expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('app-large-sheet-drag-indicator')),
-      findsOneWidget,
+    final sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
     );
+    expect(find.text('切換行程'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
     expect(find.byType(TabBar), findsNothing);
-    final screenHeight =
-        tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    expect(tester.getSize(sheet).height, closeTo(screenHeight * 0.93, 1));
+    expect(sheet.initialState, GlassSheetState.full);
+    expect(sheet.halfSize, 0.62);
+    expect(sheet.fullSize, 0.93);
+    expect(sheet.showDragIndicator, isTrue);
 
     await tester.tap(find.byKey(const ValueKey('trip-picker-item-trip-2')));
     await tester.pumpAndSettle();

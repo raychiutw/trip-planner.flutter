@@ -166,6 +166,38 @@ void main() {
       expect(find.text('09:00–17:00'), findsOneWidget);
     });
 
+    testWidgets('200% Dynamic Type 會換行且不溢出', (tester) async {
+      tester.view.physicalSize = const Size(358, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearAllTestValues);
+
+      await pumpHeader(
+        tester,
+        const TripDay(
+          id: 1,
+          dayNum: 1,
+          version: 0,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              version: 0,
+              startTime: '09:00',
+              endTime: '17:00',
+              title: 'A',
+            ),
+          ],
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('DAY 01'), findsOneWidget);
+      expect(find.text('09:00–17:00'), findsOneWidget);
+    });
+
     testWidgets('timeline 無任何時間 → 不顯示時間範圍', (tester) async {
       await pumpHeader(
         tester,

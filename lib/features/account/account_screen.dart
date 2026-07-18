@@ -15,8 +15,14 @@ import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_content_surface.dart';
+import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_settings_group.dart';
-import '../../ui/tp_root_scroll_scaffold.dart';
+import 'account_sessions_screen.dart';
+import 'connected_apps_screen.dart';
+import 'developer_apps_screen.dart';
+import 'settings/appearance_screen.dart';
+import 'settings/notifications_screen.dart';
+import 'settings/profile_edit_screen.dart';
 
 /// 帳號統計（GET /account/stats）。
 final accountStatsProvider = FutureProvider<AccountStats>(
@@ -97,7 +103,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ),
                   title: _resolveDisplayName(effectiveUser),
                   subtitle: '帳號資訊與個人資料',
-                  onTap: () => context.push('/settings/profile'),
+                  onTap: () =>
+                      _openSheetPage(context, const ProfileEditScreen()),
                 ),
               ],
             ),
@@ -140,26 +147,34 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       );
     }
 
-    return TpRootScrollScaffold(
-      title: '帳號',
-      actions: [
-        IconButton(
-          key: const ValueKey('account-close-button'),
-          tooltip: '關閉',
-          onPressed: () {
-            final router = GoRouter.maybeOf(context);
-            if (router == null) {
-              Navigator.of(context).maybePop();
-            } else if (router.canPop()) {
-              router.pop();
-            } else {
-              router.go('/trips');
-            }
-          },
-          icon: const Icon(CupertinoIcons.xmark),
-        ),
-      ],
-      slivers: slivers,
+    return Scaffold(
+      appBar: TpAppBar(
+        role: TpAppBarRole.standalone,
+        title: const Text('帳號'),
+        actions: [
+          TpToolbarIconButton(
+            key: const ValueKey('account-close-button'),
+            tooltip: '關閉',
+            onPressed: () {
+              final router = GoRouter.maybeOf(context);
+              if (router == null) {
+                Navigator.of(context).maybePop();
+              } else if (router.canPop()) {
+                router.pop();
+              } else {
+                router.go('/trips');
+              }
+            },
+            icon: CupertinoIcons.xmark,
+          ),
+        ],
+      ),
+      body: CustomScrollView(
+        slivers: [
+          ...slivers,
+          const SliverToBoxAdapter(child: SizedBox(height: TpSpacing.s6)),
+        ],
+      ),
     );
   }
 
@@ -512,27 +527,27 @@ class _SettingsGroup extends StatelessWidget {
           TpSettingsRow(
             key: const ValueKey('settings-appearance'),
             title: '外觀',
-            onTap: () => context.push('/settings/appearance'),
+            onTap: () => _openSheetPage(context, const AppearanceScreen()),
           ),
           TpSettingsRow(
             key: const ValueKey('settings-notifications'),
             title: '通知',
-            onTap: () => context.push('/settings/notifications'),
+            onTap: () => _openSheetPage(context, const NotificationsScreen()),
           ),
           TpSettingsRow(
             key: const ValueKey('settings-sessions'),
             title: '登入裝置',
-            onTap: () => context.push('/settings/sessions'),
+            onTap: () => _openSheetPage(context, const AccountSessionsScreen()),
           ),
           TpSettingsRow(
             key: const ValueKey('settings-connected-apps'),
             title: '已連結的應用程式',
-            onTap: () => context.push('/settings/connected-apps'),
+            onTap: () => _openSheetPage(context, const ConnectedAppsScreen()),
           ),
           TpSettingsRow(
             key: const ValueKey('settings-developer-apps'),
             title: '開發者 App',
-            onTap: () => context.push('/settings/developer-apps'),
+            onTap: () => _openSheetPage(context, const DeveloperAppsScreen()),
           ),
         ],
       );
@@ -597,6 +612,14 @@ class _SettingsGroup extends StatelessWidget {
       ],
     );
   }
+}
+
+void _openSheetPage(BuildContext context, Widget page) {
+  unawaited(
+    Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
+  );
 }
 
 /// 登出 destructive row。

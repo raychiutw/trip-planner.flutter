@@ -118,13 +118,14 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
     final tripTitle = _trip?.title ?? _trip?.name ?? widget.tripId;
     return Scaffold(
       appBar: TpAppBar(
+        role: TpAppBarRole.detail,
         title: const Text('異動紀錄'),
         actions: [
-          IconButton(
+          TpToolbarIconButton(
             key: const ValueKey('trip-audit-refresh-button'),
             tooltip: '重新整理',
             onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
+            icon: Icons.refresh,
           ),
         ],
       ),

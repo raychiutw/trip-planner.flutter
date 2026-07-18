@@ -9,6 +9,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
@@ -57,9 +58,14 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.text('舊名字'), findsOneWidget); // 帶入初值
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('儲存'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(
       tester
-          .widget<FilledButton>(find.byKey(const ValueKey('profile-save')))
+          .widget<TpToolbarTextButton>(
+            find.byKey(const ValueKey('profile-save')),
+          )
           .onPressed,
       isNull,
     );
@@ -71,7 +77,9 @@ void main() {
     await tester.pump();
     expect(
       tester
-          .widget<FilledButton>(find.byKey(const ValueKey('profile-save')))
+          .widget<TpToolbarTextButton>(
+            find.byKey(const ValueKey('profile-save')),
+          )
           .onPressed,
       isNotNull,
     );
@@ -79,5 +87,20 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
+  });
+
+  testWidgets('改名後取消會確認捨棄未儲存變更', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-display-name')),
+      '新名字',
+    );
+    await tester.pump();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
   });
 }

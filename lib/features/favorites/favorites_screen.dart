@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
@@ -5,12 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
+import '../../api/api_error.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
-import '../../ui/tp_root_scroll_scaffold.dart';
+import '../../ui/tp_action_item.dart';
+import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_root_scaffold.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
 
@@ -49,8 +54,11 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _typeFilter = 'all';
   String _regionFilter = 'all';
   Set<int> _selectedIds = {};
+  final Set<int> _hiddenFavoriteIds = {};
   bool _deletingSelected = false;
   int _page = 1;
+  bool _searching = false;
+  _FavoriteSort _sort = _FavoriteSort.newest;
 
   @override
   void dispose() {
@@ -62,45 +70,175 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   Widget build(BuildContext context) {
     final favoritesAsync = ref.watch(favoritesProvider);
 
-    return TpRootScrollScaffold(
-      title: '收藏',
-      onRefresh: () => ref.refresh(favoritesProvider.future),
-      actions: [
-        IconButton(
-          key: const ValueKey('favorites-explore-action'),
-          tooltip: '探索',
-          icon: const Icon(CupertinoIcons.search),
-          onPressed: () => context.go('/favorites/explore'),
+    return TpRootScaffold(
+      showSoftEdge: true,
+      header: TpRootHeaderConfig(
+        title: _searching
+            ? AppSearchField(
+                fieldKey: const ValueKey('favorites-search-input'),
+                controller: _searchController,
+                placeholder: '搜尋收藏',
+                autofocus: true,
+                embedded: true,
+                onChanged: (value) => setState(() {
+                  _searchQuery = value;
+                  _page = 1;
+                }),
+              )
+            : const Text('收藏'),
+        actions: _buildHeaderActions(context),
+      ),
+      body: TpRootScrollView(
+        onRefresh: () => ref.refresh(favoritesProvider.future),
+        slivers: [
+          ...favoritesAsync.when(
+            data: (favorites) {
+              final visible = favorites
+                  .where(
+                    (favorite) => !_hiddenFavoriteIds.contains(favorite.id),
+                  )
+                  .toList();
+              return visible.isEmpty
+                  ? [
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyHero(),
+                      ),
+                    ]
+                  : _buildListSlivers(context, ref, visible);
+            },
+            error: (error, stackTrace) => [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _ErrorState(
+                  onRetry: () => ref.invalidate(favoritesProvider),
+                ),
+              ),
+            ],
+            loading: () => const [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator.adaptive()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildHeaderActions(BuildContext context) {
+    final sort = TpMoreMenuButton<_FavoriteHeaderAction>(
+      key: const ValueKey('favorites-sort-action'),
+      tooltip: '排序與篩選',
+      triggerChild: Icon(
+        CupertinoIcons.line_horizontal_3_decrease,
+        size: 20,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      items: [
+        TpActionItem(
+          key: const ValueKey('favorites-sort-newest'),
+          label: '最近加入',
+          value: _FavoriteHeaderAction.sortNewest,
+          icon: CupertinoIcons.clock,
+          selected: _sort == _FavoriteSort.newest,
+        ),
+        TpActionItem(
+          key: const ValueKey('favorites-sort-oldest'),
+          label: '最早加入',
+          value: _FavoriteHeaderAction.sortOldest,
+          icon: CupertinoIcons.clock,
+          selected: _sort == _FavoriteSort.oldest,
+        ),
+        TpActionItem(
+          key: const ValueKey('favorites-sort-name'),
+          label: '名稱',
+          value: _FavoriteHeaderAction.sortName,
+          icon: CupertinoIcons.textformat,
+          selected: _sort == _FavoriteSort.name,
+        ),
+        TpActionItem(
+          key: const ValueKey('favorites-sort-region'),
+          label: '地區',
+          value: _FavoriteHeaderAction.sortRegion,
+          icon: CupertinoIcons.location,
+          selected: _sort == _FavoriteSort.region,
+        ),
+        TpActionItem(
+          key: const ValueKey('favorites-filter-action'),
+          label: '篩選條件',
+          value: _FavoriteHeaderAction.filter,
+          icon: CupertinoIcons.slider_horizontal_3,
+          dividerBefore: true,
+          selected: _hasActiveFilters,
+        ),
+      ],
+      onSelected: _handleHeaderAction,
+    );
+
+    if (_searching) {
+      return [
+        sort,
+        TpToolbarIconButton(
+          key: const ValueKey('favorites-search-close'),
+          tooltip: '結束搜尋',
+          icon: CupertinoIcons.xmark,
+          onPressed: _endSearch,
         ),
         const TpAccountAvatarButton(),
-      ],
-      slivers: [
-        ...favoritesAsync.when(
-          data: (favorites) => favorites.isEmpty
-              ? [
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyHero(),
-                  ),
-                ]
-              : _buildListSlivers(context, ref, favorites),
-          error: (error, stackTrace) => [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _ErrorState(
-                onRetry: () => ref.invalidate(favoritesProvider),
-              ),
-            ),
-          ],
-          loading: () => const [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator.adaptive()),
-            ),
-          ],
-        ),
-      ],
-    );
+      ];
+    }
+    return [
+      TpToolbarIconButton(
+        key: const ValueKey('favorites-search-action'),
+        tooltip: '搜尋',
+        icon: CupertinoIcons.search,
+        onPressed: () => setState(() => _searching = true),
+      ),
+      sort,
+      TpToolbarIconButton(
+        key: const ValueKey('favorites-add-action'),
+        tooltip: '新增收藏',
+        icon: CupertinoIcons.add,
+        onPressed: () => context.go('/favorites/explore'),
+      ),
+      const TpAccountAvatarButton(),
+    ];
+  }
+
+  void _endSearch() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _searchController.clear();
+    setState(() {
+      _searching = false;
+      _searchQuery = '';
+      _page = 1;
+    });
+  }
+
+  void _handleHeaderAction(_FavoriteHeaderAction action) {
+    switch (action) {
+      case _FavoriteHeaderAction.sortNewest:
+        _setSort(_FavoriteSort.newest);
+      case _FavoriteHeaderAction.sortOldest:
+        _setSort(_FavoriteSort.oldest);
+      case _FavoriteHeaderAction.sortName:
+        _setSort(_FavoriteSort.name);
+      case _FavoriteHeaderAction.sortRegion:
+        _setSort(_FavoriteSort.region);
+      case _FavoriteHeaderAction.filter:
+        final favorites = ref.read(favoritesProvider).value ?? const [];
+        final counts = _regionCountsFor(favorites);
+        unawaited(_openFilters(counts, _regionOptionsFor(counts)));
+    }
+  }
+
+  void _setSort(_FavoriteSort sort) {
+    setState(() {
+      _sort = sort;
+      _page = 1;
+    });
   }
 
   List<Widget> _buildListSlivers(
@@ -108,14 +246,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     WidgetRef ref,
     List<PoiFavorite> favorites,
   ) {
-    final filteredFavorites = _filterFavorites(
-      favorites,
-      _searchQuery,
-      _typeFilter,
-      _regionFilter,
+    final filteredFavorites = _sortFavorites(
+      _filterFavorites(favorites, _searchQuery, _typeFilter, _regionFilter),
+      _sort,
     );
-    final regionCounts = _regionCountsFor(favorites);
-    final regionOptions = _regionOptionsFor(regionCounts);
     final usePagination = favorites.length >= _favoritesPaginationThreshold;
     final totalPages = usePagination && filteredFavorites.isNotEmpty
         ? (filteredFavorites.length / _favoritesPageSize).ceil()
@@ -134,7 +268,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         : filteredFavorites;
 
     return [
-      // 底部淨空由 TpRootScrollScaffold 統一提供，這裡不再自行處理。
+      // 底部淨空由 TpRootScrollView 統一提供，這裡不再自行處理。
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(
           TpSpacing.s4,
@@ -144,34 +278,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ),
         sliver: SliverList(
           delegate: SliverChildListDelegate([
-            Row(
-              children: [
-                Expanded(
-                  child: AppSearchField(
-                    fieldKey: const ValueKey('favorites-search-input'),
-                    controller: _searchController,
-                    placeholder: '搜尋收藏',
-                    onChanged: (value) => setState(() {
-                      _searchQuery = value;
-                      _page = 1;
-                    }),
-                  ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                IconButton.filledTonal(
-                  key: const ValueKey('favorites-filter-button'),
-                  tooltip: '篩選',
-                  icon: Icon(
-                    _hasActiveFilters
-                        ? CupertinoIcons.line_horizontal_3_decrease_circle_fill
-                        : CupertinoIcons.line_horizontal_3_decrease_circle,
-                  ),
-                  onPressed: () => _openFilters(regionCounts, regionOptions),
-                ),
-              ],
-            ),
             if (_hasActiveFilters) ...[
-              const SizedBox(height: TpSpacing.s2),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -204,7 +311,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   onSelectedChanged: _deletingSelected
                       ? null
                       : (_) => _toggleFavoriteSelection(favorite.id),
-                  onRemove: () => _confirmRemove(context, ref, favorite),
+                  onRemove: () => _removeFavorite(context, ref, favorite),
                   onLongPress: () =>
                       _showFavoriteActions(context, ref, favorite),
                 ),
@@ -249,111 +356,34 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     Map<String, int> regionCounts,
     List<String> regionOptions,
   ) async {
-    var pendingType = _typeFilter;
-    var pendingRegion = _regionFilter;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                TpSpacing.s4,
-                0,
-                TpSpacing.s4,
-                MediaQuery.viewInsetsOf(context).bottom + TpSpacing.s4,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('篩選收藏', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: TpSpacing.s4),
-                    Text('類型', style: Theme.of(context).textTheme.labelLarge),
-                    const SizedBox(height: TpSpacing.s2),
-                    Wrap(
-                      spacing: TpSpacing.s2,
-                      runSpacing: TpSpacing.s2,
-                      children: [
-                        for (final option in _typeFilterOptions)
-                          FilterChip(
-                            key: ValueKey('favorites-type-${option.key}'),
-                            label: Text(option.label),
-                            selected: pendingType == option.key,
-                            onSelected: (_) =>
-                                setSheetState(() => pendingType = option.key),
-                          ),
-                      ],
-                    ),
-                    if (regionOptions.isNotEmpty) ...[
-                      const SizedBox(height: TpSpacing.s5),
-                      Text('地區', style: Theme.of(context).textTheme.labelLarge),
-                      const SizedBox(height: TpSpacing.s2),
-                      Wrap(
-                        spacing: TpSpacing.s2,
-                        runSpacing: TpSpacing.s2,
-                        children: [
-                          FilterChip(
-                            key: const ValueKey('favorites-region-all'),
-                            label: Text('全部 ${regionCounts['all'] ?? 0}'),
-                            selected: pendingRegion == 'all',
-                            onSelected: (_) =>
-                                setSheetState(() => pendingRegion = 'all'),
-                          ),
-                          for (final region in regionOptions)
-                            FilterChip(
-                              key: ValueKey('favorites-region-$region'),
-                              label: Text(
-                                '$region ${regionCounts[region] ?? 0}',
-                              ),
-                              selected: pendingRegion == region,
-                              onSelected: (_) =>
-                                  setSheetState(() => pendingRegion = region),
-                            ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: TpSpacing.s5),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            key: const ValueKey('favorites-filter-reset'),
-                            onPressed: () => setSheetState(() {
-                              pendingType = 'all';
-                              pendingRegion = 'all';
-                            }),
-                            child: const Text('重設'),
-                          ),
-                        ),
-                        const SizedBox(width: TpSpacing.s3),
-                        Expanded(
-                          child: FilledButton(
-                            key: const ValueKey('favorites-filter-apply'),
-                            onPressed: () {
-                              setState(() {
-                                _typeFilter = pendingType;
-                                _regionFilter = pendingRegion;
-                                _page = 1;
-                              });
-                              Navigator.of(sheetContext).pop();
-                            },
-                            child: const Text('套用'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
+    final controller = AppSheetFormController();
+    try {
+      await showAppFormSheet(
+        context,
+        title: '篩選收藏',
+        submitLabel: '套用',
+        submitKey: const ValueKey('favorites-filter-apply'),
+        controller: controller,
+        builder: (_) => _FavoritesFilterForm(
+          controller: controller,
+          initialType: _typeFilter,
+          initialRegion: _regionFilter,
+          regionCounts: regionCounts,
+          regionOptions: regionOptions,
+          onApply: (type, region) async {
+            if (!mounted) return false;
+            setState(() {
+              _typeFilter = type;
+              _regionFilter = region;
+              _page = 1;
+            });
+            return true;
+          },
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _showFavoriteActions(
@@ -364,21 +394,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final action = await showAppActionSheet<_FavoriteContextAction>(
       context,
       actions: const [
-        AppSheetAction(
+        TpActionItem(
           label: '加入行程',
           value: _FavoriteContextAction.addToTrip,
           icon: CupertinoIcons.calendar_badge_plus,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: '選取',
           value: _FavoriteContextAction.select,
           icon: CupertinoIcons.check_mark_circled,
         ),
-        AppSheetAction(
+        TpActionItem(
           label: '取消收藏',
           value: _FavoriteContextAction.remove,
           icon: CupertinoIcons.heart_slash,
-          isDestructive: true,
+          dividerBefore: true,
+          role: TpActionRole.destructive,
         ),
       ],
     );
@@ -397,7 +428,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         _toggleFavoriteSelection(favorite.id);
         return;
       case _FavoriteContextAction.remove:
-        await _confirmRemove(context, ref, favorite);
+        await _removeFavorite(context, ref, favorite);
         return;
       case null:
         return;
@@ -441,24 +472,15 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('確定刪除收藏？'),
-        content: Text('即將刪除 ${ids.length} 個收藏景點，此操作無法復原。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('保留'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('刪除'),
-          ),
-        ],
-      ),
+    final confirmed = await showAppConfirm(
+      context,
+      title: '確定刪除收藏？',
+      message: '即將刪除 ${ids.length} 個收藏景點，此操作無法復原。',
+      confirmLabel: '刪除',
+      cancelLabel: '保留',
+      isDestructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _deletingSelected = true);
     final repository = ref.read(favoritesRepositoryProvider);
@@ -489,29 +511,164 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _confirmRemove(
+  Future<void> _removeFavorite(
     BuildContext context,
     WidgetRef ref,
     PoiFavorite favorite,
   ) async {
-    final confirmed = await showAppConfirm(
-      context,
-      title: '取消收藏',
-      message: '確定要移除「${favorite.displayName}」嗎?',
-      confirmLabel: '移除',
-      cancelLabel: '保留',
-      isDestructive: true,
-    );
-    if (!confirmed || !context.mounted) return;
-
+    setState(() => _hiddenFavoriteIds.add(favorite.id));
     try {
       await ref.read(favoritesRepositoryProvider).deleteFavorite(favorite.id);
       ref.invalidate(favoritesProvider);
       HapticFeedback.selectionClick();
+      if (!context.mounted) return;
+      if (!ref.read(favoriteRestoreEnabledProvider)) {
+        showAppNotice(context, '已移除收藏');
+        return;
+      }
+      showAppUndoNotice(
+        context,
+        message: '已移除收藏',
+        onUndo: () => unawaited(_restoreFavorite(favorite.id)),
+      );
     } on Exception {
       if (!context.mounted) return;
+      setState(() => _hiddenFavoriteIds.remove(favorite.id));
       showAppNotice(context, '取消收藏失敗，請稍後再試');
     }
+  }
+
+  Future<void> _restoreFavorite(int favoriteId) async {
+    try {
+      await ref.read(favoritesRepositoryProvider).restoreFavorite(favoriteId);
+      if (!mounted) return;
+      setState(() => _hiddenFavoriteIds.remove(favoriteId));
+      ref.invalidate(favoritesProvider);
+      HapticFeedback.selectionClick();
+    } on Exception catch (error) {
+      if (!mounted) return;
+      final expired = error is ApiError && error.status == 410;
+      if (!expired) setState(() => _hiddenFavoriteIds.remove(favoriteId));
+      showAppNotice(context, expired ? '復原期限已過' : '無法復原收藏，請稍後再試');
+      ref.invalidate(favoritesProvider);
+    }
+  }
+}
+
+class _FavoritesFilterForm extends StatefulWidget {
+  const _FavoritesFilterForm({
+    required this.controller,
+    required this.initialType,
+    required this.initialRegion,
+    required this.regionCounts,
+    required this.regionOptions,
+    required this.onApply,
+  });
+
+  final AppSheetFormController controller;
+  final String initialType;
+  final String initialRegion;
+  final Map<String, int> regionCounts;
+  final List<String> regionOptions;
+  final Future<bool> Function(String type, String region) onApply;
+
+  @override
+  State<_FavoritesFilterForm> createState() => _FavoritesFilterFormState();
+}
+
+class _FavoritesFilterFormState extends State<_FavoritesFilterForm> {
+  late String _pendingType;
+  late String _pendingRegion;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingType = widget.initialType;
+    _pendingRegion = widget.initialRegion;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.controller.attach(_apply);
+      _syncFormState();
+    });
+  }
+
+  Future<bool> _apply() => widget.onApply(_pendingType, _pendingRegion);
+
+  void _syncFormState() {
+    widget.controller.update(
+      dirty:
+          _pendingType != widget.initialType ||
+          _pendingRegion != widget.initialRegion,
+      canSubmit: true,
+    );
+  }
+
+  void _select({String? type, String? region}) {
+    setState(() {
+      _pendingType = type ?? _pendingType;
+      _pendingRegion = region ?? _pendingRegion;
+    });
+    _syncFormState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: ListView(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        children: [
+          Text('類型', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: TpSpacing.s2),
+          Wrap(
+            spacing: TpSpacing.s2,
+            runSpacing: TpSpacing.s2,
+            children: [
+              for (final option in _typeFilterOptions)
+                FilterChip(
+                  key: ValueKey('favorites-type-${option.key}'),
+                  label: Text(option.label),
+                  selected: _pendingType == option.key,
+                  onSelected: (_) => _select(type: option.key),
+                ),
+            ],
+          ),
+          if (widget.regionOptions.isNotEmpty) ...[
+            const SizedBox(height: TpSpacing.s5),
+            Text('地區', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: TpSpacing.s2),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s2,
+              children: [
+                FilterChip(
+                  key: const ValueKey('favorites-region-all'),
+                  label: Text('全部 ${widget.regionCounts['all'] ?? 0}'),
+                  selected: _pendingRegion == 'all',
+                  onSelected: (_) => _select(region: 'all'),
+                ),
+                for (final region in widget.regionOptions)
+                  FilterChip(
+                    key: ValueKey('favorites-region-$region'),
+                    label: Text('$region ${widget.regionCounts[region] ?? 0}'),
+                    selected: _pendingRegion == region,
+                    onSelected: (_) => _select(region: region),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: TpSpacing.s5),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const ValueKey('favorites-filter-reset'),
+              onPressed: () => _select(type: 'all', region: 'all'),
+              child: const Text('重設'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -542,6 +699,35 @@ List<PoiFavorite> _filterFavorites(
     return haystack.contains(query);
   }).toList();
 }
+
+List<PoiFavorite> _sortFavorites(
+  List<PoiFavorite> favorites,
+  _FavoriteSort sort,
+) {
+  final result = List<PoiFavorite>.of(favorites);
+  switch (sort) {
+    case _FavoriteSort.newest:
+      result.sort((a, b) => _favoriteDate(b).compareTo(_favoriteDate(a)));
+    case _FavoriteSort.oldest:
+      result.sort((a, b) => _favoriteDate(a).compareTo(_favoriteDate(b)));
+    case _FavoriteSort.name:
+      result.sort((a, b) => a.displayName.compareTo(b.displayName));
+    case _FavoriteSort.region:
+      result.sort((a, b) {
+        final byRegion = _deriveRegion(
+          a.poiAddress,
+        ).compareTo(_deriveRegion(b.poiAddress));
+        return byRegion != 0
+            ? byRegion
+            : a.displayName.compareTo(b.displayName);
+      });
+  }
+  return result;
+}
+
+DateTime _favoriteDate(PoiFavorite favorite) =>
+    DateTime.tryParse(favorite.favoritedAt) ??
+    DateTime.fromMillisecondsSinceEpoch(0);
 
 Map<String, int> _regionCountsFor(List<PoiFavorite> favorites) {
   final counts = <String, int>{'all': favorites.length};
@@ -578,6 +764,16 @@ class _TypeFilterOption {
 }
 
 enum _FavoriteContextAction { addToTrip, select, remove }
+
+enum _FavoriteSort { newest, oldest, name, region }
+
+enum _FavoriteHeaderAction {
+  sortNewest,
+  sortOldest,
+  sortName,
+  sortRegion,
+  filter,
+}
 
 class _BulkToolbar extends StatelessWidget {
   const _BulkToolbar({

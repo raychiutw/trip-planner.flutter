@@ -36,26 +36,35 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
           ),
           for (final route in widget.config.routes)
             Text(route.id, key: ValueKey('map-route-${route.id}')),
-          for (final marker in widget.config.markers)
-            Align(
-              alignment: Alignment(
-                (marker.point.longitude % 2) - 1,
-                (marker.point.latitude % 2) - 1,
-              ),
-              child: Semantics(
-                label: [
-                  if (marker.title != null) marker.title!,
-                  if (marker.snippet != null) marker.snippet!,
-                ].join('，'),
-                button: marker.onTap != null,
-                child: GestureDetector(
-                  key: ValueKey(marker.id),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: marker.onTap,
-                  child: const SizedBox.square(dimension: 44),
-                ),
+          Positioned.fill(
+            child: Padding(
+              padding: widget.config.initialPadding,
+              child: Stack(
+                children: [
+                  for (final marker in widget.config.markers)
+                    Align(
+                      alignment: Alignment(
+                        (marker.point.longitude % 2) - 1,
+                        (marker.point.latitude % 2) - 1,
+                      ),
+                      child: Semantics(
+                        label: [
+                          if (marker.title != null) marker.title!,
+                          if (marker.snippet != null) marker.snippet!,
+                        ].join('，'),
+                        button: marker.onTap != null,
+                        child: GestureDetector(
+                          key: ValueKey(marker.id),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: marker.onTap,
+                          child: const SizedBox.square(dimension: 44),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );

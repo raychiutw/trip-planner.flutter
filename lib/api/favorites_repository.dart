@@ -36,6 +36,15 @@ class FavoritesRepository {
   /// DELETE /poi-favorites/:id（mutation，ApiClient 自動帶 CSRF Origin）。
   Future<void> deleteFavorite(int id) => _client.delete('/poi-favorites/$id');
 
+  /// POST /poi-favorites/:id/restore（owner-scoped soft-delete 復原）。
+  Future<PoiFavorite> restoreFavorite(int id) async {
+    final responseBody = await _client.post(
+      '/poi-favorites/$id/restore',
+      body: const <String, dynamic>{},
+    );
+    return PoiFavorite.fromJson(responseBody as Map<String, dynamic>);
+  }
+
   /// POST /poi-favorites（camelCase body）。重複收藏後端回 409。
   Future<void> addFavorite(int poiId) =>
       _client.post('/poi-favorites', body: {'poiId': poiId});

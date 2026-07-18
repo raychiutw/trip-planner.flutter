@@ -199,7 +199,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('分享連結')),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('分享連結')),
       body: state.loading
           ? const AppListLoadingSkeleton(key: ValueKey('share-loading'))
           : !state.canManage

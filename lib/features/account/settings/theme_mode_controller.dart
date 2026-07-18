@@ -32,7 +32,12 @@ class ThemeModeController extends Notifier<ThemeMode> {
   }
 
   Future<void> _load() async {
-    final v = await ref.read(settingsStoreProvider).read(_themeKey);
+    String? v;
+    try {
+      v = await ref.read(settingsStoreProvider).read(_themeKey);
+    } catch (_) {
+      return;
+    }
     // 若使用者在載入完成前已手動切換,以使用者選擇為準(避免被晚到的 _load 蓋掉)。
     if (_userOverrode) return;
     state = parseThemeMode(v);

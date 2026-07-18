@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/favorites_repository.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/favorites/poi_favorite_card.dart';
@@ -42,15 +46,32 @@ List<PoiFavorite> _manyFavorites() => [
       id: i,
       userId: 'u-1',
       poiId: 1000 + i,
-      favoritedAt: '2026-06-${(i % 28) + 1}T10:00:00Z',
+      favoritedAt: DateTime.utc(
+        2026,
+        1,
+        1,
+      ).add(Duration(days: i)).toIso8601String(),
       poiName: '收藏地點 $i',
       poiAddress: i.isEven ? '東京千代田區' : '沖繩縣那霸市',
       poiType: i.isEven ? 'restaurant' : 'attraction',
     ),
 ];
 
-Widget buildApp() =>
-    MaterialApp(theme: AppTheme.light(), home: const FavoritesScreen());
+Widget buildApp({TextScaler textScaler = TextScaler.noScaling}) => MaterialApp(
+  theme: AppTheme.light(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+    child: child!,
+  ),
+  home: const FavoritesScreen(),
+);
+
+Future<void> _openFavoritesFilter(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('favorites-filter-action')));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   group('FavoritesScreen', () {
@@ -65,21 +86,68 @@ void main() {
       );
       await tester.pump();
 
-      // SliverAppBar.large 會同時渲染展開大標題與收合小標題兩份,故 findsWidgets。
-      expect(find.text('收藏'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('tp-root-glass-header')),
+        findsOneWidget,
+      );
+      expect(find.text('收藏'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+      expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.byType(FilterChip), findsNothing);
       expect(find.byType(Checkbox), findsNothing);
       expect(
-        find.byKey(const ValueKey('favorites-filter-button')),
+        find.byKey(const ValueKey('favorites-search-action')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-sort-action')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-add-action')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-search-input')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('account-avatar-button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('200% 動態字級仍保留四個 Header action 且不溢位', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(textScaler: const TextScaler.linear(2)),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('favorites-search-action')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-sort-action')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-add-action')),
         findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('account-avatar-button')),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('搜尋收藏會比對名稱、地址與備註', (tester) async {
@@ -93,8 +161,17 @@ void main() {
       );
       await tester.pump();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
+      await tester.pump();
+
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
       expect(searchInput, findsOneWidget);
+      expect(find.text('收藏'), findsNothing);
+      expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('favorites-search-close')),
+        findsOneWidget,
+      );
 
       await tester.enterText(searchInput, '牧志');
       await tester.pump();
@@ -109,6 +186,12 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-search-close')));
+      await tester.pump();
+      expect(find.text('收藏'), findsOneWidget);
+      expect(searchInput, findsNothing);
+      expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
     testWidgets('類型篩選只保留指定類型並可切回全部', (tester) async {
@@ -122,7 +205,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await _openFavoritesFilter(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-restaurant')));
       await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
@@ -132,7 +215,7 @@ void main() {
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await _openFavoritesFilter(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-type-all')));
       await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
@@ -152,7 +235,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await _openFavoritesFilter(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-沖繩')));
       await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
@@ -162,7 +245,7 @@ void main() {
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('favorites-filter-button')));
+      await _openFavoritesFilter(tester);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('favorites-region-all')));
       await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
@@ -216,13 +299,49 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
-    testWidgets('heart → 確認對話框 → deleteFavorite + refresh', (tester) async {
+    testWidgets('heart → 立即 deleteFavorite + refresh → 可復原', (tester) async {
       final mockRepo = MockFavoritesRepository();
       var fetchCount = 0;
       when(mockRepo.watchFavorites).thenAnswer((_) {
         fetchCount++;
         return Stream.value(_favorites);
       });
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+      when(
+        () => mockRepo.restoreFavorite(any()),
+      ).thenAnswer((_) async => _favorites.first);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
+
+      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.deleteFavorite(7)).called(1);
+      expect(fetchCount, 2); // 初載 + 刪除後 invalidate refresh
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('已移除收藏'), findsOneWidget);
+      expect(find.text('復原'), findsOneWidget);
+
+      await tester.tap(find.text('復原'));
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.restoreFavorite(7)).called(1);
+      expect(fetchCount, 3);
+    });
+
+    testWidgets('restore API 未啟用時刪除後不顯示復原', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
 
       await tester.pumpWidget(
@@ -232,26 +351,60 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
 
       await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
 
-      await tester.tap(find.text('移除'));
-      await tester.pumpAndSettle();
-
-      verify(() => mockRepo.deleteFavorite(7)).called(1);
-      expect(fetchCount, 2); // 初載 + 刪除後 invalidate refresh
+      expect(find.text('已移除收藏'), findsOneWidget);
+      expect(find.text('復原'), findsNothing);
+      verifyNever(() => mockRepo.restoreFavorite(any()));
     });
 
-    testWidgets('heart → 對話框「保留」→ 不刪除', (tester) async {
+    testWidgets('取消收藏立即隱藏卡片，失敗時恢復', (tester) async {
       final mockRepo = MockFavoritesRepository();
+      final deletion = Completer<void>();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(7)).thenAnswer((_) => deletion.future);
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('favorite-card-7')), findsNothing);
+      expect(find.byKey(const ValueKey('favorite-card-8')), findsOneWidget);
+
+      deletion.completeError(Exception('network'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
+      expect(find.text('取消收藏失敗，請稍後再試'), findsOneWidget);
+    });
+
+    testWidgets('restore 410 → 顯示復原期限已過', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+      when(() => mockRepo.restoreFavorite(any())).thenThrow(
+        const ApiError(status: 410, code: 'UNDO_EXPIRED', message: 'expired'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
           child: buildApp(),
         ),
       );
@@ -259,11 +412,71 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('保留'));
+      await tester.tap(find.text('復原'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
-      verifyNever(() => mockRepo.deleteFavorite(any()));
+      expect(find.text('復原期限已過'), findsOneWidget);
+    });
+
+    testWidgets('restore 回應遺失時先解除本地隱藏再與伺服器對帳', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+      when(
+        () => mockRepo.restoreFavorite(any()),
+      ).thenThrow(Exception('response lost after commit'));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('復原'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
+      expect(find.text('無法復原收藏，請稍後再試'), findsOneWidget);
+    });
+
+    testWidgets('排序選單顯示目前勾選並切換為最早加入', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        tester.getTopLeft(find.text('暖暮拉麵')).dy,
+        lessThan(tester.getTopLeft(find.text('美麗海水族館')).dy),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('favorites-sort-newest')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('favorites-sort-oldest')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('美麗海水族館')).dy,
+        lessThan(tester.getTopLeft(find.text('暖暮拉麵')).dy),
+      );
     });
 
     testWidgets('選取多個收藏 → 確認批次刪除 → 逐筆 deleteFavorite + refresh', (
@@ -327,8 +540,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('收藏地點 1'), findsOneWidget);
-      expect(find.text('收藏地點 25'), findsNothing);
+      expect(find.text('收藏地點 200'), findsOneWidget);
+      expect(find.text('收藏地點 176'), findsNothing);
 
       final pagination = find.byKey(const ValueKey('favorites-pagination'));
       final scrollView = find.byType(CustomScrollView);
@@ -349,6 +562,8 @@ void main() {
       await tester.fling(scrollView, const Offset(0, 5000), 10000);
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
+      await tester.pump();
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
       await tester.enterText(searchInput, '收藏地點 1');
       await tester.pump();
@@ -362,7 +577,7 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsWidgets);
     });
 
-    testWidgets('AppBar 探索 action → 導到 /favorites/explore', (tester) async {
+    testWidgets('Header 新增 action → 導到 /favorites/explore', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(const []));
 
@@ -394,7 +609,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorites-explore-action')));
+      await tester.tap(find.byKey(const ValueKey('favorites-add-action')));
       await tester.pumpAndSettle();
       expect(find.text('EXPLORE-PROBE'), findsOneWidget);
     });

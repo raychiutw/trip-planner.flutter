@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
@@ -15,7 +16,7 @@ enum EntryRouteAction { copy, move }
 extension _EntryRouteActionX on EntryRouteAction {
   String get title => switch (this) {
     EntryRouteAction.copy => '複製停留點',
-    EntryRouteAction.move => '移動停留點',
+    EntryRouteAction.move => '移到其他 Day',
   };
 
   String get submitLabel => switch (this) {
@@ -44,6 +45,7 @@ class EntryActionRouteScreen extends ConsumerStatefulWidget {
 
 class _EntryActionRouteScreenState
     extends ConsumerState<EntryActionRouteScreen> {
+  final _dismissController = AppUnsavedChangesController();
   int? _targetDayId;
   bool _submitting = false;
   String? _error;
@@ -51,20 +53,33 @@ class _EntryActionRouteScreenState
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
-    return Scaffold(
-      appBar: TpAppBar(title: Text(widget.action.title)),
-      body: daysAsync.when(
-        loading: () => const AppListLoadingSkeleton(
-          key: ValueKey('entry-action-loading'),
-          itemCount: 3,
+    return AppUnsavedChangesGuard(
+      controller: _dismissController,
+      hasChanges: _targetDayId != null,
+      dismissalEnabled: !_submitting,
+      child: Scaffold(
+        appBar: TpAppBar(
+          role: TpAppBarRole.modalForm,
+          title: Text(widget.action.title),
+          onCancel: _dismissController.requestPop,
+          primaryActionLabel: widget.action.submitLabel,
+          primaryActionKey: const ValueKey('entry-action-submit'),
+          primaryActionEnabled: _targetDayId != null && !_submitting,
+          onPrimaryAction: _submit,
         ),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('載入失敗：$error', textAlign: TextAlign.center),
+        body: daysAsync.when(
+          loading: () => const AppListLoadingSkeleton(
+            key: ValueKey('entry-action-loading'),
+            itemCount: 3,
           ),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(TpSpacing.s6),
+              child: Text('載入失敗：$error', textAlign: TextAlign.center),
+            ),
+          ),
+          data: (days) => _body(context, days),
         ),
-        data: (days) => _body(context, days),
       ),
     );
   }
@@ -101,11 +116,6 @@ class _EntryActionRouteScreenState
           ),
         ],
         const SizedBox(height: TpSpacing.s4),
-        FilledButton(
-          key: const ValueKey('entry-action-submit'),
-          onPressed: _targetDayId == null || _submitting ? null : _submit,
-          child: Text(_submitting ? '處理中...' : widget.action.submitLabel),
-        ),
       ],
     );
   }

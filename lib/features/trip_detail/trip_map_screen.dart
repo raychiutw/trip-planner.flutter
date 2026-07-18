@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,29 +15,17 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_bottom_accessory.dart';
-import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_horizontal_selector.dart';
+import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../map/map_adapter.dart';
+import '../map/google_maps_external_launcher.dart';
 import '../map/map_location.dart';
 import '../map/map_style.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
+import 'google_poi_accessory_card.dart';
 import 'trip_providers.dart';
-
-/// 地圖逐日輪替 10 色（Tailwind -500；design.md data-viz 例外 palette）。
-const List<Color> kDayPinPalette = [
-  Color(0xFFEF4444), // red
-  Color(0xFFF97316), // orange
-  Color(0xFFF59E0B), // amber
-  Color(0xFF10B981), // emerald
-  Color(0xFF14B8A6), // teal
-  Color(0xFF0EA5E9), // sky
-  Color(0xFF3B82F6), // blue
-  Color(0xFF8B5CF6), // violet
-  Color(0xFFD946EF), // fuchsia
-  Color(0xFFF43F5E), // rose
-];
 
 /// 行程地圖：行程 action + DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerWidget {
@@ -48,6 +37,7 @@ class TripMapScreen extends ConsumerWidget {
     this.mapBuilder,
     this.locationService,
     this.onTripSelected,
+    this.externalLauncher = const GoogleMapsExternalLauncher(),
   });
 
   final String tripId;
@@ -64,6 +54,7 @@ class TripMapScreen extends ConsumerWidget {
   /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
   final TripMapLocationService? locationService;
   final ValueChanged<String>? onTripSelected;
+  final GoogleMapsExternalLauncher externalLauncher;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,48 +64,56 @@ class TripMapScreen extends ConsumerWidget {
       _ => const <TripSummary>[],
     };
     final currentTrip = _findTripSummary(trips, tripId);
-    return Scaffold(
-      appBar: TpAppBar(
-        title: TripTitleButton(
-          key: const ValueKey('trip-map-trip-picker'),
-          currentTripId: tripId,
-          currentTitle: currentTrip == null ? '行程' : _tripTitle(currentTrip),
-          trips: trips,
-          onSelected: (selectedTripId) {
-            if (onTripSelected != null) {
-              onTripSelected!(selectedTripId);
-              return;
-            }
-            context.go('/trips/${Uri.encodeComponent(selectedTripId)}/map');
-          },
-        ),
-        actions: [
-          TpToolbarIconButton(
-            key: const ValueKey('trip-map-notes-button'),
-            tooltip: '筆記',
-            onPressed: () =>
-                context.push('/trips/${Uri.encodeComponent(tripId)}/notes'),
-            icon: CupertinoIcons.doc_text,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      key: const ValueKey('trip-map-status-style'),
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(statusBarColor: Colors.transparent),
+      child: TpRootScaffold(
+        header: TpRootHeaderConfig(
+          platformViewBackdrop: true,
+          title: TripTitleButton(
+            key: const ValueKey('trip-map-trip-picker'),
+            currentTripId: tripId,
+            currentTitle: currentTrip == null ? '行程' : _tripTitle(currentTrip),
+            trips: trips,
+            onSelected: (selectedTripId) {
+              if (onTripSelected != null) {
+                onTripSelected!(selectedTripId);
+                return;
+              }
+              context.go('/trips/${Uri.encodeComponent(selectedTripId)}/map');
+            },
           ),
-          const TpAccountAvatarButton(),
-        ],
-      ),
-      body: daysAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator.adaptive()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('載入失敗：$error', textAlign: TextAlign.center),
-          ),
+          actions: [
+            TpToolbarIconButton(
+              key: const ValueKey('trip-map-notes-button'),
+              tooltip: '筆記',
+              onPressed: () =>
+                  context.push('/trips/${Uri.encodeComponent(tripId)}/notes'),
+              icon: CupertinoIcons.doc_text,
+            ),
+            const TpAccountAvatarButton(),
+          ],
         ),
-        data: (days) => _TripMapView(
-          tripId: tripId,
-          days: days,
-          initialEntryId: initialEntryId,
-          initialDayNum: initialDayNum,
-          mapBuilder: mapBuilder,
-          locationService: locationService,
+        body: daysAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator.adaptive()),
+          error: (error, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(TpSpacing.s6),
+              child: Text('載入失敗：$error', textAlign: TextAlign.center),
+            ),
+          ),
+          data: (days) => _TripMapView(
+            tripId: tripId,
+            days: days,
+            initialEntryId: initialEntryId,
+            initialDayNum: initialDayNum,
+            mapBuilder: mapBuilder,
+            locationService: locationService,
+            externalLauncher: externalLauncher,
+          ),
         ),
       ),
     );
@@ -176,6 +175,7 @@ class _TripMapView extends ConsumerStatefulWidget {
     this.initialDayNum,
     this.mapBuilder,
     this.locationService,
+    required this.externalLauncher,
   });
 
   final String tripId;
@@ -184,6 +184,7 @@ class _TripMapView extends ConsumerStatefulWidget {
   final int? initialDayNum;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
+  final GoogleMapsExternalLauncher externalLauncher;
 
   @override
   ConsumerState<_TripMapView> createState() => _TripMapViewState();
@@ -191,13 +192,14 @@ class _TripMapView extends ConsumerStatefulWidget {
 
 class _TripMapViewState extends ConsumerState<_TripMapView> {
   static const _dayZoom = 12.0;
-  static const _poiFocusZoom = 16.0;
+  static const _poiFocusZoom = 12.0;
 
-  final GoogleTripMapController _mapController = GoogleTripMapController();
+  final TripMapController _mapController = TripMapController();
   late final PageController _pageController;
   TripMapPoint? _userLocation;
   bool _locating = false;
   int? _activeEntryId;
+  GoogleMapPoiSelection? _selectedGooglePoi;
 
   double get _poiAccessoryHeight =>
       MediaQuery.textScalerOf(context).scale(1) >= 1.2
@@ -206,7 +208,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   EdgeInsets get _mapPadding => EdgeInsets.fromLTRB(
     TpSpacing.s10,
-    TpSpacing.s3 +
+    TpRootGeometry.headerBottom(context) +
+        TpSpacing.s2 +
         TpSpacing.tapMin +
         TpSpacing.s2 +
         TpSpacing.tapMin +
@@ -215,7 +218,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     _poiAccessoryHeight + TpRootTabGeometry.clearance(context) + TpSpacing.s6,
   );
 
-  /// -1 = 行程 action、0 = 總覽、i = 第 i 日（widget.days[i - 1]）。
+  /// -1 = 行程 action、0 = 無行程日 fallback、i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
@@ -236,7 +239,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         ? null
         : initialStops[initialPage].entry.id;
     _pageController = PageController(
-      viewportFraction: 0.72,
+      viewportFraction: 0.80,
       initialPage: initialPage,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -254,6 +257,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       final stops = _stopsForTab(_selectedTabIndex);
       final initialPage = _initialStopPage(stops);
       _activeEntryId = stops.isEmpty ? null : stops[initialPage].entry.id;
+      _selectedGooglePoi = null;
       _initialFocusApplied = false;
       unawaited(_loadRoutes());
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -368,6 +372,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     setState(() {
       _selectedTabIndex = tabIndex;
       _activeEntryId = stops.firstOrNull?.entry.id;
+      _selectedGooglePoi = null;
     });
     if (_pageController.hasClients) _pageController.jumpToPage(0);
     _focusDay(_pinsForTab(tabIndex));
@@ -479,8 +484,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _selectStop(_MapStop stop, {bool animatePage = false}) {
-    if (_activeEntryId != stop.entry.id) {
-      setState(() => _activeEntryId = stop.entry.id);
+    if (_activeEntryId != stop.entry.id || _selectedGooglePoi != null) {
+      setState(() {
+        _activeEntryId = stop.entry.id;
+        _selectedGooglePoi = null;
+      });
     }
     if (animatePage) {
       final index = _stopsForTab(
@@ -497,6 +505,25 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       }
     }
     _focusStop(stop);
+  }
+
+  void _selectGooglePoi(GoogleMapPoiSelection selection) {
+    if (_selectedGooglePoi == selection) return;
+    setState(() => _selectedGooglePoi = selection);
+  }
+
+  void _clearGooglePoi() {
+    if (_selectedGooglePoi == null) return;
+    setState(() => _selectedGooglePoi = null);
+  }
+
+  Future<void> _openGooglePoi(GoogleMapPoiSelection selection) async {
+    try {
+      if (await widget.externalLauncher.open(selection)) return;
+    } catch (_) {
+      // The same visible recovery applies to false and platform failures.
+    }
+    if (mounted) showAppError(context, '無法開啟 Google 地圖，請稍後再試');
   }
 
   Future<void> _locateMe() async {
@@ -567,6 +594,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               initialZoom: _dayZoom,
               initialPadding: _mapPadding,
               onMapReady: _handleMapReady,
+              onTap: (_) => _clearGooglePoi(),
+              onGooglePoiSelected: _selectGooglePoi,
               routes: _buildRoutes(),
               clusterMarkers: visiblePins.length >= 12,
               markers: [
@@ -590,20 +619,21 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           ),
         ),
         if (_loadingRoutes)
-          const Positioned(
+          Positioned(
             left: TpSpacing.s4,
-            top: TpSpacing.s10,
-            child: SizedBox.square(
+            top: TpRootGeometry.headerBottom(context) + TpSpacing.s3,
+            child: const SizedBox.square(
               dimension: 24,
               child: CircularProgressIndicator.adaptive(strokeWidth: 2),
             ),
           ),
         Positioned(
-          top: TpSpacing.s2,
+          top: TpRootGeometry.headerBottom(context) + TpSpacing.s2,
           left: TpSpacing.s3,
           right: TpSpacing.s3,
           child: TpHorizontalSelector<int>(
             key: const ValueKey('trip-map-day-selector'),
+            platformViewBackdrop: true,
             value: _selectedTabIndex,
             options: [
               const TpScopeOption(
@@ -612,11 +642,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                 icon: CupertinoIcons.calendar,
                 isAction: true,
                 key: ValueKey('trip-map-itinerary'),
-              ),
-              const TpScopeOption(
-                value: 0,
-                label: '總覽',
-                key: ValueKey('trip-map-day-overview'),
               ),
               for (final (index, day) in widget.days.indexed)
                 TpScopeOption(
@@ -629,7 +654,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           ),
         ),
         Positioned(
-          top: TpSpacing.s2 + TpSpacing.tapMin + TpSpacing.s2,
+          top:
+              TpRootGeometry.headerBottom(context) +
+              TpSpacing.s2 +
+              TpSpacing.tapMin +
+              TpSpacing.s2,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
             key: const ValueKey('trip-map-locate-button'),
@@ -640,6 +669,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         if (visiblePins.isEmpty)
           Positioned(
             top:
+                TpRootGeometry.headerBottom(context) +
                 TpSpacing.s2 +
                 TpSpacing.tapMin +
                 TpSpacing.s2 +
@@ -685,75 +715,91 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     return TpBottomAccessory(
       key: const ValueKey('trip-map-poi-drawer'),
       accessoryHeight: _poiAccessoryHeight,
-      child: visibleStops.isEmpty
-          ? Center(
-              child: Text(
-                '此範圍尚無停留點',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+      child: AnimatedSwitcher(
+        duration: TpMotion.resolve(context, TpMotion.fast),
+        child: _selectedGooglePoi == null
+            ? KeyedSubtree(
+                key: const ValueKey('tripline-poi-accessory'),
+                child: _buildTriplinePoiPager(visibleStops),
+              )
+            : GooglePoiAccessoryCard(
+                key: const ValueKey('google-poi-accessory'),
+                selection: _selectedGooglePoi!,
+                onClose: _clearGooglePoi,
+                onOpen: () => unawaited(_openGooglePoi(_selectedGooglePoi!)),
               ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    padEnds: false,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: visibleStops.length,
-                    onPageChanged: (index) => _selectStop(visibleStops[index]),
-                    itemBuilder: (context, index) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: TpSpacing.s1,
-                      ),
-                      child: _buildEntryCard(
-                        context,
-                        visibleStops[index],
-                        index: index,
-                        total: visibleStops.length,
-                      ),
+      ),
+    );
+  }
+
+  Widget _buildTriplinePoiPager(List<_MapStop> visibleStops) {
+    return visibleStops.isEmpty
+        ? Center(
+            child: Text(
+              '此範圍尚無停留點',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        : Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  padEnds: false,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: visibleStops.length,
+                  onPageChanged: (index) => _selectStop(visibleStops[index]),
+                  itemBuilder: (context, index) => Padding(
+                    key: ValueKey(
+                      'trip-map-poi-card-padding-${visibleStops[index].entry.id}',
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s2,
+                      vertical: TpSpacing.s1,
+                    ),
+                    child: _buildEntryCard(
+                      context,
+                      visibleStops[index],
+                      index: index,
+                      total: visibleStops.length,
                     ),
                   ),
                 ),
-                SizedBox(
-                  height: TpSpacing.s3,
-                  child: visibleStops.length <= 12
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            for (final stop in visibleStops) ...[
-                              Container(
-                                width: stop.entry.id == _activeEntryId ? 14 : 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: stop.entry.id == _activeEntryId
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurface
-                                            .withValues(alpha: 0.26),
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
+              ),
+              SizedBox(
+                height: TpSpacing.s3,
+                child: visibleStops.length <= 12
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (final stop in visibleStops) ...[
+                            Container(
+                              width: stop.entry.id == _activeEntryId ? 14 : 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: stop.entry.id == _activeEntryId
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface
+                                          .withValues(alpha: 0.26),
+                                borderRadius: BorderRadius.circular(99),
                               ),
-                              const SizedBox(width: TpSpacing.s1),
-                            ],
+                            ),
+                            const SizedBox(width: TpSpacing.s1),
                           ],
-                        )
-                      : Text(
-                          '${visibleStops.indexWhere((stop) => stop.entry.id == _activeEntryId) + 1} / ${visibleStops.length}',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
+                        ],
+                      )
+                    : Text(
+                        '${visibleStops.indexWhere((stop) => stop.entry.id == _activeEntryId) + 1} / ${visibleStops.length}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
-                ),
-              ],
-            ),
-    );
+                      ),
+              ),
+            ],
+          );
   }
 
   Widget _buildEntryCard(
@@ -769,10 +815,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     final locationLabel = stop.point == null
         ? '尚無位置'
         : stop.entry.master?.category ?? stop.entry.master?.type ?? '已定位';
-    final cardTint = theme.colorScheme.surface.withValues(
+    // The drawer itself is the single refractive layer. Keeping POI cards
+    // translucent but non-blurred avoids a doubled, cloudy glass edge.
+    final cardColor = theme.colorScheme.surface.withValues(
       alpha: isActive
-          ? (theme.brightness == Brightness.dark ? 0.46 : 0.48)
-          : (theme.brightness == Brightness.dark ? 0.28 : 0.30),
+          ? (theme.brightness == Brightness.dark ? 0.86 : 0.90)
+          : (theme.brightness == Brightness.dark ? 0.68 : 0.74),
     );
 
     return KeyedSubtree(
@@ -785,86 +833,103 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             '${index + 1} / $total，${stop.entry.title}，$timeLabel，$locationLabel',
         child: GestureDetector(
           onTap: () => _selectStop(stop),
-          child: TpGlassSurface(
+          child: DecoratedBox(
             key: ValueKey('entry-card-${stop.entry.id}'),
-            blurSigma: isActive ? 16 : 12,
-            tintColor: cardTint,
-            borderRadius: const BorderRadius.all(Radius.circular(15)),
-            padding: const EdgeInsets.all(TpSpacing.s2),
-            child: Row(
-              children: [
-                Container(
-                  key: ValueKey('poi-number-${stop.entry.id}'),
-                  width: TpSpacing.tapMin,
-                  height: TpSpacing.tapMin,
-                  decoration: BoxDecoration(
-                    color: stop.color.withValues(alpha: 0.20),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: stop.color.withValues(alpha: 0.72),
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${index + 1}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: stop.color,
-                      fontWeight: FontWeight.w800,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: const BorderRadius.all(Radius.circular(15)),
+              border: Border.all(
+                color: theme.colorScheme.onSurface.withValues(
+                  alpha: isActive ? 0.20 : 0.10,
                 ),
-                const SizedBox(width: TpSpacing.s3),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '停留 ${index + 1} / $total',
-                        maxLines: 1,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                        ),
+              ),
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: theme.colorScheme.shadow.withValues(alpha: 0.14),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                      Text(
-                        stop.entry.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      Text(
-                        '$timeLabel · $locationLabel',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: stop.point == null
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                SizedBox.square(
-                  dimension: TpSpacing.tapMin,
-                  child: DecoratedBox(
+                    ]
+                  : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(TpSpacing.s2),
+              child: Row(
+                children: [
+                  Container(
+                    key: ValueKey('poi-number-${stop.entry.id}'),
+                    width: TpSpacing.tapMin,
+                    height: TpSpacing.tapMin,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
+                      color: stop.color.withValues(alpha: 0.20),
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: stop.color.withValues(alpha: 0.72),
+                      ),
                     ),
-                    child: Icon(
-                      CupertinoIcons.arrow_right,
-                      size: 18,
-                      color: theme.colorScheme.onPrimary,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${index + 1}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: stop.color,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: TpSpacing.s3),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '停留 ${index + 1} / $total',
+                          maxLines: 1,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        Text(
+                          stop.entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        Text(
+                          '$timeLabel · $locationLabel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: stop.point == null
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                  SizedBox.square(
+                    dimension: TpSpacing.tapMin,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        CupertinoIcons.arrow_right,
+                        size: 18,
+                        color: theme.colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -351,6 +351,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('add-alternate')));
     await tester.pumpAndSettle();
+    expect(find.text('選擇地點'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('alt-search-field')),
       '拉麵',
@@ -474,6 +477,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('change-master')));
     await tester.pumpAndSettle();
+    expect(find.text('選擇地點'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('alt-search-field')),
       '波上',

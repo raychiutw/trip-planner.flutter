@@ -66,7 +66,7 @@ void main() {
     test('已收錄 Google primaryType → 細類中文 label', () {
       expect(poiCategoryLabel('tourist_attraction'), '景點');
       expect(poiCategoryLabel('fast_food_restaurant'), '速食');
-      expect(poiCategoryLabel('ramen_restaurant'), '拉麵');
+      expect(poiCategoryLabel('ramen_restaurant'), '拉麵店');
       expect(poiCategoryLabel('shinto_shrine'), '神社');
       expect(poiCategoryLabel('lodging'), '飯店');
       expect(poiCategoryLabel('department_store'), '百貨公司');

@@ -345,6 +345,42 @@ void main() {
     expect(body.containsKey('description'), isFalse);
   });
 
+  test(
+    'resolveKeepOurs preserves every locally changed conflict field',
+    () async {
+      final c = ConflictRecord(
+        id: 'c1',
+        type: 'entry.update',
+        path: '/trips/t/entries/5',
+        body: const {
+          'title': '我的標題',
+          'description': '我的備註',
+          'expectedVersion': 6,
+        },
+        args: const {'entryId': 5, 'title': '我的標題', 'description': '我的備註'},
+        cacheKey: daysKey,
+        ours: const {'title': '我的標題', 'description': '我的備註'},
+        theirs: const {'title': '他的標題', 'description': '他的備註'},
+        newVersion: 7,
+        conflictFields: const ['title', 'description'],
+        createdAt: 't',
+        base: const {'title': '舊標題', 'description': '舊備註'},
+      );
+      await cache.appendConflict(c);
+      adapter.on('PATCH', '/trips/t/entries/5', [
+        const Scripted.json(200, {'ok': true}),
+      ]);
+
+      await client.resolveConflictKeepOurs(c);
+
+      final body = bodyOf(adapter.recorded.single);
+      expect(body, containsPair('title', '我的標題'));
+      expect(body, containsPair('description', '我的備註'));
+      expect(body, containsPair('expectedVersion', 7));
+      expect(await cache.readConflicts(), isEmpty);
+    },
+  );
+
   // ─────────────────────────────────────────────
   // resolveConflictKeepTheirs
   // ─────────────────────────────────────────────

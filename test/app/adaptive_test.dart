@@ -1,10 +1,13 @@
 /// showAppConfirm 平台自適應行為測試(iOS → Cupertino、Android → Material)。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/ui/tp_action_item.dart';
 
 void main() {
   Widget host(TargetPlatform platform, void Function(BuildContext) onTap) {
@@ -72,8 +75,13 @@ void main() {
         future = showAppActionSheet<String>(
           context,
           actions: const [
-            AppSheetAction(label: '分享', value: 'share'),
-            AppSheetAction(label: '刪除', value: 'delete', isDestructive: true),
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(
+              label: '刪除',
+              value: 'delete',
+              icon: CupertinoIcons.delete,
+              role: TpActionRole.destructive,
+            ),
           ],
         );
       }),
@@ -96,7 +104,7 @@ void main() {
         future = showAppActionSheet<String>(
           context,
           actions: const [
-            AppSheetAction(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
           ],
         );
       }),
@@ -110,6 +118,146 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
     expect(await future, isNull);
+  });
+
+  testWidgets('Android action sheet preserves divider and disabled state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(
+              label: '刪除',
+              value: 'delete',
+              icon: CupertinoIcons.delete,
+              dividerBefore: true,
+              role: TpActionRole.destructive,
+              enabled: false,
+            ),
+          ],
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Divider), findsOneWidget);
+    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '刪除'));
+    expect(tile.enabled, isFalse);
+    expect(tester.getSize(find.widgetWithText(ListTile, '刪除')).height, 56);
+  });
+
+  testWidgets(
+    'Android action sheet scrolls long command lists on short screens',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      late Future<String?> future;
+      await tester.pumpWidget(
+        host(TargetPlatform.android, (context) {
+          future = showAppActionSheet<String>(
+            context,
+            actions: const [
+              TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+              TpActionItem(label: '共編設定', value: 'collab', icon: Icons.group),
+              TpActionItem(
+                label: 'AI 健檢',
+                value: 'health',
+                icon: Icons.health_and_safety,
+              ),
+              TpActionItem(
+                label: '匯出 JSON',
+                value: 'export',
+                icon: Icons.download,
+              ),
+              TpActionItem(
+                label: '刪除行程',
+                value: 'delete',
+                icon: CupertinoIcons.delete,
+                dividerBefore: true,
+                role: TpActionRole.destructive,
+              ),
+            ],
+          );
+        }),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('刪除行程'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+
+      expect(await future, 'delete');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('action sheets render the shared selected checkmark', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(
+              label: '最近加入',
+              value: 'recent',
+              icon: CupertinoIcons.clock,
+              selected: true,
+            ),
+          ],
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '最近加入'));
+    expect((tile.leading! as Icon).icon, CupertinoIcons.check_mark);
+  });
+
+  testWidgets('iOS action sheet does not dispatch a disabled action', (
+    tester,
+  ) async {
+    var completed = false;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(
+              label: '暫不可用',
+              value: 'disabled',
+              icon: CupertinoIcons.lock,
+              enabled: false,
+            ),
+          ],
+        ).then((_) => completed = true);
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('暫不可用'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(completed, isFalse);
   });
 
   testWidgets('iOS → 頂部橫幅顯示訊息(非 SnackBar);結束不留 pending timer', (tester) async {
@@ -138,6 +286,59 @@ void main() {
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('已刪除'), findsOneWidget);
+  });
+
+  testWidgets('unsaved guard coalesces concurrent close requests', (
+    tester,
+  ) async {
+    final controller = AppUnsavedChangesController();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: AppUnsavedChangesGuard(
+          controller: controller,
+          hasChanges: true,
+          child: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                unawaited(controller.requestPop());
+                unawaited(controller.requestPop());
+              },
+              child: const Text('close twice'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('close twice'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+  });
+
+  testWidgets('Undo notice renders one six-second action and dispatches it', (
+    tester,
+  ) async {
+    var undoCount = 0;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        showAppUndoNotice(context, message: '已移除收藏', onUndo: () => undoCount++);
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    expect(snackBar.duration, const Duration(seconds: 6));
+    expect(find.text('已移除收藏'), findsOneWidget);
+    expect(find.text('復原'), findsOneWidget);
+
+    await tester.tap(find.text('復原'));
+    await tester.pump();
+    expect(undoCount, 1);
   });
 
   Widget searchHost(TargetPlatform platform, TextEditingController controller) {

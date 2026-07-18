@@ -15,6 +15,7 @@ import 'package:tripline/features/trips/create/create_trip_screen.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockTripRepo extends Mock implements TripRepository {}
 
@@ -86,10 +87,13 @@ void main() {
   testWidgets('目的地空 → 送出鈕 disabled', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
-    final btn = tester.widget<FilledButton>(
+    final btn = tester.widget<TpToolbarTextButton>(
       find.byKey(const ValueKey('create-submit')),
     );
     expect(btn.onPressed, isNull);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('建立'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
   });
 
   testWidgets('首屏只顯示必要欄位，資料有效後才揭露選填設定', (tester) async {
@@ -108,6 +112,8 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('create-more-needs')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('create-more-needs')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('create-more-needs')));
     await tester.pumpAndSettle();

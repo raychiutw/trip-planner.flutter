@@ -104,6 +104,16 @@ void main() {
   });
 
   group('元件 theme 規格', () {
+    test('AppBar：標題維持中性，互動控制使用低比例 accent', () {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        expect(theme.appBarTheme.foregroundColor, theme.colorScheme.primary);
+        expect(
+          theme.appBarTheme.titleTextStyle?.color,
+          theme.colorScheme.onSurface,
+        );
+      }
+    });
+
     test('NavigationBar：active=accent、indicator=accentSubtle、label 11', () {
       final lightTheme = AppTheme.light();
       final navigationBarTheme = lightTheme.navigationBarTheme;

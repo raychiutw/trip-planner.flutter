@@ -37,6 +37,7 @@ import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
+import 'package:tripline/features/trips/edit/edit_trip_screen.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
@@ -49,6 +50,8 @@ import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
+
+import '../helpers/fake_trip_map.dart';
 
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
 class _FakeAuthNotifier extends AuthNotifier {
@@ -88,6 +91,9 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
   ).thenAnswer((_) async => const Trip(id: 'trip-1', name: 'print-trip'));
   when(
     () => mockTripRepository.fetchDays(any()),
+  ).thenAnswer((_) async => <TripDay>[]);
+  when(
+    () => mockTripRepository.fetchDaySummaries(any()),
   ).thenAnswer((_) async => <TripDay>[]);
   when(mockTripRepository.watchMyTrips).thenAnswer(
     (_) => Stream.value(const [TripSummary(tripId: 'trip-1', name: '沖繩')]),
@@ -137,6 +143,7 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
+      tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
     ],
   );
   return container;
@@ -272,6 +279,28 @@ void main() {
 
     expect(find.byType(InviteScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('cold-start public deep links do not show a fake Back', (
+    tester,
+  ) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final location in ['/invite?token=abc', '/s/public-token']) {
+      container.read(appRouterProvider).go(location);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
+    }
   });
 
   testWidgets('未登入可進入 signup、忘記密碼與 email 驗證 routes', (tester) async {
@@ -692,7 +721,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('移動停留點'), findsOneWidget);
+    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -788,6 +817,21 @@ void main() {
 
     expect(find.byType(CreateTripScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+    final createPage = ModalRoute.of(
+      tester.element(find.byType(CreateTripScreen)),
+    )!.settings;
+    expect(createPage, isA<MaterialPage<void>>());
+    expect((createPage as MaterialPage<void>).fullscreenDialog, isTrue);
+
+    container.read(appRouterProvider).go('/edit-trip/trip-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    final editPage = ModalRoute.of(
+      tester.element(find.byType(EditTripScreen)),
+    )!.settings;
+    expect(editPage, isA<MaterialPage<void>>());
+    expect((editPage as MaterialPage<void>).fullscreenDialog, isTrue);
 
     container.read(appRouterProvider).go('/account/appearance');
     await tester.pumpAndSettle();

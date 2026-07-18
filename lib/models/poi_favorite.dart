@@ -64,16 +64,17 @@ class PoiFavorite {
   factory PoiFavorite.fromJson(Map<String, dynamic> json) {
     return PoiFavorite(
       id: (json['id'] as num).toInt(),
-      userId: json['userId'] as String,
-      poiId: (json['poiId'] as num).toInt(),
-      favoritedAt: json['favoritedAt'] as String,
+      userId: (json['userId'] ?? json['user_id']) as String,
+      poiId: ((json['poiId'] ?? json['poi_id']) as num).toInt(),
+      favoritedAt: (json['favoritedAt'] ?? json['favorited_at']) as String,
       note: json['note'] as String?,
-      poiName: json['poiName'] as String?,
-      poiAddress: json['poiAddress'] as String?,
-      poiType: json['poiType'] as String?,
-      poiLat: (json['poiLat'] as num?)?.toDouble(),
-      poiLng: (json['poiLng'] as num?)?.toDouble(),
-      poiRating: (json['poiRating'] as num?)?.toDouble(),
+      poiName: (json['poiName'] ?? json['poi_name']) as String?,
+      poiAddress: (json['poiAddress'] ?? json['poi_address']) as String?,
+      poiType: (json['poiType'] ?? json['poi_type']) as String?,
+      poiLat: ((json['poiLat'] ?? json['poi_lat']) as num?)?.toDouble(),
+      poiLng: ((json['poiLng'] ?? json['poi_lng']) as num?)?.toDouble(),
+      poiRating: ((json['poiRating'] ?? json['poi_rating']) as num?)
+          ?.toDouble(),
       usages: (json['usages'] as List<dynamic>? ?? [])
           .map(
             (usageJson) =>

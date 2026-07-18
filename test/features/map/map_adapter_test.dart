@@ -1,252 +1,270 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_style.dart';
+import 'package:tripline/features/map/trip_map_overlay_synchronizer.dart';
 
 void main() {
-  test('TripMapPoint 與 Google Maps LatLng 雙向轉接', () {
-    const point = TripMapPoint(26.217, 127.719);
-
-    expect(point.toGoogleLatLng(), const LatLng(26.217, 127.719));
-    expect(TripMapPoint.fromGoogleLatLng(const LatLng(26.217, 127.719)), point);
-  });
-
-  test('內建 Google Maps presets 保留路線圖/地形/衛星', () {
+  test('TripMapPoint remains an SDK-neutral value object', () {
     expect(
-      kTripMapTilePresets.map((preset) => preset.mapType),
-      containsAll([MapType.normal, MapType.terrain, MapType.hybrid]),
+      const TripMapPoint(26.217, 127.719),
+      const TripMapPoint(26.217, 127.719),
     );
   });
 
-  testWidgets('GoogleTripMapCanvas 轉接原生 marker 與 polyline', (tester) async {
-    final controller = GoogleTripMapController();
-    addTearDown(controller.dispose);
+  test('map presets preserve road, terrain, and satellite choices', () {
+    expect(
+      kTripMapTilePresets.map((preset) => preset.style),
+      TripMapTileStyle.values,
+    );
+  });
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: GoogleTripMapCanvas(
-          config: TripMapCanvasConfig(
-            controller: controller,
-            initialFitPoints: const [TripMapPoint(26.217, 127.719)],
-            tilePreset: kTripMapTilePresets[1],
-            clusterMarkers: true,
-            routes: const [
-              TripMapRoute(
-                id: 'day-1',
-                points: [
-                  TripMapPoint(26.217, 127.719),
-                  TripMapPoint(26.214, 127.688),
-                ],
-                color: Colors.red,
-                strokeWidth: 4,
-              ),
-            ],
-            markers: const [
-              TripMapMarker(
-                id: 'stop-1',
-                point: TripMapPoint(26.217, 127.719),
-                color: Colors.blue,
-                title: '首里城',
-              ),
-            ],
-          ),
-        ),
-      ),
+  test('plugin POI is converted to the app-owned selection DTO', () {
+    const selection = GoogleMapPoiSelection(
+      placeId: 'place-1',
+      name: '清水寺',
+      point: TripMapPoint(34.9948, 135.7850),
     );
 
-    final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
-    expect(googleMap.mapType, MapType.terrain);
-    expect(googleMap.style, isNull);
-    expect(googleMap.markers.single.markerId.value, 'stop-1');
-    expect(googleMap.markers.single.infoWindow.title, '首里城');
-    expect(googleMap.clusterManagers, hasLength(1));
-    expect(googleMap.markers.single.clusterManagerId, isNotNull);
-    expect(googleMap.polylines.single.polylineId.value, 'day-1');
-    expect(googleMap.polylines.single.points, hasLength(2));
+    expect(selection.placeId, 'place-1');
+    expect(selection.point.latitude, closeTo(34.9948, 0.0001));
   });
 
-  testWidgets('深色模式套用中性 Google Maps style', (tester) async {
-    final controller = GoogleTripMapController();
-    addTearDown(controller.dispose);
+  test('controller queues camera work until the renderer attaches', () async {
+    final platform = _FakeTripMapPlatformController();
+    final controller = TripMapController();
+    final move = controller.move(const TripMapPoint(35, 135), 12);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData.dark(),
-        home: GoogleTripMapCanvas(
-          config: TripMapCanvasConfig(
-            controller: controller,
-            initialFitPoints: const [TripMapPoint(26.217, 127.719)],
-            tilePreset: kTripMapTilePresets.first,
-          ),
-        ),
-      ),
+    controller.attach(platform);
+    await move;
+
+    expect(platform.moves.single.zoom, 12);
+  });
+
+  test('controller sends the horizontal inset and motion preference', () async {
+    final platform = _FakeTripMapPlatformController();
+    final controller = TripMapController()
+      ..reduceMotion = true
+      ..attach(platform);
+
+    await controller.fitPoints(
+      const [TripMapPoint(26.217, 127.719), TripMapPoint(26.214, 127.688)],
+      padding: const EdgeInsets.fromLTRB(40, 100, 40, 250),
+      maxZoom: 12,
     );
 
-    final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
-    expect(googleMap.style, isNotNull);
-    expect(googleMap.style, contains('#1c1c1e'));
-    expect(googleMap.style, contains('#2c2c2e'));
+    expect(platform.fits.single.padding, 40);
+    expect(platform.fits.single.animate, isFalse);
   });
 
-  testWidgets('路線虛線與透明度轉接到原生 Polyline', (tester) async {
-    final controller = GoogleTripMapController();
-    addTearDown(controller.dispose);
+  test('failed camera work does not poison later queued operations', () async {
+    final platform = _FailingFirstTripMapPlatformController();
+    final controller = TripMapController()..attach(platform);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: GoogleTripMapCanvas(
-          config: TripMapCanvasConfig(
-            controller: controller,
-            initialFitPoints: const [TripMapPoint(26.217, 127.719)],
-            tilePreset: kTripMapTilePresets.first,
-            routes: const [
-              TripMapRoute(
-                id: 'solid-day',
-                points: [
-                  TripMapPoint(26.217, 127.719),
-                  TripMapPoint(26.214, 127.688),
-                ],
-                color: Color(0xFF0EA5E9),
-                strokeWidth: 3,
-                opacity: 0.6,
-              ),
-              TripMapRoute(
-                id: 'dashed-day',
-                points: [
-                  TripMapPoint(26.217, 127.719),
-                  TripMapPoint(26.214, 127.688),
-                ],
-                color: Color(0xFF14B8A6),
-                strokeWidth: 3,
-                opacity: 0.6,
-                dashed: true,
-              ),
-            ],
-          ),
-        ),
-      ),
+    final first = controller.move(const TripMapPoint(35, 135), 12);
+    final second = controller.move(const TripMapPoint(34, 136), 12);
+
+    await expectLater(first, throwsStateError);
+    await second;
+    expect(platform.moves.single.point, const TripMapPoint(34, 136));
+  });
+
+  test('overlay reconciliation updates only changed semantic IDs', () async {
+    final platform = _FakeTripMapOverlayPlatform();
+    final sync = TripMapOverlaySynchronizer(platform);
+    await sync.sync(
+      markers: [_marker('a'), _marker('b')],
+      routes: [_route('r')],
+    );
+    await sync.sync(
+      markers: [_marker('a'), _marker('c')],
+      routes: [_route('r')],
     );
 
-    final googleMap = tester.widget<GoogleMap>(find.byType(GoogleMap));
-    final byId = {
-      for (final polyline in googleMap.polylines)
-        polyline.polylineId.value: polyline,
-    };
-
-    expect(byId['solid-day']!.patterns, isEmpty);
-    expect(byId['dashed-day']!.patterns, isNotEmpty);
-    // 透明度要進到色彩 alpha，不能只留在樣式物件裡。
-    expect(byId['solid-day']!.color.a, closeTo(0.6, 0.01));
-    expect(byId['solid-day']!.width, 3);
-    // web 沒有白色外框 casing：一段路線只該有一條線。
-    expect(googleMap.polylines, hasLength(2));
+    expect(platform.removedMarkerSemanticIds, ['b']);
+    expect(platform.addedMarkerSemanticIds, containsAll(['a', 'b', 'c']));
+    expect(platform.clearCount, 0);
   });
 
-  testWidgets('renderTripMapChip 產生自繪 bytes 圖（非內建水滴 pin）', (tester) async {
-    final style = tripMapMarkerStyle(
-      dayColor: const Color(0xFF0EA5E9),
-      isFocused: false,
-    );
+  test('overlay disposal waits for sync and ignores later updates', () async {
+    final platform = _BlockingTripMapOverlayPlatform();
+    final sync = TripMapOverlaySynchronizer(platform);
+    final firstSync = sync.sync(markers: [_marker('a')], routes: const []);
+    await platform.firstAddStarted.future;
 
-    // 真的算圖 + PNG 編碼，要在 runAsync 放行真實時間才完成。
-    late final BitmapDescriptor chip;
-    await tester.runAsync(() async {
-      chip = await renderTripMapChip('1', style, pixelRatio: 2);
-    });
+    final disposal = sync.dispose();
+    final lateSync = sync.sync(markers: [_marker('b')], routes: const []);
+    await Future<void>.delayed(Duration.zero);
 
-    expect(chip, isA<BytesMapBitmap>());
+    expect(platform.maxConcurrentCalls, 1);
+    platform.releaseFirstAdd.complete();
+    await Future.wait([firstSync, disposal, lateSync]);
+
+    expect(platform.addedMarkerSemanticIds, ['a']);
+    expect(platform.removedMarkerSemanticIds, ['a']);
+    expect(platform.maxConcurrentCalls, 1);
   });
 
-  group('Reduce Motion 時鏡頭直接切換而非平移', () {
-    // 規格(design.md 地圖 C 定稿):「Reduce Motion 時卡片與 camera 直接切換」。
-    // 卡片走 TpMotion.resolve 已遵守;鏡頭先前一律 animateCamera —— 而它沒有
-    // duration 參數可以歸零,只能改用 moveCamera。鏡頭平移正是最容易誘發動暈的
-    // 動作,開這個設定的人多半就是為了避免它。
-    setUpAll(() => registerFallbackValue(_FakeCameraUpdate()));
+  test(
+    'overlay reconciliation coalesces queued updates to the latest snapshot',
+    () async {
+      final platform = _BlockingTripMapOverlayPlatform();
+      final sync = TripMapOverlaySynchronizer(platform);
+      final first = sync.sync(markers: [_marker('a')], routes: const []);
+      await platform.firstAddStarted.future;
 
-    test('預設(未開啟)→ animateCamera', () async {
-      final googleMap = _MockGoogleMapController();
-      when(() => googleMap.animateCamera(any())).thenAnswer((_) async {});
-      final controller = GoogleTripMapController()..attach(googleMap);
+      final superseded = sync.sync(markers: [_marker('b')], routes: const []);
+      final latest = sync.sync(markers: [_marker('c')], routes: const []);
+      platform.releaseFirstAdd.complete();
 
-      await controller.move(const TripMapPoint(26.2, 127.7), 16);
+      await Future.wait([first, superseded, latest]);
 
-      verify(() => googleMap.animateCamera(any())).called(1);
-      verifyNever(() => googleMap.moveCamera(any()));
-    });
-
-    test('fitPoints 多點不把底部 overlay padding 套到四邊', () async {
-      final googleMap = _MockGoogleMapController();
-      when(() => googleMap.animateCamera(any())).thenAnswer((_) async {});
-      when(() => googleMap.getZoomLevel()).thenAnswer((_) async => 12);
-      final controller = GoogleTripMapController()..attach(googleMap);
-      addTearDown(controller.dispose);
-
-      await controller.fitPoints(
-        const [TripMapPoint(26.217, 127.719), TripMapPoint(26.214, 127.688)],
-        padding: const EdgeInsets.fromLTRB(40, 100, 40, 250),
-        maxZoom: 12,
-      );
-
-      final update =
-          verify(() => googleMap.animateCamera(captureAny())).captured.single
-              as CameraUpdate;
-      final json = update.toJson() as List<Object?>;
-      expect(json[0], 'newLatLngBounds');
-      expect(json[2], 40);
-    });
-
-    test('開啟後 move 改用 moveCamera', () async {
-      final googleMap = _MockGoogleMapController();
-      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
-      final controller = GoogleTripMapController()
-        ..attach(googleMap)
-        ..reduceMotion = true;
-
-      await controller.move(const TripMapPoint(26.2, 127.7), 16);
-
-      verify(() => googleMap.moveCamera(any())).called(1);
-      verifyNever(() => googleMap.animateCamera(any()));
-    });
-
-    test('開啟後 fitPoints(單點)改用 moveCamera', () async {
-      final googleMap = _MockGoogleMapController();
-      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
-      final controller = GoogleTripMapController()
-        ..attach(googleMap)
-        ..reduceMotion = true;
-
-      await controller.fitPoints(const [
-        TripMapPoint(26.2, 127.7),
-      ], padding: EdgeInsets.zero);
-
-      verify(() => googleMap.moveCamera(any())).called(1);
-      verifyNever(() => googleMap.animateCamera(any()));
-    });
-
-    test('開啟後 fitPoints(多點 bounds + maxZoom 修正)全程 moveCamera', () async {
-      final googleMap = _MockGoogleMapController();
-      when(() => googleMap.moveCamera(any())).thenAnswer((_) async {});
-      when(() => googleMap.getZoomLevel()).thenAnswer((_) async => 18);
-      final controller = GoogleTripMapController()
-        ..attach(googleMap)
-        ..reduceMotion = true;
-
-      await controller.fitPoints(
-        const [TripMapPoint(26.2, 127.7), TripMapPoint(26.3, 127.8)],
-        padding: EdgeInsets.zero,
-        maxZoom: 16,
-      );
-
-      // bounds 一次 + 超過 maxZoom 的回拉一次,兩次都不得是 animateCamera。
-      verify(() => googleMap.moveCamera(any())).called(2);
-      verifyNever(() => googleMap.animateCamera(any()));
-    });
-  });
+      expect(platform.addedMarkerSemanticIds, ['a', 'c']);
+      expect(platform.removedMarkerSemanticIds, ['a']);
+      expect(platform.maxConcurrentCalls, 1);
+    },
+  );
 }
 
-class _MockGoogleMapController extends Mock implements GoogleMapController {}
+TripMapMarker _marker(String id) => TripMapMarker(
+  id: id,
+  point: const TripMapPoint(25.033, 121.565),
+  color: Colors.blue,
+  style: tripMapMarkerStyle(dayColor: Colors.blue, isFocused: false),
+  glyph: '1',
+);
 
-class _FakeCameraUpdate extends Fake implements CameraUpdate {}
+TripMapRoute _route(String id) => TripMapRoute(
+  id: id,
+  points: const [TripMapPoint(25.033, 121.565), TripMapPoint(25.034, 121.566)],
+  color: Colors.blue,
+  strokeWidth: 4,
+);
+
+class _CameraMove {
+  const _CameraMove(this.point, this.zoom, this.animate);
+
+  final TripMapPoint point;
+  final double zoom;
+  final bool animate;
+}
+
+class _CameraFit {
+  const _CameraFit(this.points, this.padding, this.maxZoom, this.animate);
+
+  final List<TripMapPoint> points;
+  final double padding;
+  final double? maxZoom;
+  final bool animate;
+}
+
+class _FakeTripMapPlatformController implements TripMapPlatformController {
+  final moves = <_CameraMove>[];
+  final fits = <_CameraFit>[];
+
+  @override
+  Future<void> fitPoints(
+    List<TripMapPoint> points, {
+    required double padding,
+    required bool animate,
+    double? maxZoom,
+  }) async {
+    fits.add(_CameraFit(points, padding, maxZoom, animate));
+  }
+
+  @override
+  Future<void> move(
+    TripMapPoint point,
+    double zoom, {
+    required bool animate,
+  }) async {
+    moves.add(_CameraMove(point, zoom, animate));
+  }
+}
+
+class _FailingFirstTripMapPlatformController
+    extends _FakeTripMapPlatformController {
+  var _shouldFail = true;
+
+  @override
+  Future<void> move(
+    TripMapPoint point,
+    double zoom, {
+    required bool animate,
+  }) async {
+    if (_shouldFail) {
+      _shouldFail = false;
+      throw StateError('camera unavailable');
+    }
+    await super.move(point, zoom, animate: animate);
+  }
+}
+
+class _FakeTripMapOverlayPlatform implements TripMapOverlayPlatform {
+  final addedMarkerSemanticIds = <String>[];
+  final removedMarkerSemanticIds = <String>[];
+  int clearCount = 0;
+
+  @override
+  Future<void> addMarker(TripMapMarker marker) async {
+    addedMarkerSemanticIds.add(marker.id);
+  }
+
+  @override
+  Future<void> addRoute(TripMapRoute route) async {}
+
+  @override
+  Future<void> removeMarker(String semanticId) async {
+    removedMarkerSemanticIds.add(semanticId);
+  }
+
+  @override
+  Future<void> removeRoute(String semanticId) async {}
+
+  @override
+  Future<void> updateMarker(TripMapMarker marker) async {}
+
+  @override
+  Future<void> updateRoute(TripMapRoute route) async {}
+}
+
+class _BlockingTripMapOverlayPlatform extends _FakeTripMapOverlayPlatform {
+  final firstAddStarted = Completer<void>();
+  final releaseFirstAdd = Completer<void>();
+  var _blockedFirstAdd = false;
+  var _activeCalls = 0;
+  var maxConcurrentCalls = 0;
+
+  @override
+  Future<void> addMarker(TripMapMarker marker) async {
+    _activeCalls += 1;
+    maxConcurrentCalls = maxConcurrentCalls < _activeCalls
+        ? _activeCalls
+        : maxConcurrentCalls;
+    try {
+      if (!_blockedFirstAdd) {
+        _blockedFirstAdd = true;
+        firstAddStarted.complete();
+        await releaseFirstAdd.future;
+      }
+      await super.addMarker(marker);
+    } finally {
+      _activeCalls -= 1;
+    }
+  }
+
+  @override
+  Future<void> removeMarker(String semanticId) async {
+    _activeCalls += 1;
+    maxConcurrentCalls = maxConcurrentCalls < _activeCalls
+        ? _activeCalls
+        : maxConcurrentCalls;
+    try {
+      await super.removeMarker(semanticId);
+    } finally {
+      _activeCalls -= 1;
+    }
+  }
+}

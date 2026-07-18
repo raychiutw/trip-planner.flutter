@@ -11,6 +11,14 @@ Future<void> _flush() async {
   }
 }
 
+class _ReadFailingSettingsStore implements SettingsStore {
+  @override
+  Future<String?> read(String key) => Future.error(StateError('unavailable'));
+
+  @override
+  Future<void> write(String key, String value) async {}
+}
+
 void main() {
   test('parse/toString round-trip', () {
     expect(themeModeToString(ThemeMode.dark), 'dark');
@@ -43,5 +51,19 @@ void main() {
     c.read(themeModeProvider); // 觸發 build + _load
     await _flush();
     expect(c.read(themeModeProvider), ThemeMode.dark);
+  });
+
+  test('build：儲存空間不可用時保留 system 預設', () async {
+    final c = ProviderContainer(
+      overrides: [
+        settingsStoreProvider.overrideWithValue(_ReadFailingSettingsStore()),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(themeModeProvider, (_, _) {});
+
+    expect(c.read(themeModeProvider), ThemeMode.system);
+    await _flush();
+    expect(c.read(themeModeProvider), ThemeMode.system);
   });
 }

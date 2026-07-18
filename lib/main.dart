@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'api/cache/cache_migration.dart';
@@ -17,8 +18,40 @@ import 'theme/app_theme.dart';
 /// 現階段所有產品文案均為繁體中文；新增語系前須先完成整套字串在地化。
 const kSupportedLocales = [Locale('zh', 'TW')];
 
+const _triplineGlassTheme = GlassThemeData(
+  light: GlassThemeVariant(
+    settings: GlassThemeSettings(
+      glassColor: Color(0x9EFFFBF5),
+      thickness: 24,
+      blur: 22,
+      chromaticAberration: 0.006,
+      lightIntensity: 0.82,
+      ambientStrength: 0.18,
+      refractiveIndex: 1.15,
+      saturation: 1.10,
+    ),
+    quality: GlassQuality.standard,
+    glowColors: GlassGlowColors(primary: Color(0xFFA97A4A), glowOpacity: 0.30),
+  ),
+  dark: GlassThemeVariant(
+    settings: GlassThemeSettings(
+      glassColor: Color(0x61121214),
+      thickness: 28,
+      blur: 22,
+      chromaticAberration: 0.004,
+      lightIntensity: 0.72,
+      ambientStrength: 0.08,
+      refractiveIndex: 1.15,
+      saturation: 1.08,
+    ),
+    quality: GlassQuality.standard,
+    glowColors: GlassGlowColors(primary: Color(0xFFCBA06E), glowOpacity: 0.24),
+  ),
+);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LiquidGlassWidgets.initialize();
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
   // 開啟失敗(磁碟/權限/檔案損毀)時退回預設 InMemory,不阻擋 app 啟動。
   DriftCacheStore? cacheStore;
@@ -35,12 +68,16 @@ Future<void> main() async {
     cacheStore = null;
   }
   runApp(
-    ProviderScope(
-      overrides: [
-        if (cacheStore != null)
-          cacheStoreProvider.overrideWithValue(cacheStore),
-      ],
-      child: const TriplineApp(),
+    LiquidGlassWidgets.wrap(
+      theme: _triplineGlassTheme,
+      adaptiveQuality: true,
+      child: ProviderScope(
+        overrides: [
+          if (cacheStore != null)
+            cacheStoreProvider.overrideWithValue(cacheStore),
+        ],
+        child: const TriplineApp(),
+      ),
     ),
   );
 }
@@ -78,6 +115,7 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Tripline',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ref.watch(themeModeProvider),

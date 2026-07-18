@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../api/providers.dart';
+import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -19,12 +20,17 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
+  final _dismissController = AppUnsavedChangesController();
   String? _draft; // 首次有 user 資料時 seed
   String? _initialName;
   bool _saving = false;
   String? _error;
 
+  bool get _hasChanges =>
+      _initialName != null && (_draft ?? '').trim() != _initialName!.trim();
+
   Future<void> _save() async {
+    final savedName = (_draft ?? '').trim();
     setState(() {
       _saving = true;
       _error = null;
@@ -32,19 +38,26 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     try {
       await ref
           .read(tripRepositoryProvider)
-          .updateProfile(displayName: (_draft ?? '').trim());
+          .updateProfile(displayName: savedName);
       ref.invalidate(authStateProvider);
       HapticFeedback.lightImpact();
       if (mounted) {
+        setState(() {
+          _initialName = savedName;
+          _draft = savedName;
+          _saving = false;
+        });
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已更新個人資料')));
-        if (context.canPop()) context.pop();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && context.canPop()) context.pop();
+        });
       }
     } on Exception {
       if (mounted) setState(() => _error = '儲存失敗,請稍後再試');
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted && _saving) setState(() => _saving = false);
     }
   }
 
@@ -52,23 +65,35 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
 
-    return Scaffold(
-      appBar: const TpAppBar(title: Text('個人資料')),
-      body: switch (authState) {
-        AsyncData(:final value?) => _form(context, value.displayName ?? ''),
-        AsyncError() => const Center(child: Text('無法載入個人資料')),
-        _ => const AppListLoadingSkeleton(
-          key: ValueKey('profile-edit-loading'),
-          itemCount: 2,
+    return AppUnsavedChangesGuard(
+      controller: _dismissController,
+      hasChanges: _hasChanges,
+      dismissalEnabled: !_saving,
+      child: Scaffold(
+        appBar: TpAppBar(
+          role: TpAppBarRole.modalForm,
+          title: const Text('個人資料'),
+          onCancel: _dismissController.requestPop,
+          primaryActionLabel: '儲存',
+          primaryActionKey: const ValueKey('profile-save'),
+          primaryActionEnabled: _hasChanges && !_saving,
+          onPrimaryAction: _save,
         ),
-      },
+        body: switch (authState) {
+          AsyncData(:final value?) => _form(context, value.displayName ?? ''),
+          AsyncError() => const Center(child: Text('無法載入個人資料')),
+          _ => const AppListLoadingSkeleton(
+            key: ValueKey('profile-edit-loading'),
+            itemCount: 2,
+          ),
+        },
+      ),
     );
   }
 
   Widget _form(BuildContext context, String currentName) {
     _initialName ??= currentName;
     _draft ??= currentName;
-    final hasChanges = _draft!.trim() != _initialName!.trim();
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
@@ -90,23 +115,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        FilledButton(
-          key: const ValueKey('profile-save'),
-          onPressed: _saving || !hasChanges ? null : _save,
-          child: _saving
-              ? const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                    ),
-                    SizedBox(width: TpSpacing.s2),
-                    Text('儲存'),
-                  ],
-                )
-              : const Text('儲存'),
-        ),
+        const SizedBox(height: TpSpacing.s2),
       ],
     );
   }

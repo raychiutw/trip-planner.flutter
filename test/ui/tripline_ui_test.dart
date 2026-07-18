@@ -3,14 +3,16 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
+import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_content_surface.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
-import 'package:tripline/ui/tp_root_scroll_scaffold.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 import 'package:tripline/ui/tp_state_view.dart';
@@ -100,6 +102,25 @@ void main() {
     expect(tester.widget<Text>(find.text('自動')).style?.fontSize, 15);
   });
 
+  testWidgets('TpSettingsGroup 分隔線左右各縮排 16pt', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          body: TpSettingsGroup(
+            children: [
+              TpSettingsRow(title: '外觀'),
+              TpSettingsRow(title: '通知'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final divider = tester.widget<Divider>(find.byType(Divider));
+    expect(divider.indent, TpSpacing.s4);
+    expect(divider.endIndent, TpSpacing.s4);
+  });
+
   testWidgets('TpContentSurface 是內容材質而不是 glass', (tester) async {
     await tester.pumpWidget(
       app(
@@ -117,18 +138,22 @@ void main() {
     );
   });
 
-  testWidgets('TpRootScrollScaffold 頁首恆為 inline 56，不放大也不收合', (tester) async {
+  testWidgets('TpRootScaffold 頁首固定為單一 56pt glass 膠囊', (tester) async {
     // 大標題吃掉 96-108pt 卻只重複 tab bar 已經講過的頁名。root 頁改為 inline，
     // 省下的高度換成內容（同一螢幕多看到一張卡）。
     await tester.pumpWidget(
       app(
-        const TpRootScrollScaffold(
-          title: '我的行程',
-          actions: [
-            IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
-            IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
-          ],
-          slivers: [SliverToBoxAdapter(child: Text('內容'))],
+        const TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: Text('我的行程'),
+            actions: [
+              IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
+              IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
+            ],
+          ),
+          body: TpRootScrollView(
+            slivers: [SliverToBoxAdapter(child: Text('內容'))],
+          ),
         ),
       ),
     );
@@ -138,18 +163,12 @@ void main() {
       find.byKey(const ValueKey('root-scroll-bottom-inset')),
       findsOneWidget,
     );
-    final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-    expect(appBar.toolbarHeight, 56);
-    expect(appBar.collapsedHeight, 56);
-    // 展開高度必須等於 collapsed —— 有落差就是大標題還在。
-    expect(appBar.expandedHeight, 56);
-    expect(appBar.centerTitle, isTrue);
-    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
-    expect(appBar.actions, hasLength(1));
-    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
-
-    // 實測頁首佔用高度：inline 56，不是 large 的 108。
-    expect(tester.getSize(find.byType(AppBar)).height, 56);
+    expect(find.byType(SliverAppBar), findsNothing);
+    expect(find.byType(AppBar), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('tp-root-glass-header'))),
+      const Size(768, 56),
+    );
   });
 
   testWidgets('TpAppBar more 使用水平 ellipsis 且維持 44pt target', (tester) async {
@@ -157,10 +176,13 @@ void main() {
       app(
         Scaffold(
           appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
             title: const Text('行程'),
             actions: [
               TpMoreMenuButton<int>(
-                items: const [PopupMenuItem(value: 1, child: Text('列印'))],
+                items: const [
+                  TpActionItem(value: 1, label: '列印', icon: Icons.print),
+                ],
                 onSelected: (_) {},
               ),
             ],
@@ -175,16 +197,20 @@ void main() {
       tester.getSize(find.byType(TpMoreMenuButton<int>)).height,
       greaterThanOrEqualTo(44),
     );
-    final menu = tester.widget<PopupMenuButton<int>>(
+    final menu = tester.widget<MenuAnchor>(
       find.descendant(
         of: find.byType(TpMoreMenuButton<int>),
-        matching: find.byType(PopupMenuButton<int>),
+        matching: find.byType(MenuAnchor),
       ),
     );
-    expect(menu.constraints, const BoxConstraints.tightFor(width: 248));
-    final menuShape = menu.shape! as RoundedRectangleBorder;
-    expect((menuShape.borderRadius as BorderRadius).topLeft.x, 22);
-    expect(menu.color, TpColorsLight.background.withValues(alpha: 0.88));
+    expect(menu.useRootOverlay, isTrue);
+    expect(find.byType(GlassMenu), findsNothing);
+    final toolbarGlass = find.descendant(
+      of: find.byType(TpMoreMenuButton<int>),
+      matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+    );
+    expect(toolbarGlass, findsOneWidget);
+    expect(tester.getSize(toolbarGlass), const Size(44, 44));
   });
 
   testWidgets('TpAppBar 在窄螢幕與 200% 文字強制單行截斷', (tester) async {
@@ -196,6 +222,7 @@ void main() {
       app(
         const Scaffold(
           appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
             title: Text('沖繩家族旅行超長名稱與完整行程設定'),
             actions: [IconButton(onPressed: null, icon: Icon(Icons.edit))],
           ),
@@ -204,15 +231,23 @@ void main() {
       ),
     );
 
-    final titleStyle = tester.widget<DefaultTextStyle>(
-      find.byKey(const ValueKey('tp-app-bar-title')),
-    );
+    final titleStyle = tester
+        .widgetList<DefaultTextStyle>(
+          find.descendant(
+            of: find.byKey(const ValueKey('tp-app-bar-title')),
+            matching: find.byType(DefaultTextStyle),
+          ),
+        )
+        .firstWhere(
+          (style) =>
+              style.maxLines == 1 && style.overflow == TextOverflow.ellipsis,
+        );
     expect(titleStyle.maxLines, 1);
     expect(titleStyle.overflow, TextOverflow.ellipsis);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('TpAppBar 兩個 trailing actions 仍維持幾何置中', (tester) async {
+  testWidgets('TpAppBar 兩個 trailing actions 時標題仍固定靠左', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -221,7 +256,7 @@ void main() {
       app(
         const Scaffold(
           appBar: TpAppBar(
-            automaticallyImplyLeading: false,
+            role: TpAppBarRole.standalone,
             title: Text('行程標題'),
             actions: [
               IconButton(onPressed: null, icon: Icon(Icons.edit)),
@@ -232,12 +267,15 @@ void main() {
       ),
     );
 
-    final appBar = tester.widget<AppBar>(find.byType(AppBar));
-    expect(appBar.automaticallyImplyLeading, isFalse);
-    expect(appBar.leadingWidth, TpSpacing.tapMin * 2);
+    final appBar = tester.widget<GlassAppBar>(find.byType(GlassAppBar));
+    expect(appBar.leading, isNull);
+    expect(appBar.centerTitle, isFalse);
     expect(appBar.actions, hasLength(1));
-    expect((appBar.actions!.single as SizedBox).width, TpSpacing.tapMin * 2);
-    expect(tester.getCenter(find.text('行程標題')).dx, closeTo(160, 0.1));
+    expect(
+      (appBar.actions!.single as SizedBox).width,
+      TpSpacing.tapMin * 2 + TpSpacing.s2,
+    );
+    expect(tester.getTopLeft(find.text('行程標題')).dx, closeTo(16, 0.1));
   });
 
   testWidgets('TpScopeMenu 顯示目前值並回傳新選項', (tester) async {
@@ -266,7 +304,7 @@ void main() {
   });
 
   testWidgets(
-    'TpHorizontalSelector 對齊 44pt glass 外框、34pt thumb 與 11pt DAY 字級',
+    'TpHorizontalSelector 使用單一 GlassContainer + active GlassButton 與 13pt DAY 字級',
     (tester) async {
       var selected = 0;
       await tester.pumpWidget(
@@ -302,30 +340,100 @@ void main() {
 
       final selector = find.byKey(const ValueKey('day-selector'));
       expect(
-        find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+        find.descendant(of: selector, matching: find.byType(GlassButton)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: selector, matching: find.byType(GlassContainer)),
         findsOneWidget,
       );
       expect(tester.getSize(selector).height, TpSpacing.tapMin);
-      final selectedThumb = find.descendant(
-        of: find.byKey(const ValueKey('day-overview')),
-        matching: find.byType(AnimatedContainer),
-      );
-      expect(tester.getSize(selectedThumb).height, 34);
-      expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 11);
+      expect(find.text('DAY 01'), findsOneWidget);
+      expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
       expect(
         find.byKey(const ValueKey('tp-selector-divider-0')),
         findsOneWidget,
       );
       expect(
         tester
-            .getSemantics(find.byKey(const ValueKey('day-map')))
+            .getSemantics(find.bySemanticsLabel('地圖'))
             .getSemanticsData()
             .flagsCollection
             .isSelected,
         Tristate.isFalse,
       );
-      await tester.tap(find.byKey(const ValueKey('day-1')));
+      await tester.tap(find.bySemanticsLabel('DAY 01'));
       expect(selected, 1);
+    },
+  );
+
+  testWidgets(
+    'navigation selector keeps one optical recipe over a platform view',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: Column(
+              children: [
+                TpHorizontalSelector<int>(
+                  key: const ValueKey('standard-navigation-selector'),
+                  value: 1,
+                  options: const [
+                    TpScopeOption(value: 0, label: '總覽'),
+                    TpScopeOption(value: 1, label: 'DAY 1'),
+                  ],
+                  onSelected: (_) {},
+                ),
+                TpHorizontalSelector<int>(
+                  key: const ValueKey('map-navigation-selector'),
+                  platformViewBackdrop: true,
+                  value: 1,
+                  options: const [
+                    TpScopeOption(value: 0, label: '總覽'),
+                    TpScopeOption(value: 1, label: 'DAY 1'),
+                  ],
+                  onSelected: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      GlassContainer trackFor(String key) => tester.widget<GlassContainer>(
+        find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.byType(GlassContainer),
+        ),
+      );
+
+      final standard = trackFor('standard-navigation-selector');
+      final map = trackFor('map-navigation-selector');
+      expect(standard.platformViewBackdrop, isFalse);
+      expect(map.platformViewBackdrop, isTrue);
+      expect(map.settings?.glassColor, standard.settings?.glassColor);
+      expect(map.settings?.thickness, standard.settings?.thickness);
+      expect(map.settings?.blur, standard.settings?.blur);
+      expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
+      expect(map.settings?.ambientStrength, standard.settings?.ambientStrength);
+      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
+      expect(map.settings?.saturation, standard.settings?.saturation);
+      expect(
+        map.settings?.standardOpacityMultiplier,
+        standard.settings?.standardOpacityMultiplier,
+      );
+
+      final selected = tester.widget<GlassButton>(
+        find.descendant(
+          of: find.byKey(const ValueKey('standard-navigation-selector')),
+          matching: find.byType(GlassButton),
+        ),
+      );
+      expect(selected.settings?.blur, standard.settings?.blur);
+      expect(
+        selected.settings?.refractiveIndex,
+        standard.settings?.refractiveIndex,
+      );
     },
   );
 
@@ -366,6 +474,82 @@ void main() {
     expect(selected.right, lessThanOrEqualTo(selector.right));
   });
 
+  testWidgets('TpHorizontalSelector 只捲動 DAY，跨頁 action 永遠固定在左側', (tester) async {
+    tester.view.physicalSize = const Size(360, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('fixed-action-selector'),
+            value: 8,
+            options: [
+              const TpScopeOption(
+                value: -1,
+                label: '行程',
+                icon: CupertinoIcons.calendar,
+                isAction: true,
+                key: ValueKey('fixed-action'),
+              ),
+              for (var day = 0; day < 10; day++)
+                TpScopeOption(
+                  value: day,
+                  label: day == 0
+                      ? '總覽'
+                      : 'DAY ${day.toString().padLeft(2, '0')}',
+                  key: ValueKey('fixed-day-$day'),
+                ),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final selector = tester.getRect(
+      find.byKey(const ValueKey('fixed-action-selector')),
+    );
+    final action = tester.getRect(find.byKey(const ValueKey('fixed-action')));
+    final selected = tester.getRect(find.byKey(const ValueKey('fixed-day-8')));
+    expect(action.left, selector.left);
+    expect(action.right, lessThan(selected.left));
+    expect(selected.right, lessThanOrEqualTo(selector.right));
+  });
+
+  testWidgets('深色日期 selector 使用 Liquid Glass 暖褐 thumb，不使用金色實心底', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: TpHorizontalSelector<int>(
+            value: 1,
+            options: const [
+              TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(
+                value: 1,
+                label: 'DAY 1',
+                key: ValueKey('dark-day-1'),
+              ),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final thumb = tester.widget<GlassButton>(find.byType(GlassButton));
+    expect(thumb.settings?.glassColor, TpColorsDark.dayThumb);
+    final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
+    expect(track.settings?.chromaticAberration, 0);
+  });
+
   testWidgets('TpBottomAccessory 自行避讓 root tab 並維持固定高度', (tester) async {
     const bottomInset = 34.0;
     await tester.pumpWidget(
@@ -399,10 +583,11 @@ void main() {
       find.descendant(of: accessory, matching: find.byType(TpGlassSurface)),
       findsOneWidget,
     );
-    expect(
-      find.descendant(of: accessory, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
+    final glass = tester.widget<GlassContainer>(
+      find.descendant(of: accessory, matching: find.byType(GlassContainer)),
     );
+    expect(glass.platformViewBackdrop, isTrue);
+    expect(glass.settings?.chromaticAberration, 0);
     expect(find.byType(AnimatedContainer), findsNothing);
   });
 }

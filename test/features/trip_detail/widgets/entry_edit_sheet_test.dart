@@ -214,8 +214,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('請填入緯度與經度'), findsOneWidget);
-    final button = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('entry-edit-submit')),
+    final button = tester.widget<TextButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-submit')),
+        matching: find.byType(TextButton),
+      ),
     );
     expect(button.onPressed, isNull);
     verifyNever(
@@ -356,8 +359,11 @@ void main() {
   testWidgets('標題清空 → 送出鈕 disabled', (tester) async {
     final repo = _MockTripRepository();
     await _open(tester, repo, const EntryEditNew(1));
-    final button = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('entry-edit-submit')),
+    final button = tester.widget<TextButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-submit')),
+        matching: find.byType(TextButton),
+      ),
     );
     expect(button.onPressed, isNull);
   });

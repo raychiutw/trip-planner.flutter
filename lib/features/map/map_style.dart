@@ -140,7 +140,7 @@ TripMapRouteStyle tripMapRouteStyle({
 }) {
   return TripMapRouteStyle(
     color: dayPinColor(dayNum),
-    strokeWidth: isActive ? 4 : 3,
+    strokeWidth: isActive ? 6 : 5,
     opacity: isActive ? 0.85 : 0.6,
     dashed: dayNum >= 1 && dayNum.isEven,
   );

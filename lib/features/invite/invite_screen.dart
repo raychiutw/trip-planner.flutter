@@ -41,7 +41,10 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
     final authLoading = authState.isLoading;
 
     return Scaffold(
-      appBar: const TpAppBar(title: Text('邀請確認')),
+      appBar: const TpAppBar(
+        role: TpAppBarRole.standalone,
+        title: Text('邀請確認'),
+      ),
       body: SafeArea(
         child: ListView(
           key: const ValueKey('invite-page'),

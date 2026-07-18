@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/day.dart';
@@ -12,7 +13,6 @@ import '../../models/poi_note.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
@@ -57,6 +57,8 @@ class EntryAddRouteScreen extends ConsumerStatefulWidget {
 }
 
 class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
+  final _dismissController = AppUnsavedChangesController();
+  final _customFormController = AppSheetFormController();
   late EntryAddMode _mode;
   final _searchController = TextEditingController();
   int? _selectedDayNum;
@@ -71,6 +73,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   String? _favoritesError;
   final Set<int> _selectedFavoriteIds = <int>{};
   bool _submittingSelected = false;
+  bool _dirty = false;
   late String _region;
   _EntryAddCategory _category = _EntryAddCategory.all;
 
@@ -87,6 +90,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _customFormController.dispose();
     super.dispose();
   }
 
@@ -155,6 +159,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
 
   void _togglePoiSelection(PoiSearchResult poi) {
     setState(() {
+      _dirty = true;
       if (_selectedPlaceIds.contains(poi.placeId)) {
         _selectedPlaceIds.remove(poi.placeId);
         _searchPoiTypeOverrides.remove(poi.placeId);
@@ -166,6 +171,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
 
   void _toggleFavoriteSelection(PoiFavorite favorite) {
     setState(() {
+      _dirty = true;
       if (_selectedFavoriteIds.contains(favorite.id)) {
         _selectedFavoriteIds.remove(favorite.id);
       } else {
@@ -252,6 +258,17 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
     }
   }
 
+  Future<void> _submitCurrent(int dayNum) async {
+    if (_mode == EntryAddMode.custom) {
+      if (await _customFormController.submit() && mounted) {
+        _customFormController.update(dirty: false);
+        context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
+      }
+      return;
+    }
+    await _submitSelected(dayNum);
+  }
+
   Future<String?> _buildSearchPoiNote(PoiSearchResult poi) async {
     try {
       final details = await ref
@@ -276,7 +293,10 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   }
 
   void _setMode(EntryAddMode mode) {
-    setState(() => _mode = mode);
+    setState(() {
+      if (_mode != mode) _dirty = true;
+      _mode = mode;
+    });
     if (mode == EntryAddMode.favorites) {
       unawaited(_loadFavorites());
     }
@@ -285,147 +305,188 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
-    return Scaffold(
-      appBar: const TpAppBar(
-        title: Text('新增停留點'),
-        actions: [TpAccountAvatarButton()],
-      ),
-      body: daysAsync.when(
-        loading: () =>
-            const AppListLoadingSkeleton(key: ValueKey('entry-add-loading')),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('載入失敗：$error', textAlign: TextAlign.center),
-          ),
-        ),
-        data: (days) {
-          if (days.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(TpSpacing.s6),
-                child: Text('此行程尚無日期，請先回行程頁建立日期。'),
-              ),
-            );
-          }
-          final dayNum = _dayNumFor(days);
-          final filteredResults = _results
-              .where((poi) => _matchesCategory(poi.category, _category))
-              .toList(growable: false);
-          final filteredFavorites = _favorites
-              .where(
-                (favorite) => _matchesCategory(favorite.poiType, _category),
-              )
-              .toList(growable: false);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(
-              TpSpacing.s4,
-              TpSpacing.s4,
-              TpSpacing.s4,
-              TpSpacing.s8,
+    final days = switch (daysAsync) {
+      AsyncData<List<TripDay>>(:final value) => value,
+      _ => const <TripDay>[],
+    };
+    final dayNum = days.isEmpty ? null : _dayNumFor(days);
+    final primaryKey = _mode == EntryAddMode.custom
+        ? const ValueKey('entry-edit-submit')
+        : const ValueKey('entry-add-confirm');
+
+    return AnimatedBuilder(
+      animation: _customFormController,
+      builder: (context, _) {
+        final primaryEnabled =
+            dayNum != null &&
+            !_submittingSelected &&
+            switch (_mode) {
+              EntryAddMode.search ||
+              EntryAddMode.favorites => _selectedCount > 0,
+              EntryAddMode.custom => _customFormController.canSubmit,
+            };
+        return AppUnsavedChangesGuard(
+          controller: _dismissController,
+          hasChanges: _dirty || _customFormController.isDirty,
+          dismissalEnabled:
+              !_submittingSelected && !_customFormController.isSubmitting,
+          child: Scaffold(
+            appBar: TpAppBar(
+              role: TpAppBarRole.modalForm,
+              title: const Text('新增停留點'),
+              onCancel: _dismissController.requestPop,
+              primaryActionLabel: '加入',
+              primaryActionKey: primaryKey,
+              primaryActionEnabled: primaryEnabled,
+              onPrimaryAction: () {
+                if (dayNum != null) unawaited(_submitCurrent(dayNum));
+              },
             ),
-            children: [
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _DayPicker(
-                        days: days,
-                        selectedDayNum: dayNum,
-                        onSelected: (nextDayNum) =>
-                            setState(() => _selectedDayNum = nextDayNum),
-                      ),
-                      const SizedBox(height: TpSpacing.s3),
-                      SegmentedButton<EntryAddMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: EntryAddMode.search,
-                            icon: Icon(Icons.search),
-                            label: Text('搜尋景點'),
-                          ),
-                          ButtonSegment(
-                            value: EntryAddMode.favorites,
-                            icon: Icon(Icons.favorite_border),
-                            label: Text('收藏景點'),
-                          ),
-                          ButtonSegment(
-                            value: EntryAddMode.custom,
-                            icon: Icon(Icons.edit_location_alt_outlined),
-                            label: Text('自訂'),
-                          ),
-                        ],
-                        selected: {_mode},
-                        onSelectionChanged: (values) => _setMode(values.first),
-                      ),
-                      const SizedBox(height: TpSpacing.s2),
-                      if (_mode == EntryAddMode.search ||
-                          _mode == EntryAddMode.favorites) ...[
-                        _EntryAddCategoryFilter(
-                          selected: _category,
-                          onSelected: (category) =>
-                              setState(() => _category = category),
-                        ),
-                        const SizedBox(height: TpSpacing.s2),
-                      ],
-                      if (_mode == EntryAddMode.search)
-                        _SearchPoiPanel(
-                          controller: _searchController,
-                          results: filteredResults,
-                          searching: _searching,
-                          selectedPlaceIds: _selectedPlaceIds,
-                          poiTypeOverrides: _searchPoiTypeOverrides,
-                          submitting: _submittingSelected,
-                          selectedCount: _selectedCount,
-                          error: _searchError,
-                          emptyMessage:
-                              _results.isNotEmpty && filteredResults.isEmpty
-                              ? '沒有符合分類的搜尋結果'
-                              : null,
-                          region: _region,
-                          onRegionChanged: (region) =>
-                              setState(() => _region = region),
-                          onSearch: () => _searchPois(),
-                          onToggle: _togglePoiSelection,
-                          onPoiTypeChanged: (poi, poiType) => setState(
-                            () =>
-                                _searchPoiTypeOverrides[poi.placeId] = poiType,
-                          ),
-                          onSubmit: () => _submitSelected(dayNum),
-                        )
-                      else if (_mode == EntryAddMode.favorites)
-                        _FavoritePoiPanel(
-                          favorites: filteredFavorites,
-                          loading: _favoritesLoading && !_favoritesLoaded,
-                          selectedFavoriteIds: _selectedFavoriteIds,
-                          submitting: _submittingSelected,
-                          selectedCount: _selectedCount,
-                          error: _favoritesError,
-                          emptyMessage:
-                              _favorites.isNotEmpty && filteredFavorites.isEmpty
-                              ? '沒有符合分類的收藏'
-                              : '還沒有收藏的地點',
-                          onRetry: () => _loadFavorites(force: true),
-                          onToggle: _toggleFavoriteSelection,
-                          onSubmit: () => _submitSelected(dayNum),
-                        )
-                      else
-                        EntryEditSheet(
-                          tripId: widget.tripId,
-                          args: EntryEditNew(dayNum),
-                          onSaved: () => context.go(
-                            '/trips/${Uri.encodeComponent(widget.tripId)}',
-                          ),
-                        ),
-                    ],
-                  ),
+            body: daysAsync.when(
+              loading: () => const AppListLoadingSkeleton(
+                key: ValueKey('entry-add-loading'),
+              ),
+              error: (error, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(TpSpacing.s6),
+                  child: Text('載入失敗：$error', textAlign: TextAlign.center),
                 ),
               ),
-            ],
-          );
-        },
-      ),
+              data: (days) {
+                if (days.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(TpSpacing.s6),
+                      child: Text('此行程尚無日期，請先回行程頁建立日期。'),
+                    ),
+                  );
+                }
+                final dayNum = _dayNumFor(days);
+                final filteredResults = _results
+                    .where((poi) => _matchesCategory(poi.category, _category))
+                    .toList(growable: false);
+                final filteredFavorites = _favorites
+                    .where(
+                      (favorite) =>
+                          _matchesCategory(favorite.poiType, _category),
+                    )
+                    .toList(growable: false);
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    TpSpacing.s4,
+                    TpSpacing.s4,
+                    TpSpacing.s4,
+                    TpSpacing.s8,
+                  ),
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _DayPicker(
+                              days: days,
+                              selectedDayNum: dayNum,
+                              onSelected: (nextDayNum) => setState(() {
+                                _selectedDayNum = nextDayNum;
+                                _dirty = true;
+                              }),
+                            ),
+                            const SizedBox(height: TpSpacing.s3),
+                            SegmentedButton<EntryAddMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: EntryAddMode.search,
+                                  icon: Icon(Icons.search),
+                                  label: Text('搜尋景點'),
+                                ),
+                                ButtonSegment(
+                                  value: EntryAddMode.favorites,
+                                  icon: Icon(Icons.favorite_border),
+                                  label: Text('收藏景點'),
+                                ),
+                                ButtonSegment(
+                                  value: EntryAddMode.custom,
+                                  icon: Icon(Icons.edit_location_alt_outlined),
+                                  label: Text('自訂'),
+                                ),
+                              ],
+                              selected: {_mode},
+                              onSelectionChanged: (values) =>
+                                  _setMode(values.first),
+                            ),
+                            const SizedBox(height: TpSpacing.s2),
+                            if (_mode == EntryAddMode.search ||
+                                _mode == EntryAddMode.favorites) ...[
+                              _EntryAddCategoryFilter(
+                                selected: _category,
+                                onSelected: (category) =>
+                                    setState(() => _category = category),
+                              ),
+                              const SizedBox(height: TpSpacing.s2),
+                            ],
+                            if (_mode == EntryAddMode.search)
+                              _SearchPoiPanel(
+                                controller: _searchController,
+                                results: filteredResults,
+                                searching: _searching,
+                                selectedPlaceIds: _selectedPlaceIds,
+                                poiTypeOverrides: _searchPoiTypeOverrides,
+                                submitting: _submittingSelected,
+                                selectedCount: _selectedCount,
+                                error: _searchError,
+                                emptyMessage:
+                                    _results.isNotEmpty &&
+                                        filteredResults.isEmpty
+                                    ? '沒有符合分類的搜尋結果'
+                                    : null,
+                                region: _region,
+                                onRegionChanged: (region) => setState(() {
+                                  _region = region;
+                                }),
+                                onSearch: () => _searchPois(),
+                                onToggle: _togglePoiSelection,
+                                onPoiTypeChanged: (poi, poiType) =>
+                                    setState(() {
+                                      _searchPoiTypeOverrides[poi.placeId] =
+                                          poiType;
+                                      _dirty = true;
+                                    }),
+                              )
+                            else if (_mode == EntryAddMode.favorites)
+                              _FavoritePoiPanel(
+                                favorites: filteredFavorites,
+                                loading: _favoritesLoading && !_favoritesLoaded,
+                                selectedFavoriteIds: _selectedFavoriteIds,
+                                submitting: _submittingSelected,
+                                selectedCount: _selectedCount,
+                                error: _favoritesError,
+                                emptyMessage:
+                                    _favorites.isNotEmpty &&
+                                        filteredFavorites.isEmpty
+                                    ? '沒有符合分類的收藏'
+                                    : '還沒有收藏的地點',
+                                onRetry: () => _loadFavorites(force: true),
+                                onToggle: _toggleFavoriteSelection,
+                              )
+                            else
+                              EntryEditSheet(
+                                tripId: widget.tripId,
+                                args: EntryEditNew(dayNum),
+                                formController: _customFormController,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -441,7 +502,6 @@ class _FavoritePoiPanel extends StatelessWidget {
     required this.emptyMessage,
     required this.onRetry,
     required this.onToggle,
-    required this.onSubmit,
   });
 
   final List<PoiFavorite> favorites;
@@ -453,7 +513,6 @@ class _FavoritePoiPanel extends StatelessWidget {
   final String emptyMessage;
   final VoidCallback onRetry;
   final ValueChanged<PoiFavorite> onToggle;
-  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -517,11 +576,11 @@ class _FavoritePoiPanel extends StatelessWidget {
               onTap: submitting ? null : () => onToggle(favorite),
             ),
           ),
-        _EntryAddSubmitBar(
-          selectedCount: selectedCount,
-          submitting: submitting,
-          onSubmit: onSubmit,
-        ),
+        if (selectedCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s3),
+            child: Text('已選 $selectedCount 個'),
+          ),
       ],
     );
   }
@@ -543,7 +602,6 @@ class _SearchPoiPanel extends StatelessWidget {
     required this.onSearch,
     required this.onToggle,
     required this.onPoiTypeChanged,
-    required this.onSubmit,
   });
 
   final TextEditingController controller;
@@ -560,7 +618,6 @@ class _SearchPoiPanel extends StatelessWidget {
   final VoidCallback onSearch;
   final ValueChanged<PoiSearchResult> onToggle;
   final void Function(PoiSearchResult poi, String poiType) onPoiTypeChanged;
-  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -658,11 +715,11 @@ class _SearchPoiPanel extends StatelessWidget {
             },
           ),
         ],
-        _EntryAddSubmitBar(
-          selectedCount: selectedCount,
-          submitting: submitting,
-          onSubmit: onSubmit,
-        ),
+        if (selectedCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s3),
+            child: Text('已選 $selectedCount 個'),
+          ),
       ],
     );
   }
@@ -729,35 +786,6 @@ class _SearchPoiSubtitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: children,
-    );
-  }
-}
-
-class _EntryAddSubmitBar extends StatelessWidget {
-  const _EntryAddSubmitBar({
-    required this.selectedCount,
-    required this.submitting,
-    required this.onSubmit,
-  });
-
-  final int selectedCount;
-  final bool submitting;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: TpSpacing.s3),
-      child: Row(
-        children: [
-          Expanded(child: Text('已選 $selectedCount 個')),
-          FilledButton(
-            key: const ValueKey('entry-add-confirm'),
-            onPressed: selectedCount > 0 && !submitting ? onSubmit : null,
-            child: Text(submitting ? '加入中…' : '完成'),
-          ),
-        ],
-      ),
     );
   }
 }

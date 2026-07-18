@@ -40,7 +40,10 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   Widget build(BuildContext context) {
     final appsAsync = ref.watch(connectedAppsProvider);
     return Scaffold(
-      appBar: const TpAppBar(title: Text('已連結的應用程式')),
+      appBar: const TpAppBar(
+        role: TpAppBarRole.detail,
+        title: Text('已連結的應用程式'),
+      ),
       body: appsAsync.when(
         loading: () => const AppListLoadingSkeleton(
           key: ValueKey('connected-apps-loading'),

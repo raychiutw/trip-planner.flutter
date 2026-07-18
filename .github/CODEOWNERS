@@ -1,0 +1,6 @@
+# Release automation and dependency changes require repository-owner review.
+/.github/workflows/ @raychiutw
+/pubspec.yaml @raychiutw
+/pubspec.lock @raychiutw
+/android/ @raychiutw
+/ios/ @raychiutw

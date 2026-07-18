@@ -7,6 +7,9 @@ abstract final class TpColorsLight {
   static const accentDeep = Color(0xFF8A6038);
   static const accentSubtle = Color(0xFFF4EDE3);
   static const accentBg = Color(0xFFE9DBC8);
+  static const navigationSelection = Color(0x2EA97A4A);
+  static const rootTabSelection = navigationSelection;
+  static const dayThumb = navigationSelection;
 
   // 表面
   static const background = Color(0xFFFFFBF5);
@@ -51,6 +54,9 @@ abstract final class TpColorsDark {
   static const accentDeep = Color(0xFFE0BC90);
   static const accentSubtle = tertiary;
   static const accentBg = Color(0xFF44341F);
+  static const navigationSelection = Color(0x38E0BC90);
+  static const rootTabSelection = navigationSelection;
+  static const dayThumb = navigationSelection;
 
   static const background = Color(0xFF121214);
   static const secondary = Color(0xFF1C1C1E);
@@ -118,7 +124,7 @@ abstract final class TpSpacing {
 abstract final class TpRootTabGeometry {
   static const horizontalMargin = 30.0;
   static const expandedBarHeight = 44.0;
-  static const bottomSpacing = 8.0;
+  static const bottomSpacing = 16.0;
   static const safeAreaOverlap = 24.0;
 
   static double bottomOffsetFor(double bottomInset) {

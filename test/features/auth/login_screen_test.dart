@@ -228,6 +228,16 @@ void main() {
   });
 
   group('錯誤顯示', () {
+    testWidgets('首次載入目前使用者失敗時不誤顯示登入失敗', (tester) async {
+      when(
+        () => mockAuthRepository.currentUser(),
+      ).thenAnswer((_) async => throw Exception('network unavailable'));
+
+      await pumpLoginScreen(tester);
+
+      expect(find.byKey(errorBannerKey), findsNothing);
+    });
+
     testWidgets('登入失敗：表單上方 destructive 色塊顯示 ApiError.message', (tester) async {
       when(
         () => mockAuthRepository.login(

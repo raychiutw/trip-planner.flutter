@@ -10,16 +10,20 @@ Future<void> pumpTile(
   int number = 1,
   bool isFirst = false,
   bool isLast = false,
+  TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(
-        body: TimelineEntryTile(
-          entry: entry,
-          number: number,
-          isFirst: isFirst,
-          isLast: isLast,
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: textScaler),
+        child: Scaffold(
+          body: TimelineEntryTile(
+            entry: entry,
+            number: number,
+            isFirst: isFirst,
+            isLast: isLast,
+          ),
         ),
       ),
     ),
@@ -82,7 +86,7 @@ void main() {
         ),
       );
 
-      expect(find.text('拉麵'), findsOneWidget);
+      expect(find.text('拉麵店'), findsOneWidget);
       expect(find.text('ramen_restaurant'), findsNothing);
     });
 
@@ -226,6 +230,76 @@ void main() {
       expect(node.getSemanticsData().hint, '點兩下編輯停留點');
       expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
       semantics.dispose();
+    });
+
+    testWidgets('shows start and end time and announces the complete range', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 40,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '清水寺',
+        ),
+      );
+
+      expect(find.text('09:30'), findsOneWidget);
+      expect(find.text('– 11:00'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('09:30 到 11:00')), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('Google primary type is the first secondary row', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 41,
+          sortOrder: 0,
+          version: 1,
+          title: '一蘭拉麵',
+          master: EntryPoiInfo(
+            poiId: 501,
+            type: 'restaurant',
+            category: 'ramen_restaurant',
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('entry-category-41')), findsOneWidget);
+      expect(find.text('拉麵店'), findsOneWidget);
+      expect(find.text('ramen_restaurant'), findsNothing);
+    });
+
+    testWidgets('accessibility text uses stacked layout without overflow', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 42,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '很長但仍需要完整閱讀的景點名稱',
+          master: EntryPoiInfo(poiId: 502, category: 'tourist_attraction'),
+        ),
+        textScaler: const TextScaler.linear(2),
+      );
+
+      expect(
+        find.byKey(const ValueKey('timeline-entry-accessibility-42')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('很長但仍需要完整閱讀的景點名稱'), findsOneWidget);
     });
   });
 }

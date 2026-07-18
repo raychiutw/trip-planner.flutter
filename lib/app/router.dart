@@ -1,7 +1,7 @@
 /// 全 app 路由：StatefulShellRoute 5 branches + 認證 redirect。
 library;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,6 +22,7 @@ import '../features/favorites/favorites_screen.dart';
 import '../features/favorites/explore/explore_screen.dart';
 import '../features/invite/invite_screen.dart';
 import '../features/map/global_map_screen.dart';
+import '../features/map/map_adapter.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/trip_detail/entry_action_route_screen.dart';
@@ -41,8 +42,13 @@ import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 import '../models/oauth.dart';
 
+final tripMapCanvasBuilderProvider = Provider<TripMapCanvasBuilder?>((ref) {
+  return null;
+});
+
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final mapBuilder = ref.watch(tripMapCanvasBuilderProvider);
   // 橋接 authStateProvider 變化 → GoRouter 重新評估 redirect
   final authChangeNotifier = ValueNotifier<int>(0);
   ref.onDispose(authChangeNotifier.dispose);
@@ -218,12 +224,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // 建立/編輯行程:shell 外全螢幕表單(避開 /trips/:tripId 衝突)
       GoRoute(
         path: '/new-trip',
-        builder: (context, state) => const CreateTripScreen(),
+        pageBuilder: (context, state) => const MaterialPage<void>(
+          fullscreenDialog: true,
+          child: CreateTripScreen(),
+        ),
       ),
       GoRoute(
         path: '/edit-trip/:tripId',
-        builder: (context, state) =>
-            EditTripScreen(tripId: state.pathParameters['tripId']!),
+        pageBuilder: (context, state) => MaterialPage<void>(
+          fullscreenDialog: true,
+          child: EditTripScreen(tripId: state.pathParameters['tripId']!),
+        ),
       ),
       GoRoute(
         path: '/collab/:tripId',
@@ -418,6 +429,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   initialTripId: state.uri.queryParameters['tripId'],
                   initialEntryId: _entryFocusFromQuery(state.uri),
                   initialDayNum: _dayFocusFromQuery(state.uri),
+                  mapBuilder: mapBuilder,
                 ),
               ),
             ],
