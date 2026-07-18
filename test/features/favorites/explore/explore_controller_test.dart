@@ -100,9 +100,9 @@ void main() {
     await controller.search('沖繩');
 
     final categories = container.read(exploreControllerProvider).fineCategories;
-    expect(categories.first, (label: '拉麵', poiType: 'restaurant', count: 2));
+    expect(categories.first, (label: '拉麵店', poiType: 'restaurant', count: 2));
 
-    controller.setCategory('拉麵');
+    controller.setCategory('拉麵店');
     final state = container.read(exploreControllerProvider);
     expect(state.filteredResults.map((p) => p.name), ['拉麵店', '第二間拉麵']);
 
@@ -128,7 +128,7 @@ void main() {
     final container = _container(poi, fav);
     final controller = container.read(exploreControllerProvider.notifier);
     await controller.search('東京');
-    controller.setCategory('拉麵');
+    controller.setCategory('拉麵店');
 
     await controller.search('大阪');
 

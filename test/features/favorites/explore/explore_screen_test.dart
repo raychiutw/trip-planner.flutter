@@ -65,15 +65,15 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('動態細分類 chip「拉麵」→ 只剩拉麵店', (tester) async {
+  testWidgets('動態細分類 chip「拉麵店」→ 只剩拉麵店', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('拉麵  1'));
+    await tester.tap(find.text('拉麵店  1'));
     await tester.pumpAndSettle();
 
     expect(find.byType(PoiSearchCard), findsOneWidget);
-    expect(find.text('拉麵店'), findsOneWidget);
+    expect(find.byKey(const ValueKey('poi-card-p1')), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
   });
 

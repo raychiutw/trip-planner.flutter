@@ -51,6 +51,8 @@ import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
 
+import '../helpers/fake_trip_map.dart';
+
 /// 固定回傳指定使用者的假 AuthNotifier（不打 API）。
 class _FakeAuthNotifier extends AuthNotifier {
   _FakeAuthNotifier(this._fixedUser);
@@ -141,6 +143,7 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
+      tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
     ],
   );
   return container;
