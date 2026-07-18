@@ -32,7 +32,7 @@ const Map<String, String> kPoiTypeLabels = {
 /// mapping 能直接從 UI 被發現並事後補上。
 const Map<String, String> _googlePrimaryTypeLabels = {
   // 餐飲（吃 → 粉）
-  'ramen_restaurant': '拉麵',
+  'ramen_restaurant': '拉麵店',
   'sushi_restaurant': '壽司',
   'japanese_restaurant': '日式料理',
   'chinese_restaurant': '中式料理',

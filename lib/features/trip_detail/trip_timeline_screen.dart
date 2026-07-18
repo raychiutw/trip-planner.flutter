@@ -681,7 +681,7 @@ class _DaySection extends ConsumerWidget {
           children: [
             DayHeader(day: day, segments: segments),
             const SizedBox(height: TpSpacing.s3),
-            DayWeatherPreview(dayNum: day.dayNum),
+            DayWeatherCard(day: day),
             const SizedBox(height: TpSpacing.s3),
             ReorderableListView.builder(
               shrinkWrap: true,

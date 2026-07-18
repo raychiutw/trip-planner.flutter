@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,5 +107,73 @@ void main() {
     expect(find.text('逐時預報（2 個地點）'), findsOneWidget);
     expect(find.text('0:00'), findsOneWidget);
     expect(find.text('23:00'), findsOneWidget);
+  });
+
+  testWidgets(
+    'DayWeatherCard keeps the labeled preview until live data arrives',
+    (tester) async {
+      final completer = Completer<TripWeatherHourly>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dayWeatherFetcherProvider.overrideWithValue(
+              (request) => completer.future,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('day-weather-preview-1')),
+        findsOneWidget,
+      );
+      expect(find.text('天氣示意'), findsOneWidget);
+      expect(find.text('正在更新預報'), findsOneWidget);
+
+      completer.complete(
+        TripWeatherHourly(
+          temps: [for (var h = 0; h < 24; h++) 24],
+          rains: [for (var h = 0; h < 24; h++) 20],
+          codes: [for (var h = 0; h < 24; h++) 1],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('day-weather-live-1')), findsOneWidget);
+      expect(find.text('天氣示意'), findsNothing);
+    },
+  );
+
+  testWidgets('forecast outside the range stays explicitly labeled as sample', (
+    tester,
+  ) async {
+    final date = DateTime.now().add(const Duration(days: 30));
+    final dateText =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final day = TripDay(
+      id: 99,
+      dayNum: 3,
+      date: dateText,
+      version: 1,
+      timeline: _okinawaDay.timeline,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: DayWeatherCard(day: day)),
+        ),
+      ),
+    );
+
+    expect(find.text('天氣示意'), findsOneWidget);
+    expect(find.text('天氣預報將於出發前 16 天開放'), findsOneWidget);
   });
 }
