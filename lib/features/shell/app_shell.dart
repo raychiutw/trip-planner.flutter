@@ -32,23 +32,20 @@ class AppShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final shell = Scaffold(
-      extendBody: showRootTab,
-      // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
-      body: Column(
-        children: [
-          Expanded(child: navigationShell),
-          const OfflineStatusBanner(),
-        ],
-      ),
-      bottomNavigationBar: showRootTab
-          ? AppleRootTabBar(
-              selectedIndex: navigationShell.currentIndex,
-              onSelected: _selectTab,
-            )
-          : null,
-    );
-    return shell;
-  }
+  Widget build(BuildContext context) => Scaffold(
+    extendBody: showRootTab,
+    // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
+    body: Column(
+      children: [
+        Expanded(child: navigationShell),
+        const OfflineStatusBanner(),
+      ],
+    ),
+    bottomNavigationBar: showRootTab
+        ? AppleRootTabBar(
+            selectedIndex: navigationShell.currentIndex,
+            onSelected: _selectTab,
+          )
+        : null,
+  );
 }
