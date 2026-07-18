@@ -114,6 +114,13 @@ class CreateTripController extends Notifier<CreateTripState> {
       state.flexDayCount != 5 ||
       state.description.isNotEmpty;
 
+  void reset() {
+    state = CreateTripState(
+      flexYear: _initialFlexYear,
+      flexMonth: _initialFlexMonth,
+    );
+  }
+
   void addDestination(DestinationInput d) =>
       state = state.copyWith(destinations: [...state.destinations, d]);
 
@@ -160,6 +167,7 @@ class CreateTripController extends Notifier<CreateTripState> {
         countries: deriveCountries(dests),
         destinations: dests,
       );
+      if (!_disposed) reset();
       return r.tripId;
     } on ApiError catch (e) {
       if (_disposed) return null;

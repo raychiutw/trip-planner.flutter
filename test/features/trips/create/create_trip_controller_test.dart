@@ -86,6 +86,22 @@ void main() {
     expect(c.read(createTripControllerProvider).canSubmit, isTrue);
   });
 
+  test('hasChanges 反映編輯且 reset 復原初始狀態', () {
+    final c = makeC();
+    final t = ctrl(c);
+
+    expect(t.hasChanges, isFalse);
+    t.setDescription('家族旅行');
+    expect(t.hasChanges, isTrue);
+
+    t.reset();
+
+    expect(t.hasChanges, isFalse);
+    expect(c.read(createTripControllerProvider).submitting, isFalse);
+    expect(c.read(createTripControllerProvider).description, isEmpty);
+    expect(c.read(createTripControllerProvider).destinations, isEmpty);
+  });
+
   test('submit：衍生 name/countries + 呼叫 createTrip → 回 tripId', () async {
     when(
       () => repo.createTrip(
@@ -114,6 +130,9 @@ void main() {
 
     final id = await t.submit();
     expect(id, 'a-b-x');
+    expect(t.hasChanges, isFalse);
+    expect(c.read(createTripControllerProvider).submitting, isFalse);
+    expect(c.read(createTripControllerProvider).destinations, isEmpty);
     verify(
       () => repo.createTrip(
         id: any(named: 'id'),
