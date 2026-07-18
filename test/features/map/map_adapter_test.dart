@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/map/map_adapter.dart';
@@ -72,6 +74,25 @@ void main() {
     expect(platform.removedMarkerSemanticIds, ['b']);
     expect(platform.addedMarkerSemanticIds, containsAll(['a', 'b', 'c']));
     expect(platform.clearCount, 0);
+  });
+
+  test('overlay disposal waits for sync and ignores later updates', () async {
+    final platform = _BlockingTripMapOverlayPlatform();
+    final sync = TripMapOverlaySynchronizer(platform);
+    final firstSync = sync.sync(markers: [_marker('a')], routes: const []);
+    await platform.firstAddStarted.future;
+
+    final disposal = sync.dispose();
+    final lateSync = sync.sync(markers: [_marker('b')], routes: const []);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(platform.maxConcurrentCalls, 1);
+    platform.releaseFirstAdd.complete();
+    await Future.wait([firstSync, disposal, lateSync]);
+
+    expect(platform.addedMarkerSemanticIds, ['a']);
+    expect(platform.removedMarkerSemanticIds, ['a']);
+    expect(platform.maxConcurrentCalls, 1);
   });
 }
 
@@ -157,4 +178,43 @@ class _FakeTripMapOverlayPlatform implements TripMapOverlayPlatform {
 
   @override
   Future<void> updateRoute(TripMapRoute route) async {}
+}
+
+class _BlockingTripMapOverlayPlatform extends _FakeTripMapOverlayPlatform {
+  final firstAddStarted = Completer<void>();
+  final releaseFirstAdd = Completer<void>();
+  var _blockedFirstAdd = false;
+  var _activeCalls = 0;
+  var maxConcurrentCalls = 0;
+
+  @override
+  Future<void> addMarker(TripMapMarker marker) async {
+    _activeCalls += 1;
+    maxConcurrentCalls = maxConcurrentCalls < _activeCalls
+        ? _activeCalls
+        : maxConcurrentCalls;
+    try {
+      if (!_blockedFirstAdd) {
+        _blockedFirstAdd = true;
+        firstAddStarted.complete();
+        await releaseFirstAdd.future;
+      }
+      await super.addMarker(marker);
+    } finally {
+      _activeCalls -= 1;
+    }
+  }
+
+  @override
+  Future<void> removeMarker(String semanticId) async {
+    _activeCalls += 1;
+    maxConcurrentCalls = maxConcurrentCalls < _activeCalls
+        ? _activeCalls
+        : maxConcurrentCalls;
+    try {
+      await super.removeMarker(semanticId);
+    } finally {
+      _activeCalls -= 1;
+    }
+  }
 }

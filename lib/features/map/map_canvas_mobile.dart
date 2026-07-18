@@ -34,7 +34,6 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   _GoogleNavigationOverlayPlatform? _overlayPlatform;
   TripMapOverlaySynchronizer? _overlaySynchronizer;
   Map<String, TripMapMarker> _visibleMarkers = const {};
-  Future<void> _syncTail = Future<void>.value();
   double _zoom = 12;
   double _pixelRatio = 1;
   Brightness? _brightness;
@@ -132,6 +131,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   Future<void> _handleViewCreated(
     nav.GoogleMapViewController controller,
   ) async {
+    if (_disposed) return;
     _nativeController = controller;
     final cameraPlatform = _GoogleNavigationPlatformController(controller);
     final overlayPlatform = _GoogleNavigationOverlayPlatform(
@@ -154,9 +154,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   }
 
   void _scheduleOverlaySync() {
-    _syncTail = _syncTail
-        .then((_) => _syncOverlays())
-        .catchError(_reportPlatformError);
+    unawaited(_syncOverlays().catchError(_reportPlatformError));
   }
 
   Future<void> _syncOverlays() async {

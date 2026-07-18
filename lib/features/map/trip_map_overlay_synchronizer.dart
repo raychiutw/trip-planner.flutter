@@ -17,8 +17,18 @@ class TripMapOverlaySynchronizer {
   final TripMapOverlayPlatform _platform;
   final Map<String, TripMapMarker> _markers = {};
   final Map<String, TripMapRoute> _routes = {};
+  Future<void> _tail = Future<void>.value();
+  bool _disposed = false;
 
   Future<void> sync({
+    required List<TripMapMarker> markers,
+    required List<TripMapRoute> routes,
+  }) {
+    if (_disposed) return Future<void>.value();
+    return _enqueue(() => _sync(markers: markers, routes: routes));
+  }
+
+  Future<void> _sync({
     required List<TripMapMarker> markers,
     required List<TripMapRoute> routes,
   }) async {
@@ -56,7 +66,13 @@ class TripMapOverlaySynchronizer {
     }
   }
 
-  Future<void> dispose() async {
+  Future<void> dispose() {
+    if (_disposed) return _tail;
+    _disposed = true;
+    return _enqueue(_dispose);
+  }
+
+  Future<void> _dispose() async {
     for (final id in _markers.keys.toList()) {
       await _platform.removeMarker(id);
     }
@@ -65,6 +81,12 @@ class TripMapOverlaySynchronizer {
     }
     _markers.clear();
     _routes.clear();
+  }
+
+  Future<void> _enqueue(Future<void> Function() operation) {
+    final result = _tail.then((_) => operation());
+    _tail = result.catchError((Object _, StackTrace _) {});
+    return result;
   }
 }
 
