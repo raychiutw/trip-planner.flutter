@@ -9,6 +9,7 @@ void main() {
       value: 'delete',
       label: '刪除行程',
       icon: CupertinoIcons.delete,
+      selected: true,
       dividerBefore: true,
       role: TpActionRole.destructive,
     ),
@@ -16,6 +17,8 @@ void main() {
 
   test('one action list carries renderer-independent semantics', () {
     expect(sharedActions.last.role, TpActionRole.destructive);
+    expect(sharedActions.first.selected, isFalse);
+    expect(sharedActions.last.selected, isTrue);
     expect(sharedActions.last.dividerBefore, isTrue);
     expect(sharedActions.map((action) => action.value), ['edit', 'delete']);
   });

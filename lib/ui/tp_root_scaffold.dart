@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'tp_app_bar.dart';
 import 'tp_glass_surface.dart';
 
 @immutable
@@ -80,8 +81,8 @@ class TpRootGlassHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(
-      config.actions.length <= 2,
-      'Root header supports at most two actions.',
+      config.actions.length <= 4,
+      'Root header supports at most four actions.',
     );
     final theme = Theme.of(context);
     return SizedBox(
@@ -117,11 +118,17 @@ class TpRootGlassHeader extends StatelessWidget {
                 for (var index = 0; index < config.actions.length; index++) ...[
                   if (index > 0)
                     const SizedBox(width: TpRootGeometry.actionGap),
-                  SizedBox.square(
-                    key: ValueKey('tp-root-header-action-$index'),
-                    dimension: TpSpacing.tapMin,
-                    child: config.actions[index],
-                  ),
+                  if (config.actions[index] is TpToolbarTextButton)
+                    KeyedSubtree(
+                      key: ValueKey('tp-root-header-action-$index'),
+                      child: config.actions[index],
+                    )
+                  else
+                    SizedBox.square(
+                      key: ValueKey('tp-root-header-action-$index'),
+                      dimension: TpSpacing.tapMin,
+                      child: config.actions[index],
+                    ),
                 ],
               ],
             ],

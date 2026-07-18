@@ -180,6 +180,7 @@ Future<void> _pumpTimeline(
   int? initialDayNum,
   DayWeatherFetcher? dayWeatherFetcher,
   bool disableAnimations = false,
+  TextScaler? textScaler,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$tripId',
@@ -271,9 +272,10 @@ Future<void> _pumpTimeline(
         theme: AppTheme.light(),
         routerConfig: router,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(disableAnimations: disableAnimations),
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations: disableAnimations,
+            textScaler: textScaler,
+          ),
           child: child!,
         ),
       ),
@@ -496,12 +498,12 @@ void main() {
   testWidgets('閱讀模式隱藏移動與排序控制，點編輯後才顯示', (tester) async {
     await _pumpTimeline(tester);
 
-    expect(find.byKey(const ValueKey('entry-menu-11')), findsNothing);
+    expect(find.byKey(const ValueKey('entry-move-to-day-11')), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
 
     await _enableTimelineEditing(tester);
 
-    expect(find.byKey(const ValueKey('entry-menu-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-move-to-day-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsNothing);
     expect(
@@ -540,6 +542,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('完成'), findsOneWidget);
+    expect(find.text('調整順序'), findsOneWidget);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
 
     await tester.tap(
@@ -551,31 +554,45 @@ void main() {
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
   });
 
-  testWidgets(
-    'entry menu labels Move To Day and keeps drag as an alternative',
-    (tester) async {
-      await _pumpTimeline(tester);
-      await _enableTimelineEditing(tester);
+  testWidgets('Move To Day and reorder use matching direct inline controls', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester);
+    await _enableTimelineEditing(tester);
 
-      final dragHandle = find.byKey(const ValueKey('entry-drag-11'));
-      expect(tester.getSize(dragHandle), const Size(44, 44));
-      expect(tester.getSemantics(dragHandle).label, '拖曳調整順序');
+    final moveButton = find.byKey(const ValueKey('entry-move-to-day-11'));
+    final dragHandle = find.byKey(const ValueKey('entry-drag-11'));
+    expect(tester.getSize(moveButton), const Size(44, 44));
+    expect(tester.getSize(dragHandle), const Size(44, 44));
+    expect(tester.getSemantics(moveButton).label, '移到其他 Day');
+    expect(tester.getSemantics(dragHandle).label, '拖曳調整順序');
+    expect(
+      find.descendant(
+        of: moveButton,
+        matching: find.byIcon(CupertinoIcons.folder),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('entry-menu-11')), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
-      await tester.pumpAndSettle();
+    await tester.tap(moveButton);
+    await tester.pumpAndSettle();
+    expect(find.text('移到其他 Day'), findsOneWidget);
+  });
 
-      final moveAction = find.byKey(const ValueKey('entry-move-to-day-11'));
-      expect(moveAction, findsOneWidget);
-      expect(find.text('移到其他 Day'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: moveAction,
-          matching: find.byIcon(CupertinoIcons.folder),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+  testWidgets('Done keeps its full label at 200 percent text', (tester) async {
+    await _pumpTimeline(tester, textScaler: const TextScaler.linear(2));
+    await _enableTimelineEditing(tester);
+
+    final done = find.byKey(const ValueKey('tp-root-header-primary-action'));
+    expect(
+      find.descendant(of: done, matching: find.text('完成')),
+      findsOneWidget,
+    );
+    expect(tester.getSize(done).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(done).width, greaterThan(44));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('更多選單的分享連結使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
@@ -1353,10 +1370,8 @@ void main() {
     await _pumpTimeline(tester, repo: repo);
     await _enableTimelineEditing(tester);
 
-    await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-move-to-day-11')));
-    await _pumpGlassMenuClose(tester);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('move-day-2')));
     await tester.pumpAndSettle();
 
@@ -1386,10 +1401,8 @@ void main() {
     await _pumpTimeline(tester, repo: repo);
     await _enableTimelineEditing(tester);
 
-    await tester.tap(find.byKey(const ValueKey('entry-menu-11')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-move-to-day-11')));
-    await _pumpGlassMenuClose(tester);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('move-day-2')));
     await tester.pumpAndSettle();
 

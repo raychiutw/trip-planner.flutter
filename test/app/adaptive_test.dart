@@ -149,6 +149,32 @@ void main() {
     expect(tester.getSize(find.widgetWithText(ListTile, '刪除')).height, 56);
   });
 
+  testWidgets('action sheets render the shared selected checkmark', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(
+              label: '最近加入',
+              value: 'recent',
+              icon: CupertinoIcons.clock,
+              selected: true,
+            ),
+          ],
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '最近加入'));
+    expect((tile.leading! as Icon).icon, CupertinoIcons.check_mark);
+  });
+
   testWidgets('iOS action sheet does not dispatch a disabled action', (
     tester,
   ) async {

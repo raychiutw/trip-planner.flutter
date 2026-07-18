@@ -538,7 +538,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     final isDark = theme.brightness == Brightness.dark;
     final scheme = theme.colorScheme;
     final triggerForeground = scheme.primary;
-    final menuForeground = isDark ? scheme.primary : scheme.onPrimaryContainer;
+    final menuForeground = isDark ? scheme.primary : scheme.onSurface;
     final settings = LiquidGlassSettings(
       glassColor: scheme.primaryContainer.withValues(
         alpha: isDark ? 0.62 : 0.68,
@@ -588,7 +588,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
             GlassMenuItem(
               key: item.key,
               title: item.label,
-              icon: Icon(item.icon),
+              icon: Icon(item.selected ? CupertinoIcons.check_mark : item.icon),
               iconColor: item.role == TpActionRole.destructive
                   ? null
                   : menuForeground,

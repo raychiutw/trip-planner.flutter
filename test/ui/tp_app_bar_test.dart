@@ -225,6 +225,7 @@ void main() {
                       value: 'notes',
                       label: '筆記',
                       icon: Icons.description_outlined,
+                      selected: true,
                     ),
                   ],
                   onSelected: (_) {},
@@ -251,10 +252,52 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('primary-more-menu')));
       await tester.pumpAndSettle();
       final item = tester.widget<GlassMenuItem>(find.byType(GlassMenuItem));
-      expect(item.iconColor, TpColorsLight.accentDeep);
-      expect(item.titleStyle?.color, TpColorsLight.accentDeep);
+      expect(item.iconColor, TpColorsLight.foreground);
+      expect(item.titleStyle?.color, TpColorsLight.foreground);
+      expect(
+        find.descendant(
+          of: find.byType(GlassMenuItem),
+          matching: find.byIcon(CupertinoIcons.check_mark),
+        ),
+        findsOneWidget,
+      );
     },
   );
+
+  testWidgets('Dark More menu uses the Tripline primary foreground', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
+            title: const Text('行程'),
+            actions: [
+              TpMoreMenuButton<String>(
+                key: const ValueKey('dark-more-menu'),
+                items: const [
+                  TpActionItem(
+                    value: 'notes',
+                    label: '筆記',
+                    icon: Icons.description_outlined,
+                  ),
+                ],
+                onSelected: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('dark-more-menu')));
+    await tester.pumpAndSettle();
+    final item = tester.widget<GlassMenuItem>(find.byType(GlassMenuItem));
+    expect(item.iconColor, TpColorsDark.accent);
+    expect(item.titleStyle?.color, TpColorsDark.accent);
+  });
 
   testWidgets(
     'More menu preserves divider, destructive role, and disabled state',

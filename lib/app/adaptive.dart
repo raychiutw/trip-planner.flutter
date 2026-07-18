@@ -111,7 +111,17 @@ Future<T?> showAppActionSheet<T>(
               CupertinoActionSheetAction(
                 isDestructiveAction: action.role == TpActionRole.destructive,
                 onPressed: () => Navigator.of(sheetContext).pop(action.value),
-                child: Text(action.label),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (action.selected) ...[
+                      const Icon(CupertinoIcons.check_mark, size: 18),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(action.label),
+                  ],
+                ),
               )
             else
               Semantics(
@@ -149,7 +159,7 @@ Future<T?> showAppActionSheet<T>(
                 key: action.key,
                 enabled: action.enabled,
                 leading: Icon(
-                  action.icon,
+                  action.selected ? CupertinoIcons.check_mark : action.icon,
                   color: action.role == TpActionRole.destructive ? error : null,
                 ),
                 title: Text(

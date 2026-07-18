@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
 Widget _app(Widget home, {MediaQueryData? mediaQueryData}) {
@@ -55,10 +56,10 @@ void main() {
     );
   });
 
-  testWidgets('root header has one glass surface and at most two actions', (
+  testWidgets('root header has one glass surface and supports four actions', (
     tester,
   ) async {
-    await tester.pumpWidget(_app(_root(actionCount: 2)));
+    await tester.pumpWidget(_app(_root(actionCount: 4)));
 
     final header = find.byKey(const ValueKey('tp-root-glass-header'));
     expect(
@@ -73,11 +74,43 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('tp-root-header-action-1')),
+      find.byKey(const ValueKey('tp-root-header-action-3')),
       findsOneWidget,
     );
-    await tester.pumpWidget(_app(_root(actionCount: 3)));
+    await tester.pumpWidget(_app(_root(actionCount: 5)));
     expect(tester.takeException(), isAssertionError);
+  });
+
+  testWidgets('root text action keeps the full label and intrinsic width', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: const Text('調整順序'),
+            actions: [
+              TpToolbarTextButton(label: '完成', onPressed: () {}),
+              const SizedBox.square(dimension: 44),
+            ],
+          ),
+          body: const SizedBox.expand(),
+        ),
+        mediaQueryData: const MediaQueryData(
+          size: Size(390, 844),
+          textScaler: TextScaler.linear(2),
+        ),
+      ),
+    );
+
+    final action = find.byKey(const ValueKey('tp-root-header-action-0'));
+    expect(
+      find.descendant(of: action, matching: find.text('完成')),
+      findsOneWidget,
+    );
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(action).width, greaterThan(44));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('scroll content starts clear then passes under fixed header', (

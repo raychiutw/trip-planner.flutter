@@ -51,8 +51,6 @@ enum _TripMoreAction {
   health,
 }
 
-enum _EntryEditAction { moveToDay }
-
 /// 行程時間軸畫面：AppBar（可切換 trip + 功能選單 + 帳號）→ 單層地圖／DAY selector →
 /// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
@@ -117,14 +115,16 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     return TpRootScaffold(
       showSoftEdge: true,
       header: TpRootHeaderConfig(
-        title: TripTitleButton(
-          key: const ValueKey('trip-timeline-trip-picker'),
-          currentTripId: widget.tripId,
-          currentTitle: tripTitle,
-          trips: trips,
-          onSelected: (tripId) =>
-              context.go('/trips/${Uri.encodeComponent(tripId)}'),
-        ),
+        title: _isEditing
+            ? const Text('調整順序')
+            : TripTitleButton(
+                key: const ValueKey('trip-timeline-trip-picker'),
+                currentTripId: widget.tripId,
+                currentTitle: tripTitle,
+                trips: trips,
+                onSelected: (tripId) =>
+                    context.go('/trips/${Uri.encodeComponent(tripId)}'),
+              ),
         actions: [
           if (_isEditing)
             TpToolbarTextButton(
@@ -1185,23 +1185,11 @@ class _EntryTrailing extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TpMoreMenuButton<_EntryEditAction>(
-          key: ValueKey('entry-menu-$entryId'),
-          tooltip: '停留點操作',
-          triggerChild: Icon(
-            CupertinoIcons.ellipsis,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          items: [
-            TpActionItem(
-              key: ValueKey('entry-move-to-day-$entryId'),
-              value: _EntryEditAction.moveToDay,
-              icon: CupertinoIcons.folder,
-              label: '移到其他 Day',
-            ),
-          ],
-          onSelected: (_) => onMove(),
+        TpInlineEditActionButton(
+          key: ValueKey('entry-move-to-day-$entryId'),
+          icon: CupertinoIcons.folder,
+          tooltip: '移到其他 Day',
+          onPressed: onMove,
         ),
         ReorderDragHandle(
           index: index,
