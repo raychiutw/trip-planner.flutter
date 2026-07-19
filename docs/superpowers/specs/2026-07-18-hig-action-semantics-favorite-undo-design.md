@@ -154,7 +154,7 @@ Restore 重送必須 idempotent；成功後 App 重新整理收藏。`410 UNDO_E
 
 `TpRootGlassHeader` 的定版幾何如下：
 
-- 位於 `safeArea.top + 8pt`，左右各 `16pt`，視覺高度 `56pt`。
+- 位於 `safeArea.top + 8pt`，左右各 `16pt`，視覺高度 `64pt`，外圓角 `32pt`。
 - 整條 Header 是**單一** Liquid Glass 膠囊；標題與右側 actions 不各自再包第二層 glass。
 - 標題靠左、單行省略；圖示 action 固定 44×44pt，文字 action 採內容寬度且至少 44pt 高，actions 間距 `8pt`。一般 Root 頁維持最多兩個 actions；收藏因標題固定且短，可在同一膠囊內顯示搜尋、排序、新增與帳號四個明確動作，並以 200% Dynamic Type 測試證明不破版。
 - Header 固定浮在內容上方；聊天、Timeline、收藏清單與地圖本體皆延伸到 Header 下方。
@@ -173,7 +173,9 @@ Root 標題語意固定如下：
 
 收藏頁一般狀態固定為「收藏｜搜尋｜排序｜新增｜帳號」。搜尋使用 `CupertinoIcons.search`；排序按鈕使用 Apple 圖庫同語意的 `CupertinoIcons.line_horizontal_3_decrease`，點擊後由 `TpMoreMenuButton` 顯示錨定選單，當前排序以 checkmark 表示。新增使用 `CupertinoIcons.add` 並開啟既有收藏探索流程；帳號維持最右側。
 
-點搜尋後，搜尋欄在同一條 Root Glass Header 膠囊內取代「收藏」標題並自動聚焦；排序與帳號維持可見，新增暫時隱藏，另提供 44pt「結束搜尋」動作。搜尋欄的清除只清空文字，結束搜尋會清空查詢、收起鍵盤並恢復一般狀態。頁內不得再保留第二條搜尋欄。
+點搜尋後，搜尋欄在同一條 Root Glass Header 膠囊內取代「收藏」標題並自動聚焦；排序與帳號維持可見，新增暫時隱藏，另提供最小 44pt 的文字「取消」動作。搜尋欄的清除只清空文字；取消搜尋會清空查詢、收起鍵盤並恢復一般狀態。頁內不得再保留第二條搜尋欄，清單拖曳使用 `onDrag` 收起鍵盤。收藏名稱、地址與備註中的符合字串使用 `onSurface`＋Semibold 加深，其餘字串維持 `onSurfaceVariant`，不得用整列 accent 背景標記。
+
+Google POI 等遠端搜尋共用 `AppSearchField`：輸入少於 2 個字元不發 request，達門檻後以 300ms debounce 即時查詢，清空立即清除結果；每次查詢以 sequence/token 忽略過期 response，鍵盤 Search submit 取消 debounce 並立即送出。畫面只顯示細線 loading feedback，不再保留重複的搜尋 icon button。
 
 排序選單至少提供「最近加入、最早加入、名稱、地區」，下方以 separator 分組提供「篩選條件」並沿用既有篩選 Sheet。沒有第二種收藏版面，因此不實作參考圖的「顯示方式選項」。收藏頁不再設定 Header padding；共用 Root Header 仍讓最右側 action 固定保留 16pt、所有 action 固定間距 8pt。
 
@@ -246,7 +248,7 @@ class TpActionItem<T> {
 
 - Light／Dark Liquid Glass、Reduce Transparency fallback 與主題切換。
 - barrier、圓角、safe area、鍵盤 inset、拖曳動畫與 Reduce Motion。
-- large／medium detent、初始 detent、grabber、向下滑動關閉。
+- fixed／resizable 高度、初始 detent、依可調整性顯示 grabber、向下滑動關閉。
 - 標題列幾何、標題、取消／返回／關閉／完成按鈕與 44pt target。
 - 單一 Sheet 內的 Navigator、返回結果與防止重複關閉。
 - 未儲存表單的互動關閉攔截；內容與立即選取 Sheet 不需攔截。
@@ -255,23 +257,23 @@ Feature 只能使用以下有語意的 wrapper：
 
 | Wrapper | 使用情境 | HIG 標題列 | 高度與選取 |
 |---|---|---|---|
-| `showAppSelectionSheet<T>` | 切換行程、移到 Day、POI／分類選擇 | 置中任務標題；leading `取消`；無 `完成` | 長清單初始 large，支援 medium＋large；點列立即選取並關閉，現在值顯示 checkmark |
+| `showAppSelectionSheet<T>` | 切換行程、移到 Day、POI／分類選擇 | 置中任務標題；leading `取消`；無 `完成` | 固定 93% 近滿版且無 grabber；點列立即選取並關閉，現在值顯示 checkmark |
 | `showAppFormSheet<T>` | 新增／編輯停留點、交通、筆記、篩選 | leading `取消`；trailing `完成`／明確動詞 | medium＋large 或依鍵盤擴展；有未儲存內容時攔截 swipe dismiss |
-| `showAppContentSheet<T>` | 帳號、同步衝突、功能說明 | 單頁用 `關閉`；階層子頁用 `返回`，不得把返回當關閉 | 內容需要時使用 large；子頁沿用同一個 Sheet Navigator，不再疊第二張 Sheet |
-| `showAppScreenSheet<T>` | 行程功能開啟的近滿版功能頁 | 共用 Sheet Header／`TpAppBar`；第一層可關閉，後續層返回 | large；不得以 `go()` 替換原頁而失去退出路徑 |
+| `showAppContentSheet<T>` | 帳號、同步衝突、功能說明 | 單頁用 `關閉`；階層子頁用 `返回`，不得把返回當關閉 | 固定 93% 且無 grabber；子頁沿用同一個 Sheet Navigator，不再疊第二張 Sheet |
+| `showAppScreenSheet<T>` | 行程功能開啟的近滿版功能頁 | 共用 Sheet Header／`TpAppBar`；第一層可關閉，後續層返回 | 固定 93% 且無 grabber；不得以 `go()` 替換原頁而失去退出路徑 |
 | `showAppActionSheet<T>` | 使用者剛發起的一個動作需要 2–3 個短選項 | 系統 action sheet 語意，含取消 | 不得捲動；最多 3 個動作加取消；destructive 固定 system red |
 
 原生時間／日期 picker 不包裝成自製 Tripline picker，繼續使用平台元件。由 `...` 按鈕展開、選項超過三個的功能清單應使用共用 `TpMoreMenuButton`，不是 action sheet。
 
-#### 6.5.1 「切換行程」目前實作與 HIG 差異
+#### 6.5.1 「切換行程」定版
 
 目前 `TripTitleButton` 直接呼叫 `showAppLargeSheet`；該入口同時供帳號使用，因此「切換行程」被套成帳號／內容型 Sheet。
 
 | 項目 | 現在實際實作 | HIG／定版 |
 |---|---|---|
 | 任務類型 | 與帳號共用同一個泛用 large content sheet | 行程切換是立即選取清單，改走 `showAppSelectionSheet<String>` |
-| 高度 | `halfSize` 與 `fullSize` 都是 `0.93`，只有一個固定高度 | 初始 large 以保留近滿版；另提供 medium detent，內容捲動或拖曳可展開 |
-| Grabber | 自繪 36×5 指示線，但 Sheet 沒有兩個不同 detent | 只有可 resize 時顯示 grabber；medium／large 必須是實際不同停靠點 |
+| 高度 | `mediumSize` 與 `largeSize` 都是 `0.93`，`resizable=false` | 固定近滿版，內容本身可捲動，不以假 detent 暗示高度可調整 |
+| Grabber | 固定高度不建立 resize affordance | 不顯示 grabber；只有表單等實際具有不同 detent 的 Sheet 才顯示 |
 | 標題列 | 20pt 標題靠左，右上圓形 X | 任務標題置中，leading `取消`；立即選取不顯示多餘的 `完成` |
 | 選取回饋 | 目前行程有 trailing checkmark，點列立即 `pop(tripId)` | 保留；符合 option list 的短暫 highlight＋checkmark 語意 |
 | 搜尋與長清單 | Sheet 內搜尋框＋可捲動 ListView | 保留；長清單不應改成 action sheet |
@@ -326,7 +328,7 @@ Feature 只能使用以下有語意的 wrapper：
 - `AppleRootTabBar`：聊天、行程、地圖、收藏四個頂層目的地。
 - `TpHorizontalSelector`：行程／地圖互切與 Day 的一階水平選擇；行程頁不再提供「總覽」。
 
-兩者的 44pt 膠囊屬於同一種小型 navigation glass，必須共用 `tpNavigationGlassSettings(BuildContext)`。唯一來源放在 `lib/ui/tp_glass_surface.dart`，統一 Light／Dark 的 glass color、thickness、blur、light intensity、ambient strength、refractive index、saturation、opacity multiplier 與 PlatformView fallback color。
+兩者使用同一種 navigation glass optics，但保留不同導覽幾何：Root Tab 高 64pt、水平 margin 16pt；行程／地圖 selector 高 44pt。兩者必須共用 `tpNavigationGlassSettings(BuildContext)`；唯一來源放在 `lib/ui/tp_glass_surface.dart`，統一 Light／Dark 的 glass color、thickness、blur、light intensity、ambient strength、refractive index、saturation、opacity multiplier 與 PlatformView fallback color。
 
 `platformViewBackdrop` 只決定 Google Map PlatformView 上方的相容渲染路徑，不得再改變 blur、厚度、折射率、亮邊或透明度。行程頁與地圖頁使用相同的 optics；背景內容造成的自然明暗差異可以保留。
 
@@ -356,9 +358,9 @@ Mobile 地圖引擎由 `google_maps_flutter` 全面更換為 `google_navigation_
 
 外觀規則：
 
-- Light appearance 使用 `MapColorScheme.light`；Dark appearance 使用 `MapColorScheme.dark`。模式跟 App appearance，不依當地時間自行切夜間地圖。
+- Light／Dark appearance 都使用 `MapColorScheme.light` 日間底圖；Dark App 只改變覆蓋在 PlatformView 上方的 navigation glass，不切換 Google 夜間地圖。
 - 原生 Google POI、道路、車站與地名必須保持可見與可點；自訂 map style／Map ID 不得隱藏 POI feature layer。
-- Tripline 行程 marker、加粗 route 與底部卡片維持現有產品樣式；Day 與 POI focus zoom 都固定為 `12.0`，點 POI 不可改成建築級 zoom。
+- Tripline 行程 marker、加粗 route 與底部卡片維持現有產品樣式；預設進入、切換行程、切換 Day 與 Tripline POI focus zoom 都固定為 `13.0`。
 - Header、Day selector、定位按鈕、POI accessory 與 Root Tab 都以 map padding／safe-area token 避讓；不得由各層分別硬加 magic numbers。
 
 平台條件：
@@ -373,11 +375,11 @@ Mobile 地圖引擎由 `google_maps_flutter` 全面更換為 `google_navigation_
 
 Google 原生底圖 POI 與 Tripline 行程 POI 是兩種來源，不能混用 marker ID 或資料模型：
 
-1. 使用者點 Google 原生 POI 時，`onPoiClicked` 轉成 `GoogleMapPoiSelection`，不更動目前 Day、Tripline active entry 或固定 zoom 12。
+1. 使用者點 Google 原生 POI 時，`onPoiClicked` 轉成 `GoogleMapPoiSelection`，不更動目前 Day、Tripline active entry 或固定 zoom 13。
 2. Bottom accessory 的**同一個 slot**暫時從 Tripline `PageView` 換成 `GooglePoiAccessoryCard`；不得在原卡片上再堆第二張卡或開 modal sheet。
 3. Google 卡顯示 POI 名稱、Google 地點識別、關閉按鈕，以及明確標示的「在 Google 地圖開啟」secondary action；主要 Tripline 色只作小比例 accent。
 4. 點 Google 卡的關閉、點地圖空白，或點任一 Tripline marker 時，清除 Google selection 並恢復原本 Tripline POI 卡與頁次。
-5. 點 Tripline marker 仍走 `onMarkerClicked` 對照 app marker ID，維持橫滑卡片同步與 zoom 12；不得誤觸 Google POI 流程。
+5. 點 Tripline marker 仍走 `onMarkerClicked` 對照 app marker ID，維持橫滑卡片同步與 zoom 13；不得誤觸 Google POI 流程。
 
 「在 Google 地圖開啟」是明確的使用者動作，不先顯示確認 Alert，也不在點 POI 時自動切離 App。共用 `GoogleMapsExternalLauncher` 建立：
 
@@ -408,7 +410,8 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 
 ### 7.2 景點時間與 Google 分類
 
-- Timeline 左側時間欄顯示起訖時間；有 `startTime` 與 `endTime` 時採兩行 `09:30`／`– 11:00`，避免單行時間範圍擠壓內容卡。
+- Timeline 採 D1 單一 rail＋堆疊內容：左側 rail 固定 32pt，時間與景點卡位於右側同一內容欄，交通列也使用完全相同的內容起點。有 `startTime` 與 `endTime` 時固定單行 `09：30 - 11：00`，禁止折行；畫面使用全形冒號改善中文節奏，資料與 VoiceOver 保留 ASCII 時間。
+- D1 幾何固定為：rail/content gap 10pt、停留點圓點 22pt、卡片圓角 18pt／內距 16pt、交通列最低 64pt。每個 1／2 圓點頂端必須與同列時間第一行頂端對齊；直線在圓點後方銜接交通列，不得以額外 top spacer 把圓點下推。時間使用 HIG Title 3（20pt），景點名使用最接近 mockup 23pt 的 HIG Title 2（22pt），摘要與交通使用 Body 17pt；Dynamic Type 只向下增高，不切回獨立時間欄。
 - 只有開始時間時只顯示開始時間；不得自行推算結束時間。`startTime` 缺少時才沿用相容欄位 `time`。
 - 時間使用 tabular figures；VoiceOver 語意為「09:30 到 11:00」。內容卡可以保留停留時長，但不得再重複完整起訖時間。
 - Google `primaryType` 分類固定放在景點名稱下方第一個次要位置，使用小型分類圖示＋可縮放的 `labelMedium`，不做另一顆高彩度膠囊。
@@ -444,8 +447,8 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 ### 7.5 Dynamic Type 下維持 Timeline
 
 - 不關閉 Dynamic Type、不限制全 App text scale，也不以縮小字體解決破版。
-- 一般字級維持「時間｜rail｜卡片」橫向結構；時間、編號、標題、分類與控制都使用主題 text style，不再分散硬寫 11／12px。
-- 進入 accessibility text size 時改成較少欄的堆疊 layout：rail 繼續沿 leading 側延伸，起訖時間在內容上方，卡片使用剩餘完整寬度，編輯／拖曳控制移到卡片尾端或 footer。
+- 所有 Dynamic Type 尺寸都維持 D1「rail｜單一內容欄」：時間在卡片上方，時間、卡片與交通列共用同一 leading；編號、標題、分類與控制都使用主題 text style，不再分散硬寫 11／12px。
+- 進入 accessibility text size 時改成較少欄的堆疊 layout：rail 繼續沿 leading 側延伸，單行起訖時間在內容上方，卡片使用剩餘完整寬度，時間、卡片與交通列使用同一 leading，編輯／拖曳控制移到卡片尾端或 footer。
 - 一般字級標題可顯示兩行；accessibility size 允許卡片增高，不得因 Timeline 位於可捲動區就固定單行截斷主要資訊。
 - Day selector 是導覽 label，可維持受控的 label hierarchy；景點名稱、時間與內容必須完整跟隨 Dynamic Type。
 - 所有可點擊區維持至少 44×44pt，字級放大後圖示與語意也必須可辨識。
@@ -476,7 +479,7 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 11. 不可逆確認全部走 `showAppConfirm`；可復原通知全部走 `showAppUndoNotice`。
 12. `lib/features/**` 不再直接呼叫 `showModalBottomSheet`、`showCupertinoModalPopup` 或 `showGeneralDialog`。
 13. 切換行程使用 selection variant：標題置中、leading 取消、現在值 checkmark、點列立即回傳，不顯示完成。
-14. 可調整 Sheet 的 medium 與 large 是不同高度；固定 93% 的 Sheet 不得顯示暗示可 resize 的 grabber。
+14. 可調整 Sheet 的 medium 與 large 是不同高度；selection／content／screen 固定 93% 且不得顯示暗示可 resize 的 grabber。
 15. 表單 Sheet 具取消／完成與未儲存內容保護；返回只退內部一層，關閉才退出整張 Sheet。
 16. Action sheet 不可捲動且最多三個動作加取消；長功能清單改用 `TpMoreMenuButton`。
 17. `AppleRootTabBar` 與 `TpHorizontalSelector` 共用 `tpNavigationGlassSettings`，Feature 不得自行複製 navigation glass 數值。
@@ -485,11 +488,11 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 20. Light、Dark、Google Map PlatformView 與 Reduce Transparency fallback 都要實機／模擬器擷圖比對；允許背景造成自然差異，不允許元件配方不同。
 21. 行程 Timeline 符合第 7.6 節全部驗收項目，且沒有新增捲動套件或第二套 Day selector。
 22. 聊天、行程、地圖、收藏全部使用 `TpRootScaffold`＋單一 `TpRootGlassHeader`；`TpRootScrollScaffold`、`_MapRootAppBar` 與 Root `TpAppBar` 退場。
-23. Root Header 位於 safe area 下 8pt、左右 16pt、高 56pt；所有 action 為 44pt 且間距 8pt。Chat／行程／地圖標題可切換目前行程；收藏一般狀態顯示「收藏｜搜尋｜排序｜新增｜帳號」，搜尋狀態在同一膠囊內顯示搜尋欄並保持帳號最右。
+23. Root Header 位於 safe area 下 8pt、左右 16pt、高 64pt、外圓角 32pt；所有 action 為 44pt 且間距 8pt。Chat／行程／地圖標題可切換目前行程；收藏一般狀態顯示「收藏｜搜尋｜排序｜新增｜帳號」，搜尋狀態在同一膠囊內顯示搜尋欄並保持帳號最右。
 24. Mobile 只保留 `google_navigation_flutter`，Feature 不直接 import plugin，`google_maps_flutter` dependency／import／controller／cluster types 全部為零。
 25. Android API 24、Kotlin 2.3.0、iOS 16.0、CI 與本機 build target 一致；Android debug APK 與 iOS simulator build 都通過。
 26. Google 原生 POI 可點，選取後在既有 bottom accessory slot 顯示 Google 卡；關閉、點空白或點 Tripline marker 會回復原 Tripline 卡與頁次。
-27. Google POI selection 不移動 camera、不改 Day／active entry／PageController，也不寫入收藏或後端；Tripline Day/POI focus zoom 維持 `12.0`。
+27. Google POI selection 不移動 camera、不改 Day／active entry／PageController，也不寫入收藏或後端；預設／切行程／Day／Tripline POI focus zoom 維持 `13.0`。
 28. 「在 Google 地圖開啟」只由使用者明確按鈕觸發，使用含 `api=1`、`query`、可用時 `query_place_id` 的 Universal URL；App 不存在時由 browser fallback。
 29. Flutter Web 不載入 mobile plugin 或第二套 embedded Google Maps SDK；使用同一 URI builder 顯示明確外開 fallback。
 30. Tripline 編號 marker、使用者 marker、加粗 route、12+ POI clustering 與橫滑卡片在套件遷移後維持功能與視覺；overlay 更新不得 clear 全圖閃爍。
@@ -500,6 +503,9 @@ Google POI selection 只保存目前畫面狀態，不寫入收藏、行程或�
 35. 每則自己與協作者聊天訊息都顯示正確作者名稱；display name 缺少時 fallback 到該帳號 email 的 `@` 前文字。協作者使用 dynamic system Indigo 的單一語意 tint，自己維持 Tripline accent，AI 維持中性 surface。
 36. 進入調整順序模式後 Header 顯示任務標題「調整順序」與完整 trailing「完成」；文字 action 寬度大於 44pt 且支援 200% Dynamic Type，不得截成「完」。
 37. 停留點的 `folder` 移到其他 Day 與 `line_horizontal_3` 拖曳排序共用同一套 44pt inline control 規格；單一動作 ellipsis menu 退場，兩者的 semantics 分別為「移到其他 Day」與「拖曳調整順序」。
+38. Root Tab 使用 16pt 水平 margin、64pt 套件預設高度與 `max(16pt, safe area - 24pt)` 底部位移；Feature 不得重新覆寫 indicator、padding 或 label 幾何。
+39. 收藏搜尋以文字「取消」退出；遠端 POI 搜尋具 2 字門檻、300ms debounce、過期結果保護與鍵盤立即 submit，所有清單拖曳可收起鍵盤。
+40. Google 地圖在 Light／Dark App appearance 下都回傳 `MapColorScheme.light`，上層 Glass 則正確跟隨 App appearance。
 
 ## 9. 參考
 

@@ -64,6 +64,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   int? _selectedDayNum;
   List<PoiSearchResult> _results = const [];
   bool _searching = false;
+  int _searchRequest = 0;
   String? _searchError;
   final Set<String> _selectedPlaceIds = <String>{};
   final Map<String, String> _searchPoiTypeOverrides = <String, String>{};
@@ -104,8 +105,13 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
 
   Future<void> _searchPois() async {
     final q = _searchController.text.trim();
-    if (q.isEmpty) {
-      setState(() => _searchError = '請輸入景點關鍵字');
+    final request = ++_searchRequest;
+    if (q.length < 2) {
+      setState(() {
+        _results = const [];
+        _searching = false;
+        _searchError = null;
+      });
       return;
     }
     setState(() {
@@ -116,14 +122,14 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       final results = await ref
           .read(poiRepositoryProvider)
           .searchPois(q: q, limit: 20, region: _regionForSearch(_region));
-      if (!mounted) return;
+      if (!mounted || request != _searchRequest) return;
       setState(() {
         _results = results;
         _searching = false;
         _searchError = results.isEmpty ? '找不到符合的景點' : null;
       });
     } on Exception {
-      if (!mounted) return;
+      if (!mounted || request != _searchRequest) return;
       setState(() {
         _searching = false;
         _searchError = '搜尋失敗，請稍後再試';
@@ -372,6 +378,8 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                     )
                     .toList(growable: false);
                 return ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(
                     TpSpacing.s4,
                     TpSpacing.s4,
@@ -641,31 +649,18 @@ class _SearchPoiPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: TpSpacing.s2),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('entry-add-search-field'),
-                controller: controller,
-                decoration: const InputDecoration(labelText: '搜尋景點'),
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => onSearch(),
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s2),
-            IconButton.filled(
-              key: const ValueKey('entry-add-search-submit'),
-              tooltip: '搜尋',
-              onPressed: searching ? null : onSearch,
-              icon: searching
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.search),
-            ),
-          ],
+        AppSearchField(
+          fieldKey: const ValueKey('entry-add-search-field'),
+          controller: controller,
+          placeholder: '搜尋景點',
+          debounce: const Duration(milliseconds: 300),
+          onChanged: (_) => onSearch(),
+          onSubmitted: (_) => onSearch(),
         ),
+        if (searching) ...[
+          const SizedBox(height: TpSpacing.s1),
+          const LinearProgressIndicator(minHeight: 2),
+        ],
         if (error != null)
           Padding(
             padding: const EdgeInsets.only(top: TpSpacing.s2),

@@ -94,6 +94,18 @@ void main() {
       expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
       expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
+      expect(
+        find.byKey(const ValueKey('favorites-grouped-list')),
+        findsOneWidget,
+      );
+      expect(find.text('最近收藏'), findsOneWidget);
+      expect(find.text('2 個地點'), findsOneWidget);
+      expect(
+        tester
+            .widgetList<PoiFavoriteCard>(find.byType(PoiFavoriteCard))
+            .every((card) => card.grouped),
+        isTrue,
+      );
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.byType(FilterChip), findsNothing);
@@ -120,7 +132,12 @@ void main() {
       );
     });
 
-    testWidgets('200% 動態字級仍保留四個 Header action 且不溢位', (tester) async {
+    testWidgets('320pt / 200% 字級將新增收進更多選單且 Header 不溢位', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -139,12 +156,16 @@ void main() {
         find.byKey(const ValueKey('favorites-sort-action')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('favorites-add-action')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
       expect(
         find.byKey(const ValueKey('account-avatar-button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('favorites-add-menu-action')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
@@ -169,13 +190,16 @@ void main() {
       expect(find.text('收藏'), findsNothing);
       expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
       expect(
-        find.byKey(const ValueKey('favorites-search-close')),
+        find.byKey(const ValueKey('favorites-search-cancel')),
         findsOneWidget,
       );
+      expect(find.text('取消'), findsOneWidget);
 
       await tester.enterText(searchInput, '牧志');
       await tester.pump();
 
+      expect(find.text('搜尋結果'), findsOneWidget);
+      expect(find.text('1 個地點'), findsOneWidget);
       expect(find.byType(PoiFavoriteCard), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsNothing);
@@ -187,7 +211,7 @@ void main() {
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('favorites-search-close')));
+      await tester.tap(find.byKey(const ValueKey('favorites-search-cancel')));
       await tester.pump();
       expect(find.text('收藏'), findsOneWidget);
       expect(searchInput, findsNothing);

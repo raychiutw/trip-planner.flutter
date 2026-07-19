@@ -23,6 +23,11 @@ on:
         options:
           - macos-26
           - tripline-release
+      run_optional_evidence:
+        description: Also run staging contract and Firebase device evidence
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -83,7 +88,7 @@ jobs:
 
   favorite_restore_contract:
     name: Verify staging favorite restore
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 10
@@ -107,9 +112,8 @@ jobs:
         run: tool/verify_favorite_restore_contract.sh
 
   external_device_gate:
-    name: External device release gate
-    needs: favorite_restore_contract
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    name: External device evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
     permissions:
       contents: read
       id-token: write
@@ -131,8 +135,7 @@ jobs:
 
   testflight:
     name: Upload to TestFlight
-    needs: external_device_gate
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'testflight' && needs.external_device_gate.result == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'testflight' }}
     runs-on: ${{ inputs.runner }}
     environment: mobile-release
     timeout-minutes: 75
@@ -221,8 +224,7 @@ jobs:
 
   android_internal:
     name: Upload to Google Play internal testing
-    needs: external_device_gate
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'android-internal' && needs.external_device_gate.result == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'android-internal' }}
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 45

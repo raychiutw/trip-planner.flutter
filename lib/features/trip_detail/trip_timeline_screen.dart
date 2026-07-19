@@ -1003,9 +1003,7 @@ class _DaySection extends ConsumerWidget {
                               child: SizedBox(
                                 width:
                                     MediaQuery.sizeOf(context).width -
-                                    (TpSpacing.s4 * 2) -
-                                    kTimelineTimeColumnWidth -
-                                    kTimelineRailWidth,
+                                    (TpSpacing.s4 * 2),
                                 child: IgnorePointer(child: tile),
                               ),
                             ),
@@ -1240,7 +1238,7 @@ bool _missingTravelCoords(TimelineEntry from, TimelineEntry to) {
   return missing(from) || missing(to);
 }
 
-/// travel pill 列：沿用 tile 的時間欄 + rail 縮排，可編輯或補建交通 segment。
+/// travel pill 列：沿用 D1 的固定 rail + 內容起點，可編輯或補建交通 segment。
 class _TravelRow extends StatelessWidget {
   const _TravelRow({
     required this.travel,
@@ -1305,26 +1303,22 @@ class _TravelRow extends StatelessWidget {
       );
     }
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(width: kTimelineTimeColumnWidth),
-          Container(
-            width: 1,
-            margin: const EdgeInsets.symmetric(
-              horizontal: (kTimelineRailWidth - 1) / 2,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 64),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: kTimelineRailWidth,
+              child: Center(child: Container(width: 1, color: railLineColor)),
             ),
-            color: railLineColor,
-          ),
-          const SizedBox(width: TpSpacing.s2),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+            const SizedBox(width: 10),
+            Expanded(
               child: Align(alignment: Alignment.centerLeft, child: pill),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

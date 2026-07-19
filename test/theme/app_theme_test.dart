@@ -54,11 +54,19 @@ void main() {
 
     test('V3 使用中性深色 canvas 與 surface', () {
       final darkTheme = AppTheme.dark();
+      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF1C1C1E));
       expect(darkTheme.colorScheme.surface, const Color(0xFF1C1C1E));
-      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF121214));
-      expect(TpColorsDark.background, const Color(0xFF121214));
-      expect(TpColorsDark.secondary, const Color(0xFF1C1C1E));
-      expect(TpColorsDark.tertiary, const Color(0xFF2C2C2E));
+      expect(
+        darkTheme.colorScheme.surfaceContainerLow,
+        const Color(0xFF2C2C2E),
+      );
+      expect(
+        darkTheme.colorScheme.surfaceContainerHigh,
+        const Color(0xFF3A3A3C),
+      );
+      expect(TpColorsDark.background, const Color(0xFF1C1C1E));
+      expect(TpColorsDark.secondary, const Color(0xFF2C2C2E));
+      expect(TpColorsDark.tertiary, const Color(0xFF3A3A3C));
       expect(TpColorsDark.foreground, const Color(0xFFF5F5F7));
       expect(TpColorsDark.muted, const Color(0xFFA1A1A6));
     });

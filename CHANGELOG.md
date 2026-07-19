@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 收藏頁加入 HIG S1 即時搜尋、排序／篩選選單與符合文字加深；窄螢幕搭配 200% Dynamic Type 時，新增景點會收進既有更多選單。
+- 原生地圖 smoke 與 release flow 補上 zoom `13`、固定白天地圖、Light／Dark Liquid Glass 與命名畫面證據。
+
+### 變更
+
+- 地圖預設進入、切換行程、切換 Day 與點選 Tripline POI 共用固定 zoom `13`；Google 原生 POI 選取仍不移動鏡頭。
+- Root Header、底部導覽、DAY selector、POI dock 與功能選單統一使用共用 Liquid Glass recipe；PlatformView 上維持呼叫端指定 blur 與亮邊，不再疊加內層玻璃。
+- 行程 Timeline 統一為 D1 `rail｜單一內容欄`，起訖時間固定單行並在空間不足時等比縮小；景點卡與交通列改用中性 surface 加單一 Tripline accent。
+- 收藏卡的 POI 類型色退場，leading、heart 與搜尋命中改用同一 Tripline accent；搜尋命中文字渲染收斂為單一共用 widget。
+
+### 修正
+
+- 修正探索、加入景點與替代景點搜尋在清空或快速改字時殘留舊結果，以及 debounce 送出後再次觸發過期查詢。
+- 修正 320pt／200% Dynamic Type 下收藏 Header、Timeline 時間與長交通狀態可能溢位或折行破版。
+- 修正切換行程重用地圖 state 時未重新對焦，現在即使 days 物件相同也會以 zoom `13` 套用新行程中心。
+- 商店上傳不再等待 Firebase／外部裝置證據；TestFlight 與 Google Play internal release 可在裝置報告稍後回補時獨立執行。
+
 ## [0.9.1] - 2026-07-18
 
 ### 新增

@@ -23,7 +23,7 @@ void main() {
     'ios/Flutter/TestLabSigning.xcconfig',
   ).readAsStringSync();
 
-  group('external mobile integration test gate', () {
+  group('external mobile integration evidence', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
       expect(e2eWorkflow, contains('patrol_test/native_map_smoke_test.dart'));
       expect(e2eWorkflow, contains('patrol_test/app_owned_flow_test.dart'));
@@ -67,6 +67,20 @@ void main() {
         isNot(contains('with:\n      platform: android')),
       );
     });
+
+    test(
+      'manual release evidence is opt-in and cannot fail a store upload',
+      () {
+        expect(releaseWorkflow, contains('run_optional_evidence:'));
+        expect(releaseWorkflow, contains('default: false'));
+        expect(
+          RegExp(
+            r'inputs\.run_optional_evidence',
+          ).allMatches(releaseWorkflow).length,
+          greaterThanOrEqualTo(2),
+        );
+      },
+    );
 
     test('manual releases are master-only and use a protected environment', () {
       expect(releaseWorkflow, contains("github.ref == 'refs/heads/master'"));
@@ -209,7 +223,7 @@ void main() {
     });
 
     test(
-      'release fails closed on the real staging favorite restore contract',
+      'release keeps the real staging favorite restore contract as evidence',
       () {
         expect(releaseWorkflow, contains('Verify staging favorite restore'));
         expect(releaseWorkflow, contains('STAGING_API_BASE_URL'));
@@ -235,19 +249,18 @@ void main() {
           releaseWorkflow,
           contains(
             'external_device_gate:\n'
-            '    name: External device release gate\n'
-            '    needs: favorite_restore_contract',
+            '    name: External device evidence\n'
+            '    if:',
           ),
         );
         expect(
-          'needs: external_device_gate'.allMatches(releaseWorkflow).length,
-          2,
+          releaseWorkflow,
+          isNot(contains('needs: favorite_restore_contract')),
         );
+        expect(releaseWorkflow, isNot(contains('needs: external_device_gate')));
         expect(
-          "needs.external_device_gate.result == 'success'"
-              .allMatches(releaseWorkflow)
-              .length,
-          2,
+          releaseWorkflow,
+          isNot(contains("needs.external_device_gate.result == 'success'")),
         );
       },
     );

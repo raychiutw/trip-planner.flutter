@@ -9,13 +9,21 @@ Future<void> pumpPill(
   WidgetTester tester,
   Travel travel, {
   String? statusLabel,
+  TextScaler textScaler = TextScaler.noScaling,
+  double? width,
 }) {
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(
-        body: Center(
-          child: TravelPill(travel: travel, statusLabel: statusLabel),
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: textScaler),
+        child: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: width,
+              child: TravelPill(travel: travel, statusLabel: statusLabel),
+            ),
+          ),
         ),
       ),
     ),
@@ -47,6 +55,19 @@ void main() {
       await pumpPill(tester, const Travel(type: 'walk', min: 12));
       expect(find.text('12 分鐘'), findsOneWidget);
       expect(find.byIcon(Icons.directions_walk), findsOneWidget);
+
+      final pill = tester.widget<Container>(
+        find.byKey(const ValueKey('travel-pill')),
+      );
+      expect(
+        pill.padding,
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      );
+      expect(
+        tester.getSize(find.byIcon(Icons.directions_walk)),
+        const Size(17, 17),
+      );
+      expect(tester.widget<Text>(find.text('12 分鐘')).style?.fontSize, 17);
     });
 
     testWidgets('無 min 有 desc → desc', (tester) async {
@@ -166,6 +187,28 @@ void main() {
 
       expect(find.text('車程重新計算中'), findsOneWidget);
       expect(find.text('20 分鐘 · 11 km'), findsNothing);
+    });
+
+    testWidgets('390pt 與 200% 文字可完整換行最長交通狀態', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpPill(
+        tester,
+        const Travel(type: 'car'),
+        statusLabel: '缺座標，無法計算車程',
+        textScaler: const TextScaler.linear(2),
+        width: 300,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+      expect(
+        tester.getRect(find.text('缺座標，無法計算車程')).right,
+        lessThanOrEqualTo(390),
+      );
     });
   });
 }

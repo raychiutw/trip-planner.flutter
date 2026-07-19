@@ -291,7 +291,31 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '水族館',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    expect(find.byKey(const ValueKey('entry-add-search-submit')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-add-poi-p1')), findsOneWidget);
+    expect(
+      tester
+          .widgetList<ListView>(find.byType(ListView))
+          .any(
+            (list) =>
+                list.keyboardDismissBehavior ==
+                ScrollViewKeyboardDismissBehavior.onDrag,
+          ),
+      isTrue,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '',
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('entry-add-poi-p1')), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '水族館',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
     await tester.pump();
@@ -302,7 +326,7 @@ void main() {
 
     verify(
       () => poiRepo.searchPois(q: '水族館', limit: 20, region: null),
-    ).called(1);
+    ).called(2);
     verify(() => poiRepo.resolvePlace('p1')).called(1);
     verify(
       () => repo.addEntryToDay(
@@ -369,7 +393,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '水族館',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
     await tester.pump();
@@ -449,7 +473,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '沖繩',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p2')));
@@ -518,7 +542,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '水族館',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     verify(
@@ -578,7 +602,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '沖繩',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     expect(find.text('牧志市場'), findsOneWidget);
@@ -658,7 +682,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '市場',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
     await tester.pumpAndSettle();
@@ -734,7 +758,7 @@ void main() {
       find.byKey(const ValueKey('entry-add-search-field')),
       '市場',
     );
-    await tester.tap(find.byKey(const ValueKey('entry-add-search-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     final card = find.byKey(const ValueKey('entry-add-poi-p1'));
     await tester.tap(card);

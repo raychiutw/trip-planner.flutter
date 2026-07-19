@@ -745,6 +745,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   List<PoiSearchResult> _results = const [];
   List<PoiFavorite> _favorites = const [];
   bool _searching = false;
+  int _searchRequest = 0;
   bool _favoritesLoaded = false;
   bool _favoritesLoading = false;
   String? _favoritesError;
@@ -762,18 +763,29 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
 
   Future<void> _search() async {
     final q = _ctrl.text.trim();
-    if (q.length < 2) return;
+    final request = ++_searchRequest;
+    if (q.length < 2) {
+      if (mounted) {
+        setState(() {
+          _results = const [];
+          _searching = false;
+        });
+      }
+      return;
+    }
     setState(() => _searching = true);
     try {
       final results = await ref.read(poiRepositoryProvider).searchPois(q: q);
-      if (mounted) {
+      if (mounted && request == _searchRequest) {
         setState(() {
           _results = results;
           _searching = false;
         });
       }
     } on Exception {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && request == _searchRequest) {
+        setState(() => _searching = false);
+      }
     }
   }
 
@@ -879,29 +891,24 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
             ),
             const SizedBox(height: TpSpacing.s3),
             if (_tab == _PoiPickerTab.search) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: AppSearchField(
-                      fieldKey: const ValueKey('alt-search-field'),
-                      controller: _ctrl,
-                      placeholder: widget.hintText,
-                      autofocus: true,
-                      onSubmitted: (_) => _search(),
-                    ),
-                  ),
-                  const SizedBox(width: TpSpacing.s2),
-                  FilledButton(
-                    key: const ValueKey('alt-search-button'),
-                    onPressed: _searching ? null : _search,
-                    child: Text(_searching ? '搜尋中…' : '搜尋'),
-                  ),
-                ],
+              AppSearchField(
+                fieldKey: const ValueKey('alt-search-field'),
+                controller: _ctrl,
+                placeholder: widget.hintText,
+                debounce: const Duration(milliseconds: 300),
+                onChanged: (_) => _search(),
+                onSubmitted: (_) => _search(),
               ),
+              if (_searching) ...[
+                const SizedBox(height: TpSpacing.s1),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
               const SizedBox(height: TpSpacing.s3),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 320),
                 child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   shrinkWrap: true,
                   children: [
                     for (final poi in _results)
@@ -940,6 +947,8 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     shrinkWrap: true,
                     children: [
                       for (final favorite in _favorites)

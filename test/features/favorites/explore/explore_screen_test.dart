@@ -121,18 +121,56 @@ void main() {
     expect(find.text('車站'), findsOneWidget);
   });
 
-  testWidgets('手動搜尋 <2 字 → 持續錯誤提示', (tester) async {
+  testWidgets('輸入即時搜尋：少於 2 字不送 request，300ms 後只送最新 query', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    clearInteractions(poi);
+    expect(
+      tester.widget<GridView>(find.byType(GridView)).keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('explore-search-field')),
       'a',
     );
-    await tester.tap(find.byKey(const ValueKey('explore-search-button')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(PoiSearchCard), findsNothing);
+    verifyNever(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    );
+    expect(find.text('至少輸入 2 個字'), findsNothing);
+    expect(find.byKey(const ValueKey('explore-search-button')), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      '東京',
+    );
+    await tester.pump(const Duration(milliseconds: 299));
+    verifyNever(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.pump();
 
-    expect(find.text('至少輸入 2 個字'), findsOneWidget);
+    verify(
+      () => poi.searchPois(
+        q: '東京',
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
   });
 
   testWidgets('離開再返回探索頁會保留搜尋文字與結果', (tester) async {
@@ -155,7 +193,7 @@ void main() {
       find.byKey(const ValueKey('explore-search-field')),
       '大阪景點',
     );
-    await tester.tap(find.byKey(const ValueKey('explore-search-button')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     await tester.pumpWidget(app(const Scaffold(body: Text('OTHER'))));

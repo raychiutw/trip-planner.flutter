@@ -30,6 +30,30 @@ TpRootScaffold _root({int actionCount = 0, Widget? body}) {
 }
 
 void main() {
+  testWidgets(
+    'root scroll dismisses the keyboard when results start scrolling',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TpRootScaffold(
+            header: const TpRootHeaderConfig(title: Text('收藏')),
+            body: const TpRootScrollView(
+              slivers: [SliverToBoxAdapter(child: SizedBox(height: 1200))],
+            ),
+          ),
+        ),
+      );
+
+      final scrollView = tester.widget<CustomScrollView>(
+        find.byKey(const ValueKey('tp-root-scroll-view')),
+      );
+      expect(
+        scrollView.keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.onDrag,
+      );
+    },
+  );
+
   testWidgets('root header is one fixed capsule over full bleed content', (
     tester,
   ) async {
@@ -47,7 +71,7 @@ void main() {
     expect(header, findsOneWidget);
     expect(tester.getRect(header).top, 52);
     expect(tester.getRect(header).left, 16);
-    expect(tester.getSize(header).height, 56);
+    expect(tester.getSize(header).height, 64);
     expect(find.byType(SliverAppBar), findsNothing);
     expect(find.byType(AppBar), findsNothing);
     expect(

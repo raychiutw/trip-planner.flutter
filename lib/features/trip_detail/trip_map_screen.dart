@@ -191,8 +191,7 @@ class _TripMapView extends ConsumerStatefulWidget {
 }
 
 class _TripMapViewState extends ConsumerState<_TripMapView> {
-  static const _dayZoom = 12.0;
-  static const _poiFocusZoom = 12.0;
+  static const _focusZoom = 13.0;
 
   final TripMapController _mapController = TripMapController();
   late final PageController _pageController;
@@ -250,7 +249,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   @override
   void didUpdateWidget(covariant _TripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialEntryId != widget.initialEntryId ||
+    if (oldWidget.tripId != widget.tripId ||
+        oldWidget.initialEntryId != widget.initialEntryId ||
         oldWidget.initialDayNum != widget.initialDayNum ||
         !identical(oldWidget.days, widget.days)) {
       _selectedTabIndex = _initialTabIndex();
@@ -474,13 +474,13 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   void _focusDay(List<_MapStop> pins) {
     final center = _centerForPins(pins);
     if (!_mapIsReady || center == null) return;
-    _mapController.move(center, _dayZoom);
+    _mapController.move(center, _focusZoom);
   }
 
   void _focusStop(_MapStop stop) {
     final point = stop.point;
     if (!_mapIsReady || point == null) return;
-    _mapController.move(point, _poiFocusZoom);
+    _mapController.move(point, _focusZoom);
   }
 
   void _selectStop(_MapStop stop, {bool animatePage = false}) {
@@ -591,7 +591,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               tilePreset: kTripMapTilePresets.first,
               initialFitPoints: const [],
               initialCenter: initialCenter,
-              initialZoom: _dayZoom,
+              initialZoom: _focusZoom,
               initialPadding: _mapPadding,
               onMapReady: _handleMapReady,
               onTap: (_) => _clearGooglePoi(),

@@ -246,7 +246,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('root tab 對齊定版 mockup 的 30/44/16 幾何與透明玻璃色', (tester) async {
+    testWidgets('root tab 使用套件原生 16/64/32 Liquid Glass 幾何', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -261,11 +261,14 @@ void main() {
       final padding = tester.widget<Padding>(
         find.descendant(of: bar, matching: find.byType(Padding)).first,
       );
-      expect(padding.padding, const EdgeInsets.fromLTRB(30, 0, 30, 16));
+      expect(padding.padding, const EdgeInsets.fromLTRB(16, 0, 16, 16));
       final glass = tester.widget<GlassTabBar>(
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
-      expect(glass.barHeight, 44);
+      expect(glass.barHeight, 64);
+      expect(glass.barBorderRadius, 32);
+      expect(glass.iconSize, 24);
+      expect(glass.iconLabelSpacing, 4);
       expect(glass.platformViewBackdrop, isFalse);
       expect(glass.indicatorColor, TpColorsLight.rootTabSelection);
       expect(glass.settings?.chromaticAberration, 0);
@@ -293,7 +296,7 @@ void main() {
     });
 
     test('iPhone safe area 與膠囊重疊後，底部至少保留 16pt', () {
-      expect(TpRootTabGeometry.expandedHeightFor(34), 60);
+      expect(TpRootTabGeometry.expandedHeightFor(34), 80);
     });
   });
 }

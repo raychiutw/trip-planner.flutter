@@ -6,7 +6,8 @@ import '../theme/tokens.dart';
 LiquidGlassSettings tpNavigationGlassSettings(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final settings = LiquidGlassSettings(
-    glassColor: isDark ? const Color(0x70121214) : const Color(0x70FFFBF5),
+    glassColor: (isDark ? TpColorsDark.secondary : TpColorsLight.background)
+        .withValues(alpha: isDark ? 0.68 : 0.58),
     thickness: 16,
     blur: 16,
     chromaticAberration: 0,
@@ -14,10 +15,11 @@ LiquidGlassSettings tpNavigationGlassSettings(BuildContext context) {
     ambientStrength: isDark ? 0.06 : 0.10,
     refractiveIndex: 1.06,
     saturation: 1.02,
-    standardOpacityMultiplier: isDark ? 0.52 : 0.40,
-    platformViewFallbackColor: isDark
-        ? const Color(0x66121214)
-        : const Color(0x5CFFFBF5),
+    standardOpacityMultiplier: 1,
+    platformViewFallbackColor:
+        (isDark ? TpColorsDark.secondary : TpColorsLight.background).withValues(
+          alpha: isDark ? 0.68 : 0.58,
+        ),
   );
   if (!MediaQuery.highContrastOf(context)) return settings;
   final opaqueColor =
@@ -67,21 +69,21 @@ class TpGlassSurface extends StatelessWidget {
     final highContrast = MediaQuery.highContrastOf(context);
     final isDark = theme.brightness == Brightness.dark;
     final defaultTint = isDark
-        ? TpColorsDark.background.withValues(alpha: highContrast ? 0.96 : 0.34)
+        ? TpColorsDark.secondary.withValues(alpha: highContrast ? 0.96 : 0.68)
         : TpColorsLight.background.withValues(
-            alpha: highContrast ? 0.96 : (platformViewBackdrop ? 0.44 : 0.56),
+            alpha: highContrast ? 0.96 : 0.58,
           );
     final tint = tintColor == null
         ? defaultTint
         : tintColor!.withValues(alpha: highContrast ? 0.96 : tintColor!.a);
     final border = isDark
-        ? Colors.white.withValues(alpha: highContrast ? 0.64 : 0.34)
-        : Colors.white.withValues(alpha: highContrast ? 1 : 0.58);
+        ? Colors.white.withValues(alpha: highContrast ? 0.64 : 0.18)
+        : Colors.white.withValues(alpha: highContrast ? 1 : 0.88);
     final radius = borderRadius.topLeft.x;
     final defaultSettings = LiquidGlassSettings(
       glassColor: tint,
       thickness: platformViewBackdrop ? 16 : (isDark ? 28 : 24),
-      blur: platformViewBackdrop && blurSigma > 18 ? 18 : blurSigma,
+      blur: blurSigma,
       chromaticAberration: platformViewBackdrop ? 0 : (isDark ? 0.004 : 0.006),
       lightIntensity: platformViewBackdrop
           ? (isDark ? 0.56 : 0.62)
@@ -91,12 +93,8 @@ class TpGlassSurface extends StatelessWidget {
           : (isDark ? 0.08 : 0.18),
       refractiveIndex: platformViewBackdrop ? 1.06 : 1.15,
       saturation: platformViewBackdrop ? 1.02 : (isDark ? 1.08 : 1.10),
-      standardOpacityMultiplier: platformViewBackdrop
-          ? (isDark ? 0.52 : 0.40)
-          : 1,
-      platformViewFallbackColor: highContrast
-          ? tint
-          : tint.withValues(alpha: platformViewBackdrop ? 0.36 : tint.a),
+      standardOpacityMultiplier: 1,
+      platformViewFallbackColor: tint,
     );
     final baseSettings = glassSettings ?? defaultSettings;
     final resolvedSettings = highContrast

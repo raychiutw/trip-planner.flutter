@@ -20,7 +20,7 @@ class TpRootHeaderConfig {
 abstract final class TpRootGeometry {
   static const double topGap = 8;
   static const double horizontalInset = 16;
-  static const double headerHeight = 56;
+  static const double headerHeight = 64;
   static const double headerContentInset = 16;
   static const double actionGap = 8;
 
@@ -92,7 +92,7 @@ class TpRootGlassHeader extends StatelessWidget {
         child: TpGlassSurface(
           platformViewBackdrop: config.platformViewBackdrop,
           glassSettings: tpNavigationGlassSettings(context),
-          borderRadius: const BorderRadius.all(Radius.circular(28)),
+          borderRadius: const BorderRadius.all(Radius.circular(32)),
           padding: const EdgeInsets.symmetric(
             horizontal: TpRootGeometry.headerContentInset,
           ),
@@ -154,6 +154,7 @@ class TpRootScrollView extends StatelessWidget {
       key: const ValueKey('tp-root-scroll-view'),
       controller: controller,
       physics: physics,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverToBoxAdapter(
           child: SizedBox(height: TpRootGeometry.initialContentTop(context)),

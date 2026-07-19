@@ -97,9 +97,9 @@ server 端 `deepCamel()` 已把回應轉成 camelCase,欄位名 1:1 對應,json_
 1. 通用解析規則(num 轉型、0/1 bool、list 預設)集中文件化於 [Models 參考](reference-models.md#通用解析規則),所有 model 一致
 2. 每個 model 都有 fromJson 測試(fixture 對齊後端實際輸出)
 
-## 為什麼使用 google_maps_flutter
+## 為什麼使用 google_navigation_flutter
 
-Flutter 與 Web 共用 Google 路線與地點語意，iOS／Android 直接使用原生 Google Maps SDK。`features/map/map_adapter.dart` 把 SDK 型別限制在 adapter 內，畫面只使用 Tripline 的 marker／route view model；路線由既有 `/route` API 回傳，失敗時保留 marker 而不畫誤導性的直線。兩平台金鑰分離，從未追蹤的本機設定或 CI environment 注入。
+Flutter 與 Web 共用 Google 路線與地點語意，iOS／Android 透過 `google_navigation_flutter` 的地圖 view 使用原生 Google Maps SDK。`features/map/map_adapter.dart` 把套件型別限制在 adapter 內，畫面只使用 Tripline 的 marker／route view model 與 app-owned Google POI selection；路線由既有 `/route` API 回傳，失敗時保留 marker 而不畫誤導性的直線。兩平台金鑰分離，從未追蹤的本機設定或 CI environment 注入。
 
 ## OCC(樂觀並行控制)
 

@@ -13,6 +13,7 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/day_weather.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
+import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
@@ -586,6 +587,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('200 percent text aligns time, entry card, and travel pill', (
+    tester,
+  ) async {
+    await _pumpTimeline(tester, textScaler: const TextScaler.linear(2));
+    await tester.pumpAndSettle();
+
+    final timeX = tester.getTopLeft(find.text('12：30')).dx;
+    final cardX = tester
+        .getTopLeft(find.byKey(const ValueKey('timeline-entry-content-12')))
+        .dx;
+    final travelX = tester.getTopLeft(find.byType(TravelPill).first).dx;
+
+    expect(cardX, closeTo(timeX, 0.1));
+    expect(travelX, closeTo(timeX, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('更多選單的分享連結使用共用可關閉 sheet', (tester) async {
     await _pumpTimeline(tester);
     await _expectTripActionOpensClosableSheet(
@@ -636,17 +654,16 @@ void main() {
     );
   });
 
-  testWidgets('entry tile 依 master.type 顯示對應 tone 圓點', (tester) async {
+  testWidgets('entry tile 不因 master.type 恢復三色圓點', (tester) async {
     await _pumpTimeline(tester);
 
-    // attraction → accent、restaurant → pink、transport → sage
     expect(_entryDotColor(tester, 11), TpColorsLight.accentDeep);
-    expect(_entryDotColor(tester, 12), TpColorsLight.pinkDeep);
+    expect(_entryDotColor(tester, 12), TpColorsLight.accentDeep);
 
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    expect(_entryDotColor(tester, 21), TpColorsLight.sageDeep);
+    expect(_entryDotColor(tester, 21), TpColorsLight.accentDeep);
   });
 
   testWidgets('travel pill 使用出發 entry 的 travel 顯示各相鄰路段', (tester) async {
@@ -1094,7 +1111,7 @@ void main() {
     final decoration = focusedCard.decoration! as BoxDecoration;
     final border = decoration.border! as Border;
 
-    expect(border.top.color, TpColorsLight.accentDeep);
+    expect(border.top.color, AppTheme.light().colorScheme.primary);
     expect(border.top.width, 2);
   });
 
@@ -1148,19 +1165,28 @@ void main() {
   testWidgets(
     'cross-Day drag lifts the full card and marks only the insertion point',
     (tester) async {
+      // D1 使用較大的 HIG 語意字級與 64pt 交通列；此測試需要兩天的
+      // drop target 同時建構，故提供足夠高的測試 viewport。
       tester.view.physicalSize =
-          const Size(800, 1200) * tester.view.devicePixelRatio;
+          const Size(800, 2400) * tester.view.devicePixelRatio;
       addTearDown(tester.view.resetPhysicalSize);
       await _pumpTimeline(tester);
       await _enableTimelineEditing(tester);
 
       final drag = find.byKey(const ValueKey('entry-cross-drag-11'));
+      final sourceWidth = tester.getSize(drag).width;
       final gesture = await tester.startGesture(tester.getCenter(drag));
       await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
 
       expect(
         find.byKey(const ValueKey('entry-drag-feedback-11')),
         findsOneWidget,
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('entry-drag-feedback-11')))
+            .width,
+        sourceWidth,
       );
       expect(find.text('美麗海水族館'), findsWidgets);
 

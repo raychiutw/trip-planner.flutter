@@ -34,7 +34,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
   _GoogleNavigationOverlayPlatform? _overlayPlatform;
   TripMapOverlaySynchronizer? _overlaySynchronizer;
   Map<String, TripMapMarker> _visibleMarkers = const {};
-  double _zoom = 12;
+  double _zoom = 13;
   double _pixelRatio = 1;
   Brightness? _brightness;
   bool _disposed = false;
@@ -106,7 +106,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
         zoom: widget.config.initialZoom,
       ),
       initialMapType: _mapType(widget.config.tilePreset.style),
-      initialMapColorScheme: _mapColorScheme(Theme.of(context).brightness),
+      initialMapColorScheme: tripMapColorScheme(Theme.of(context).brightness),
       initialCompassEnabled: true,
       initialMapToolbarEnabled: false,
       initialZoomControlsEnabled: false,
@@ -220,7 +220,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
     Brightness brightness,
   ) async {
     try {
-      await controller.setMapColorScheme(_mapColorScheme(brightness));
+      await controller.setMapColorScheme(tripMapColorScheme(brightness));
       if (!_disposed && _brightness == brightness) {
         widget.config.onMapStyleApplied?.call(brightness);
       }
@@ -452,7 +452,5 @@ nav.MapType _mapType(TripMapTileStyle style) => switch (style) {
   TripMapTileStyle.satellite => nav.MapType.hybrid,
 };
 
-nav.MapColorScheme _mapColorScheme(Brightness brightness) =>
-    brightness == Brightness.dark
-    ? nav.MapColorScheme.dark
-    : nav.MapColorScheme.light;
+/// 行程地圖固定使用日間底圖，App 深淺色只影響疊在地圖上的介面。
+nav.MapColorScheme tripMapColorScheme(Brightness _) => nav.MapColorScheme.light;

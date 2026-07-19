@@ -88,6 +88,23 @@ void main() {
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 
+  test('商店上傳不等待外部裝置測試證據', () {
+    final workflow = read('.github/workflows/mobile.yml');
+    final testflightJob = workflow.substring(
+      workflow.indexOf('  testflight:'),
+      workflow.indexOf('  android_internal:'),
+    );
+    final androidJob = workflow.substring(
+      workflow.indexOf('  android_internal:'),
+    );
+
+    expect(workflow, contains('  external_device_gate:'));
+    expect(testflightJob, isNot(contains('needs: external_device_gate')));
+    expect(testflightJob, isNot(contains('needs.external_device_gate.result')));
+    expect(androidJob, isNot(contains('needs: external_device_gate')));
+    expect(androidJob, isNot(contains('needs.external_device_gate.result')));
+  });
+
   test('workflow 手動發布 Android internal testing 且沒有 production 權限', () {
     final workflow = read('.github/workflows/mobile.yml');
 

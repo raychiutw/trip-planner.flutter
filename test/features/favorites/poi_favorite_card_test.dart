@@ -9,6 +9,7 @@ Future<void> pumpCard(
   PoiFavorite favorite, {
   VoidCallback? onRemove,
   VoidCallback? onAddToTrip,
+  String matchQuery = '',
 }) {
   return tester.pumpWidget(
     MaterialApp(
@@ -18,6 +19,7 @@ Future<void> pumpCard(
           favorite: favorite,
           onRemove: onRemove ?? () {},
           onAddToTrip: onAddToTrip,
+          matchQuery: matchQuery,
         ),
       ),
     ),
@@ -31,6 +33,7 @@ const _favorite = PoiFavorite(
   favoritedAt: '2026-06-01T10:00:00Z',
   note: '想去',
   poiName: '美麗海水族館',
+  poiAddress: '沖繩縣國頭郡本部町石川424',
   poiType: 'attraction',
   poiRating: 4.6,
   usages: [
@@ -63,6 +66,77 @@ void main() {
       );
       expect(find.text('無人地點'), findsOneWidget);
       expect(find.textContaining('用於'), findsNothing);
+    });
+
+    testWidgets('S1 搜尋結果只加深符合字串並維持單行', (tester) async {
+      await pumpCard(tester, _favorite, matchQuery: '水族');
+
+      final title = tester.widget<Text>(
+        find.byKey(const ValueKey('favorite-title-7')),
+      );
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+      final span = title.textSpan! as TextSpan;
+      final children = span.children!.cast<TextSpan>();
+      expect(children.map((child) => child.text).toList(), ['美麗海', '水族', '館']);
+      expect(children[1].style?.fontWeight, FontWeight.w600);
+      expect(children[1].style?.color, AppTheme.light().colorScheme.onSurface);
+    });
+
+    testWidgets('S1 地址命中時顯示地址並加深符合字串', (tester) async {
+      await pumpCard(tester, _favorite, matchQuery: '沖繩');
+
+      final address = tester.widget<Text>(
+        find.byKey(const ValueKey('favorite-address-7')),
+      );
+      final span = address.textSpan! as TextSpan;
+      final matched = span.children!.cast<TextSpan>()[0];
+      expect(matched.text, '沖繩');
+      expect(matched.style?.fontWeight, FontWeight.w600);
+      expect(matched.style?.color, AppTheme.light().colorScheme.onSurface);
+    });
+
+    testWidgets('所有 POI 類型的 leading 都使用同一 Tripline accent', (tester) async {
+      await pumpCard(
+        tester,
+        const PoiFavorite(
+          id: 9,
+          userId: 'u-1',
+          poiId: 503,
+          favoritedAt: '2026-06-03T10:00:00Z',
+          poiName: '沖繩飯店',
+          poiType: 'hotel',
+        ),
+      );
+
+      final leading = tester.widget<Container>(
+        find.byKey(const ValueKey('favorite-leading-9')),
+      );
+      final decoration = leading.decoration! as BoxDecoration;
+      final tones = AppTheme.light().extension<TpTones>()!;
+      expect(decoration.color, tones.accentBg);
+      expect(
+        tester
+            .widget<Icon>(
+              find.descendant(
+                of: find.byKey(const ValueKey('favorite-leading-9')),
+                matching: find.byType(Icon),
+              ),
+            )
+            .color,
+        tones.accentDeep,
+      );
+      expect(
+        tester
+            .widget<Icon>(
+              find.descendant(
+                of: find.byKey(const ValueKey('favorite-remove-9')),
+                matching: find.byType(Icon),
+              ),
+            )
+            .color,
+        tones.accentDeep,
+      );
     });
 
     testWidgets('點 heart → onRemove 被呼叫', (tester) async {
