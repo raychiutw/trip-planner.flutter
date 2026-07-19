@@ -22,6 +22,7 @@
 - 修正 320pt／200% Dynamic Type 下收藏 Header、Timeline 時間與長交通狀態可能溢位或折行破版。
 - 修正切換行程重用地圖 state 時未重新對焦，現在即使 days 物件相同也會以 zoom `13` 套用新行程中心。
 - 商店上傳不再等待 Firebase／外部裝置證據；TestFlight 與 Google Play internal release 可在裝置報告稍後回補時獨立執行。
+- Mobile release 新增 `both` 目標，TestFlight 與 Google Play internal 由同一次 dispatch 取得相同 build number，避免分開執行造成版本序號漂移。
 
 ## [0.9.1] - 2026-07-18
 
