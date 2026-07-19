@@ -15,6 +15,7 @@ on:
         options:
           - testflight
           - android-internal
+          - both
       runner:
         description: Runner used for the manual TestFlight release
         required: true
@@ -119,7 +120,7 @@ jobs:
       id-token: write
     uses: ./.github/workflows/mobile-e2e.yml
     with:
-      platform: ${{ inputs.release_target == 'testflight' && 'ios' || 'android' }}
+      platform: ${{ inputs.release_target == 'both' && 'all' || inputs.release_target == 'testflight' && 'ios' || 'android' }}
     secrets:
       GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -135,7 +136,7 @@ jobs:
 
   testflight:
     name: Upload to TestFlight
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'testflight' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'testflight' || inputs.release_target == 'both') }}
     runs-on: ${{ inputs.runner }}
     environment: mobile-release
     timeout-minutes: 75
@@ -224,7 +225,7 @@ jobs:
 
   android_internal:
     name: Upload to Google Play internal testing
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.release_target == 'android-internal' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'android-internal' || inputs.release_target == 'both') }}
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 45
