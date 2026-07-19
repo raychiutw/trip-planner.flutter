@@ -91,7 +91,7 @@ same change as the protected GitHub secrets.
 
 In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. Before GitHub uploads the seven-day artifact, `tool/sanitize_test_lab_evidence.sh` applies an evidence-only allowlist and removes signed APK/XCTest archives plus unknown binary formats. GitHub therefore retains the matrix log, JUnit/XML results, logcat, video, screenshots, and text metadata without republishing installable test inputs.
 
-Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Store upload is independent of staging and Firebase evidence so a Test Lab configuration, quota, or infrastructure failure cannot block TestFlight／Play internal delivery. Keep `run_optional_evidence` disabled for the publish-first path; enable it only when the same dispatch should also collect staging and device evidence. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
+Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Select `release_target=both` for the normal release path: the TestFlight and Google Play jobs then share one `GITHUB_RUN_NUMBER`／`GITHUB_RUN_ATTEMPT` pair and therefore receive the same build number. Use a platform-specific target only to recover or republish one store. Store upload is independent of staging and Firebase evidence so a Test Lab configuration, quota, or infrastructure failure cannot block TestFlight／Play internal delivery. Keep `run_optional_evidence` disabled for the publish-first path; enable it only when the same dispatch should also collect staging and device evidence. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
 
 When `run_optional_evidence` is enabled, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI before collecting Test Lab evidence. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
 
@@ -189,7 +189,18 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
-## 2026-07-19 verification record
+## 2026-07-20 store release record
+
+Source SHA `e4ebcb5f60ce0eaaa9b397683d793da0e3b8eb96` was released from one approved `release_target=both` dispatch. Workflow run [29699386889](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29699386889) used run number `92`, attempt `1`, and the shared build-number formula to produce iOS and Android build `9201` for version `0.9.1`.
+
+| Store | Result | Evidence |
+| --- | --- | --- |
+| TestFlight | PASS | Build `9201` uploaded through the App Store API; App Store processing returned `VALID` |
+| Google Play internal | PASS | Signed AAB uploaded to package `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `08259896710714327432` committed |
+
+Optional Firebase and staging evidence was deliberately disabled for this publish-first run. Those independent gates remain tracked below and can be collected without invalidating the completed store release.
+
+## 2026-07-19 pre-release verification record
 
 Source SHA `fec66f90` (the `master` head at verification time) was verified with
 the following layered evidence. A blocked external gate is deliberately not
@@ -208,12 +219,11 @@ counted as a pass.
 | Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097), SHA `d47e88d0` |
 | iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
 | Favorite restore staging contract | BLOCKED | Backend identity endpoint and server-side expected-environment mutation guard are not deployed; the deployed origin/environment pair is not committed to `tool/staging-release-environments.txt`; protected staging URL, account cookies, fixture POI, and contract guard are not configured |
-| Current-master TestFlight upload | BLOCKED | Release correctly waits for both blocked gates above |
+| TestFlight upload for this snapshot | NOT RUN | At this point in the verification sequence, release was still coupled to the two blocked optional gates above |
 
-The last successful TestFlight upload predates the HIG/map merge and is not
-accepted as current-release evidence. Do not dispatch the TestFlight workflow
-until the two blocked rows are configured; the workflow is intentionally
-fail-closed.
+This table records the pre-release state at source SHA `fec66f90`. The later
+store record above supersedes its upload status after store delivery was safely
+decoupled from optional external-device and staging evidence.
 
 The Android Test Lab run is one CI-only scheduling commit behind the recorded
 master SHA. The diff from `d47e88d0` to `fec66f90` changes only
