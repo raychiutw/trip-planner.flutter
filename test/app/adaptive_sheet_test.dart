@@ -5,7 +5,7 @@ import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
-  testWidgets('selection sheet has Cancel, no Done, and distinct detents', (
+  testWidgets('selection sheet has Cancel, no Done, and one fixed detent', (
     tester,
   ) async {
     String? result;
@@ -38,9 +38,12 @@ void main() {
       find.byType(GlassModalSheetScaffold),
     );
     expect(sheet.initialState, GlassSheetState.full);
-    expect(sheet.halfSize, 0.62);
+    expect(sheet.halfSize, 0.93);
     expect(sheet.fullSize, 0.93);
-    expect(sheet.showDragIndicator, isTrue);
+    expect(sheet.showDragIndicator, isFalse);
+    expect(sheet.fillThreshold, 0.85);
+    expect(sheet.fullSettings, isNull);
+    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
 
     await tester.tap(find.text('東京五日行'));
     await tester.pumpAndSettle();
@@ -75,6 +78,39 @@ void main() {
     expect(sheet.halfSize, 0.93);
     expect(sheet.fullSize, 0.93);
     expect(sheet.showDragIndicator, isFalse);
+    expect(sheet.fillThreshold, 0.85);
+    expect(sheet.fullSettings, isNull);
+    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
+  });
+
+  testWidgets('fixed content sheet uses a neutral opaque dark canvas', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (_) => const Text('帳號內容'),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.fillThreshold, 0.85);
+    expect(sheet.fullSettings, isNull);
+    expect(sheet.expandedColor, const Color(0xFF1C1C1E));
   });
 
   testWidgets('system Back returns from a nested content-sheet page first', (

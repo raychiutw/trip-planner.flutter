@@ -58,7 +58,7 @@ void main() {
     expect(state.searching, isFalse);
   });
 
-  test('search：q < 2 字 → 不呼叫 repo,設 error 訊息', () async {
+  test('search：q < 2 字 → 更新 query 但不呼叫 repo 或顯示錯誤', () async {
     final poi = _MockPoiRepository();
     final fav = _MockFavoritesRepository();
     when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
@@ -66,7 +66,8 @@ void main() {
     final controller = container.read(exploreControllerProvider.notifier);
 
     await controller.search('a');
-    expect(container.read(exploreControllerProvider).errorMessage, '至少輸入 2 個字');
+    expect(container.read(exploreControllerProvider).query, 'a');
+    expect(container.read(exploreControllerProvider).errorMessage, isNull);
     verifyNever(
       () => poi.searchPois(
         q: any(named: 'q'),
@@ -75,6 +76,30 @@ void main() {
         cancelToken: any(named: 'cancelToken'),
       ),
     );
+  });
+
+  test('search：查詢清空會立即移除上一批結果', () async {
+    final poi = _MockPoiRepository();
+    final fav = _MockFavoritesRepository();
+    when(() => fav.fetchFavorites()).thenAnswer((_) async => const []);
+    when(
+      () => poi.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => [_poi('p1', '首里城', 'tourist_attraction')]);
+    final container = _container(poi, fav);
+    final controller = container.read(exploreControllerProvider.notifier);
+
+    await controller.search('首里城');
+    expect(container.read(exploreControllerProvider).results, isNotEmpty);
+
+    await controller.search('');
+
+    expect(container.read(exploreControllerProvider).results, isEmpty);
+    expect(container.read(exploreControllerProvider).searching, isFalse);
   });
 
   test('fineCategories 聚合細類計數，filteredResults 精確篩選', () async {

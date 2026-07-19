@@ -147,7 +147,14 @@ class ExploreController extends Notifier<ExploreState> {
     final q = rawQuery.trim();
     state = state.copyWith(query: q, errorMessage: null);
     if (q.length < 2) {
-      state = state.copyWith(errorMessage: '至少輸入 2 個字');
+      ++_requestSeq;
+      _cancelToken?.cancel('query too short');
+      state = state.copyWith(
+        category: 'all',
+        results: const [],
+        searching: false,
+        errorMessage: null,
+      );
       return;
     }
     final seq = ++_requestSeq;

@@ -38,25 +38,48 @@ class TpSettingsGroup extends StatelessWidget {
               ),
             ),
           ],
-          Material(
-            color: theme.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(TpRadius.lg),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (var index = 0; index < children.length; index++) ...[
-                  if (index > 0)
-                    Divider(
-                      height: 1,
-                      indent: TpSpacing.s4,
-                      endIndent: TpSpacing.s4,
-                      color: theme.colorScheme.outlineVariant,
-                    ),
-                  children[index],
-                ],
-              ],
-            ),
-          ),
+          TpGroupedSurface(children: children),
+        ],
+      ),
+    );
+  }
+}
+
+/// HIG inset-grouped list 的唯一 surface 與 separator 實作。
+///
+/// 設定、收藏等內容 row 都委派這個元件，避免每筆各自套圓角卡片，並讓
+/// light／dark surface、圓角及 inset separator 永遠同步。
+class TpGroupedSurface extends StatelessWidget {
+  const TpGroupedSurface({
+    super.key,
+    required this.children,
+    this.separatorIndent = TpSpacing.s4,
+    this.separatorEndIndent = TpSpacing.s4,
+  });
+
+  final List<Widget> children;
+  final double separatorIndent;
+  final double separatorEndIndent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(TpRadius.lg),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                indent: separatorIndent,
+                endIndent: separatorEndIndent,
+                color: theme.colorScheme.outlineVariant,
+              ),
+            children[index],
+          ],
         ],
       ),
     );

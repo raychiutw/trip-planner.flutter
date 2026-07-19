@@ -5,17 +5,12 @@ import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
-import '../../../theme/poi_tone.dart';
 import 'entry_duration.dart';
 
-/// 時間欄寬度（timeline rail 對齊用，travel row 共用）。
-const double kTimelineTimeColumnWidth = 48;
-
 /// rail（圓點 + 連線）欄寬度。
-const double kTimelineRailWidth = 24;
+const double kTimelineRailWidth = 32;
 
-/// 時間軸停留點 tile：時間欄（tabular）+ tone 圓點 rail + 內容卡。
-/// tone 依 master.type：玩/看/買=accent、住/移動=sage、吃=pink。
+/// D1 時間軸停留點：固定左 rail，時間與卡片共用同一內容起點。
 class TimelineEntryTile extends StatelessWidget {
   const TimelineEntryTile({
     super.key,
@@ -52,7 +47,6 @@ class TimelineEntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    final tone = resolvePoiTone(tones, entry.master?.type);
     final railLineColor = theme.colorScheme.outlineVariant;
     final startTime = (entry.startTime ?? entry.time ?? '').trim();
     final endTime = entry.endTime?.trim() ?? '';
@@ -70,99 +64,72 @@ class TimelineEntryTile extends StatelessWidget {
       categoryLabel ?? '停留點',
     ].join('，');
     final entryContent = Semantics(
+      key: ValueKey('timeline-entry-content-${entry.id}'),
       label: semanticsLabel,
       hint: onTap == null ? null : '點兩下編輯停留點',
       button: onTap != null,
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(TpRadius.md),
+          borderRadius: BorderRadius.circular(18),
           child: _EntryCard(
             entry: entry,
-            tone: tone,
             isFocused: isFocused,
             categoryLabel: categoryLabel,
           ),
         ),
       ),
     );
-    final accessibilityLayout =
-        MediaQuery.textScalerOf(context).scale(17) >= 23;
-
-    if (accessibilityLayout) {
-      return KeyedSubtree(
-        key: ValueKey('timeline-entry-accessibility-${entry.id}'),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TimelineRail(
-                entryId: entry.id,
-                number: number,
-                isFirst: isFirst,
-                isLast: isLast,
-                color: tone.deep,
-                lineColor: railLineColor,
+    return KeyedSubtree(
+      key: ValueKey('timeline-entry-d1-${entry.id}'),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TimelineRail(
+              entryId: entry.id,
+              number: number,
+              isFirst: isFirst,
+              isLast: isLast,
+              color: tones.accentDeep,
+              lineColor: railLineColor,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _EntryTimeRange(
+                    entryId: entry.id,
+                    startTime: startTime,
+                    endTime: endTime,
+                  ),
+                  const SizedBox(height: TpSpacing.s2),
+                  entryContent,
+                  if (trailing != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: trailing,
+                    ),
+                  const SizedBox(height: TpSpacing.s3),
+                ],
               ),
-              const SizedBox(width: TpSpacing.s2),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _EntryTimeRange(startTime: startTime, endTime: endTime),
-                    const SizedBox(height: TpSpacing.s2),
-                    entryContent,
-                    if (trailing != null)
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: trailing,
-                      ),
-                    const SizedBox(height: TpSpacing.s3),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: kTimelineTimeColumnWidth,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: _EntryTimeRange(startTime: startTime, endTime: endTime),
-            ),
-          ),
-          _TimelineRail(
-            entryId: entry.id,
-            number: number,
-            isFirst: isFirst,
-            isLast: isLast,
-            color: tone.deep,
-            lineColor: railLineColor,
-          ),
-          const SizedBox(width: TpSpacing.s2),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-              child: entryContent,
-            ),
-          ),
-          ?trailing,
-        ],
       ),
     );
   }
 }
 
 class _EntryTimeRange extends StatelessWidget {
-  const _EntryTimeRange({required this.startTime, required this.endTime});
+  const _EntryTimeRange({
+    required this.entryId,
+    required this.startTime,
+    required this.endTime,
+  });
 
+  final int entryId;
   final String startTime;
   final String endTime;
 
@@ -170,25 +137,31 @@ class _EntryTimeRange extends StatelessWidget {
   Widget build(BuildContext context) {
     if (startTime.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final style = theme.textTheme.labelMedium?.copyWith(
+    final style = theme.textTheme.headlineSmall?.copyWith(
       fontWeight: FontWeight.w600,
       color: theme.colorScheme.onSurface,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(startTime, style: style),
-        if (endTime.isNotEmpty)
-          Text(
-            '– $endTime',
-            style: style?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-      ],
+    final visualStart = _visualTime(startTime);
+    final visualEnd = _visualTime(endTime);
+    return SizedBox(
+      width: double.infinity,
+      child: FittedBox(
+        key: ValueKey('entry-time-scale-$entryId'),
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Text(
+          visualEnd.isEmpty ? visualStart : '$visualStart - $visualEnd',
+          maxLines: 1,
+          softWrap: false,
+          style: style,
+        ),
+      ),
     );
   }
 }
+
+String _visualTime(String value) => value.replaceFirst(':', '：');
 
 class _TimelineRail extends StatelessWidget {
   const _TimelineRail({
@@ -211,17 +184,20 @@ class _TimelineRail extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: kTimelineRailWidth,
-      child: Column(
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          Container(
-            width: 1,
-            height: 16,
-            color: isFirst ? Colors.transparent : lineColor,
-          ),
+          if (!isFirst || !isLast)
+            Positioned(
+              top: isFirst ? 22 : 0,
+              bottom: isLast ? null : 0,
+              height: isLast ? 22 : null,
+              child: Container(width: 1, color: lineColor),
+            ),
           Container(
             key: ValueKey('entry-dot-$entryId'),
-            width: 18,
-            height: 18,
+            width: 22,
+            height: 22,
             alignment: Alignment.center,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             child: Text(
@@ -235,29 +211,21 @@ class _TimelineRail extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            child: Container(
-              width: 1,
-              color: isLast ? Colors.transparent : lineColor,
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-/// 內容卡：tone 色階梯（卡底 subtle、hairline bg、分類字 deep）。
+/// 內容卡統一使用中性 system surface；POI 類型只以文字呈現。
 class _EntryCard extends StatelessWidget {
   const _EntryCard({
     required this.entry,
-    required this.tone,
     required this.isFocused,
     required this.categoryLabel,
   });
 
   final TimelineEntry entry;
-  final PoiToneColors tone;
   final bool isFocused;
   final String? categoryLabel;
 
@@ -321,12 +289,14 @@ class _EntryCard extends StatelessWidget {
     return Container(
       key: ValueKey('entry-card-${entry.id}'),
       width: double.infinity,
-      padding: const EdgeInsets.all(TpSpacing.s3),
+      padding: const EdgeInsets.all(TpSpacing.s4),
       decoration: BoxDecoration(
-        color: tone.subtle,
-        borderRadius: BorderRadius.circular(TpRadius.md),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isFocused ? tone.deep : tone.bg,
+          color: isFocused
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant,
           width: isFocused ? 2 : 1,
         ),
       ),
@@ -335,9 +305,9 @@ class _EntryCard extends StatelessWidget {
         children: [
           Text(
             entry.title,
-            style: theme.textTheme.bodyLarge?.copyWith(
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w600,
-              height: 1.4,
+              height: 1.25,
             ),
           ),
           if (categoryLabel != null)
@@ -355,9 +325,9 @@ class _EntryCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       categoryLabel!,
-                      style: theme.textTheme.labelMedium?.copyWith(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -380,7 +350,10 @@ class _EntryCard extends StatelessWidget {
                 entry.description!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(color: mutedColor),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: mutedColor,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ),
         ],

@@ -246,10 +246,15 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
   );
 }
 
-Finder _rootTab(String label) => find.descendant(
-  of: find.byKey(const ValueKey('apple-root-tab-bar')),
-  matching: find.bySemanticsLabel(label),
-);
+Finder _rootTab(String label) {
+  final semantics = find.descendant(
+    of: find.byKey(const ValueKey('apple-root-tab-bar')),
+    matching: find.bySemanticsLabel(label),
+  );
+  return find
+      .ancestor(of: semantics, matching: find.byType(GestureDetector))
+      .first;
+}
 
 typedef AppFlowCapture = Future<void> Function(String name);
 typedef AppFlowAppWrapper = Widget Function(Widget child);
@@ -399,7 +404,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pump();
   expect(find.text('暖暮拉麵'), findsOneWidget);
   expect(find.text('美麗海水族館'), findsNothing);
-  await tester.tap(find.byKey(const ValueKey('favorites-search-close')));
+  await tester.tap(find.byKey(const ValueKey('favorites-search-cancel')));
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
   await tester.pumpAndSettle();

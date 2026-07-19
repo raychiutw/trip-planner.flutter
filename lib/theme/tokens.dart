@@ -58,15 +58,15 @@ abstract final class TpColorsDark {
   static const rootTabSelection = navigationSelection;
   static const dayThumb = navigationSelection;
 
-  static const background = Color(0xFF121214);
-  static const secondary = Color(0xFF1C1C1E);
-  static const tertiary = Color(0xFF2C2C2E);
-  static const glass = Color(0xFF28282A);
-  static const hover = Color(0xFF242426);
+  static const background = Color(0xFF1C1C1E);
+  static const secondary = Color(0xFF2C2C2E);
+  static const tertiary = Color(0xFF3A3A3C);
+  static const glass = secondary;
+  static const hover = Color(0xFF38383A);
 
   static const foreground = Color(0xFFF5F5F7);
   static const muted = Color(0xFFA1A1A6);
-  static const accentForeground = Color(0xFF121214);
+  static const accentForeground = background;
 
   // 舊 API 相容別名：三色分類已退場，全部映射到中性深色階。
   static const sage = muted;
@@ -122,8 +122,8 @@ abstract final class TpSpacing {
 
 /// 浮動四分頁的實際佔位；地圖 accessory 與 root scroll 共用。
 abstract final class TpRootTabGeometry {
-  static const horizontalMargin = 30.0;
-  static const expandedBarHeight = 44.0;
+  static const horizontalMargin = 16.0;
+  static const expandedBarHeight = 64.0;
   static const bottomSpacing = 16.0;
   static const safeAreaOverlap = 24.0;
 

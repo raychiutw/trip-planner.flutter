@@ -49,11 +49,65 @@ void main() {
     expect(glass.useOwnLayer, isTrue);
     expect(
       glass.settings?.glassColor,
-      TpColorsLight.background.withValues(alpha: 0.56),
+      TpColorsLight.background.withValues(alpha: 0.58),
     );
     expect(glass.settings?.blur, 22);
     expect(shape.borderRadius, 28);
+    expect(shape.side.color.a, closeTo(0.88, 0.01));
   });
+
+  testWidgets('dark glass uses elevated material with a subtle bright rim', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(brightness: Brightness.dark),
+        home: const Scaffold(
+          body: TpGlassSurface(child: SizedBox(width: 120, height: 44)),
+        ),
+      ),
+    );
+
+    final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
+    final shape = glass.shape as LiquidRoundedSuperellipse;
+
+    expect(
+      glass.settings?.glassColor,
+      TpColorsDark.secondary.withValues(alpha: 0.68),
+    );
+    expect(shape.side.color.a, closeTo(0.18, 0.01));
+  });
+
+  for (final (brightness, expectedTint) in [
+    (Brightness.light, TpColorsLight.background.withValues(alpha: 0.58)),
+    (Brightness.dark, TpColorsDark.secondary.withValues(alpha: 0.68)),
+  ]) {
+    testWidgets(
+      'PlatformView ${brightness.name} glass preserves the 28pt Liquid Glass recipe',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(brightness: brightness),
+            home: const Scaffold(
+              body: TpGlassSurface(
+                platformViewBackdrop: true,
+                blurSigma: 28,
+                child: SizedBox(width: 120, height: 44),
+              ),
+            ),
+          ),
+        );
+
+        final settings = tester
+            .widget<GlassContainer>(find.byType(GlassContainer))
+            .settings!;
+        expect(settings.blur, 28);
+        expect(settings.glassColor, expectedTint);
+        expect(settings.standardOpacityMultiplier, 1);
+        expect(settings.platformViewFallbackColor, expectedTint);
+      },
+    );
+  }
 
   for (final (brightness, expectedColor) in [
     (Brightness.light, TpColorsLight.background.withValues(alpha: 0.52)),

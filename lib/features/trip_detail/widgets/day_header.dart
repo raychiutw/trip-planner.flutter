@@ -5,7 +5,7 @@ import '../../../models/segment.dart';
 import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
-/// 計算當日時間範圍字串「min–max」（en dash U+2013）。
+/// 計算當日時間範圍字串「HH：MM - HH：MM」（D1 定版）。
 ///
 /// 每筆 start 候選 = startTime ?? time、end 候選 = endTime ?? startTime ?? time;
 /// HH:MM 字典序取 min/max。timeline 無任何時間 → 回 null。
@@ -23,7 +23,7 @@ String? dayTimeRange(TripDay day) {
     }
   }
   if (min == null || max == null) return null;
-  return '$min–$max';
+  return '${min.replaceFirst(':', '：')} - ${max.replaceFirst(':', '：')}';
 }
 
 int dayTotalDistanceM(TripDay day, List<TripSegment> segments) {
@@ -72,8 +72,7 @@ class DayHeader extends StatelessWidget {
           children: [
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-              style: TextStyle(
-                fontSize: 11,
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
                 color: tones.accent,
@@ -81,22 +80,28 @@ class DayHeader extends StatelessWidget {
               ),
             ),
             if (timeRange != null)
-              Text(
-                timeRange,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              FittedBox(
+                key: const ValueKey('day-time-scale'),
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  timeRange,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
           ],
         ),
         const SizedBox(height: TpSpacing.s1),
-        Text(day.displayTitle, style: theme.textTheme.titleLarge),
+        Text(day.displayTitle, style: theme.textTheme.displaySmall),
         Text(
           summary,
-          style: TextStyle(
-            fontSize: 11,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w400,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),

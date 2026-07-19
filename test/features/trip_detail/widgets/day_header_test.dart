@@ -38,6 +38,12 @@ void main() {
       expect(find.text('DAY 03'), findsOneWidget);
       expect(find.text('2026-06-12（週五）'), findsOneWidget);
       expect(find.text('首里城與國際通'), findsNothing);
+      expect(tester.widget<Text>(find.text('DAY 03')).style?.fontSize, 17);
+      expect(
+        tester.widget<Text>(find.text('2026-06-12（週五）')).style?.fontSize,
+        28,
+      );
+      expect(tester.widget<Text>(find.text('0 個停留點')).style?.fontSize, 17);
     });
 
     testWidgets('date / dayOfWeek 皆 null → 不顯示日期列,title 退回 Day N', (
@@ -135,7 +141,7 @@ void main() {
       expect(find.textContaining('2000'), findsNothing);
     });
 
-    testWidgets('當日時間範圍：取 timeline min–max（en dash）', (tester) async {
+    testWidgets('當日時間範圍：取 timeline min–max 並使用 D1 定版格式', (tester) async {
       await pumpHeader(
         tester,
         const TripDay(
@@ -162,8 +168,11 @@ void main() {
           ],
         ),
       );
-      // U+2013 en dash
-      expect(find.text('09:00–17:00'), findsOneWidget);
+      expect(find.text('09：00 - 17：00'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.text('09：00 - 17：00')).style?.fontSize,
+        17,
+      );
     });
 
     testWidgets('200% Dynamic Type 會換行且不溢出', (tester) async {
@@ -195,7 +204,13 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('DAY 01'), findsOneWidget);
-      expect(find.text('09:00–17:00'), findsOneWidget);
+      final range = tester.widget<Text>(find.text('09：00 - 17：00'));
+      expect(range.maxLines, 1);
+      expect(range.softWrap, isFalse);
+      final scaleDown = tester.widget<FittedBox>(
+        find.byKey(const ValueKey('day-time-scale')),
+      );
+      expect(scaleDown.fit, BoxFit.scaleDown);
     });
 
     testWidgets('timeline 無任何時間 → 不顯示時間範圍', (tester) async {
@@ -210,7 +225,7 @@ void main() {
           ],
         ),
       );
-      expect(find.textContaining('–'), findsNothing);
+      expect(find.textContaining(' - '), findsNothing);
     });
 
     testWidgets('總距離為 0 → 只顯示停留點數,隱藏「· K km」', (tester) async {

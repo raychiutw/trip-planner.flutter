@@ -16,6 +16,7 @@ import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/tp_settings_group.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
 
@@ -128,6 +129,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   }
 
   List<Widget> _buildHeaderActions(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final compactHeader =
+        mediaQuery.size.width <= 360 && mediaQuery.textScaler.scale(17) >= 23;
     final sort = TpMoreMenuButton<_FavoriteHeaderAction>(
       key: const ValueKey('favorites-sort-action'),
       tooltip: '排序與篩選',
@@ -173,6 +177,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           dividerBefore: true,
           selected: _hasActiveFilters,
         ),
+        if (compactHeader)
+          const TpActionItem(
+            key: ValueKey('favorites-add-menu-action'),
+            label: '新增景點',
+            value: _FavoriteHeaderAction.explore,
+            icon: CupertinoIcons.add,
+            dividerBefore: true,
+          ),
       ],
       onSelected: _handleHeaderAction,
     );
@@ -180,10 +192,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     if (_searching) {
       return [
         sort,
-        TpToolbarIconButton(
-          key: const ValueKey('favorites-search-close'),
-          tooltip: '結束搜尋',
-          icon: CupertinoIcons.xmark,
+        TpToolbarTextButton(
+          key: const ValueKey('favorites-search-cancel'),
+          label: '取消',
           onPressed: _endSearch,
         ),
         const TpAccountAvatarButton(),
@@ -197,12 +208,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         onPressed: () => setState(() => _searching = true),
       ),
       sort,
-      TpToolbarIconButton(
-        key: const ValueKey('favorites-add-action'),
-        tooltip: '新增收藏',
-        icon: CupertinoIcons.add,
-        onPressed: () => context.go('/favorites/explore'),
-      ),
+      if (!compactHeader)
+        TpToolbarIconButton(
+          key: const ValueKey('favorites-add-action'),
+          tooltip: '新增收藏',
+          icon: CupertinoIcons.add,
+          onPressed: () => context.go('/favorites/explore'),
+        ),
       const TpAccountAvatarButton(),
     ];
   }
@@ -231,6 +243,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         final favorites = ref.read(favoritesProvider).value ?? const [];
         final counts = _regionCountsFor(favorites);
         unawaited(_openFilters(counts, _regionOptionsFor(counts)));
+      case _FavoriteHeaderAction.explore:
+        context.go('/favorites/explore');
     }
   }
 
@@ -289,7 +303,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: TpSpacing.s3),
+            if (_hasActiveFilters) const SizedBox(height: TpSpacing.s3),
             if (_selectedIds.isNotEmpty) ...[
               _BulkToolbar(
                 selectedCount: _selectedIds.length,
@@ -302,21 +316,34 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             ],
             if (filteredFavorites.isEmpty)
               _NoSearchResult(onClear: _clearAllFilters)
-            else
-              for (final favorite in visibleFavorites) ...[
-                PoiFavoriteCard(
-                  favorite: favorite,
-                  selected: _selectedIds.contains(favorite.id),
-                  selectionMode: _selectedIds.isNotEmpty,
-                  onSelectedChanged: _deletingSelected
-                      ? null
-                      : (_) => _toggleFavoriteSelection(favorite.id),
-                  onRemove: () => _removeFavorite(context, ref, favorite),
-                  onLongPress: () =>
-                      _showFavoriteActions(context, ref, favorite),
-                ),
-                const SizedBox(height: TpSpacing.s3),
-              ],
+            else ...[
+              _FavoritesSectionHeader(
+                title: _searching ? '搜尋結果' : '最近收藏',
+                count: filteredFavorites.length,
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              TpGroupedSurface(
+                key: const ValueKey('favorites-grouped-list'),
+                // icon 40 + row 左右 padding 12 + gap 12，分隔線從文字起點開始。
+                separatorIndent: 64,
+                children: [
+                  for (final favorite in visibleFavorites)
+                    PoiFavoriteCard(
+                      favorite: favorite,
+                      grouped: true,
+                      matchQuery: _searching ? _searchQuery : '',
+                      selected: _selectedIds.contains(favorite.id),
+                      selectionMode: _selectedIds.isNotEmpty,
+                      onSelectedChanged: _deletingSelected
+                          ? null
+                          : (_) => _toggleFavoriteSelection(favorite.id),
+                      onRemove: () => _removeFavorite(context, ref, favorite),
+                      onLongPress: () =>
+                          _showFavoriteActions(context, ref, favorite),
+                    ),
+                ],
+              ),
+            ],
             if (usePagination && filteredFavorites.isNotEmpty)
               _PaginationControls(
                 page: page,
@@ -773,6 +800,34 @@ enum _FavoriteHeaderAction {
   sortName,
   sortRegion,
   filter,
+  explore,
+}
+
+class _FavoritesSectionHeader extends StatelessWidget {
+  const _FavoritesSectionHeader({required this.title, required this.count});
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s1),
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+          const SizedBox(width: TpSpacing.s3),
+          Text(
+            '$count 個地點',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BulkToolbar extends StatelessWidget {

@@ -156,6 +156,7 @@ Widget _buildScreen(
   ThemeData? theme,
   GoogleMapsExternalLauncher externalLauncher =
       const GoogleMapsExternalLauncher(),
+  bool renderSelectedTripMap = false,
 }) {
   final router = GoRouter(
     routes: [
@@ -175,9 +176,21 @@ Widget _buildScreen(
       ),
       GoRoute(
         path: '/trips/:tripId/map',
-        builder: (context, state) => Scaffold(
-          body: Text('trip-map-route-${state.pathParameters['tripId']}'),
-        ),
+        builder: (context, state) {
+          final selectedTripId = state.pathParameters['tripId']!;
+          if (!renderSelectedTripMap) {
+            return Scaffold(body: Text('trip-map-route-$selectedTripId'));
+          }
+          return TripMapScreen(
+            tripId: selectedTripId,
+            mapBuilder: (config) {
+              onMapConfig?.call(config);
+              return fakeTripMapBuilder(config);
+            },
+            locationService: locationService,
+            externalLauncher: externalLauncher,
+          );
+        },
       ),
       GoRoute(
         path: '/trips/:tripId',
@@ -248,7 +261,7 @@ void main() {
     expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
   });
 
-  testWidgets('空白地圖與 Tripline marker 還原原頁且 marker 維持 zoom 12', (tester) async {
+  testWidgets('空白地圖與 Tripline marker 還原原頁且 marker 維持 zoom 13', (tester) async {
     final nativeController = _FakeTripMapPlatformController();
     TripMapCanvasConfig? mapConfig;
     var attached = false;
@@ -283,7 +296,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
     expect(nativeController.moves, isNotEmpty);
-    expect(nativeController.moves.last.zoom, 12);
+    expect(nativeController.moves.last.zoom, 13);
   });
 
   testWidgets('選取 Google POI 不移動鏡頭，外開失敗保留卡片並顯示錯誤', (tester) async {
@@ -379,7 +392,7 @@ void main() {
       TpBottomAccessory.height,
     );
     expect(mapConfig?.initialMaxZoom, isNull);
-    expect(mapConfig?.initialZoom, 12);
+    expect(mapConfig?.initialZoom, 13);
     expect(mapConfig?.initialFitPoints, isEmpty);
     expect(mapConfig?.initialCenter?.latitude, closeTo(26.2155, 0.00001));
     expect(mapConfig?.initialCenter?.longitude, closeTo(127.7035, 0.00001));
@@ -502,13 +515,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(mapConfig?.initialZoom, 12);
+    expect(mapConfig?.initialZoom, 13);
     expect(mapConfig?.initialFitPoints, isEmpty);
     expect(mapConfig?.initialCenter?.latitude, 26.217);
     expect(mapConfig?.initialCenter?.longitude, 127.719);
   });
 
-  testWidgets('切到 DAY 02：只顯示該日內容且鏡頭維持 zoom 12', (tester) async {
+  testWidgets('切到 DAY 02：只顯示該日內容且鏡頭維持 zoom 13', (tester) async {
     final nativeController = _FakeTripMapPlatformController();
     TripMapCanvasConfig? mapConfig;
     var attached = false;
@@ -533,11 +546,11 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
     expect(find.text('美麗海水族館'), findsOneWidget);
     expect(find.text('首里城'), findsNothing);
-    expect(mapConfig?.initialZoom, 12);
+    expect(mapConfig?.initialZoom, 13);
     expect(mapConfig?.initialCenter?.latitude, 26.694);
     expect(mapConfig?.initialCenter?.longitude, 127.878);
     expect(nativeController.moves, isNotEmpty);
-    expect(nativeController.moves.last.zoom, 12);
+    expect(nativeController.moves.last.zoom, 13);
     expect(nativeController.moves.last.point.latitude, 26.694);
     expect(nativeController.moves.last.point.longitude, 127.878);
   });
@@ -587,7 +600,7 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
   });
 
-  testWidgets('點選 POI 後鏡頭維持城市 zoom 12', (tester) async {
+  testWidgets('點選 POI 後鏡頭維持城市 zoom 13', (tester) async {
     final nativeController = _FakeTripMapPlatformController();
     var attached = false;
 
@@ -607,7 +620,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-card-11')));
     await tester.pumpAndSettle();
 
-    expect(nativeController.moves.single.zoom, 12);
+    expect(nativeController.moves.single.zoom, 13);
   });
 
   testWidgets('marker 點擊與左右滑卡共用 active POI', (tester) async {
@@ -806,9 +819,17 @@ void main() {
   });
 
   testWidgets('行程切換選單：可從地圖切到另一個行程', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    TripMapController? attachedController;
     await tester.pumpWidget(
       _buildScreen(
         [_dayOne, _dayTwo],
+        renderSelectedTripMap: true,
+        onMapConfig: (config) {
+          if (identical(attachedController, config.controller)) return;
+          attachedController = config.controller;
+          config.controller.attach(nativeController);
+        },
         trips: const [
           TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
           TripSummary(tripId: 'trip-2', name: 'tokyo', title: '東京週末'),
@@ -827,14 +848,17 @@ void main() {
     expect(find.text('完成'), findsNothing);
     expect(find.byType(TabBar), findsNothing);
     expect(sheet.initialState, GlassSheetState.full);
-    expect(sheet.halfSize, 0.62);
+    expect(sheet.halfSize, 0.93);
     expect(sheet.fullSize, 0.93);
-    expect(sheet.showDragIndicator, isTrue);
+    expect(sheet.showDragIndicator, isFalse);
 
+    nativeController.moves.clear();
     await tester.tap(find.byKey(const ValueKey('trip-picker-item-trip-2')));
     await tester.pumpAndSettle();
 
-    expect(find.text('trip-map-route-trip-2'), findsOneWidget);
+    expect(find.text('東京週末'), findsOneWidget);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.zoom, 13);
   });
 
   testWidgets('全部 entry 無座標：仍渲染地圖與 POI page', (tester) async {

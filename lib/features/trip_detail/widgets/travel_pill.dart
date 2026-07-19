@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
 import '../../../models/segment.dart';
-import '../../../theme/app_theme.dart';
 
-/// 站間移動 pill：sage 描邊、透明底、type icon + 分鐘數（tabular）。
+/// 站間移動 pill：中性描邊、Tripline accent icon + 分鐘數（tabular）。
 class TravelPill extends StatelessWidget {
   const TravelPill({
     super.key,
@@ -64,14 +63,13 @@ class TravelPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tones = Theme.of(context).extension<TpTones>()!;
     final colorScheme = Theme.of(context).colorScheme;
     final noTravel = segment?.noTravel ?? travel?.sameplace ?? false;
 
     if (noTravel) {
       return Container(
         key: const ValueKey('travel-no-travel'),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: colorScheme.outlineVariant),
@@ -81,16 +79,17 @@ class TravelPill extends StatelessWidget {
           children: [
             Icon(
               Icons.location_on_outlined,
-              size: 14,
+              size: 17,
               color: colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 4),
-            Text(
-              '不需計算路程',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurfaceVariant,
+            Flexible(
+              child: Text(
+                '不需計算路程',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -134,28 +133,31 @@ class TravelPill extends StatelessWidget {
     }
 
     return Container(
-      key: isStale ? const ValueKey('travel-stale') : null,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      key: isStale
+          ? const ValueKey('travel-stale')
+          : const ValueKey('travel-pill'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: tones.sage),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             iconForType(submode ?? mode ?? ''),
-            size: 14,
-            color: tones.sageDeep,
+            size: 17,
+            color: colorScheme.primary,
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: tones.sageDeep,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],

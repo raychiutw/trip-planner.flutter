@@ -354,11 +354,39 @@ void main() {
     expect(find.text('選擇地點'), findsOneWidget);
     expect(find.text('取消'), findsOneWidget);
     expect(find.text('完成'), findsNothing);
+    final editable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('alt-search-field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(editable.focusNode.hasFocus, isFalse);
     await tester.enterText(
       find.byKey(const ValueKey('alt-search-field')),
       '拉麵',
     );
-    await tester.tap(find.byKey(const ValueKey('alt-search-button')));
+    expect(find.byKey(const ValueKey('alt-search-button')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('alt-result-p9')), findsOneWidget);
+    expect(
+      tester
+          .widgetList<ListView>(find.byType(ListView))
+          .any(
+            (list) =>
+                list.keyboardDismissBehavior ==
+                ScrollViewKeyboardDismissBehavior.onDrag,
+          ),
+      isTrue,
+    );
+    await tester.enterText(find.byKey(const ValueKey('alt-search-field')), '');
+    await tester.pump();
+    expect(find.byKey(const ValueKey('alt-result-p9')), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('alt-search-field')),
+      '拉麵',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('alt-result-p9')));
     await tester.pumpAndSettle();
@@ -484,7 +512,7 @@ void main() {
       find.byKey(const ValueKey('alt-search-field')),
       '波上',
     );
-    await tester.tap(find.byKey(const ValueKey('alt-search-button')));
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('alt-result-p8')));
     await tester.pumpAndSettle();

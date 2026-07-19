@@ -60,7 +60,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('09:30'), findsOneWidget);
+      expect(find.text('09：30'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('沖縄美ら海水族館'), findsOneWidget); // master.name ≠ title 才顯示
       expect(find.text('景點'), findsOneWidget);
@@ -106,7 +106,7 @@ void main() {
       expect(find.text('景點'), findsNothing);
     });
 
-    testWidgets('圓點色依 tone:restaurant → pinkDeep', (tester) async {
+    testWidgets('所有 POI 類型共用 Tripline accent 圓點', (tester) async {
       await pumpTile(
         tester,
         const TimelineEntry(
@@ -117,7 +117,31 @@ void main() {
           master: EntryPoiInfo(poiId: 1, type: 'restaurant'),
         ),
       );
-      expect(dotColor(tester, 2), tones.pinkDeep);
+      expect(dotColor(tester, 2), tones.accentDeep);
+    });
+
+    testWidgets('POI 類型不改變中性卡片 surface 與邊框', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 20,
+          sortOrder: 0,
+          version: 0,
+          title: '暖暮拉麵',
+          master: EntryPoiInfo(poiId: 1, type: 'restaurant'),
+        ),
+      );
+
+      final decoration =
+          tester
+                  .widget<Container>(
+                    find.byKey(const ValueKey('entry-card-20')),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      final colors = AppTheme.light().colorScheme;
+      expect(decoration.color, colors.surfaceContainerLow);
+      expect(decoration.border!.top.color, colors.outlineVariant);
     });
 
     testWidgets('master 為 null → accentDeep;startTime 缺則用 time', (
@@ -134,7 +158,7 @@ void main() {
         ),
       );
       expect(dotColor(tester, 3), tones.accentDeep);
-      expect(find.text('14:00'), findsOneWidget);
+      expect(find.text('14：00'), findsOneWidget);
     });
 
     testWidgets('rail badge 顯示停留點編號', (tester) async {
@@ -248,10 +272,53 @@ void main() {
         ),
       );
 
-      expect(find.text('09:30'), findsOneWidget);
-      expect(find.text('– 11:00'), findsOneWidget);
+      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('09：30'), findsNothing);
+      expect(find.text('– 11:00'), findsNothing);
       expect(find.bySemanticsLabel(RegExp('09:30 到 11:00')), findsOneWidget);
       semantics.dispose();
+    });
+
+    testWidgets('iOS Large keeps the complete range on one visible line', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 43,
+          sortOrder: 0,
+          version: 1,
+          startTime: '20:50',
+          endTime: '21:50',
+          title: '那覇空港',
+        ),
+        textScaler: const TextScaler.linear(1.25),
+      );
+
+      final range = tester.widget<Text>(find.text('20：50 - 21：50'));
+      expect(range.maxLines, 1);
+      expect(range.softWrap, isFalse);
+      expect(range.style?.fontSize, 20);
+      expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 22);
+      expect(kTimelineRailWidth, 32);
+      expect(
+        find.byKey(const ValueKey('timeline-entry-d1-43')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.text('20：50 - 21：50')).dx,
+        tester.getTopLeft(find.byKey(const ValueKey('entry-card-43'))).dx,
+        reason: 'D1 的時間與卡片必須共用相同內容起點',
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('entry-dot-43'))),
+        const Size(22, 22),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('entry-dot-43'))).dy,
+        tester.getTopLeft(find.text('20：50 - 21：50')).dy,
+        reason: 'D1 的數字圓點頂端必須和時間第一行對齊，不可落在基線下方',
+      );
     });
 
     testWidgets('Google primary type is the first secondary row', (
@@ -280,6 +347,11 @@ void main() {
     testWidgets('accessibility text uses stacked layout without overflow', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await pumpTile(
         tester,
         const TimelineEntry(
@@ -295,11 +367,18 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey('timeline-entry-accessibility-42')),
+        find.byKey(const ValueKey('timeline-entry-d1-42')),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
       expect(find.text('很長但仍需要完整閱讀的景點名稱'), findsOneWidget);
+      final range = tester.widget<Text>(find.text('09：30 - 11：00'));
+      expect(range.maxLines, 1);
+      expect(range.softWrap, isFalse);
+      final scaleDown = tester.widget<FittedBox>(
+        find.byKey(const ValueKey('entry-time-scale-42')),
+      );
+      expect(scaleDown.fit, BoxFit.scaleDown);
     });
   });
 }

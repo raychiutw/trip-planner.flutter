@@ -138,7 +138,7 @@ void main() {
     );
   });
 
-  testWidgets('TpRootScaffold 頁首固定為單一 56pt glass 膠囊', (tester) async {
+  testWidgets('TpRootScaffold 頁首固定為 C1 單一 64pt glass 膠囊', (tester) async {
     // 大標題吃掉 96-108pt 卻只重複 tab bar 已經講過的頁名。root 頁改為 inline，
     // 省下的高度換成內容（同一螢幕多看到一張卡）。
     await tester.pumpWidget(
@@ -167,7 +167,7 @@ void main() {
     expect(find.byType(AppBar), findsNothing);
     expect(
       tester.getSize(find.byKey(const ValueKey('tp-root-glass-header'))),
-      const Size(768, 56),
+      const Size(768, 64),
     );
   });
 

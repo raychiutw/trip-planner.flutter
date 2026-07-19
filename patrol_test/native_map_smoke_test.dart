@@ -23,7 +23,7 @@ const _poiTapOffsets = <Offset>[
 ];
 
 void main() {
-  patrolTest('native Google Map renders, keeps zoom 12, and exposes a POI', (
+  patrolTest('native Google Map renders, keeps zoom 13, and exposes a POI', (
     $,
   ) async {
     final ready = Completer<void>();
@@ -48,11 +48,11 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapReady), findsOneWidget);
 
-    await $(#focusAtZoom12).tap();
+    await $(#focusAtZoom13).tap();
     await $(
-      #observedZoom12,
+      #observedZoom13,
     ).waitUntilExists(timeout: const Duration(seconds: 15));
-    expect($(#observedZoom12), findsOneWidget);
+    expect($(#observedZoom13), findsOneWidget);
 
     await $(#toggleBrightness).tap();
     await $(
@@ -80,7 +80,7 @@ void main() {
 
     if (!_expectGooglePoi) return;
 
-    // The release behavior stays at zoom 12. For the strict Test Lab-only POI
+    // The release behavior stays at zoom 13. For the strict Test Lab-only POI
     // assertion, zoom in after that check so the known native POI is a stable
     // center-screen tap across device sizes and locales.
     await controller.move(_taipei101, 18);
@@ -132,8 +132,8 @@ class _NativeMapSmokeHarness extends StatefulWidget {
 class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
   Brightness _brightness = Brightness.light;
   bool _ready = false;
-  bool _expectingZoom12 = false;
-  bool _observedZoom12 = false;
+  bool _expectingZoom13 = false;
+  bool _observedZoom13 = false;
   bool _expectingGesture = false;
   bool _gestureObserved = false;
   bool _darkStyleApplied = false;
@@ -151,12 +151,12 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
       setState(() => _poiZoomReady = true);
       return;
     }
-    if (_expectingZoom12 &&
-        (position.zoom - 12).abs() < 0.05 &&
+    if (_expectingZoom13 &&
+        (position.zoom - 13).abs() < 0.05 &&
         _near(position.target, _zoomCheckPoint)) {
       setState(() {
-        _expectingZoom12 = false;
-        _observedZoom12 = true;
+        _expectingZoom13 = false;
+        _observedZoom13 = true;
       });
       return;
     }
@@ -212,8 +212,8 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                   tilePreset: kTripMapTilePresets.first,
                   initialFitPoints: const [_taipei101],
                   initialCenter: _taipei101,
-                  initialZoom: 12,
-                  initialMaxZoom: 12,
+                  initialZoom: 13,
+                  initialMaxZoom: 13,
                   routes: const [
                     TripMapRoute(
                       id: 'smoke-route',
@@ -252,12 +252,12 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                   spacing: 8,
                   children: [
                     FilledButton(
-                      key: const ValueKey('focusAtZoom12'),
+                      key: const ValueKey('focusAtZoom13'),
                       onPressed: () async {
-                        setState(() => _expectingZoom12 = true);
-                        await widget.controller.move(_zoomCheckPoint, 12);
+                        setState(() => _expectingZoom13 = true);
+                        await widget.controller.move(_zoomCheckPoint, 13);
                       },
-                      child: const Text('Zoom 12'),
+                      child: const Text('Zoom 13'),
                     ),
                     FilledButton(
                       key: const ValueKey('toggleBrightness'),
@@ -290,9 +290,9 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapReady')),
               ),
-            if (_observedZoom12)
+            if (_observedZoom13)
               const IgnorePointer(
-                child: SizedBox(key: ValueKey('observedZoom12')),
+                child: SizedBox(key: ValueKey('observedZoom13')),
               ),
             if (_darkStyleApplied)
               const IgnorePointer(

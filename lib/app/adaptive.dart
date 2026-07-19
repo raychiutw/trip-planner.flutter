@@ -458,12 +458,14 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         fullSize: widget.largeSize,
         settings: settings,
         halfSettings: settings,
-        fullSettings: settings,
         expandedColor: isDark
             ? const Color(0xFF1C1C1E)
             : const Color(0xFFFFFBF5),
         quality: GlassQuality.standard,
-        fillThreshold: 1,
+        // 定版近滿版 sheet 是「實色內容畫布＋玻璃控制元件」；只在進場時
+        // 保留玻璃過渡，固定於 93% detent 後即使用完整 canvas 色，避免
+        // 背後地圖穿透而降低文字與 grouped list 的對比。
+        fillThreshold: 0.85,
         fillTransition: GlassFillTransition.gradual,
         topBorderRadius: 28,
         fullTopBorderRadius: 28,
@@ -492,9 +494,9 @@ Future<T?> showAppSelectionSheet<T>(
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
-    mediumSize: 0.62,
+    mediumSize: 0.93,
     largeSize: 0.93,
-    resizable: true,
+    resizable: false,
     builder: (sheetContext, close) => Material(
       color: Colors.transparent,
       child: Column(
@@ -746,6 +748,7 @@ class AppSearchField extends StatefulWidget {
     required this.placeholder,
     this.onChanged,
     this.onSubmitted,
+    this.debounce,
     this.autofocus = false,
     this.enabled = true,
     this.embedded = false,
@@ -757,6 +760,7 @@ class AppSearchField extends StatefulWidget {
   final String placeholder;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final Duration? debounce;
   final bool autofocus;
   final bool enabled;
   final bool embedded;
@@ -766,6 +770,8 @@ class AppSearchField extends StatefulWidget {
 }
 
 class _AppSearchFieldState extends State<AppSearchField> {
+  Timer? _debounceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -774,6 +780,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
   }
@@ -785,7 +792,22 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   void _clear() {
     widget.controller.clear();
-    widget.onChanged?.call('');
+    _changed('');
+  }
+
+  void _changed(String value) {
+    _debounceTimer?.cancel();
+    final debounce = widget.debounce;
+    if (debounce == null || value.isEmpty) {
+      widget.onChanged?.call(value);
+      return;
+    }
+    _debounceTimer = Timer(debounce, () => widget.onChanged?.call(value));
+  }
+
+  void _submitted(String value) {
+    _debounceTimer?.cancel();
+    widget.onSubmitted?.call(value);
   }
 
   @override
@@ -799,8 +821,8 @@ class _AppSearchFieldState extends State<AppSearchField> {
         key: widget.fieldKey,
         controller: widget.controller,
         placeholder: widget.placeholder,
-        onChanged: widget.onChanged,
-        onSubmitted: widget.onSubmitted,
+        onChanged: _changed,
+        onSubmitted: _submitted,
         autofocus: widget.autofocus,
         enabled: widget.enabled,
         backgroundColor: widget.embedded ? Colors.transparent : null,
@@ -813,8 +835,8 @@ class _AppSearchFieldState extends State<AppSearchField> {
       autofocus: widget.autofocus,
       enabled: widget.enabled,
       textInputAction: TextInputAction.search,
-      onChanged: widget.onChanged,
-      onSubmitted: widget.onSubmitted,
+      onChanged: _changed,
+      onSubmitted: _submitted,
       decoration: InputDecoration(
         hintText: widget.placeholder,
         isDense: true,

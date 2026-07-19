@@ -388,4 +388,64 @@ void main() {
     await tester.pump();
     expect(controller.text, isEmpty);
   });
+
+  testWidgets('AppSearchField debounce 只送出停止輸入後的最新文字', (tester) async {
+    final controller = TextEditingController();
+    final changes = <String>[];
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppSearchField(
+            fieldKey: const ValueKey('search'),
+            controller: controller,
+            placeholder: '搜尋',
+            debounce: const Duration(milliseconds: 300),
+            onChanged: changes.add,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byKey(const ValueKey('search')), '東');
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.enterText(find.byKey(const ValueKey('search')), '東京');
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(changes, isEmpty);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(changes, ['東京']);
+  });
+
+  testWidgets('AppSearchField 搜尋送出會取消尚未觸發的 debounce', (tester) async {
+    final controller = TextEditingController();
+    final changes = <String>[];
+    final submissions = <String>[];
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppSearchField(
+            fieldKey: const ValueKey('search'),
+            controller: controller,
+            placeholder: '搜尋',
+            debounce: const Duration(milliseconds: 300),
+            onChanged: changes.add,
+            onSubmitted: submissions.add,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byKey(const ValueKey('search')), '東京');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+
+    expect(submissions, ['東京']);
+    expect(changes, isEmpty);
+
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(changes, isEmpty);
+  });
 }

@@ -57,6 +57,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     FocusScope.of(context).unfocus();
   }
 
+  void _searchAsTyped(String _) {
+    ref.read(exploreControllerProvider.notifier).search(_searchController.text);
+  }
+
   Future<void> _openCustomRegion() async {
     final textController = TextEditingController();
     try {
@@ -142,22 +146,20 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
             Padding(
               padding: const EdgeInsets.all(TpSpacing.s4),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: AppSearchField(
-                      fieldKey: const ValueKey('explore-search-field'),
-                      controller: _searchController,
-                      placeholder: '搜尋地點',
-                      onSubmitted: (_) => _submitSearch(),
-                    ),
+                  AppSearchField(
+                    fieldKey: const ValueKey('explore-search-field'),
+                    controller: _searchController,
+                    placeholder: '搜尋地點',
+                    debounce: const Duration(milliseconds: 300),
+                    onChanged: _searchAsTyped,
+                    onSubmitted: (_) => _submitSearch(),
                   ),
-                  const SizedBox(width: TpSpacing.s2),
-                  FilledButton(
-                    key: const ValueKey('explore-search-button'),
-                    onPressed: state.searching ? null : _submitSearch,
-                    child: Text(state.searching ? '搜尋中…' : '搜尋'),
-                  ),
+                  if (state.searching) ...[
+                    const SizedBox(height: TpSpacing.s1),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
                 ],
               ),
             ),
@@ -299,7 +301,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         );
       }
-      return const AppListLoadingSkeleton(key: ValueKey('explore-loading'));
+      return const Center(child: Text('輸入至少 2 個字開始搜尋'));
     }
 
     final filtered = state.filteredResults;
@@ -326,6 +328,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     }
 
     return GridView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(TpSpacing.s4),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 260,
