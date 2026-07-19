@@ -55,7 +55,7 @@ wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.t
 
 ### Theme 取色守則
 
-語意色走 `colorScheme`;三色 tone(accent=玩/看/買、sage=住/移動、pink=吃,各 4 階)走 `Theme.of(context).extension<TpTones>()!` — 不要直接引用 `TpColorsLight/Dark` 常數(會壞 dark mode)。poi_type → tone 對照在 `lib/features/trip_detail/widgets/entry_tone.dart`。設計禁忌:無 gradient 裝飾、無 emoji icon、無 rainbow 色(地圖 pin palette 是唯一例外)。
+語意色走 `colorScheme`；柔褐 accent 是唯一品牌強調色，內容 surface 使用暖白／中性深色。`TpTones` 的 sage／pink 僅是舊 API 相容別名，不得恢復內容三色分類。Widget 不要直接引用 `TpColorsLight/Dark` 常數（會壞 dark mode）；地圖逐日 pin／route palette 是唯一 rainbow 色例外。設計禁忌：無 gradient 裝飾、無 emoji icon。
 
 ### OCC
 

@@ -4,7 +4,7 @@
 
 **Goal:** Make every Tripline root page, detail page, bottom sheet, itinerary Timeline, movement workflow, compact navigation capsule, and map interaction use the correct HIG semantics and one shared implementation source for its role, including a fixed full-width Root Glass Header and clickable native Google POIs.
 
-**Architecture:** Keep `liquid_glass_widgets` and `lib/app/adaptive.dart` as the single material/presentation boundaries. Replace Root `SliverAppBar` and feature-owned app bars with one full-bleed `TpRootScaffold` that overlays a fixed `TpRootGlassHeader`; keep role-aware `TpAppBar` only for detail routes and sheet navigation. Replace generic large-sheet functions with one private engine plus semantic wrappers, and migrate call sites by task type. Keep `AppleRootTabBar` and `TpHorizontalSelector` semantically separate while sharing one compact-navigation glass recipe. Convert the itinerary to one native section-linked `CustomScrollView` with adaptive rows and explicit movement semantics. Replace `google_maps_flutter` with mobile-only `google_navigation_flutter` behind an app-owned `TripMapController`/canvas boundary, preserve Tripline markers, routes, clustering, zoom 12, and accessories, and add native Google POI selection plus Universal URL external opening. Use a web external-map fallback instead of retaining a second embedded Google Maps SDK. This is a whole-plan structural refactor: remove duplicate compatibility paths after migration, while preserving product behavior, accessibility, and tests. The only planned API change is the owner-scoped favorite restore contract in `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`.
+**Architecture:** Keep `liquid_glass_widgets` and `lib/app/adaptive.dart` as the single material/presentation boundaries. Replace Root `SliverAppBar` and feature-owned app bars with one full-bleed `TpRootScaffold` that overlays a fixed `TpRootGlassHeader`; keep role-aware `TpAppBar` only for detail routes and sheet navigation. Replace generic large-sheet functions with one private engine plus semantic wrappers, and migrate call sites by task type. Keep `AppleRootTabBar` and `TpHorizontalSelector` semantically separate while sharing one compact-navigation glass recipe. Convert the itinerary to one native section-linked `CustomScrollView` with adaptive rows and explicit movement semantics. Replace `google_maps_flutter` with mobile-only `google_navigation_flutter` behind an app-owned `TripMapController`/canvas boundary, preserve Tripline markers, routes, clustering, fixed zoom 13, and accessories, and add native Google POI selection plus Universal URL external opening. Use a web external-map fallback instead of retaining a second embedded Google Maps SDK. This is a whole-plan structural refactor: remove duplicate compatibility paths after migration, while preserving product behavior, accessibility, and tests. The only planned API change is the owner-scoped favorite restore contract in `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`.
 
 **Tech Stack:** Flutter, Dart, Riverpod, GoRouter, `liquid_glass_widgets`, `google_navigation_flutter ^0.10.0`, `url_launcher`, Flutter widget tests, Mocktail.
 
@@ -42,7 +42,7 @@
 - Do not add background navigation or Always-location behavior for the map-only use case. Keep least-privilege location requests; if the package cannot pass an iOS 16 map-only build without background mode, stop at the dependency spike and document the conflict before expanding permissions.
 - Keep Google native POIs visible and clickable. A native POI uses the existing bottom accessory slot temporarily; it never overwrites the current Tripline selection or writes data.
 - External Google Maps opening is always user-initiated from a labeled button and uses a Universal URL with `api=1`, `query`, and `query_place_id` when available. No confirmation alert precedes the open.
-- Preserve Tripline marker, route, cluster, PageView, and zoom-12 behavior across the map-engine migration.
+- Preserve Tripline marker, route, cluster, PageView, and fixed zoom-13 behavior across the map-engine migration.
 - The itinerary selector contains `地圖` and `DAY 1...DAY N`; remove `總覽` and do not add vertical page snapping.
 - The itinerary uses one vertical `CustomScrollView`; no nested vertical scroll view and no scroll-position dependency.
 - Passive scrolling updates the local active Day only; never invalidate Riverpod state from Sliver layout or widget build.
@@ -96,7 +96,7 @@
 - `lib/features/map/trip_map_cluster_projector.dart`: pure-Dart zoom-grid clustering that replaces `google_maps_flutter.ClusterManager` without leaking plugin types.
 - `lib/features/map/google_maps_external_launcher.dart`: typed Universal URL builder and injectable `url_launcher` boundary.
 - `lib/features/trip_detail/google_poi_accessory_card.dart`: selected Google-native POI card rendered in the existing bottom accessory slot.
-- `lib/features/trip_detail/trip_map_screen.dart`: preserve Tripline POI/Day selection and zoom 12 while adding temporary Google POI selection state.
+- `lib/features/trip_detail/trip_map_screen.dart`: preserve Tripline POI/Day selection and fixed zoom 13 while adding temporary Google POI selection state.
 - `lib/features/trip_detail/day_weather.dart`: one weather state surface that keeps the sample layout until live forecast data is available.
 - `lib/features/trip_detail/widgets/timeline_entry_tile.dart`: start/end time, localized Google category, and standard/accessibility Timeline layouts.
 - `lib/features/trip_detail/widgets/reorderable_row.dart`: shared 44pt reorder handle and accessibility semantics.
@@ -120,7 +120,7 @@
 - `test/features/map/map_adapter_test.dart`: package-neutral config/controller and mobile renderer translation contract.
 - `test/features/map/trip_map_cluster_projector_test.dart`: stable cluster membership, zoom changes, non-clusterable markers, and cluster fit points.
 - `test/features/map/google_maps_external_launcher_test.dart`: encoded Universal URL, place-ID precision, fallback, and launch failure.
-- `test/features/trip_detail/trip_map_screen_test.dart`: native Google POI accessory swap/restore, Tripline marker precedence, zoom 12, and existing PageView behavior.
+- `test/features/trip_detail/trip_map_screen_test.dart`: native Google POI accessory swap/restore, Tripline marker precedence, zoom 13, and existing PageView behavior.
 - `test/ui/shared_ui_usage_test.dart`: static regression guard against feature-owned AppBars and sheet APIs.
 - `test/ui/tripline_ui_test.dart`: selector optics remain identical with and without PlatformView rendering.
 - `test/features/shell/app_shell_test.dart`: Root Tab optics stay identical across branches and its selected indicator reuses the base optics.
@@ -3864,7 +3864,7 @@ git commit -m "refactor: unify root pages under glass header"
 - Mobile renderer owns: `GoogleMapsMapView`, `GoogleMapViewController`, `Marker`, `Polyline`, `ImageDescriptor`, and plugin event conversion
 - Web renderer owns: non-embedded fallback only; it never imports `google_navigation_flutter`
 - Removes: `GoogleTripMapController`, `GoogleMap`, `BitmapDescriptor`, `ClusterManager`, and every `google_maps_flutter` import/dependency
-- Preserves: numbered Tripline markers, user marker, route styling, Day/POI zoom 12, map padding, Reduce Motion, marker taps, and 12+ marker clustering
+- Preserves: numbered Tripline markers, user marker, route styling, default/trip/Day/POI zoom 13, map padding, Reduce Motion, marker taps, and 12+ marker clustering
 
 - [ ] **Step 1: Add failing dependency/platform guards**
 
@@ -3970,7 +3970,7 @@ test('controller queues camera work until the renderer attaches', () async {
   final move = controller.move(const TripMapPoint(35, 135), 12);
   controller.attach(platform);
   await move;
-  expect(platform.moves.single.zoom, 12);
+  expect(platform.moves.single.zoom, 13);
 });
 
 test('overlay reconciliation updates only changed semantic IDs', () async {
@@ -4078,7 +4078,7 @@ flutter build ios --simulator --no-codesign
 rg -n "google_maps_flutter|GoogleTripMapController|ClusterManager" pubspec.yaml lib android ios && exit 1 || true
 ```
 
-Manually verify iOS and Android: native POI labels visible, Day and POI zoom exactly 12, route width/style intact, Tripline numbered markers intact, 12+ markers cluster, cluster tap fits members, map light/dark follows App appearance, and Root/Day/POI/Tab glass overlays do not steal map gestures.
+Manually verify iOS and Android: native POI labels visible, default/trip/Day/POI zoom exactly 13, route width/style intact, Tripline numbered markers intact, 12+ markers cluster, cluster tap fits members, map light/dark follows App appearance, and Root/Day/POI/Tab glass overlays do not steal map gestures.
 
 Commit:
 
@@ -4106,7 +4106,7 @@ git commit -m "refactor: replace trip map engine"
 **Interfaces:**
 - Produces: immutable `GoogleMapPoiSelection`, `GoogleMapsExternalLauncher`, `GooglePoiAccessoryCard`, and injectable launcher provider/callback
 - Consumes: `TripMapCanvasConfig.onGooglePoiSelected`, `onTap`, `onMarkerClicked`, and the existing `TpBottomAccessory` slot
-- Preserves: Tripline active entry ID, PageController page, Day selection, zoom 12, and original entry-card behavior
+- Preserves: Tripline active entry ID, PageController page, Day selection, zoom 13, and original entry-card behavior
 - Does not produce: a Place Details API call, backend write, favorite, trip entry, automatic context switch, or confirmation alert
 
 - [ ] **Step 1: Add failing URL and launcher tests**
@@ -4179,7 +4179,7 @@ testWidgets('Google POI temporarily replaces the Tripline accessory', (
   expect(find.byKey(const ValueKey('trip-map-poi-page-view')), findsOneWidget);
 });
 
-testWidgets('map tap and Tripline marker restore the prior page at zoom 12', (
+testWidgets('map tap and Tripline marker restore the prior page at zoom 13', (
   tester,
 ) async {
   final harness = await _pumpControllableMap(tester, initialPage: 2);
@@ -4193,7 +4193,7 @@ testWidgets('map tap and Tripline marker restore the prior page at zoom 12', (
   harness.tapTriplineMarker('map-pin-13');
   await tester.pump();
   expect(find.byKey(const ValueKey('entry-card-13')), findsOneWidget);
-  expect(harness.lastMove.zoom, 12);
+  expect(harness.lastMove.zoom, 13);
 });
 
 testWidgets('Google POI selection does not move the camera', (tester) async {
@@ -4452,7 +4452,7 @@ Only after all gates are green may the implementation session run the explicit p
 **Interfaces:**
 - Produces: a fast deterministic PR gate, a device-level Patrol smoke suite, and named screenshot artifacts for every approved appearance/accessibility state
 - Consumes: the existing `TriplineApp`, `TpRootScaffold`, semantic sheet wrappers, `TripMapCanvasConfig`, `TripMapController`, package-neutral map callbacks, and provider overrides
-- Preserves: no production test mode, no authentication bypass in shipping code, no backend writes, zoom 12, native Google POIs, Tripline marker precedence, and existing Light/Dark theme ownership
+- Preserves: no production test mode, no authentication bypass in shipping code, no backend writes, fixed zoom 13, native Google POIs, Tripline marker precedence, and existing Light/Dark theme ownership
 - Pins: `patrol: 4.6.1` with `patrol_cli 4.4.0`, matching the official `google_navigation_flutter` example and Patrol compatibility table for Flutter 3.44.6
 
 - [x] **Step 1: Turn review-discovered regressions into failing tests first**
@@ -4497,7 +4497,7 @@ For every state assert:
 - Root actions, Back, Close, Cancel, Done, reorder, search, sort, and add expose at least 44×44 logical-point hit regions.
 - trip picker, account, notes, print, audit, share, collaboration, health, edit, and destructive confirmation can open and dismiss through their documented semantic action.
 - no `FlutterError`, overflow indicator, hidden initial content, or Root Tab overlap occurs.
-- map Day and POI focus requests remain exactly zoom 12.
+- map default/trip/Day/POI focus requests remain exactly zoom 13.
 - native Google POI selection replaces only the accessory, blank-map tap restores the Tripline accessory, and Tripline marker selection remains authoritative.
 
 Run `flutter test test/flows/hig_regression_matrix_test.dart` after each new assertion. A test that passes before its assertion is added is not evidence; each regression assertion must be observed failing against a deliberately incomplete harness or the current defect before going green.
@@ -4546,7 +4546,7 @@ Add exact Patrol package/native runner configuration, keep tests under `patrol_t
 - `onMapReady` fires on the real `GoogleMapsMapView`;
 - Light and Dark app theme changes update the native map color scheme without switching to clock-based night mode;
 - Tripline numbered markers and route overlays render without a platform exception;
-- Day and Tripline POI actions keep camera zoom 12;
+- default, trip switch, Day and Tripline POI actions keep camera zoom 13;
 - location permission can be accepted through Patrol when displayed;
 - native map gestures are still accepted around Root/Day/POI/Tab overlays;
 - tapping one stable, fixed-coordinate native POI can produce `GoogleMapPoiSelection`, and the external-open action changes apps/web without an in-app confirmation. The POI callback assertion is enabled with `E2E_EXPECT_GOOGLE_POI=true` on Test Lab; local runs without a valid Maps key still exercise the native view, overlays, zoom, and theme lifecycle.
@@ -4655,6 +4655,6 @@ git commit -m "test: automate Tripline release verification"
 - Cleanup check: the final source-usage test prevents regression to feature-owned Root/AppBar/sheet APIs, generic legacy wrappers, multiple Google map SDKs, plugin leakage, and duplicate navigation-glass values.
 - Glass check: Root Header, Root Tab, and itinerary/map selector remain separate semantic widgets; compact navigation shares one optical recipe and selection tint, Root Header uses one full-width glass surface, PlatformView only changes the rendering path, and larger sheets/accessories remain size-aware.
 - Timeline check: `DayWeatherCard` is the only Timeline weather entry, the selector has no overview option, one `CustomScrollView` owns vertical movement, active Day changes only from post-frame scroll observation, and accessibility sizes reduce columns instead of clamping text.
-- Map check: mobile uses map-only `GoogleMapsMapView`, app types do not expose plugin types, Tripline markers/routes/clusters and zoom 12 remain stable, native Google POI selection swaps one accessory slot without mutating trip state, and web uses the same Universal URL builder.
+- Map check: mobile uses map-only `GoogleMapsMapView`, app types do not expose plugin types, Tripline markers/routes/clusters and zoom 13 remain stable, native Google POI selection swaps one accessory slot without mutating trip state, and web uses the same Universal URL builder.
 - Platform/privacy check: Android API 24, Kotlin 2.3.0, iOS 16, API-key restrictions, attribution, and mobile builds are explicit; the plan refuses to add background location merely to satisfy an unverified package assumption.
 - Landing check: scoped simplification, independent merge-base code review, full verification, screenshot QA, gstack `/review`, Codex adversarial/structured review, resolved findings, and a final evidence summary all gate remote push.

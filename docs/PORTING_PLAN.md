@@ -14,7 +14,7 @@
 | Routing | go_router + StatefulShellRoute | 4-tab shell（聊天/行程/地圖/收藏）保留各 tab navigation stack；帳號由右上 avatar 進入 |
 | HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry |
 | 認證 | Cookie 登入 + OAuth PKCE/Bearer 就緒 | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE/Bearer client 端已實作並以 dart-define 啟用，production backend 已 provision `tripline-mobile` active public client |
-| 地圖 | google_maps_flutter + domain adapter | iOS／Android 使用各自受平台限制的金鑰；`features/map/map_adapter.dart` 集中 SDK 轉接，路線沿用 Web `/route` 契約 |
+| 地圖 | google_navigation_flutter + domain adapter | iOS／Android 使用各自受平台限制的金鑰；`features/map/map_adapter.dart` 隔離 SDK 型別並支援原生 Google POI callback，路線沿用 Web `/route` 契約 |
 | JSON | 手寫 fromJson（camelCase wire） | server 端 `deepCamel()` 已轉 camelCase；不用 build_runner 減少建置複雜度 |
 | 測試 | flutter_test + mocktail + http_mock_adapter | TDD：models 解析測試、api client 行為測試、widget 測試 |
 
@@ -52,7 +52,7 @@ lib/
   main.dart                 # ProviderScope + MaterialApp.router
   app/router.dart           # go_router + StatefulShellRoute + auth redirect
   theme/tokens.dart         # design token 常數（tokens.css 對應）
-  theme/app_theme.dart      # light/dark ThemeData + ThemeExtension（三色 4 階）
+  theme/app_theme.dart      # 暖白／中性深色 ThemeData + 語意色 ThemeExtension
   models/                   # trip / day / entry / poi / notes / user…（fromJson + 等值）
   api/api_client.dart       # dio 封裝：cookie、origin、錯誤、retry、204
   api/api_error.dart        # ApiError（code/message/detail）
@@ -70,9 +70,9 @@ test/                       # 與 lib/ 鏡像
 
 ## 設計系統重點（詳見 discovery/design.md）
 
-- 主色柔褐 `#A97A4A`（dark `#CBA06E`），奶油底 `#FFFBF5`（dark `#1A140F`）
+- 主色柔褐 `#A97A4A`（dark `#CBA06E`），奶油底 `#FFFBF5`（dark `#1C1C1E`）
 - 柔褐 accent 是唯一品牌強調色；POI／收藏／行程 surface 使用中性色，sage／pink 分類色已退場
 - 卡片：elevation 0 + 1px hairline `#EADFCF`、radius 8；shadow 只給浮層
 - 字體：平台系統字（iOS/macOS SF Pro、Android Roboto，中文走系統 fallback）；主要內文 17/26；時間 tabular-nums
-- 導覽：五個 branch 共用 `AppleRootTabBar` Liquid Glass 浮動功能層；垂直捲動時縮合，內容寬版則由 `AppAdaptiveContent` 依角色限寬
+- 導覽：四個 branch 共用固定 64pt `AppleRootTabBar` Liquid Glass 浮動功能層；帳號由各 root header 的 avatar 進入，內容寬版由 `AppAdaptiveContent` 依角色限寬
 - 禁止：gradient 裝飾、emoji icon、rainbow 色（地圖 polyline 例外）

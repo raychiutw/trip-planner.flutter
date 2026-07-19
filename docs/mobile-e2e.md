@@ -5,12 +5,12 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix, Play Internal dispatches run the Android matrix, and neither upload proceeds when its external-device gate fails. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix and Play Internal dispatches run the Android matrix as independent evidence jobs. Store uploads no longer wait for Firebase or the staging favorite-restore contract; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
-The Patrol bundle contains two independent release gates:
+The Patrol bundle contains two independent evidence suites:
 
 - `app_owned_flow_test.dart` runs login, itinerary/day switching, notes, map/itinerary switching, trip selection, account/appearance, chat, and favorites search/sort against deterministic repository fixtures. It never calls production services.
-- `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 12, overlays, and theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
+- `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 13, overlays, and theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
@@ -91,9 +91,9 @@ same change as the protected GitHub secrets.
 
 In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. Before GitHub uploads the seven-day artifact, `tool/sanitize_test_lab_evidence.sh` applies an evidence-only allowlist and removes signed APK/XCTest archives plus unknown binary formats. GitHub therefore retains the matrix log, JUnit/XML results, logcat, video, screenshots, and text metadata without republishing installable test inputs.
 
-Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. They do not bypass the matching platform matrix. The release job waits for `external_device_gate`; a test, configuration, quota, or Test Lab infrastructure failure leaves the upload job skipped instead of publishing an unverified build. Google Workload Identity Federation is also restricted to this repository's `mobile-e2e.yml` on `master`.
+Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Store upload is independent of staging and Firebase evidence so a Test Lab configuration, quota, or infrastructure failure cannot block TestFlight／Play internal delivery. Keep `run_optional_evidence` disabled for the publish-first path; enable it only when the same dispatch should also collect staging and device evidence. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
 
-Before Test Lab, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
+When `run_optional_evidence` is enabled, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI before collecting Test Lab evidence. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
 
 - `STAGING_API_BASE_URL` (HTTPS only), `STAGING_ORIGIN`
 - `STAGING_SESSION_COOKIE`, optional `STAGING_CSRF_TOKEN`

@@ -1,6 +1,6 @@
 # Tripline Theme 與共用 UI 參考
 
-> 更新：2026-07-17。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-17-tripline-final.html`](design-sessions/2026-07-17-tripline-final.html) 為準。
+> 更新：2026-07-20。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-17-tripline-final.html`](design-sessions/2026-07-17-tripline-final.html) 為準。
 
 ## 取色
 
@@ -11,9 +11,9 @@
 
 | Token | Light | Dark | 用途 |
 |---|---|---|---|
-| background | `#FFFBF5` | `#121214` | 頁面底色 |
-| secondary | `#FAF4EA` | `#1C1C1E` | grouped surface |
-| tertiary | `#F2EAD9` | `#2C2C2E` | 次級／選取 surface |
+| background | `#FFFBF5` | `#1C1C1E` | 頁面底色 |
+| secondary | `#FAF4EA` | `#2C2C2E` | grouped surface |
+| tertiary | `#F2EAD9` | `#3A3A3C` | 次級／選取 surface |
 | accent | `#A97A4A` | `#CBA06E` | 選取、主要動作 |
 | foreground | `#2A1F18` | `#F5F5F7` | 主要文字 |
 | muted | `#6F5A47` | `#A1A1A6` | 次要文字 |
@@ -38,7 +38,7 @@
 
 - Root tab 固定四項：聊天、行程、地圖、收藏。
 - 帳號不在 tab；四個 root 畫面右上固定圓形 `TpAccountAvatarButton`，`/account` 保留 deep link。
-- 浮動 tab 使用 `AppleRootTabBar`，左右 margin `24`、可見高度 `56`、安全區上方留白 `18`。
+- 浮動 tab 使用 `AppleRootTabBar`，左右 margin `16`、可見高度 `64`、安全區上方留白由 `TpRootTabGeometry` 統一計算。
 - `AppShell` 開啟 `extendBody`。根頁底部淨空一律使用 `TpRootScrollScaffold` 或 `TpRootTabGeometry.clearance(context)`，不得另寫 magic number。
 - 最小 tap target `44×44`；selection 使用 haptic；reduced motion 由 `TpMotion.resolve` 處理。
 
@@ -48,7 +48,7 @@
 - 地圖頁單層 selector：`行程 | DAY 1 | DAY 2...`。
 - 第一項切換頁面並保留 day；筆記放右上功能區。
 - 目前行程標題可點擊，開啟含搜尋、目前 checkmark、最近行程的 bottom sheet。
-- 每日地圖 zoom 固定 `12`，明確 POI focus 使用 `16`。
+- 預設進入、切換行程、切換 Day 與明確 POI focus 的 zoom 都固定 `13`，避免互動後跳成其他層級。
 - POI 卡以 `PageView(viewportFraction: .84)` 左右滑動；卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
 
 ## 內容與設定元件
