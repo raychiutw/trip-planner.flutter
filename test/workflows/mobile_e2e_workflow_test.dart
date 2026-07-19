@@ -59,12 +59,28 @@ void main() {
       expect(
         releaseWorkflow,
         contains(
-          "platform: \${{ inputs.release_target == 'testflight' && 'ios' || 'android' }}",
+          "inputs.release_target == 'both' && 'all' ||",
         ),
       );
       expect(
         releaseWorkflow,
         isNot(contains('with:\n      platform: android')),
+      );
+    });
+
+    test('one dispatch can release both stores with the same build number', () {
+      expect(releaseWorkflow, contains('          - both'));
+      expect(
+        RegExp(
+          r"inputs\.release_target == 'both'",
+        ).allMatches(releaseWorkflow).length,
+        greaterThanOrEqualTo(3),
+      );
+      expect(
+        RegExp(
+          r'GITHUB_RUN_NUMBER \* 100 \+ GITHUB_RUN_ATTEMPT',
+        ).allMatches(releaseWorkflow).length,
+        2,
       );
     });
 
