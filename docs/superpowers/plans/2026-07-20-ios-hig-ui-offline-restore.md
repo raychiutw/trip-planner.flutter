@@ -397,15 +397,15 @@ TASK-03～08 在 TASK-01 的共用 API 定稿後可各自進行；TASK-10 是 ex
 
 | TASK | 狀態 | 備註 |
 |---|---|---|
-| TASK-00 | TODO | 基線與工具鏈 |
-| TASK-01 | TODO | Header material／Back |
-| TASK-02 | TODO | Action／Day selector |
-| TASK-03 | TODO | Typography |
-| TASK-04 | TODO | Favorites search |
-| TASK-05 | TODO | Add stop UI |
-| TASK-06 | TODO | Swipe delete |
-| TASK-07 | TODO | Sheet audit |
-| TASK-08 | TODO | Map POI card／camera |
-| TASK-09 | TODO | Foreground reconnect |
-| TASK-10 | TODO | Restore deployment evidence |
-| TASK-11 | TODO | Final regression |
+| TASK-00 | DONE | 基線與工具鏈 |
+| TASK-01 | DONE | Header material／Back |
+| TASK-02 | DONE | Action／Day selector |
+| TASK-03 | DONE | Typography |
+| TASK-04 | DONE | Favorites search |
+| TASK-05 | DONE | Add stop UI |
+| TASK-06 | DONE | Swipe delete |
+| TASK-07 | DONE | Sheet audit |
+| TASK-08 | DONE | Map POI card／camera |
+| TASK-09 | DONE | Foreground reconnect |
+| TASK-10 | BLOCKED（外部設定） | App route／release flag 已接；缺少真實 staging protected environment 與 allowlist |
+| TASK-11 | LOCAL PASS | 本機 regression 已通過；Linux CI、iOS signed build 與 store upload 由 ship 階段執行 |

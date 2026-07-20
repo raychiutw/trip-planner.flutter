@@ -90,9 +90,11 @@ class _FakeTripMapPlatformController implements TripMapPlatformController {
 TimelineEntry _entry({
   required int id,
   required String title,
+  String? time,
   String? startTime,
   String? endTime,
   String? category,
+  String? type,
   double? lat,
   double? lng,
 }) {
@@ -101,6 +103,7 @@ TimelineEntry _entry({
     sortOrder: 0,
     title: title,
     version: 1,
+    time: time,
     startTime: startTime,
     endTime: endTime,
     master: (lat == null || lng == null)
@@ -111,6 +114,7 @@ TimelineEntry _entry({
             lat: lat,
             lng: lng,
             category: category,
+            type: type,
           ),
   );
 }
@@ -555,11 +559,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-card-11')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
     nativeController.moves.clear();
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsNothing);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsNothing);
+    expect(find.byKey(const ValueKey('preview-entry-card-21')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
     expect(find.text('美麗海水族館'), findsOneWidget);
@@ -677,6 +688,14 @@ void main() {
           lat: 26.2,
           lng: 127.7,
         ),
+        _entry(
+          id: 42,
+          title: '空白分類餐廳',
+          category: ' ',
+          type: 'restaurant',
+          lat: 26.21,
+          lng: 127.71,
+        ),
       ],
     );
 
@@ -693,6 +712,51 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('sports_activity'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-card-42')),
+        matching: find.text('餐廳'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('POI 卡相容 legacy time，缺少結束時間時不製造假區間', (tester) async {
+    final day = TripDay(
+      id: 5,
+      dayNum: 1,
+      version: 1,
+      timeline: [
+        _entry(id: 51, title: '舊格式時間', time: '07:45', lat: 26.2, lng: 127.7),
+        _entry(
+          id: 52,
+          title: '尚未排定結束',
+          startTime: '08:00',
+          endTime: ' ',
+          lat: 26.21,
+          lng: 127.71,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_buildScreen([day]));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-card-51')),
+        matching: find.text('07:45'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-card-52')),
+        matching: find.text('08:00'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('時間未設定'), findsNothing);
   });
 
   testWidgets('marker 點擊會移動地圖；左右滑卡只更新預覽且不改 active POI', (tester) async {

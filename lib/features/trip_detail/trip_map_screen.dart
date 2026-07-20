@@ -527,11 +527,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     _mapController.move(point, _focusZoom);
   }
 
-  void _selectStop(
-    _MapStop stop, {
-    bool animatePage = false,
-    bool focusMap = true,
-  }) {
+  void _selectStop(_MapStop stop, {bool animatePage = false}) {
     if (_activeEntryId != stop.entry.id ||
         _previewEntryId != stop.entry.id ||
         _selectedGooglePoi != null) {
@@ -555,7 +551,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         );
       }
     }
-    if (focusMap) _focusStop(stop);
+    _focusStop(stop);
   }
 
   void _previewStop(_MapStop stop) {
@@ -871,9 +867,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         : '$startTime–$endTime';
     final isActive = _activeEntryId == stop.entry.id;
     final isPreview = _previewEntryId == stop.entry.id;
+    final category = stop.entry.master?.category?.trim();
     final categoryLabel =
         poiCategoryLabel(
-          stop.entry.master?.category ?? stop.entry.master?.type,
+          category == null || category.isEmpty
+              ? stop.entry.master?.type
+              : category,
         ) ??
         (stop.point == null ? '尚無位置' : '未分類');
     // The drawer itself is the single refractive layer. Keeping POI cards

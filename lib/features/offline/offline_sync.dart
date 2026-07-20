@@ -40,6 +40,7 @@ final offlineSyncControllerProvider =
 
 class OfflineSyncController extends Notifier<AsyncValue<void>> {
   bool? _wasOnline;
+  bool _rerunAfterCurrentSync = false;
 
   @override
   AsyncValue<void> build() => const AsyncData(null);
@@ -54,7 +55,10 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
 
   /// 重播離線佇列;成功有同步則 invalidate 受影響讀取(讓 server 真相上畫面)。
   Future<void> sync() async {
-    if (state.isLoading) return;
+    if (state.isLoading) {
+      _rerunAfterCurrentSync = true;
+      return;
+    }
     state = const AsyncLoading();
     try {
       final result = await ref.read(apiClientProvider).flushQueue();
@@ -77,6 +81,11 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
       state = const AsyncData(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
+    } finally {
+      if (_rerunAfterCurrentSync) {
+        _rerunAfterCurrentSync = false;
+        unawaited(sync());
+      }
     }
   }
 }

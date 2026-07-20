@@ -382,6 +382,18 @@ void main() {
       );
       await tester.pump();
 
+      expect(
+        tester
+            .widgetList<Semantics>(find.byType(Semantics))
+            .any(
+              (widget) =>
+                  widget.properties.customSemanticsActions?.keys.any(
+                    (action) => action.label == '移除收藏',
+                  ) ??
+                  false,
+            ),
+        isTrue,
+      );
       await tester.drag(
         find.byKey(const ValueKey('favorite-dismiss-7')),
         const Offset(-500, 0),

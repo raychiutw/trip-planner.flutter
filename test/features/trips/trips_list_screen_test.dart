@@ -744,7 +744,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.text('刪除'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('刪除'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       verify(

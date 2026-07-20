@@ -310,6 +310,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   for (final favorite in visibleFavorites)
                     SwipeToDelete(
                       dismissKey: ValueKey('favorite-dismiss-${favorite.id}'),
+                      actionLabel: '移除收藏',
                       onDelete: () => _removeFavorite(context, ref, favorite),
                       child: PoiFavoriteCard(
                         favorite: favorite,

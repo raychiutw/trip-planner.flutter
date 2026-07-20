@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,20 @@ import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
+
+class _ControlledApiClient extends ApiClient {
+  _ControlledApiClient() : super(sessionStore: InMemorySessionStore());
+
+  final responses = <Completer<FlushResult>>[];
+  var flushCalls = 0;
+
+  @override
+  Future<FlushResult> flushQueue() {
+    final response = responses[flushCalls];
+    flushCalls++;
+    return response.future;
+  }
+}
 
 void main() {
   late Dio dio;
@@ -110,6 +126,45 @@ void main() {
     }
 
     expect(await cache.readQueue(), isEmpty);
+  });
+
+  test('重連發生在既有同步期間，會在該輪結束後補跑一次', () async {
+    final controlledClient = _ControlledApiClient();
+    final first = Completer<FlushResult>();
+    final second = Completer<FlushResult>();
+    controlledClient.responses.addAll([first, second]);
+    final controlledContainer = ProviderContainer(
+      overrides: [
+        cacheStoreProvider.overrideWithValue(cache),
+        apiClientProvider.overrideWithValue(controlledClient),
+      ],
+    );
+    addTearDown(controlledContainer.dispose);
+    final controller = controlledContainer.read(
+      offlineSyncControllerProvider.notifier,
+    );
+
+    final initialSync = controller.sync();
+    expect(controlledClient.flushCalls, 1);
+
+    controller.handleNetworkAvailability(false);
+    controller.handleNetworkAvailability(true);
+    expect(controlledClient.flushCalls, 1);
+
+    first.complete(FlushResult.empty);
+    await initialSync;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (controlledClient.flushCalls == 2) break;
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(controlledClient.flushCalls, 2);
+
+    second.complete(FlushResult.empty);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      controlledContainer.read(offlineSyncControllerProvider),
+      const AsyncData<void>(null),
+    );
   });
 
   // 衝突真相源改為持久化 conflict store(flushQueue/_tryRebase 寫入,api 層測試覆蓋);

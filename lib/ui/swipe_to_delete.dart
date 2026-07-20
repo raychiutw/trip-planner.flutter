@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../theme/tokens.dart';
 
@@ -13,25 +16,32 @@ class SwipeToDelete extends StatelessWidget {
     required this.dismissKey,
     required this.onDelete,
     required this.child,
+    this.actionLabel = '刪除',
     this.backgroundMargin = EdgeInsets.zero,
   });
 
   final Key dismissKey;
   final Future<void> Function() onDelete;
   final Widget child;
+  final String actionLabel;
   final EdgeInsetsGeometry backgroundMargin;
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: dismissKey,
-      direction: DismissDirection.endToStart,
-      background: _SwipeDeleteBackground(margin: backgroundMargin),
-      confirmDismiss: (_) async {
-        await onDelete();
-        return false;
+    return Semantics(
+      customSemanticsActions: {
+        CustomSemanticsAction(label: actionLabel): () => unawaited(onDelete()),
       },
-      child: child,
+      child: Dismissible(
+        key: dismissKey,
+        direction: DismissDirection.endToStart,
+        background: _SwipeDeleteBackground(margin: backgroundMargin),
+        confirmDismiss: (_) async {
+          await onDelete();
+          return false;
+        },
+        child: child,
+      ),
     );
   }
 }
@@ -49,10 +59,28 @@ class _SwipeDeleteBackground extends StatelessWidget {
       margin: margin,
       padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
       decoration: BoxDecoration(
-        color: scheme.errorContainer,
+        color: scheme.error,
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
       ),
-      child: Icon(CupertinoIcons.delete, color: scheme.onErrorContainer),
+      child: OverflowBox(
+        alignment: Alignment.centerRight,
+        minWidth: 0,
+        maxWidth: double.infinity,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.delete, color: scheme.onError),
+            const SizedBox(width: TpSpacing.s2),
+            Text(
+              '刪除',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: scheme.onError,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
