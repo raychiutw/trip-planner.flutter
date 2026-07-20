@@ -6,11 +6,18 @@
 
 ### 新增
 
+- App 在前景由離線恢復連線時會立即重試既有同步佇列；冷啟動、回前景與手動重試入口維持不變。
+- 行程與收藏列表支援 iOS 慣例的尾端左滑刪除，並保留原本可見操作與收藏六秒復原。
 - 收藏頁加入 HIG S1 即時搜尋、排序／篩選選單與符合文字加深；窄螢幕搭配 200% Dynamic Type 時，新增景點會收進既有更多選單。
 - 原生地圖 smoke 與 release flow 補上 zoom `13`、固定白天地圖、Light／Dark Liquid Glass 與命名畫面證據。
 
 ### 變更
 
+- 單一行程改用 20／15／13pt 內容層級並提供固定返回行程列表；Header command 與 Day selection 不再混在同一控制列。
+- 文字型聊天／行程／收藏使用較實的 navigation material，地圖維持視覺背景材質，避免 Header 前後景文字疊在一起。
+- 收藏搜尋改成與行程一覽一致的常駐搜尋欄；新增停留點改用短模式名稱、單一日期欄位與不折行分類列。
+- 地圖 POI 卡移除停留進度與箭頭，改顯示起訖時間及本地化分類；滑卡只預覽，點卡片或 marker 才移動地圖。
+- Bottom Sheet 依互動語意統一：固定內容不顯示 grabber，只有可調整高度表單顯示。
 - 地圖預設進入、切換行程、切換 Day 與點選 Tripline POI 共用固定 zoom `13`；Google 原生 POI 選取仍不移動鏡頭。
 - Root Header、底部導覽、DAY selector、POI dock 與功能選單統一使用共用 Liquid Glass recipe；PlatformView 上維持呼叫端指定 blur 與亮邊，不再疊加內層玻璃。
 - 行程 Timeline 統一為 D1 `rail｜單一內容欄`，起訖時間固定單行並在空間不足時等比縮小；景點卡與交通列改用中性 surface 加單一 Tripline accent。

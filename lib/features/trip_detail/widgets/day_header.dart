@@ -72,7 +72,7 @@ class DayHeader extends StatelessWidget {
           children: [
             Text(
               'DAY ${day.dayNum.toString().padLeft(2, '0')}',
-              style: theme.textTheme.titleLarge?.copyWith(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
                 color: tones.accent,
@@ -88,7 +88,7 @@ class DayHeader extends StatelessWidget {
                   timeRange,
                   maxLines: 1,
                   softWrap: false,
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
@@ -97,10 +97,10 @@ class DayHeader extends StatelessWidget {
           ],
         ),
         const SizedBox(height: TpSpacing.s1),
-        Text(day.displayTitle, style: theme.textTheme.displaySmall),
+        Text(day.displayTitle, style: theme.textTheme.headlineSmall),
         Text(
           summary,
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w400,
             color: theme.colorScheme.onSurfaceVariant,
             fontFeatures: const [FontFeature.tabularFigures()],

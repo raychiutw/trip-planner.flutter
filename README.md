@@ -7,7 +7,7 @@
 **P0（已完成）**
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
 - 4-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏）— go_router StatefulShellRoute + auth redirect；帳號由各頁右上 avatar 進入
-- 行程清單（中性 grouped surface、pull-to-refresh、長按刪除）
+- 行程清單（中性 grouped surface、pull-to-refresh、尾端左滑刪除，並保留長按操作）
 - 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）

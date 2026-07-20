@@ -1,6 +1,8 @@
 /// 離線同步:重連 / app-resume / 手動觸發 flush 佇列,暴露待同步筆數與衝突清單。
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/cache/cache_store.dart';
@@ -37,12 +39,26 @@ final offlineSyncControllerProvider =
     );
 
 class OfflineSyncController extends Notifier<AsyncValue<void>> {
+  bool? _wasOnline;
+  bool _rerunAfterCurrentSync = false;
+
   @override
   AsyncValue<void> build() => const AsyncData(null);
 
+  /// 平台連線型態從離線恢復時立即重試同步。首次線上事件不重複冷啟動同步。
+  /// [isOnline] 只是重試訊號，不是可上網保證；真正錯誤仍由 [sync] 處理。
+  void handleNetworkAvailability(bool isOnline) {
+    final reconnected = _wasOnline == false && isOnline;
+    _wasOnline = isOnline;
+    if (reconnected) unawaited(sync());
+  }
+
   /// 重播離線佇列;成功有同步則 invalidate 受影響讀取(讓 server 真相上畫面)。
   Future<void> sync() async {
-    if (state.isLoading) return;
+    if (state.isLoading) {
+      _rerunAfterCurrentSync = true;
+      return;
+    }
     state = const AsyncLoading();
     try {
       final result = await ref.read(apiClientProvider).flushQueue();
@@ -65,6 +81,11 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
       state = const AsyncData(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
+    } finally {
+      if (_rerunAfterCurrentSync) {
+        _rerunAfterCurrentSync = false;
+        unawaited(sync());
+      }
     }
   }
 }

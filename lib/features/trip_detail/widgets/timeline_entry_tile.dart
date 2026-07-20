@@ -137,7 +137,7 @@ class _EntryTimeRange extends StatelessWidget {
   Widget build(BuildContext context) {
     if (startTime.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final style = theme.textTheme.headlineSmall?.copyWith(
+    final style = theme.textTheme.bodyLarge?.copyWith(
       fontWeight: FontWeight.w600,
       color: theme.colorScheme.onSurface,
       fontFeatures: const [FontFeature.tabularFigures()],
@@ -247,8 +247,7 @@ class _EntryCard extends StatelessWidget {
             const SizedBox(width: 2),
             Text(
               duration,
-              style: TextStyle(
-                fontSize: 11,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: mutedColor,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
@@ -261,7 +260,10 @@ class _EntryCard extends StatelessWidget {
       final masterName = master.name;
       if (masterName != null && masterName != entry.title) {
         metaItems.add(
-          Text(masterName, style: TextStyle(fontSize: 12, color: mutedColor)),
+          Text(
+            masterName,
+            style: theme.textTheme.bodyMedium?.copyWith(color: mutedColor),
+          ),
         );
       }
       if (master.rating != null) {
@@ -274,8 +276,7 @@ class _EntryCard extends StatelessWidget {
               const SizedBox(width: 2),
               Text(
                 master.rating!.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 11,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: mutedColor,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -305,7 +306,7 @@ class _EntryCard extends StatelessWidget {
         children: [
           Text(
             entry.title,
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: theme.textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
               height: 1.25,
             ),
@@ -325,7 +326,7 @@ class _EntryCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       categoryLabel!,
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w400,
                       ),
@@ -350,7 +351,7 @@ class _EntryCard extends StatelessWidget {
                 entry.description!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleLarge?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: mutedColor,
                   fontWeight: FontWeight.w400,
                 ),

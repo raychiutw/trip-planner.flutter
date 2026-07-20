@@ -178,6 +178,12 @@ void main() {
 
     await tester.tap(find.text('開啟'));
     await tester.pumpAndSettle();
+    final sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.halfSize, 0.62);
+    expect(sheet.fullSize, 0.93);
+    expect(sheet.showDragIndicator, isTrue);
     await tester.enterText(find.byType(TextField), '京都');
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
@@ -301,6 +307,12 @@ void main() {
 
     await tester.tap(find.text('開啟'));
     await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<GlassModalSheetScaffold>(find.byType(GlassModalSheetScaffold))
+          .showDragIndicator,
+      isFalse,
+    );
     await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
     await tester.pumpAndSettle();
 

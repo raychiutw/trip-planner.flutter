@@ -68,6 +68,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuth),
           tripRepositoryProvider.overrideWithValue(mockTrips),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
         ],
         child: const TriplineApp(),
       ),
@@ -120,6 +123,9 @@ void main() {
         overrides: [
           authStateProvider.overrideWith(_LoggedInAuthNotifier.new),
           tripRepositoryProvider.overrideWithValue(mockTrips),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
         ],
         child: const TriplineApp(),
       ),
@@ -135,6 +141,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TripTimelineScreen), findsOneWidget);
     expect(find.text('那霸機場'), findsOneWidget);
+
+    // 單一行程的固定返回動作會回到行程列表。
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-back')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripsListScreen), findsOneWidget);
+
+    // 再次進入行程，接續驗證功能選單流程。
+    await tester.tap(find.text('沖繩家族之旅'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
 
     // 從右上功能選單選筆記 → 筆記頁
     await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));

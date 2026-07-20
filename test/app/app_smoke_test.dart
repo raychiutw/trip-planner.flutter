@@ -33,6 +33,9 @@ void main() {
         overrides: [
           authStateProvider.overrideWith(_FakeAuthNotifier.new),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
         ],
         child: const TriplineApp(),
       ),

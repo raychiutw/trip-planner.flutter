@@ -48,7 +48,10 @@ class AppleRootTabBar extends StatelessWidget {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
     final isDark = theme.brightness == Brightness.dark;
-    final glassSettings = tpNavigationGlassSettings(context);
+    final glassSettings = tpNavigationGlassSettings(
+      context,
+      visualContent: selectedIndex == 2,
+    );
     final selectionTint = isDark
         ? TpColorsDark.navigationSelection
         : TpColorsLight.navigationSelection;

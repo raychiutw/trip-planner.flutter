@@ -1264,7 +1264,9 @@ void main() {
       const Offset(-500, 0),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('刪除'));
+    await tester.tap(
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+    );
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);

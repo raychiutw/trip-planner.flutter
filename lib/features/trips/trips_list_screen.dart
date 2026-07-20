@@ -16,6 +16,7 @@ import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/swipe_to_delete.dart';
 import 'trip_card.dart';
 
 const int _maxTripImportBytes = 512 * 1024;
@@ -544,12 +545,16 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             const SizedBox(height: TpSpacing.s3),
         itemBuilder: (context, index) {
           final trip = trips[index];
-          return TripCard(
-            trip: trip,
-            currentUserId: currentUserId,
-            onTap: () => context.go('/trips/${trip.tripId}'),
-            onLongPress: () => _showTripActions(context, trip),
-            onMorePressed: () => _showTripActions(context, trip),
+          return SwipeToDelete(
+            dismissKey: ValueKey('trip-dismiss-${trip.tripId}'),
+            onDelete: () => _confirmAndDeleteTrip(context, trip),
+            child: TripCard(
+              trip: trip,
+              currentUserId: currentUserId,
+              onTap: () => context.go('/trips/${trip.tripId}'),
+              onLongPress: () => _showTripActions(context, trip),
+              onMorePressed: () => _showTripActions(context, trip),
+            ),
           );
         },
       ),

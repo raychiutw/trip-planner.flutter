@@ -6,6 +6,32 @@ import 'package:tripline/ui/tp_glass_expansion_section.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  testWidgets('navigation glass separates text and visual backdrops', (
+    tester,
+  ) async {
+    LiquidGlassSettings? textBackdrop;
+    LiquidGlassSettings? visualBackdrop;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            textBackdrop = tpNavigationGlassSettings(context);
+            visualBackdrop = tpNavigationGlassSettings(
+              context,
+              visualContent: true,
+            );
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(textBackdrop!.glassColor.a, closeTo(0.90, 0.01));
+    expect(textBackdrop!.backerColor?.a, closeTo(0.90, 0.01));
+    expect(visualBackdrop!.glassColor.a, closeTo(0.58, 0.01));
+    expect(visualBackdrop!.backerColor, isNull);
+  });
+
   testWidgets('navigation glass becomes opaque when contrast is increased', (
     tester,
   ) async {

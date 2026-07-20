@@ -38,12 +38,12 @@ void main() {
       expect(find.text('DAY 03'), findsOneWidget);
       expect(find.text('2026-06-12（週五）'), findsOneWidget);
       expect(find.text('首里城與國際通'), findsNothing);
-      expect(tester.widget<Text>(find.text('DAY 03')).style?.fontSize, 17);
+      expect(tester.widget<Text>(find.text('DAY 03')).style?.fontSize, 13);
       expect(
         tester.widget<Text>(find.text('2026-06-12（週五）')).style?.fontSize,
-        28,
+        20,
       );
-      expect(tester.widget<Text>(find.text('0 個停留點')).style?.fontSize, 17);
+      expect(tester.widget<Text>(find.text('0 個停留點')).style?.fontSize, 13);
     });
 
     testWidgets('date / dayOfWeek 皆 null → 不顯示日期列,title 退回 Day N', (
@@ -171,7 +171,7 @@ void main() {
       expect(find.text('09：00 - 17：00'), findsOneWidget);
       expect(
         tester.widget<Text>(find.text('09：00 - 17：00')).style?.fontSize,
-        17,
+        13,
       );
     });
 

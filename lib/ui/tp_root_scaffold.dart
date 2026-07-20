@@ -8,11 +8,13 @@ import 'tp_glass_surface.dart';
 class TpRootHeaderConfig {
   const TpRootHeaderConfig({
     required this.title,
+    this.leading,
     this.actions = const <Widget>[],
     this.platformViewBackdrop = false,
   });
 
   final Widget title;
+  final Widget? leading;
   final List<Widget> actions;
   final bool platformViewBackdrop;
 }
@@ -91,13 +93,24 @@ class TpRootGlassHeader extends StatelessWidget {
         key: const ValueKey('tp-glass-surface'),
         child: TpGlassSurface(
           platformViewBackdrop: config.platformViewBackdrop,
-          glassSettings: tpNavigationGlassSettings(context),
+          glassSettings: tpNavigationGlassSettings(
+            context,
+            visualContent: config.platformViewBackdrop,
+          ),
           borderRadius: const BorderRadius.all(Radius.circular(32)),
           padding: const EdgeInsets.symmetric(
             horizontal: TpRootGeometry.headerContentInset,
           ),
           child: Row(
             children: [
+              if (config.leading != null) ...[
+                SizedBox.square(
+                  key: const ValueKey('tp-root-header-leading'),
+                  dimension: TpSpacing.tapMin,
+                  child: config.leading,
+                ),
+                const SizedBox(width: TpSpacing.s2),
+              ],
               Expanded(
                 child: Align(
                   alignment: Alignment.centerLeft,

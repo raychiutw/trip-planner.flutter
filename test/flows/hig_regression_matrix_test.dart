@@ -103,7 +103,9 @@ void main() {
       final fallbackAlpha = headerGlass.settings!.platformViewFallbackColor!.a;
       expect(
         fallbackAlpha,
-        state.reduceTransparency ? greaterThanOrEqualTo(0.95) : lessThan(0.8),
+        state.reduceTransparency
+            ? greaterThanOrEqualTo(0.95)
+            : closeTo(state.brightness == Brightness.dark ? 0.88 : 0.90, 0.01),
       );
 
       await tester.fling(
@@ -192,12 +194,6 @@ class _MatrixSceneState extends State<_MatrixScene> {
                     value: _day,
                     options: const [
                       TpScopeOption(
-                        value: 0,
-                        label: '地圖',
-                        icon: CupertinoIcons.map,
-                        isAction: true,
-                      ),
-                      TpScopeOption(
                         value: 1,
                         label: 'DAY 1',
                         key: ValueKey('day-1-option'),
@@ -209,9 +205,7 @@ class _MatrixSceneState extends State<_MatrixScene> {
                       ),
                       TpScopeOption(value: 3, label: 'DAY 3'),
                     ],
-                    onSelected: (value) {
-                      if (value > 0) setState(() => _day = value);
-                    },
+                    onSelected: (value) => setState(() => _day = value),
                   ),
                   const SizedBox(height: 16),
                   for (var index = 0; index < 12; index++)

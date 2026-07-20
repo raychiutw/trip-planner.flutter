@@ -189,6 +189,25 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
+## 2026-07-20 HIG／offline／restore implementation verification
+
+The 2026-07-20 App implementation completed the HIG navigation, typography,
+search, swipe-delete, sheet semantics, map POI interaction, and reconnect-sync
+tasks. Local verification used Flutter 3.44.6:
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Dart formatting and analyzer | PASS | All changed Dart files formatted; analyzer reported 0 issues |
+| Product Flutter suite | PASS | 1,284 tests across API, app, features, flows, models, platform, theme, and UI |
+| Android native compile | PASS | `flutter build apk --debug` produced `app-debug.apk` |
+| Favorite restore App wiring | PASS | `POST /poi-favorites/{id}/restore`; release builds enable `FAVORITE_RESTORE_ENABLED=true` |
+| Real staging restore contract | BLOCKED | The protected `mobile-release` environment has no real staging secrets or variables, and the reviewed allowlist contains only the reserved `.test` fixture |
+
+The two Bash-based workflow test files are not a Windows/MSYS verification
+surface because Dart-launched Git Bash does not preserve their POSIX path and
+environment assumptions. They remain mandatory Linux CI gates. Do not interpret
+this host limitation as staging contract evidence.
+
 ## 2026-07-20 store release record
 
 Source SHA `e4ebcb5f60ce0eaaa9b397683d793da0e3b8eb96` was released from one approved `release_target=both` dispatch. Workflow run [29699386889](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29699386889) used run number `92`, attempt `1`, and the shared build-number formula to produce iOS and Android build `9201` for version `0.9.1`.
