@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,6 +91,8 @@ TimelineEntry _entry({
   required int id,
   required String title,
   String? startTime,
+  String? endTime,
+  String? category,
   double? lat,
   double? lng,
 }) {
@@ -99,9 +102,16 @@ TimelineEntry _entry({
     title: title,
     version: 1,
     startTime: startTime,
+    endTime: endTime,
     master: (lat == null || lng == null)
         ? null
-        : EntryPoiInfo(poiId: id * 10, name: title, lat: lat, lng: lng),
+        : EntryPoiInfo(
+            poiId: id * 10,
+            name: title,
+            lat: lat,
+            lng: lng,
+            category: category,
+          ),
   );
 }
 
@@ -111,7 +121,15 @@ final _dayOne = TripDay(
   date: '2026-04-01',
   version: 1,
   timeline: [
-    _entry(id: 11, title: '首里城', startTime: '09:00', lat: 26.217, lng: 127.719),
+    _entry(
+      id: 11,
+      title: '首里城',
+      startTime: '09:00',
+      endTime: '10:30',
+      category: '景點',
+      lat: 26.217,
+      lng: 127.719,
+    ),
     _entry(id: 12, title: '國際通', startTime: '11:30', lat: 26.214, lng: 127.688),
     // 無座標 entry：不應產生 pin 與 entry card。
     _entry(id: 13, title: '自由活動', startTime: '14:00'),
@@ -258,7 +276,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PageView), findsOneWidget);
-    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
   });
 
   testWidgets('空白地圖與 Tripline marker 還原原頁且 marker 維持 zoom 13', (tester) async {
@@ -386,7 +404,7 @@ void main() {
     expect(find.byType(PageView), findsOneWidget);
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.scrollDirection, Axis.horizontal);
-    expect(pageView.controller!.viewportFraction, 0.80);
+    expect(pageView.controller!.viewportFraction, 0.74);
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
       TpBottomAccessory.height,
@@ -439,7 +457,7 @@ void main() {
     );
   });
 
-  testWidgets('相鄰 POI 露出相同中性底色，提示可左右滑動', (tester) async {
+  testWidgets('縮短 POI 卡並露出相鄰卡，提示可左右滑動', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -454,10 +472,10 @@ void main() {
     final neighborRect = tester.getRect(neighbor);
     expect(neighborRect.left, lessThan(drawer.right));
     expect(neighborRect.right, greaterThan(drawer.right));
-    expect(
-      (drawer.right - neighborRect.left) / currentRect.width,
-      closeTo(0.25, 0.03),
-    );
+    final visibleNeighborRatio =
+        (drawer.right - neighborRect.left) / currentRect.width;
+    expect(visibleNeighborRatio, greaterThan(0.30));
+    expect(visibleNeighborRatio, lessThan(0.40));
 
     expect(
       find.descendant(of: neighbor, matching: find.byType(BackdropFilter)),
@@ -623,31 +641,96 @@ void main() {
     expect(nativeController.moves.single.zoom, 13);
   });
 
-  testWidgets('marker 點擊與左右滑卡共用 active POI', (tester) async {
+  testWidgets('POI 卡顯示起訖時間與獨立分類，不顯示停留進度與箭頭', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const ValueKey('entry-card-11'));
+    expect(
+      find.descendant(of: card, matching: find.text('09:00–10:30')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('景點')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('停留 1 /'), findsNothing);
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.byIcon(CupertinoIcons.arrow_right),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('POI 卡將原始分類本地化，缺少時間時顯示明確狀態', (tester) async {
+    final day = TripDay(
+      id: 4,
+      dayNum: 1,
+      version: 1,
+      timeline: [
+        _entry(
+          id: 41,
+          title: '海上活動',
+          category: 'sports_activity',
+          lat: 26.2,
+          lng: 127.7,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_buildScreen([day]));
+    await tester.pumpAndSettle();
+
+    final card = find.byKey(const ValueKey('entry-card-41'));
+    expect(
+      find.descendant(of: card, matching: find.text('時間未設定')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('運動活動')),
+      findsOneWidget,
+    );
+    expect(find.text('sports_activity'), findsNothing);
+  });
+
+  testWidgets('marker 點擊會移動地圖；左右滑卡只更新預覽且不改 active POI', (tester) async {
     TripMapCanvasConfig? mapConfig;
+    final nativeController = _FakeTripMapPlatformController();
+    var attached = false;
     await tester.pumpWidget(
-      _buildScreen([
-        _dayOne,
-        _dayTwo,
-      ], onMapConfig: (config) => mapConfig = config),
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        onMapConfig: (config) {
+          mapConfig = config;
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
     );
     await tester.pumpAndSettle();
+    nativeController.moves.clear();
 
     await tester.tap(find.byKey(const ValueKey('map-pin-12')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
     expect(tester.widget<PageView>(find.byType(PageView)).controller!.page, 1);
+    expect(nativeController.moves, hasLength(1));
+    nativeController.moves.clear();
 
     await tester.drag(find.byType(PageView), const Offset(700, 0));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+    expect(nativeController.moves, isEmpty);
     final first = mapConfig!.markers.singleWhere(
       (marker) => marker.id == 'map-pin-11',
     );
     final second = mapConfig!.markers.singleWhere(
       (marker) => marker.id == 'map-pin-12',
     );
-    expect(first.zIndex, greaterThan(second.zIndex));
+    expect(second.zIndex, greaterThan(first.zIndex));
   });
 
   testWidgets('無座標 POI 仍可透過水平滑動到達', (tester) async {
@@ -659,7 +742,7 @@ void main() {
     await tester.drag(find.byType(PageView), const Offset(-700, 0));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-13')), findsOneWidget);
     expect(find.text('自由活動'), findsOneWidget);
     expect(find.textContaining('尚無位置'), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-13')), findsNothing);
@@ -737,7 +820,7 @@ void main() {
 
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
-      144,
+      closeTo(112.5, 0.01),
     );
     final selector = tester.getRect(
       find.byKey(const ValueKey('trip-map-day-selector')),
@@ -761,7 +844,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byKey(const ValueKey('active-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
   });
 
   testWidgets('長行程 page indicator 不會水平溢出', (tester) async {
@@ -872,7 +955,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
-    expect(find.byKey(const ValueKey('active-entry-card-31')), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-31')), findsOneWidget);
     expect(find.text('自由活動'), findsOneWidget);
     expect(find.textContaining('尚無位置'), findsOneWidget);
   });

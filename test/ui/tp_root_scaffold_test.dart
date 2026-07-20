@@ -30,6 +30,37 @@ TpRootScaffold _root({int actionCount = 0, Widget? body}) {
 }
 
 void main() {
+  testWidgets('root header supports a standard leading navigation action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        TpRootScaffold(
+          header: TpRootHeaderConfig(
+            leading: TpToolbarIconButton(
+              key: const ValueKey('root-leading'),
+              icon: Icons.chevron_left,
+              tooltip: '返回',
+              onPressed: () {},
+            ),
+            title: const Text('單一行程'),
+          ),
+          body: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('root-leading')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('root-leading'))),
+      const Size(44, 44),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('tp-root-header-title'))).dx,
+      greaterThan(60),
+    );
+  });
+
   testWidgets(
     'root scroll dismisses the keyboard when results start scrolling',
     (tester) async {

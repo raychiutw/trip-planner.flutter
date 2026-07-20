@@ -407,12 +407,12 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                                 ButtonSegment(
                                   value: EntryAddMode.search,
                                   icon: Icon(Icons.search),
-                                  label: Text('搜尋景點'),
+                                  label: Text('搜尋'),
                                 ),
                                 ButtonSegment(
                                   value: EntryAddMode.favorites,
                                   icon: Icon(Icons.favorite_border),
-                                  label: Text('收藏景點'),
+                                  label: Text('收藏'),
                                 ),
                                 ButtonSegment(
                                   value: EntryAddMode.custom,
@@ -796,18 +796,23 @@ class _EntryAddCategoryFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: TpSpacing.s2,
-      runSpacing: TpSpacing.s2,
-      children: [
-        for (final (category, label) in _entryAddCategoryChips)
-          FilterChip(
+    return SizedBox(
+      height: TpSpacing.tapMin,
+      child: ListView.separated(
+        key: const ValueKey('entry-add-category-list'),
+        scrollDirection: Axis.horizontal,
+        itemCount: _entryAddCategoryChips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: TpSpacing.s2),
+        itemBuilder: (context, index) {
+          final (category, label) = _entryAddCategoryChips[index];
+          return FilterChip(
             key: ValueKey('entry-add-category-${category.name}'),
             selected: selected == category,
             onSelected: (_) => onSelected(category),
             label: Text(label),
-          ),
-      ],
+          );
+        },
+      ),
     );
   }
 }
@@ -825,18 +830,43 @@ class _DayPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: TpSpacing.s2,
-      runSpacing: TpSpacing.s2,
-      children: [
-        for (final day in days)
-          FilterChip(
-            key: ValueKey('entry-add-day-${day.dayNum}'),
-            selected: day.dayNum == selectedDayNum,
-            onSelected: (_) => onSelected(day.dayNum),
-            label: Text(_dayLabel(day)),
+    final selectedDay = days.firstWhere(
+      (day) => day.dayNum == selectedDayNum,
+      orElse: () => days.first,
+    );
+    return OutlinedButton(
+      key: const ValueKey('entry-add-day-picker'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(56),
+        padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+        alignment: Alignment.centerLeft,
+      ),
+      onPressed: () async {
+        final selected = await showAppSelectionSheet<int>(
+          context,
+          title: '選擇日期',
+          builder: (sheetContext, select) => ListView(
+            children: [
+              for (final day in days)
+                ListTile(
+                  key: ValueKey('entry-add-day-${day.dayNum}'),
+                  title: Text(_dayLabel(day)),
+                  trailing: day.dayNum == selectedDayNum
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () => select(day.dayNum),
+                ),
+            ],
           ),
-      ],
+        );
+        if (selected != null && context.mounted) onSelected(selected);
+      },
+      child: Row(
+        children: [
+          Expanded(child: Text(_dayLabel(selectedDay))),
+          const Icon(Icons.keyboard_arrow_down),
+        ],
+      ),
     );
   }
 }

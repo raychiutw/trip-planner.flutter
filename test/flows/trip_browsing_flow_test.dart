@@ -68,6 +68,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuth),
           tripRepositoryProvider.overrideWithValue(mockTrips),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
         ],
         child: const TriplineApp(),
       ),
@@ -120,6 +123,9 @@ void main() {
         overrides: [
           authStateProvider.overrideWith(_LoggedInAuthNotifier.new),
           tripRepositoryProvider.overrideWithValue(mockTrips),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
         ],
         child: const TriplineApp(),
       ),

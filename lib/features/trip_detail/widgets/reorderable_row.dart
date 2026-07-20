@@ -1,8 +1,8 @@
-/// trip_detail 共用的「可拖曳排序 + 左滑刪除」row 元件（timeline entry 與 notes 共用）。
+/// trip_detail 共用的可拖曳排序 row 元件（timeline entry 與 notes 共用）。
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/adaptive.dart';
@@ -35,26 +35,6 @@ Future<void> confirmAndDelete(
   } on Exception {
     if (!context.mounted) return;
     showAppError(context, '刪除失敗，請稍後再試');
-  }
-}
-
-/// 左滑刪除的紅底背景（errorContainer + 刪除 icon）。
-class ReorderDeleteBackground extends StatelessWidget {
-  const ReorderDeleteBackground({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      alignment: Alignment.centerRight,
-      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-      ),
-      child: Icon(CupertinoIcons.delete, color: scheme.onErrorContainer),
-    );
   }
 }
 
@@ -169,36 +149,6 @@ class TpInlineEditControlVisual extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(22)),
       ),
       child: Icon(icon, size: 20, color: primary),
-    );
-  }
-}
-
-/// 左滑刪除外殼:Dismissible(endToStart) + 紅底背景。確認/刪除交給 [onDelete],
-/// 一律 return false（靠 provider invalidate 重抓移除,避免與資料源雙重移除）。
-class SwipeToDelete extends StatelessWidget {
-  const SwipeToDelete({
-    super.key,
-    required this.dismissKey,
-    required this.onDelete,
-    required this.child,
-  });
-
-  /// Dismissible 的 key（測試探針:entry-dismiss-* / note-dismiss-*）。
-  final Key dismissKey;
-  final Future<void> Function() onDelete;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dismissible(
-      key: dismissKey,
-      direction: DismissDirection.endToStart,
-      background: const ReorderDeleteBackground(),
-      confirmDismiss: (_) async {
-        await onDelete();
-        return false;
-      },
-      child: child,
     );
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:ui' show Tristate;
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -315,13 +313,6 @@ void main() {
               value: selected,
               options: const [
                 TpScopeOption(
-                  value: -1,
-                  label: '地圖',
-                  icon: CupertinoIcons.map,
-                  isAction: true,
-                  key: ValueKey('day-map'),
-                ),
-                TpScopeOption(
                   value: 0,
                   label: '總覽',
                   key: ValueKey('day-overview'),
@@ -350,18 +341,7 @@ void main() {
       expect(tester.getSize(selector).height, TpSpacing.tapMin);
       expect(find.text('DAY 01'), findsOneWidget);
       expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
-      expect(
-        find.byKey(const ValueKey('tp-selector-divider-0')),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .getSemantics(find.bySemanticsLabel('地圖'))
-            .getSemanticsData()
-            .flagsCollection
-            .isSelected,
-        Tristate.isFalse,
-      );
+      expect(find.byKey(const ValueKey('tp-selector-divider-0')), findsNothing);
       await tester.tap(find.bySemanticsLabel('DAY 01'));
       expect(selected, 1);
     },
@@ -411,7 +391,10 @@ void main() {
       final map = trackFor('map-navigation-selector');
       expect(standard.platformViewBackdrop, isFalse);
       expect(map.platformViewBackdrop, isTrue);
-      expect(map.settings?.glassColor, standard.settings?.glassColor);
+      expect(
+        map.settings?.glassColor.a,
+        lessThan(standard.settings!.glassColor.a),
+      );
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
@@ -474,50 +457,25 @@ void main() {
     expect(selected.right, lessThanOrEqualTo(selector.right));
   });
 
-  testWidgets('TpHorizontalSelector 只捲動 DAY，跨頁 action 永遠固定在左側', (tester) async {
-    tester.view.physicalSize = const Size(360, 400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
+  testWidgets('TpHorizontalSelector rejects cross-page actions', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       app(
         Scaffold(
           body: TpHorizontalSelector<int>(
-            key: const ValueKey('fixed-action-selector'),
-            value: 8,
-            options: [
-              const TpScopeOption(
-                value: -1,
-                label: '行程',
-                icon: CupertinoIcons.calendar,
-                isAction: true,
-                key: ValueKey('fixed-action'),
-              ),
-              for (var day = 0; day < 10; day++)
-                TpScopeOption(
-                  value: day,
-                  label: day == 0
-                      ? '總覽'
-                      : 'DAY ${day.toString().padLeft(2, '0')}',
-                  key: ValueKey('fixed-day-$day'),
-                ),
+            value: 1,
+            options: const [
+              TpScopeOption(value: -1, label: '行程', isAction: true),
+              TpScopeOption(value: 1, label: 'DAY 1'),
             ],
             onSelected: (_) {},
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
 
-    final selector = tester.getRect(
-      find.byKey(const ValueKey('fixed-action-selector')),
-    );
-    final action = tester.getRect(find.byKey(const ValueKey('fixed-action')));
-    final selected = tester.getRect(find.byKey(const ValueKey('fixed-day-8')));
-    expect(action.left, selector.left);
-    expect(action.right, lessThan(selected.left));
-    expect(selected.right, lessThanOrEqualTo(selector.right));
+    expect(tester.takeException(), isAssertionError);
   });
 
   testWidgets('深色日期 selector 使用 Liquid Glass 暖褐 thumb，不使用金色實心底', (

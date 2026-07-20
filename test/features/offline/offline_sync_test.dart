@@ -89,6 +89,29 @@ void main() {
     expect(await currentCount(), 0);
   });
 
+  test('前景由離線恢復連線時自動同步，首次線上事件不重複冷啟動同步', () async {
+    await cache.appendMutation(mut('reconnect'));
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (server) => server.reply(200, {'ok': true}),
+      data: Matchers.any,
+    );
+    final controller = container.read(offlineSyncControllerProvider.notifier);
+
+    controller.handleNetworkAvailability(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(await cache.readQueue(), hasLength(1));
+
+    controller.handleNetworkAvailability(false);
+    controller.handleNetworkAvailability(true);
+    for (var attempt = 0; attempt < 20; attempt++) {
+      if ((await cache.readQueue()).isEmpty) break;
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    expect(await cache.readQueue(), isEmpty);
+  });
+
   // 衝突真相源改為持久化 conflict store(flushQueue/_tryRebase 寫入,api 層測試覆蓋);
   // 此處驗證 syncConflictRecordsProvider 反應式反映 store 內容與變動。
   test('syncConflictRecordsProvider 反映 conflict store 並反應式更新', () async {

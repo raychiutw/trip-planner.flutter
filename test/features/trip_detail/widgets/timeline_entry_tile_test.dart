@@ -298,8 +298,8 @@ void main() {
       final range = tester.widget<Text>(find.text('20：50 - 21：50'));
       expect(range.maxLines, 1);
       expect(range.softWrap, isFalse);
-      expect(range.style?.fontSize, 20);
-      expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 22);
+      expect(range.style?.fontSize, 15);
+      expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 15);
       expect(kTimelineRailWidth, 32);
       expect(
         find.byKey(const ValueKey('timeline-entry-d1-43')),

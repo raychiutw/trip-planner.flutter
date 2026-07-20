@@ -117,6 +117,22 @@ void main() {
     () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
   );
 
+  testWidgets('320pt / 200% 字級仍完整顯示取消', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+
+    await tester.pumpWidget(_buildScreen(_MockTripRepository()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('取'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('送出自訂停留點會使用 query day 並回行程頁', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -143,6 +159,11 @@ void main() {
     expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('搜尋'), findsOneWidget);
+    expect(find.text('收藏'), findsOneWidget);
+    expect(find.text('搜尋景點'), findsNothing);
+    expect(find.text('收藏景點'), findsNothing);
+    expect(find.byKey(const ValueKey('entry-add-category-list')), findsNothing);
 
     await tester.enterText(
       find.byKey(const ValueKey('entry-edit-title')),
@@ -199,8 +220,11 @@ void main() {
     await tester.pumpWidget(_buildScreen(repo, initialDayNum: 1));
     await tester.pumpAndSettle();
 
+    expect(find.byType(FilterChip), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('entry-add-day-picker')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-add-day-2')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('entry-edit-title')),
       '晚餐',
@@ -286,6 +310,11 @@ void main() {
       _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
     );
     await tester.pumpAndSettle();
+
+    final categoryList = tester.widget<ListView>(
+      find.byKey(const ValueKey('entry-add-category-list')),
+    );
+    expect(categoryList.scrollDirection, Axis.horizontal);
 
     await tester.enterText(
       find.byKey(const ValueKey('entry-add-search-field')),
@@ -822,7 +851,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('收藏景點'), findsWidgets);
+    expect(find.text('收藏'), findsOneWidget);
+    expect(find.text('收藏景點'), findsNothing);
     expect(find.text('首里城'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
     await tester.pump();

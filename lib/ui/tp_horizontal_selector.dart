@@ -6,11 +6,7 @@ import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
 
-/// 行程／地圖頁共用的一階切換器。
-///
-/// 跨頁動作、分隔線和 DAY 選擇都位於同一個 Liquid Glass 膠囊內；只有
-/// selected DAY 使用第二個小型 glass thumb。這和定版 mockup 的「攤平一階」
-/// 結構一致，也避免兩個相鄰膠囊在地圖上形成不連續的白色區塊。
+/// 行程／地圖頁共用的同層選擇器；跨頁動作應放在頁首工具列。
 class TpHorizontalSelector<T> extends StatefulWidget {
   const TpHorizontalSelector({
     super.key,
@@ -66,7 +62,6 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       var center = 0.0;
       var found = false;
       for (final option in widget.options) {
-        if (option.isAction) continue;
         final width = _optionWidth(option);
         if (option.value == widget.value) {
           center += width / 2;
@@ -92,10 +87,17 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      widget.options.every((option) => !option.isAction),
+      'TpHorizontalSelector only accepts selection options.',
+    );
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final tones = theme.extension<TpTones>()!;
-    final trackSettings = tpNavigationGlassSettings(context);
+    final trackSettings = tpNavigationGlassSettings(
+      context,
+      visualContent: widget.platformViewBackdrop,
+    );
     final selectedColor = isDark
         ? TpColorsDark.navigationSelection
         : TpColorsLight.navigationSelection;
@@ -103,13 +105,6 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       glassColor: selectedColor,
       platformViewFallbackColor: selectedColor,
     );
-    final actionOptions = widget.options
-        .where((option) => option.isAction)
-        .toList(growable: false);
-    final tabOptions = widget.options
-        .where((option) => !option.isAction)
-        .toList(growable: false);
-
     return SizedBox(
       height: TpSpacing.tapMin,
       child: GlassContainer(
@@ -124,52 +119,25 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
           ),
         ),
         settings: trackSettings,
-        child: Row(
-          children: [
-            for (final option in actionOptions)
-              _SelectorOption<T>(
-                option: option,
-                selected: false,
-                width: _optionWidth(option),
-                selectedSettings: selectedSettings,
-                accentColor: tones.accentDeep,
-                onTap: () => widget.onSelected(option.value),
-              ),
-            if (actionOptions.isNotEmpty && tabOptions.isNotEmpty)
-              Container(
-                key: const ValueKey('tp-selector-divider-0'),
-                width: 1,
-                height: 18,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
-              ),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _controller,
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final option in tabOptions)
-                      _SelectorOption<T>(
-                        option: option,
-                        selected: option.value == widget.value,
-                        width: _optionWidth(option),
-                        selectedSettings: selectedSettings,
-                        accentColor: tones.accentDeep,
-                        onTap: () => widget.onSelected(option.value),
-                      ),
-                  ],
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final option in widget.options)
+                _SelectorOption<T>(
+                  option: option,
+                  selected: option.value == widget.value,
+                  width: _optionWidth(option),
+                  selectedSettings: selectedSettings,
+                  accentColor: tones.accentDeep,
+                  onTap: () => widget.onSelected(option.value),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  double _actionWidth(TpScopeOption<T> option) {
-    final iconWidth = option.icon == null ? 0 : 20;
-    return 24 + iconWidth + option.label.characters.length * 13;
   }
 
   double _optionWidth(TpScopeOption<T> option) {
@@ -177,10 +145,9 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       1.0,
       2.0,
     );
-    final baseWidth = option.isAction
-        ? _actionWidth(option)
-        : (_tabWidth + (option.label.characters.length - 5).clamp(0, 4) * 10)
-              .toDouble();
+    final baseWidth =
+        (_tabWidth + (option.label.characters.length - 5).clamp(0, 4) * 10)
+            .toDouble();
     return baseWidth * textScale;
   }
 }
@@ -205,9 +172,7 @@ class _SelectorOption<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = selected || option.isAction
-        ? accentColor
-        : theme.colorScheme.onSurfaceVariant;
+    final color = selected ? accentColor : theme.colorScheme.onSurfaceVariant;
     return Semantics(
       key: option.key,
       button: true,

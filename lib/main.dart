@@ -1,6 +1,9 @@
 /// Tripline app 進入點。
 library;
 
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +20,14 @@ import 'theme/app_theme.dart';
 
 /// 現階段所有產品文案均為繁體中文；新增語系前須先完成整套字串在地化。
 const kSupportedLocales = [Locale('zh', 'TW')];
+
+/// App-level retry signal. Widget/integration tests override this with an empty
+/// stream so they never depend on a registered platform plugin.
+final appNetworkAvailabilityProvider = Provider<Stream<bool>>(
+  (ref) => Connectivity().onConnectivityChanged.map(
+    (results) => results.any((result) => result != ConnectivityResult.none),
+  ),
+);
 
 const _triplineGlassTheme = GlassThemeData(
   light: GlassThemeVariant(
@@ -93,10 +104,19 @@ class TriplineApp extends ConsumerStatefulWidget {
 
 class _TriplineAppState extends ConsumerState<TriplineApp> {
   late final AppLifecycleListener _lifecycle;
+  late final StreamSubscription<bool> _connectivity;
 
   @override
   void initState() {
     super.initState();
+    _connectivity = ref
+        .read(appNetworkAvailabilityProvider)
+        .listen(
+          (isOnline) => ref
+              .read(offlineSyncControllerProvider.notifier)
+              .handleNetworkAvailability(isOnline),
+          onError: (_) {},
+        );
     _lifecycle = AppLifecycleListener(onResume: _syncOffline);
     // 冷啟動時也排空上次離線殘留的佇列。
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncOffline());
@@ -107,6 +127,7 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
 
   @override
   void dispose() {
+    unawaited(_connectivity.cancel());
     _lifecycle.dispose();
     super.dispose();
   }

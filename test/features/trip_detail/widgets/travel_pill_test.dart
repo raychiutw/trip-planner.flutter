@@ -67,7 +67,7 @@ void main() {
         tester.getSize(find.byIcon(Icons.directions_walk)),
         const Size(17, 17),
       );
-      expect(tester.widget<Text>(find.text('12 分鐘')).style?.fontSize, 17);
+      expect(tester.widget<Text>(find.text('12 分鐘')).style?.fontSize, 13);
     });
 
     testWidgets('無 min 有 desc → desc', (tester) async {

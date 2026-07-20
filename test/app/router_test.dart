@@ -144,6 +144,7 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
+      appNetworkAvailabilityProvider.overrideWithValue(const Stream.empty()),
     ],
   );
   return container;
@@ -671,13 +672,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
-    expect(find.text('搜尋景點'), findsWidgets);
+    expect(find.text('搜尋'), findsOneWidget);
 
     container.read(appRouterProvider).go('/trip/trip-1/add-stop?day=1');
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
-    expect(find.text('搜尋景點'), findsWidgets);
+    expect(find.text('搜尋'), findsOneWidget);
 
     container
         .read(appRouterProvider)
@@ -695,7 +696,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
-    expect(find.text('收藏景點'), findsWidgets);
+    expect(find.text('收藏'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -775,7 +776,7 @@ void main() {
     expect(find.byType(AppleRootTabBar), findsOneWidget);
   });
 
-  testWidgets('行程 selector 切到地圖 root branch 並保留 DAY', (tester) async {
+  testWidgets('行程工具列切到地圖 root branch 並保留 DAY', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
 

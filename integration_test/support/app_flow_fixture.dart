@@ -201,6 +201,7 @@ class AppFlowFixture {
       mapRepositoryProvider.overrideWithValue(map),
       settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
+      appNetworkAvailabilityProvider.overrideWithValue(const Stream.empty()),
     ],
     child: const TriplineApp(),
   );
@@ -395,8 +396,6 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.text('美麗海水族館'), findsOneWidget);
   await captureState('favorites');
-  await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
-  await tester.pump();
   await tester.enterText(
     find.byKey(const ValueKey('favorites-search-input')),
     '牧志',
@@ -404,7 +403,10 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pump();
   expect(find.text('暖暮拉麵'), findsOneWidget);
   expect(find.text('美麗海水族館'), findsNothing);
-  await tester.tap(find.byKey(const ValueKey('favorites-search-cancel')));
+  await tester.enterText(
+    find.byKey(const ValueKey('favorites-search-input')),
+    '',
+  );
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
   await tester.pumpAndSettle();

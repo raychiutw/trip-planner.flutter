@@ -190,6 +190,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'performing_arts_theater': '劇場',
   'karaoke': 'KTV',
   'sports_complex': '運動中心',
+  'sports_activity': '運動活動',
   'swimming_pool': '游泳池',
   'ski_resort': '滑雪場',
   'golf_course': '高爾夫球場',

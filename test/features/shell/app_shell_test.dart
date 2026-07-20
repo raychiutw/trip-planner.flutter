@@ -119,7 +119,7 @@ void main() {
       expect(glass.selectedIconColor, TpColorsDark.accentDeep);
     });
 
-    testWidgets('root branches keep one navigation glass recipe', (
+    testWidgets('root branches use text glass except the visual map branch', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -147,7 +147,10 @@ void main() {
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
-      expect(map.settings?.glassColor, standard.settings?.glassColor);
+      expect(
+        map.settings?.glassColor.a,
+        lessThan(standard.settings!.glassColor.a),
+      );
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);

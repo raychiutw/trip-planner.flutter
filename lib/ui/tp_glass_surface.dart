@@ -3,11 +3,18 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
 
-LiquidGlassSettings tpNavigationGlassSettings(BuildContext context) {
+LiquidGlassSettings tpNavigationGlassSettings(
+  BuildContext context, {
+  bool visualContent = false,
+}) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
+  final baseColor = isDark ? TpColorsDark.secondary : TpColorsLight.background;
+  final tint = baseColor.withValues(
+    alpha: visualContent ? (isDark ? 0.68 : 0.58) : (isDark ? 0.88 : 0.90),
+  );
   final settings = LiquidGlassSettings(
-    glassColor: (isDark ? TpColorsDark.secondary : TpColorsLight.background)
-        .withValues(alpha: isDark ? 0.68 : 0.58),
+    glassColor: tint,
+    backerColor: visualContent ? null : tint,
     thickness: 16,
     blur: 16,
     chromaticAberration: 0,
@@ -16,10 +23,7 @@ LiquidGlassSettings tpNavigationGlassSettings(BuildContext context) {
     refractiveIndex: 1.06,
     saturation: 1.02,
     standardOpacityMultiplier: 1,
-    platformViewFallbackColor:
-        (isDark ? TpColorsDark.secondary : TpColorsLight.background).withValues(
-          alpha: isDark ? 0.68 : 0.58,
-        ),
+    platformViewFallbackColor: tint,
   );
   if (!MediaQuery.highContrastOf(context)) return settings;
   final opaqueColor =

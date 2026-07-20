@@ -75,7 +75,7 @@ void main() {
       if (source.contains(
         "package:google_navigation_flutter/google_navigation_flutter.dart",
       )) {
-        mapSdkOwners.add(entity.path);
+        mapSdkOwners.add(entity.path.replaceAll('\\', '/'));
       }
     }
 
@@ -99,11 +99,11 @@ void main() {
       'lib/ui/tp_root_scaffold.dart',
     ];
 
-    expect(appBar, contains('tpNavigationGlassSettings(context)'));
+    expect(appBar, contains('tpNavigationGlassSettings('));
     expect(appBar, isNot(contains('tpToolbarGlassSettings')));
     for (final path in consumers) {
       final source = File(path).readAsStringSync();
-      expect(source, contains('tpNavigationGlassSettings(context)'));
+      expect(source, contains('tpNavigationGlassSettings('));
       expect(source, isNot(contains('LiquidGlassSettings(')));
     }
   });

@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_glass_expansion_section.dart';
+import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
@@ -593,6 +594,7 @@ class _NoteRowTile extends StatelessWidget {
     return SwipeToDelete(
       dismissKey: ValueKey('note-dismiss-${section.name}-${row.id}'),
       onDelete: onDelete,
+      backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s3),
       child: Row(
         children: [
           Expanded(

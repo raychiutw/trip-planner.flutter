@@ -719,6 +719,39 @@ void main() {
       expect(find.text('health:okinawa-trip-2026'), findsOneWidget);
     });
 
+    testWidgets('左滑行程卡 → AlertDialog 確認 → 呼叫 deleteTrip', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(() => mockTripRepository.deleteTrip(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.drag(
+        find.byKey(const ValueKey('trip-dismiss-okinawa-trip-2026')),
+        const Offset(-600, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('刪除'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).called(1);
+    });
+
     testWidgets(
       '長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
       (tester) async {

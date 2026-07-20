@@ -112,7 +112,7 @@ void main() {
       expect(find.byType(Checkbox), findsNothing);
       expect(
         find.byKey(const ValueKey('favorites-search-action')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('favorites-sort-action')),
@@ -124,7 +124,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('favorites-search-input')),
-        findsNothing,
+        findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('account-avatar-button')),
@@ -150,6 +150,10 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('favorites-search-action')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-search-input')),
         findsOneWidget,
       );
       expect(
@@ -182,18 +186,17 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
-      await tester.pump();
-
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
       expect(searchInput, findsOneWidget);
-      expect(find.text('收藏'), findsNothing);
-      expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
+      expect(find.text('收藏'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('favorites-search-cancel')),
+        find.byKey(const ValueKey('favorites-add-action')),
         findsOneWidget,
       );
-      expect(find.text('取消'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('favorites-search-cancel')),
+        findsNothing,
+      );
 
       await tester.enterText(searchInput, '牧志');
       await tester.pump();
@@ -211,10 +214,10 @@ void main() {
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('暖暮拉麵'), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('favorites-search-cancel')));
+      await tester.enterText(searchInput, '');
       await tester.pump();
       expect(find.text('收藏'), findsOneWidget);
-      expect(searchInput, findsNothing);
+      expect(searchInput, findsOneWidget);
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
@@ -361,6 +364,34 @@ void main() {
 
       verify(() => mockRepo.restoreFavorite(7)).called(1);
       expect(fetchCount, 3);
+    });
+
+    testWidgets('左滑收藏卡 → 立即 deleteFavorite 並提供復原', (tester) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(mockRepo),
+            favoriteRestoreEnabledProvider.overrideWithValue(true),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.drag(
+        find.byKey(const ValueKey('favorite-dismiss-7')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.deleteFavorite(7)).called(1);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('已移除收藏'), findsOneWidget);
+      expect(find.text('復原'), findsOneWidget);
     });
 
     testWidgets('restore API 未啟用時刪除後不顯示復原', (tester) async {
@@ -586,8 +617,6 @@ void main() {
       await tester.fling(scrollView, const Offset(0, 5000), 10000);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('favorites-search-action')));
-      await tester.pump();
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
       await tester.enterText(searchInput, '收藏地點 1');
       await tester.pump();

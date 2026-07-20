@@ -86,7 +86,7 @@ class TravelPill extends StatelessWidget {
             Flexible(
               child: Text(
                 '不需計算路程',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -153,7 +153,7 @@ class TravelPill extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
                 fontFeatures: const [FontFeature.tabularFigures()],

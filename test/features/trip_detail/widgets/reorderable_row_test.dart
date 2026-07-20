@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripline/features/trip_detail/widgets/reorderable_row.dart';
+import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 void main() {

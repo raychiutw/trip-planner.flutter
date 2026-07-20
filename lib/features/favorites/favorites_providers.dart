@@ -11,7 +11,8 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>(
   (ref) => FavoritesRepository(client: ref.watch(apiClientProvider)),
 );
 
-/// Remains off until the owner-scoped soft-delete/restore API is deployed.
+/// Local builds default off; signed release builds explicitly enable the
+/// deployed owner-scoped soft-delete/restore API.
 final favoriteRestoreEnabledProvider = Provider<bool>(
   (ref) => const bool.fromEnvironment('FAVORITE_RESTORE_ENABLED'),
 );

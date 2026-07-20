@@ -16,6 +16,7 @@ import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_settings_group.dart';
 import 'favorites_providers.dart';
 import 'poi_favorite_card.dart';
@@ -58,7 +59,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   final Set<int> _hiddenFavoriteIds = {};
   bool _deletingSelected = false;
   int _page = 1;
-  bool _searching = false;
   _FavoriteSort _sort = _FavoriteSort.newest;
 
   @override
@@ -74,24 +74,31 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     return TpRootScaffold(
       showSoftEdge: true,
       header: TpRootHeaderConfig(
-        title: _searching
-            ? AppSearchField(
-                fieldKey: const ValueKey('favorites-search-input'),
-                controller: _searchController,
-                placeholder: '搜尋收藏',
-                autofocus: true,
-                embedded: true,
-                onChanged: (value) => setState(() {
-                  _searchQuery = value;
-                  _page = 1;
-                }),
-              )
-            : const Text('收藏'),
+        title: const Text('收藏'),
         actions: _buildHeaderActions(context),
       ),
       body: TpRootScrollView(
         onRefresh: () => ref.refresh(favoritesProvider.future),
         slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TpSpacing.s4,
+                TpSpacing.s2,
+                TpSpacing.s4,
+                TpSpacing.s2,
+              ),
+              child: AppSearchField(
+                fieldKey: const ValueKey('favorites-search-input'),
+                controller: _searchController,
+                placeholder: '搜尋收藏',
+                onChanged: (value) => setState(() {
+                  _searchQuery = value;
+                  _page = 1;
+                }),
+              ),
+            ),
+          ),
           ...favoritesAsync.when(
             data: (favorites) {
               final visible = favorites
@@ -189,24 +196,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       onSelected: _handleHeaderAction,
     );
 
-    if (_searching) {
-      return [
-        sort,
-        TpToolbarTextButton(
-          key: const ValueKey('favorites-search-cancel'),
-          label: '取消',
-          onPressed: _endSearch,
-        ),
-        const TpAccountAvatarButton(),
-      ];
-    }
     return [
-      TpToolbarIconButton(
-        key: const ValueKey('favorites-search-action'),
-        tooltip: '搜尋',
-        icon: CupertinoIcons.search,
-        onPressed: () => setState(() => _searching = true),
-      ),
       sort,
       if (!compactHeader)
         TpToolbarIconButton(
@@ -217,16 +207,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         ),
       const TpAccountAvatarButton(),
     ];
-  }
-
-  void _endSearch() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    _searchController.clear();
-    setState(() {
-      _searching = false;
-      _searchQuery = '';
-      _page = 1;
-    });
   }
 
   void _handleHeaderAction(_FavoriteHeaderAction action) {
@@ -318,7 +298,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               _NoSearchResult(onClear: _clearAllFilters)
             else ...[
               _FavoritesSectionHeader(
-                title: _searching ? '搜尋結果' : '最近收藏',
+                title: _searchQuery.trim().isEmpty ? '最近收藏' : '搜尋結果',
                 count: filteredFavorites.length,
               ),
               const SizedBox(height: TpSpacing.s2),
@@ -328,18 +308,22 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 separatorIndent: 64,
                 children: [
                   for (final favorite in visibleFavorites)
-                    PoiFavoriteCard(
-                      favorite: favorite,
-                      grouped: true,
-                      matchQuery: _searching ? _searchQuery : '',
-                      selected: _selectedIds.contains(favorite.id),
-                      selectionMode: _selectedIds.isNotEmpty,
-                      onSelectedChanged: _deletingSelected
-                          ? null
-                          : (_) => _toggleFavoriteSelection(favorite.id),
-                      onRemove: () => _removeFavorite(context, ref, favorite),
-                      onLongPress: () =>
-                          _showFavoriteActions(context, ref, favorite),
+                    SwipeToDelete(
+                      dismissKey: ValueKey('favorite-dismiss-${favorite.id}'),
+                      onDelete: () => _removeFavorite(context, ref, favorite),
+                      child: PoiFavoriteCard(
+                        favorite: favorite,
+                        grouped: true,
+                        matchQuery: _searchQuery,
+                        selected: _selectedIds.contains(favorite.id),
+                        selectionMode: _selectedIds.isNotEmpty,
+                        onSelectedChanged: _deletingSelected
+                            ? null
+                            : (_) => _toggleFavoriteSelection(favorite.id),
+                        onRemove: () => _removeFavorite(context, ref, favorite),
+                        onLongPress: () =>
+                            _showFavoriteActions(context, ref, favorite),
+                      ),
                     ),
                 ],
               ),
