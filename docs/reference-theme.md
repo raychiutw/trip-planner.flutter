@@ -49,7 +49,7 @@
 - 第一項切換頁面並保留 day；筆記放右上功能區。
 - 目前行程標題可點擊，開啟含搜尋、目前 checkmark、最近行程的 bottom sheet。
 - 預設進入、切換行程、切換 Day 與明確 POI focus 的 zoom 都固定 `13`，避免互動後跳成其他層級。
-- POI 卡以 `PageView(viewportFraction: .84)` 左右滑動；卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
+- POI 卡以 `PageView(viewportFraction: .74)` 左右滑動；滑動只更新預覽，點卡片或 marker 才以 zoom `13` 移動地圖。卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
 
 ## 內容與設定元件
 

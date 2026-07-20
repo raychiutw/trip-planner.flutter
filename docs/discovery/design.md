@@ -145,18 +145,17 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 - Google 原生 POI 保持可見與可點擊；選取後暫時取代底部 accessory，使用者按「在 Google 地圖開啟」才以 Universal URL 外開 App 或 Web，不寫入 Tripline 行程資料。
 - 預設進入、切換行程、切換 Day 與點選 Tripline POI 都固定 zoom `13.0`，不執行全日本 bounds fit。
 - 當日沒有座標時仍維持 zoom `13.0`，並使用行程第一個已知座標作為城市層級 fallback；不得 fit 全行程 bounds。
-- 明確點 marker／POI 卡時使用 zoom `16.0`。
-- POI dock 固定在 root tab 上方 4pt；標準高度 96pt，外層使用參考圖的 full-width glass band、28pt blur、半透明底色、1px rim highlight 與內高光；active 卡再疊一層 16pt blur 的玻璃 surface，不使用實心 group 色。無障礙文字可自動增高。
-- POI PageView 的卡片寬度固定為可視軌道的 80%。第一筆靠左，下一張露出約 25% 提示可滑動；滑動後仍由左側對齊目前卡，最後一筆不循環製造假資料。卡片下方顯示頁碼圓點，active 頁使用 Tripline accent 的短膠囊。
-- POI 卡資訊層級參考核准圖：左側當日編號圓章；中央依序為「停留 N / 總數」、景點名、時間與類型摘要；右側為圓形導航動作。卡片與導航按鈕皆使用 Tripline accent，不引入新的分類色。
-- marker、route、卡片與 camera focus 共用同一 active entry；缺座標 POI 仍留在 accessory 並顯示「尚無位置」。
+- 明確點 marker／POI 卡時維持 zoom `13.0`。
+- POI dock 固定在 root tab 上方 4pt；標準高度使用共用 `TpBottomAccessory.height`，外層使用參考圖的 full-width glass band、28pt blur、半透明底色、1px rim highlight 與內高光；卡片使用半透明、無內層 blur 的內容 surface，避免巢狀玻璃。無障礙文字可自動增高。
+- POI PageView 的卡片寬度固定為可視軌道的 74%。第一筆靠左並露出下一張提示可滑動；滑動後仍由左側對齊目前卡，最後一筆不循環製造假資料。卡片下方顯示頁碼圓點，預覽頁使用 Tripline accent 的短膠囊。
+- POI 卡資訊層級：左側當日編號圓章；中央依序為景點名、起訖時間、本地化分類。移除「停留 N / 總數」與右側箭頭，縮短卡片。
+- 滑動卡片只更新預覽與頁碼，不移動地圖；點卡片或 marker 才設為 active entry 並以 zoom `13.0` 置中。缺座標 POI 仍留在 accessory 並顯示「尚無位置」。
 - POI rail 沒有垂直拖曳、收合、detent 或 grabber。
 
 ## 8. 收藏
 
-- Root Header 一般狀態為 `收藏｜搜尋｜排序｜新增｜帳號`，所有動作都在同一條 glass 膠囊內；搜尋用 `search`、排序用無外圈的 `line_horizontal_3_decrease`、新增用 `plus`、帳號固定最右。
-- 點搜尋後，Header 標題區原地轉成自動聚焦的 `搜尋收藏` 欄位；排序、結束搜尋與帳號維持可見，新增暫時隱藏。結束搜尋會清空查詢並恢復一般狀態，頁內不再放第二條搜尋欄。
-- 搜尋狀態使用清楚的文字「取消」結束，不以語意不明的 `×` 取代。清單捲動會收起鍵盤，鍵盤 Search 仍可立即送出。
+- Root Header 固定顯示 `收藏`，右側保留排序、新增與帳號；Header 不再切換成搜尋模式，避免窄螢幕與 Dynamic Type 擠壓標題和動作。
+- 搜尋使用與行程一覽相同的頁內常駐 `AppSearchField`，清除鈕只清空文字。清單捲動會收起鍵盤，鍵盤 Search 仍可立即送出。
 - 本地收藏結果每輸入一字即時更新；名稱、地址與備註中的符合字串使用較深 `onSurface`＋Semibold，其餘文字維持次要色，不用大面積 accent 標記。
 - 排序使用 `TpMoreMenuButton` 錨定選單，提供最近加入、最早加入、名稱、地區；目前排序顯示 checkmark。separator 下方的「篩選條件」沿用既有類型／地區篩選 Sheet，不新增沒有產品需求的顯示方式選單。
 - `plus` 開啟既有 Google POI 探索／收藏流程；新增不是搜尋，因此不得使用放大鏡代表新增。
@@ -191,6 +190,6 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 - Light／Dark、320×568、390×844、430×932、200% text、Bold Text、Reduce Motion 均可操作。
 - Reduce Transparency／High Contrast 必須使用套件 fallback，所有文字、選取狀態與操作仍可辨識。
 - iOS 與 Android 實機必須驗證 Google Maps PlatformView 上的 root tab、DAY selector、POI dock、marker 點擊、地圖拖曳與 tab 點擊不凍結，並以 profile mode 檢查 raster jank。
-- Widget tests 覆蓋 4-tab、account deep link、trip sheet、單層 selector、固定 zoom、POI clearance、聊天／Timeline full-bleed 捲動、聊天自己／協作者名稱 fallback 與協作者 dynamic Indigo tint、收藏 Header 搜尋狀態、排序 checkmark、plus 導覽、grouped list 與 HIG text styles。
+- Widget tests 覆蓋 4-tab、account deep link、trip sheet、單層 selector、固定 zoom、POI clearance、聊天／Timeline full-bleed 捲動、聊天自己／協作者名稱 fallback 與協作者 dynamic Indigo tint、收藏常駐搜尋、排序 checkmark、plus 導覽、grouped list 與 HIG text styles。
 - `dart format --output=none --set-exit-if-changed .`、`flutter analyze --no-fatal-infos`、`flutter test`、`flutter build ios --release --no-codesign` 全部通過。
 - 合併至 `master` 後觸發新的 TestFlight workflow，並確認新 build 完成 Apple processing。
