@@ -113,6 +113,9 @@ void main() {
       find.byKey(const ValueKey('signup-password-field')),
       'password123',
     );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -149,6 +152,61 @@ void main() {
     expect(textField().obscureText, isFalse);
   });
 
+  testWidgets('未同意個資條款不呼叫建立帳號', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pump();
+
+    expect(find.text('請先閱讀並同意個資條款'), findsOneWidget);
+    verifyNever(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    );
+  });
+
+  testWidgets('建立帳號失敗後保留個資條款同意狀態', (tester) async {
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenThrow(Exception('network'));
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    final consent = find.byKey(
+      const ValueKey('signup-privacy-consent-checkbox'),
+    );
+    await tester.tap(consent);
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<CheckboxListTile>(consent).value, isTrue);
+    expect(find.byKey(const ValueKey('signup-error-banner')), findsOneWidget);
+  });
+
   testWidgets('註冊若已加入行程會導向行程清單 selected trip', (tester) async {
     when(
       () => mockAuthRepository.signup(
@@ -177,6 +235,9 @@ void main() {
     await tester.enterText(
       find.byKey(const ValueKey('signup-password-field')),
       'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();

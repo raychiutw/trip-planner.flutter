@@ -1,5 +1,5 @@
 /// appRouterProvider redirect 行為測試：
-/// 1. 未登入（AsyncData null）→ 任何受保護路徑 redirect 到 /login
+/// 1. 未登入（AsyncData null）→ 任何受保護路徑 redirect 到 /welcome
 /// 2. 已登入在 /login → redirect 到 /trips
 library;
 
@@ -15,6 +15,7 @@ import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/oauth_consent_screen.dart';
+import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_screen.dart';
@@ -151,7 +152,7 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
 }
 
 void main() {
-  testWidgets('未登入時 redirect 到 /login', (tester) async {
+  testWidgets('未登入時 redirect 到 /welcome', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
 
@@ -163,8 +164,78 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
     expect(find.byType(TripsListScreen), findsNothing);
+  });
+
+  testWidgets('Welcome CTA 前往登入', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+  });
+
+  testWidgets('未登入 deep link 經 Welcome 保留安全站內目的地', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/chat?tripId=trip-1');
+    await tester.pumpAndSettle();
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      router
+          .routerDelegate
+          .currentConfiguration
+          .uri
+          .queryParameters['redirect_after'],
+      '/chat?tripId=trip-1',
+    );
+  });
+
+  testWidgets('已登入導向 /welcome 會回 /trips', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/welcome');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
   });
 
   testWidgets('已登入時進入 /trips（不停留 /login）', (tester) async {

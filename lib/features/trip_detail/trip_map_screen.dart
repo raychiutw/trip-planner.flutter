@@ -62,23 +62,6 @@ class TripMapScreen extends ConsumerStatefulWidget {
 }
 
 class _TripMapScreenState extends ConsumerState<TripMapScreen> {
-  int? _activeDayNum;
-
-  @override
-  void initState() {
-    super.initState();
-    _activeDayNum = widget.initialDayNum;
-  }
-
-  @override
-  void didUpdateWidget(covariant TripMapScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.tripId != widget.tripId ||
-        oldWidget.initialDayNum != widget.initialDayNum) {
-      _activeDayNum = widget.initialDayNum;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
@@ -110,19 +93,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
           ),
           actions: [
             TpToolbarIconButton(
-              key: const ValueKey('trip-map-itinerary'),
-              tooltip: '行程',
-              onPressed: () {
-                final query = _activeDayNum == null
-                    ? ''
-                    : '?day=$_activeDayNum';
-                context.go(
-                  '/trips/${Uri.encodeComponent(widget.tripId)}$query',
-                );
-              },
-              icon: CupertinoIcons.calendar,
-            ),
-            TpToolbarIconButton(
               key: const ValueKey('trip-map-notes-button'),
               tooltip: '筆記',
               onPressed: () => context.push(
@@ -150,7 +120,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             externalLauncher: widget.externalLauncher,
-            onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
           ),
         ),
       ),
@@ -214,7 +183,6 @@ class _TripMapView extends ConsumerStatefulWidget {
     this.mapBuilder,
     this.locationService,
     required this.externalLauncher,
-    required this.onActiveDayChanged,
   });
 
   final String tripId;
@@ -224,7 +192,6 @@ class _TripMapView extends ConsumerStatefulWidget {
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
   final GoogleMapsExternalLauncher externalLauncher;
-  final ValueChanged<int?> onActiveDayChanged;
 
   @override
   ConsumerState<_TripMapView> createState() => _TripMapViewState();
@@ -259,7 +226,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     _poiAccessoryHeight + TpRootTabGeometry.clearance(context) + TpSpacing.s6,
   );
 
-  /// -1 = 行程 action、0 = 無行程日 fallback、i = 第 i 日（widget.days[i - 1]）。
+  /// 選取日在 [widget.days] 的 zero-based index；無行程日時保持 0。
   int _selectedTabIndex = 0;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
@@ -356,18 +323,14 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   List<_MapStop> _stopsForTab(int tabIndex) {
     final stopsByDay = _stopsByDay;
-    if (tabIndex == 0) {
-      return [for (final dayStops in stopsByDay) ...dayStops];
-    }
-    return stopsByDay[tabIndex - 1];
+    if (tabIndex < 0 || tabIndex >= stopsByDay.length) return const [];
+    return stopsByDay[tabIndex];
   }
 
   List<_MapStop> _pinsForTab(int tabIndex) {
     final pinsByDay = _pinsByDay;
-    if (tabIndex == 0) {
-      return [for (final dayPins in pinsByDay) ...dayPins];
-    }
-    return pinsByDay[tabIndex - 1];
+    if (tabIndex < 0 || tabIndex >= pinsByDay.length) return const [];
+    return pinsByDay[tabIndex];
   }
 
   int _initialTabIndex() {
@@ -375,7 +338,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (entryId != null) {
       for (final (dayIndex, dayStops) in _stopsByDay.indexed) {
         if (dayStops.any((stop) => stop.entry.id == entryId)) {
-          return dayIndex + 1;
+          return dayIndex;
         }
       }
     }
@@ -384,9 +347,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       final index = widget.days.indexWhere(
         (day) => day.dayNum == initialDayNum,
       );
-      if (index >= 0) return index + 1;
+      if (index >= 0) return index;
     }
-    return widget.days.isEmpty ? 0 : 1;
+    return 0;
   }
 
   int _initialStopPage(List<_MapStop> stops) {
@@ -415,16 +378,14 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       _activeEntryId = null;
       _selectedGooglePoi = null;
     });
-    widget.onActiveDayChanged(
-      tabIndex == 0 ? null : widget.days[tabIndex - 1].dayNum,
-    );
     if (_pageController.hasClients) _pageController.jumpToPage(0);
     _focusDay(_pinsForTab(tabIndex));
     unawaited(_loadRoutes());
   }
 
   List<(_MapStop, _MapStop)> _routePairsForTab(int tabIndex) {
-    final days = tabIndex == 0 ? _pinsByDay : [_pinsByDay[tabIndex - 1]];
+    if (tabIndex < 0 || tabIndex >= _pinsByDay.length) return const [];
+    final days = [_pinsByDay[tabIndex]];
     return [
       for (final pins in days)
         for (var index = 0; index + 1 < pins.length; index++)
@@ -624,7 +585,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   @override
   Widget build(BuildContext context) {
-    final allPins = _pinsForTab(0);
+    final allPins = [for (final dayPins in _pinsByDay) ...dayPins];
     final visiblePins = _pinsForTab(_selectedTabIndex);
     final visibleStops = _stopsForTab(_selectedTabIndex);
     return _buildMap(allPins, visiblePins, visibleStops);
@@ -690,11 +651,24 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             key: const ValueKey('trip-map-day-selector'),
             platformViewBackdrop: true,
             value: _selectedTabIndex,
+            leadingAction: TpHorizontalSelectorAction(
+              key: const ValueKey('trip-map-itinerary'),
+              icon: CupertinoIcons.calendar,
+              label: '行程',
+              onPressed: () {
+                final dayNum = widget.days
+                    .elementAtOrNull(_selectedTabIndex)
+                    ?.dayNum;
+                final query = dayNum == null ? '' : '?day=$dayNum';
+                context.go(
+                  '/trips/${Uri.encodeComponent(widget.tripId)}$query',
+                );
+              },
+            ),
             options: [
-              const TpScopeOption(value: 0, label: '總覽'),
               for (final (index, day) in widget.days.indexed)
                 TpScopeOption(
-                  value: index + 1,
+                  value: index,
                   label: 'DAY ${day.dayNum}',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
                 ),
@@ -797,6 +771,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                 child: PageView.builder(
                   controller: _pageController,
                   padEnds: false,
+                  pageSnapping: false,
                   scrollDirection: Axis.horizontal,
                   itemCount: visibleStops.length,
                   onPageChanged: (index) => _previewStop(visibleStops[index]),

@@ -64,6 +64,7 @@ void main() {
     output.createSync(recursive: true);
 
     const expected = {
+      'welcome',
       'chat',
       'itinerary',
       'map-tripline-poi',

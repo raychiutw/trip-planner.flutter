@@ -11,7 +11,9 @@ import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
+import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/auth/login_screen.dart';
+import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -202,6 +204,9 @@ class AppFlowFixture {
       settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
       appNetworkAvailabilityProvider.overrideWithValue(const Stream.empty()),
+      appVersionProvider.overrideWith(
+        (ref) async => const AppVersion(version: '0.9.1', buildNumber: '12'),
+      ),
     ],
     child: const TriplineApp(),
   );
@@ -274,6 +279,10 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpWidget(appWrapper?.call(app) ?? app);
   await tester.pumpAndSettle();
 
+  expect(find.byType(WelcomeScreen), findsOneWidget);
+  await captureState('welcome');
+  await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+  await tester.pumpAndSettle();
   expect(find.byType(LoginScreen), findsOneWidget);
   await tester.enterText(
     find.byKey(const ValueKey('login-email-field')),
@@ -291,9 +300,14 @@ Future<void> runAppOwnedReleaseFlow(
     () => fixture.auth.login(email: 'ray@example.com', password: 'secret'),
   ).called(1);
 
-  await tester.tap(find.byKey(const ValueKey('trip-card-more-okinawa')));
+  await tester.drag(
+    find.byKey(const ValueKey('trip-dismiss-okinawa')),
+    const Offset(-320, 0),
+  );
   await tester.pumpAndSettle();
-  await tester.tap(find.text('刪除行程'));
+  expect(find.text('刪除'), findsOneWidget);
+  expect(find.textContaining('此動作無法復原'), findsNothing);
+  await tester.tap(find.text('刪除'));
   await tester.pumpAndSettle();
   expect(find.textContaining('此動作無法復原'), findsOneWidget);
   await captureState('destructive-confirm');
@@ -332,6 +346,8 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
+  expect(find.text('總覽'), findsNothing);
+  expect(tester.widget<PageView>(find.byType(PageView)).pageSnapping, isFalse);
   await captureState('map-tripline-poi');
   await tester.tap(find.byKey(const ValueKey('fake-google-poi-trigger')));
   await tester.pumpAndSettle();
@@ -362,6 +378,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  expect(find.text('版本 0.9.1（12）'), findsOneWidget);
   await captureState('account');
   await tester.tap(find.byKey(const ValueKey('settings-appearance')));
   await tester.pumpAndSettle();
@@ -378,7 +395,17 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('chat-input')),
     'device smoke draft',
   );
+  final chatInput = tester.widget<EditableText>(
+    find.descendant(
+      of: find.byKey(const ValueKey('chat-input')),
+      matching: find.byType(EditableText),
+    ),
+  );
   expect(find.text('device smoke draft'), findsOneWidget);
+  expect(chatInput.focusNode.hasFocus, isTrue);
+  await tester.tap(find.text('從一個指令開始'));
+  await tester.pump();
+  expect(chatInput.focusNode.hasFocus, isFalse);
   await captureState('chat');
 
   await tester.tap(_rootTab('行程'));

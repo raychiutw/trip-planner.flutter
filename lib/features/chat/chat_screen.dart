@@ -147,10 +147,12 @@ class _ChatBody extends ConsumerStatefulWidget {
 
 class _ChatBodyState extends ConsumerState<_ChatBody> {
   final _scroll = ScrollController();
+  final _composerKey = GlobalKey();
   late final TextEditingController _input;
   late final Future<void> _aiAuthorizationLoad;
   bool? _aiAuthorized;
   bool _sendInProgress = false;
+  double _composerHeight = 0;
 
   @override
   void initState() {
@@ -180,6 +182,15 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         ref.read(chatControllerProvider(widget.tripId).notifier).loadOlder(),
       );
     }
+  }
+
+  void _syncComposerHeight() {
+    if (!mounted) return;
+    final box = _composerKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final height = box.size.height;
+    if ((height - _composerHeight).abs() < 0.5) return;
+    setState(() => _composerHeight = height);
   }
 
   Future<void> _loadAiAuthorization() async {
@@ -250,58 +261,101 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     );
 
     final controller = ref.read(chatControllerProvider(widget.tripId).notifier);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncComposerHeight());
+    final messageBottomInset = _composerHeight > 0
+        ? _composerHeight + TpSpacing.s2
+        : TpRootTabGeometry.clearance(context) + 80;
 
-    return Column(
+    return Stack(
       children: [
-        if (hasBanner)
-          SizedBox(height: TpRootGeometry.initialContentTop(context)),
-        if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
-        // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
-        if (state.error != null && msgs.isNotEmpty) _Banner(text: state.error!),
-        Expanded(
-          child: state.initialLoading
-              ? initiallyBelowHeader(
-                  const Center(child: CircularProgressIndicator.adaptive()),
-                )
-              : (state.error != null && msgs.isEmpty)
-              ? initiallyBelowHeader(
-                  _CenteredHint(
-                    title: '載入失敗',
-                    body: '無法取得對話,請稍後再試。',
-                    onRetry: () => unawaited(controller.reload()),
-                  ),
-                )
-              : msgs.isEmpty
-              ? initiallyBelowHeader(
-                  _EmptyStatePrompts(
-                    sending: state.sending,
-                    onSelect: (prompt) =>
-                        unawaited(_sendText(prompt, clearComposer: false)),
-                  ),
-                )
-              : ListView.builder(
-                  key: const ValueKey('chat-list'),
-                  controller: _scroll,
-                  reverse: true,
-                  padding: EdgeInsets.fromLTRB(
-                    TpSpacing.s4,
-                    contentTop,
-                    TpSpacing.s4,
-                    TpSpacing.s4,
-                  ),
-                  itemCount: msgs.length,
-                  itemBuilder: (context, i) {
-                    final m = msgs[msgs.length - 1 - i];
-                    return _MessageBubble(
-                      message: m,
-                      tripId: widget.tripId,
-                      myEmail: currentUser?.email,
-                      myDisplayName: currentUser?.displayName,
-                    );
-                  },
+        Positioned.fill(
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+            child: Column(
+              children: [
+                if (hasBanner)
+                  SizedBox(height: TpRootGeometry.initialContentTop(context)),
+                if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
+                // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
+                if (state.error != null && msgs.isNotEmpty)
+                  _Banner(text: state.error!),
+                Expanded(
+                  child: state.initialLoading
+                      ? initiallyBelowHeader(
+                          const Center(
+                            child: CircularProgressIndicator.adaptive(),
+                          ),
+                        )
+                      : (state.error != null && msgs.isEmpty)
+                      ? initiallyBelowHeader(
+                          _CenteredHint(
+                            title: '載入失敗',
+                            body: '無法取得對話,請稍後再試。',
+                            onRetry: () => unawaited(controller.reload()),
+                          ),
+                        )
+                      : msgs.isEmpty
+                      ? initiallyBelowHeader(
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: messageBottomInset,
+                            ),
+                            child: _EmptyStatePrompts(
+                              sending: state.sending,
+                              onSelect: (prompt) => unawaited(
+                                _sendText(prompt, clearComposer: false),
+                              ),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          key: const ValueKey('chat-list'),
+                          controller: _scroll,
+                          reverse: true,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: EdgeInsets.fromLTRB(
+                            TpSpacing.s4,
+                            contentTop,
+                            TpSpacing.s4,
+                            messageBottomInset,
+                          ),
+                          itemCount: msgs.length,
+                          itemBuilder: (context, i) {
+                            final m = msgs[msgs.length - 1 - i];
+                            return _MessageBubble(
+                              message: m,
+                              tripId: widget.tripId,
+                              myEmail: currentUser?.email,
+                              myDisplayName: currentUser?.displayName,
+                            );
+                          },
+                        ),
                 ),
+              ],
+            ),
+          ),
         ),
-        _Composer(input: _input, sending: state.sending, onSend: _send),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _syncComposerHeight(),
+              );
+              return false;
+            },
+            child: SizeChangedLayoutNotifier(
+              key: _composerKey,
+              child: _Composer(
+                input: _input,
+                sending: state.sending,
+                onSend: _send,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -532,70 +586,74 @@ class _ComposerState extends ConsumerState<_Composer> {
     // lazy:預設 enabled,僅送出中 disable;權限在點擊時才檢查。
     final micEnabled = !widget.sending;
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TpSpacing.s3,
-          TpSpacing.s2,
-          TpSpacing.s3,
-          TpSpacing.s2,
-        ),
-        child: TpGlassSurface(
-          key: const ValueKey('chat-composer-glass'),
-          padding: const EdgeInsets.all(TpSpacing.s2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  key: const ValueKey('chat-input'),
-                  controller: widget.input,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => widget.onSend(),
-                  // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
-                  decoration: InputDecoration(
-                    hintText: '輸入訊息或語音指令',
-                    isDense: true,
-                    filled: true,
-                    fillColor: scheme.surfaceContainerHighest,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: TpSpacing.s4,
-                      vertical: TpSpacing.s3,
+    return TextFieldTapRegion(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TpSpacing.s3,
+            TpSpacing.s2,
+            TpSpacing.s3,
+            TpSpacing.s2,
+          ),
+          child: TpGlassSurface(
+            key: const ValueKey('chat-composer-glass'),
+            padding: const EdgeInsets.all(TpSpacing.s2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('chat-input'),
+                    controller: widget.input,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    onSubmitted: (_) => widget.onSend(),
+                    // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                    decoration: InputDecoration(
+                      hintText: '輸入訊息或語音指令',
+                      isDense: true,
+                      filled: true,
+                      fillColor: scheme.surfaceContainerHighest,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: TpSpacing.s4,
+                        vertical: TpSpacing.s3,
+                      ),
+                      border: _composerPillBorder,
+                      enabledBorder: _composerPillBorder,
+                      focusedBorder: _composerPillBorder,
                     ),
-                    border: _composerPillBorder,
-                    enabledBorder: _composerPillBorder,
-                    focusedBorder: _composerPillBorder,
                   ),
                 ),
-              ),
-              const SizedBox(width: TpSpacing.s2),
-              IconButton(
-                key: const ValueKey('chat-mic-button'),
-                tooltip: _listening ? '停止語音輸入' : '語音輸入',
-                onPressed: micEnabled ? () => unawaited(_onMic()) : null,
-                color: _listening ? scheme.primary : null,
-                icon: Icon(
-                  _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+                const SizedBox(width: TpSpacing.s2),
+                IconButton(
+                  key: const ValueKey('chat-mic-button'),
+                  tooltip: _listening ? '停止語音輸入' : '語音輸入',
+                  onPressed: micEnabled ? () => unawaited(_onMic()) : null,
+                  color: _listening ? scheme.primary : null,
+                  icon: Icon(
+                    _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+                  ),
                 ),
-              ),
-              const SizedBox(width: TpSpacing.s1),
-              IconButton.filled(
-                key: const ValueKey('chat-send'),
-                onPressed: widget.sending ? null : widget.onSend,
-                icon: widget.sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(CupertinoIcons.arrow_up_circle_fill),
-              ),
-            ],
+                const SizedBox(width: TpSpacing.s1),
+                IconButton.filled(
+                  key: const ValueKey('chat-send'),
+                  onPressed: widget.sending ? null : widget.onSend,
+                  icon: widget.sending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator.adaptive(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(CupertinoIcons.arrow_up_circle_fill),
+                ),
+              ],
+            ),
           ),
         ),
       ),

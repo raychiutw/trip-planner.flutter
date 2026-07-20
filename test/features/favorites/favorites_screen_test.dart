@@ -399,6 +399,15 @@ void main() {
         const Offset(-500, 0),
       );
       await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<Object>((
+            'swipe-delete-action',
+            ValueKey('favorite-dismiss-7'),
+          )),
+        ),
+      );
+      await tester.pumpAndSettle();
 
       verify(() => mockRepo.deleteFavorite(7)).called(1);
       expect(find.byType(AlertDialog), findsNothing);

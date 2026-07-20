@@ -17,6 +17,7 @@ import '../../models/poi_favorite.dart';
 import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
+import '../../ui/swipe_to_delete.dart';
 import '../../ui/tp_app_bar.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
@@ -113,8 +114,6 @@ class EntryPoiScreen extends ConsumerWidget {
 
   Widget _body(BuildContext context, WidgetRef ref, TimelineEntry entry) {
     final theme = Theme.of(context);
-    final repo = ref.read(tripRepositoryProvider);
-    final version = entry.entryPoisVersion;
     final sameDayEntries = switch (ref.watch(tripDaysProvider(tripId))) {
       AsyncData(:final value) => _sameDayEntries(value, entry.id),
       _ => const <TimelineEntry>[],
@@ -177,73 +176,96 @@ class EntryPoiScreen extends ConsumerWidget {
           )
         else
           for (final (index, alt) in entry.alternates.indexed)
-            _PoiCard(
-              poi: alt,
-              isMaster: false,
-              reservationUrlLauncher: reservationUrlLauncher,
-              trailing: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        key: ValueKey('alt-move-up-${alt.poiId}'),
-                        tooltip: '上移',
-                        icon: const Icon(Icons.keyboard_arrow_up),
-                        onPressed: index == 0
-                            ? null
-                            : () => _moveAlternate(
-                                context,
-                                ref,
-                                entry,
-                                index,
-                                -1,
-                              ),
-                      ),
-                      IconButton(
-                        key: ValueKey('alt-move-down-${alt.poiId}'),
-                        tooltip: '下移',
-                        icon: const Icon(Icons.keyboard_arrow_down),
-                        onPressed: index == entry.alternates.length - 1
-                            ? null
-                            : () =>
-                                  _moveAlternate(context, ref, entry, index, 1),
-                      ),
-                      IconButton(
-                        key: ValueKey('alt-remove-${alt.poiId}'),
-                        tooltip: '移除',
-                        icon: const Icon(CupertinoIcons.delete),
-                        onPressed: () => _run(
-                          context,
-                          ref,
-                          () => repo.removeEntryAlternate(
-                            tripId: tripId,
-                            entryId: entryId,
-                            poiId: alt.poiId,
-                            entryPoisVersion: version,
-                          ),
-                          success: '已移除備選',
+            SwipeToDelete(
+              dismissKey: ValueKey('alt-swipe-${alt.poiId}'),
+              backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s2),
+              onDelete: () => _confirmRemoveAlternate(context, ref, entry, alt),
+              child: _PoiCard(
+                poi: alt,
+                isMaster: false,
+                reservationUrlLauncher: reservationUrlLauncher,
+                trailing: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: ValueKey('alt-move-up-${alt.poiId}'),
+                          tooltip: '上移',
+                          icon: const Icon(Icons.keyboard_arrow_up),
+                          onPressed: index == 0
+                              ? null
+                              : () => _moveAlternate(
+                                  context,
+                                  ref,
+                                  entry,
+                                  index,
+                                  -1,
+                                ),
                         ),
-                      ),
-                    ],
-                  ),
-                  TextButton(
-                    key: ValueKey('alt-setmaster-${alt.poiId}'),
-                    onPressed: () => _confirmSetMaster(
-                      context,
-                      ref,
-                      entry,
-                      alt,
-                      sameDayEntries,
+                        IconButton(
+                          key: ValueKey('alt-move-down-${alt.poiId}'),
+                          tooltip: '下移',
+                          icon: const Icon(Icons.keyboard_arrow_down),
+                          onPressed: index == entry.alternates.length - 1
+                              ? null
+                              : () => _moveAlternate(
+                                  context,
+                                  ref,
+                                  entry,
+                                  index,
+                                  1,
+                                ),
+                        ),
+                      ],
                     ),
-                    child: const Text('設為正選'),
-                  ),
-                ],
+                    TextButton(
+                      key: ValueKey('alt-setmaster-${alt.poiId}'),
+                      onPressed: () => _confirmSetMaster(
+                        context,
+                        ref,
+                        entry,
+                        alt,
+                        sameDayEntries,
+                      ),
+                      child: const Text('設為正選'),
+                    ),
+                  ],
+                ),
               ),
             ),
       ],
+    );
+  }
+
+  Future<void> _confirmRemoveAlternate(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+    EntryPoiInfo alternate,
+  ) async {
+    final confirmed = await showAppConfirm(
+      context,
+      title: '移除備選景點？',
+      message: '移除「${alternate.name ?? '未命名地點'}」後無法復原。',
+      confirmLabel: '刪除',
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+    await _run(
+      context,
+      ref,
+      () => ref
+          .read(tripRepositoryProvider)
+          .removeEntryAlternate(
+            tripId: tripId,
+            entryId: entryId,
+            poiId: alternate.poiId,
+            entryPoisVersion: entry.entryPoisVersion,
+          ),
+      success: '已移除備選',
     );
   }
 

@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../theme/tokens.dart';
 
 /// iOS 慣例的尾端左滑刪除外殼。
 ///
-/// [onDelete] 負責確認、刪除及更新資料源；元件本身不直接移除 child，
-/// 避免與 provider／repository 更新造成重複移除。
-class SwipeToDelete extends StatelessWidget {
+/// 手勢只揭露紅色動作；[onDelete] 負責確認、刪除與資料更新。
+class SwipeToDelete extends StatefulWidget {
   const SwipeToDelete({
     super.key,
     required this.dismissKey,
@@ -27,59 +27,108 @@ class SwipeToDelete extends StatelessWidget {
   final EdgeInsetsGeometry backgroundMargin;
 
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      customSemanticsActions: {
-        CustomSemanticsAction(label: actionLabel): () => unawaited(onDelete()),
-      },
-      child: Dismissible(
-        key: dismissKey,
-        direction: DismissDirection.endToStart,
-        background: _SwipeDeleteBackground(margin: backgroundMargin),
-        confirmDismiss: (_) async {
-          await onDelete();
-          return false;
-        },
-        child: child,
-      ),
-    );
-  }
+  State<SwipeToDelete> createState() => _SwipeToDeleteState();
 }
 
-class _SwipeDeleteBackground extends StatelessWidget {
-  const _SwipeDeleteBackground({required this.margin});
+class _SwipeToDeleteState extends State<SwipeToDelete>
+    with SingleTickerProviderStateMixin {
+  static const _groupTag = 'tripline-delete-actions';
+  static const _actionWidth = 92.0;
+  late final SlidableController _controller;
+  bool _running = false;
 
-  final EdgeInsetsGeometry margin;
+  @override
+  void initState() {
+    super.initState();
+    _controller = SlidableController(this);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runDelete() async {
+    if (_running) return;
+    _running = true;
+    try {
+      await widget.onDelete();
+    } finally {
+      _running = false;
+      if (mounted) {
+        await _controller.close();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      alignment: Alignment.centerRight,
-      margin: margin,
-      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-      decoration: BoxDecoration(
-        color: scheme.error,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-      ),
-      child: OverflowBox(
-        alignment: Alignment.centerRight,
-        minWidth: 0,
-        maxWidth: double.infinity,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.delete, color: scheme.onError),
-            const SizedBox(width: TpSpacing.s2),
-            Text(
-              '刪除',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: scheme.onError,
-                fontWeight: FontWeight.w700,
-              ),
+    return Semantics(
+      customSemanticsActions: {
+        CustomSemanticsAction(label: widget.actionLabel): () =>
+            unawaited(_runDelete()),
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final extentRatio = constraints.maxWidth.isFinite
+              ? (_actionWidth / constraints.maxWidth).clamp(0.0, 1.0)
+              : 0.24;
+          return Slidable(
+            key: widget.dismissKey,
+            controller: _controller,
+            groupTag: _groupTag,
+            closeOnScroll: true,
+            endActionPane: ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: extentRatio,
+              children: [
+                CustomSlidableAction(
+                  autoClose: false,
+                  backgroundColor: Colors.transparent,
+                  padding: EdgeInsets.zero,
+                  onPressed: (_) => unawaited(_runDelete()),
+                  child: Container(
+                    key: ValueKey<Object>((
+                      'swipe-delete-action',
+                      widget.dismissKey,
+                    )),
+                    width: double.infinity,
+                    height: double.infinity,
+                    margin: widget.backgroundMargin,
+                    decoration: BoxDecoration(
+                      color: scheme.error,
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(TpRadius.md),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.delete, color: scheme.onError),
+                          const SizedBox(height: TpSpacing.s1),
+                          Text(
+                            widget.actionLabel,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: scheme.onError,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+            child: widget.child,
+          );
+        },
       ),
     );
   }

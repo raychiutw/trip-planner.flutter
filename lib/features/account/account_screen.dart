@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_version.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -110,6 +111,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
             const _SettingsGroup(compact: true),
             _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+            const _VersionFooter(),
           ]
         : <Widget>[
             Padding(
@@ -131,6 +133,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             const SizedBox(height: TpSpacing.s2),
             const _SettingsGroup(),
             _LogoutRow(onTap: () => _confirmLogout(context, ref)),
+            const _VersionFooter(),
           ];
 
     final slivers = [
@@ -271,6 +274,38 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     if (ok) {
       await ref.read(authStateProvider.notifier).logout();
     }
+  }
+}
+
+class _VersionFooter extends ConsumerWidget {
+  const _VersionFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = ref
+        .watch(appVersionProvider)
+        .when(
+          data: (version) => version.label,
+          loading: () => '版本 …',
+          error: (_, _) => '版本資訊無法取得',
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TpSpacing.s4,
+        TpSpacing.s3,
+        TpSpacing.s4,
+        TpSpacing.s4,
+      ),
+      child: Text(
+        label,
+        key: const ValueKey('account-version-footer'),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/user.dart';
@@ -48,6 +49,7 @@ void main() {
     WidgetTester tester, {
     UserInfo user = verifiedUser,
     AccountStats stats = defaultStats,
+    AppVersion version = const AppVersion(version: '0.9.1', buildNumber: '12'),
   }) async {
     when(() => mockAuthRepository.currentUser()).thenAnswer((_) async => user);
     // 內容較長，放大測試視窗確保全部 row 都在畫面內。
@@ -62,6 +64,7 @@ void main() {
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           accountStatsProvider.overrideWith((ref) => Future.value(stats)),
+          appVersionProvider.overrideWith((ref) => Future.value(version)),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -99,6 +102,11 @@ void main() {
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           accountStatsProvider.overrideWith(
             (ref) => Future.value(defaultStats),
+          ),
+          appVersionProvider.overrideWith(
+            (ref) => Future.value(
+              const AppVersion(version: '0.9.1', buildNumber: '12'),
+            ),
           ),
         ],
         child: Consumer(
@@ -149,6 +157,7 @@ void main() {
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-sheet-profile')), findsOneWidget);
     expect(find.text('帳號資訊與個人資料'), findsOneWidget);
+    expect(find.text('版本 0.9.1（12）'), findsOneWidget);
     expect(find.text('行程數'), findsNothing);
     expect(find.text('旅程天數'), findsNothing);
     expect(find.text('旅伴數'), findsNothing);
@@ -170,6 +179,21 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
     await tester.pumpAndSettle();
     expect(sheet, findsNothing);
+  });
+
+  testWidgets('帳號頁底部顯示版本與 build number', (tester) async {
+    await pumpAccountScreen(tester);
+
+    expect(find.text('版本 0.9.1（12）'), findsOneWidget);
+  });
+
+  testWidgets('build number 為空時只顯示版本', (tester) async {
+    await pumpAccountScreen(
+      tester,
+      version: const AppVersion(version: '0.9.1', buildNumber: ''),
+    );
+
+    expect(find.text('版本 0.9.1'), findsOneWidget);
   });
 
   testWidgets('帳號 sheet 子頁維持在圓角面板內並使用圓形返回鍵', (tester) async {

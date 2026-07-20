@@ -274,6 +274,15 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(
+      find.byKey(
+        const ValueKey<Object>((
+          'swipe-delete-action',
+          ValueKey('note-dismiss-flights-1'),
+        )),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(
       find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
     );
     await tester.pumpAndSettle();

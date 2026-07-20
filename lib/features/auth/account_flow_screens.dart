@@ -160,7 +160,37 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: TpSpacing.s6),
+            const SizedBox(height: TpSpacing.s3),
+            FormField<bool>(
+              key: const ValueKey('signup-privacy-consent-field'),
+              initialValue: false,
+              validator: (value) => value == true ? null : '請先閱讀並同意個資條款',
+              builder: (field) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CheckboxListTile(
+                    key: const ValueKey('signup-privacy-consent-checkbox'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: field.value ?? false,
+                    onChanged: _submitting ? null : field.didChange,
+                    title: const Text('我已閱讀並同意個資條款'),
+                  ),
+                  if (field.errorText != null)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 12),
+                      child: Text(
+                        field.errorText!,
+                        key: const ValueKey('signup-privacy-consent-error'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s4),
             FilledButton(
               key: const ValueKey('signup-submit-button'),
               onPressed: _submitting ? null : _submit,

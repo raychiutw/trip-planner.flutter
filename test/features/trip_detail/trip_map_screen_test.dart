@@ -399,6 +399,7 @@ void main() {
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
+    expect(find.text('總覽'), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
@@ -409,6 +410,12 @@ void main() {
     final pageView = tester.widget<PageView>(find.byType(PageView));
     expect(pageView.scrollDirection, Axis.horizontal);
     expect(pageView.controller!.viewportFraction, 0.74);
+    expect(pageView.pageSnapping, isFalse);
+    final headerRect = tester.getRect(
+      find.byKey(const ValueKey('tp-root-glass-header')),
+    );
+    final selectorRect = tester.getRect(daySelector);
+    expect(selectorRect.top - headerRect.bottom, closeTo(TpSpacing.s2, 1));
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
       TpBottomAccessory.height,

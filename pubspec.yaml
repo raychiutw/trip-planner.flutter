@@ -53,6 +53,8 @@ dependencies:
   file_selector: ^1.1.0
   qr: ^3.0.2
   share_plus: ^13.2.0
+  package_info_plus: ^10.2.0
+  flutter_slidable: ^4.0.3
   geolocator: ^14.0.3
   google_navigation_flutter: ^0.10.0
   drift: ^2.34.2

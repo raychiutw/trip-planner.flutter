@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -143,6 +144,8 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),
+      builder: (context, child) =>
+          SlidableAutoCloseBehavior(child: child ?? const SizedBox.shrink()),
     );
   }
 }

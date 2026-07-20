@@ -222,6 +222,64 @@ void main() {
     );
   });
 
+  testWidgets('聊天訊息可捲到 composer 後方，並可拖曳或點外側收鍵盤', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          _req(
+            id: 30,
+            message: '可收鍵盤的訊息',
+            reply: '收到',
+            status: RequestStatus.completed,
+            submittedBy: 'ray@example.com',
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final listFinder = find.byKey(const ValueKey('chat-list'));
+    final composerFinder = find.byKey(const ValueKey('chat-composer-glass'));
+    final list = tester.widget<ListView>(listFinder);
+    expect(
+      list.keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
+    expect(
+      tester.getRect(listFinder).bottom,
+      greaterThan(tester.getRect(composerFinder).top),
+    );
+
+    final inputFinder = find.byKey(const ValueKey('chat-input'));
+    EditableText editable() => tester.widget<EditableText>(
+      find.descendant(of: inputFinder, matching: find.byType(EditableText)),
+    );
+    await tester.tap(inputFinder);
+    await tester.pump();
+    expect(editable().focusNode.hasFocus, isTrue);
+
+    await tester.tap(find.text('可收鍵盤的訊息'));
+    await tester.pump();
+    expect(editable().focusNode.hasFocus, isFalse);
+
+    await tester.tap(inputFinder);
+    await tester.pump();
+    await tester.drag(listFinder, const Offset(0, -80));
+    await tester.pump();
+    expect(editable().focusNode.hasFocus, isFalse);
+  });
+
   testWidgets('聊天自己名稱缺少時使用 email local part', (tester) async {
     when(
       () => reqRepo.fetchRequests(

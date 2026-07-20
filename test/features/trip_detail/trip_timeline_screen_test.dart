@@ -416,6 +416,13 @@ void main() {
     expect(find.byKey(const ValueKey('trip-secondary-notes')), findsNothing);
     expect(find.byIcon(CupertinoIcons.printer), findsNothing);
     expect(find.byIcon(Icons.history_outlined), findsNothing);
+    final headerRect = tester.getRect(
+      find.byKey(const ValueKey('tp-root-glass-header')),
+    );
+    final selectorRect = tester.getRect(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    expect(selectorRect.top - headerRect.bottom, closeTo(TpSpacing.s2, 1));
 
     await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
     await tester.pumpAndSettle();
@@ -1264,6 +1271,15 @@ void main() {
       const Offset(-500, 0),
     );
     await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey<Object>((
+          'swipe-delete-action',
+          ValueKey('entry-dismiss-11'),
+        )),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(
       find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
     );

@@ -742,6 +742,15 @@ void main() {
         const Offset(-600, 0),
       );
       await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<Object>((
+            'swipe-delete-action',
+            ValueKey('trip-dismiss-okinawa-trip-2026'),
+          )),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(AlertDialog), findsOneWidget);
       await tester.tap(

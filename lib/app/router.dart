@@ -16,6 +16,7 @@ import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/account_flow_screens.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/oauth_consent_screen.dart';
+import '../features/auth/welcome_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
 import '../features/favorites/favorites_screen.dart';
@@ -66,16 +67,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final isLoggedIn = authState.value != null;
       final isOnLogin = state.matchedLocation == '/login';
+      final isOnWelcome = state.matchedLocation == '/welcome';
       final isPublicRoute = _isPublicShellOutsideRoute(state);
       if (!isLoggedIn && !isOnLogin && !isPublicRoute) {
-        return _loginLocationWithRedirect(state);
+        return _welcomeLocationWithRedirect(state);
       }
-      if (isLoggedIn && isOnLogin) return _redirectAfterLogin(state);
+      if (isLoggedIn && (isOnLogin || isOnWelcome)) {
+        return _redirectAfterLogin(state);
+      }
       return null;
     },
     routes: [
       // 登入頁在 shell 外（無底部導航）
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/welcome',
+        builder: (context, state) => WelcomeScreen(
+          onLogin: () => context.go(_loginLocationFromWelcome(state)),
+        ),
+      ),
       GoRoute(
         path: '/signup',
         builder: (context, state) => SignupScreen(
@@ -476,6 +486,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 const _publicShellOutsideRoutes = {
+  '/welcome',
   '/login',
   '/signup',
   '/signup/check-email',
@@ -567,10 +578,16 @@ String _withQuery(String path, GoRouterState state) {
   return query.isEmpty ? path : '$path?$query';
 }
 
-String _loginLocationWithRedirect(GoRouterState state) {
+String _welcomeLocationWithRedirect(GoRouterState state) {
   final requestedLocation = state.uri.toString();
-  if (requestedLocation == '/trips') return '/login';
-  return '/login?redirect_after=${Uri.encodeComponent(requestedLocation)}';
+  if (requestedLocation == '/trips') return '/welcome';
+  return '/welcome?redirect_after=${Uri.encodeComponent(requestedLocation)}';
+}
+
+String _loginLocationFromWelcome(GoRouterState state) {
+  final redirectAfter = _redirectAfterLogin(state);
+  if (redirectAfter == '/trips') return '/login';
+  return '/login?redirect_after=${Uri.encodeComponent(redirectAfter)}';
 }
 
 String _redirectAfterLogin(GoRouterState state) {
@@ -583,7 +600,8 @@ String _redirectAfterLogin(GoRouterState state) {
       redirectUri.hasAuthority ||
       !rawRedirect.startsWith('/') ||
       rawRedirect.startsWith('//') ||
-      redirectUri.path == '/login') {
+      redirectUri.path == '/login' ||
+      redirectUri.path == '/welcome') {
     return '/trips';
   }
   return redirectUri.toString();

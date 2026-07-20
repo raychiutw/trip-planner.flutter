@@ -76,21 +76,14 @@ class TripTimelineScreen extends ConsumerStatefulWidget {
 
 class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   var _isEditing = false;
-  int? _activeDayNum;
-
   @override
   void initState() {
     super.initState();
-    _activeDayNum = widget.initialDayNum;
   }
 
   @override
   void didUpdateWidget(covariant TripTimelineScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tripId != widget.tripId ||
-        oldWidget.initialDayNum != widget.initialDayNum) {
-      _activeDayNum = widget.initialDayNum;
-    }
   }
 
   void _openActionSheet(Widget screen) {
@@ -133,7 +126,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     };
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
-    final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
 
     return TpRootScaffold(
       showSoftEdge: true,
@@ -155,19 +147,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                     context.go('/trips/${Uri.encodeComponent(tripId)}'),
               ),
         actions: [
-          if (!_isEditing)
-            TpToolbarIconButton(
-              key: const ValueKey('trip-timeline-map'),
-              icon: CupertinoIcons.map,
-              tooltip: '地圖',
-              onPressed: () {
-                final dayNum = _activeDayNum ?? fallbackDayNum;
-                context.go(
-                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
-                  '${dayNum == null ? '' : '&day=$dayNum'}',
-                );
-              },
-            ),
           if (_isEditing)
             TpToolbarTextButton(
               key: const ValueKey('tp-root-header-primary-action'),
@@ -242,7 +221,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 initialEntryId: widget.initialEntryId,
                 initialDayNum: widget.initialDayNum,
                 isEditing: _isEditing,
-                onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
         error: (error, stackTrace) => initiallyBelowHeader(
@@ -268,7 +246,6 @@ class _TimelineBody extends StatefulWidget {
     this.initialEntryId,
     this.initialDayNum,
     required this.isEditing,
-    required this.onActiveDayChanged,
   });
 
   final List<TripDay> days;
@@ -276,14 +253,13 @@ class _TimelineBody extends StatefulWidget {
   final int? initialEntryId;
   final int? initialDayNum;
   final bool isEditing;
-  final ValueChanged<int> onActiveDayChanged;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
 }
 
 class _TimelineBodyState extends State<_TimelineBody> {
-  static const _selectorExtent = 64.0;
+  static const _selectorExtent = TpSpacing.tapMin + TpSpacing.s1;
 
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
@@ -472,7 +448,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
     }
     if (next != _activeDayNum) {
       setState(() => _activeDayNum = next);
-      widget.onActiveDayChanged(next);
     }
   }
 
@@ -484,16 +459,12 @@ class _TimelineBodyState extends State<_TimelineBody> {
     final viewport = RenderAbstractViewport.of(object);
     final reveal = viewport.getOffsetToReveal(object, 0).offset;
     final position = _scrollController.position;
-    final target =
-        (reveal -
-                TpRootGeometry.initialContentTop(targetContext) -
-                _selectorExtent)
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
+    final target = (reveal - _selectorTop(targetContext) - _selectorExtent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
     final generation = ++_programmaticScrollGeneration;
     _programmaticDayNum = dayNum;
     setState(() => _activeDayNum = dayNum);
-    widget.onActiveDayChanged(dayNum);
     final duration = TpMotion.resolve(targetContext, TpMotion.normal);
     if (duration == Duration.zero) {
       _scrollController.jumpTo(target);
@@ -526,7 +497,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
             pinned: true,
             delegate: _DaySelectorHeaderDelegate(
               extent: _selectorExtent,
-              topInset: TpRootGeometry.initialContentTop(context),
+              topInset: _selectorTop(context),
               child: KeyedSubtree(
                 key: _selectorAnchorKey,
                 child: _buildDaySelector(context),
@@ -573,13 +544,26 @@ class _TimelineBodyState extends State<_TimelineBody> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TpSpacing.s3,
-        TpSpacing.s2,
+        0,
         TpSpacing.s3,
         TpSpacing.s1,
       ),
       child: TpHorizontalSelector<int>(
         key: const ValueKey('trip-timeline-view-day-selector'),
         value: _activeDayNum,
+        leadingAction: widget.isEditing
+            ? null
+            : TpHorizontalSelectorAction(
+                key: const ValueKey('trip-timeline-map'),
+                icon: CupertinoIcons.map,
+                label: '地圖',
+                onPressed: () {
+                  context.go(
+                    '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
+                    '&day=$_activeDayNum',
+                  );
+                },
+              ),
         options: [
           for (final day in widget.days)
             TpScopeOption(
@@ -595,6 +579,9 @@ class _TimelineBodyState extends State<_TimelineBody> {
       ),
     );
   }
+
+  double _selectorTop(BuildContext context) =>
+      TpRootGeometry.headerBottom(context) + TpSpacing.s2;
 }
 
 class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {

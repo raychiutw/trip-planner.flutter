@@ -125,6 +125,17 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
+Future<void> _openAlternateDelete(WidgetTester tester, int poiId) async {
+  final dismissKey = ValueKey('alt-swipe-$poiId');
+  await tester.drag(find.byKey(dismissKey), const Offset(-240, 0));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(ValueKey<Object>(('swipe-delete-action', dismissKey))),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
 void main() {
   setUpAll(
     () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
@@ -216,7 +227,7 @@ void main() {
     expect(find.textContaining('可能跨區，前後車程會誤算'), findsOneWidget);
   });
 
-  testWidgets('移除備選 → removeEntryAlternate', (tester) async {
+  testWidgets('左滑備選只揭露刪除，確認後才 removeEntryAlternate', (tester) async {
     final repo = _MockTripRepository();
     when(
       () => repo.removeEntryAlternate(
@@ -228,7 +239,18 @@ void main() {
     ).thenAnswer((_) async {});
     await _pump(tester, repo);
 
-    await tester.tap(find.byKey(const ValueKey('alt-remove-502')));
+    await _openAlternateDelete(tester, 502);
+    expect(find.text('移除備選景點？'), findsOneWidget);
+    verifyNever(
+      () => repo.removeEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
     await tester.pumpAndSettle();
 
     verify(
@@ -239,6 +261,24 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('備選刪除確認取消不呼叫 repository', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await _openAlternateDelete(tester, 502);
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+
+    verifyNever(
+      () => repo.removeEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    );
   });
 
   testWidgets('操作未回來就離開地點管理 → 不得因 use-after-dispose 崩潰', (tester) async {
@@ -257,7 +297,8 @@ void main() {
     ).thenAnswer((_) => pending.future);
     await _pump(tester, repo);
 
-    await tester.tap(find.byKey(const ValueKey('alt-remove-502')));
+    await _openAlternateDelete(tester, 502);
+    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
     await tester.pump();
 
     // 回應抵達前離開頁面。
