@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
@@ -449,13 +450,120 @@ void main() {
       find.byKey(const ValueKey('settings-notifications')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('settings-privacy-policy')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-delete-account')),
+      findsOneWidget,
+    );
     expect(find.text('通知'), findsOneWidget);
 
-    expect(find.byType(TpSettingsGroup), findsNWidgets(4));
+    expect(find.byType(TpSettingsGroup), findsNWidgets(5));
     final notificationsTile = tester.widget<TpSettingsRow>(
       find.byKey(const ValueKey('settings-notifications')),
     );
     expect(notificationsTile.onTap, isNotNull);
+  });
+
+  testWidgets('刪除帳號顯示影響數字並要求密碼，錯誤時保留對話框', (tester) async {
+    when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
+      (_) async => const AccountDeletionPreview(
+        hasPassword: true,
+        tripsOwned: 3,
+        collaboratorsAffected: 5,
+      ),
+    );
+    when(
+      () => mockAuthRepository.deleteAccount(
+        hasPassword: any(named: 'hasPassword'),
+        confirmation: any(named: 'confirmation'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 401,
+        code: 'ACCOUNT_DELETE_PASSWORD_INVALID',
+        message: 'invalid',
+      ),
+    );
+    await pumpAccountScreen(tester);
+
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.ensureVisible(deleteRow);
+    await tester.tap(deleteRow);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('3 個行程'), findsOneWidget);
+    expect(find.textContaining('5 位共編者'), findsOneWidget);
+    expect(find.text('此操作無法復原。'), findsNothing);
+    expect(find.textContaining('此操作無法復原'), findsOneWidget);
+    final confirmButton = find.byKey(
+      const ValueKey('delete-account-confirm-button'),
+    );
+    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('delete-account-confirmation-field')),
+      'wrong-password',
+    );
+    await tester.pump();
+    await tester.tap(confirmButton);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockAuthRepository.deleteAccount(
+        hasPassword: true,
+        confirmation: 'wrong-password',
+      ),
+    ).called(1);
+    expect(find.text('密碼不正確，請重新輸入'), findsOneWidget);
+    expect(find.byKey(const ValueKey('delete-account-dialog')), findsOneWidget);
+  });
+
+  testWidgets('純 OAuth 帳號只有輸入大寫 DELETE 才可確認', (tester) async {
+    when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
+      (_) async => const AccountDeletionPreview(
+        hasPassword: false,
+        tripsOwned: 0,
+        collaboratorsAffected: 0,
+      ),
+    );
+    when(
+      () => mockAuthRepository.deleteAccount(
+        hasPassword: any(named: 'hasPassword'),
+        confirmation: any(named: 'confirmation'),
+      ),
+    ).thenAnswer((_) async {});
+    await pumpAccountScreen(tester);
+
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.ensureVisible(deleteRow);
+    await tester.tap(deleteRow);
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(
+      const ValueKey('delete-account-confirmation-field'),
+    );
+    final confirmButton = find.byKey(
+      const ValueKey('delete-account-confirm-button'),
+    );
+    await tester.enterText(field, 'delete');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
+    await tester.enterText(field, 'DELETE');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNotNull);
+    await tester.tap(confirmButton);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => mockAuthRepository.deleteAccount(
+        hasPassword: false,
+        confirmation: 'DELETE',
+      ),
+    ).called(1);
+    expect(find.byKey(const ValueKey('delete-account-dialog')), findsNothing);
   });
 
   testWidgets('點登出 row 出現確認對話框，確認後呼叫 logout', (tester) async {

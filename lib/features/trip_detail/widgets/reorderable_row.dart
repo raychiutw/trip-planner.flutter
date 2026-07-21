@@ -38,7 +38,7 @@ Future<void> confirmAndDelete(
   }
 }
 
-/// 拖曳排序 handle（須置於 ReorderableListView 內;長按拖動）。
+/// 拖曳排序 handle（須置於 ReorderableListView 內；按住即可拖動）。
 class ReorderDragHandle extends StatefulWidget {
   const ReorderDragHandle({
     super.key,
@@ -75,50 +75,6 @@ class _ReorderDragHandleState extends State<ReorderDragHandle> {
           label: '拖曳調整順序',
           child: TpInlineEditControlVisual(
             icon: CupertinoIcons.line_horizontal_3,
-            pressed: _pressed,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class TpInlineEditActionButton extends StatefulWidget {
-  const TpInlineEditActionButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  State<TpInlineEditActionButton> createState() =>
-      _TpInlineEditActionButtonState();
-}
-
-class _TpInlineEditActionButtonState extends State<TpInlineEditActionButton> {
-  var _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: widget.tooltip,
-      child: Tooltip(
-        message: widget.tooltip,
-        excludeFromSemantics: true,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTap: widget.onPressed,
-          child: TpInlineEditControlVisual(
-            icon: widget.icon,
             pressed: _pressed,
           ),
         ),

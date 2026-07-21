@@ -12,6 +12,7 @@ void main() {
   late DioAdapter dioAdapter;
   late InMemorySessionStore sessionStore;
   late AuthRepository authRepository;
+  late List<RequestOptions> recordedRequests;
 
   const userInfoJson = {
     'id': 'u1hex',
@@ -25,6 +26,15 @@ void main() {
   setUp(() {
     dio = Dio();
     dioAdapter = DioAdapter(dio: dio);
+    recordedRequests = [];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          recordedRequests.add(options);
+          handler.next(options);
+        },
+      ),
+    );
     sessionStore = InMemorySessionStore();
     final apiClient = ApiClient(sessionStore: sessionStore, dio: dio);
     authRepository = AuthRepository(
@@ -86,6 +96,7 @@ void main() {
       expect(loggedInUser.email, 'ray@example.com');
       expect(loggedInUser.emailVerified, isTrue);
       expect(loggedInUser.displayName, 'Ray');
+      expect(recordedRequests.first.headers['Origin'], kTriplineOrigin);
     });
 
     test('401 LOGIN_INVALID → 丟 ApiError、store 不寫入', () async {
@@ -151,6 +162,7 @@ void main() {
         data: {
           'email': 'traveler@example.com',
           'password': 'secret123',
+          'privacyConsent': true,
           'displayName': 'Ray',
           'invitationToken': 'invite-token',
         },
@@ -159,6 +171,7 @@ void main() {
       final result = await authRepository.signup(
         email: ' traveler@example.com ',
         password: 'secret123',
+        privacyConsent: true,
         displayName: ' Ray ',
         invitationToken: ' invite-token ',
       );
@@ -170,6 +183,7 @@ void main() {
       expect(result.joinedTrip?.id, 'trip-1');
       expect(result.joinedTrip?.title, '沖繩家庭旅行');
       expect(result.invitationError, isNull);
+      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
     });
 
     test('SIGNUP_EMAIL_TAKEN → 丟 ApiError、store 不寫入', () async {
@@ -178,11 +192,19 @@ void main() {
         (server) => server.reply(409, {
           'error': {'code': 'SIGNUP_EMAIL_TAKEN', 'message': '已註冊'},
         }),
-        data: {'email': 'ray@example.com', 'password': 'secret123'},
+        data: {
+          'email': 'ray@example.com',
+          'password': 'secret123',
+          'privacyConsent': true,
+        },
       );
 
       await expectLater(
-        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        authRepository.signup(
+          email: 'ray@example.com',
+          password: 'secret123',
+          privacyConsent: true,
+        ),
         throwsA(
           isA<ApiError>().having(
             (error) => error.code,
@@ -194,6 +216,79 @@ void main() {
       expect(await sessionStore.read(), isNull);
     });
 
+    test('privacyConsent 會以實際 boolean false 傳給後端', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(400, {
+          'error': {
+            'code': 'SIGNUP_CONSENT_REQUIRED',
+            'message': 'consent required',
+          },
+        }),
+        data: {
+          'email': 'ray@example.com',
+          'password': 'secret123',
+          'privacyConsent': false,
+        },
+      );
+
+      await expectLater(
+        authRepository.signup(
+          email: 'ray@example.com',
+          password: 'secret123',
+          privacyConsent: false,
+        ),
+        throwsA(
+          isA<ApiError>().having(
+            (error) => error.code,
+            'code',
+            'SIGNUP_CONSENT_REQUIRED',
+          ),
+        ),
+      );
+    });
+
+    test('SIGNUP_RATE_LIMITED 保留 Retry-After 秒數', () async {
+      dioAdapter.onPost(
+        '/oauth/signup',
+        (server) => server.reply(
+          429,
+          {
+            'error': {
+              'code': 'SIGNUP_RATE_LIMITED',
+              'message': 'too many requests',
+            },
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'retry-after': ['42'],
+          },
+        ),
+        data: {
+          'email': 'ray@example.com',
+          'password': 'secret123',
+          'privacyConsent': true,
+        },
+      );
+
+      await expectLater(
+        authRepository.signup(
+          email: 'ray@example.com',
+          password: 'secret123',
+          privacyConsent: true,
+        ),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.code, 'code', 'SIGNUP_RATE_LIMITED')
+              .having(
+                (error) => error.retryAfterSeconds,
+                'retryAfterSeconds',
+                42,
+              ),
+        ),
+      );
+    });
+
     test('201 但無 tripline_session cookie → 丟 ApiError', () async {
       dioAdapter.onPost(
         '/oauth/signup',
@@ -203,14 +298,85 @@ void main() {
           'email': 'ray@example.com',
           'requiresVerification': true,
         }),
-        data: {'email': 'ray@example.com', 'password': 'secret123'},
+        data: {
+          'email': 'ray@example.com',
+          'password': 'secret123',
+          'privacyConsent': true,
+        },
       );
 
       await expectLater(
-        authRepository.signup(email: 'ray@example.com', password: 'secret123'),
+        authRepository.signup(
+          email: 'ray@example.com',
+          password: 'secret123',
+          privacyConsent: true,
+        ),
         throwsA(isA<ApiError>()),
       );
       expect(await sessionStore.read(), isNull);
+    });
+  });
+
+  group('account deletion', () {
+    test('GET /account 解析刪除影響預覽且不使用快取', () async {
+      dioAdapter.onGet(
+        '/account',
+        (server) => server.reply(200, {
+          'hasPassword': true,
+          'tripsOwned': 3,
+          'collaboratorsAffected': 5,
+        }),
+      );
+
+      final preview = await authRepository.fetchAccountDeletionPreview();
+
+      expect(preview.hasPassword, isTrue);
+      expect(preview.tripsOwned, 3);
+      expect(preview.collaboratorsAffected, 5);
+    });
+
+    test('GET /account 缺少影響數字時拒絕顯示誤導性的零值', () async {
+      dioAdapter.onGet(
+        '/account',
+        (server) => server.reply(200, {'hasPassword': true}),
+      );
+
+      await expectLater(
+        authRepository.fetchAccountDeletionPreview(),
+        throwsA(isA<TypeError>()),
+      );
+    });
+
+    test('密碼帳號 DELETE /account 送 password 並清除 session', () async {
+      await sessionStore.write('session-token');
+      dioAdapter.onDelete(
+        '/account',
+        (server) => server.reply(200, {'ok': true, 'tripsDeleted': 2}),
+        data: {'password': 'secret123'},
+      );
+
+      await authRepository.deleteAccount(
+        hasPassword: true,
+        confirmation: 'secret123',
+      );
+
+      expect(await sessionStore.read(), isNull);
+    });
+
+    test('純 OAuth 帳號 DELETE /account 送 confirm DELETE', () async {
+      dioAdapter.onDelete(
+        '/account',
+        (server) => server.reply(200, {'ok': true, 'tripsDeleted': 0}),
+        data: {'confirm': 'DELETE'},
+      );
+
+      await expectLater(
+        authRepository.deleteAccount(
+          hasPassword: false,
+          confirmation: 'DELETE',
+        ),
+        completes,
+      );
     });
   });
 

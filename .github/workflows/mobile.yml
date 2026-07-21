@@ -34,7 +34,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: '3.44.6'
+  FLUTTER_VERSION: '3.44.7'
   IOS_BUNDLE_ID: com.raychiu.tripline
 
 jobs:

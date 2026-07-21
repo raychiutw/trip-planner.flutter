@@ -346,7 +346,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
-  expect(find.text('總覽'), findsNothing);
+  expect(find.text('總覽'), findsOneWidget);
   expect(tester.widget<PageView>(find.byType(PageView)).pageSnapping, isFalse);
   await captureState('map-tripline-poi');
   await tester.tap(find.byKey(const ValueKey('fake-google-poi-trigger')));
@@ -378,8 +378,25 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  final accountScroll = find.descendant(
+    of: find.byKey(const ValueKey('account-sheet-content')),
+    matching: find.byType(Scrollable),
+  );
+  await tester.scrollUntilVisible(
+    find.byKey(const ValueKey('account-version-footer')),
+    200,
+    scrollable: accountScroll,
+  );
+  await tester.pumpAndSettle();
   expect(find.text('版本 0.9.1（12）'), findsOneWidget);
   await captureState('account');
+  await tester.scrollUntilVisible(
+    find.byKey(const ValueKey('settings-appearance')),
+    -200,
+    scrollable: accountScroll,
+  );
+  await tester.drag(accountScroll, const Offset(0, 160));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('settings-appearance')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);

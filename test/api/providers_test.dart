@@ -149,5 +149,20 @@ void main() {
       expect(container.read(authStateProvider).value, isNull);
       expect(await sessionStore.read(), isNull);
     });
+
+    test('帳號刪除後清除離線快取並將 state 設為未登入', () async {
+      dioAdapter.onGet(
+        '/oauth/userinfo',
+        (server) => server.reply(200, userInfoJson),
+      );
+      expect(await container.read(authStateProvider.future), isNotNull);
+      final cache = container.read(cacheStoreProvider);
+      await cache.writeResponse('trip-cache', {'id': 'trip-1'});
+
+      await container.read(authStateProvider.notifier).accountDeleted();
+
+      expect(container.read(authStateProvider).value, isNull);
+      expect(await cache.readResponse('trip-cache'), isNull);
+    });
   });
 }

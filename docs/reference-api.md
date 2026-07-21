@@ -18,11 +18,12 @@ class ApiClient {
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query});
   Future<dynamic> post(String path, {Object? body});
+  Future<Response<dynamic>> postForResponse(String path, {Object? body});
   Future<dynamic> put(String path, {Object? body});
   Future<dynamic> patch(String path, {Object? body});
-  Future<dynamic> delete(String path);
+  Future<dynamic> delete(String path, {Object? body});
 
-  Dio get dio;  // 供 AuthRepository 直接讀 response headers(set-cookie)
+  Dio get dio;  // OAuth PKCE 等需要 Dio 原生 request options 的進階流程
 
   static int parseRetryAfterSeconds(String? headerValue);
 }
@@ -93,16 +94,24 @@ class AuthRepository {
   AuthRepository({required ApiClient client, required SessionStore sessionStore});
 
   Future<UserInfo> login({required String email, required String password});
+  Future<SignupResult> signup({required String email, required String password, required bool privacyConsent, String? displayName, String? invitationToken});
   Future<void> logout();
   Future<UserInfo?> currentUser();
+  Future<AccountDeletionPreview> fetchAccountDeletionPreview();
+  Future<void> deleteAccount({required bool hasPassword, required String confirmation});
 }
 ```
 
 | 方法 | 行為 |
 |---|---|
-| `login` | `POST /oauth/login`(走 raw `client.dio` 才能讀 headers)→ 用 regex 從 `set-cookie` 解析 `tripline_session=<value>` → 寫入 store → `GET /oauth/userinfo` 回 `UserInfo`。找不到 cookie 時 throw `ApiError(code: 'AUTH_NO_SESSION_COOKIE')` |
+| `login` | `POST /oauth/login` 走共用 `postForResponse` 以保留 Origin／錯誤轉換並讀 headers → 從 `set-cookie` 解析 `tripline_session=<value>` → 寫入 store → `GET /oauth/userinfo` 回 `UserInfo`。找不到 cookie 時 throw `ApiError(code: 'AUTH_NO_SESSION_COOKIE')` |
+| `signup` | `POST /oauth/signup`，送出畫面真實的 JSON boolean `privacyConsent`；成功後解析 session cookie，不會把同意值寫死為 `true` |
 | `logout` | `POST /oauth/logout`(**失敗忽略**,server 端登出失敗不影響本機)+ `store.clear()`(必執行,在 `finally`) |
 | `currentUser` | `GET /oauth/userinfo`;**401 回 `null` 不 throw**(未登入是正常狀態),其他錯誤 rethrow |
+| `fetchAccountDeletionPreview` | `GET /account` 且停用 cache fallback，取得 `hasPassword`、owned trips 與受影響協作者摘要 |
+| `deleteAccount` | `DELETE /account`；密碼帳號送 `password`，純 OAuth 帳號送 `confirm: DELETE`，成功後清除本機 session |
+
+所有 auth mutation 都經 `ApiClient` 注入 production `Origin`。公開隱私權政策位於 `https://trip-planner-dby.pages.dev/privacy`，不加 `/api`，註冊與帳號頁共用同一個外部連結 helper。
 
 ## TripRepository(`trip_repository.dart`)
 
@@ -115,6 +124,7 @@ class TripRepository {
   Future<List<TripSummary>> fetchMyTrips();              // GET /my-trips
   Future<List<Trip>>        fetchTrips();                // GET /trips(published 清單)
   Future<Trip>              fetchTrip(String id);        // GET /trips/:id
+  Future<({String tripId, int daysCreated, int destinationsCreated})> createTrip({required String name, required DateTime startDate, required DateTime endDate, String? description, String? countries, required List<DestinationInput> destinations, int published = 0}); // POST /trips；id 由 server 產生
   Future<List<TripDay>>     fetchDays(String id);        // GET /trips/:id/days?all=1
   Future<TripNotes>         fetchNotes(String id);       // GET /trips/:id/notes
   Future<({int jobId, int requestId, String status, String tripId, String docType})>

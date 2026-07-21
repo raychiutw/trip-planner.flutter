@@ -4,8 +4,12 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-07-21
+
 ### 新增
 
+- 未登入首頁加入精簡功能導覽、品牌圖片、隱私權入口與登入後開始使用按鈕；帳號頁底部顯示實際 app 版本與 build number。
+- 註冊流程要求使用者勾選個資條款並把真實 `privacyConsent` 傳給 signup API；帳號頁加入隱私權政策與依帳號類型二次確認的永久刪除流程。
 - App 在前景由離線恢復連線時會立即重試既有同步佇列；冷啟動、回前景與手動重試入口維持不變。
 - 行程與收藏列表支援 iOS 慣例的尾端左滑刪除，並保留原本可見操作與收藏六秒復原。
 - 收藏頁加入 HIG S1 即時搜尋、排序／篩選選單與符合文字加深；窄螢幕搭配 200% Dynamic Type 時，新增景點會收進既有更多選單。
@@ -13,6 +17,8 @@
 
 ### 變更
 
+- Flutter 開發、CI、TestFlight、Google Play 與 Firebase Test Lab 工具鏈統一為 3.44.7 stable；PATH 不再混用舊 SDK。
+- 建立行程不再傳送 client-generated `id`，由後端回傳 canonical `tripId`；新行程維持 `published = 0`。
 - 單一行程改用 20／15／13pt 內容層級並提供固定返回行程列表；Header command 與 Day selection 不再混在同一控制列。
 - 文字型聊天／行程／收藏使用較實的 navigation material，地圖維持視覺背景材質，避免 Header 前後景文字疊在一起。
 - 收藏搜尋改成與行程一覽一致的常駐搜尋欄；新增停留點改用短模式名稱、單一日期欄位與不折行分類列。
@@ -260,5 +266,7 @@ P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽
 - 專案 CLAUDE.md(agent 開發指南)
 - PORTING_PLAN/CONTRACTS 與實作同步(riverpod 3.x、歷史契約標註)
 
-[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.0...v0.9.1
 [0.1.0]: https://github.com/raychiutw/trip-planner.flutter/releases/tag/v0.1.0

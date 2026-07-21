@@ -11,7 +11,8 @@
 - 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
-- 帳號（profile、統計、登出）
+- 帳號（profile、統計、版本資訊、隱私權政策、刪除帳號、登出）
+- 未登入首頁（功能導覽、隱私權政策入口與登入後開始使用）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
 **P2（已完成）**：分享/列印/匯入、設定子頁、通知偏好 toggle、OAuth PKCE Bearer 認證（production `tripline-mobile` public client 已 provision）、離線快取。
@@ -52,6 +53,7 @@ docs/
 | 啟用 OAuth PKCE | [How to 啟用 OAuth PKCE](docs/howto-oauth-pkce.md) |
 | 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
 | 跑 Patrol／Firebase Test Lab 外部裝置證據 | [Mobile E2E automation](docs/mobile-e2e.md) |
+| 發布 TestFlight／Google Play internal | [Mobile release runbook 與發布紀錄](docs/mobile-e2e.md#run-and-interpret) |
 | 查 API 層介面 | [reference-api](docs/reference-api.md) |
 | 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
 | 查設計 token / 自適應 UI 規格 | [reference-theme](docs/reference-theme.md) |
@@ -60,7 +62,7 @@ docs/
 | 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
 | 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
 
-技術棧：Flutter 3.44.6 / Dart 3.11.3（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、google_navigation_flutter 0.10。
+技術棧：Flutter 3.44.7 stable / Dart 3.12.2（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、google_navigation_flutter 0.10。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 

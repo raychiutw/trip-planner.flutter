@@ -122,6 +122,19 @@ void main() {
       expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
     });
 
+    test('DELETE 可送 JSON body 並帶 Origin', () async {
+      dioAdapter.onDelete(
+        '/account',
+        (server) => server.reply(200, {'ok': true}),
+        data: {'confirm': 'DELETE'},
+      );
+
+      await apiClient.delete('/account', body: {'confirm': 'DELETE'});
+
+      expect(recordedRequests.single.data, {'confirm': 'DELETE'});
+      expect(recordedRequests.single.headers['Origin'], kTriplineOrigin);
+    });
+
     test('GET 不帶 Origin', () async {
       dioAdapter.onGet('/trips', (server) => server.reply(200, []));
 
@@ -409,7 +422,7 @@ void main() {
 
   group('base URL', () {
     test('base = <origin>/api', () {
-      expect(apiClient.dio.options.baseUrl, '$kTriplineOrigin/api');
+      expect(apiClient.baseUrl, '$kTriplineOrigin/api');
     });
   });
 

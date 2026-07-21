@@ -227,7 +227,6 @@ void main() {
     when(() => authRepo.fetchAiAuthorization()).thenThrow(Exception('offline'));
     when(
       () => tripRepo.createTrip(
-        id: any(named: 'id'),
         name: any(named: 'name'),
         startDate: any(named: 'startDate'),
         endDate: any(named: 'endDate'),
@@ -257,7 +256,6 @@ void main() {
 
     verify(
       () => tripRepo.createTrip(
-        id: any(named: 'id'),
         name: '東京',
         startDate: any(named: 'startDate'),
         endDate: any(named: 'endDate'),

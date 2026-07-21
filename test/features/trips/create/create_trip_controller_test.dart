@@ -105,7 +105,6 @@ void main() {
   test('submit：衍生 name/countries + 呼叫 createTrip → 回 tripId', () async {
     when(
       () => repo.createTrip(
-        id: any(named: 'id'),
         name: any(named: 'name'),
         startDate: any(named: 'startDate'),
         endDate: any(named: 'endDate'),
@@ -135,7 +134,6 @@ void main() {
     expect(c.read(createTripControllerProvider).destinations, isEmpty);
     verify(
       () => repo.createTrip(
-        id: any(named: 'id'),
         name: 'A、B',
         startDate: '2026-07-01',
         endDate: '2026-07-05',
@@ -149,7 +147,6 @@ void main() {
   test('submit 409 → error,submitting false', () async {
     when(
       () => repo.createTrip(
-        id: any(named: 'id'),
         name: any(named: 'name'),
         startDate: any(named: 'startDate'),
         endDate: any(named: 'endDate'),

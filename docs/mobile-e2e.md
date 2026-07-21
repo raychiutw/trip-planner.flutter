@@ -189,6 +189,28 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
+## 2026-07-21 v0.9.2 release-candidate verification
+
+This release candidate standardizes local and GitHub Actions builds on Flutter
+3.44.7 stable／Dart 3.12.2. The public privacy policy returned HTTP 200 at
+`https://trip-planner-dby.pages.dev/privacy`; signup forwards the user's actual
+`privacyConsent`, account settings link to the same policy, and in-app account
+deletion uses an uncached preview followed by `DELETE /api/account`.
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Analyzer | PASS | Flutter 3.44.7, 0 issues |
+| Focused release／API／account／trip tests | PASS | 218 tests, including the four stale assertions from the previous failed Linux run |
+| Full Windows host run | PARTIAL | 1,314 passed; 12 Bash-invocation cases in the two workflow contract files are not reliable under Windows/MSYS and remain mandatory Ubuntu CI gates |
+| Workflow／signing configuration | PASS | Flutter version pinned to 3.44.7; required App Store, Play, Maps, and signing secret names are configured |
+| Public privacy policy | PASS | Anonymous HTTPS GET returned 200 on 2026-07-21 |
+| Favorite restore staging contract | BLOCKED | Protected staging credentials and reviewed real staging allowlist are still absent; publish with `run_optional_evidence=false` |
+| TestFlight／Play Internal upload | PENDING | Run `Mobile CI / Releases` from `master` with `release_target=both` after push CI passes |
+
+The release dispatch requires approval from the `mobile-release` Environment.
+Both store jobs must finish successfully before this section is converted to a
+release record with the workflow URL, source SHA, and shared build number.
+
 ## 2026-07-20 HIG／offline／restore implementation verification
 
 The 2026-07-20 App implementation completed the HIG navigation, typography,

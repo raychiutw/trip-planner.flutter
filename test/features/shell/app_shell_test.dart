@@ -119,7 +119,7 @@ void main() {
       expect(glass.selectedIconColor, TpColorsDark.accentDeep);
     });
 
-    testWidgets('root branches use text glass except the visual map branch', (
+    testWidgets('root branches keep content visible through Liquid Glass', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -141,16 +141,15 @@ void main() {
 
       final standard = rootBar();
       expect(standard.platformViewBackdrop, isFalse);
+      expect(standard.settings?.glassColor.a, closeTo(0.58, 0.01));
+      expect(standard.settings?.backerColor, isNull);
 
       await tester.tap(find.bySemanticsLabel('地圖'));
       await tester.pumpAndSettle();
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
-      expect(
-        map.settings?.glassColor.a,
-        lessThan(standard.settings!.glassColor.a),
-      );
+      expect(map.settings?.glassColor.a, standard.settings?.glassColor.a);
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);

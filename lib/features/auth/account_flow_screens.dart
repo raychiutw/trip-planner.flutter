@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
+import '../../app/external_links.dart';
 import '../../theme/tokens.dart';
 
 /// Email/password signup page, including optional invitation token handoff.
@@ -28,6 +29,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _displayNameController = TextEditingController();
   bool _submitting = false;
   bool _obscurePassword = true;
+  bool _privacyConsent = false;
+  String? _emailServerError;
+  String? _passwordServerError;
+  String? _privacyConsentError;
   String? _error;
 
   @override
@@ -44,6 +49,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     setState(() {
       _submitting = true;
       _error = null;
+      _emailServerError = null;
+      _passwordServerError = null;
+      _privacyConsentError = null;
     });
     try {
       final email = _emailController.text.trim();
@@ -52,6 +60,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           .signup(
             email: email,
             password: _passwordController.text,
+            privacyConsent: _privacyConsent,
             displayName: _displayNameController.text,
             invitationToken: widget.invitationToken,
           );
@@ -81,12 +90,31 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
     } on Exception catch (error) {
       if (!mounted) return;
+      if (error is ApiError) {
+        switch (error.code) {
+          case 'SIGNUP_CONSENT_REQUIRED':
+            setState(() => _privacyConsentError = '請先閱讀並同意個資條款');
+            return;
+          case 'SIGNUP_INVALID_EMAIL':
+            setState(() => _emailServerError = '電子郵件格式無效');
+            return;
+          case 'SIGNUP_INVALID_PASSWORD':
+          case 'SIGNUP_PASSWORD_TOO_SHORT':
+            setState(() => _passwordServerError = '密碼至少 8 字元');
+            return;
+          case 'SIGNUP_RATE_LIMITED':
+            final seconds = error.retryAfterSeconds;
+            setState(
+              () => _error = seconds == null
+                  ? '註冊請求過多，請幾分鐘後再試'
+                  : '註冊請求過多，請在 $seconds 秒後再試',
+            );
+            return;
+        }
+      }
       setState(
         () => _error = _authErrorMessage(error, const {
-          'SIGNUP_INVALID_EMAIL': '電子郵件格式無效',
-          'SIGNUP_INVALID_PASSWORD': '密碼至少 8 字元',
           'SIGNUP_EMAIL_TAKEN': '此電子郵件已註冊，請改用登入或重設密碼',
-          'SIGNUP_RATE_LIMITED': '註冊請求過多，請幾分鐘後再試',
         }, '註冊失敗，請稍後再試'),
       );
     } finally {
@@ -119,6 +147,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               enabled: !_submitting,
+              forceErrorText: _emailServerError,
+              onChanged: (_) {
+                if (_emailServerError != null) {
+                  setState(() => _emailServerError = null);
+                }
+              },
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) =>
                   value == null || value.trim().isEmpty ? '請輸入 Email' : null,
@@ -138,6 +172,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               obscureText: _obscurePassword,
               textInputAction: TextInputAction.done,
               enabled: !_submitting,
+              forceErrorText: _passwordServerError,
+              onChanged: (_) {
+                if (_passwordServerError != null) {
+                  setState(() => _passwordServerError = null);
+                }
+              },
               onFieldSubmitted: (_) => _submit(),
               decoration: InputDecoration(
                 labelText: '密碼',
@@ -173,14 +213,30 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
                     value: field.value ?? false,
-                    onChanged: _submitting ? null : field.didChange,
+                    onChanged: _submitting
+                        ? null
+                        : (value) {
+                            field.didChange(value);
+                            setState(() {
+                              _privacyConsent = value ?? false;
+                              _privacyConsentError = null;
+                            });
+                          },
                     title: const Text('我已閱讀並同意個資條款'),
                   ),
-                  if (field.errorText != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton(
+                      key: const ValueKey('signup-privacy-policy-link'),
+                      onPressed: openPrivacyPolicy,
+                      child: const Text('查看個資條款'),
+                    ),
+                  ),
+                  if (field.errorText != null || _privacyConsentError != null)
                     Padding(
                       padding: const EdgeInsetsDirectional.only(start: 12),
                       child: Text(
-                        field.errorText!,
+                        field.errorText ?? _privacyConsentError!,
                         key: const ValueKey('signup-privacy-consent-error'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.error,

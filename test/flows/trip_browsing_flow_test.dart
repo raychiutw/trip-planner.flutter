@@ -77,6 +77,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
+    await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsOneWidget);
 
     await tester.enterText(

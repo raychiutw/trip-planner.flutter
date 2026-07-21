@@ -114,14 +114,13 @@ class TripRepository {
   /// 後端自動建好每日 days + owner 權限;不回整列。
   Future<({String tripId, int daysCreated, int destinationsCreated})>
   createTrip({
-    required String id,
     required String name,
     required String startDate,
     required String endDate,
     String? title,
     String? description,
     String countries = 'JP',
-    int published = 1,
+    int published = 0,
     String dataSource = 'manual',
     String lang = 'zh-TW',
     List<DestinationInput> destinations = const [],
@@ -129,7 +128,6 @@ class TripRepository {
     final body = await _client.post(
       '/trips',
       body: {
-        'id': id,
         'name': name,
         'startDate': startDate,
         'endDate': endDate,
@@ -144,7 +142,7 @@ class TripRepository {
     );
     final map = body as Map<String, dynamic>;
     return (
-      tripId: map['tripId'] as String? ?? id,
+      tripId: map['tripId'] as String,
       daysCreated: (map['daysCreated'] as num?)?.toInt() ?? 0,
       destinationsCreated: (map['destinationsCreated'] as num?)?.toInt() ?? 0,
     );

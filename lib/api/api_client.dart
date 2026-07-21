@@ -88,8 +88,30 @@ class ApiClient {
   int _mutationCounter = 0;
   bool _flushing = false;
 
-  /// 供 AuthRepository 直接讀 response headers（set-cookie）用。
-  Dio get dio => _dio;
+  String get baseUrl => _dio.options.baseUrl;
+
+  /// POST 並保留完整 response（例如 AuthRepository 需要讀 set-cookie）。
+  ///
+  /// 仍統一套用 Cookie／Bearer／Origin，避免需要 response headers 的流程繞過
+  /// [ApiClient] 的認證與 CSRF 規則。
+  Future<Response<dynamic>> postForResponse(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    bool followRedirects = true,
+  }) async {
+    final auth = await _authHeadersFor('POST');
+    return _dio.request<dynamic>(
+      path,
+      queryParameters: query,
+      data: body,
+      options: Options(
+        method: 'POST',
+        headers: auth.headers,
+        followRedirects: followRedirects,
+      ),
+    );
+  }
 
   Future<dynamic> get(
     String path, {
@@ -124,8 +146,11 @@ class ApiClient {
   Future<dynamic> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body);
 
-  Future<dynamic> delete(String path, {Map<String, dynamic>? query}) =>
-      _send('DELETE', path, query: query);
+  Future<dynamic> delete(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+  }) => _send('DELETE', path, body: body, query: query);
 
   /// POST that preserves 3xx redirect response instead of following it.
   Future<ApiRedirectResponse> postForRedirect(
@@ -133,16 +158,11 @@ class ApiClient {
     Object? body,
     Map<String, dynamic>? query,
   }) async {
-    final auth = await _authHeadersFor('POST');
-    final response = await _dio.request<dynamic>(
+    final response = await postForResponse(
       path,
-      queryParameters: query,
-      data: body,
-      options: Options(
-        method: 'POST',
-        headers: auth.headers,
-        followRedirects: false,
-      ),
+      body: body,
+      query: query,
+      followRedirects: false,
     );
     final statusCode = response.statusCode ?? 0;
     if (_isEdgeBlockPage(response)) {

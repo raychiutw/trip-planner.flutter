@@ -39,7 +39,7 @@
 
 | TASK | 狀態 | 證據／阻擋 |
 |---|---|---|
-| 00–09 | DONE | Flutter 3.44.6；focused tests 與 1,284 個產品測試通過；analyzer 0 issue |
+| 00–09 | DONE | Flutter 3.44.7 stable；focused tests 通過；analyzer 0 issue；完整 Linux suite 由本次 ship CI 重驗 |
 | 10 | BLOCKED（外部設定） | App route／release flag 已接；`mobile-release` 無真實 staging secrets／variables，allowlist 只有 `.test` fixture，不能安全執行 mutation contract |
 | 11 | LOCAL PASS | Dart format、analyzer、產品 suite、Android debug APK 皆通過；Linux workflow、iOS signed build 與 store upload 待 commit 後執行 |
 

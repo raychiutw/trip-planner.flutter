@@ -55,7 +55,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: '3.44.6'
+  FLUTTER_VERSION: '3.44.7'
   PATROL_CLI_VERSION: '4.4.0'
   PATROL_ANALYTICS_ENABLED: 'false'
   FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_TEST_LAB_PROJECT_ID }}

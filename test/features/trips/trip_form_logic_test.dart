@@ -3,34 +3,6 @@ import 'package:tripline/features/trips/trip_form_logic.dart';
 import 'package:tripline/models/destination_input.dart';
 
 void main() {
-  group('slugify', () {
-    test('ascii → 連字號', () => expect(slugify('Tokyo Kyoto!!'), 'tokyo-kyoto'));
-    test('全非 ascii → 空', () => expect(slugify('東京、京都'), ''));
-    test(
-      '首尾/連續分隔收斂',
-      () => expect(slugify('  Hello---World  '), 'hello-world'),
-    );
-  });
-
-  group('genTripId', () {
-    test('ascii 名 → slug-base36', () {
-      final id = genTripId('Tokyo', 1717000000000);
-      expect(id.startsWith('tokyo-'), isTrue);
-      expect(RegExp(r'^[a-z0-9-]+$').hasMatch(id), isTrue);
-    });
-    test('全中文名 → trip-<suffix>', () {
-      final id = genTripId('東京', 1717000000000);
-      expect(id.startsWith('trip-'), isTrue);
-      expect(RegExp(r'^[a-z0-9-]+$').hasMatch(id), isTrue);
-    });
-    test('長度 ≤100', () {
-      expect(
-        genTripId('a' * 200, 1717000000000).length,
-        lessThanOrEqualTo(100),
-      );
-    });
-  });
-
   test('deriveTripName 以「、」串接', () {
     expect(
       deriveTripName(const [

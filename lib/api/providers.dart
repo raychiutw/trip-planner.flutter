@@ -135,6 +135,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
+    await _clearLocalAuth();
+  }
+
+  /// 帳號已由後端刪除，只清本機認證與離線資料，不再呼叫 logout API。
+  Future<void> accountDeleted() => _clearLocalAuth();
+
+  Future<void> _clearLocalAuth() async {
     if (OAuthConfig.isConfigured) {
       await ref.read(oauthTokenStoreProvider).clear();
     }

@@ -3,25 +3,6 @@ library;
 
 import '../../models/destination_input.dart';
 
-final _nonSlug = RegExp(r'[^a-z0-9]+');
-final _trimDash = RegExp(r'^-+|-+$');
-
-String slugify(String s) =>
-    s.toLowerCase().replaceAll(_nonSlug, '-').replaceAll(_trimDash, '');
-
-/// client 產 tripId:slug + '-' + base36(now) 後 4 碼;slug 空(全非 ascii)→
-/// `trip-<suffix>`;一律合 `^[a-z0-9-]+$`、≤100。
-String genTripId(String name, int nowMillis) {
-  final base36 = nowMillis.toRadixString(36);
-  final tail = base36.length <= 4
-      ? base36
-      : base36.substring(base36.length - 4);
-  final base = slugify(name);
-  final id = base.isEmpty ? 'trip-$tail' : '$base-$tail';
-  if (id.length <= 100) return id;
-  return id.substring(0, 100).replaceAll(_trimDash, ''); // 截斷後勿留尾端 '-'
-}
-
 String deriveTripName(List<DestinationInput> dests) =>
     dests.map((d) => d.name).join('、');
 

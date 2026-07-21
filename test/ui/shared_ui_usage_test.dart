@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('feature screens use shared app bar and root scaffold primitives', () {
+    const standaloneLandingPages = {'lib/features/auth/welcome_screen.dart'};
     final offenders = <String>[];
     for (final entity in Directory('lib/features').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final normalizedPath = entity.path.replaceAll('\\', '/');
+      if (standaloneLandingPages.contains(normalizedPath)) continue;
       final source = entity.readAsStringSync();
       if (RegExp(
         r'\b(?:AppBar|SliverAppBar|GlassAppBar)\s*\(',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
@@ -86,6 +87,7 @@ void main() {
       () => mockAuthRepository.signup(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
         displayName: any(named: 'displayName'),
         invitationToken: any(named: 'invitationToken'),
       ),
@@ -123,6 +125,7 @@ void main() {
       () => mockAuthRepository.signup(
         email: 'ray@example.com',
         password: 'password123',
+        privacyConsent: true,
         displayName: 'Ray',
         invitationToken: 'inv-1',
       ),
@@ -138,6 +141,10 @@ void main() {
     await pumpAuthRoutes(tester, initialLocation: '/signup');
 
     expect(find.text('至少 8 個字元'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('signup-privacy-policy-link')),
+      findsOneWidget,
+    );
     final fieldFinder = find.byKey(const ValueKey('signup-password-field'));
     TextField textField() => tester.widget<TextField>(
       find.descendant(of: fieldFinder, matching: find.byType(TextField)),
@@ -171,6 +178,7 @@ void main() {
       () => mockAuthRepository.signup(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
         displayName: any(named: 'displayName'),
         invitationToken: any(named: 'invitationToken'),
       ),
@@ -182,6 +190,7 @@ void main() {
       () => mockAuthRepository.signup(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
         displayName: any(named: 'displayName'),
         invitationToken: any(named: 'invitationToken'),
       ),
@@ -207,11 +216,121 @@ void main() {
     expect(find.byKey(const ValueKey('signup-error-banner')), findsOneWidget);
   });
 
+  testWidgets('後端拒絕個資同意時在勾選框旁顯示錯誤', (tester) async {
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 400,
+        code: 'SIGNUP_CONSENT_REQUIRED',
+        message: 'consent required',
+      ),
+    );
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('請先閱讀並同意個資條款'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-error-banner')), findsNothing);
+  });
+
+  testWidgets('後端拒絕 email 時在 email 欄位顯示 inline 錯誤', (tester) async {
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 400,
+        code: 'SIGNUP_INVALID_EMAIL',
+        message: 'invalid email',
+      ),
+    );
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'invalid@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('電子郵件格式無效'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-error-banner')), findsNothing);
+  });
+
+  testWidgets('註冊限流提示 Retry-After 秒數', (tester) async {
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenThrow(
+      const ApiError(
+        status: 429,
+        code: 'SIGNUP_RATE_LIMITED',
+        message: 'too many requests',
+        retryAfterSeconds: 42,
+      ),
+    );
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('註冊請求過多，請在 42 秒後再試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-error-banner')), findsOneWidget);
+  });
+
   testWidgets('註冊若已加入行程會導向行程清單 selected trip', (tester) async {
     when(
       () => mockAuthRepository.signup(
         email: any(named: 'email'),
         password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
         displayName: any(named: 'displayName'),
         invitationToken: any(named: 'invitationToken'),
       ),

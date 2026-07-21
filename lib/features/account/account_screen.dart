@@ -9,9 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
+import '../../api/auth_repository.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_version.dart';
+import '../../app/external_links.dart';
 import '../../models/user.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
@@ -48,6 +51,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   String _nameBaseline = '';
   String? _nameError;
   UserInfo? _profileOverride;
+  bool _loadingAccountDeletion = false;
 
   @override
   void initState() {
@@ -110,6 +114,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               ],
             ),
             const _SettingsGroup(compact: true),
+            _PrivacyAndAccountGroup(
+              loadingDeletion: _loadingAccountDeletion,
+              onPrivacyPolicy: openPrivacyPolicy,
+              onDeleteAccount: _confirmDeleteAccount,
+            ),
             _LogoutRow(onTap: () => _confirmLogout(context, ref)),
             const _VersionFooter(),
           ]
@@ -132,6 +141,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             ),
             const SizedBox(height: TpSpacing.s2),
             const _SettingsGroup(),
+            _PrivacyAndAccountGroup(
+              loadingDeletion: _loadingAccountDeletion,
+              onPrivacyPolicy: openPrivacyPolicy,
+              onDeleteAccount: _confirmDeleteAccount,
+            ),
             _LogoutRow(onTap: () => _confirmLogout(context, ref)),
             const _VersionFooter(),
           ];
@@ -273,6 +287,51 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     );
     if (ok) {
       await ref.read(authStateProvider.notifier).logout();
+    }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    if (_loadingAccountDeletion) return;
+    setState(() => _loadingAccountDeletion = true);
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      final preview = await repository.fetchAccountDeletionPreview();
+      if (!mounted) return;
+      setState(() => _loadingAccountDeletion = false);
+      final deleted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _DeleteAccountDialog(
+          preview: preview,
+          onDelete: (confirmation) => repository.deleteAccount(
+            hasPassword: preview.hasPassword,
+            confirmation: confirmation,
+          ),
+        ),
+      );
+      if (deleted != true || !mounted) return;
+      final router = GoRouter.maybeOf(context);
+      await ref.read(authStateProvider.notifier).accountDeleted();
+      if (!mounted) return;
+      if (widget.embedded) Navigator.of(context).pop();
+      router?.go('/welcome');
+    } on Exception {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('無法載入刪除資訊'),
+          content: const Text('請檢查網路連線後再試一次。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('好'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingAccountDeletion = false);
     }
   }
 }
@@ -643,6 +702,164 @@ class _SettingsGroup extends StatelessWidget {
               onTap: () => context.push('/settings/developer-apps'),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PrivacyAndAccountGroup extends StatelessWidget {
+  const _PrivacyAndAccountGroup({
+    required this.loadingDeletion,
+    required this.onPrivacyPolicy,
+    required this.onDeleteAccount,
+  });
+
+  final bool loadingDeletion;
+  final VoidCallback onPrivacyPolicy;
+  final VoidCallback onDeleteAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return TpSettingsGroup(
+      title: '隱私與帳號',
+      children: [
+        TpSettingsRow(
+          key: const ValueKey('settings-privacy-policy'),
+          leading: const Icon(CupertinoIcons.lock_shield),
+          title: '隱私權政策',
+          onTap: onPrivacyPolicy,
+        ),
+        TpSettingsRow(
+          key: const ValueKey('settings-delete-account'),
+          leading: loadingDeletion
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(CupertinoIcons.delete),
+          title: '刪除帳號',
+          subtitle: loadingDeletion ? '正在載入刪除資訊…' : '永久刪除帳號與擁有的行程',
+          destructive: true,
+          onTap: loadingDeletion ? null : onDeleteAccount,
+        ),
+      ],
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog({required this.preview, required this.onDelete});
+
+  final AccountDeletionPreview preview;
+  final Future<void> Function(String confirmation) onDelete;
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _controller = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  bool get _canSubmit => widget.preview.hasPassword
+      ? _controller.text.isNotEmpty
+      : _controller.text == 'DELETE';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_refresh)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _refresh() => setState(() => _error = null);
+
+  Future<void> _delete() async {
+    if (!_canSubmit || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.onDelete(_controller.text);
+      if (mounted) Navigator.of(context).pop(true);
+    } on ApiError catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = switch (error.code) {
+          'ACCOUNT_DELETE_PASSWORD_INVALID' => '密碼不正確，請重新輸入',
+          'ACCOUNT_DELETE_CONFIRM_REQUIRED' => '請輸入確認內容',
+          _ => '刪除失敗，請稍後再試',
+        };
+      });
+    } on Exception {
+      if (mounted) setState(() => _error = '刪除失敗，請稍後再試');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = widget.preview;
+    return AlertDialog(
+      key: const ValueKey('delete-account-dialog'),
+      title: const Text('永久刪除帳號？'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '將一併刪除你擁有的 ${preview.tripsOwned} 個行程，'
+              '並影響 ${preview.collaboratorsAffected} 位共編者。此操作無法復原。',
+            ),
+            const SizedBox(height: TpSpacing.s4),
+            TextField(
+              key: const ValueKey('delete-account-confirmation-field'),
+              controller: _controller,
+              enabled: !_submitting,
+              obscureText: preview.hasPassword,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                labelText: preview.hasPassword ? '輸入密碼' : '輸入 DELETE 確認',
+                errorText: _error,
+              ),
+              onSubmitted: (_) => _delete(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting
+              ? null
+              : () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const ValueKey('delete-account-confirm-button'),
+          onPressed: _canSubmit && !_submitting ? _delete : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+          ),
+          child: _submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('永久刪除'),
         ),
       ],
     );

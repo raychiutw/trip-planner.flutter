@@ -1932,12 +1932,11 @@ void main() {
         'destinationsCreated': 1,
       }),
       data: {
-        'id': 'tokyo-abcd',
         'name': '東京',
         'startDate': '2026-07-01',
         'endDate': '2026-07-05',
         'countries': 'JP',
-        'published': 1,
+        'published': 0,
         'data_source': 'manual',
         'lang': 'zh-TW',
         'destinations': [
@@ -1947,7 +1946,6 @@ void main() {
     );
 
     final r = await tripRepository.createTrip(
-      id: 'tokyo-abcd',
       name: '東京',
       startDate: '2026-07-01',
       endDate: '2026-07-05',

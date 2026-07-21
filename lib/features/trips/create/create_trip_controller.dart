@@ -155,11 +155,9 @@ class CreateTripController extends Notifier<CreateTripState> {
     if (!state.canSubmit) return null;
     final dests = state.destinations;
     final name = deriveTripName(dests);
-    final id = genTripId(name, DateTime.now().millisecondsSinceEpoch);
     state = state.copyWith(submitting: true, error: null);
     try {
       final r = await _repo.createTrip(
-        id: id,
         name: name,
         startDate: state.startDate!,
         endDate: state.endDate!,

@@ -52,6 +52,25 @@ class SignupResult {
   }
 }
 
+class AccountDeletionPreview {
+  const AccountDeletionPreview({
+    required this.hasPassword,
+    required this.tripsOwned,
+    required this.collaboratorsAffected,
+  });
+
+  final bool hasPassword;
+  final int tripsOwned;
+  final int collaboratorsAffected;
+
+  factory AccountDeletionPreview.fromJson(Map<String, dynamic> json) =>
+      AccountDeletionPreview(
+        hasPassword: json['hasPassword'] as bool,
+        tripsOwned: (json['tripsOwned'] as num).toInt(),
+        collaboratorsAffected: (json['collaboratorsAffected'] as num).toInt(),
+      );
+}
+
 /// 對應 `/api/oauth/*` 認證 endpoints。
 class AuthRepository {
   AuthRepository({
@@ -79,10 +98,9 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    // 走 raw dio 才能讀 response headers（set-cookie）
-    final loginResponse = await _client.dio.post<dynamic>(
+    final loginResponse = await _client.postForResponse(
       '/oauth/login',
-      data: {'email': email, 'password': password},
+      body: {'email': email, 'password': password},
     );
 
     final statusCode = loginResponse.statusCode ?? 0;
@@ -108,14 +126,16 @@ class AuthRepository {
   Future<SignupResult> signup({
     required String email,
     required String password,
+    required bool privacyConsent,
     String? displayName,
     String? invitationToken,
   }) async {
-    final signupResponse = await _client.dio.post<dynamic>(
+    final signupResponse = await _client.postForResponse(
       '/oauth/signup',
-      data: {
+      body: {
         'email': email.trim(),
         'password': password,
+        'privacyConsent': privacyConsent,
         if (displayName != null && displayName.trim().isNotEmpty)
           'displayName': displayName.trim(),
         if (invitationToken != null && invitationToken.trim().isNotEmpty)
@@ -125,7 +145,13 @@ class AuthRepository {
 
     final statusCode = signupResponse.statusCode ?? 0;
     if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(statusCode, signupResponse.data);
+      throw ApiError.fromResponse(
+        statusCode,
+        signupResponse.data,
+        retryAfterSeconds: int.tryParse(
+          signupResponse.headers.value('retry-after') ?? '',
+        ),
+      );
     }
 
     final sessionToken = _sessionTokenFrom(signupResponse.headers);
@@ -139,6 +165,30 @@ class AuthRepository {
     await _sessionStore.write(sessionToken);
 
     return SignupResult.fromJson(signupResponse.data as Map<String, dynamic>);
+  }
+
+  /// GET /account：刪除前顯示會受影響的行程與共編者。
+  Future<AccountDeletionPreview> fetchAccountDeletionPreview() async {
+    final body = await _client.get(
+      '/account',
+      writeCache: false,
+      fallbackToCache: false,
+    );
+    return AccountDeletionPreview.fromJson(body as Map<String, dynamic>);
+  }
+
+  /// DELETE /account：有密碼的帳號送 password，純 OAuth 帳號送 DELETE。
+  Future<void> deleteAccount({
+    required bool hasPassword,
+    required String confirmation,
+  }) async {
+    await _client.delete(
+      '/account',
+      body: hasPassword
+          ? {'password': confirmation}
+          : {'confirm': confirmation},
+    );
+    await _sessionStore.clear();
   }
 
   /// POST /oauth/forgot-password；後端固定 generic response，避免帳號列舉。

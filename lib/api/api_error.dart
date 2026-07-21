@@ -9,12 +9,14 @@ class ApiError implements Exception {
     required this.message,
     this.detail,
     this.payload,
+    this.retryAfterSeconds,
   });
 
   final int status;
   final String code;
   final String message;
   final String? detail;
+  final int? retryAfterSeconds;
 
   /// 原始 error body（供 409 conflictWith 等結構化錯誤取用）。
   final Map<String, dynamic>? payload;
@@ -22,7 +24,11 @@ class ApiError implements Exception {
   /// 三層 fallback：`{error:{code,message,detail}}` →
   /// `{error:"string"}`（OAuth flat，`error_description` 當 message）→
   /// status fallback。detail 截 200 字。
-  factory ApiError.fromResponse(int status, dynamic body) {
+  factory ApiError.fromResponse(
+    int status,
+    dynamic body, {
+    int? retryAfterSeconds,
+  }) {
     final payload = body is Map ? Map<String, dynamic>.from(body) : null;
     if (body is Map) {
       final errorField = body['error'];
@@ -33,6 +39,7 @@ class ApiError implements Exception {
           message: errorField['message']?.toString() ?? 'HTTP $status',
           detail: _truncateDetail(errorField['detail']?.toString()),
           payload: payload,
+          retryAfterSeconds: retryAfterSeconds,
         );
       }
       if (errorField is String && errorField.isNotEmpty) {
@@ -41,6 +48,7 @@ class ApiError implements Exception {
           code: errorField,
           message: body['error_description']?.toString() ?? errorField,
           payload: payload,
+          retryAfterSeconds: retryAfterSeconds,
         );
       }
     }
@@ -49,6 +57,7 @@ class ApiError implements Exception {
       code: 'HTTP_$status',
       message: 'HTTP $status',
       payload: payload,
+      retryAfterSeconds: retryAfterSeconds,
     );
   }
 

@@ -19,6 +19,7 @@ class TimelineEntryTile extends StatelessWidget {
     this.isFirst = false,
     this.isLast = false,
     this.isFocused = false,
+    this.compact = false,
     this.onTap,
     this.trailing,
   });
@@ -36,6 +37,9 @@ class TimelineEntryTile extends StatelessWidget {
 
   /// deep link 或搜尋結果指定的目前聚焦停留點。
   final bool isFocused;
+
+  /// 排序模式只保留名稱與拖曳手把。
+  final bool compact;
 
   /// 點內容卡的回呼（null 則不可點）。
   final VoidCallback? onTap;
@@ -76,6 +80,8 @@ class TimelineEntryTile extends StatelessWidget {
             entry: entry,
             isFocused: isFocused,
             categoryLabel: categoryLabel,
+            compact: compact,
+            trailing: trailing,
           ),
         ),
       ),
@@ -106,11 +112,6 @@ class TimelineEntryTile extends StatelessWidget {
                   ),
                   const SizedBox(height: TpSpacing.s2),
                   entryContent,
-                  if (trailing != null)
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: trailing,
-                    ),
                   const SizedBox(height: TpSpacing.s3),
                 ],
               ),
@@ -223,11 +224,15 @@ class _EntryCard extends StatelessWidget {
     required this.entry,
     required this.isFocused,
     required this.categoryLabel,
+    required this.compact,
+    this.trailing,
   });
 
   final TimelineEntry entry;
   final bool isFocused;
   final String? categoryLabel;
+  final bool compact;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +295,12 @@ class _EntryCard extends StatelessWidget {
     return Container(
       key: ValueKey('entry-card-${entry.id}'),
       width: double.infinity,
-      padding: const EdgeInsets.all(TpSpacing.s4),
+      padding: compact
+          ? const EdgeInsets.symmetric(
+              horizontal: TpSpacing.s4,
+              vertical: TpSpacing.s2,
+            )
+          : const EdgeInsets.all(TpSpacing.s4),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
@@ -301,62 +311,77 @@ class _EntryCard extends StatelessWidget {
           width: isFocused ? 2 : 1,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            entry.title,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-              height: 1.25,
-            ),
-          ),
-          if (categoryLabel != null)
-            Padding(
-              padding: const EdgeInsets.only(top: TpSpacing.s1),
-              child: Row(
-                key: ValueKey('entry-category-${entry.id}'),
-                children: [
-                  Icon(
-                    CupertinoIcons.tag,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.title,
+                  maxLines: compact ? 1 : null,
+                  overflow: compact ? TextOverflow.ellipsis : null,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
+                ),
+                if (!compact && categoryLabel != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
+                    child: Row(
+                      key: ValueKey('entry-category-${entry.id}'),
+                      children: [
+                        Icon(
+                          CupertinoIcons.tag,
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            categoryLabel!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (!compact && metaItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
+                    child: Wrap(
+                      spacing: TpSpacing.s2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: metaItems,
+                    ),
+                  ),
+                if (!compact &&
+                    entry.description != null &&
+                    entry.description!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: TpSpacing.s1),
                     child: Text(
-                      categoryLabel!,
+                      entry.description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: mutedColor,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-          if (metaItems.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: TpSpacing.s1),
-              child: Wrap(
-                spacing: TpSpacing.s2,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: metaItems,
-              ),
-            ),
-          if (entry.description != null && entry.description!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: TpSpacing.s1),
-              child: Text(
-                entry.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: mutedColor,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: TpSpacing.s2),
+            trailing!,
+          ],
         ],
       ),
     );
