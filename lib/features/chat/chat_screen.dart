@@ -16,7 +16,6 @@ import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trips/trip_title_button.dart';
@@ -98,7 +97,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 trips: trips,
                 onSelected: (value) => setState(() => _tripId = value),
               ),
-        actions: const [TpAccountAvatarButton()],
+        actions: const [],
       ),
       body: tripsAsync.when(
         loading: () => initiallyBelowHeader(

@@ -75,6 +75,37 @@ void main() {
     expect(await cache.readQueue(), hasLength(1)); // 待同步保留
   });
 
+  test('session 過期後直接登入另一帳號 → 清前帳號快取與佇列', () async {
+    final cache = InMemoryCacheStore();
+    await cache.writeResponse('__cache_owner__', 'A|a@x.com');
+    await cache.writeResponse('GET /my-trips', [
+      {'id': 'a-trip'},
+    ]);
+    await cache.appendMutation(_mut('1'));
+
+    final repo = _MockAuthRepo();
+    when(() => repo.currentUser()).thenAnswer((_) async => null);
+    when(
+      () => repo.login(email: 'b@x.com', password: 'secret'),
+    ).thenAnswer((_) async => const UserInfo(id: 'B', email: 'b@x.com'));
+
+    final c = ProviderContainer(
+      overrides: [
+        cacheStoreProvider.overrideWithValue(cache),
+        authRepositoryProvider.overrideWithValue(repo),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    expect(await c.read(authStateProvider.future), isNull);
+    await c.read(authStateProvider.notifier).login('b@x.com', 'secret');
+
+    expect(c.read(authStateProvider).value?.id, 'B');
+    expect(await cache.readResponse('GET /my-trips'), isNull);
+    expect(await cache.readQueue(), isEmpty);
+    expect((await cache.readResponse('__cache_owner__'))!.data, 'B|b@x.com');
+  });
+
   test('首次登入(無前 owner)→ 不清,只設 owner', () async {
     final cache = InMemoryCacheStore();
     await cache.writeResponse('GET /my-trips', [

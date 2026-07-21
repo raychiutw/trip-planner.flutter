@@ -22,6 +22,25 @@ class GoogleMapsExternalLauncher {
     });
   }
 
+  static Uri buildEntryUri({
+    String? name,
+    double? latitude,
+    double? longitude,
+  }) {
+    final cleanName = name?.trim() ?? '';
+    final coordinates = latitude == null || longitude == null
+        ? ''
+        : '${_coordinate(latitude)},${_coordinate(longitude)}';
+    final query = coordinates.isNotEmpty ? coordinates : cleanName;
+    if (query.isEmpty) {
+      throw ArgumentError('A map query requires a name or coordinates.');
+    }
+    return Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': query,
+    });
+  }
+
   Future<bool> open(GoogleMapPoiSelection selection) =>
       launch(buildSearchUri(selection), mode: LaunchMode.externalApplication);
 }

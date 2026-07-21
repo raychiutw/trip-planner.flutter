@@ -12,7 +12,6 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
@@ -322,7 +321,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
               ),
             ],
           ),
-          const TpAccountAvatarButton(),
         ],
       ),
       body: TpRootScrollView(

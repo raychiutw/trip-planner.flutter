@@ -9,6 +9,7 @@ class TpActionItem<T> {
     required this.label,
     required this.icon,
     this.key,
+    this.semanticLabel,
     this.selected = false,
     this.dividerBefore = false,
     this.role = TpActionRole.normal,
@@ -19,6 +20,7 @@ class TpActionItem<T> {
   final String label;
   final IconData icon;
   final Key? key;
+  final String? semanticLabel;
   final bool selected;
   final bool dividerBefore;
   final TpActionRole role;

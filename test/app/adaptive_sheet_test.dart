@@ -5,6 +5,60 @@ import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('共用鍵盤區域可點外部或拖曳收合，且保留草稿', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppKeyboardDismissRegion(
+          child: Scaffold(
+            body: ListView(
+              children: [
+                TextField(
+                  key: const ValueKey('keyboard-field'),
+                  controller: controller,
+                  focusNode: focusNode,
+                ),
+                TextFieldTapRegion(
+                  child: IconButton(
+                    key: const ValueKey('field-accessory'),
+                    onPressed: () {},
+                    icon: const Icon(Icons.mic_none),
+                  ),
+                ),
+                const SizedBox(
+                  key: ValueKey('outside-area'),
+                  height: 800,
+                  child: Text('欄位外'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('keyboard-field')));
+    await tester.enterText(find.byType(TextField), '未送出的草稿');
+    await tester.tap(find.byKey(const ValueKey('field-accessory')));
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+
+    await tester.tap(find.text('欄位外'));
+    await tester.pump();
+    expect(focusNode.hasFocus, isFalse);
+    expect(controller.text, '未送出的草稿');
+
+    await tester.tap(find.byKey(const ValueKey('keyboard-field')));
+    await tester.drag(find.byType(ListView), const Offset(0, -80));
+    await tester.pump();
+    expect(focusNode.hasFocus, isFalse);
+    expect(controller.text, '未送出的草稿');
+  });
+
   testWidgets('selection sheet has Cancel, no Done, and one fixed detent', (
     tester,
   ) async {

@@ -126,11 +126,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => ref
+    state = await AsyncValue.guard(() async {
+      final user = await ref
           .read(authRepositoryProvider)
-          .login(email: email, password: password),
-    );
+          .login(email: email, password: password);
+      await _enforceCacheOwner(user);
+      return user;
+    });
   }
 
   Future<void> logout() async {

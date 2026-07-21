@@ -2,22 +2,34 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'posix_test_support.dart';
+
 void main() {
   late Directory sandbox;
   late File mockCurl;
+  late File mockState;
+  late File mockMutationLog;
   late Map<String, String> baseEnvironment;
 
   setUp(() {
     sandbox = Directory.systemTemp.createTempSync('tripline-contract-test-');
     mockCurl = File('${sandbox.path}/curl')..writeAsStringSync(_mockCurlSource);
-    final chmod = Process.runSync('chmod', ['+x', mockCurl.path]);
+    mockState = File('${sandbox.path}/curl-state');
+    mockMutationLog = File('${sandbox.path}/mutation-log');
+    final chmod = Process.runSync(testBashExecutable, [
+      '-lc',
+      r'chmod +x "$1"',
+      'bash',
+      bashPath(mockCurl.path),
+    ]);
     if (chmod.exitCode != 0) {
       fail('Could not make mock curl executable: ${chmod.stderr}');
     }
+    final path = pathWithPrefix(sandbox.path);
     baseEnvironment = {
-      'PATH': '${sandbox.path}:${Platform.environment['PATH']}',
-      'MOCK_CURL_STATE': '${sandbox.path}/curl-state',
-      'MOCK_MUTATION_LOG': '${sandbox.path}/mutation-log',
+      path.key: path.value,
+      'MOCK_CURL_STATE': bashPath(mockState.path),
+      'MOCK_MUTATION_LOG': bashPath(mockMutationLog.path),
       'MOCK_ENVIRONMENT_ID': 'tripline-staging-test',
       'MOCK_MUTATION_GUARD': 'expected-environment-id-v1',
       'STAGING_API_BASE_URL': 'https://staging.tripline.test',
@@ -48,7 +60,7 @@ void main() {
       wrongHost.stderr,
       contains('committed staging environment allowlist'),
     );
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test(
@@ -61,7 +73,7 @@ void main() {
 
       expect(result.exitCode, 2);
       expect(result.stderr, contains('production hostname'));
-      expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+      expect(mockState.existsSync(), isFalse);
     },
   );
 
@@ -73,7 +85,7 @@ void main() {
 
     expect(result.exitCode, 2);
     expect(result.stderr, contains('committed staging environment allowlist'));
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test('rejects an explicit port before curl', () async {
@@ -84,7 +96,7 @@ void main() {
 
     expect(result.exitCode, 2);
     expect(result.stderr, contains('exact committed HTTPS origin'));
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test('rejects a mismatched backend identity before mutations', () async {
@@ -95,7 +107,7 @@ void main() {
 
     expect(result.exitCode, 2);
     expect(result.stderr, contains('environment identity'));
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test('rejects a backend without the environment mutation guard', () async {
@@ -106,7 +118,7 @@ void main() {
 
     expect(result.exitCode, 2);
     expect(result.stderr, contains('mutation guard'));
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test('rejects a route switch after identity without mutating', () async {
@@ -117,7 +129,7 @@ void main() {
 
     expect(result.exitCode, isNot(0));
     expect(result.stderr, contains('HTTP 412'));
-    expect(File(baseEnvironment['MOCK_MUTATION_LOG']!).existsSync(), isFalse);
+    expect(mockMutationLog.existsSync(), isFalse);
   });
 
   test(
@@ -141,7 +153,7 @@ void main() {
 
       expect(result.exitCode, 2);
       expect(result.stderr, contains('allowlist is invalid'));
-      expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+      expect(mockState.existsSync(), isFalse);
     },
   );
 
@@ -164,7 +176,7 @@ void main() {
     });
     expect(userInfo.exitCode, 2);
     expect(userInfo.stderr, contains('exact committed HTTPS origin'));
-    expect(File(baseEnvironment['MOCK_CURL_STATE']!).existsSync(), isFalse);
+    expect(mockState.existsSync(), isFalse);
   });
 
   test(
@@ -174,10 +186,7 @@ void main() {
 
       expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
       expect(result.stdout, contains('contract passed'));
-      expect(
-        File(baseEnvironment['MOCK_CURL_STATE']!).readAsStringSync().trim(),
-        '8',
-      );
+      expect(mockState.readAsStringSync().trim(), '8');
     },
   );
 
@@ -196,8 +205,8 @@ Future<ProcessResult> _runContract(
   Map<String, String> environment, {
   String scriptPath = 'tool/verify_favorite_restore_contract.sh',
 }) => Process.run(
-  'bash',
-  [scriptPath],
+  testBashExecutable,
+  [bashPath(scriptPath)],
   workingDirectory: Directory.current.path,
   environment: environment,
 );

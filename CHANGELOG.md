@@ -4,6 +4,26 @@
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-07-21
+
+### 新增
+
+- Account 成為第 5 個 root tab；行程景點卡加入 Google／Apple 導航、備選景點展開與符合 Tripline 分組的操作選單。
+- 行程排序支援短按拖曳到同日任意位置、其他 Day 或空 Day，並在更新後重算受影響日期的交通。
+
+### 變更
+
+- 行程景點卡收斂為名稱、時間／分類／停留／星等、導航與備註四列摘要；點卡片改為展開備選景點，編輯改由 `…` 選單進入。
+- 全 App 共用點擊空白與向下捲動收合鍵盤；起訖時間改用平台原生 compact picker。
+- Root Header、Day selector 與底部功能列統一 Liquid Glass recipe，並保留 Reduce Transparency／High Contrast fallback。
+- GitHub Actions artifact 上傳更新至 `actions/upload-artifact v7.0.1`。
+
+### 修正
+
+- 修正同日景點拖到末端會落在倒數第二筆，以及排序／設為正選請求中切換行程可能更新錯誤行程。
+- 修正 session 過期後直接登入另一帳號時，`/my-trips` 離線快取與待同步佇列可能沿用前帳號資料。
+- 修正 Windows POSIX workflow contract tests 可能誤用 WSL Bash，並補上跨 Day、備選正選與刪除輔助使用回歸測試。
+
 ## [0.9.2] - 2026-07-21
 
 ### 新增

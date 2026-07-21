@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
@@ -60,9 +62,8 @@ void main() {
           ),
         ),
       );
-      expect(find.text('09：30'), findsOneWidget);
+      expect(find.text('09:30'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
-      expect(find.text('沖縄美ら海水族館'), findsOneWidget); // master.name ≠ title 才顯示
       expect(find.text('景點'), findsOneWidget);
       expect(find.text('4.6'), findsOneWidget);
       expect(find.text('世界最大級水槽'), findsOneWidget);
@@ -158,7 +159,7 @@ void main() {
         ),
       );
       expect(dotColor(tester, 3), tones.accentDeep);
-      expect(find.text('14：00'), findsOneWidget);
+      expect(find.text('14:00'), findsOneWidget);
     });
 
     testWidgets('rail badge 顯示停留點編號', (tester) async {
@@ -227,6 +228,42 @@ void main() {
       expect(tapped, 1);
     });
 
+    testWidgets('時間與地圖控制不會誤觸卡片展開', (tester) async {
+      var cardTaps = 0;
+      var timeTaps = 0;
+      var mapTaps = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: TimelineEntryTile(
+              entry: const TimelineEntry(
+                id: 13,
+                sortOrder: 0,
+                version: 1,
+                startTime: '09:30',
+                title: '互動測試',
+              ),
+              number: 1,
+              onTap: () => cardTaps++,
+              onEditTime: () => timeTaps++,
+              mapLinks: TextButton(
+                key: const ValueKey('test-map-link'),
+                onPressed: () => mapTaps++,
+                child: const Text('Google 地圖'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('entry-time-13')));
+      await tester.tap(find.byKey(const ValueKey('test-map-link')));
+      expect(timeTaps, 1);
+      expect(mapTaps, 1);
+      expect(cardTaps, 0);
+    });
+
     testWidgets('內容卡以單一語意朗讀名稱、時間、類型與動作', (tester) async {
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
@@ -251,8 +288,12 @@ void main() {
 
       expect(find.bySemanticsLabel('首里城，09:30，景點'), findsOneWidget);
       final node = tester.getSemantics(find.bySemanticsLabel('首里城，09:30，景點'));
-      expect(node.getSemanticsData().hint, '點兩下編輯停留點');
+      expect(node.getSemanticsData().hint, '點兩下展開備選景點');
       expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
+      expect(
+        node.getSemanticsData().flagsCollection.isExpanded,
+        Tristate.isFalse,
+      );
       semantics.dispose();
     });
 
@@ -272,10 +313,12 @@ void main() {
         ),
       );
 
-      expect(find.text('09：30 - 11：00'), findsOneWidget);
-      expect(find.text('09：30'), findsNothing);
-      expect(find.text('– 11:00'), findsNothing);
-      expect(find.bySemanticsLabel(RegExp('09:30 到 11:00')), findsOneWidget);
+      expect(find.text('09:30–11:00'), findsOneWidget);
+      expect(find.text('09:30'), findsNothing);
+      final semanticsNode = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-40')),
+      );
+      expect(semanticsNode.getSemanticsData().label, contains('09:30–11:00'));
       semantics.dispose();
     });
 
@@ -295,10 +338,7 @@ void main() {
         textScaler: const TextScaler.linear(1.25),
       );
 
-      final range = tester.widget<Text>(find.text('20：50 - 21：50'));
-      expect(range.maxLines, 1);
-      expect(range.softWrap, isFalse);
-      expect(range.style?.fontSize, 15);
+      expect(find.text('20:50–21:50'), findsOneWidget);
       expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 15);
       expect(kTimelineRailWidth, 32);
       expect(
@@ -306,18 +346,16 @@ void main() {
         findsOneWidget,
       );
       expect(
-        tester.getTopLeft(find.text('20：50 - 21：50')).dx,
-        tester.getTopLeft(find.byKey(const ValueKey('entry-card-43'))).dx,
-        reason: 'D1 的時間與卡片必須共用相同內容起點',
+        tester.getCenter(find.byKey(const ValueKey('entry-dot-43'))).dy,
+        closeTo(
+          tester.getCenter(find.byKey(const ValueKey('entry-card-43'))).dy,
+          1,
+        ),
+        reason: '停留點編號需與主卡片垂直置中',
       );
       expect(
         tester.getSize(find.byKey(const ValueKey('entry-dot-43'))),
         const Size(22, 22),
-      );
-      expect(
-        tester.getTopLeft(find.byKey(const ValueKey('entry-dot-43'))).dy,
-        tester.getTopLeft(find.text('20：50 - 21：50')).dy,
-        reason: 'D1 的數字圓點頂端必須和時間第一行對齊，不可落在基線下方',
       );
     });
 
@@ -372,13 +410,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('很長但仍需要完整閱讀的景點名稱'), findsOneWidget);
-      final range = tester.widget<Text>(find.text('09：30 - 11：00'));
-      expect(range.maxLines, 1);
-      expect(range.softWrap, isFalse);
-      final scaleDown = tester.widget<FittedBox>(
-        find.byKey(const ValueKey('entry-time-scale-42')),
-      );
-      expect(scaleDown.fit, BoxFit.scaleDown);
+      expect(find.text('09:30–11:00'), findsOneWidget);
     });
   });
 }

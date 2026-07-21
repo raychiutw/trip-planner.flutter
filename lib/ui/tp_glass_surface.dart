@@ -3,18 +3,21 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
 
+enum TpNavigationGlassRecipe { regular, platformView }
+
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
-  bool visualContent = false,
+  TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final baseColor = isDark ? TpColorsDark.secondary : TpColorsLight.background;
+  final platformView = recipe == TpNavigationGlassRecipe.platformView;
   final tint = baseColor.withValues(
-    alpha: visualContent ? (isDark ? 0.68 : 0.58) : (isDark ? 0.88 : 0.90),
+    alpha: platformView ? (isDark ? 0.62 : 0.56) : (isDark ? 0.48 : 0.40),
   );
   final settings = LiquidGlassSettings(
     glassColor: tint,
-    backerColor: visualContent ? null : tint,
+    backerColor: null,
     thickness: 16,
     blur: 16,
     chromaticAberration: 0,

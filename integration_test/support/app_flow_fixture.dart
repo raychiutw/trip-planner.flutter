@@ -375,11 +375,11 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.text('取消'));
   await tester.pumpAndSettle();
 
-  await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+  await tester.tap(_rootTab('帳號'));
   await tester.pumpAndSettle();
-  expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  expect(find.byKey(const ValueKey('account-root-content')), findsOneWidget);
   final accountScroll = find.descendant(
-    of: find.byKey(const ValueKey('account-sheet-content')),
+    of: find.byKey(const ValueKey('account-root-content')),
     matching: find.byType(Scrollable),
   );
   await tester.scrollUntilVisible(
@@ -399,10 +399,8 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('settings-appearance')));
   await tester.pumpAndSettle();
-  expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
-  await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+  expect(find.byKey(const ValueKey('tp-app-bar-back')), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
   await tester.pumpAndSettle();
 
   await tester.tap(_rootTab('聊天'));

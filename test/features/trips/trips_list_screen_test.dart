@@ -160,7 +160,7 @@ void main() {
   });
 
   group('TripsListScreen 清單渲染', () {
-    testWidgets('功能選單收納新增行程，右側固定帳號入口', (tester) async {
+    testWidgets('功能選單收納新增行程，帳號入口只保留在第 5 tab', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -182,10 +182,7 @@ void main() {
       expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
       expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
       expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('account-avatar-button')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
       expect(find.byType(SliverAppBar), findsNothing);
       expect(find.byTooltip('更多'), findsOneWidget);
       expect(
@@ -196,16 +193,7 @@ void main() {
         of: find.byKey(const ValueKey('trips-sort-button')),
         matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
       );
-      final accountGlass = find.descendant(
-        of: find.byKey(const ValueKey('account-avatar-button')),
-        matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
-      );
       expect(tester.getSize(moreGlass), const Size(44, 44));
-      expect(tester.getSize(accountGlass), const Size(44, 44));
-      expect(
-        tester.getRect(accountGlass).left - tester.getRect(moreGlass).right,
-        8,
-      );
 
       await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
       await tester.pumpAndSettle();

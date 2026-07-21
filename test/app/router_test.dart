@@ -822,7 +822,7 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('帳號頁位於 root shell 外且不顯示 tab bar', (tester) async {
+  testWidgets('帳號頁是第五個 root branch 並顯示 tab bar', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
 
@@ -838,13 +838,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AccountScreen), findsOneWidget);
-    expect(find.byType(AppleRootTabBar), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('account-close-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
     expect(find.byType(AppleRootTabBar), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-close-button')), findsNothing);
   });
 
   testWidgets('行程工具列切到地圖 root branch 並保留 DAY', (tester) async {

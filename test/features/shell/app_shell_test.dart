@@ -24,6 +24,7 @@ GoRouter buildShellRouter() {
           probe('/trips', 'PROBE-TRIPS'),
           probe('/map', 'PROBE-MAP'),
           probe('/favorites', 'PROBE-FAV'),
+          probe('/account', 'PROBE-ACCOUNT'),
         ],
       ),
     ],
@@ -53,6 +54,7 @@ GoRouter buildScrollableShellRouter() {
           probe('/trips', const Text('PROBE-TRIPS')),
           probe('/map', const Text('PROBE-MAP')),
           probe('/favorites', const Text('PROBE-FAV')),
+          probe('/account', const Text('PROBE-ACCOUNT')),
         ],
       ),
     ],
@@ -60,8 +62,8 @@ GoRouter buildScrollableShellRouter() {
 }
 
 void main() {
-  group('AppShell 4-tab 導航', () {
-    testWidgets('4 個 tab,點擊切換到對應 branch', (tester) async {
+  group('AppShell 5-tab 導航', () {
+    testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -87,7 +89,10 @@ void main() {
       await tester.tap(find.bySemanticsLabel('收藏'));
       await tester.pumpAndSettle();
       expect(find.text('PROBE-FAV'), findsOneWidget);
-      expect(find.text('帳號'), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel('帳號'));
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-ACCOUNT'), findsOneWidget);
     });
 
     testWidgets('地圖 branch 跟隨深色主題並使用深色 Liquid Glass', (tester) async {
@@ -115,7 +120,10 @@ void main() {
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
       expect(glass.platformViewBackdrop, isTrue);
-      expect(glass.indicatorColor, TpColorsDark.rootTabSelection);
+      expect(
+        glass.indicatorColor,
+        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+      );
       expect(glass.selectedIconColor, TpColorsDark.accentDeep);
     });
 
@@ -141,7 +149,7 @@ void main() {
 
       final standard = rootBar();
       expect(standard.platformViewBackdrop, isFalse);
-      expect(standard.settings?.glassColor.a, closeTo(0.58, 0.01));
+      expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
       expect(standard.settings?.backerColor, isNull);
 
       await tester.tap(find.bySemanticsLabel('地圖'));
@@ -149,7 +157,7 @@ void main() {
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
-      expect(map.settings?.glassColor.a, standard.settings?.glassColor.a);
+      expect(map.settings?.glassColor.a, closeTo(0.56, 0.01));
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
@@ -224,7 +232,7 @@ void main() {
       expect(find.bySemanticsLabel('聊天'), findsOneWidget);
     });
 
-    testWidgets('四個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
+    testWidgets('五個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         ProviderScope(
@@ -236,16 +244,42 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (final label in ['聊天', '行程', '地圖', '收藏']) {
+      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
-      expect(find.bySemanticsLabel('帳號'), findsNothing);
       final selected = tester.getSemantics(find.bySemanticsLabel('聊天'));
       expect(
         selected.getSemanticsData().flagsCollection.isSelected,
         Tristate.isTrue,
       );
       semantics.dispose();
+    });
+
+    testWidgets('320pt 與 200% 文字下五個單字 label 完整可讀', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('root tab 使用套件原生 16/64/32 Liquid Glass 幾何', (tester) async {
@@ -272,7 +306,10 @@ void main() {
       expect(glass.iconSize, 24);
       expect(glass.iconLabelSpacing, 4);
       expect(glass.platformViewBackdrop, isFalse);
-      expect(glass.indicatorColor, TpColorsLight.rootTabSelection);
+      expect(
+        glass.indicatorColor,
+        TpColorsLight.rootTabSelection.withValues(alpha: 0.68),
+      );
       expect(glass.settings?.chromaticAberration, 0);
       expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
     });
@@ -292,7 +329,10 @@ void main() {
       final glass = tester.widget<GlassTabBar>(
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
-      expect(glass.indicatorColor, TpColorsDark.rootTabSelection);
+      expect(
+        glass.indicatorColor,
+        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+      );
       expect(glass.selectedIconColor, TpColorsDark.accentDeep);
       expect(glass.settings?.chromaticAberration, 0);
     });

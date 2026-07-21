@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
@@ -7,10 +7,8 @@ import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 import 'entry_duration.dart';
 
-/// rail（圓點 + 連線）欄寬度。
 const double kTimelineRailWidth = 32;
 
-/// D1 時間軸停留點：固定左 rail，時間與卡片共用同一內容起點。
 class TimelineEntryTile extends StatelessWidget {
   const TimelineEntryTile({
     super.key,
@@ -20,149 +18,137 @@ class TimelineEntryTile extends StatelessWidget {
     this.isLast = false,
     this.isFocused = false,
     this.compact = false,
+    this.expanded = false,
     this.onTap,
+    this.onEditTime,
     this.trailing,
+    this.mapLinks,
+    this.expandedChild,
   });
 
   final TimelineEntry entry;
-
-  /// 當日序號（1-based),渲染於 rail badge。
   final int number;
-
-  /// 當日第一個 entry：rail 不畫圓點上方連線。
   final bool isFirst;
-
-  /// 當日最後一個 entry：rail 不畫圓點下方連線。
   final bool isLast;
-
-  /// deep link 或搜尋結果指定的目前聚焦停留點。
   final bool isFocused;
-
-  /// 排序模式只保留名稱與拖曳手把。
   final bool compact;
-
-  /// 點內容卡的回呼（null 則不可點）。
+  final bool expanded;
   final VoidCallback? onTap;
-
-  /// tile 尾端附加元件（拖曳 handle、搬移鈕）。
+  final VoidCallback? onEditTime;
   final Widget? trailing;
+  final Widget? mapLinks;
+  final Widget? expandedChild;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
-    final railLineColor = theme.colorScheme.outlineVariant;
-    final startTime = (entry.startTime ?? entry.time ?? '').trim();
-    final endTime = entry.endTime?.trim() ?? '';
     final categoryLabel =
         poiCategoryLabel(entry.master?.category) ??
         kPoiTypeLabels[entry.master?.type];
-    final timeSemantics = startTime.isEmpty
-        ? null
-        : endTime.isEmpty
-        ? startTime
-        : '$startTime 到 $endTime';
+    final timeLabel = _timeLabel(entry);
     final semanticsLabel = [
       entry.title,
-      ?timeSemantics,
+      timeLabel,
       categoryLabel ?? '停留點',
     ].join('，');
-    final entryContent = Semantics(
+
+    final card = Semantics(
       key: ValueKey('timeline-entry-content-${entry.id}'),
+      container: true,
+      explicitChildNodes: true,
       label: semanticsLabel,
-      hint: onTap == null ? null : '點兩下編輯停留點',
+      hint: onTap == null ? null : (expanded ? '點兩下收合備選景點' : '點兩下展開備選景點'),
       button: onTap != null,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: _EntryCard(
-            entry: entry,
-            isFocused: isFocused,
-            categoryLabel: categoryLabel,
-            compact: compact,
-            trailing: trailing,
-          ),
+      expanded: onTap == null ? null : expanded,
+      onTap: onTap,
+      child: InkWell(
+        excludeFromSemantics: true,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: _EntryCard(
+          entry: entry,
+          isFocused: isFocused,
+          categoryLabel: categoryLabel,
+          compact: compact,
+          timeLabel: timeLabel,
+          onEditTime: onEditTime,
+          trailing: trailing,
+          mapLinks: mapLinks,
         ),
       ),
     );
+
     return KeyedSubtree(
       key: ValueKey('timeline-entry-d1-${entry.id}'),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TimelineRail(
-              entryId: entry.id,
-              number: number,
-              isFirst: isFirst,
-              isLast: isLast,
-              color: tones.accentDeep,
-              lineColor: railLineColor,
+      child: Column(
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TimelineRail(
+                  entryId: entry.id,
+                  number: number,
+                  isFirst: isFirst,
+                  isLast: isLast && expandedChild == null,
+                  color: tones.accentDeep,
+                  lineColor: theme.colorScheme.outlineVariant,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: card),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _EntryTimeRange(
-                    entryId: entry.id,
-                    startTime: startTime,
-                    endTime: endTime,
+          ),
+          const SizedBox(height: TpSpacing.s3),
+          AnimatedSize(
+            duration: TpMotion.resolve(context, TpMotion.normal),
+            curve: TpMotion.appleEase,
+            alignment: Alignment.topCenter,
+            child: expandedChild == null
+                ? const SizedBox.shrink()
+                : IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: kTimelineRailWidth,
+                          child: Center(
+                            child: Container(
+                              width: 1,
+                              color: isLast
+                                  ? Colors.transparent
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: TpSpacing.s3,
+                            ),
+                            child: expandedChild!,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: TpSpacing.s2),
-                  entryContent,
-                  const SizedBox(height: TpSpacing.s3),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _EntryTimeRange extends StatelessWidget {
-  const _EntryTimeRange({
-    required this.entryId,
-    required this.startTime,
-    required this.endTime,
-  });
-
-  final int entryId;
-  final String startTime;
-  final String endTime;
-
-  @override
-  Widget build(BuildContext context) {
-    if (startTime.isEmpty) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    final style = theme.textTheme.bodyLarge?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: theme.colorScheme.onSurface,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    final visualStart = _visualTime(startTime);
-    final visualEnd = _visualTime(endTime);
-    return SizedBox(
-      width: double.infinity,
-      child: FittedBox(
-        key: ValueKey('entry-time-scale-$entryId'),
-        fit: BoxFit.scaleDown,
-        alignment: AlignmentDirectional.centerStart,
-        child: Text(
-          visualEnd.isEmpty ? visualStart : '$visualStart - $visualEnd',
-          maxLines: 1,
-          softWrap: false,
-          style: style,
-        ),
-      ),
-    );
-  }
+String _timeLabel(TimelineEntry entry) {
+  final start = (entry.startTime ?? entry.time ?? '').trim();
+  final end = (entry.endTime ?? '').trim();
+  if (start.isEmpty && end.isEmpty) return '未設定時間';
+  if (start.isEmpty) return end;
+  if (end.isEmpty) return start;
+  return '$start–$end';
 }
-
-String _visualTime(String value) => value.replaceFirst(':', '：');
 
 class _TimelineRail extends StatelessWidget {
   const _TimelineRail({
@@ -186,7 +172,7 @@ class _TimelineRail extends StatelessWidget {
     return SizedBox(
       width: kTimelineRailWidth,
       child: Stack(
-        alignment: Alignment.topCenter,
+        alignment: Alignment.center,
         children: [
           if (!isFirst || !isLast)
             Positioned(
@@ -218,79 +204,35 @@ class _TimelineRail extends StatelessWidget {
   }
 }
 
-/// 內容卡統一使用中性 system surface；POI 類型只以文字呈現。
 class _EntryCard extends StatelessWidget {
   const _EntryCard({
     required this.entry,
     required this.isFocused,
     required this.categoryLabel,
     required this.compact,
+    required this.timeLabel,
+    this.onEditTime,
     this.trailing,
+    this.mapLinks,
   });
 
   final TimelineEntry entry;
   final bool isFocused;
   final String? categoryLabel;
   final bool compact;
+  final String timeLabel;
+  final VoidCallback? onEditTime;
   final Widget? trailing;
+  final Widget? mapLinks;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tones = theme.extension<TpTones>()!;
     final master = entry.master;
-    final mutedColor = theme.colorScheme.onSurfaceVariant;
-
-    final metaItems = <Widget>[];
+    final muted = theme.colorScheme.onSurfaceVariant;
     final duration = formatEntryDuration(entry.startTime, entry.endTime);
-    if (duration != null) {
-      metaItems.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(CupertinoIcons.clock, size: 14, color: mutedColor),
-            const SizedBox(width: 2),
-            Text(
-              duration,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: mutedColor,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    if (master != null) {
-      final masterName = master.name;
-      if (masterName != null && masterName != entry.title) {
-        metaItems.add(
-          Text(
-            masterName,
-            style: theme.textTheme.bodyMedium?.copyWith(color: mutedColor),
-          ),
-        );
-      }
-      if (master.rating != null) {
-        // rating 一律 accent（設計系統：rating 屬 accent 職責）
-        metaItems.add(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(CupertinoIcons.star_fill, size: 14, color: tones.accent),
-              const SizedBox(width: 2),
-              Text(
-                master.rating!.toStringAsFixed(1),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: mutedColor,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-    }
+    final details = _details(entry);
 
     return Container(
       key: ValueKey('entry-card-${entry.id}'),
@@ -311,79 +253,120 @@ class _EntryCard extends StatelessWidget {
           width: isFocused ? 2 : 1,
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
                   entry.title,
-                  maxLines: compact ? 1 : null,
-                  overflow: compact ? TextOverflow.ellipsis : null,
+                  maxLines: compact ? 1 : 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     height: 1.25,
                   ),
                 ),
-                if (!compact && categoryLabel != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Row(
-                      key: ValueKey('entry-category-${entry.id}'),
-                      children: [
-                        Icon(
-                          CupertinoIcons.tag,
-                          size: 14,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            categoryLabel!,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ],
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: TpSpacing.s1),
+                trailing!,
+              ],
+            ],
+          ),
+          if (!compact) ...[
+            const SizedBox(height: TpSpacing.s1),
+            Wrap(
+              key: ValueKey('entry-meta-${entry.id}'),
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s1,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ActionChip(
+                  key: ValueKey('entry-time-${entry.id}'),
+                  avatar: const Icon(CupertinoIcons.clock, size: 14),
+                  label: Text(
+                    timeLabel,
+                    style: const TextStyle(
+                      fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
-                if (!compact && metaItems.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Wrap(
-                      spacing: TpSpacing.s2,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: metaItems,
+                  onPressed: onEditTime,
+                ),
+                if (categoryLabel != null)
+                  Text(
+                    categoryLabel!,
+                    key: ValueKey('entry-category-${entry.id}'),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                  ),
+                if (duration != null)
+                  Text(
+                    duration,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: muted,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                if (!compact &&
-                    entry.description != null &&
-                    entry.description!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(
-                      entry.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: mutedColor,
-                        fontWeight: FontWeight.w400,
+                if (master?.rating != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.star_fill,
+                        size: 14,
+                        color: tones.accent,
                       ),
-                    ),
+                      const SizedBox(width: 2),
+                      Text(
+                        master!.rating!.toStringAsFixed(1),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: TpSpacing.s2),
-            trailing!,
+            if (mapLinks != null) ...[
+              const SizedBox(height: TpSpacing.s1),
+              mapLinks!,
+            ],
+            if (details.isNotEmpty) ...[
+              const SizedBox(height: TpSpacing.s1),
+              Text(
+                details.join(' · '),
+                key: ValueKey('entry-details-${entry.id}'),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+              ),
+            ],
           ],
         ],
       ),
     );
   }
+}
+
+List<String> _details(TimelineEntry entry) {
+  final master = entry.master;
+  final values = [
+    entry.description,
+    master?.description,
+    entry.note == null ? null : '備註：${entry.note}',
+    master?.note == null ? null : '備註：${master?.note}',
+    master?.price,
+    master?.hours,
+    master?.reservation,
+  ];
+  final result = <String>[];
+  for (final value in values) {
+    final clean = value?.trim();
+    if (clean != null && clean.isNotEmpty && !result.contains(clean)) {
+      result.add(clean);
+    }
+  }
+  return result;
 }

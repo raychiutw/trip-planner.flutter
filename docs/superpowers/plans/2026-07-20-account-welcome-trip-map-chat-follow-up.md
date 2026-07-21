@@ -10,6 +10,8 @@
 >
 > 2026-07-21 導覽更正：行程／地圖切換保留在 Root Header；Day tab 只放 scope options；地圖恢復「總覽」。
 >
+> 2026-07-21 superseded note：Root Account、Timeline 景點卡／`…` menu、跨 Day 拖曳、全 App 鍵盤與 navigation glass 的最新規則改由 [`2026-07-21-trip-entry-card-menu-keyboard-glass.md`](2026-07-21-trip-entry-card-menu-keyboard-glass.md) 接管；本文件其餘 Welcome、版本資訊、隱私同意與聊天規格仍有效。
+>
 > 驗證基底：`master` / `c82c75b032e3f5b26e87fd62455bf703b8ab94cb`
 >
 > 範圍：本文件只規劃本輪 8 項需求與「景點刪除後不提供復原」補充，不授權 push、release 或後端修改。

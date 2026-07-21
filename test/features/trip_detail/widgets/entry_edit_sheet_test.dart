@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoDatePicker;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,8 +29,9 @@ TripDay _day(int dayNum, String date) =>
 Future<void> _open(
   WidgetTester tester,
   _MockTripRepository repo,
-  EntryEditArgs args,
-) async {
+  EntryEditArgs args, {
+  TargetPlatform platform = TargetPlatform.android,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -39,7 +41,7 @@ Future<void> _open(
         ).overrideWith((ref) => Stream.value(const <TripDay>[])),
       ],
       child: MaterialApp(
-        theme: AppTheme.light(),
+        theme: AppTheme.light().copyWith(platform: platform),
         home: Scaffold(
           body: Builder(
             builder: (context) => ElevatedButton(
@@ -145,6 +147,31 @@ void main() {
 
     expect(startTop, lessThan(descTop));
     expect(endTop, lessThan(descTop));
+    expect(
+      tester.widget(find.byKey(const ValueKey('entry-edit-start'))),
+      isA<InputChip>(),
+    );
+    expect(
+      tester.widget(find.byKey(const ValueKey('entry-edit-end'))),
+      isA<InputChip>(),
+    );
+  });
+
+  testWidgets('iOS compact time chip 開啟 Cupertino time picker', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      platform: TargetPlatform.iOS,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    expect(find.text('取消'), findsWidgets);
+    expect(find.text('完成'), findsOneWidget);
   });
 
   testWidgets('新增模式：送出呼叫 addEntryToDay(source custom)', (tester) async {

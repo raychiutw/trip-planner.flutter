@@ -1,6 +1,6 @@
 # Tripline Flutter Design System
 
-> 更新：2026-07-19。唯一視覺驗收依據是 [`2026-07-17-tripline-final.html`](../design-sessions/2026-07-17-tripline-final.html)。三色系、五項 root tab、large title 與雙層行程／地圖 selector 均已退場。
+> 更新：2026-07-21。視覺基底沿用 [`2026-07-17-tripline-final.html`](../design-sessions/2026-07-17-tripline-final.html)，並由 [`2026-07-21-trip-entry-card-menu-keyboard-glass.md`](../superpowers/plans/2026-07-21-trip-entry-card-menu-keyboard-glass.md) 覆蓋 Root Account、行程景點卡、鍵盤與 navigation glass 規則。三色分類、large title 與雙層行程／地圖 selector 均已退場。
 
 ## 1. 產品基準
 
@@ -14,7 +14,7 @@
 - 導航與控制層全面採用固定版本 `liquid_glass_widgets 0.22.1`；不得使用 caret 自動升級。升版必須重新跑視覺、實機與可及性驗收。
 - App 啟動時初始化 shader，並由單一全域 `GlassThemeData` 提供暖白 Light 與中性深色 Dark；開啟 adaptive quality，遵守系統 Reduce Motion、Reduce Transparency 與 High Contrast。
 - 現有共用入口保留，由內部委派套件元件：`TpGlassSurface` 使用 `GlassContainer`、`TpAppBar` 使用 `GlassAppBar`、root navigation 使用 `GlassTabBar.bottom`、scope menu 使用 `GlassMenu`、大型 sheet 使用 `GlassModalSheetScaffold`。
-- 行程／地圖 selector 由共用 `TpHorizontalSelector` 提供：左側 `GlassButton` 是跨頁 action，右側只有可水平滑動的 `DAY 1...DAY N` 單選狀態；不得把跨頁 action 偽裝成 segmented selection，也不得恢復「總覽」。
+- 行程／地圖跨頁切換位於各自 Root Header。行程 selector 只有可水平滑動的 `DAY 1...DAY N`；地圖 selector 保留 `總覽、DAY 1...DAY N`。不得把跨頁 action 放回 Day selector。
 - 地圖 root tab 與浮動控制必須啟用 PlatformView backdrop 相容模式；`google_navigation_flutter` 的 `GoogleMapsMapView`、路線、marker、camera 與手勢由 app-owned map adapter 負責，不啟動導航 session。
 - POI dock 只建立一個折射玻璃層；內層 POI 卡使用暖色半透明內容 surface，禁止玻璃內再巢狀玻璃，避免 rim、blur 與 refraction 失真。
 - AI composer 可採 `GlassTextField`，但附件、語音、送出、disabled、loading、focus 與 Dynamic Type 行為必須原樣保留。
@@ -85,21 +85,22 @@ Flutter 必須以 `TextTheme` 語意樣式對應，不在 widget 內硬寫另一
 
 ## 4. Root navigation
 
-Root tab 固定四項：
+Root tab 固定五項：
 
 1. 聊天
 2. 行程
 3. 地圖
 4. 收藏
+5. 帳號
 
-帳號不再是 tab。帳號 avatar 固定在四個主畫面右上角，以圓形按鈕開啟 `/account`。舊 `/account` deep link 必須保留。
+帳號是第 5 個頂層目的地；Chat、行程、地圖與收藏 Header 不再重複 avatar。`/account` deep link 直接落入第 5 branch，設定子頁保留該 branch 的 navigation stack。
 
 Root tab 幾何：
 
-- 水平 margin 16pt；四項目的地平均分配，在小螢幕與大字體下仍保留完整 label。
+- 水平 margin 16pt；五項單字目的地平均分配，在小螢幕與大字體下仍保留完整 label。
 - 可見高度 64pt，外圓角與 active indicator 採套件 `GlassTabBar.bottom` 預設幾何；互動 target 與可見膠囊一致，不再由 feature 覆寫套件尺寸。
 - 底部位移為 `max(16pt, safe area - 24pt)`，讓膠囊避開 home indicator 且保留 Apple 慣例的底部呼吸空間。
-- Light glass 使用 C1 暖白配方（`rgba(255,251,245,.58)`、88% 白色亮邊）；Dark glass 使用 A 配方 `rgba(44,44,46,.68)` 與 18% 白色亮邊。共用 navigation recipe 的 opacity multiplier 固定為 `1.0`，不再二次稀釋定案 alpha；選中項使用 14% 柔褐 selected surface。
+- Navigation glass 由共用 recipe 產生：regular Light/Dark tint alpha 為 `.40/.48`，PlatformView 為 `.56/.62`，不使用同色 opaque backer；High Contrast 使用 `.96` 實色 fallback。選中 DAY／tab 使用 `.64/.68` 柔褐 tint，內容卡維持實色 surface。
 - 內容可以延伸到玻璃後方，但可操作內容、POI accessory 與輸入列必須使用相同 geometry 避讓。
 - tab 不隨捲動縮小、淡出或改變標籤。
 - AI chat composer 與其他 bottom accessory 使用同一 geometry，與 root tab 的可見間距固定 4pt；本次只調整位置與視覺，送出、語音、附件與既有狀態處理全部維持原功能。
@@ -109,30 +110,35 @@ Root tab 幾何：
 - Chat、行程、地圖的 title 直接顯示目前行程名稱。
 - 點 title 開啟共用 HIG 近滿版 bottom sheet：固定高度 93%、不顯示暗示可調整的 drag indicator、Header 提供符合任務語意的取消／關閉、搜尋、目前項目 checkmark、最近行程；沒有 tab，也不是 dropdown。
 - 收藏 title 顯示「收藏」。
-- 返回、關閉、帳號與功能 action 共用同一套 44pt Liquid Glass 圓形元件，不使用各頁自製尺寸或厚 border；同一列有兩個以上圓形按鈕時固定保留 8pt 間距。一般 Root 頁最多兩個 actions；收藏因標題固定且短，可在同一膠囊內放搜尋、排序、新增與帳號，並以 200% Dynamic Type 驗證。Menu 使用右上錨定的 260pt 浮動玻璃面板、24pt 圓角、48pt 圖示列與 inset separator。
+- 返回、關閉與功能 action 共用同一套 44pt Liquid Glass 元件，不使用各頁自製尺寸或厚 border；同一列有兩個以上按鈕時固定保留 8pt 間距。帳號只在 Root tab 出現。Menu 使用右上錨定的浮動玻璃面板、24pt 圓角、至少 44pt 圖示列與 inset separator。
 - 行程列表與行程內容頁的功能入口共用 `TpMoreMenuButton`。觸發鈕與展開面板使用同一套 `primaryContainer` 玻璃設定；Light 選項文字／圖示使用 Tripline 暖深色 `onSurface`，Dark 使用 `primary`，禁止改成純黑或脫離 Tripline 主題色。
 - 筆記是行程／地圖右上角命令，不是主 selector 或 root tab。
 - Account／Settings 使用 grouped list、inset separator、無 card border／shadow、system red destructive row。
 - 行程功能選單中的筆記、行程資料、列印、異動紀錄、分享連結、共編設定與 AI 健檢，全部使用共用的固定 93% 高度 bottom sheet：不可顯示 resize grabber，Header 有 44pt 關閉鈕；不得以沒有出口的整頁 route 取代。只有「調整順序」留在原頁切換 reorder mode，並直接顯示「完成」。
-- 調整順序模式的 Header title 改為「調整順序」，trailing 使用完整文字「完成」並保留至少 44pt 高度與可隨文字伸展的寬度；`TpRootGlassHeader` 不得把文字 action 強制塞進 44pt 正方形而顯示成「完」。完成與帳號相距 8pt。
-- 每個停留點的「移到其他 Day」與拖曳排序都是列內動作：前者直接使用 `folder` 開啟 Day selection sheet，後者使用 `line_horizontal_3` 作 drag handle。兩者共用同一個 44×44pt、無額外 glass 外框的 inline action 樣式、主題 tint、pressed state、tooltip 與 semantics；只有一個動作的 ellipsis menu 退場。
+- 調整順序模式的 Header title 改為「調整順序」，trailing 使用完整文字「完成」並保留至少 44pt 高度與可隨文字伸展的寬度；`TpRootGlassHeader` 不得把文字 action 強制塞進 44pt 正方形而顯示成「完」。
+- 每張停留點卡右上固定 `…`，依序提供「重新排序、換景點｜編輯景點、移動到其他天｜複製到其他天、刪除景點」。刪除為 destructive red；移動／複製在只有一天時 disabled。
+- 排序模式只保留名稱與單一短按 `line_horizontal_3` handle。拖曳可在同日排序或跨到任一 Day；drop 後以一次 batch 同步來源日與目的日的 `day_id + sort_order`，失敗還原兩日，成功重算兩日交通。
 - 上述 sheet 內的功能頁共用套件 `GlassAppBar`：子頁標題採 Title 3（20pt）並置中，移除重複的 system top safe-area，標題緊接 drag indicator，不留下第二段狀態列高度的空白。
 - 點擊後在原位置展開內容的 accordion 共用 `TpGlassExpansionSection`，由套件 GlassContainer 承接材質；Light 使用暖白玻璃，Dark 使用中性深色玻璃，禁止各頁自行以實心 Container 包裝 ExpansionTile。
 
 ## 6. 行程與地圖單層控制
 
-同一位置、同一高度、同一選取 DAY：
+跨頁 action 位於 Header；Day selector 維持同一位置與高度：
 
-- 行程頁：`地圖 | DAY 1 | DAY 2 | …`
-- 地圖頁：`行程 | DAY 1 | DAY 2 | …`
+- 行程頁：`DAY 1 | DAY 2 | …`
+- 地圖頁：`總覽 | DAY 1 | DAY 2 | …`
 
-左側是 accent icon＋文字的目的地 action，點擊後互切頁面並保留 DAY；細分隔線後直接排列單選 DAY。active DAY 使用可滑動的 accent thumb；長行程整段可水平滑動並自動保持目前 DAY 可見。當前頁不重複顯示自己，也不再顯示「行程＋地圖」雙選項。
+Header 的地圖／行程 icon 互切頁面並保留 DAY。active DAY 使用可滑動的 accent thumb；長行程整段可水平滑動並自動保持目前 DAY 可見。切換到另一趟行程時回到新行程 DAY 1，明確的 `?day=N` 或 entry deep link 才可覆蓋。
 
 地圖頁讓地圖延伸到 selector 後方，DAY selector 浮在 toolbar 下方 8pt；行程頁仍在相同垂直位置使用同尺寸 selector。兩者完全依定版圖：外膠囊 44pt 高／22pt 圓角／4pt 內距，active thumb 34pt 高／17pt 圓角，標籤使用 12pt semibold；材質使用 22pt blur、半透明底、低陰影與 1px rim highlight。
 
-行程往下內容必須完整包含：日期、明確標示「天氣示意」的固定展示資料、景點、交通、長按排序、新增景點、下一日；不能只套用 header。每日飯店摘要卡退場，住宿仍以一般停留點存在於行程內容，不另做重複摘要。
+行程往下內容必須完整包含：日期、明確標示「天氣示意」的固定展示資料、景點、交通、短按 handle 排序、新增景點、下一日；不能只套用 header。每日飯店摘要卡退場，住宿仍以一般停留點存在於行程內容，不另做重複摘要。
 
-Timeline 在所有 Dynamic Type 尺寸都使用 D1 單一結構：左側固定 32pt rail，右側依序堆疊時間與景點卡；交通列沿用相同 rail 與內容起點。時間使用 tabular figures 單行顯示 `09：30 - 11：00`，不得拆行；VoiceOver 仍讀為「09:30 到 11:00」。停留點圓點 22pt，圓點頂端與該停留點時間第一行頂端對齊，連線穿過前後交通列且不得把 1／2 圓點下推；rail 與內容間距 10pt、卡片圓角 18pt／內距 16pt、交通列最低 64pt，放大字體只增加垂直高度，不改變水平欄位。
+Timeline 左側固定 32pt rail；22pt 編號圓點與主景點卡垂直置中，連線貫穿前後交通列。卡片第一列是名稱與 44pt `…`；第二列用可換行的時間 chip、分類、停留時間、星等；第三列是 Google／Apple 導航；第四列是說明、備註、價位、營業與訂位摘要。卡片 tap 只展開／收合備選景點，不直接編輯；時間 chip 與 `…` 是獨立操作。卡片及備選區使用實色 surface，不使用 glass。
+
+起訖時間在編輯頁使用兩個 compact chips。iOS/macOS 開 `CupertinoDatePicker`，Android 開 Material time picker；結束必須晚於開始，本輪不支援跨午夜。
+
+所有輸入畫面套用 `AppKeyboardDismissRegion`：點欄位外或拖曳 scroll view 只收鍵盤，不清空草稿、不 submit、不關閉 sheet；欄位附屬控制使用 `TextFieldTapRegion` 保留焦點。
 
 AI 聊天訊息與行程 Timeline 不能把整個 body 固定 padding 到 Header 下方。和收藏清單相同，唯一垂直捲動面先提供初始 top inset，之後讓內容從固定 Root Glass Header 下方通過；聊天 composer 與 Root Tab 仍固定在底部並共用 clearance。
 
@@ -154,7 +160,7 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 
 ## 8. 收藏
 
-- Root Header 固定顯示 `收藏`，右側保留排序、新增與帳號；Header 不再切換成搜尋模式，避免窄螢幕與 Dynamic Type 擠壓標題和動作。
+- Root Header 固定顯示 `收藏`，右側保留排序與新增；Header 不再切換成搜尋模式，避免窄螢幕與 Dynamic Type 擠壓標題和動作。
 - 搜尋使用與行程一覽相同的頁內常駐 `AppSearchField`，清除鈕只清空文字。清單捲動會收起鍵盤，鍵盤 Search 仍可立即送出。
 - 本地收藏結果每輸入一字即時更新；名稱、地址與備註中的符合字串使用較深 `onSurface`＋Semibold，其餘文字維持次要色，不用大面積 accent 標記。
 - 排序使用 `TpMoreMenuButton` 錨定選單，提供最近加入、最早加入、名稱、地區；目前排序顯示 checkmark。separator 下方的「篩選條件」沿用既有類型／地區篩選 Sheet，不新增沒有產品需求的顯示方式選單。
@@ -177,7 +183,7 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 
 ## 10. 帳號與設定
 
-- Account avatar 顯示帳號／顯示名稱第一個字元，使用與其他 toolbar action 相同的 44pt Liquid Glass 圓形元件；點擊後開啟與行程切換相同的 93% 高度 bottom sheet，右上 close target 44pt。獨立 `/account` route 僅保留 deep link 與直接導覽相容性。
+- Account 是第 5 個 Root tab。`/account` deep link 與設定子路由都在同一 StatefulShell branch，切換 tab 後保留 navigation stack；Root Account 畫面不顯示重複 close/avatar。
 - Light group 使用 `#FAF4EA`，Dark group 使用 `#2C2C2E`；無額外 card border 或 shadow。
 - row title 使用 Body／Headline 17pt，secondary 使用 Subheadline 15pt。
 - separator 1pt、左右 inset 16pt；有 leading image 時從文字欄開始。
@@ -190,6 +196,6 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 - Light／Dark、320×568、390×844、430×932、200% text、Bold Text、Reduce Motion 均可操作。
 - Reduce Transparency／High Contrast 必須使用套件 fallback，所有文字、選取狀態與操作仍可辨識。
 - iOS 與 Android 實機必須驗證 Google Maps PlatformView 上的 root tab、DAY selector、POI dock、marker 點擊、地圖拖曳與 tab 點擊不凍結，並以 profile mode 檢查 raster jank。
-- Widget tests 覆蓋 4-tab、account deep link、trip sheet、單層 selector、固定 zoom、POI clearance、聊天／Timeline full-bleed 捲動、聊天自己／協作者名稱 fallback 與協作者 dynamic Indigo tint、收藏常駐搜尋、排序 checkmark、plus 導覽、grouped list 與 HIG text styles。
+- Widget tests 覆蓋 5-tab、account branch、trip Day reset、同日／跨日拖曳、景點 menu／accordion、導航 links、鍵盤收合、滑動刪除、glass recipes、固定 zoom、POI clearance 與 200% Dynamic Type。
 - `dart format --output=none --set-exit-if-changed .`、`flutter analyze --no-fatal-infos`、`flutter test`、`flutter build ios --release --no-codesign` 全部通過。
 - 合併至 `master` 後觸發新的 TestFlight workflow，並確認新 build 完成 Apple processing。

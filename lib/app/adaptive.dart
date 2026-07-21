@@ -15,6 +15,102 @@ import '../theme/tokens.dart';
 import '../ui/tp_action_item.dart';
 import '../ui/tp_app_bar.dart';
 
+/// 全 App 的鍵盤收合規則：點欄位外或拖曳任何 scroll view 都只移除焦點。
+/// [TextFieldTapRegion] 內的附屬控制仍由 Flutter 排除在 outside tap 之外。
+class AppKeyboardDismissRegion extends StatelessWidget {
+  const AppKeyboardDismissRegion({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Actions(
+      actions: {
+        EditableTextTapOutsideIntent:
+            CallbackAction<EditableTextTapOutsideIntent>(
+              onInvoke: (intent) {
+                intent.focusNode.unfocus();
+                return null;
+              },
+            ),
+      },
+      child: NotificationListener<ScrollStartNotification>(
+        onNotification: (notification) {
+          if (notification.dragDetails != null) {
+            FocusManager.instance.primaryFocus?.unfocus();
+          }
+          return false;
+        },
+        child: child,
+      ),
+    );
+  }
+}
+
+/// iOS 使用底部 wheel，其他平台使用原生 Material time picker。
+Future<TimeOfDay?> showAppTimePicker(
+  BuildContext context, {
+  required TimeOfDay initialTime,
+}) {
+  final platform = Theme.of(context).platform;
+  final isApple =
+      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+  if (!isApple) {
+    return showTimePicker(context: context, initialTime: initialTime);
+  }
+
+  var selected = initialTime;
+  return showCupertinoModalPopup<TimeOfDay>(
+    context: context,
+    builder: (sheetContext) => Material(
+      color: Theme.of(sheetContext).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(selected),
+                      child: const Text('完成'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: true,
+                  initialDateTime: DateTime(
+                    2000,
+                    1,
+                    1,
+                    initialTime.hour,
+                    initialTime.minute,
+                  ),
+                  onDateTimeChanged: (value) => selected = TimeOfDay(
+                    hour: value.hour,
+                    minute: value.minute,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 /// 顯示自適應「確認 / 取消」對話框,回傳使用者是否確認。
 ///
 /// - iOS/macOS → [CupertinoAlertDialog];破壞性操作([isDestructive])用紅字

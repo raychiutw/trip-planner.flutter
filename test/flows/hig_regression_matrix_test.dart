@@ -105,7 +105,7 @@ void main() {
         fallbackAlpha,
         state.reduceTransparency
             ? greaterThanOrEqualTo(0.95)
-            : closeTo(state.brightness == Brightness.dark ? 0.88 : 0.90, 0.01),
+            : closeTo(state.brightness == Brightness.dark ? 0.48 : 0.40, 0.01),
       );
 
       await tester.fling(

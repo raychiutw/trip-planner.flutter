@@ -109,7 +109,7 @@ void main() {
     );
   }
 
-  testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet 與帳號入口', (tester) async {
+  testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -117,7 +117,7 @@ void main() {
     expect(find.text('沖繩'), findsWidgets);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.byType(PopupMenuButton<String>), findsNothing);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(find.byType(TpRootScaffold), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);

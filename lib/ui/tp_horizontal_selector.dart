@@ -96,14 +96,17 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     final tones = theme.extension<TpTones>()!;
     final trackSettings = tpNavigationGlassSettings(
       context,
-      visualContent: widget.platformViewBackdrop,
+      recipe: widget.platformViewBackdrop
+          ? TpNavigationGlassRecipe.platformView
+          : TpNavigationGlassRecipe.regular,
     );
     final selectedColor = isDark
         ? TpColorsDark.navigationSelection
         : TpColorsLight.navigationSelection;
+    final selectedTint = selectedColor.withValues(alpha: isDark ? 0.72 : 0.64);
     final selectedSettings = trackSettings.copyWith(
-      glassColor: selectedColor,
-      platformViewFallbackColor: selectedColor,
+      glassColor: selectedTint,
+      platformViewFallbackColor: selectedTint,
     );
     return SizedBox(
       height: TpSpacing.tapMin,

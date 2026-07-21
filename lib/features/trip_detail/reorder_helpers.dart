@@ -13,3 +13,41 @@ List<({int id, int sortOrder})> reorderedSortOrders(
   list.insert(newIndex, moved);
   return [for (var i = 0; i < list.length; i++) (id: list[i], sortOrder: i)];
 }
+
+Map<int, List<T>> moveEntryBetweenDays<T>(
+  Map<int, List<T>> entriesByDayId, {
+  required int sourceDayId,
+  required int sourceIndex,
+  required int targetDayId,
+  required int targetIndex,
+}) {
+  final result = {
+    for (final day in entriesByDayId.entries) day.key: List<T>.of(day.value),
+  };
+  final source = result[sourceDayId]!;
+  final moved = source.removeAt(sourceIndex);
+  final target = result[targetDayId]!;
+  var insertionIndex = targetIndex;
+  if (sourceDayId == targetDayId && targetIndex > sourceIndex) {
+    insertionIndex--;
+  }
+  insertionIndex = insertionIndex.clamp(0, target.length);
+  target.insert(insertionIndex, moved);
+  return result;
+}
+
+List<({int id, int sortOrder, int? dayId})> reorderUpdatesForDays(
+  Map<int, List<int>> entryIdsByDayId,
+  Set<int> affectedDayIds,
+) {
+  final dayIds = affectedDayIds.toList()..sort();
+  return [
+    for (final dayId in dayIds)
+      for (
+        var index = 0;
+        index < (entryIdsByDayId[dayId]?.length ?? 0);
+        index++
+      )
+        (id: entryIdsByDayId[dayId]![index], sortOrder: index, dayId: dayId),
+  ];
+}

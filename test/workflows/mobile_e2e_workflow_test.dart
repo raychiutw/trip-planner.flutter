@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'posix_test_support.dart';
+
 void main() {
   final e2eWorkflow = File(
     '.github/workflows/mobile-e2e.yml',
@@ -58,9 +60,7 @@ void main() {
     test('release target selects its matching external device platform', () {
       expect(
         releaseWorkflow,
-        contains(
-          "inputs.release_target == 'both' && 'all' ||",
-        ),
+        contains("inputs.release_target == 'both' && 'all' ||"),
       );
       expect(
         releaseWorkflow,
@@ -339,9 +339,10 @@ void main() {
         ..createSync(recursive: true)
         ..writeAsBytesSync(const [9, 10, 11]);
 
-      final result = Process.runSync('bash', [
+      final result = Process.runSync(testBashExecutable, [
+        '-l',
         'tool/sanitize_test_lab_evidence.sh',
-        root.path,
+        bashPath(root.path),
       ]);
 
       expect(result.exitCode, 0, reason: '${result.stderr}');
@@ -360,9 +361,10 @@ void main() {
       final binary = File('${root.path}/must-not-delete.apk')
         ..writeAsBytesSync(const [1, 2, 3]);
 
-      final result = Process.runSync('bash', [
+      final result = Process.runSync(testBashExecutable, [
+        '-l',
         'tool/sanitize_test_lab_evidence.sh',
-        root.path,
+        bashPath(root.path),
       ]);
 
       expect(result.exitCode, 64);

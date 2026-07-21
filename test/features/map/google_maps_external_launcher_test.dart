@@ -49,4 +49,21 @@ void main() {
     expect(openedUri, GoogleMapsExternalLauncher.buildSearchUri(namedPoi));
     expect(openedMode, LaunchMode.externalApplication);
   });
+
+  test('entry URI uses coordinates first and name as fallback', () {
+    expect(
+      GoogleMapsExternalLauncher.buildEntryUri(
+        name: '沖繩美麗海水族館',
+        latitude: 26.6942,
+        longitude: 127.8778,
+      ).queryParameters['query'],
+      '26.6942,127.8778',
+    );
+    expect(
+      GoogleMapsExternalLauncher.buildEntryUri(
+        name: '沖繩美麗海水族館',
+      ).queryParameters['query'],
+      '沖繩美麗海水族館',
+    );
+  });
 }

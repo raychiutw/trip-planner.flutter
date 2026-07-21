@@ -10,12 +10,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
+import '../../models/poi_type.dart';
 import '../../models/segment.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_horizontal_selector.dart';
@@ -35,7 +36,7 @@ import 'trip_providers.dart';
 import 'trip_notes_screen.dart';
 import 'trip_print_screen.dart';
 import 'widgets/day_header.dart';
-import 'widgets/entry_edit_sheet.dart';
+import 'widgets/entry_map_links.dart';
 import 'widgets/reorderable_row.dart';
 import 'widgets/timeline_entry_tile.dart';
 import 'widgets/travel_edit_sheet.dart';
@@ -52,7 +53,9 @@ enum _TripMoreAction {
   health,
 }
 
-/// 行程時間軸畫面：AppBar（可切換 trip／地圖 + 功能選單 + 帳號）→ DAY selector →
+enum _EntryMoreAction { reorder, changePoi, edit, move, copy, delete }
+
+/// 行程時間軸畫面：AppBar（可切換 trip／地圖 + 功能選單）→ DAY selector →
 /// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
@@ -90,6 +93,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     if (oldWidget.tripId != widget.tripId ||
         oldWidget.initialDayNum != widget.initialDayNum) {
       _activeDayNum = widget.initialDayNum;
+      if (oldWidget.tripId != widget.tripId) _isEditing = false;
     }
   }
 
@@ -230,7 +234,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 ),
               ],
             ),
-          const TpAccountAvatarButton(),
         ],
       ),
       body: daysAsync.when(
@@ -242,6 +245,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 initialEntryId: widget.initialEntryId,
                 initialDayNum: widget.initialDayNum,
                 isEditing: _isEditing,
+                onStartEditing: () => setState(() => _isEditing = true),
                 onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
@@ -261,13 +265,14 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
 typedef _EntriesSnapshot = Map<int, List<TimelineEntry>>;
 
 /// 日程主體：固定 DAY selector + 單一逐日 Sliver 捲動。
-class _TimelineBody extends StatefulWidget {
+class _TimelineBody extends ConsumerStatefulWidget {
   const _TimelineBody({
     required this.days,
     required this.tripId,
     this.initialEntryId,
     this.initialDayNum,
     required this.isEditing,
+    required this.onStartEditing,
     required this.onActiveDayChanged,
   });
 
@@ -276,13 +281,14 @@ class _TimelineBody extends StatefulWidget {
   final int? initialEntryId;
   final int? initialDayNum;
   final bool isEditing;
+  final VoidCallback onStartEditing;
   final ValueChanged<int> onActiveDayChanged;
 
   @override
-  State<_TimelineBody> createState() => _TimelineBodyState();
+  ConsumerState<_TimelineBody> createState() => _TimelineBodyState();
 }
 
-class _TimelineBodyState extends State<_TimelineBody> {
+class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   static const _selectorExtent = TpSpacing.tapMin + TpSpacing.s1;
 
   Map<int, GlobalKey> _daySectionKeys = {};
@@ -294,6 +300,9 @@ class _TimelineBodyState extends State<_TimelineBody> {
   bool _daySyncScheduled = false;
   int? _programmaticDayNum;
   var _programmaticScrollGeneration = 0;
+  int? _expandedEntryId;
+  var _reorderSubmitting = false;
+  final _settingMasterEntryIds = <int>{};
 
   @override
   void initState() {
@@ -309,9 +318,30 @@ class _TimelineBodyState extends State<_TimelineBody> {
   @override
   void didUpdateWidget(covariant _TimelineBody oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final tripChanged = oldWidget.tripId != widget.tripId;
     final daysChanged = !identical(oldWidget.days, widget.days);
-    if (daysChanged) {
+    if (daysChanged && !_reorderSubmitting) {
       _visibleEntriesByDayId = _entriesFromDays(widget.days);
+    }
+    if (tripChanged) {
+      _daySectionKeys = {};
+      _entryKeys = {};
+      _expandedEntryId = null;
+      _reorderSubmitting = false;
+      _settingMasterEntryIds.clear();
+      _visibleEntriesByDayId = _entriesFromDays(widget.days);
+      _rebuildKeys();
+      _activeDayNum =
+          _initialDayNum() ??
+          (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onActiveDayChanged(_activeDayNum);
+      });
+      _scheduleInitialFocusScroll();
+      return;
+    }
+    if (!oldWidget.isEditing && widget.isEditing) {
+      _expandedEntryId = null;
     }
     if (daysChanged ||
         oldWidget.initialEntryId != widget.initialEntryId ||
@@ -355,17 +385,123 @@ class _TimelineBodyState extends State<_TimelineBody> {
     setState(() => _visibleEntriesByDayId = snapshot);
   }
 
-  _EntriesSnapshot _previewReorder(int dayId, int oldIndex, int newIndex) {
-    final snapshot = _snapshotEntries();
-    final entries = List<TimelineEntry>.of(
-      _visibleEntriesByDayId[dayId] ?? const [],
-    );
-    final moved = entries.removeAt(oldIndex);
-    entries.insert(newIndex, moved);
+  void _toggleExpanded(int entryId) {
     setState(() {
-      _visibleEntriesByDayId = {..._visibleEntriesByDayId, dayId: entries};
+      _expandedEntryId = _expandedEntryId == entryId ? null : entryId;
     });
-    return snapshot;
+  }
+
+  Future<void> _reorderEntry(
+    _EntryDragData data,
+    int targetDayId,
+    int targetIndex,
+  ) async {
+    if (_reorderSubmitting) return;
+    final tripId = widget.tripId;
+    final days = widget.days;
+    final repository = ref.read(tripRepositoryProvider);
+    final before = _snapshotEntries();
+    final after = moveEntryBetweenDays<TimelineEntry>(
+      before,
+      sourceDayId: data.sourceDayId,
+      sourceIndex: data.sourceIndex,
+      targetDayId: targetDayId,
+      targetIndex: targetIndex,
+    );
+    if (_sameEntryOrder(before, after)) return;
+    final affected = {data.sourceDayId, targetDayId};
+    final updates = reorderUpdatesForDays({
+      for (final day in after.entries)
+        day.key: [for (final entry in day.value) entry.id],
+    }, affected);
+    setState(() {
+      _visibleEntriesByDayId = after;
+      _reorderSubmitting = true;
+    });
+    try {
+      await repository.reorderEntries(tripId: tripId, updates: updates);
+      final dayNums = [
+        for (final day in days)
+          if (affected.contains(day.id)) day.dayNum,
+      ];
+      for (final dayNum in dayNums) {
+        try {
+          await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
+        } on Exception {
+          // 排序已完成；交通資料會在下一次刷新自行補齊。
+        }
+      }
+      if (mounted) {
+        ref.invalidate(tripDaysProvider(tripId));
+        ref.invalidate(tripSegmentsProvider(tripId));
+      }
+    } on Exception {
+      if (mounted) {
+        ref.invalidate(tripDaysProvider(tripId));
+        if (widget.tripId == tripId) {
+          _restoreEntries(before);
+          showAppError(context, '排序失敗，已還原原本順序');
+        }
+      }
+    } finally {
+      if (mounted && widget.tripId == tripId) {
+        setState(() => _reorderSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _setMaster(
+    TimelineEntry entry,
+    EntryPoiInfo alternate,
+    int dayNum,
+  ) async {
+    if (!_settingMasterEntryIds.add(entry.id)) return;
+    final tripId = widget.tripId;
+    final repository = ref.read(tripRepositoryProvider);
+    setState(() {});
+    try {
+      await repository.setEntryMaster(
+        tripId: tripId,
+        entryId: entry.id,
+        poiId: alternate.poiId,
+        entryPoisVersion: entry.entryPoisVersion,
+      );
+      try {
+        await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
+      } on Exception {
+        // 正選已更新；交通資料可稍後重算。
+      }
+      if (mounted) {
+        ref.invalidate(tripDaysProvider(tripId));
+        ref.invalidate(tripSegmentsProvider(tripId));
+      }
+    } on Exception {
+      if (mounted && widget.tripId == tripId) {
+        showAppError(context, '設為正選失敗，請重新載入後再試');
+      }
+    } finally {
+      _settingMasterEntryIds.remove(entry.id);
+      if (mounted && widget.tripId == tripId) setState(() {});
+    }
+  }
+
+  void _autoScroll(DragUpdateDetails details) {
+    if (!_scrollController.hasClients) return;
+    final height = MediaQuery.sizeOf(context).height;
+    final position = _scrollController.position;
+    var delta = 0.0;
+    if (details.globalPosition.dy < TpRootGeometry.headerBottom(context) + 80) {
+      delta = -16;
+    } else if (details.globalPosition.dy >
+        height - TpRootTabGeometry.clearance(context) - 80) {
+      delta = 16;
+    }
+    if (delta == 0) return;
+    _scrollController.jumpTo(
+      (position.pixels + delta)
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble(),
+    );
   }
 
   int? _initialDayNum() {
@@ -491,6 +627,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
       child: CustomScrollView(
         key: const ValueKey('trip-timeline-scroll'),
         controller: _scrollController,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           SliverPersistentHeader(
             pinned: true,
@@ -512,6 +649,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
                   child: _DaySection(
                     key: _daySectionKeys[day.dayNum],
                     day: day,
+                    dayCount: widget.days.length,
                     timeline:
                         _visibleEntriesByDayId[day.id] ??
                         const <TimelineEntry>[],
@@ -519,8 +657,14 @@ class _TimelineBodyState extends State<_TimelineBody> {
                     entryKeys: _entryKeys,
                     focusedEntryId: widget.initialEntryId,
                     isEditing: widget.isEditing,
-                    previewReorder: _previewReorder,
-                    restoreEntries: _restoreEntries,
+                    reorderSubmitting: _reorderSubmitting,
+                    expandedEntryId: _expandedEntryId,
+                    settingMasterEntryIds: _settingMasterEntryIds,
+                    onToggleExpanded: _toggleExpanded,
+                    onStartEditing: widget.onStartEditing,
+                    onReorder: _reorderEntry,
+                    onDragUpdate: _autoScroll,
+                    onSetMaster: _setMaster,
                   ),
                 ),
               ),
@@ -670,23 +814,46 @@ class _DaySection extends ConsumerWidget {
     super.key,
     required this.tripId,
     required this.day,
+    required this.dayCount,
     required this.timeline,
     required this.entryKeys,
     this.focusedEntryId,
     required this.isEditing,
-    required this.previewReorder,
-    required this.restoreEntries,
+    required this.reorderSubmitting,
+    required this.expandedEntryId,
+    required this.settingMasterEntryIds,
+    required this.onToggleExpanded,
+    required this.onStartEditing,
+    required this.onReorder,
+    required this.onDragUpdate,
+    required this.onSetMaster,
   });
 
   final String tripId;
   final TripDay day;
+  final int dayCount;
   final List<TimelineEntry> timeline;
   final Map<int, GlobalKey> entryKeys;
   final int? focusedEntryId;
   final bool isEditing;
-  final _EntriesSnapshot Function(int dayId, int oldIndex, int newIndex)
-  previewReorder;
-  final void Function(_EntriesSnapshot snapshot) restoreEntries;
+  final bool reorderSubmitting;
+  final int? expandedEntryId;
+  final Set<int> settingMasterEntryIds;
+  final ValueChanged<int> onToggleExpanded;
+  final VoidCallback onStartEditing;
+  final Future<void> Function(
+    _EntryDragData data,
+    int targetDayId,
+    int targetIndex,
+  )
+  onReorder;
+  final ValueChanged<DragUpdateDetails> onDragUpdate;
+  final Future<void> Function(
+    TimelineEntry entry,
+    EntryPoiInfo alternate,
+    int dayNum,
+  )
+  onSetMaster;
 
   Future<void> _confirmDelete(
     BuildContext context,
@@ -705,33 +872,6 @@ class _DaySection extends ConsumerWidget {
       },
       onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
     );
-  }
-
-  Future<void> _reorder(
-    BuildContext context,
-    WidgetRef ref,
-    int oldIndex,
-    int newIndex,
-  ) async {
-    final updates = computeReorderUpdates(
-      [for (final e in timeline) e.id],
-      oldIndex,
-      newIndex,
-    );
-    final snapshot = previewReorder(day.id, oldIndex, newIndex);
-    final repo = ref.read(tripRepositoryProvider);
-    try {
-      await repo.reorderEntries(tripId: tripId, updates: updates);
-    } on Exception {
-      restoreEntries(snapshot);
-      if (context.mounted) {
-        showAppNotice(context, '排序失敗，請稍後再試');
-      }
-      ref.invalidate(tripDaysProvider(tripId));
-      return;
-    }
-    ref.invalidate(tripDaysProvider(tripId));
-    await _recomputeAndRefresh(ref);
   }
 
   /// reorder 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
@@ -790,82 +930,24 @@ class _DaySection extends ConsumerWidget {
         const SizedBox(height: TpSpacing.s3),
         DayWeatherCard(day: day),
         const SizedBox(height: TpSpacing.s3),
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          buildDefaultDragHandles: false,
-          itemCount: timeline.length,
-          onReorderItem: (oldIndex, newIndex) =>
-              _reorder(context, ref, oldIndex, newIndex),
-          itemBuilder: (context, i) {
-            final entry = timeline[i];
-            final previous = i > 0 ? timeline[i - 1] : null;
-            final travel = previous?.travel;
-            final travelSegment = previous == null
-                ? null
-                : _findSegment(segments, previous.id, entry.id);
-            final tile = TimelineEntryTile(
-              entry: entry,
-              number: i + 1,
-              isFirst: i == 0,
-              isLast: i == timeline.length - 1,
-              isFocused: entry.id == focusedEntryId,
-              compact: isEditing,
-              onTap: isEditing
-                  ? null
-                  : () => showEntryEditSheet(
-                      context,
-                      tripId: tripId,
-                      args: EntryEditExisting(entry),
-                    ),
-              trailing: isEditing
-                  ? ReorderDragHandle(
-                      index: i,
-                      iconKey: ValueKey('entry-drag-${entry.id}'),
-                    )
-                  : null,
-            );
-            final row = isEditing
-                ? tile
-                : SwipeToDelete(
-                    dismissKey: ValueKey('entry-dismiss-${entry.id}'),
-                    onDelete: () => _confirmDelete(context, ref, entry),
-                    backgroundMargin: const EdgeInsets.only(
-                      bottom: TpSpacing.s3,
-                    ),
-                    child: tile,
-                  );
-            return Container(
-              key: entryKeys[entry.id],
-              child: Column(
-                key: ValueKey('entry-${entry.id}'),
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!isEditing &&
-                      previous != null &&
-                      (travel != null || segmentsReady))
-                    _TravelRow(
-                      travel: travel,
-                      segment: travelSegment,
-                      tripId: tripId,
-                      fromEntryId: previous.id,
-                      toEntryId: entry.id,
-                      segmentsReady: segmentsReady,
-                      missingSegment:
-                          segmentsReady &&
-                          travelSegment == null &&
-                          travel != null,
-                      recomputeStalled: _stalledTravelRecomputeScopes.contains(
-                        '$tripId:${day.dayNum}',
-                      ),
-                      missingCoords: _missingTravelCoords(previous, entry),
-                    ),
-                  row,
-                ],
-              ),
-            );
-          },
-        ),
+        if (isEditing) ...[
+          for (var index = 0; index < timeline.length; index++) ...[
+            _EntryDropTarget(
+              targetDayId: day.id,
+              targetIndex: index,
+              onAccept: onReorder,
+            ),
+            _buildEntryRow(context, ref, index, segments, segmentsReady),
+          ],
+          _EntryDropTarget(
+            targetDayId: day.id,
+            targetIndex: timeline.length,
+            empty: timeline.isEmpty,
+            onAccept: onReorder,
+          ),
+        ] else
+          for (var index = 0; index < timeline.length; index++)
+            _buildEntryRow(context, ref, index, segments, segmentsReady),
         const SizedBox(height: TpSpacing.s2),
         Align(
           alignment: Alignment.centerLeft,
@@ -882,6 +964,184 @@ class _DaySection extends ConsumerWidget {
         const SizedBox(height: TpSpacing.s6),
       ],
     );
+  }
+
+  Widget _buildEntryRow(
+    BuildContext context,
+    WidgetRef ref,
+    int index,
+    List<TripSegment> segments,
+    bool segmentsReady,
+  ) {
+    final entry = timeline[index];
+    final previous = index > 0 ? timeline[index - 1] : null;
+    final travel = previous?.travel;
+    final travelSegment = previous == null
+        ? null
+        : _findSegment(segments, previous.id, entry.id);
+    final expanded = !isEditing && expandedEntryId == entry.id;
+    final tile = TimelineEntryTile(
+      entry: entry,
+      number: index + 1,
+      isFirst: index == 0,
+      isLast: index == timeline.length - 1,
+      isFocused: entry.id == focusedEntryId,
+      compact: isEditing,
+      expanded: expanded,
+      onTap: isEditing ? null : () => onToggleExpanded(entry.id),
+      onEditTime: isEditing
+          ? null
+          : () => context.push(
+              '/trips/${Uri.encodeComponent(tripId)}/entries/${entry.id}/edit',
+            ),
+      mapLinks: isEditing || entry.master == null
+          ? null
+          : EntryMapLinks(
+              poi: entry.master!,
+              onError: () => showAppError(context, '無法開啟地圖，請稍後再試'),
+            ),
+      expandedChild: expanded
+          ? _AlternatesPanel(
+              entry: entry,
+              settingMaster: settingMasterEntryIds.contains(entry.id),
+              onChangePoi: () => context.push(
+                '/trips/${Uri.encodeComponent(tripId)}/entries/${entry.id}/pois',
+              ),
+              onSetMaster: (alternate) =>
+                  onSetMaster(entry, alternate, day.dayNum),
+              onMapError: () => showAppError(context, '無法開啟地圖，請稍後再試'),
+            )
+          : null,
+      trailing: isEditing
+          ? _EntryDragHandle(
+              data: _EntryDragData(
+                sourceDayId: day.id,
+                sourceIndex: index,
+                entry: entry,
+              ),
+              enabled: !reorderSubmitting,
+              onDragUpdate: onDragUpdate,
+              feedbackWidth:
+                  MediaQuery.sizeOf(context).width -
+                  TpSpacing.s4 * 2 -
+                  kTimelineRailWidth -
+                  10,
+            )
+          : _entryMenu(context, ref, entry),
+    );
+    final row = isEditing
+        ? tile
+        : SwipeToDelete(
+            dismissKey: ValueKey('entry-dismiss-${entry.id}'),
+            actionLabel: '刪除景點',
+            onDelete: () => _confirmDelete(context, ref, entry),
+            backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s3),
+            child: tile,
+          );
+    return Container(
+      key: entryKeys[entry.id],
+      child: Column(
+        key: ValueKey('entry-${entry.id}'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!isEditing &&
+              previous != null &&
+              (travel != null || segmentsReady))
+            _TravelRow(
+              travel: travel,
+              segment: travelSegment,
+              tripId: tripId,
+              fromEntryId: previous.id,
+              toEntryId: entry.id,
+              segmentsReady: segmentsReady,
+              missingSegment:
+                  segmentsReady && travelSegment == null && travel != null,
+              recomputeStalled: _stalledTravelRecomputeScopes.contains(
+                '$tripId:${day.dayNum}',
+              ),
+              missingCoords: _missingTravelCoords(previous, entry),
+            ),
+          row,
+        ],
+      ),
+    );
+  }
+
+  Widget _entryMenu(BuildContext context, WidgetRef ref, TimelineEntry entry) {
+    final canChangeDay = dayCount > 1;
+    return TpMoreMenuButton<_EntryMoreAction>(
+      key: ValueKey('entry-more-${entry.id}'),
+      tooltip: '景點操作',
+      items: [
+        TpActionItem(
+          key: ValueKey('entry-reorder-${entry.id}'),
+          value: _EntryMoreAction.reorder,
+          label: '重新排序',
+          icon: CupertinoIcons.line_horizontal_3,
+        ),
+        TpActionItem(
+          key: ValueKey('entry-change-poi-${entry.id}'),
+          value: _EntryMoreAction.changePoi,
+          label: '換景點',
+          icon: CupertinoIcons.arrow_2_circlepath,
+        ),
+        TpActionItem(
+          key: ValueKey('entry-edit-${entry.id}'),
+          value: _EntryMoreAction.edit,
+          label: '編輯景點',
+          icon: CupertinoIcons.pencil,
+          dividerBefore: true,
+        ),
+        TpActionItem(
+          key: ValueKey('entry-move-${entry.id}'),
+          value: _EntryMoreAction.move,
+          label: '移動到其他天',
+          semanticLabel: canChangeDay ? null : '移動到其他天，目前行程只有一天，無法使用',
+          icon: CupertinoIcons.arrow_right_arrow_left,
+          enabled: canChangeDay,
+        ),
+        TpActionItem(
+          key: ValueKey('entry-copy-${entry.id}'),
+          value: _EntryMoreAction.copy,
+          label: '複製到其他天',
+          semanticLabel: canChangeDay ? null : '複製到其他天，目前行程只有一天，無法使用',
+          icon: CupertinoIcons.doc_on_doc,
+          dividerBefore: true,
+          enabled: canChangeDay,
+        ),
+        TpActionItem(
+          key: ValueKey('entry-delete-${entry.id}'),
+          value: _EntryMoreAction.delete,
+          label: '刪除景點',
+          icon: CupertinoIcons.delete,
+          role: TpActionRole.destructive,
+        ),
+      ],
+      onSelected: (action) => _handleEntryAction(context, ref, entry, action),
+    );
+  }
+
+  void _handleEntryAction(
+    BuildContext context,
+    WidgetRef ref,
+    TimelineEntry entry,
+    _EntryMoreAction action,
+  ) {
+    final base = '/trips/${Uri.encodeComponent(tripId)}/entries/${entry.id}';
+    switch (action) {
+      case _EntryMoreAction.reorder:
+        onStartEditing();
+      case _EntryMoreAction.changePoi:
+        context.push('$base/pois');
+      case _EntryMoreAction.edit:
+        context.push('$base/edit');
+      case _EntryMoreAction.move:
+        context.push('$base/move');
+      case _EntryMoreAction.copy:
+        context.push('$base/copy');
+      case _EntryMoreAction.delete:
+        unawaited(_confirmDelete(context, ref, entry));
+    }
   }
 
   void _requestMissingSegmentRecompute(
@@ -906,6 +1166,310 @@ class _DaySection extends ConsumerWidget {
     if (!_requestedTravelGapRecomputes.add(key)) return;
     _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
     unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+  }
+}
+
+bool _sameEntryOrder(_EntriesSnapshot a, _EntriesSnapshot b) {
+  if (a.length != b.length) return false;
+  for (final day in a.entries) {
+    final other = b[day.key];
+    if (other == null || other.length != day.value.length) return false;
+    for (var index = 0; index < day.value.length; index++) {
+      if (day.value[index].id != other[index].id) return false;
+    }
+  }
+  return true;
+}
+
+class _EntryDragData {
+  const _EntryDragData({
+    required this.sourceDayId,
+    required this.sourceIndex,
+    required this.entry,
+  });
+
+  final int sourceDayId;
+  final int sourceIndex;
+  final TimelineEntry entry;
+}
+
+class _EntryDragHandle extends StatelessWidget {
+  const _EntryDragHandle({
+    required this.data,
+    required this.enabled,
+    required this.onDragUpdate,
+    required this.feedbackWidth,
+  });
+
+  final _EntryDragData data;
+  final bool enabled;
+  final ValueChanged<DragUpdateDetails> onDragUpdate;
+  final double feedbackWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final handle = Semantics(
+      key: ValueKey('entry-drag-${data.entry.id}'),
+      button: true,
+      enabled: enabled,
+      label: '拖曳調整順序，可移到其他天',
+      child: const TpInlineEditControlVisual(
+        icon: CupertinoIcons.line_horizontal_3,
+      ),
+    );
+    if (!enabled) return Opacity(opacity: 0.45, child: handle);
+    return Draggable<_EntryDragData>(
+      data: data,
+      maxSimultaneousDrags: 1,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      onDragStarted: HapticFeedback.selectionClick,
+      onDragUpdate: onDragUpdate,
+      feedback: Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          key: ValueKey('entry-drag-feedback-${data.entry.id}'),
+          width: feedbackWidth,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(TpSpacing.s4),
+              child: Text(
+                data.entry.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.30, child: handle),
+      child: handle,
+    );
+  }
+}
+
+class _EntryDropTarget extends StatelessWidget {
+  const _EntryDropTarget({
+    required this.targetDayId,
+    required this.targetIndex,
+    required this.onAccept,
+    this.empty = false,
+  });
+
+  final int targetDayId;
+  final int targetIndex;
+  final bool empty;
+  final Future<void> Function(
+    _EntryDragData data,
+    int targetDayId,
+    int targetIndex,
+  )
+  onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<_EntryDragData>(
+      key: ValueKey('entry-drop-$targetDayId-$targetIndex'),
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) =>
+          unawaited(onAccept(details.data, targetDayId, targetIndex)),
+      builder: (context, candidates, rejected) => SizedBox(
+        height: empty ? TpSpacing.tapMin : 12,
+        child: AnimatedContainer(
+          duration: TpMotion.resolve(context, TpMotion.fast),
+          margin: const EdgeInsets.symmetric(horizontal: kTimelineRailWidth),
+          decoration: BoxDecoration(
+            color: candidates.isEmpty
+                ? Colors.transparent
+                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(8),
+            border: candidates.isEmpty
+                ? null
+                : Border.all(color: Theme.of(context).colorScheme.primary),
+          ),
+          alignment: Alignment.center,
+          child: empty && candidates.isEmpty
+              ? Text(
+                  '拖曳景點到 DAY',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _AlternatesPanel extends StatelessWidget {
+  const _AlternatesPanel({
+    required this.entry,
+    required this.settingMaster,
+    required this.onChangePoi,
+    required this.onSetMaster,
+    required this.onMapError,
+  });
+
+  final TimelineEntry entry;
+  final bool settingMaster;
+  final VoidCallback onChangePoi;
+  final Future<void> Function(EntryPoiInfo alternate) onSetMaster;
+  final VoidCallback onMapError;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: ValueKey('entry-alternates-${entry.id}'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(TpSpacing.s4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('備選景點', style: theme.textTheme.titleSmall),
+          const SizedBox(height: TpSpacing.s2),
+          if (entry.alternates.isEmpty) ...[
+            Text(
+              '尚無備選景點',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            TextButton.icon(
+              key: ValueKey('entry-change-poi-empty-${entry.id}'),
+              onPressed: onChangePoi,
+              icon: const Icon(CupertinoIcons.arrow_2_circlepath),
+              label: const Text('換景點'),
+            ),
+          ] else
+            for (final alternate in entry.alternates)
+              Padding(
+                padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+                child: _AlternateCard(
+                  alternate: alternate,
+                  settingMaster: settingMaster,
+                  onSetMaster: () => onSetMaster(alternate),
+                  onMapError: onMapError,
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlternateCard extends StatelessWidget {
+  const _AlternateCard({
+    required this.alternate,
+    required this.settingMaster,
+    required this.onSetMaster,
+    required this.onMapError,
+  });
+
+  final EntryPoiInfo alternate;
+  final bool settingMaster;
+  final Future<void> Function() onSetMaster;
+  final VoidCallback onMapError;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final category =
+        poiCategoryLabel(alternate.category) ?? kPoiTypeLabels[alternate.type];
+    final facts = <String>[
+      if (alternate.rating != null) '★ ${alternate.rating!.toStringAsFixed(1)}',
+      if (alternate.price?.trim().isNotEmpty ?? false) alternate.price!.trim(),
+      if (alternate.hours?.trim().isNotEmpty ?? false) alternate.hours!.trim(),
+      if (alternate.reservation?.trim().isNotEmpty ?? false)
+        alternate.reservation!.trim(),
+    ];
+    return Container(
+      key: ValueKey('alternate-${alternate.poiId}'),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: TpSpacing.s2,
+            runSpacing: TpSpacing.s1,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                alternate.name?.trim().isNotEmpty ?? false
+                    ? alternate.name!.trim()
+                    : '未命名景點',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (category != null)
+                Text(
+                  category,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: TpSpacing.s1),
+          EntryMapLinks(poi: alternate, onError: onMapError),
+          if (facts.isNotEmpty) ...[
+            const SizedBox(height: TpSpacing.s1),
+            Text(
+              facts.join(' · '),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (alternate.description?.trim().isNotEmpty ?? false) ...[
+            const SizedBox(height: TpSpacing.s1),
+            Text(alternate.description!.trim()),
+          ],
+          if (alternate.note?.trim().isNotEmpty ?? false) ...[
+            const SizedBox(height: TpSpacing.s1),
+            Text('備註：${alternate.note!.trim()}'),
+          ],
+          const SizedBox(height: TpSpacing.s2),
+          FilledButton.tonalIcon(
+            key: ValueKey('alternate-set-master-${alternate.poiId}'),
+            onPressed: settingMaster ? null : () => unawaited(onSetMaster()),
+            icon: settingMaster
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(CupertinoIcons.arrow_turn_down_left),
+            label: const Text('設為正選'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
