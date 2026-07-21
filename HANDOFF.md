@@ -18,20 +18,16 @@
 
 ## 已驗證
 
-```powershell
-C:\flutter\bin\dart.bat format --output=none --set-exit-if-changed <本輪 Dart 檔案>
-C:\flutter\bin\flutter.bat analyze
-C:\flutter\bin\flutter.bat test --no-pub -r failures-only test\api test\app
-C:\flutter\bin\flutter.bat test --no-pub -r failures-only test\features
-C:\flutter\bin\flutter.bat test --no-pub -r failures-only test\helpers test\models test\platform test\theme test\ui
-C:\flutter\bin\flutter.bat test --no-pub -r failures-only test\flows
-C:\flutter\bin\flutter.bat test --no-pub -r failures-only
-C:\flutter\bin\flutter.bat build apk --debug --no-pub
+```bash
+dart format --output=none --set-exit-if-changed .
+flutter analyze
+flutter test --no-pub -r failures-only
+flutter build apk --debug --no-pub
 ```
 
-結果：analyze 0 issue；全庫 1,341 tests 全部通過，包含跨 Day 成功／失敗回滾、單日 move/copy disabled reason semantics、卡片內控制不誤觸展開，以及 27 個 POSIX workflow contract tests；Android debug APK 已產生於 `build/app/outputs/flutter-apk/app-debug.apk`。
+結果：analyze 0 issue；全庫 1,347 tests 全部通過，包含跨 Day 成功／失敗回滾、拖曳 feedback 寬度、單日 move/copy disabled reason semantics、卡片內控制不誤觸展開，以及 27 個 POSIX workflow contract tests；Android debug APK 已產生於 `build/app/outputs/flutter-apk/app-debug.apk`。PR CI [29829527458](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29829527458) 亦通過 analyzer、完整測試、UI artifacts 與 Android debug build。
 
-## 下一手必做的平台驗收
+## 後續非阻塞平台驗收
 
 1. 在 macOS 執行 `flutter build ios --simulator`，再跑 iOS simulator widget／integration flows。
 2. iPhone 320pt／390pt／430pt，100%／200% Dynamic Type：檢查 5-tab labels、時間 chips、導航 pills、menu 與刪除 label。
@@ -52,5 +48,6 @@ POSIX contract tests 會明確使用 Git for Windows Bash，並把 Windows temp 
 
 ## Git／發布狀態
 
-- 本輪尚未 commit、push 或 release。
-- `.context/` 為既有未追蹤內容，未納入本輪修改。
+- PR [#71](https://github.com/raychiutw/trip-planner.flutter/pull/71) 已合併至 `master`，source SHA 為 `eb4c493bb16c9317017c268fe225b43fa6fa801e`，並已推送 annotated tag `v0.9.3`。
+- Release workflow [29830338702](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29830338702) 已把共同 build `10701` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`）。
+- Optional Firebase／staging evidence 本次依 publish-first 設定未執行，不影響已完成的商店發布；後續可獨立回補。

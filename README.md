@@ -6,7 +6,7 @@
 
 **P0（已完成）**
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
-- 4-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏）— go_router StatefulShellRoute + auth redirect；帳號由各頁右上 avatar 進入
+- 5-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
 - 行程清單（中性 grouped surface、pull-to-refresh、尾端左滑刪除，並保留長按操作）
 - 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
@@ -33,7 +33,7 @@ lib/
   theme/        # 暖白／中性深色 design tokens + ThemeData + 語意色 ThemeExtension
   models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
   api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
-  app/          # go_router（4-tab StatefulShellRoute + auth redirect）
+  app/          # go_router（5-tab StatefulShellRoute + auth redirect）
   features/     # auth / trips / trip_detail（timeline·map·notes）/ account / shell
 docs/
   PORTING_PLAN.md   # 移植藍圖與架構決策

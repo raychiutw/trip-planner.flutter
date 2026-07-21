@@ -11,7 +11,7 @@
 | 面向 | 決策 | 理由 |
 |---|---|---|
 | State management | flutter_riverpod 3.x | scoped provider 天然對應 web 的 TripLayout 共用 fetch（規劃時為 2.x，實作採 3.x） |
-| Routing | go_router + StatefulShellRoute | 4-tab shell（聊天/行程/地圖/收藏）保留各 tab navigation stack；帳號由右上 avatar 進入 |
+| Routing | go_router + StatefulShellRoute | 5-tab shell（聊天/行程/地圖/收藏/帳號）保留各 tab navigation stack |
 | HTTP | dio + interceptor | interceptor 統一處理 session cookie、Origin header、錯誤轉換、429 retry |
 | 認證 | Cookie 登入 + OAuth PKCE/Bearer 就緒 | `POST /api/oauth/login` → 解析 `Set-Cookie: tripline_session`，存 flutter_secure_storage；mutating request 手動帶 `Origin: https://trip-planner-dby.pages.dev`（CSRF Origin 檢查必要）。OAuth PKCE/Bearer client 端已實作並以 dart-define 啟用，production backend 已 provision `tripline-mobile` active public client |
 | 地圖 | google_navigation_flutter + domain adapter | iOS／Android 使用各自受平台限制的金鑰；`features/map/map_adapter.dart` 隔離 SDK 型別並支援原生 Google POI callback，路線沿用 Web `/route` 契約 |
@@ -33,7 +33,7 @@
 
 | Screen | Web 對應 | 資料來源 |
 |---|---|---|
-| 4-tab shell + account deep link | GlobalBottomNav | — |
+| 5-tab shell | GlobalBottomNav | — |
 | LoginScreen | LoginPage | `POST /oauth/login` |
 | TripsListScreen | TripsListPage | `GET /my-trips` + `GET /trips?all=1`、`DELETE /trips/:id` |
 | TripTimelineScreen | TripPage（embedded） | `GET /trips/:id` + `GET /trips/:id/days?all=1` |
@@ -63,7 +63,7 @@ lib/
   features/trip_detail/     # TripTimelineScreen / TripMapScreen / TripNotesScreen + trip scope providers
   features/map/             # GlobalMapScreen + map_adapter.dart
   features/account/         # AccountScreen
-  features/shell/           # 4-tab scaffold + placeholder screens
+  features/shell/           # 5-tab scaffold + root navigation
   widgets/                  # 共用：toast、confirm dialog、empty state、chips
 test/                       # 與 lib/ 鏡像
 ```
@@ -74,5 +74,5 @@ test/                       # 與 lib/ 鏡像
 - 柔褐 accent 是唯一品牌強調色；POI／收藏／行程 surface 使用中性色，sage／pink 分類色已退場
 - 卡片：elevation 0 + 1px hairline `#EADFCF`、radius 8；shadow 只給浮層
 - 字體：平台系統字（iOS/macOS SF Pro、Android Roboto，中文走系統 fallback）；主要內文 17/26；時間 tabular-nums
-- 導覽：四個 branch 共用固定 64pt `AppleRootTabBar` Liquid Glass 浮動功能層；帳號由各 root header 的 avatar 進入，內容寬版由 `AppAdaptiveContent` 依角色限寬
+- 導覽：五個 branch 共用 `AppleRootTabBar` Liquid Glass 浮動功能層；帳號是第 5 個 root tab，內容寬版由 `AppAdaptiveContent` 依角色限寬
 - 禁止：gradient 裝飾、emoji icon、rainbow 色（地圖 polyline 例外）

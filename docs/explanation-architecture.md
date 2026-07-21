@@ -9,7 +9,7 @@ Tripline Flutter 是 [trip-planner React SPA](https://github.com/raychiutw/trip-
 │ features/   畫面與 widget(auth/trips/      │
 │             trip_detail/account/shell)     │
 ├─────────────────────────────────────────────┤
-│ app/        go_router(4-tab shell +        │
+│ app/        go_router(5-tab shell +        │
 │             auth redirect)                  │
 ├─────────────────────────────────────────────┤
 │ api/        ApiClient(dio)+ repositories  │
