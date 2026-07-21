@@ -1,6 +1,6 @@
 # Tripline Theme 與共用 UI 參考
 
-> 更新：2026-07-20。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-17-tripline-final.html`](design-sessions/2026-07-17-tripline-final.html) 為準。
+> 更新：2026-07-21。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-21-trip-entry-card-menu-keyboard-glass.md`](superpowers/plans/2026-07-21-trip-entry-card-menu-keyboard-glass.md) 為準。
 
 ## 取色
 
@@ -36,20 +36,21 @@
 
 ## 導覽
 
-- Root tab 固定四項：聊天、行程、地圖、收藏。
-- 帳號不在 tab；四個 root 畫面右上固定圓形 `TpAccountAvatarButton`，`/account` 保留 deep link。
+- Root tab 固定五項：聊天、行程、地圖、收藏、帳號。
+- Account 是第 5 branch；其他 root Header 不再重複 avatar，`/account` deep link 保留。
 - 浮動 tab 使用 `AppleRootTabBar`，左右 margin `16`、可見高度 `64`、安全區上方留白由 `TpRootTabGeometry` 統一計算。
 - `AppShell` 開啟 `extendBody`。根頁底部淨空一律使用 `TpRootScrollScaffold` 或 `TpRootTabGeometry.clearance(context)`，不得另寫 magic number。
 - 最小 tap target `44×44`；selection 使用 haptic；reduced motion 由 `TpMotion.resolve` 處理。
 
 ## 行程與地圖
 
-- 行程頁單層 selector：`地圖 | DAY 1 | DAY 2...`。
-- 地圖頁單層 selector：`行程 | DAY 1 | DAY 2...`。
-- 第一項切換頁面並保留 day；筆記放右上功能區。
+- 行程頁 selector：`DAY 1 | DAY 2...`；地圖頁 selector：`總覽 | DAY 1 | DAY 2...`。
+- 行程／地圖在 Root Header 互切並保留 day；切換到另一行程預設回 DAY 1。
 - 目前行程標題可點擊，開啟含搜尋、目前 checkmark、最近行程的 bottom sheet。
 - 預設進入、切換行程、切換 Day 與明確 POI focus 的 zoom 都固定 `13`，避免互動後跳成其他層級。
 - POI 卡以 `PageView(viewportFraction: .74)` 左右滑動；滑動只更新預覽，點卡片或 marker 才以 zoom `13` 移動地圖。卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
+- Timeline 景點卡使用四列資訊；卡片 tap 展開備選，`…` 提供六項三組命令。排序只用短按 handle，支援同日與跨 Day drop。
+- 起訖時間使用 compact chips 與平台 picker；卡片上的 Google/Apple links 由 `EntryMapLinks` 提供。
 
 ## 內容與設定元件
 
@@ -57,16 +58,19 @@
 - 設定頁使用 `TpSettingsGroup`：無外框、無陰影、圓角 grouped surface、內縮 separator。
 - 帳號列、通知 switch、外觀 checkmark 均使用原生熟悉的 HIG 動線。
 - 卡片不靠彩色分類表達資訊；階層以字重、留白與 separator 建立。
+- Navigation regular glass 使用 Light/Dark alpha `.40/.48`，PlatformView 使用 `.56/.62`，High Contrast 使用 `.96` opaque fallback；內容卡不套 glass。
 
 ## 共用 primitive
 
 - `TpHorizontalSelector`：行程／地圖與 day 的單層 selector。
 - `TripTitleButton`：目前行程標題與切換 sheet。
-- `TpAccountAvatarButton`：root 頁右上帳號入口。
 - `TpSettingsGroup` / `TpSettingsRow`：帳號設定分組。
 - `TpContentSurface`：實色內容卡。
 - `TpGlassSurface`：僅限浮動功能層。
-- `AppSearchField` / `showAppActionSheet` / `showAppConfirm`：平台自適應互動。
+- `EntryMapLinks`：景點 Google／Apple 導航。
+- `SwipeToDelete`：左滑只揭露紅色刪除，點擊後才進確認。
+- `AppKeyboardDismissRegion`：全 App 點外部／拖曳收鍵盤並保留草稿。
+- `AppSearchField` / `showAppActionSheet` / `showAppConfirm` / `showAppTimePicker`：平台自適應互動。
 
 ## 例外
 

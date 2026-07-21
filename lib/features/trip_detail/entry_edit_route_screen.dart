@@ -82,12 +82,10 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
                 child: Text('載入失敗：$error', textAlign: TextAlign.center),
               ),
             ),
-            data: (entry) => SingleChildScrollView(
-              child: EntryEditSheet(
-                tripId: widget.tripId,
-                args: EntryEditExisting(entry),
-                formController: _formController,
-              ),
+            data: (entry) => EntryEditSheet(
+              tripId: widget.tripId,
+              args: EntryEditExisting(entry),
+              formController: _formController,
             ),
           ),
         ),

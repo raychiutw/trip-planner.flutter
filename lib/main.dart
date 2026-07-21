@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'api/cache/cache_migration.dart';
 import 'api/cache/drift_cache_store.dart';
 import 'api/providers.dart';
+import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
@@ -144,8 +145,11 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),
-      builder: (context, child) =>
-          SlidableAutoCloseBehavior(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => AppKeyboardDismissRegion(
+        child: SlidableAutoCloseBehavior(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
     );
   }
 }

@@ -126,10 +126,7 @@ void main() {
         find.byKey(const ValueKey('favorites-search-input')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('account-avatar-button')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     });
 
     testWidgets('320pt / 200% 字級將新增收進更多選單且 Header 不溢位', (tester) async {
@@ -161,10 +158,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('account-avatar-button')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
       await tester.pumpAndSettle();

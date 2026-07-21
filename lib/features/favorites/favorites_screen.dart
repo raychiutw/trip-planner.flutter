@@ -12,7 +12,6 @@ import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
@@ -205,7 +204,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           icon: CupertinoIcons.add,
           onPressed: () => context.go('/favorites/explore'),
         ),
-      const TpAccountAvatarButton(),
     ];
   }
 

@@ -1,4 +1,4 @@
-/// 帳號 hub 畫面：由 root 畫面右上 avatar 進入，包含 profile、設定與登出。
+/// 帳號 hub 畫面：Root 第五個 tab，包含 profile、設定與登出。
 library;
 
 import 'dart:async';
@@ -165,31 +165,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     }
 
     return Scaffold(
-      appBar: TpAppBar(
-        role: TpAppBarRole.standalone,
-        title: const Text('帳號'),
-        actions: [
-          TpToolbarIconButton(
-            key: const ValueKey('account-close-button'),
-            tooltip: '關閉',
-            onPressed: () {
-              final router = GoRouter.maybeOf(context);
-              if (router == null) {
-                Navigator.of(context).maybePop();
-              } else if (router.canPop()) {
-                router.pop();
-              } else {
-                router.go('/trips');
-              }
-            },
-            icon: CupertinoIcons.xmark,
-          ),
-        ],
-      ),
+      appBar: TpAppBar(role: TpAppBarRole.standalone, title: const Text('帳號')),
       body: CustomScrollView(
+        key: const ValueKey('account-root-content'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           ...slivers,
-          const SliverToBoxAdapter(child: SizedBox(height: TpSpacing.s6)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+            ),
+          ),
         ],
       ),
     );

@@ -257,52 +257,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ShareScreen(tripId: state.pathParameters['tripId']!),
       ),
       GoRoute(
-        path: '/account',
-        builder: (context, state) => const AccountScreen(),
-      ),
-      GoRoute(
-        path: '/settings/appearance',
-        builder: (context, state) => const AppearanceScreen(),
-      ),
-      GoRoute(
-        path: '/settings/profile',
-        builder: (context, state) => const ProfileEditScreen(),
-      ),
-      GoRoute(
-        path: '/settings/notifications',
-        builder: (context, state) => const NotificationsScreen(),
-      ),
-      GoRoute(
-        path: '/account/notifications',
-        builder: (context, state) => const NotificationsScreen(),
-      ),
-      GoRoute(
-        path: '/settings/sessions',
-        builder: (context, state) => const AccountSessionsScreen(),
-      ),
-      GoRoute(
-        path: '/settings/connected-apps',
-        builder: (context, state) => const ConnectedAppsScreen(),
-      ),
-      GoRoute(
-        path: '/settings/developer-apps',
-        builder: (context, state) => const DeveloperAppsScreen(),
-        routes: [
-          GoRoute(
-            path: 'new',
-            builder: (context, state) => const DeveloperAppNewScreen(),
-          ),
-        ],
-      ),
-      GoRoute(
         path: '/developer/apps',
-        builder: (context, state) => const DeveloperAppsScreen(),
-        routes: [
-          GoRoute(
-            path: 'new',
-            builder: (context, state) => const DeveloperAppNewScreen(),
-          ),
-        ],
+        redirect: (context, state) => '/settings/developer-apps',
+      ),
+      GoRoute(
+        path: '/developer/apps/new',
+        redirect: (context, state) => '/settings/developer-apps/new',
       ),
       GoRoute(
         path: '/oauth/consent',
@@ -477,6 +437,50 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/account',
+                builder: (context, state) => const AccountScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) => const NotificationsScreen(),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: '/settings/appearance',
+                builder: (context, state) => const AppearanceScreen(),
+              ),
+              GoRoute(
+                path: '/settings/profile',
+                builder: (context, state) => const ProfileEditScreen(),
+              ),
+              GoRoute(
+                path: '/settings/notifications',
+                builder: (context, state) => const NotificationsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/sessions',
+                builder: (context, state) => const AccountSessionsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/connected-apps',
+                builder: (context, state) => const ConnectedAppsScreen(),
+              ),
+              GoRoute(
+                path: '/settings/developer-apps',
+                builder: (context, state) => const DeveloperAppsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    builder: (context, state) => const DeveloperAppNewScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -617,7 +621,8 @@ bool _isRootTabLocation(String path) {
   if (path == '/chat' ||
       path == '/trips' ||
       path == '/map' ||
-      path == '/favorites') {
+      path == '/favorites' ||
+      path == '/account') {
     return true;
   }
   final segments = Uri.parse(path).pathSegments;

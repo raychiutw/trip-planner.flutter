@@ -95,7 +95,9 @@ class TpRootGlassHeader extends StatelessWidget {
           platformViewBackdrop: config.platformViewBackdrop,
           glassSettings: tpNavigationGlassSettings(
             context,
-            visualContent: config.platformViewBackdrop,
+            recipe: config.platformViewBackdrop
+                ? TpNavigationGlassRecipe.platformView
+                : TpNavigationGlassRecipe.regular,
           ),
           borderRadius: const BorderRadius.all(Radius.circular(32)),
           padding: const EdgeInsets.symmetric(

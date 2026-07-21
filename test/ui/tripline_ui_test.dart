@@ -391,10 +391,8 @@ void main() {
       final map = trackFor('map-navigation-selector');
       expect(standard.platformViewBackdrop, isFalse);
       expect(map.platformViewBackdrop, isTrue);
-      expect(
-        map.settings?.glassColor.a,
-        lessThan(standard.settings!.glassColor.a),
-      );
+      expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
+      expect(map.settings?.glassColor.a, closeTo(0.56, 0.01));
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
@@ -503,7 +501,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final thumb = tester.widget<GlassButton>(find.byType(GlassButton));
-    expect(thumb.settings?.glassColor, TpColorsDark.dayThumb);
+    expect(
+      thumb.settings?.glassColor,
+      TpColorsDark.dayThumb.withValues(alpha: 0.72),
+    );
     final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
     expect(track.settings?.chromaticAberration, 0);
   });

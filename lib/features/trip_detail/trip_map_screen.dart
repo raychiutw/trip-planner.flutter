@@ -13,7 +13,6 @@ import '../../models/entry.dart';
 import '../../models/poi_type.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_bottom_accessory.dart';
 import '../../ui/tp_horizontal_selector.dart';
@@ -130,7 +129,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
               ),
               icon: CupertinoIcons.doc_text,
             ),
-            const TpAccountAvatarButton(),
           ],
         ),
         body: daysAsync.when(

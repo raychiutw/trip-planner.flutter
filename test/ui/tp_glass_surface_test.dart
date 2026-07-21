@@ -18,7 +18,7 @@ void main() {
             textBackdrop = tpNavigationGlassSettings(context);
             visualBackdrop = tpNavigationGlassSettings(
               context,
-              visualContent: true,
+              recipe: TpNavigationGlassRecipe.platformView,
             );
             return const SizedBox();
           },
@@ -26,9 +26,9 @@ void main() {
       ),
     );
 
-    expect(textBackdrop!.glassColor.a, closeTo(0.90, 0.01));
-    expect(textBackdrop!.backerColor?.a, closeTo(0.90, 0.01));
-    expect(visualBackdrop!.glassColor.a, closeTo(0.58, 0.01));
+    expect(textBackdrop!.glassColor.a, closeTo(0.40, 0.01));
+    expect(textBackdrop!.backerColor, isNull);
+    expect(visualBackdrop!.glassColor.a, closeTo(0.56, 0.01));
     expect(visualBackdrop!.backerColor, isNull);
   });
 

@@ -11,7 +11,6 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_account_avatar_button.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/trips_list_screen.dart';
@@ -143,10 +142,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
 
   Widget _rootState(BuildContext context, Widget body) {
     return TpRootScaffold(
-      header: const TpRootHeaderConfig(
-        title: Text('地圖'),
-        actions: [TpAccountAvatarButton()],
-      ),
+      header: const TpRootHeaderConfig(title: Text('地圖')),
       body: Padding(
         padding: EdgeInsets.only(
           top: TpRootGeometry.initialContentTop(context),

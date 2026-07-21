@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,17 +14,31 @@ import 'package:tripline/features/trip_detail/day_weather.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
+import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 const _tripId = 'okinawa-2026';
 
 class _MockTripRepository extends Mock implements TripRepository {}
+
+class _TripSwitchHarness extends StatelessWidget {
+  const _TripSwitchHarness(this.tripId);
+
+  final ValueListenable<String> tripId;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String>(
+    valueListenable: tripId,
+    builder: (context, value, child) => TripTimelineScreen(tripId: value),
+  );
+}
 
 const _fakeTrip = Trip(id: _tripId, name: '沖繩自駕 2026', title: '沖繩自駕五日');
 
@@ -222,6 +237,13 @@ Future<void> _pumpTimeline(
               ),
             ),
           ),
+          for (final action in ['edit', 'pois', 'move', 'copy'])
+            GoRoute(
+              path: 'entries/:entryId/$action',
+              builder: (context, state) => Scaffold(
+                body: Text('entry-$action-${state.pathParameters['entryId']}'),
+              ),
+            ),
         ],
       ),
       GoRoute(
@@ -380,7 +402,7 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('Root Glass Header 顯示行程選擇、功能選單與帳號入口', (tester) async {
+  testWidgets('Root Glass Header 顯示行程選擇與功能選單，帳號移至第五個 Tab', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
@@ -400,7 +422,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(find.widgetWithText(TextButton, '編輯'), findsNothing);
     expect(
       find.byKey(const ValueKey('trip-timeline-view-day-selector')),
@@ -451,6 +473,161 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+  });
+
+  testWidgets('切換到不同 Trip 會重設 DAY 1，不沿用舊 Trip 的 DAY', (tester) async {
+    const otherTripId = 'tokyo-2026';
+    const days = [
+      TripDay(id: 1, dayNum: 1, version: 1),
+      TripDay(id: 2, dayNum: 2, version: 1),
+    ];
+    final activeTripId = ValueNotifier(_tripId);
+    addTearDown(activeTripId.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tripDetailProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(_fakeTrip)),
+          tripDetailProvider(otherTripId).overrideWith(
+            (ref) => Stream.value(
+              const Trip(id: otherTripId, name: '東京', title: '東京五日'),
+            ),
+          ),
+          tripDaysProvider(_tripId).overrideWith((ref) => Stream.value(days)),
+          tripDaysProvider(
+            otherTripId,
+          ).overrideWith((ref) => Stream.value(days)),
+          tripSegmentsProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
+          tripSegmentsProvider(
+            otherTripId,
+          ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: _TripSwitchHarness(activeTripId),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
+
+    activeTripId.value = otherTripId;
+    await tester.pumpAndSettle();
+    expect(find.text('東京五日'), findsOneWidget);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+  });
+
+  testWidgets('排序請求中切換 Trip，交通重算仍只作用於原行程', (tester) async {
+    tester.view.physicalSize = const Size(800, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const otherTripId = 'tokyo-2026';
+    final activeTripId = ValueNotifier(_tripId);
+    final pendingReorder = Completer<void>();
+    addTearDown(activeTripId.dispose);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) => pendingReorder.future);
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tripRepositoryProvider.overrideWithValue(repo),
+          myTripsProvider.overrideWith(
+            (ref) => Stream.value(const [
+              TripSummary(tripId: _tripId, name: '沖繩'),
+              TripSummary(tripId: otherTripId, name: '東京'),
+            ]),
+          ),
+          tripDetailProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(_fakeTrip)),
+          tripDetailProvider(otherTripId).overrideWith(
+            (ref) => Stream.value(
+              const Trip(id: otherTripId, name: '東京', title: '東京五日'),
+            ),
+          ),
+          tripDaysProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
+          tripDaysProvider(
+            otherTripId,
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
+          tripSegmentsProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
+          tripSegmentsProvider(
+            otherTripId,
+          ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: _TripSwitchHarness(activeTripId),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _enableTimelineEditing(tester);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('entry-drag-11'))),
+    );
+    await gesture.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('entry-drop-2-1'))),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    activeTripId.value = otherTripId;
+    await tester.pump();
+    pendingReorder.complete();
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntries(
+        tripId: _tripId,
+        updates: any(named: 'updates'),
+      ),
+    ).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: otherTripId,
+        day: any(named: 'day'),
+      ),
+    );
   });
 
   testWidgets('更多選單的列印由下往上開啟共用可關閉 sheet', (tester) async {
@@ -528,7 +705,10 @@ void main() {
       find.byWidgetPredicate((widget) => widget is LongPressDraggable),
       findsNothing,
     );
-    expect(find.byType(ReorderableDragStartListener), findsWidgets);
+    expect(
+      find.byWidgetPredicate((widget) => widget is Draggable),
+      findsWidgets,
+    );
     expect(find.byKey(const ValueKey('entry-move-to-day-11')), findsNothing);
     final dragHandle = find.byKey(const ValueKey('entry-drag-11'));
     expect(dragHandle, findsOneWidget);
@@ -605,20 +785,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('200 percent text aligns time, entry card, and travel pill', (
+  testWidgets('200 percent text keeps metadata and travel pill within layout', (
     tester,
   ) async {
     await _pumpTimeline(tester, textScaler: const TextScaler.linear(2));
     await tester.pumpAndSettle();
 
-    final timeX = tester.getTopLeft(find.text('12：30')).dx;
-    final cardX = tester
-        .getTopLeft(find.byKey(const ValueKey('timeline-entry-content-12')))
-        .dx;
-    final travelX = tester.getTopLeft(find.byType(TravelPill).first).dx;
+    final card = tester.getRect(find.byKey(const ValueKey('entry-card-12')));
+    final time = tester.getRect(find.byKey(const ValueKey('entry-time-12')));
+    final travel = tester.getRect(find.byType(TravelPill).first);
 
-    expect(cardX, closeTo(timeX, 0.1));
-    expect(travelX, closeTo(timeX, 0.1));
+    expect(card.contains(time.center), isTrue);
+    expect(travel.left, greaterThan(card.left - 60));
     expect(tester.takeException(), isNull);
   });
 
@@ -1116,7 +1294,10 @@ void main() {
         matching: find.byType(GlassButton),
       ),
     );
-    expect(selected.settings?.glassColor, TpColorsLight.dayThumb);
+    expect(
+      selected.settings?.glassColor,
+      TpColorsLight.dayThumb.withValues(alpha: 0.64),
+    );
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -1185,12 +1366,132 @@ void main() {
     expect(fetchDaysAttempts, 2);
   });
 
-  testWidgets('點 entry tile 開啟編輯 sheet（不顯示 legacy 標題欄）', (tester) async {
+  testWidgets('點 entry tile 展開備選景點，不直接開啟編輯', (tester) async {
     await _pumpTimeline(tester);
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
-    expect(find.text('編輯停留點'), findsOneWidget);
-    expect(find.byKey(const ValueKey('entry-edit-title')), findsNothing);
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
+    expect(find.text('尚無備選景點'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsNothing);
+
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+  });
+
+  testWidgets('展開備選後可設為正選並重算當日交通', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.setEntryMaster(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    const alternateDays = [
+      TripDay(
+        id: 1,
+        dayNum: 1,
+        version: 1,
+        timeline: [
+          TimelineEntry(
+            id: 11,
+            sortOrder: 0,
+            title: '美麗海水族館',
+            version: 1,
+            entryPoisVersion: '4',
+            master: EntryPoiInfo(poiId: 101, name: '目前景點'),
+            alternates: [EntryPoiInfo(poiId: 102, name: '備選景點')],
+          ),
+        ],
+      ),
+    ];
+    await _pumpTimeline(tester, repo: repo, fetchDays: () => alternateDays);
+
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    final setMaster = find.byKey(const ValueKey('alternate-set-master-102'));
+    await tester.ensureVisible(setMaster);
+    await tester.pumpAndSettle();
+    await tester.tap(setMaster);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.setEntryMaster(
+        tripId: _tripId,
+        entryId: 11,
+        poiId: 102,
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+  });
+
+  testWidgets('景點更多選單固定六項三組，編輯由選單路由進入', (tester) async {
+    await _pumpTimeline(tester);
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+
+    for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.byType(Divider), findsNWidgets(2));
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('entry-edit-11'), findsOneWidget);
+  });
+
+  testWidgets('只有一天時移動與複製停用並說明原因', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pumpTimeline(tester, fetchDays: () => [_fakeDays.first]);
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+
+    for (final action in ['move', 'copy']) {
+      final finder = find.byKey(ValueKey('entry-$action-11'));
+      expect(tester.widget<MenuItemButton>(finder).onPressed, isNull);
+      final label = action == 'move' ? '移動到其他天' : '複製到其他天';
+      expect(find.bySemanticsLabel('$label，目前行程只有一天，無法使用'), findsOneWidget);
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('景點選單刪除先確認，確認前不呼叫 API', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
+    await tester.pumpAndSettle();
+    verifyNever(() => repo.deleteEntry(tripId: _tripId, entryId: 11));
+
+    await tester.tap(
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+    );
+    await tester.pumpAndSettle();
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
   });
 
   testWidgets('一般模式左滑 entry → 確認 → 刪除後重算交通', (tester) async {
@@ -1208,6 +1509,12 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     await _pumpTimeline(tester, repo: repo);
+    expect(
+      tester
+          .widget<SwipeToDelete>(find.byType(SwipeToDelete).first)
+          .actionLabel,
+      '刪除景點',
+    );
 
     await tester.drag(
       find.byKey(const ValueKey('entry-dismiss-11')),
@@ -1263,7 +1570,7 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
 
-  testWidgets('同日排序的樂觀畫面與 onReorderItem API 順序一致', (tester) async {
+  testWidgets('短按拖曳 handle 同日排序，畫面與 API 順序一致', (tester) async {
     final repo = _MockTripRepository();
     final pendingReorder = Completer<void>();
     when(
@@ -1281,9 +1588,13 @@ void main() {
     await _pumpTimeline(tester, repo: repo);
     await _enableTimelineEditing(tester);
 
-    tester
-        .widget<ReorderableListView>(find.byType(ReorderableListView).first)
-        .onReorderItem!(0, 2);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('entry-drag-11'))),
+    );
+    await gesture.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('entry-drop-1-3'))),
+    );
+    await gesture.up();
     await tester.pump();
 
     final item12Top = tester.getTopLeft(find.text('海人食堂')).dy;
@@ -1292,8 +1603,124 @@ void main() {
     expect(item12Top, lessThan(item13Top));
     expect(item13Top, lessThan(item11Top));
 
+    final captured =
+        verify(
+              () => repo.reorderEntries(
+                tripId: _tripId,
+                updates: captureAny(named: 'updates'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured.map((item) => item.id), [12, 13, 11, 14]);
+    expect(captured.every((item) => item.dayId == 1), isTrue);
+
     pendingReorder.complete();
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('短按拖曳 handle 可跨 DAY，單次 API 同步兩天順序', (tester) async {
+    tester.view.physicalSize = const Size(800, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = _MockTripRepository();
+    final pendingReorder = Completer<void>();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) => pendingReorder.future);
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('entry-drag-11'))),
+    );
+    await gesture.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('entry-drop-2-1'))),
+    );
+    await gesture.up();
+    await tester.pump();
+
+    final captured =
+        verify(
+              () => repo.reorderEntries(
+                tripId: _tripId,
+                updates: captureAny(named: 'updates'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder, int? dayId})>;
+    expect(captured, [
+      (id: 12, sortOrder: 0, dayId: 1),
+      (id: 13, sortOrder: 1, dayId: 1),
+      (id: 14, sortOrder: 2, dayId: 1),
+      (id: 21, sortOrder: 0, dayId: 2),
+      (id: 11, sortOrder: 1, dayId: 2),
+      (id: 22, sortOrder: 2, dayId: 2),
+    ]);
+    expect(
+      tester.getTopLeft(find.text('單軌電車移動')).dy,
+      lessThan(tester.getTopLeft(find.text('美麗海水族館')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('美麗海水族館')).dy,
+      lessThan(tester.getTopLeft(find.text('首里城公園')).dy),
+    );
+
+    pendingReorder.complete();
+    await tester.pumpAndSettle();
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: _tripId, day: '2')).called(1);
+  });
+
+  testWidgets('跨 DAY 排序失敗會還原來源與目標日', (tester) async {
+    tester.view.physicalSize = const Size(800, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenThrow(Exception('network'));
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('entry-drag-11'))),
+    );
+    await gesture.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('entry-drop-2-1'))),
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('排序失敗，已還原原本順序'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('entry-11'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('entry-12'))).dy),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('entry-14'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('entry-21'))).dy),
+    );
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    );
   });
 
   testWidgets('entry 早於營業時間 → 不顯示「注意事項」卡', (tester) async {

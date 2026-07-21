@@ -650,7 +650,13 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
                       onPressed: item.enabled
                           ? () => _select(item.value)
                           : null,
-                      child: Text(item.label),
+                      child: item.semanticLabel == null
+                          ? Text(item.label)
+                          : Semantics(
+                              label: item.semanticLabel,
+                              excludeSemantics: true,
+                              child: Text(item.label),
+                            ),
                     ),
                   ],
                 ],

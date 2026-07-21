@@ -41,6 +41,11 @@ class AppleRootTabBar extends StatelessWidget {
       icon: CupertinoIcons.heart,
       selectedIcon: CupertinoIcons.heart_fill,
     ),
+    (
+      label: '帳號',
+      icon: CupertinoIcons.person,
+      selectedIcon: CupertinoIcons.person_fill,
+    ),
   ];
 
   @override
@@ -50,7 +55,9 @@ class AppleRootTabBar extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final glassSettings = tpNavigationGlassSettings(
       context,
-      visualContent: true,
+      recipe: selectedIndex == 2
+          ? TpNavigationGlassRecipe.platformView
+          : TpNavigationGlassRecipe.regular,
     );
     final selectionTint = isDark
         ? TpColorsDark.navigationSelection
@@ -96,10 +103,10 @@ class AppleRootTabBar extends StatelessWidget {
           unselectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w500,
           ),
-          indicatorColor: selectionTint,
+          indicatorColor: selectionTint.withValues(alpha: 0.68),
           indicatorSettings: glassSettings.copyWith(
-            glassColor: selectionTint,
-            platformViewFallbackColor: selectionTint,
+            glassColor: selectionTint.withValues(alpha: 0.68),
+            platformViewFallbackColor: selectionTint.withValues(alpha: 0.68),
           ),
           magnification: 1,
           blendAmount: 4,

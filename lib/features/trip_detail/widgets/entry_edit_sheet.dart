@@ -220,8 +220,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   }
 
   Future<void> _pick(bool isStart) async {
-    final picked = await showTimePicker(
-      context: context,
+    FocusManager.instance.primaryFocus?.unfocus();
+    final picked = await showAppTimePicker(
+      context,
       initialTime:
           (isStart ? _start : _end) ?? const TimeOfDay(hour: 9, minute: 0),
     );
@@ -338,6 +339,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
         dayOptions.any((d) => d.dayNum == selectedDayNum);
     return SafeArea(
       child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(TpSpacing.s4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -436,9 +438,11 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                 ),
             ],
             const SizedBox(height: TpSpacing.s3),
-            _timeField(true),
-            const SizedBox(height: TpSpacing.s2),
-            _timeField(false),
+            Wrap(
+              spacing: TpSpacing.s2,
+              runSpacing: TpSpacing.s2,
+              children: [_timeField(true), _timeField(false)],
+            ),
             if (!timeValid)
               Padding(
                 padding: const EdgeInsets.only(top: TpSpacing.s2),
@@ -488,26 +492,23 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   Widget _timeField(bool isStart) {
     final t = isStart ? _start : _end;
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
-            onPressed: () => _pick(isStart),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text('${isStart ? '開始' : '結束'}　${_fmt(t) ?? '未設定'}'),
+    return InputChip(
+      key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
+      avatar: const Icon(CupertinoIcons.clock, size: 18),
+      label: Text('${isStart ? '開始' : '結束'} ${_fmt(t) ?? '未設定'}'),
+      onPressed: () => _pick(isStart),
+      deleteIcon: t == null
+          ? null
+          : Icon(
+              CupertinoIcons.xmark_circle_fill,
+              key: ValueKey(
+                isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
+              ),
+              size: 18,
             ),
-          ),
-        ),
-        if (t != null)
-          IconButton(
-            key: ValueKey(
-              isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
-            ),
-            tooltip: '清除',
-            icon: const Icon(CupertinoIcons.xmark, size: 18),
-            onPressed: () {
+      onDeleted: t == null
+          ? null
+          : () {
               if (isStart) {
                 _start = null;
               } else {
@@ -515,8 +516,6 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               }
               _markChanged();
             },
-          ),
-      ],
     );
   }
 }
