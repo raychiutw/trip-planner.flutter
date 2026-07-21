@@ -1,4 +1,16 @@
-# Handoff — 2026-07-21 行程景點卡／跨 Day 排序／Root UI
+# Handoff — 2026-07-21 v0.9.4 缺陷修正與雙商店發布
+
+## v0.9.4 發布結案
+
+- 行程地圖入口精簡為 `Google`／`Apple`，並保留完整 VoiceOver 動作語意，避免大字體或窄寬度折行。
+- Timeline 第一個編號的直線由 marker 中心開始，交通列之間保持連續，最後一個 stop 下方亦保留延伸線。
+- 起訖時間與精確停留時間固定同列，Google 分類與星等移至下一列；舊資料只有 `time` 時仍可正確計算。
+- 編輯頁文字按鈕不再受 44pt 固定寬度限制，大字體下「取消」可完整顯示。
+- iOS 模擬器已驗證行程、排序、編輯與地圖；地圖維持淺色、原生 Google POI 可見，預設／切 Day／點 POI 均維持 zoom `13`。
+- Analyzer 0 issue、全庫 1,355 tests、PR CI 與 merge commit CI 的 Android debug build 全部通過。
+- PR [#73](https://github.com/raychiutw/trip-planner.flutter/pull/73) 已合併，annotated tag `v0.9.4` 已推送；release workflow [29848648325](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29848648325) 已將共同 build `11201` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`）。
+
+以下保留 v0.9.3 大型 UI 重構的交接背景，供後續維護追溯。
 
 ## 本輪已完成
 
@@ -48,6 +60,7 @@ POSIX contract tests 會明確使用 Git for Windows Bash，並把 Windows temp 
 
 ## Git／發布狀態
 
-- PR [#71](https://github.com/raychiutw/trip-planner.flutter/pull/71) 已合併至 `master`，source SHA 為 `eb4c493bb16c9317017c268fe225b43fa6fa801e`，並已推送 annotated tag `v0.9.3`。
-- Release workflow [29830338702](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29830338702) 已把共同 build `10701` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`）。
+- PR [#73](https://github.com/raychiutw/trip-planner.flutter/pull/73) 已合併至 `master`，source SHA 為 `e9517dd131836e80424b3aae6a7046df75f8a053`，並已推送 annotated tag `v0.9.4`。
+- PR CI [29846766960](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29846766960) 與 merge commit CI [29847777356](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29847777356) 均通過 analyzer、1,355 tests、UI artifacts 與 Android debug build。
+- Release workflow [29848648325](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29848648325) 已把共同 build `11201` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`）。
 - Optional Firebase／staging evidence 本次依 publish-first 設定未執行，不影響已完成的商店發布；後續可獨立回補。

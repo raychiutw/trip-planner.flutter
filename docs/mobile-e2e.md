@@ -189,6 +189,30 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
+## 2026-07-21 v0.9.4 store release record
+
+Source SHA `e9517dd131836e80424b3aae6a7046df75f8a053` was released from
+[workflow run 29848648325](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29848648325).
+Run number `112`, attempt `1`, produced shared iOS／Android build `11201` for
+version `0.9.4`. The source was merged through
+[PR #73](https://github.com/raychiutw/trip-planner.flutter/pull/73) after
+[PR CI run 29846766960](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29846766960)
+completed successfully; the exact merge commit then passed
+[master CI run 29847777356](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29847777356).
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Analyzer／format／workflow lint | PASS | Flutter analyzer reported 0 issues; Dart format, actionlint, and `git diff --check` passed |
+| Full Flutter suite | PASS | 1,355 tests passed locally, in PR CI, on the merge commit, and independently in both store jobs |
+| Android build evidence | PASS | PR and master CI each completed the Android debug build; the release job produced and preserved the signed AAB |
+| iOS simulator evidence | PASS | Timeline rail, exact duration, compact map links, large-text cancel action, native Google POIs, light map style, and zoom `13` were visually and semantically verified |
+| TestFlight | PASS | Build `11201` uploaded through the App Store API; processing returned `VALID` |
+| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `03552382695613245559` committed |
+
+The `mobile-release` Environment approved both store jobs. Optional Firebase
+and staging evidence was disabled for this publish-first run and remains an
+independent evidence path rather than a claimed pass.
+
 ## 2026-07-21 v0.9.3 store release record
 
 Source SHA `eb4c493bb16c9317017c268fe225b43fa6fa801e` was released from
