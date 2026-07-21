@@ -286,7 +286,8 @@ P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽
 - 專案 CLAUDE.md(agent 開發指南)
 - PORTING_PLAN/CONTRACTS 與實作同步(riverpod 3.x、歷史契約標註)
 
-[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.0...v0.9.1
 [0.1.0]: https://github.com/raychiutw/trip-planner.flutter/releases/tag/v0.1.0

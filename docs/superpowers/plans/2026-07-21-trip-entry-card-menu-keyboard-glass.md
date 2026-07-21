@@ -414,7 +414,7 @@
 - `dart format --output=none --set-exit-if-changed`：本輪變更 Dart 檔案須為乾淨格式。
 - `flutter analyze`：通過，0 issue。
 - focused widget tests：timeline tile／screen、同日／跨日 drag、entry edit、entry action、entry POI、router、app shell、glass、selector、swipe、keyboard forms，通過 172 tests。
-- `flutter test --no-pub -r failures-only`：1,341 tests 全部通過，包含 27 個 POSIX workflow contract tests；Windows 使用 Git for Windows Bash，避免誤呼叫 WSL `bash.exe`。
+- `flutter test --no-pub -r failures-only`：1,347 tests 全部通過，包含 27 個 POSIX workflow contract tests 與拖曳 feedback 寬度回歸；POSIX contract runner 直接呼叫解析後的 Bash，避免 login shell 改寫 mock `PATH`。
 - `flutter build apk --debug --no-pub`：通過，產出 `build/app/outputs/flutter-apk/app-debug.apk`。
 - `flutter build ios --simulator`：Windows 無法執行，列入 macOS handoff 必跑項目。
 
@@ -456,7 +456,7 @@
 - 不新增跨天拖曳後端 API；沿用 `PATCH /trips/:id/entries/batch` 的 `day_id + sort_order`。若實際 backend contract 不接受跨 Day batch，才回報 contract blocker，不在 App 串接兩個非原子 request 假裝完成。
 - 不把 timeline 卡片、備選卡、設定 group 玻璃化。
 - 不更換 `liquid_glass_widgets`；先修共用 recipe 並實機驗證。
-- 本輪未執行 commit、push 或發布；需由使用者另行授權。
+- 實作已由 PR #71 合併、tag `v0.9.3`，並以共同 build `10701` 發布至 TestFlight 與 Google Play internal。
 
 ## 已核准產品決策
 
@@ -480,7 +480,7 @@
 | Responsive／accessibility | 6/10 | 9/10 | 已納入 320pt、200%、VoiceOver 與透明度／動態設定 |
 | Unresolved decisions | — | 0 項 | D1–D5 已核准並實作；只剩平台驗收，不是產品決策 |
 
-整體設計評分：`5.7/10 → 9.0/10`。規格與程式實作已對齊；macOS／iOS Simulator、實機 glass、VoiceOver 與 Reduce Transparency 是交付前的剩餘驗收。
+整體設計評分：`5.7/10 → 9.0/10`。規格與程式實作已對齊並完成商店發布；macOS／iOS Simulator、實機 glass、VoiceOver 與 Reduce Transparency 可作為後續獨立裝置證據持續回補。
 
 ## GSTACK REVIEW REPORT
 
@@ -493,4 +493,4 @@
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | 未執行 |
 
 - **UNRESOLVED:** 無產品決策；剩餘 macOS／iOS／實機驗收已寫入 `HANDOFF.md`。
-- **VERDICT:** 規格與程式已完成；未經使用者授權，不 commit、push 或 release。
+- **VERDICT:** RELEASED。PR #71 已合併；release run 29830338702 已將 v0.9.3 build `10701` 發布至 TestFlight（`VALID`）與 Google Play internal（`completed`）。

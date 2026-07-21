@@ -189,6 +189,28 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
+## 2026-07-21 v0.9.3 store release record
+
+Source SHA `eb4c493bb16c9317017c268fe225b43fa6fa801e` was released from
+[workflow run 29830338702](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29830338702).
+Run number `107`, attempt `1`, produced shared iOS／Android build `10701` for
+version `0.9.3`. The source was merged through
+[PR #71](https://github.com/raychiutw/trip-planner.flutter/pull/71) after
+[PR CI run 29829527458](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29829527458)
+completed successfully.
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Analyzer／format／workflow lint | PASS | Flutter analyzer reported 0 issues; Dart format, actionlint, and `git diff --check` passed |
+| Full Flutter suite | PASS | 1,347 tests passed locally and in PR CI, including POSIX release contracts and timeline drag-feedback geometry |
+| PR build evidence | PASS | Run 29829527458 completed analyzer, full tests, named UI artifacts, and Android debug build |
+| TestFlight | PASS | Build `10701` uploaded through the App Store API; processing returned `VALID` |
+| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `06867052877178981510` committed |
+
+The `mobile-release` Environment approved both store jobs. Optional Firebase
+and staging evidence was disabled for this publish-first run and remains an
+independent evidence path rather than a claimed pass.
+
 ## 2026-07-21 v0.9.2 store release record
 
 Source SHA `12a8721c1f8361e244af6395fcad51df4745b002` was released from
