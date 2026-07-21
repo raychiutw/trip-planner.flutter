@@ -206,7 +206,7 @@ Future<ProcessResult> _runContract(
   String scriptPath = 'tool/verify_favorite_restore_contract.sh',
 }) => Process.run(
   testBashExecutable,
-  ['-l', bashPath(scriptPath)],
+  [bashPath(scriptPath)],
   workingDirectory: Directory.current.path,
   environment: environment,
 );
