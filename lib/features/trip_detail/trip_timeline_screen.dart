@@ -1021,6 +1021,11 @@ class _DaySection extends ConsumerWidget {
               ),
               enabled: !reorderSubmitting,
               onDragUpdate: onDragUpdate,
+              feedbackWidth:
+                  MediaQuery.sizeOf(context).width -
+                  TpSpacing.s4 * 2 -
+                  kTimelineRailWidth -
+                  10,
             )
           : _entryMenu(context, ref, entry),
     );
@@ -1193,11 +1198,13 @@ class _EntryDragHandle extends StatelessWidget {
     required this.data,
     required this.enabled,
     required this.onDragUpdate,
+    required this.feedbackWidth,
   });
 
   final _EntryDragData data;
   final bool enabled;
   final ValueChanged<DragUpdateDetails> onDragUpdate;
+  final double feedbackWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -1219,8 +1226,9 @@ class _EntryDragHandle extends StatelessWidget {
       onDragUpdate: onDragUpdate,
       feedback: Material(
         color: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280),
+        child: SizedBox(
+          key: ValueKey('entry-drag-feedback-${data.entry.id}'),
+          width: feedbackWidth,
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHigh,

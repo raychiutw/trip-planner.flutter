@@ -1570,6 +1570,30 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
 
+  testWidgets('拖曳 feedback 維持原行程卡寬度', (tester) async {
+    tester.view.physicalSize = const Size(393, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpTimeline(tester);
+    await _enableTimelineEditing(tester);
+
+    final cardWidth = tester
+        .getSize(find.byKey(const ValueKey('entry-card-11')))
+        .width;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('entry-drag-11'))),
+    );
+    await tester.pump();
+
+    final feedback = find.byKey(const ValueKey('entry-drag-feedback-11'));
+    expect(feedback, findsOneWidget);
+    expect(tester.getSize(feedback).width, closeTo(cardWidth, 0.1));
+
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('短按拖曳 handle 同日排序，畫面與 API 順序一致', (tester) async {
     final repo = _MockTripRepository();
     final pendingReorder = Completer<void>();
