@@ -38,14 +38,15 @@ void main() {
       },
     );
 
-    expect(find.text('Google 地圖'), findsOneWidget);
-    expect(find.text('Apple 地圖'), findsNothing);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Apple'), findsNothing);
+    expect(find.bySemanticsLabel('使用 Google 開啟地圖'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('entry-google-map-101'))).height,
       greaterThanOrEqualTo(44),
     );
 
-    await tester.tap(find.text('Google 地圖'));
+    await tester.tap(find.text('Google'));
     await tester.pump();
     expect(opened?.host, 'www.google.com');
     expect(opened?.queryParameters['query'], '26.6942,127.8778');
@@ -62,9 +63,10 @@ void main() {
       },
     );
 
-    expect(find.text('Google 地圖'), findsOneWidget);
-    expect(find.text('Apple 地圖'), findsOneWidget);
-    await tester.tap(find.text('Apple 地圖'));
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Apple'), findsOneWidget);
+    expect(find.bySemanticsLabel('使用 Apple 開啟地圖'), findsOneWidget);
+    await tester.tap(find.text('Apple'));
     await tester.pump();
     expect(modes, [LaunchMode.externalApplication, LaunchMode.platformDefault]);
   });
@@ -79,7 +81,7 @@ void main() {
       onError: () => errors++,
     );
     expect(find.bySemanticsLabel('尚無位置'), findsOneWidget);
-    expect(find.text('Google 地圖'), findsNothing);
+    expect(find.text('Google'), findsNothing);
 
     await _pump(
       tester,
@@ -87,7 +89,7 @@ void main() {
       launch: (uri, {mode = LaunchMode.platformDefault}) async => false,
       onError: () => errors++,
     );
-    await tester.tap(find.text('Google 地圖'));
+    await tester.tap(find.text('Google'));
     await tester.pump();
     expect(errors, 1);
   });

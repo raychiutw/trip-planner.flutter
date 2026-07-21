@@ -5,13 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/timeline_entry_tile.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 Future<void> pumpTile(
   WidgetTester tester,
   TimelineEntry entry, {
   int number = 1,
   bool isFirst = false,
-  bool isLast = false,
   TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
@@ -24,7 +24,6 @@ Future<void> pumpTile(
             entry: entry,
             number: number,
             isFirst: isFirst,
-            isLast: isLast,
           ),
         ),
       ),
@@ -62,7 +61,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('09:30'), findsOneWidget);
+      expect(find.text('09：30'), findsOneWidget);
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('景點'), findsOneWidget);
       expect(find.text('4.6'), findsOneWidget);
@@ -159,7 +158,7 @@ void main() {
         ),
       );
       expect(dotColor(tester, 3), tones.accentDeep);
-      expect(find.text('14:00'), findsOneWidget);
+      expect(find.text('14：00'), findsOneWidget);
     });
 
     testWidgets('rail badge 顯示停留點編號', (tester) async {
@@ -286,8 +285,8 @@ void main() {
         ),
       );
 
-      expect(find.bySemanticsLabel('首里城，09:30，景點'), findsOneWidget);
-      final node = tester.getSemantics(find.bySemanticsLabel('首里城，09:30，景點'));
+      expect(find.bySemanticsLabel('首里城，09：30，景點'), findsOneWidget);
+      final node = tester.getSemantics(find.bySemanticsLabel('首里城，09：30，景點'));
       expect(node.getSemanticsData().hint, '點兩下展開備選景點');
       expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
       expect(
@@ -313,12 +312,12 @@ void main() {
         ),
       );
 
-      expect(find.text('09:30–11:00'), findsOneWidget);
+      expect(find.text('09：30 - 11：00'), findsOneWidget);
       expect(find.text('09:30'), findsNothing);
       final semanticsNode = tester.getSemantics(
         find.byKey(const ValueKey('timeline-entry-content-40')),
       );
-      expect(semanticsNode.getSemanticsData().label, contains('09:30–11:00'));
+      expect(semanticsNode.getSemanticsData().label, contains('09：30 - 11：00'));
       semantics.dispose();
     });
 
@@ -338,7 +337,7 @@ void main() {
         textScaler: const TextScaler.linear(1.25),
       );
 
-      expect(find.text('20:50–21:50'), findsOneWidget);
+      expect(find.text('20：50 - 21：50'), findsOneWidget);
       expect(tester.widget<Text>(find.text('那覇空港')).style?.fontSize, 15);
       expect(kTimelineRailWidth, 32);
       expect(
@@ -358,6 +357,111 @@ void main() {
         const Size(22, 22),
       );
     });
+
+    testWidgets(
+      'metadata stacks time with duration above category with rating',
+      (tester) async {
+        await pumpTile(
+          tester,
+          const TimelineEntry(
+            id: 44,
+            sortOrder: 0,
+            version: 1,
+            startTime: '12:00',
+            endTime: '12:45',
+            title: '首里城',
+            master: EntryPoiInfo(
+              poiId: 502,
+              type: 'attraction',
+              category: 'tourist_attraction',
+              rating: 4.7,
+            ),
+          ),
+        );
+
+        final time = tester.getRect(
+          find.byKey(const ValueKey('entry-time-44')),
+        );
+        final duration = tester.getRect(
+          find.byKey(const ValueKey('entry-duration-44')),
+        );
+        final category = tester.getRect(
+          find.byKey(const ValueKey('entry-category-44')),
+        );
+        final rating = tester.getRect(
+          find.byKey(const ValueKey('entry-rating-44')),
+        );
+        expect((time.center.dy - duration.center.dy).abs(), lessThan(5));
+        expect((category.center.dy - rating.center.dy).abs(), lessThan(5));
+        expect(category.top, greaterThan(time.bottom));
+        expect(find.text('45 min'), findsOneWidget);
+      },
+    );
+
+    testWidgets('legacy time fallback also drives the displayed duration', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 47,
+          sortOrder: 0,
+          version: 1,
+          time: '12:00',
+          endTime: '12:45',
+          title: '舊資料停留點',
+        ),
+      );
+
+      expect(find.text('12：00 - 12：45'), findsOneWidget);
+      expect(find.text('45 min'), findsOneWidget);
+    });
+
+    testWidgets(
+      'first stop rail starts at the centered marker for a dynamic-height card',
+      (tester) async {
+        await pumpTile(
+          tester,
+          const TimelineEntry(
+            id: 46,
+            sortOrder: 0,
+            version: 1,
+            title: '第一個會因內容增高的停留點',
+            description: '使用較多內容讓卡片高度不再等於固定的圓點位置。',
+          ),
+          isFirst: true,
+        );
+
+        final dot = tester.getRect(find.byKey(const ValueKey('entry-dot-46')));
+        final rail = tester.getRect(
+          find.byKey(const ValueKey('entry-rail-line-46')),
+        );
+        expect(rail.top, closeTo(dot.center.dy, 0.1));
+        expect(rail.bottom, greaterThan(dot.bottom));
+      },
+    );
+
+    testWidgets(
+      'last stop rail continues below its marker and across spacing',
+      (tester) async {
+        await pumpTile(
+          tester,
+          const TimelineEntry(id: 45, sortOrder: 0, version: 1, title: '那覇空港'),
+          number: 3,
+        );
+
+        final dot = tester.getRect(find.byKey(const ValueKey('entry-dot-45')));
+        final rail = tester.getRect(
+          find.byKey(const ValueKey('entry-rail-line-45')),
+        );
+        final gap = tester.getRect(
+          find.byKey(const ValueKey('entry-rail-gap-45')),
+        );
+        expect(rail.bottom, greaterThan(dot.bottom));
+        expect(gap.height, TpSpacing.s3);
+        expect(gap.top, closeTo(rail.bottom, 0.1));
+      },
+    );
 
     testWidgets('Google primary type is the first secondary row', (
       tester,
@@ -410,7 +514,34 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('很長但仍需要完整閱讀的景點名稱'), findsOneWidget);
-      expect(find.text('09:30–11:00'), findsOneWidget);
+      expect(find.text('09：30 - 11：00'), findsOneWidget);
+    });
+
+    testWidgets('maximum accessibility text keeps the time range on one line', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 48,
+          sortOrder: 0,
+          version: 1,
+          startTime: '12:00',
+          endTime: '12:45',
+          title: '大字體停留點',
+        ),
+        textScaler: const TextScaler.linear(3),
+      );
+
+      expect(tester.takeException(), isNull);
+      final timeText = tester.widget<Text>(find.text('12：00 - 12：45'));
+      expect(timeText.maxLines, 1);
+      expect(timeText.softWrap, isFalse);
     });
   });
 }

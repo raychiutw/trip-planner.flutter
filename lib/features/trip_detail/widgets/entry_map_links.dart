@@ -39,13 +39,15 @@ class EntryMapLinks extends StatelessWidget {
       children: [
         _MapLinkButton(
           key: ValueKey('entry-google-map-${poi.poiId}'),
-          label: 'Google 地圖',
+          label: 'Google',
+          semanticLabel: '使用 Google 開啟地圖',
           onPressed: () => _openGoogle(),
         ),
         if (showApple)
           _MapLinkButton(
             key: ValueKey('entry-apple-map-${poi.poiId}'),
-            label: 'Apple 地圖',
+            label: 'Apple',
+            semanticLabel: '使用 Apple 開啟地圖',
             onPressed: () => _openApple(),
           ),
       ],
@@ -86,24 +88,32 @@ class _MapLinkButton extends StatelessWidget {
   const _MapLinkButton({
     super.key,
     required this.label,
+    required this.semanticLabel,
     required this.onPressed,
   });
 
   final String label;
+  final String semanticLabel;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: TpSpacing.tapMin),
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          visualDensity: VisualDensity.compact,
-          minimumSize: const Size(0, TpSpacing.tapMin),
+      child: Semantics(
+        label: semanticLabel,
+        button: true,
+        onTap: onPressed,
+        excludeSemantics: true,
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            minimumSize: const Size(0, TpSpacing.tapMin),
+          ),
+          onPressed: onPressed,
+          icon: const Icon(CupertinoIcons.location_solid, size: 15),
+          label: Text(label),
         ),
-        onPressed: onPressed,
-        icon: const Icon(CupertinoIcons.location_solid, size: 15),
-        label: Text(label),
       ),
     );
   }

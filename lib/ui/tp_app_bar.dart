@@ -181,12 +181,7 @@ abstract final class TpToolbarSlots {
     if (width == 0) return null;
     return SizedBox(
       width: width,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: action == null
-            ? null
-            : SizedBox.square(dimension: TpSpacing.tapMin, child: action),
-      ),
+      child: Align(alignment: Alignment.centerLeft, child: action),
     );
   }
 

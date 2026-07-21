@@ -15,7 +15,6 @@ class TimelineEntryTile extends StatelessWidget {
     required this.entry,
     required this.number,
     this.isFirst = false,
-    this.isLast = false,
     this.isFocused = false,
     this.compact = false,
     this.expanded = false,
@@ -29,7 +28,6 @@ class TimelineEntryTile extends StatelessWidget {
   final TimelineEntry entry;
   final int number;
   final bool isFirst;
-  final bool isLast;
   final bool isFocused;
   final bool compact;
   final bool expanded;
@@ -91,7 +89,6 @@ class TimelineEntryTile extends StatelessWidget {
                   entryId: entry.id,
                   number: number,
                   isFirst: isFirst,
-                  isLast: isLast && expandedChild == null,
                   color: tones.accentDeep,
                   lineColor: theme.colorScheme.outlineVariant,
                 ),
@@ -100,7 +97,25 @@ class TimelineEntryTile extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: TpSpacing.s3),
+          SizedBox(
+            height: TpSpacing.s3,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: kTimelineRailWidth,
+                  child: Center(
+                    child: Container(
+                      key: ValueKey('entry-rail-gap-${entry.id}'),
+                      width: 1,
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+          ),
           AnimatedSize(
             duration: TpMotion.resolve(context, TpMotion.normal),
             curve: TpMotion.appleEase,
@@ -116,9 +131,7 @@ class TimelineEntryTile extends StatelessWidget {
                           child: Center(
                             child: Container(
                               width: 1,
-                              color: isLast
-                                  ? Colors.transparent
-                                  : theme.colorScheme.outlineVariant,
+                              color: theme.colorScheme.outlineVariant,
                             ),
                           ),
                         ),
@@ -142,20 +155,26 @@ class TimelineEntryTile extends StatelessWidget {
 }
 
 String _timeLabel(TimelineEntry entry) {
-  final start = (entry.startTime ?? entry.time ?? '').trim();
-  final end = (entry.endTime ?? '').trim();
+  final start = _resolvedStartTime(entry);
+  final end = _resolvedEndTime(entry);
   if (start.isEmpty && end.isEmpty) return '未設定時間';
-  if (start.isEmpty) return end;
-  if (end.isEmpty) return start;
-  return '$start–$end';
+  if (start.isEmpty) return _displayTime(end);
+  if (end.isEmpty) return _displayTime(start);
+  return '${_displayTime(start)} - ${_displayTime(end)}';
 }
+
+String _displayTime(String value) => value.replaceAll(':', '：');
+
+String _resolvedStartTime(TimelineEntry entry) =>
+    (entry.startTime ?? entry.time ?? '').trim();
+
+String _resolvedEndTime(TimelineEntry entry) => (entry.endTime ?? '').trim();
 
 class _TimelineRail extends StatelessWidget {
   const _TimelineRail({
     required this.entryId,
     required this.number,
     required this.isFirst,
-    required this.isLast,
     required this.color,
     required this.lineColor,
   });
@@ -163,7 +182,6 @@ class _TimelineRail extends StatelessWidget {
   final int entryId;
   final int number;
   final bool isFirst;
-  final bool isLast;
   final Color color;
   final Color lineColor;
 
@@ -174,13 +192,19 @@ class _TimelineRail extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (!isFirst || !isLast)
-            Positioned(
-              top: isFirst ? 22 : 0,
-              bottom: isLast ? null : 0,
-              height: isLast ? 22 : null,
-              child: Container(width: 1, color: lineColor),
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                heightFactor: isFirst ? 0.5 : 1,
+                child: Container(
+                  key: ValueKey('entry-rail-line-$entryId'),
+                  width: 1,
+                  color: lineColor,
+                ),
+              ),
             ),
+          ),
           Container(
             key: ValueKey('entry-dot-$entryId'),
             width: 22,
@@ -231,7 +255,10 @@ class _EntryCard extends StatelessWidget {
     final tones = theme.extension<TpTones>()!;
     final master = entry.master;
     final muted = theme.colorScheme.onSurfaceVariant;
-    final duration = formatEntryDuration(entry.startTime, entry.endTime);
+    final duration = formatEntryDuration(
+      _resolvedStartTime(entry),
+      _resolvedEndTime(entry),
+    );
     final details = _details(entry);
 
     return Container(
@@ -278,55 +305,76 @@ class _EntryCard extends StatelessWidget {
           ),
           if (!compact) ...[
             const SizedBox(height: TpSpacing.s1),
-            Wrap(
+            Column(
               key: ValueKey('entry-meta-${entry.id}'),
-              spacing: TpSpacing.s2,
-              runSpacing: TpSpacing.s1,
-              crossAxisAlignment: WrapCrossAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ActionChip(
-                  key: ValueKey('entry-time-${entry.id}'),
-                  avatar: const Icon(CupertinoIcons.clock, size: 14),
-                  label: Text(
-                    timeLabel,
-                    style: const TextStyle(
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  onPressed: onEditTime,
-                ),
-                if (categoryLabel != null)
-                  Text(
-                    categoryLabel!,
-                    key: ValueKey('entry-category-${entry.id}'),
-                    style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                  ),
-                if (duration != null)
-                  Text(
-                    duration,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: muted,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                if (master?.rating != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.star_fill,
-                        size: 14,
-                        color: tones.accent,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        master!.rating!.toStringAsFixed(1),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: muted,
+                Wrap(
+                  spacing: TpSpacing.s2,
+                  runSpacing: TpSpacing.s1,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ActionChip(
+                      key: ValueKey('entry-time-${entry.id}'),
+                      avatar: const Icon(CupertinoIcons.clock, size: 14),
+                      label: Text(
+                        timeLabel,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: const TextStyle(
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
+                      onPressed: onEditTime,
+                    ),
+                    if (duration != null)
+                      Text(
+                        duration,
+                        key: ValueKey('entry-duration-${entry.id}'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: muted,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                  ],
+                ),
+                if (categoryLabel != null || master?.rating != null) ...[
+                  const SizedBox(height: TpSpacing.s1),
+                  Wrap(
+                    spacing: TpSpacing.s2,
+                    runSpacing: TpSpacing.s1,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (categoryLabel != null)
+                        Text(
+                          categoryLabel!,
+                          key: ValueKey('entry-category-${entry.id}'),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                      if (master?.rating != null)
+                        Row(
+                          key: ValueKey('entry-rating-${entry.id}'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.star_fill,
+                              size: 14,
+                              color: tones.accent,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              master!.rating!.toStringAsFixed(1),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: muted,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
+                ],
               ],
             ),
             if (mapLinks != null) ...[
