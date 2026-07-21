@@ -984,7 +984,6 @@ class _DaySection extends ConsumerWidget {
       entry: entry,
       number: index + 1,
       isFirst: index == 0,
-      isLast: index == timeline.length - 1,
       isFocused: entry.id == focusedEntryId,
       compact: isEditing,
       expanded: expanded,

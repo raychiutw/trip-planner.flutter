@@ -19,6 +19,14 @@ void main() {
       expect(formatEntryDuration('09:00', '09:30'), '0.5 hr');
     });
 
+    test('非半小時倍數維持精確分鐘（45 分 = 45 min）', () {
+      expect(formatEntryDuration('12:00', '12:45'), '45 min');
+    });
+
+    test('超過一小時的零散分鐘不被四捨五入', () {
+      expect(formatEntryDuration('12:00', '13:15'), '1 hr 15 min');
+    });
+
     test('startTime 為 null → 回 null', () {
       expect(formatEntryDuration(null, '11:00'), isNull);
     });

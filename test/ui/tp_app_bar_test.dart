@@ -84,6 +84,42 @@ void main() {
     expect(saved, isTrue);
   });
 
+  testWidgets('modal form keeps the complete Cancel label at large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.modalForm,
+            title: const Text('編輯停留點'),
+            onCancel: () {},
+            primaryActionLabel: '儲存',
+            onPrimaryAction: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('取消'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('tp-app-bar-cancel'))).width,
+      greaterThan(64),
+    );
+  });
+
   testWidgets('sheet header centers its title between optional controls', (
     tester,
   ) async {
