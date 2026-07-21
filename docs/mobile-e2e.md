@@ -189,9 +189,12 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
-## 2026-07-21 v0.9.2 release-candidate verification
+## 2026-07-21 v0.9.2 store release record
 
-This release candidate standardizes local and GitHub Actions builds on Flutter
+Source SHA `12a8721c1f8361e244af6395fcad51df4745b002` was released from
+[workflow run 29802745365](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29802745365).
+Run number `101`, attempt `1`, produced the shared iOS／Android build number
+`10101` for version `0.9.2`. This release standardizes local and GitHub Actions builds on Flutter
 3.44.7 stable／Dart 3.12.2. The public privacy policy returned HTTP 200 at
 `https://trip-planner-dby.pages.dev/privacy`; signup forwards the user's actual
 `privacyConsent`, account settings link to the same policy, and in-app account
@@ -202,14 +205,17 @@ deletion uses an uncached preview followed by `DELETE /api/account`.
 | Analyzer | PASS | Flutter 3.44.7, 0 issues |
 | Focused release／API／account／trip tests | PASS | 218 tests, including the four stale assertions from the previous failed Linux run |
 | Full Windows host run | PARTIAL | 1,314 passed; 12 Bash-invocation cases in the two workflow contract files are not reliable under Windows/MSYS and remain mandatory Ubuntu CI gates |
-| Workflow／signing configuration | PASS | Flutter version pinned to 3.44.7; required App Store, Play, Maps, and signing secret names are configured |
+| Push CI | PASS | [Run 29802168723](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29802168723): actionlint, analyzer, complete Ubuntu suite including Bash contracts, and Android debug build |
+| Workflow／signing configuration | PASS | Flutter version pinned to 3.44.7; App Store, Play, Maps, and signing secrets produced valid signed artifacts |
 | Public privacy policy | PASS | Anonymous HTTPS GET returned 200 on 2026-07-21 |
 | Favorite restore staging contract | BLOCKED | Protected staging credentials and reviewed real staging allowlist are still absent; publish with `run_optional_evidence=false` |
-| TestFlight／Play Internal upload | PENDING | Run `Mobile CI / Releases` from `master` with `release_target=both` after push CI passes |
+| TestFlight | PASS | Build `10101` uploaded through the App Store API; processing returned `VALID` |
+| Google Play internal | PASS | Build `10101` uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `06752822212770581126` committed |
 
-The release dispatch requires approval from the `mobile-release` Environment.
-Both store jobs must finish successfully before this section is converted to a
-release record with the workflow URL, source SHA, and shared build number.
+The `mobile-release` Environment approved both store deployments. Optional
+Firebase and staging evidence was deliberately disabled for this publish-first
+run; the blocked restore contract remains an independent evidence task and is
+not represented as passed.
 
 ## 2026-07-20 HIG／offline／restore implementation verification
 

@@ -1,6 +1,6 @@
 # Tripline iOS HIG UI、地圖 POI 與離線／Restore Implementation Tasks
 
-> 狀態：TASK-00～09 完成；TASK-10 等待 staging protected environment；TASK-11 本機 gate 完成、CI／上架待執行
+> 狀態：TASK-00～09 完成；TASK-10 等待 staging protected environment；TASK-11 已完成 CI 並發布 TestFlight／Google Play Internal
 > 規格來源：`docs/superpowers/specs/2026-07-20-ios-hig-ui-offline-restore-audit.md`
 > 原則：逐 TASK 實作、逐 TASK 驗證；重用現有共用元件，不新增 UI dependency。
 
@@ -41,7 +41,7 @@
 |---|---|---|
 | 00–09 | DONE | Flutter 3.44.7 stable；focused tests 通過；analyzer 0 issue；完整 Linux suite 由本次 ship CI 重驗 |
 | 10 | BLOCKED（外部設定） | App route／release flag 已接；`mobile-release` 無真實 staging secrets／variables，allowlist 只有 `.test` fixture，不能安全執行 mutation contract |
-| 11 | LOCAL PASS | Dart format、analyzer、產品 suite、Android debug APK 皆通過；Linux workflow、iOS signed build 與 store upload 待 commit 後執行 |
+| 11 | RELEASED | Push CI `29802168723` 全綠；release run `29802745365` 已將 v0.9.2 build `10101` 發布至 TestFlight（VALID）與 Google Play Internal（completed） |
 
 ## 執行順序
 
@@ -408,4 +408,4 @@ TASK-03～08 在 TASK-01 的共用 API 定稿後可各自進行；TASK-10 是 ex
 | TASK-08 | DONE | Map POI card／camera |
 | TASK-09 | DONE | Foreground reconnect |
 | TASK-10 | BLOCKED（外部設定） | App route／release flag 已接；缺少真實 staging protected environment 與 allowlist |
-| TASK-11 | LOCAL PASS | 本機 regression 已通過；Linux CI、iOS signed build 與 store upload 由 ship 階段執行 |
+| TASK-11 | RELEASED | v0.9.2 build `10101` 已由同一 workflow 發布 TestFlight／Google Play Internal；TASK-10 外部 restore evidence 仍獨立 BLOCKED |
