@@ -52,7 +52,7 @@ enum _TripMoreAction {
   health,
 }
 
-/// 行程時間軸畫面：AppBar（可切換 trip + 功能選單 + 帳號）→ 單層地圖／DAY selector →
+/// 行程時間軸畫面：AppBar（可切換 trip／地圖 + 功能選單 + 帳號）→ DAY selector →
 /// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
@@ -76,14 +76,21 @@ class TripTimelineScreen extends ConsumerStatefulWidget {
 
 class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   var _isEditing = false;
+  int? _activeDayNum;
+
   @override
   void initState() {
     super.initState();
+    _activeDayNum = widget.initialDayNum;
   }
 
   @override
   void didUpdateWidget(covariant TripTimelineScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.tripId != widget.tripId ||
+        oldWidget.initialDayNum != widget.initialDayNum) {
+      _activeDayNum = widget.initialDayNum;
+    }
   }
 
   void _openActionSheet(Widget screen) {
@@ -126,6 +133,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     };
     final trip = tripAsync.value;
     final tripTitle = trip?.title ?? trip?.name ?? '行程';
+    final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
 
     return TpRootScaffold(
       showSoftEdge: true,
@@ -147,6 +155,19 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                     context.go('/trips/${Uri.encodeComponent(tripId)}'),
               ),
         actions: [
+          if (!_isEditing)
+            TpToolbarIconButton(
+              key: const ValueKey('trip-timeline-map'),
+              icon: CupertinoIcons.map,
+              tooltip: '地圖',
+              onPressed: () {
+                final dayNum = _activeDayNum ?? fallbackDayNum;
+                context.go(
+                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
+                  '${dayNum == null ? '' : '&day=$dayNum'}',
+                );
+              },
+            ),
           if (_isEditing)
             TpToolbarTextButton(
               key: const ValueKey('tp-root-header-primary-action'),
@@ -221,6 +242,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 initialEntryId: widget.initialEntryId,
                 initialDayNum: widget.initialDayNum,
                 isEditing: _isEditing,
+                onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
         error: (error, stackTrace) => initiallyBelowHeader(
@@ -238,7 +260,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
 
 typedef _EntriesSnapshot = Map<int, List<TimelineEntry>>;
 
-/// 日程主體：固定「地圖／DAY」selector + 單一逐日 Sliver 捲動。
+/// 日程主體：固定 DAY selector + 單一逐日 Sliver 捲動。
 class _TimelineBody extends StatefulWidget {
   const _TimelineBody({
     required this.days,
@@ -246,6 +268,7 @@ class _TimelineBody extends StatefulWidget {
     this.initialEntryId,
     this.initialDayNum,
     required this.isEditing,
+    required this.onActiveDayChanged,
   });
 
   final List<TripDay> days;
@@ -253,6 +276,7 @@ class _TimelineBody extends StatefulWidget {
   final int? initialEntryId;
   final int? initialDayNum;
   final bool isEditing;
+  final ValueChanged<int> onActiveDayChanged;
 
   @override
   State<_TimelineBody> createState() => _TimelineBodyState();
@@ -448,6 +472,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
     }
     if (next != _activeDayNum) {
       setState(() => _activeDayNum = next);
+      widget.onActiveDayChanged(next);
     }
   }
 
@@ -465,6 +490,7 @@ class _TimelineBodyState extends State<_TimelineBody> {
     final generation = ++_programmaticScrollGeneration;
     _programmaticDayNum = dayNum;
     setState(() => _activeDayNum = dayNum);
+    widget.onActiveDayChanged(dayNum);
     final duration = TpMotion.resolve(targetContext, TpMotion.normal);
     if (duration == Duration.zero) {
       _scrollController.jumpTo(target);
@@ -551,19 +577,6 @@ class _TimelineBodyState extends State<_TimelineBody> {
       child: TpHorizontalSelector<int>(
         key: const ValueKey('trip-timeline-view-day-selector'),
         value: _activeDayNum,
-        leadingAction: widget.isEditing
-            ? null
-            : TpHorizontalSelectorAction(
-                key: const ValueKey('trip-timeline-map'),
-                icon: CupertinoIcons.map,
-                label: '地圖',
-                onPressed: () {
-                  context.go(
-                    '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
-                    '&day=$_activeDayNum',
-                  );
-                },
-              ),
         options: [
           for (final day in widget.days)
             TpScopeOption(

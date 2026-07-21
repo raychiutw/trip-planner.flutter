@@ -8,6 +8,8 @@
 >
 > 2026-07-20 版型補充：功能說明在同一頁直接呈現，不設「往下點」或第二層展開；主標是一個句子，不強制斷行。隱私權與刪除帳號內容由產品後續提供。
 >
+> 2026-07-21 導覽更正：行程／地圖切換保留在 Root Header；Day tab 只放 scope options；地圖恢復「總覽」。
+>
 > 驗證基底：`master` / `c82c75b032e3f5b26e87fd62455bf703b8ab94cb`
 >
 > 範圍：本文件只規劃本輪 8 項需求與「景點刪除後不提供復原」補充，不授權 push、release 或後端修改。
@@ -16,9 +18,9 @@
 
 本文件是 2026-07-20 UI 規格的後續修正。若與 `docs/superpowers/plans/2026-07-20-ios-hig-ui-offline-restore.md` 衝突，只覆蓋以下決策：
 
-1. 舊 TASK-02 將「地圖／行程」移到 Root Header。本輪改為放回 Day 導覽列，但仍以獨立 action 呈現，不偽裝成可選 Day。
+1. 「地圖／行程」是跨頁切換，保留在 Root Header；Day 導覽列只放可選範圍。
 2. 舊 TASK-06 使用 `Dismissible.confirmDismiss`，滑過門檻會直接執行刪除。本輪改成左滑只揭露右側紅色按鈕，必須再點按鈕才進入既有刪除流程。
-3. 地圖不再提供「總覽」Day。Day 導覽列的固定前導 action 顯示「行程」，其餘項目只列實際 DAY。
+3. 地圖保留「總覽」與實際 DAY；「總覽」以 sentinel index 0 聚合所有日期的 pins、routes 與 POI cards。
 
 其他已完成的字級、返回行程列表、收藏搜尋、Sheet、離線與 Restore 接線規格維持不變。
 
@@ -53,9 +55,9 @@ Apple HIG 定義的是互動與層級，不指定 Flutter 元件。`flutter_slid
 |---|---|---|
 | 1. 帳號頁面底部增加版本資訊 | TASK-01 | 帳號完整頁與 avatar 帳號 Sheet 底部顯示 App 版本與 build number |
 | 2. 未登入首頁含功能圖片與登入 CTA | TASK-02 | 未登入進 App 先看到 welcome page；CTA 進入登入並保留 deep link |
-| 3. 行程 Day tab 間距對齊地圖，還原地圖按鈕 | TASK-03 | 兩頁 Day rail 距 Header 一致；行程列固定顯示「地圖」action |
+| 3. 行程 Day tab 間距對齊地圖，還原地圖按鈕 | TASK-03 | 兩頁 Day rail 距 Header 一致；Root Header 顯示「地圖」action |
 | 4. 管理景點使用 iOS 左滑刪除 | TASK-04 | 備選景點左滑揭露紅色「刪除」，不再用 inline trash 直接執行 |
-| 5. 地圖 Day tab 顯示「行程」且無總覽；POI 自由滑動 | TASK-03、TASK-05 | 「行程」是固定 action；Day 只列實際日期；POI 不吸附 |
+| 5. 2026-07-21 更正：地圖保留 Header「行程」與「總覽」；POI 自由滑動 | TASK-03、TASK-05 | 跨頁 action 不進 Day tab；總覽與 DAY 可選；POI 不吸附 |
 | 6. AI 聊天可滑動／點畫面收鍵盤 | TASK-06 | drag 或 tap outside 皆 unfocus，composer 回到一行休息狀態 |
 | 7. 共用刪除先揭露紅色按鈕 | TASK-04 | 行程、收藏、停留點、筆記、備選景點使用相同 reveal interaction |
 | 8. AI 訊息可捲到輸入框／功能 tab 下方 | TASK-06 | 訊息在 glass composer／root tab 後方仍可見，初始最新訊息不被遮住 |
@@ -69,8 +71,8 @@ Apple HIG 定義的是互動與層級，不指定 Flutter 元件。`flutter_slid
 |---|---|---|
 | 帳號 | `lib/features/account/account_screen.dart:82-176` 的完整頁與 embedded Sheet 都只在內容尾端放登出；`pubspec.yaml:30-59` 沒有 package info dependency | 無 runtime app metadata，也沒有共用 version footer |
 | 未登入入口 | `lib/app/router.dart:59-78` 初始 `/trips`，未登入受保護頁直接 redirect `/login`；repo 沒有 onboarding image assets | 沒有 public welcome route，也無法先說明 App 價值 |
-| Timeline Day rail | `trip_timeline_screen.dart:525-595` 使用 `initialContentTop + 64pt header delegate`，selector 內又加 8pt top padding；地圖 action 位於 Header `:157-170` | 實際 Day rail top 約為 Header bottom + 20pt，地圖頁為 +8pt；action 不在 Day rail |
-| Map Day rail | `trip_map_screen.dart:685-703` 第一個 option 仍是「總覽」；「行程」action 位於 Header `:111-124` | 「總覽」以 sentinel index 0 參與資料與路線分支，和新需求衝突 |
+| Timeline Day rail | `trip_timeline_screen.dart:525-595` 使用 `initialContentTop + 64pt header delegate`，selector 內又加 8pt top padding；地圖 action 位於 Header `:157-170` | 只需修正 Day rail top gap；Header action 應保留 |
+| Map Day rail | `trip_map_screen.dart:685-703` 第一個 option 是「總覽」；「行程」action 位於 Header `:111-124` | 此結構符合 2026-07-21 更正，需與新的 POI 自由滑動行為並存 |
 | 管理景點 | `entry_poi_screen.dart:179-229` 的備選景點用 inline trash `IconButton` 直接呼叫 `removeEntryAlternate` | 沒有 swipe reveal；刪除也沒有不可復原確認 |
 | 共用刪除 | `lib/ui/swipe_to_delete.dart:29-37` 使用 `Dismissible.confirmDismiss`，跨過門檻立即 `await onDelete()` | 背景雖顯示紅色按鈕，但它不是可停留、可點擊的 action |
 | 共用刪除 consumers | `TripsListScreen`、`FavoritesScreen`、Timeline 停留點、Trip notes 共 4 類；備選景點尚未接入 | 共用外觀已存在，互動模型錯誤且覆蓋不完整 |
@@ -90,7 +92,7 @@ TASK-00
                └─> TASK-07
 ```
 
-TASK-03 先移除 map overview sentinel 並定稿 Day rail API，TASK-05 才改 POI pager，避免同一份 map test fixture 重複重寫。TASK-04 先改共用 reveal 元件，再接入管理景點。
+TASK-03 先定稿 Header 跨頁 action、Map overview sentinel 與 Day rail API，TASK-05 才改 POI pager，避免同一份 map test fixture 重複重寫。TASK-04 先改共用 reveal 元件，再接入管理景點。
 
 ---
 
@@ -192,7 +194,7 @@ TASK-03 先移除 map overview sentinel 並定稿 Day rail API，TASK-05 才改 
 
 ## TASK-03：統一 Timeline／Map Day 導覽列
 
-**狀態：DONE。** Timeline／Map 共用固定前導 action 與獨立可捲 Day options。
+**狀態：DONE（2026-07-21 更正）。** Timeline／Map 的跨頁 action 位於 Root Header；Day rail 只含可捲 options，Map 保留總覽。
 
 **修改檔案：**
 
@@ -206,29 +208,26 @@ TASK-03 先移除 map overview sentinel 並定稿 Day rail API，TASK-05 才改 
 
 **共用元件決策：**
 
-- [ ] `TpHorizontalSelector<T>` 新增具型別的 optional `leadingAction`，欄位只含 `key`、`icon`、`label`、`onPressed`。
-- [ ] `leadingAction` 固定在玻璃 track 左端、44pt 高且不隨 Day 水平捲動；Day options 在右側可捲動。
-- [ ] action semantics 是 `button` 且沒有 `selected`；Day semantics 才是互斥 selected options。不得恢復 `TpScopeOption.isAction` 混合模型。
-- [ ] selected auto-reveal 計算只處理 Day scroll viewport，不把 fixed action 寬度算成 Day index。
+- [x] `TpHorizontalSelector<T>` 只接受 selection options；跨頁 action 放 Root Header。
+- [x] Day options 使用互斥 selected semantics，長列表維持水平捲動與 selected auto-reveal。
 
 **Timeline：**
 
-- [ ] Day rail top 改成 `TpRootGeometry.headerBottom(context) + TpSpacing.s2`，與 map 的 +8pt 完全一致。
-- [ ] `_selectorExtent` 改為 `TpSpacing.tapMin + TpSpacing.s1`，移除 selector 內額外的 8pt top padding；捲到 Day 的 offset 使用同一個 rail bottom 計算，不留 magic number。
-- [ ] 移除 Root Header 的 `trip-timeline-map` action；正常模式在 Day rail 固定前導顯示 map icon + `地圖`，編輯排序模式隱藏此 action。
-- [ ] 點 `地圖` 保留目前 active Day，前往 `/map?tripId=...&day=...`。
+- [x] Day rail top 改成 `TpRootGeometry.headerBottom(context) + TpSpacing.s2`，與 map 的 +8pt 完全一致。
+- [x] `_selectorExtent` 改為 `TpSpacing.tapMin + TpSpacing.s1`，移除 selector 內額外的 8pt top padding；捲到 Day 的 offset 使用同一個 rail bottom 計算，不留 magic number。
+- [x] Root Header 保留 `trip-timeline-map`；Day rail 不顯示跨頁 action，編輯排序模式隱藏 Header action。
+- [x] 點 Header `地圖` 保留目前 active Day，前往 `/map?tripId=...&day=...`。
 
 **Map：**
 
-- [ ] 移除 Root Header 的 `trip-map-itinerary` action。
-- [ ] Day rail 固定前導顯示 calendar icon + `行程`，點擊回 `/trips/:tripId?day=<activeDay>`。
-- [ ] 完全移除「總覽」option 與 sentinel index 0；selector options 只用實際 `day.dayNum`。
-- [ ] `_selectedTabIndex` 改為所選 Day number／Day index 的單一模型：deep-link entry 優先選其所屬 Day，其次 valid `initialDayNum`，最後第一天；沒有 Day 才為 null。
-- [ ] pins、routes、POI cards 只顯示 selected Day；可保留 all-pins 只作「所選 Day 無座標」時的初始相機 fallback，不得重新暴露總覽狀態。
+- [x] Root Header 保留 `trip-map-itinerary`；Day rail 不顯示跨頁 action，點擊回 `/trips/:tripId?day=<activeDay>`。
+- [x] 恢復「總覽」option 與 sentinel index 0；實際 DAY 使用 index + 1。
+- [x] deep-link entry 優先選其所屬 Day，其次 valid `initialDayNum`，最後第一天；使用者可再切到總覽。
+- [x] 總覽聚合所有日期的 pins、routes、POI cards；單日只顯示 selected Day。
 
-**測試情境（8）：** action／selection semantics、兩頁 top rect 差 ≤1px、timeline action 路由、map action 路由、無「總覽」、預設 DAY 1、deep-link Day、無 Day empty state。
+**測試情境（8）：** Header action 不在 Day selector、兩頁 top rect 差 ≤1px、timeline action 路由、map action 路由、總覽跨日 POI、預設 DAY 1、deep-link Day、無 Day empty state。
 
-**完成條件：** Timeline 與 Map 的 Day rail 距 Header 相同；左右互切 action 位於同一視覺列且不污染 Day selection；Map 不再存在總覽 UI 或資料分支。
+**完成條件：** Timeline 與 Map 的 Day rail 距 Header 相同；左右互切 action 位於 Root Header 且不污染 Day selection；Map 保留可聚合所有日期的總覽。
 
 ---
 
@@ -376,8 +375,8 @@ TASK-03 先移除 map overview sentinel 並定稿 Day rail API，TASK-05 才改 
 2. 未登入首次啟動顯示一頁式 welcome，包含 3 張 bundled product images 與 `登入後開始使用`。
 3. 未登入 deep link 經 welcome → login 後回安全站內目的地；外部 redirect 被拒絕。
 4. Timeline 與 Map Day rail 距 Header 的 top gap 都是 `TpSpacing.s2`，幾何差 ≤1px。
-5. Timeline Day rail 固定 action 是 `地圖`；Map Day rail 固定 action 是 `行程`。
-6. Map UI、semantics、state model 與測試都不存在「總覽」Day。
+5. Timeline Root Header action 是 `地圖`；Map Root Header action 是 `行程`，兩者都不進 Day rail。
+6. Map Day rail 提供「總覽」與實際 DAY；總覽聚合所有日期的 pins、routes 與 POI cards。
 7. POI PageView `pageSnapping == false`，拖曳 POI 不移動相機，點選才移動。
 8. 所有 `SwipeToDelete` 左滑只揭露右側紅色按鈕；放手或 full swipe 均不呼叫 delete callback。
 9. 管理景點的備選景點刪除需點紅色按鈕並確認；成功後沒有 Undo／Restore。
@@ -412,7 +411,7 @@ TASK-03 先移除 map overview sentinel 並定稿 Day rail API，TASK-05 才改 
 ## Rollback
 
 - TASK-01、02：移除 Welcome route／畫面與 version provider／dependency，router 回復未登入直達 `/login`。
-- TASK-03、05：回復 Header action、Day state 與 `pageSnapping`；不得只回復一邊造成 Timeline／Map 不對稱。
+- TASK-03、05：回復 Day state 或 `pageSnapping` 時不得移除 Root Header 跨頁 action，也不得只改 Timeline／Map 其中一邊。
 - TASK-04：可回復 `SwipeToDelete` implementation 與 dependency，但管理景點 inline delete 必須一起回復，避免刪除入口消失。
 - TASK-06：回復 chat `Column` 與 focus callbacks；不影響 message API 或資料。
 - 所有變更均是 client UI／routing，無資料 migration；正常 rollback 為 revert 對應 commit。

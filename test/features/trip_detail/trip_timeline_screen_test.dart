@@ -409,6 +409,20 @@ void main() {
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
     expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('tp-root-glass-header')),
+        matching: find.byKey(const ValueKey('trip-timeline-map')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+        matching: find.byKey(const ValueKey('trip-timeline-map')),
+      ),
+      findsNothing,
+    );
+    expect(
       find.byKey(const ValueKey('trip-timeline-day-overview')),
       findsNothing,
     );
@@ -430,7 +444,7 @@ void main() {
     expect(find.byKey(const ValueKey('trip-action-notes')), findsOneWidget);
   });
 
-  testWidgets('單層 selector 選地圖並保留目前 DAY', (tester) async {
+  testWidgets('Header 切換地圖並保留目前 DAY', (tester) async {
     await _pumpTimeline(tester);
 
     await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));

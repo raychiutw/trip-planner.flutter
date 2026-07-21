@@ -6,35 +6,19 @@ import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
 
-class TpHorizontalSelectorAction {
-  const TpHorizontalSelectorAction({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    this.key,
-  });
-
-  final Key? key;
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-}
-
-/// 行程／地圖頁共用的 Day 選擇器。
+/// 行程／地圖頁共用的同層選擇器；跨頁動作應放在頁首工具列。
 class TpHorizontalSelector<T> extends StatefulWidget {
   const TpHorizontalSelector({
     super.key,
     required this.value,
     required this.options,
     required this.onSelected,
-    this.leadingAction,
     this.platformViewBackdrop = false,
   });
 
   final T value;
   final List<TpScopeOption<T>> options;
   final ValueChanged<T> onSelected;
-  final TpHorizontalSelectorAction? leadingAction;
   final bool platformViewBackdrop;
 
   @override
@@ -135,30 +119,22 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
           ),
         ),
         settings: trackSettings,
-        child: Row(
-          children: [
-            if (widget.leadingAction case final action?)
-              _SelectorAction(action: action, color: tones.accentDeep),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: _controller,
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final option in widget.options)
-                      _SelectorOption<T>(
-                        option: option,
-                        selected: option.value == widget.value,
-                        width: _optionWidth(option),
-                        selectedSettings: selectedSettings,
-                        accentColor: tones.accentDeep,
-                        onTap: () => widget.onSelected(option.value),
-                      ),
-                  ],
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final option in widget.options)
+                _SelectorOption<T>(
+                  option: option,
+                  selected: option.value == widget.value,
+                  width: _optionWidth(option),
+                  selectedSettings: selectedSettings,
+                  accentColor: tones.accentDeep,
+                  onTap: () => widget.onSelected(option.value),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -173,63 +149,6 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
         (_tabWidth + (option.label.characters.length - 5).clamp(0, 4) * 10)
             .toDouble();
     return baseWidth * textScale;
-  }
-}
-
-class _SelectorAction extends StatelessWidget {
-  const _SelectorAction({required this.action, required this.color});
-
-  final TpHorizontalSelectorAction action;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final textScale = (MediaQuery.textScalerOf(context).scale(13) / 13).clamp(
-      1.0,
-      2.0,
-    );
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Semantics(
-          key: action.key,
-          button: true,
-          label: action.label,
-          excludeSemantics: true,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: action.onPressed,
-            child: SizedBox(
-              width: 88 * textScale,
-              height: TpSpacing.tapMin,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(action.icon, size: 14, color: color),
-                  const SizedBox(width: TpSpacing.s1),
-                  Text(
-                    action.label,
-                    maxLines: 1,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontSize: 13,
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Container(
-          width: 1,
-          height: 24,
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurface.withValues(alpha: 0.16),
-        ),
-      ],
-    );
   }
 }
 

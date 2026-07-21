@@ -379,7 +379,7 @@ void main() {
     expect(region.value.statusBarBrightness, Brightness.dark);
   });
 
-  testWidgets('DAY 1：單層行程/DAY selector、固定城市 zoom 與當日 POI', (tester) async {
+  testWidgets('DAY 1：Header 行程切換、總覽/DAY selector 與當日 POI', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
       _buildScreen([
@@ -398,8 +398,22 @@ void main() {
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('tp-root-glass-header')),
+        matching: find.byKey(const ValueKey('trip-map-itinerary')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: daySelector,
+        matching: find.byKey(const ValueKey('trip-map-itinerary')),
+      ),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
-    expect(find.text('總覽'), findsNothing);
+    expect(find.text('總覽'), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     expect(
@@ -591,7 +605,18 @@ void main() {
     expect(nativeController.moves.last.point.longitude, 127.878);
   });
 
-  testWidgets('地圖的行程選項切回同一天 timeline', (tester) async {
+  testWidgets('總覽顯示所有日期的 POI', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('總覽'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
+  });
+
+  testWidgets('地圖 Header 的行程按鈕切回同一天 timeline', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 

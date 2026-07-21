@@ -4,7 +4,7 @@
 
 - Account screen and account sheet show the real app version/build number.
 - Unauthenticated users land on the approved Variant B Welcome page; login preserves safe internal deep links.
-- Timeline/map Day navigation, map action, free POI-card scrolling, chat keyboard dismissal, and content-under-glass behavior are aligned.
+- Timeline/map switching stays in each Root Header; Day tabs contain only scope options, and Map retains Overview. Free POI-card scrolling, chat keyboard dismissal, and content-under-glass behavior are aligned.
 - Shared deletion now uses swipe-to-reveal plus an explicit red delete action; alternate POI deletion has no Undo.
 - Signup has a required privacy-consent checkbox. Unchecked submission shows an inline error and does not call `AuthRepository.signup`; failed signup keeps the checked state.
 
