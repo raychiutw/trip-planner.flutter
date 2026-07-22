@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:patrol/patrol.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 
+import 'support/ios_system_alerts.dart';
+
 const _taipei101 = TripMapPoint(25.033968, 121.564468);
 // Keep this outside the initial Taipei 101 viewport so the native SDK cannot
 // coalesce the camera update and skip its idle callback.
@@ -26,6 +28,7 @@ void main() {
   patrolTest('native Google Map renders, keeps zoom 13, and exposes a POI', (
     $,
   ) async {
+    await dismissStaleSpringBoardTutorial($);
     final ready = Completer<void>();
     final selectedPoi = Completer<GoogleMapPoiSelection>();
     final controller = TripMapController();
