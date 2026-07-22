@@ -8,6 +8,7 @@
 
 ### 修正
 
+- 修正 Firebase iOS Test Lab 以不同 Xcode 版本建置與執行時會遭基礎設施拒絕；CI 建置與 Test Lab 統一鎖定 Xcode 26.2，並在簽章及建置前驗證所選 iOS 版本的即時相容性。
 - 修正 320pt 窄螢幕搭配最大 Dynamic Type 時，行程卡的完整起訖時間會被 `ActionChip` 淡出裁切；時間維持單行並在可用寬度內等比例縮放。
 - 修正行程景點的多行備註被截成三行；卡片現在依內容完整展開，描述、備註與其他資訊分行顯示。
 - 修正編輯備註儲存後再次開啟仍顯示舊資料、後續因舊 OCC version 儲存失敗；離線快取會同步單筆資料，共用 optimistic cache 的線上寫入、pending 寫入（包含不同景點 path）與 flush 收尾都會依序執行，使用者再次儲存時會主動喚起 idle queue，當機復原的 patch 也會持久化。

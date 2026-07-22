@@ -58,6 +58,58 @@ void main() {
     expect(workflow, contains('E2E_EXPECT_GOOGLE_POI=true'));
   });
 
+  test('iOS Test Lab builds and runs with the same supported Xcode', () {
+    final workflow = File(
+      '.github/workflows/mobile-e2e.yml',
+    ).readAsStringSync();
+    final iosJobStart = workflow.indexOf('  ios_test_lab:\n');
+    expect(iosJobStart, isNonNegative);
+    final iosJob = workflow.substring(iosJobStart);
+
+    expect(
+      workflow,
+      contains(RegExp(r"^  FIREBASE_XCODE_VERSION: '26\.2'$", multiLine: true)),
+    );
+    expect(
+      iosJob,
+      contains(
+        RegExp(
+          r'^      DEVELOPER_DIR: /Applications/Xcode_26\.2\.app/Contents/Developer$',
+          multiLine: true,
+        ),
+      ),
+    );
+    expect(
+      iosJob,
+      contains(
+        RegExp(
+          r'^            --xcode-version "\$FIREBASE_XCODE_VERSION" \\',
+          multiLine: true,
+        ),
+      ),
+    );
+    expect(
+      iosJob,
+      contains(
+        RegExp(
+          r'^      - name: Verify Test Lab Xcode compatibility$',
+          multiLine: true,
+        ),
+      ),
+    );
+    expect(
+      iosJob,
+      contains(
+        'gcloud firebase test ios versions describe '
+        '"\$FIREBASE_IOS_VERSION"',
+      ),
+    );
+    expect(
+      iosJob,
+      contains("'.supportedXcodeVersionIds | index(\$xcode) != null'"),
+    );
+  });
+
   test(
     'mobile releases keep reusable Test Lab evidence without gating uploads',
     () {
