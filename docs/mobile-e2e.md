@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: TestFlight dispatches run the iOS matrix and Play Internal dispatches run the Android matrix as independent evidence jobs. Store uploads no longer wait for Firebase or the staging favorite-restore contract; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: a release dispatch can opt into the matching Test Lab matrix with `run_optional_evidence=true`, or Firebase can run separately as independent evidence. Store uploads no longer wait for Firebase or the staging favorite-restore contract; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
 The Patrol bundle contains two independent evidence suites:
 
@@ -216,6 +216,30 @@ Official references:
 - [Firebase Android command line testing](https://firebase.google.com/docs/test-lab/android/command-line)
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
+
+## 2026-07-23 v0.9.6 store release record
+
+Final source SHA `4ac7776d95135cbcf1baded91511a11d28d171c9` was released from
+[workflow run 29964801571](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29964801571).
+Run number `127`, attempt `1`, produced shared iOS／Android build `12701` for
+version `0.9.6`. The final Test Lab navigation fix was merged through
+[PR #80](https://github.com/raychiutw/trip-planner.flutter/pull/80) after
+[PR CI run 29963049945](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963049945)
+completed successfully; the exact merge commit then passed
+[master CI run 29963722375](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963722375).
+
+| Layer | Result | Evidence |
+| --- | --- | --- |
+| Analyzer／full Flutter suite | PASS | Analyzer reported 0 issues; 1,402 tests passed locally, in PR CI, on the merge commit, and independently in both store jobs |
+| Local Patrol product flow | PASS | iOS simulator completed 1 app-owned flow covering login, chat input, all five root tabs, and favorites search |
+| iOS Firebase Test Lab | PASS | [Run 29963749443](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963749443) tested the exact final SHA on iPhone 14 Pro／iOS 16.6 and reported `3 test cases passed` |
+| TestFlight | PASS | Build `12701` uploaded through the App Store API; processing returned `VALID` |
+| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `14630000200256184012` committed |
+
+The `mobile-release` Environment approved both store jobs. The release dispatch
+kept `run_optional_evidence=false` to avoid rerunning the already-passing iOS
+matrix; Android Test Lab and the staging favorite-restore contract were not
+claimed as part of this release record.
 
 ## 2026-07-21 v0.9.4 store release record
 

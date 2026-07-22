@@ -1,4 +1,15 @@
-# Handoff — 2026-07-21 v0.9.4 缺陷修正與雙商店發布
+# Handoff — 2026-07-23 v0.9.6 Firebase iOS 驗證與雙商店發布
+
+## v0.9.6 發布結案
+
+- 最終 source SHA `4ac7776d95135cbcf1baded91511a11d28d171c9` 已經 PR [#80](https://github.com/raychiutw/trip-planner.flutter/pull/80) 合併至 `master`；PR CI [29963049945](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963049945) 與 master CI [29963722375](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963722375) 均通過 analyzer、完整測試、UI evidence 與 Android debug build。
+- 本機 `flutter analyze` 0 issue、1,402 tests 全數通過；iOS simulator Patrol app-owned flow 1/1 通過登入、聊天、五個 root tabs 與收藏搜尋。
+- iOS Firebase Test Lab [29963749443](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963749443) 在 iPhone 14 Pro／iOS 16.6 對 final master 回報 `3 test cases passed`，涵蓋 XCTest example、app-owned release flow 與 native Google map smoke。
+- iOS release flow 已改用 Patrol 實機文字輸入 driver，root tab 導覽改用 app 自有唯一 `ValueKey`；不再依賴 release build 不提供的 debug semantics 或 Liquid Glass 套件內部手勢元件。
+- Release workflow [29964801571](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29964801571) 已將共同 build `12701` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`，Play edit `14630000200256184012`）。
+- 本次 release dispatch 關閉重複 optional evidence；Firebase iOS 證據已由上述 final-master 獨立 run 完成，未重跑 Android matrix 或 staging favorite-restore contract。
+
+以下保留 v0.9.4 與 v0.9.3 大型 UI 重構的交接背景，供後續維護追溯。
 
 ## v0.9.4 發布結案
 
@@ -9,8 +20,6 @@
 - iOS 模擬器已驗證行程、排序、編輯與地圖；地圖維持淺色、原生 Google POI 可見，預設／切 Day／點 POI 均維持 zoom `13`。
 - Analyzer 0 issue、全庫 1,355 tests、PR CI 與 merge commit CI 的 Android debug build 全部通過。
 - PR [#73](https://github.com/raychiutw/trip-planner.flutter/pull/73) 已合併，annotated tag `v0.9.4` 已推送；release workflow [29848648325](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29848648325) 已將共同 build `11201` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`）。
-
-以下保留 v0.9.3 大型 UI 重構的交接背景，供後續維護追溯。
 
 ## 本輪已完成
 
