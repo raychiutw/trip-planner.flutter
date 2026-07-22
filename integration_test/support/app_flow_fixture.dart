@@ -298,10 +298,19 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('login-submit-button')));
   await tester.pumpAndSettle();
 
-  expect(find.byType(TripsListScreen), findsOneWidget);
-  verify(
-    () => fixture.auth.login(email: 'ray@example.com', password: 'secret'),
-  ).called(1);
+  final visibleText = tester
+      .widgetList<Text>(find.byType(Text))
+      .map((widget) => widget.data)
+      .whereType<String>()
+      .join(' | ');
+  expect(
+    () => verify(
+      () => fixture.auth.login(email: 'ray@example.com', password: 'secret'),
+    ).called(1),
+    returnsNormally,
+    reason: visibleText,
+  );
+  expect(find.byType(TripsListScreen), findsOneWidget, reason: visibleText);
 
   await tester.drag(
     find.byKey(const ValueKey('trip-dismiss-okinawa')),

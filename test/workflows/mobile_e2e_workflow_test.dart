@@ -14,6 +14,15 @@ void main() {
   final nativeMapSmoke = File(
     'patrol_test/native_map_smoke_test.dart',
   ).readAsStringSync();
+  final appOwnedSmoke = File(
+    'patrol_test/app_owned_flow_test.dart',
+  ).readAsStringSync();
+  final appFlowFixture = File(
+    'integration_test/support/app_flow_fixture.dart',
+  ).readAsStringSync();
+  final springBoardGuard = File(
+    'patrol_test/support/ios_system_alerts.dart',
+  ).readAsStringSync();
   final setupGuide = File('docs/mobile-e2e.md').readAsStringSync();
   final restoreContract = File(
     'tool/verify_favorite_restore_contract.sh',
@@ -385,5 +394,33 @@ void main() {
         expect(nativeMapSmoke, isNot(contains('_requestedZoom12')));
       },
     );
+
+    test('both iOS targets dismiss a stale SpringBoard tutorial', () {
+      final appDismissal = appOwnedSmoke.indexOf(
+        'dismissStaleSpringBoardTutorial',
+      );
+      final mapDismissal = nativeMapSmoke.indexOf(
+        'dismissStaleSpringBoardTutorial',
+      );
+      final flow = appOwnedSmoke.indexOf('runAppOwnedReleaseFlow');
+      final map = nativeMapSmoke.indexOf('pumpWidgetAndSettle');
+
+      expect(appDismissal, isNonNegative);
+      expect(mapDismissal, isNonNegative);
+      expect(appDismissal, lessThan(flow));
+      expect(mapDismissal, lessThan(map));
+      expect(springBoardGuard, contains("text: 'Edit Home Screen'"));
+      expect(springBoardGuard, contains('IOSElementType.button'));
+      expect(springBoardGuard, contains("label: 'Dismiss'"));
+      expect(springBoardGuard, contains('getNativeViews'));
+      expect(springBoardGuard, contains('.tap('));
+      expect(springBoardGuard, isNot(contains('tapAt')));
+      expect(springBoardGuard, isNot(contains('PatrolActionException')));
+    });
+
+    test('login failures retain visible screen diagnostics', () {
+      expect(appFlowFixture, contains('final visibleText ='));
+      expect(appFlowFixture, contains('reason: visibleText'));
+    });
   });
 }
