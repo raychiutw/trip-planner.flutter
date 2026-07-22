@@ -308,8 +308,8 @@ jobs:
         run: |
           set -euo pipefail
           patrol build ios \
-            --target patrol_test/native_map_smoke_test.dart \
             --target patrol_test/app_owned_flow_test.dart \
+            --target patrol_test/native_map_smoke_test.dart \
             --dart-define E2E_EXPECT_GOOGLE_POI=true \
             --release
 
