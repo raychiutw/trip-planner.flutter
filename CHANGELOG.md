@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 修正
+
+- 修正 iOS Firebase Test Lab 的 Liquid Glass 底部導覽點擊：release 測試改用 app 自有穩定 key，不再依賴 release 不提供的 debug semantics 或套件內部手勢元件。
+
 ## [0.9.6] - 2026-07-23
 
 ### 修正

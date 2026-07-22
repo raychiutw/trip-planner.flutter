@@ -256,13 +256,7 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
 }
 
 Finder _rootTab(String label) {
-  final semantics = find.descendant(
-    of: find.byKey(const ValueKey('apple-root-tab-bar')),
-    matching: find.bySemanticsLabel(label),
-  );
-  return find
-      .ancestor(of: semantics, matching: find.byType(GestureDetector))
-      .first;
+  return find.byKey(ValueKey('root-tab-$label'));
 }
 
 typedef AppFlowCapture = Future<void> Function(String name);
