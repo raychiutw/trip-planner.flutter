@@ -110,6 +110,23 @@ void main() {
     );
   });
 
+  test('iOS Test Lab runs the app-owned flow before native map state', () {
+    final workflow = File(
+      '.github/workflows/mobile-e2e.yml',
+    ).readAsStringSync();
+    final iosJob = workflow.substring(workflow.indexOf('  ios_test_lab:\n'));
+    final appOwnedTarget = iosJob.indexOf(
+      '--target patrol_test/app_owned_flow_test.dart',
+    );
+    final nativeMapTarget = iosJob.indexOf(
+      '--target patrol_test/native_map_smoke_test.dart',
+    );
+
+    expect(appOwnedTarget, isNonNegative);
+    expect(nativeMapTarget, isNonNegative);
+    expect(appOwnedTarget, lessThan(nativeMapTarget));
+  });
+
   test(
     'mobile releases keep reusable Test Lab evidence without gating uploads',
     () {
