@@ -9,6 +9,7 @@ import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_status_banner.dart';
+import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 QueuedMutation _mut(String id) => QueuedMutation(
@@ -108,10 +109,21 @@ void main() {
     expect(find.text('1 筆變更待同步'), findsOneWidget);
 
     await tester.tap(find.text('立即重試'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      for (var attempt = 0; attempt < 100; attempt++) {
+        if ((await cache.readQueue()).isEmpty &&
+            !container.read(offlineSyncControllerProvider).isLoading) {
+          return;
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
+    });
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('offline-pending-banner')), findsNothing);
+    expect(container.read(offlineSyncControllerProvider).isLoading, isFalse);
     expect(await cache.readQueue(), isEmpty);
+    expect(find.byKey(const ValueKey('offline-pending-banner')), findsNothing);
   });
 
   testWidgets('banner 顯示 conflict store 衝突數', (tester) async {

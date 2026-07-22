@@ -1,6 +1,7 @@
 /// dio 封裝：cookie 認證、CSRF Origin、錯誤轉換、暫時性失敗 retry、204 處理。
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpDate;
 
@@ -87,8 +88,16 @@ class ApiClient {
   final Dio _dio;
   int _mutationCounter = 0;
   bool _flushing = false;
+  bool _flushAgain = false;
+  Future<void>? _queueLockTail;
+  final Map<String, Future<void>> _mutationResourceTails = {};
+  final StreamController<void> _queueFlushRequests =
+      StreamController<void>.broadcast(sync: true);
 
   String get baseUrl => _dio.options.baseUrl;
+
+  /// 新寫入排在 idle queue 後時通知同步層；由同步層統一處理結果、錯誤與 provider refresh。
+  Stream<void> get queueFlushRequests => _queueFlushRequests.stream;
 
   /// POST 並保留完整 response（例如 AuthRepository 需要讀 set-cookie）。
   ///
@@ -185,9 +194,22 @@ class ApiClient {
     final key = cacheKeyFor('GET', path, query);
     var yieldedStale = false;
     if (store != null) {
-      final cached = await store.readResponse(key);
-      if (cached != null) {
-        yield cached.data;
+      Object? stale;
+      var foundStale = false;
+      await _withQueueLock(() async {
+        final cached = await store.readResponse(key);
+        if (cached == null) return;
+        stale = await _applyPendingPatches(store, key, cached.data);
+        if (!identical(stale, cached.data)) {
+          // 當機可能發生在 queue 已落盤、樂觀 patch 尚未寫回之間。讀 queue、
+          // 重播與寫回必須和 flush completion 共用臨界區，避免 queue 已移除後
+          // 又把沒有對應 pending record 的 optimistic cache 復活。
+          await store.writeResponse(key, stale, cachedAt: cached.cachedAt);
+        }
+        foundStale = true;
+      });
+      if (foundStale) {
+        yield stale;
         yieldedStale = true;
       }
     }
@@ -199,14 +221,29 @@ class ApiClient {
         path,
         query: query,
         fallbackToCache: false,
+        writeCache: false,
       );
       if (store == null) {
         yield fresh;
       } else {
-        final patched = await _applyPendingPatches(store, key, fresh);
-        if (!identical(patched, fresh)) {
-          await store.writeResponse(key, patched);
-        }
+        Object? patched;
+        await _withQueueLock(() async {
+          final patchedValue = await _applyPendingPatches(store, key, fresh);
+          patched = patchedValue;
+          final isEmpty =
+              patchedValue == null ||
+              (patchedValue is String && patchedValue.isEmpty);
+          if (!isEmpty) {
+            await store.writeResponse(key, patchedValue);
+            final capacity = _capacityFor(path);
+            if (capacity != null) {
+              await store.enforceCapacity(
+                'GET ${capacity.key}',
+                capacity.value,
+              );
+            }
+          }
+        });
         yield patched;
       }
     } on DioException catch (e) {
@@ -232,51 +269,148 @@ class ApiClient {
     Map<String, dynamic>? query,
     OfflineOp? optimistic,
   }) async {
-    try {
-      return await _send(method, path, body: body, query: query);
-    } on DioException catch (e) {
-      final store = _cacheStore;
-      if (optimistic != null && store != null && _isOfflineError(e)) {
-        final now = DateTime.now();
-        final seq = _mutationCounter++;
-        final id = '${now.microsecondsSinceEpoch}-$seq';
-        // 穩定臨時 id:由「微秒×1000 + seq」導出唯一負值,存進 args 一次 →
-        // 入佇列當下與日後 getStream 重播讀同一值(冪等);連續離線新增不碰撞、
-        // 跨重啟單調遞減。已帶 tempId(測試)則尊重之。
-        final args = optimistic.args.containsKey('tempId')
-            ? optimistic.args
-            : {
-                ...optimistic.args,
-                'tempId': -(now.microsecondsSinceEpoch * 1000 + (seq % 1000)),
-              };
-        final base = await _extractBase(store, optimistic);
-        await store.appendMutation(
-          QueuedMutation(
-            id: id,
-            method: method,
-            path: path,
-            query: query,
-            body: body,
-            type: optimistic.type,
-            cacheKey: optimistic.cacheKey,
-            args: args,
-            createdAt: now.toIso8601String(),
-            base: base,
-          ),
-        );
-        final current = await store.readResponse(optimistic.cacheKey);
-        final patched = applyOptimisticPatch(
-          optimistic.type,
-          current?.data,
-          args,
-        );
-        // null 代表無 base 可 patch(該資源未快取)→ 不寫,僅留佇列待 flush。
-        if (patched != null) {
-          await store.writeResponse(optimistic.cacheKey, patched);
+    final store = _cacheStore;
+    if (optimistic == null || store == null) {
+      return _send(method, path, body: body, query: query);
+    }
+    // 只有等待同資源前一筆寫入時才預先保存快取；一般 enqueue 仍在
+    // queue lock 內讀取，避免與 flush 收尾的 eviction 交錯。
+    final cachedBeforeWait =
+        _mutationResourceTails.containsKey(optimistic.cacheKey)
+        ? store.readResponse(optimistic.cacheKey)
+        : null;
+    return _withMutationResourceLock(optimistic.cacheKey, () async {
+      final fallbackCache = cachedBeforeWait == null
+          ? null
+          : await cachedBeforeWait;
+      var shouldFlush = false;
+      final queued = await _withQueueLock(() async {
+        final queue = await store.readQueue();
+        if (!queue.any(
+          (mutation) => mutation.cacheKey == optimistic.cacheKey,
+        )) {
+          return false;
         }
+        await _enqueueOptimisticMutation(
+          store: store,
+          method: method,
+          path: path,
+          body: body,
+          query: query,
+          optimistic: optimistic,
+          fallbackCache: fallbackCache,
+        );
+        if (_flushing) {
+          _flushAgain = true;
+        } else {
+          shouldFlush = true;
+        }
+        return true;
+      });
+      if (queued) {
+        if (shouldFlush) _queueFlushRequests.add(null);
         return null;
       }
-      rethrow;
+      try {
+        return await _send(method, path, body: body, query: query);
+      } on DioException catch (e) {
+        if (_isOfflineError(e)) {
+          await _withQueueLock(() async {
+            await _enqueueOptimisticMutation(
+              store: store,
+              method: method,
+              path: path,
+              body: body,
+              query: query,
+              optimistic: optimistic,
+              fallbackCache: fallbackCache,
+            );
+            if (_flushing) _flushAgain = true;
+          });
+          return null;
+        }
+        rethrow;
+      }
+    });
+  }
+
+  /// 同一 optimistic cache 的網路寫入依序執行，避免一筆成功 eviction 與另一筆
+  /// 離線入佇列交錯，清掉後者用來擷取 rebase base 的快取。
+  Future<T> _withMutationResourceLock<T>(
+    String cacheKey,
+    Future<T> Function() action,
+  ) async {
+    final previous = _mutationResourceTails[cacheKey];
+    final release = Completer<void>();
+    final tail = release.future;
+    _mutationResourceTails[cacheKey] = tail;
+    if (previous != null) await previous;
+    try {
+      return await action();
+    } finally {
+      release.complete();
+      if (identical(_mutationResourceTails[cacheKey], tail)) {
+        _mutationResourceTails.remove(cacheKey);
+      }
+    }
+  }
+
+  /// 將 queue 的「檢查 → 寫入」與 flush 的「移除 → cache eviction → 收尾」
+  /// 線性化。鎖只包本機持久化，不包網路請求，避免慢網路阻塞使用者編輯。
+  Future<T> _withQueueLock<T>(Future<T> Function() action) async {
+    final previous = _queueLockTail;
+    final release = Completer<void>();
+    _queueLockTail = release.future;
+    if (previous != null) await previous;
+    try {
+      return await action();
+    } finally {
+      release.complete();
+    }
+  }
+
+  Future<void> _enqueueOptimisticMutation({
+    required CacheStore store,
+    required String method,
+    required String path,
+    required Object? body,
+    required Map<String, dynamic>? query,
+    required OfflineOp optimistic,
+    required CacheEntry? fallbackCache,
+  }) async {
+    final now = DateTime.now();
+    final seq = _mutationCounter++;
+    final id = '${now.microsecondsSinceEpoch}-$seq';
+    // 穩定臨時 id:由「微秒×1000 + seq」導出唯一負值,存進 args 一次 →
+    // 入佇列當下與日後 getStream 重播讀同一值(冪等);連續離線新增不碰撞、
+    // 跨重啟單調遞減。已帶 tempId(測試)則尊重之。
+    final args = optimistic.args.containsKey('tempId')
+        ? optimistic.args
+        : {
+            ...optimistic.args,
+            'tempId': -(now.microsecondsSinceEpoch * 1000 + (seq % 1000)),
+          };
+    final current =
+        await store.readResponse(optimistic.cacheKey) ?? fallbackCache;
+    final base = _extractBase(current?.data, optimistic);
+    await store.appendMutation(
+      QueuedMutation(
+        id: id,
+        method: method,
+        path: path,
+        query: query,
+        body: body,
+        type: optimistic.type,
+        cacheKey: optimistic.cacheKey,
+        args: args,
+        createdAt: now.toIso8601String(),
+        base: base,
+      ),
+    );
+    final patched = applyOptimisticPatch(optimistic.type, current?.data, args);
+    // null 代表無 base 可 patch(該資源未快取)→ 不寫,僅留佇列待 flush。
+    if (patched != null) {
+      await store.writeResponse(optimistic.cacheKey, patched);
     }
   }
 
@@ -287,51 +421,119 @@ class ApiClient {
   /// 5xx / 401 / 403 / 連線錯誤 → 中止並保留剩餘佇列(下次再試)。重入時直接回 empty。
   Future<FlushResult> flushQueue() async {
     final store = _cacheStore;
-    if (store == null || _flushing) return FlushResult.empty;
-    _flushing = true;
+    if (store == null) return FlushResult.empty;
+    final shouldStart = await _withQueueLock(() async {
+      if (_flushing) {
+        _flushAgain = true;
+        return false;
+      }
+      _flushing = true;
+      _flushAgain = false;
+      return true;
+    });
+    if (!shouldStart) return FlushResult.empty;
     // [P1] 同一輪 flush 內,同 cacheKey 的整包重抓只打一次(同 trip 多筆 STALE 共用)。
     final refetchCache = <String, Future<Object?>>{};
     try {
       final conflicts = <QueuedMutation>[];
       var synced = 0;
-      for (final m in await store.readQueue()) {
-        try {
-          await _send(m.method, m.path, body: m.body, query: m.query);
-          await store.removeMutation(m.id);
-          synced++;
-        } on ApiError catch (e) {
-          if (e.status == 409 &&
-              e.code == 'STALE_ENTRY' &&
-              _rebasable(m.type)) {
-            final outcome = await _tryRebase(m, refetchCache);
-            if (outcome == _RebaseOutcome.synced) {
-              await store.removeMutation(m.id);
-              synced++;
-            } else if (outcome == _RebaseOutcome.conflict) {
-              await store.removeMutation(m.id);
-              conflicts.add(m);
-            } else {
-              break; // offline / retryLater → 保留佇列待下次
-            }
-          } else if (e.status >= 500 || e.status == 401 || e.status == 403) {
-            // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
-            // → 中止保留佇列、待重試,避免永久遺失離線編輯。
-            break;
-          } else {
-            // 其他 4xx(409 非 STALE / 400 / 404 等永久無效)→ 上報並移除。
-            conflicts.add(m);
-            await store.removeMutation(m.id);
-          }
-        } on DioException catch (e) {
-          if (_isOfflineError(e)) break;
-          rethrow;
+      while (true) {
+        await _withQueueLock(() async {
+          _flushAgain = false;
+        });
+        final queued = await store.readQueue();
+        final remainingByPath = <String, int>{};
+        for (final mutation in queued) {
+          remainingByPath.update(
+            mutation.path,
+            (count) => count + 1,
+            ifAbsent: () => 1,
+          );
         }
+        for (final m in queued) {
+          remainingByPath[m.path] = remainingByPath[m.path]! - 1;
+          try {
+            await _send(
+              m.method,
+              m.path,
+              body: m.body,
+              query: m.query,
+              evictMutationCache: false,
+            );
+            await _removeQueuedMutation(store, m);
+            synced++;
+            if (remainingByPath[m.path]! > 0) {
+              refetchCache.remove(m.cacheKey);
+            }
+          } on ApiError catch (e) {
+            if (e.status == 409 &&
+                e.code == 'STALE_ENTRY' &&
+                _rebasable(m.type)) {
+              final outcome = await _tryRebase(
+                m,
+                refetchCache,
+                evictMutationCache: false,
+              );
+              if (outcome == _RebaseOutcome.synced) {
+                await _removeQueuedMutation(store, m);
+                synced++;
+                if (remainingByPath[m.path]! > 0) {
+                  refetchCache.remove(m.cacheKey);
+                }
+              } else if (outcome == _RebaseOutcome.conflict) {
+                await _removeQueuedMutation(store, m);
+                conflicts.add(m);
+              } else {
+                break; // offline / retryLater → 保留佇列待下次
+              }
+            } else if (e.status >= 500 || e.status == 401 || e.status == 403) {
+              // 5xx 暫時失敗、401/403 認證未就緒(如 session 過期、冷啟動 sync 早於重新登入)
+              // → 中止保留佇列、待重試,避免永久遺失離線編輯。
+              break;
+            } else {
+              // 其他 4xx(409 非 STALE / 400 / 404 等永久無效)→ 上報並移除。
+              conflicts.add(m);
+              await _removeQueuedMutation(store, m);
+            }
+          } on DioException catch (e) {
+            if (_isOfflineError(e)) break;
+            rethrow;
+          }
+        }
+        final repeat = await _withQueueLock(() async {
+          if (_flushAgain) {
+            _flushAgain = false;
+            return true;
+          }
+          _flushing = false;
+          return false;
+        });
+        if (!repeat) {
+          return FlushResult(synced: synced, conflicts: conflicts);
+        }
+        refetchCache.clear();
       }
-      return FlushResult(synced: synced, conflicts: conflicts);
-    } finally {
-      _flushing = false;
+    } catch (_) {
+      await _withQueueLock(() async {
+        _flushing = false;
+      });
+      rethrow;
     }
   }
+
+  /// queue mutation（成功或永久拒絕）先在同一臨界區移除；只有該 cacheKey
+  /// 已沒有後續 pending 時才 eviction。如此同資源新編輯能先從完整樂觀 cache
+  /// 擷取 rebase base，最後一筆被拒絕時也不會留下孤兒 optimistic cache。
+  Future<void> _removeQueuedMutation(
+    CacheStore store,
+    QueuedMutation mutation,
+  ) => _withQueueLock(() async {
+    await store.removeMutation(mutation.id);
+    final queue = await store.readQueue();
+    if (!queue.any((pending) => pending.cacheKey == mutation.cacheKey)) {
+      await _evictForMutation(mutation.method, mutation.path, mutation.body);
+    }
+  });
 
   static const _rebasableTypes = {'entry.update', 'note.update'};
   bool _rebasable(String type) => _rebasableTypes.contains(type);
@@ -339,8 +541,9 @@ class ApiClient {
   /// STALE 重抓 server 真相 → 三方 merge → 無衝突重送 / 有衝突入 conflict store。
   Future<_RebaseOutcome> _tryRebase(
     QueuedMutation m,
-    Map<String, Future<Object?>> refetchCache,
-  ) async {
+    Map<String, Future<Object?>> refetchCache, {
+    bool evictMutationCache = true,
+  }) async {
     final store = _cacheStore!;
     final tripId = _tripIdFromPath(m.path);
     if (tripId == null) return _RebaseOutcome.conflict;
@@ -382,6 +585,7 @@ class ApiClient {
           m.path,
           body: _rebasedBody(m.base, ours, m.body, newVersion),
           query: m.query,
+          evictMutationCache: evictMutationCache,
         );
         return _RebaseOutcome.synced;
       } on ApiError {
@@ -557,6 +761,7 @@ class ApiClient {
     bool isRetryAttempt = false,
     bool fallbackToCache = true,
     bool writeCache = true,
+    bool evictMutationCache = true,
   }) async {
     final auth = await _authHeadersFor(method);
 
@@ -597,6 +802,7 @@ class ApiClient {
       isRetryAttempt: true,
       fallbackToCache: fallbackToCache,
       writeCache: writeCache,
+      evictMutationCache: evictMutationCache,
     );
     if ((statusCode == 429 || isEdgeBlockPage) &&
         isRetryableMethod &&
@@ -622,7 +828,9 @@ class ApiClient {
       throw _upstreamUnavailable(statusCode);
     }
     if (statusCode == 204) {
-      await _evictForMutation(method, path, body);
+      if (evictMutationCache) {
+        await _evictForMutation(method, path, body);
+      }
       return null;
     }
     final responseData = response.data;
@@ -646,7 +854,9 @@ class ApiClient {
         }
       }
     } else {
-      await _evictForMutation(method, path, body);
+      if (evictMutationCache) {
+        await _evictForMutation(method, path, body);
+      }
     }
     return isEmpty ? null : responseData;
   }
@@ -825,7 +1035,9 @@ class ApiClient {
     }
   }
 
-  /// 對某 key 依佇列順序套用所有 cacheKey 命中的待 flush 樂觀 patch(維持不變式)。
+  /// 依佇列順序套用同資源 patch，並同步 entry detail 的跨資源 update。
+  /// patcher 以穩定 tempId 保持冪等，因此 queue 已寫、cache 尚未寫就崩潰時，
+  /// stale leg 仍可安全重播而不會重複新增。
   Future<Object?> _applyPendingPatches(
     CacheStore store,
     String key,
@@ -833,9 +1045,14 @@ class ApiClient {
   ) async {
     final queue = await store.readQueue();
     var result = base;
-    for (final m in queue) {
-      if (m.cacheKey == key) {
-        result = applyOptimisticPatch(m.type, result, m.args);
+    for (final mutation in queue) {
+      final sameResource = mutation.cacheKey == key;
+      final crossResource =
+          mutation.cacheKey != key &&
+          mutation.type == 'entry.update' &&
+          key == cacheKeyFor('GET', mutation.path);
+      if (sameResource || crossResource) {
+        result = applyOptimisticPatch(mutation.type, result, mutation.args);
       }
     }
     return result;
@@ -843,11 +1060,7 @@ class ApiClient {
 
   /// 入佇列時從快取擷取「離線改過欄位」的當下值,供 flush rebase 三方比對。
   /// 只對 entry.update / note.update;其餘回 null。
-  Future<Map<String, dynamic>?> _extractBase(
-    CacheStore store,
-    OfflineOp op,
-  ) async {
-    final cached = (await store.readResponse(op.cacheKey))?.data;
+  Map<String, dynamic>? _extractBase(Object? cached, OfflineOp op) {
     if (op.type == 'entry.update') {
       return extractEntryFields(
         cached,

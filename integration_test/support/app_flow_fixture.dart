@@ -127,6 +127,9 @@ class AppFlowFixture {
     final map = MockMapRepository();
     final apiClient = MockApiClient();
 
+    when(
+      () => apiClient.queueFlushRequests,
+    ).thenAnswer((_) => const Stream<void>.empty());
     when(auth.currentUser).thenAnswer((_) async => null);
     when(
       () => auth.login(
