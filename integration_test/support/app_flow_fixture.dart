@@ -267,15 +267,19 @@ Finder _rootTab(String label) {
 
 typedef AppFlowCapture = Future<void> Function(String name);
 typedef AppFlowAppWrapper = Widget Function(Widget child);
+typedef AppFlowEnterText = Future<void> Function(Finder finder, String text);
 
 Future<void> runAppOwnedReleaseFlow(
   WidgetTester tester, {
   AppFlowCapture? capture,
   AppFlowAppWrapper? appWrapper,
+  AppFlowEnterText? enterText,
 }) async {
   Future<void> captureState(String name) async {
     if (capture != null) await capture(name);
   }
+
+  final typeText = enterText ?? tester.enterText;
 
   final fixture = AppFlowFixture.loggedOut();
   final app = fixture.app;
@@ -287,14 +291,11 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
   await tester.pumpAndSettle();
   expect(find.byType(LoginScreen), findsOneWidget);
-  await tester.enterText(
+  await typeText(
     find.byKey(const ValueKey('login-email-field')),
     'ray@example.com',
   );
-  await tester.enterText(
-    find.byKey(const ValueKey('login-password-field')),
-    'secret',
-  );
+  await typeText(find.byKey(const ValueKey('login-password-field')), 'secret');
   await tester.tap(find.byKey(const ValueKey('login-submit-button')));
   await tester.pumpAndSettle();
 
@@ -418,7 +419,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
-  await tester.enterText(
+  await typeText(
     find.byKey(const ValueKey('chat-input')),
     'device smoke draft',
   );
@@ -450,17 +451,11 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.text('美麗海水族館'), findsOneWidget);
   await captureState('favorites');
-  await tester.enterText(
-    find.byKey(const ValueKey('favorites-search-input')),
-    '牧志',
-  );
+  await typeText(find.byKey(const ValueKey('favorites-search-input')), '牧志');
   await tester.pump();
   expect(find.text('暖暮拉麵'), findsOneWidget);
   expect(find.text('美麗海水族館'), findsNothing);
-  await tester.enterText(
-    find.byKey(const ValueKey('favorites-search-input')),
-    '',
-  );
+  await typeText(find.byKey(const ValueKey('favorites-search-input')), '');
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
   await tester.pumpAndSettle();
