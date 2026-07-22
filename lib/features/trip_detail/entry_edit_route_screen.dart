@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
+import '../../models/entry.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'trip_providers.dart';
@@ -29,7 +31,23 @@ class EntryEditRouteScreen extends ConsumerStatefulWidget {
 
 class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
   final _dismissController = AppUnsavedChangesController();
-  final _formController = AppSheetFormController();
+  AppSheetFormController _formController = AppSheetFormController();
+  TimelineEntry? _lastEntry;
+
+  @override
+  void didUpdateWidget(covariant EntryEditRouteScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tripId == widget.tripId &&
+        oldWidget.entryId == widget.entryId) {
+      return;
+    }
+    final previousController = _formController;
+    _lastEntry = null;
+    _formController = AppSheetFormController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      previousController.dispose();
+    });
+  }
 
   @override
   void dispose() {
@@ -50,11 +68,22 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
     });
   }
 
+  void _retryEntry() {
+    ref.invalidate(
+      entryDetailProvider((tripId: widget.tripId, entryId: widget.entryId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final entryAsync = ref.watch(
       entryDetailProvider((tripId: widget.tripId, entryId: widget.entryId)),
     );
+    final latestEntry = entryAsync.value;
+    if (latestEntry != null) _lastEntry = latestEntry;
+    final visibleEntry = latestEntry ?? _lastEntry;
+    final refreshError = entryAsync.error;
+    final entryDeleted = refreshError is ApiError && refreshError.status == 404;
     return AnimatedBuilder(
       animation: _formController,
       builder: (context, _) => AppUnsavedChangesGuard(
@@ -68,26 +97,50 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
             onCancel: _dismissController.requestPop,
             primaryActionLabel: '儲存',
             primaryActionKey: const ValueKey('entry-edit-submit'),
-            primaryActionEnabled: _formController.canSubmit,
+            primaryActionEnabled: !entryDeleted && _formController.canSubmit,
             onPrimaryAction: () => unawaited(_save()),
           ),
-          body: entryAsync.when(
-            loading: () => const AppListLoadingSkeleton(
-              key: ValueKey('entry-edit-loading'),
-              itemCount: 3,
-            ),
-            error: (error, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(TpSpacing.s6),
-                child: Text('載入失敗：$error', textAlign: TextAlign.center),
-              ),
-            ),
-            data: (entry) => EntryEditSheet(
-              tripId: widget.tripId,
-              args: EntryEditExisting(entry),
-              formController: _formController,
-            ),
-          ),
+          body: visibleEntry == null
+              ? entryAsync.when(
+                  loading: () => const AppListLoadingSkeleton(
+                    key: ValueKey('entry-edit-loading'),
+                    itemCount: 3,
+                  ),
+                  error: (error, _) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('載入失敗：$error', textAlign: TextAlign.center),
+                          const SizedBox(height: TpSpacing.s3),
+                          TextButton(
+                            onPressed: _retryEntry,
+                            child: const Text('重試'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  data: (_) => const SizedBox.shrink(),
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: EntryEditSheet(
+                        key: ValueKey((
+                          'entry-edit-form',
+                          widget.tripId,
+                          visibleEntry.id,
+                        )),
+                        tripId: widget.tripId,
+                        args: EntryEditExisting(visibleEntry),
+                        formController: _formController,
+                        refreshError: refreshError,
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );

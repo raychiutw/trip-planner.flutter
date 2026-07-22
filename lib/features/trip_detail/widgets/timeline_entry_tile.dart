@@ -260,6 +260,7 @@ class _EntryCard extends StatelessWidget {
       _resolvedEndTime(entry),
     );
     final details = _details(entry);
+    final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 2;
 
     return Container(
       key: ValueKey('entry-card-${entry.id}'),
@@ -316,13 +317,22 @@ class _EntryCard extends StatelessWidget {
                   children: [
                     ActionChip(
                       key: ValueKey('entry-time-${entry.id}'),
-                      avatar: const Icon(CupertinoIcons.clock, size: 14),
-                      label: Text(
-                        timeLabel,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: const TextStyle(
-                          fontFeatures: [FontFeature.tabularFigures()],
+                      avatar: accessibilityText
+                          ? null
+                          : const Icon(CupertinoIcons.clock, size: 14),
+                      // The approved D1 layout keeps the full range on one line.
+                      // Remove the decorative icon first; scale only when the
+                      // accessibility glyphs physically exceed the card width.
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          timeLabel,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: const TextStyle(
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
                         ),
                       ),
                       onPressed: onEditTime,
@@ -384,10 +394,8 @@ class _EntryCard extends StatelessWidget {
             if (details.isNotEmpty) ...[
               const SizedBox(height: TpSpacing.s1),
               Text(
-                details.join(' · '),
+                details.join('\n'),
                 key: ValueKey('entry-details-${entry.id}'),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(color: muted),
               ),
             ],

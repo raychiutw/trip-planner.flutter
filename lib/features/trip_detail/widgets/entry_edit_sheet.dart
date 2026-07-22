@@ -53,7 +53,7 @@ Future<void> showEntryEditSheet(
       submitLabel: isEdit ? '儲存' : '新增',
       submitKey: const ValueKey('entry-edit-submit'),
       controller: controller,
-      builder: (_) => EntryEditSheet(
+      builder: (_) => _LiveEntryEditSheet(
         tripId: tripId,
         args: args,
         formController: controller,
@@ -61,6 +61,40 @@ Future<void> showEntryEditSheet(
     );
   } finally {
     controller.dispose();
+  }
+}
+
+class _LiveEntryEditSheet extends ConsumerWidget {
+  const _LiveEntryEditSheet({
+    required this.tripId,
+    required this.args,
+    required this.formController,
+  });
+
+  final String tripId;
+  final EntryEditArgs args;
+  final AppSheetFormController formController;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    EntryEditArgs liveArgs = args;
+    Object? refreshError;
+    if (args case EntryEditExisting(:final entry)) {
+      final detailAsync = ref.watch(
+        entryDetailProvider((tripId: tripId, entryId: entry.id)),
+      );
+      final detail = detailAsync.value;
+      refreshError = detailAsync.error;
+      liveArgs = EntryEditExisting(
+        detail != null && detail.version >= entry.version ? detail : entry,
+      );
+    }
+    return EntryEditSheet(
+      tripId: tripId,
+      args: liveArgs,
+      formController: formController,
+      refreshError: refreshError,
+    );
   }
 }
 
@@ -72,12 +106,14 @@ class EntryEditSheet extends ConsumerStatefulWidget {
     required this.args,
     this.onSaved,
     this.formController,
+    this.refreshError,
   });
 
   final String tripId;
   final EntryEditArgs args;
   final VoidCallback? onSaved;
   final AppSheetFormController? formController;
+  final Object? refreshError;
 
   @override
   ConsumerState<EntryEditSheet> createState() => _EntryEditSheetState();
@@ -90,22 +126,41 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   late final TextEditingController _lng;
   TimeOfDay? _start;
   TimeOfDay? _end;
+  String _baseDescription = '';
+  String? _baseStartTime;
+  String? _baseEndTime;
   String _poiType = 'attraction';
   int? _newDayNum;
   bool _submitting = false;
   bool _dirty = false;
+  bool _syncingFromModel = false;
+  bool _descriptionDirty = false;
+  bool _startDirty = false;
+  bool _endDirty = false;
+  bool _descriptionConflict = false;
+  bool _startConflict = false;
+  bool _endConflict = false;
+  bool _waitingForFresh = false;
+  int? _staleVersion;
+  TimelineEntry? _acceptedEntry;
 
   bool get _isEdit => widget.args is EntryEditExisting;
+  TimelineEntry get _existingEntry =>
+      _acceptedEntry ?? (widget.args as EntryEditExisting).entry;
 
   @override
   void initState() {
     super.initState();
     final args = widget.args;
     if (args is EntryEditExisting) {
+      _acceptedEntry = args.entry;
       _title = TextEditingController(text: args.entry.title);
       _desc = TextEditingController(text: args.entry.description ?? '');
       _start = _parseHm(args.entry.startTime);
       _end = _parseHm(args.entry.endTime);
+      _baseDescription = args.entry.description ?? '';
+      _baseStartTime = _fmt(_start);
+      _baseEndTime = _fmt(_end);
     } else {
       _title = TextEditingController();
       _desc = TextEditingController();
@@ -114,7 +169,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     _lat = TextEditingController();
     _lng = TextEditingController();
     _title.addListener(_onChanged);
-    _desc.addListener(_onChanged);
+    _desc.addListener(_onDescriptionChanged);
     _lat.addListener(_onChanged);
     _lng.addListener(_onChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,16 +182,144 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   @override
   void didUpdateWidget(covariant EntryEditSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final wasDeleted =
+        oldWidget.refreshError is ApiError &&
+        (oldWidget.refreshError! as ApiError).status == 404;
+    if (wasDeleted != _entryDeleted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncFormState();
+      });
+    }
     final previousArgs = oldWidget.args;
     final nextArgs = widget.args;
     if (previousArgs is EntryEditNew &&
         nextArgs is EntryEditNew &&
         previousArgs.dayNum != nextArgs.dayNum) {
       _newDayNum = nextArgs.dayNum;
+    } else if (previousArgs is EntryEditExisting &&
+        nextArgs is EntryEditExisting) {
+      final acceptedEntry = _acceptedEntry ?? previousArgs.entry;
+      if (nextArgs.entry.id == acceptedEntry.id &&
+          nextArgs.entry.version < acceptedEntry.version) {
+        return;
+      }
+      if (_entryChanged(acceptedEntry, nextArgs.entry)) {
+        _acceptedEntry = nextArgs.entry;
+        _mergeExistingEntry(nextArgs.entry);
+      }
     }
   }
 
-  void _onChanged() => _markChanged();
+  static bool _entryChanged(TimelineEntry previous, TimelineEntry next) {
+    return previous.id != next.id ||
+        previous.version != next.version ||
+        previous.title != next.title ||
+        previous.description != next.description ||
+        previous.startTime != next.startTime ||
+        previous.endTime != next.endTime;
+  }
+
+  bool get _hasRemoteConflict =>
+      _descriptionConflict || _startConflict || _endConflict;
+
+  void _mergeExistingEntry(TimelineEntry entry) {
+    final description = entry.description ?? '';
+    final start = _parseHm(entry.startTime);
+    final end = _parseHm(entry.endTime);
+    final startTime = _fmt(start);
+    final endTime = _fmt(end);
+    _descriptionConflict =
+        (_descriptionConflict && _desc.text != description) ||
+        (_descriptionDirty &&
+            description != _baseDescription &&
+            _desc.text != description);
+    _startConflict =
+        (_startConflict && _start != start) ||
+        (_startDirty && startTime != _baseStartTime && _start != start);
+    _endConflict =
+        (_endConflict && _end != end) ||
+        (_endDirty && endTime != _baseEndTime && _end != end);
+
+    _syncingFromModel = true;
+    _title.value = TextEditingValue(
+      text: entry.title,
+      selection: TextSelection.collapsed(offset: entry.title.length),
+    );
+    if (!_descriptionDirty) {
+      _desc.value = TextEditingValue(
+        text: description,
+        selection: TextSelection.collapsed(offset: description.length),
+      );
+    }
+    if (!_startDirty) _start = start;
+    if (!_endDirty) _end = end;
+    _syncingFromModel = false;
+    _baseDescription = description;
+    _baseStartTime = startTime;
+    _baseEndTime = endTime;
+    _descriptionDirty = _desc.text != description;
+    _startDirty = _fmt(_start) != startTime;
+    _endDirty = _fmt(_end) != endTime;
+    _dirty = _descriptionDirty || _startDirty || _endDirty;
+    final staleVersion = _staleVersion;
+    final freshAfterConflict =
+        _waitingForFresh &&
+        staleVersion != null &&
+        entry.version > staleVersion;
+    if (freshAfterConflict) {
+      _waitingForFresh = false;
+      _staleVersion = null;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {});
+      _syncFormState();
+      if (freshAfterConflict) {
+        if (_hasRemoteConflict) {
+          showAppError(context, '協作者也更新了這筆資料。你的修改已保留；再次儲存前請確認是否覆蓋對方版本。');
+        } else {
+          showAppNotice(context, '已載入最新資料；你的修改已保留。');
+        }
+      }
+    });
+  }
+
+  void _onChanged() {
+    if (_syncingFromModel) return;
+    _markChanged();
+  }
+
+  void _onDescriptionChanged() {
+    if (_syncingFromModel) return;
+    if (!_isEdit) {
+      _markChanged();
+      return;
+    }
+    _descriptionDirty = _desc.text != _baseDescription;
+    if (!_descriptionDirty) _descriptionConflict = false;
+    _updateEditDirty();
+  }
+
+  void _markTimeChanged(bool isStart) {
+    if (!_isEdit) {
+      _markChanged();
+      return;
+    }
+    if (isStart) {
+      _startDirty = _fmt(_start) != _baseStartTime;
+      if (!_startDirty) _startConflict = false;
+    } else {
+      _endDirty = _fmt(_end) != _baseEndTime;
+      if (!_endDirty) _endConflict = false;
+    }
+    _updateEditDirty();
+  }
+
+  void _updateEditDirty() {
+    _dirty = _descriptionDirty || _startDirty || _endDirty;
+    setState(() {});
+    _syncFormState();
+  }
 
   void _markChanged() {
     _dirty = true;
@@ -208,9 +391,15 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   bool get _canSubmit =>
       !_submitting &&
+      !_waitingForFresh &&
+      !_entryDeleted &&
       (_isEdit || _title.text.trim().isNotEmpty) &&
       entryTimeRangeValid(_start, _end) &&
       _coordsValid;
+
+  bool get _entryDeleted =>
+      widget.refreshError is ApiError &&
+      (widget.refreshError! as ApiError).status == 404;
 
   int _selectedDayNum(EntryEditNew args) {
     final dayNum = _newDayNum ?? args.dayNum;
@@ -232,7 +421,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       } else {
         _end = picked;
       }
-      _markChanged();
+      _markTimeChanged(isStart);
     }
   }
 
@@ -246,7 +435,24 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     }
   }
 
+  void _retryAfterStale() {
+    if (!mounted) return;
+    // 重試只重新觸發載入；在 _mergeExistingEntry 真正觀察到更高 version 前，
+    // 維持 submit 鎖定，避免用同一個已知 stale version 再送出必然 409 的請求。
+    _invalidateEntryCaches();
+  }
+
   Future<bool> _submitForSheet() => _save();
+
+  void _invalidateEntryCaches() {
+    ref.invalidate(tripDaysProvider(widget.tripId));
+    if (_isEdit) {
+      final entry = _existingEntry;
+      ref.invalidate(
+        entryDetailProvider((tripId: widget.tripId, entryId: entry.id)),
+      );
+    }
+  }
 
   Future<void> _submitLegacy() async {
     final saved = await _save();
@@ -255,14 +461,31 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   }
 
   Future<bool> _save() async {
+    if (_hasRemoteConflict) {
+      final overwrite = await showAppConfirm(
+        context,
+        title: '保留你的版本？',
+        message: '協作者也修改了相同欄位。繼續會以你目前的內容覆蓋對方版本。',
+        confirmLabel: '保留我的版本',
+        cancelLabel: '繼續編輯',
+        isDestructive: true,
+      );
+      if (!mounted || !overwrite) return false;
+      _descriptionConflict = false;
+      _startConflict = false;
+      _endConflict = false;
+    }
     final title = _title.text.trim();
     final description = _desc.text.trim().isEmpty ? null : _desc.text.trim();
+    int? submittedVersion;
     setState(() => _submitting = true);
     _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
     try {
       switch (widget.args) {
-        case EntryEditExisting(:final entry):
+        case EntryEditExisting():
+          final entry = _existingEntry;
+          submittedVersion = entry.version;
           await repo.updateEntry(
             tripId: widget.tripId,
             entryId: entry.id,
@@ -294,10 +517,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
           );
           await _recomputeDay(dayNum);
       }
-      ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return false;
+      _invalidateEntryCaches();
       HapticFeedback.lightImpact();
       _dirty = false;
+      _descriptionDirty = false;
+      _startDirty = false;
+      _endDirty = false;
       _submitting = false;
       _syncFormState();
       final onSaved = widget.onSaved;
@@ -308,11 +534,22 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       return true;
     } on ApiError catch (error) {
       if (!mounted) return false;
-      if (error.status == 409) {
-        ref.invalidate(tripDaysProvider(widget.tripId));
-        showAppError(context, '此停留點已更新，已重新載入，請再編輯一次');
-        setState(() => _submitting = false);
+      if (error.status == 409 && error.code == 'STALE_ENTRY') {
+        final currentVersion = _isEdit ? _existingEntry.version : null;
+        final freshAlreadyLoaded =
+            submittedVersion != null && currentVersion != submittedVersion;
+        setState(() {
+          _submitting = false;
+          _waitingForFresh = !freshAlreadyLoaded;
+          _staleVersion = submittedVersion;
+        });
         _syncFormState();
+        _invalidateEntryCaches();
+        showAppError(
+          context,
+          '此停留點已有新版，正在重新載入；你的修改會先保留。',
+          onRetry: _retryAfterStale,
+        );
         return false;
       }
       setState(() => _submitting = false);
@@ -337,6 +574,8 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     final showDayPicker =
         dayOptions.length > 1 &&
         dayOptions.any((d) => d.dayNum == selectedDayNum);
+    final refreshError = widget.refreshError;
+    final entryDeleted = refreshError is ApiError && refreshError.status == 404;
     return SafeArea(
       child: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -356,6 +595,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               TextField(
                 key: const ValueKey('entry-edit-title'),
                 controller: _title,
+                enabled: !_submitting,
                 decoration: const InputDecoration(labelText: '標題'),
                 textInputAction: TextInputAction.next,
               ),
@@ -372,11 +612,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                         child: Text('DAY ${day.dayNum} · ${day.displayTitle}'),
                       ),
                   ],
-                  onChanged: (value) {
-                    if (value == null) return;
-                    _newDayNum = value;
-                    _markChanged();
-                  },
+                  onChanged: _submitting
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          _newDayNum = value;
+                          _markChanged();
+                        },
                 ),
               ],
               const SizedBox(height: TpSpacing.s3),
@@ -391,11 +633,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                       child: Text(entry.value),
                     ),
                 ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  _poiType = value;
-                  _markChanged();
-                },
+                onChanged: _submitting
+                    ? null
+                    : (value) {
+                        if (value == null) return;
+                        _poiType = value;
+                        _markChanged();
+                      },
               ),
               const SizedBox(height: TpSpacing.s3),
               Row(
@@ -404,6 +648,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     child: TextField(
                       key: const ValueKey('entry-edit-lat'),
                       controller: _lat,
+                      enabled: !_submitting,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
@@ -416,6 +661,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                     child: TextField(
                       key: const ValueKey('entry-edit-lng'),
                       controller: _lng,
+                      enabled: !_submitting,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
@@ -438,6 +684,50 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
                 ),
             ],
             const SizedBox(height: TpSpacing.s3),
+            if (refreshError != null) ...[
+              Container(
+                key: const ValueKey('entry-edit-refresh-error'),
+                padding: const EdgeInsets.all(TpSpacing.s3),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(TpSpacing.s3),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      entryDeleted
+                          ? '此停留點已被刪除，無法再儲存；你的草稿仍保留。'
+                          : '無法載入最新版本；你的草稿仍保留。',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    if (!entryDeleted) ...[
+                      const SizedBox(height: TpSpacing.s2),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: TextButton.icon(
+                          key: const ValueKey('entry-edit-stale-retry'),
+                          onPressed: _retryAfterStale,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重試載入'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: TpSpacing.s3),
+            ] else if (_waitingForFresh) ...[
+              OutlinedButton.icon(
+                key: const ValueKey('entry-edit-stale-retry'),
+                onPressed: _retryAfterStale,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新載入新版'),
+              ),
+              const SizedBox(height: TpSpacing.s3),
+            ],
             Wrap(
               spacing: TpSpacing.s2,
               runSpacing: TpSpacing.s2,
@@ -458,20 +748,32 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             TextField(
               key: const ValueKey('entry-edit-desc'),
               controller: _desc,
-              decoration: const InputDecoration(labelText: '描述（選填）'),
-              maxLines: 2,
+              enabled: !_submitting,
+              // The backend calls this entry-level field `description`.
+              // Per-POI notes are edited separately on the location screen.
+              decoration: const InputDecoration(labelText: '行程備註（選填）'),
+              minLines: 4,
+              maxLines: 8,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              textCapitalization: TextCapitalization.sentences,
+              scrollPadding: const EdgeInsets.only(
+                bottom: TpSpacing.s10 + TpSpacing.s6,
+              ),
             ),
             if (_isEdit) ...[
               const SizedBox(height: TpSpacing.s3),
               OutlinedButton.icon(
                 key: const ValueKey('entry-edit-manage-pois'),
-                onPressed: () {
-                  final entry = (widget.args as EntryEditExisting).entry;
-                  Navigator.of(context).pop();
-                  context.push(
-                    '/trips/${widget.tripId}/entries/${entry.id}/pois',
-                  );
-                },
+                onPressed: _submitting
+                    ? null
+                    : () {
+                        final entry = _existingEntry;
+                        Navigator.of(context).pop();
+                        context.push(
+                          '/trips/${widget.tripId}/entries/${entry.id}/pois',
+                        );
+                      },
                 icon: const Icon(CupertinoIcons.location_solid),
                 label: const Text('管理地點'),
               ),
@@ -496,7 +798,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
       avatar: const Icon(CupertinoIcons.clock, size: 18),
       label: Text('${isStart ? '開始' : '結束'} ${_fmt(t) ?? '未設定'}'),
-      onPressed: () => _pick(isStart),
+      onPressed: _submitting ? null : () => _pick(isStart),
       deleteIcon: t == null
           ? null
           : Icon(
@@ -506,7 +808,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               ),
               size: 18,
             ),
-      onDeleted: t == null
+      onDeleted: t == null || _submitting
           ? null
           : () {
               if (isStart) {
@@ -514,7 +816,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               } else {
                 _end = null;
               }
-              _markChanged();
+              _markTimeChanged(isStart);
             },
     );
   }
