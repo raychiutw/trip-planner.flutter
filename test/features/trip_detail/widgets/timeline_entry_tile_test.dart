@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderBox, RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/timeline_entry_tile.dart';
@@ -66,6 +67,47 @@ void main() {
       expect(find.text('景點'), findsOneWidget);
       expect(find.text('4.6'), findsOneWidget);
       expect(find.text('世界最大級水槽'), findsOneWidget);
+    });
+
+    testWidgets('完整顯示多行備註，不截斷或改成刪節號', (tester) async {
+      const note = '第一行：集合地點\n第二行：取票方式\n第三行：預約代碼\n第四行：飲食需求\n第五行：其他提醒';
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 48,
+          sortOrder: 0,
+          version: 1,
+          title: '首里城',
+          description: note,
+        ),
+      );
+
+      final details = tester.widget<Text>(
+        find.byKey(const ValueKey('entry-details-48')),
+      );
+      expect(details.data, contains(note));
+      expect(details.maxLines, isNull);
+      expect(details.overflow, isNot(TextOverflow.ellipsis));
+    });
+
+    testWidgets('地點 POI note 以備註標示呈現，不與行程 description 混淆', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 49,
+          sortOrder: 0,
+          version: 1,
+          title: '首里城',
+          description: '使用者行程備註',
+          note: '地點資料備註',
+        ),
+      );
+
+      final details = tester.widget<Text>(
+        find.byKey(const ValueKey('entry-details-49')),
+      );
+      expect(details.data, startsWith('使用者行程備註\n'));
+      expect(details.data, contains('備註：地點資料備註'));
     });
 
     testWidgets('英文 master.category 顯示細類中文 label，不外露 primaryType', (
@@ -539,9 +581,37 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      final timeText = tester.widget<Text>(find.text('12：00 - 12：45'));
+      final timeFinder = find.text('12：00 - 12：45');
+      final timeText = tester.widget<Text>(timeFinder);
       expect(timeText.maxLines, 1);
       expect(timeText.softWrap, isFalse);
+      final timeChip = tester.widget<ActionChip>(
+        find.byKey(const ValueKey('entry-time-48')),
+      );
+      expect(
+        timeChip.avatar,
+        isNull,
+        reason: '大字級時移除裝飾性圖示，把寬度留給完整時間與 Dynamic Type',
+      );
+
+      final paragraph = tester.renderObject<RenderParagraph>(timeFinder);
+      final naturalSize = paragraph.getDryLayout(const BoxConstraints());
+      expect(
+        paragraph.size.width,
+        greaterThanOrEqualTo(naturalSize.width - 0.1),
+        reason: '完整起訖時間不得被 ActionChip 的 fade overflow 裁掉',
+      );
+      final timeBox = tester.renderObject<RenderBox>(timeFinder);
+      final paintedStart = timeBox.localToGlobal(Offset.zero);
+      final paintedEnd = timeBox.localToGlobal(Offset(timeBox.size.width, 0));
+      final chipWidth = tester
+          .getSize(find.byKey(const ValueKey('entry-time-48')))
+          .width;
+      expect(
+        paintedEnd.dx - paintedStart.dx,
+        lessThan(chipWidth),
+        reason: '定版要求不折行；實際繪製後的完整時間必須落在 chip 內',
+      );
     });
   });
 }

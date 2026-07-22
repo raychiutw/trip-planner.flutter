@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-07-22
+
+### 修正
+
+- 修正 320pt 窄螢幕搭配最大 Dynamic Type 時，行程卡的完整起訖時間會被 `ActionChip` 淡出裁切；時間維持單行並在可用寬度內等比例縮放。
+- 修正行程景點的多行備註被截成三行；卡片現在依內容完整展開，描述、備註與其他資訊分行顯示。
+- 修正編輯備註儲存後再次開啟仍顯示舊資料、後續因舊 OCC version 儲存失敗；離線快取會同步單筆資料，共用 optimistic cache 的線上寫入、pending 寫入（包含不同景點 path）與 flush 收尾都會依序執行，使用者再次儲存時會主動喚起 idle queue，當機復原的 patch 也會持久化。
+- 編輯器拒絕亂序舊版 SWR 回應；409 `STALE_ENTRY` 重新載入或暫時失敗時保留草稿並等待最新 version 才能重試，重新載入失敗或停留點已被刪除時會持續顯示明確狀態並停用儲存。
+- 多人同時編輯改為欄位級合併：未修改欄位採用協作者新版，同欄衝突會要求明確確認；送出期間停用表單，避免請求完成時遺失新草稿。
+- 備註編輯改成符合 HIG 長文字情境的 4–8 行可捲動文字視圖，支援換行鍵盤並在鍵盤出現時保留足夠捲動空間。
+- 修正 Google Play 安裝版因 Android Maps 金鑰未允許 Play App Signing 憑證而無法顯示地圖；保留既有 debug／upload 簽章與 Maps／Navigation API 限制。
+
 ## [0.9.4] - 2026-07-21
 
 ### 變更
@@ -299,7 +311,8 @@ P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽
 - 專案 CLAUDE.md(agent 開發指南)
 - PORTING_PLAN/CONTRACTS 與實作同步(riverpod 3.x、歷史契約標註)
 
-[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.1...v0.9.2

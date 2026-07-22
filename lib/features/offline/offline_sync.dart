@@ -43,7 +43,14 @@ class OfflineSyncController extends Notifier<AsyncValue<void>> {
   bool _rerunAfterCurrentSync = false;
 
   @override
-  AsyncValue<void> build() => const AsyncData(null);
+  AsyncValue<void> build() {
+    final subscription = ref
+        .watch(apiClientProvider)
+        .queueFlushRequests
+        .listen((_) => unawaited(sync()));
+    ref.onDispose(() => unawaited(subscription.cancel()));
+    return const AsyncData(null);
+  }
 
   /// 平台連線型態從離線恢復時立即重試同步。首次線上事件不重複冷啟動同步。
   /// [isOnline] 只是重試訊號，不是可上網保證；真正錯誤仍由 [sync] 處理。

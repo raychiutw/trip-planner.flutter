@@ -7,6 +7,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
+import 'package:tripline/api/cache/offline_op.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/session_store.dart';
 import 'package:tripline/features/offline/offline_sync.dart';
@@ -126,6 +127,42 @@ void main() {
     }
 
     expect(await cache.readQueue(), isEmpty);
+  });
+
+  test('idle queue 自動同步失敗會進入 controller error state', () async {
+    await cache.appendMutation(mut('existing'));
+    adapter.onPost(
+      '/trips/t/days/1/entries',
+      (server) => server.throws(
+        495,
+        DioException(
+          requestOptions: RequestOptions(path: '/trips/t/days/1/entries'),
+          type: DioExceptionType.badCertificate,
+        ),
+      ),
+      data: Matchers.any,
+    );
+    container.read(offlineSyncControllerProvider.notifier);
+
+    await container
+        .read(apiClientProvider)
+        .sendMutation(
+          'POST',
+          '/trips/t/days/1/entries',
+          body: const {'title': 'later'},
+          optimistic: OfflineOp(
+            'entry.add',
+            cacheKeyFor('GET', '/trips/t/days', const {'all': '1'}),
+            const {'dayNum': 1, 'title': 'later'},
+          ),
+        );
+    for (var attempt = 0; attempt < 20; attempt++) {
+      if (container.read(offlineSyncControllerProvider).hasError) break;
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+
+    expect(container.read(offlineSyncControllerProvider).hasError, isTrue);
+    expect(await cache.readQueue(), hasLength(2));
   });
 
   test('重連發生在既有同步期間，會在該輪結束後補跑一次', () async {

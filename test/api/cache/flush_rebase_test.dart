@@ -373,6 +373,56 @@ void main() {
     expect(adapter.countOf('GET', '/trips/t/days'), 0);
   });
 
+  test('5c. 共用 cacheKey 的最後一筆 permanent 4xx 被移除時仍會 evict', () async {
+    await cache.writeResponse(daysKey, [
+      {
+        'dayNum': 1,
+        'timeline': [
+          {'id': 5, 'title': '被拒絕的 optimistic 標題', 'version': 1},
+        ],
+      },
+    ]);
+    await cache.appendMutation(
+      QueuedMutation(
+        id: 'first',
+        method: 'POST',
+        path: '/trips/t/days/1/entries',
+        body: const {'title': '先成功'},
+        type: 'entry.add',
+        cacheKey: daysKey,
+        args: const {'dayNum': 1, 'title': '先成功', 'tempId': -1},
+        createdAt: 't1',
+      ),
+    );
+    await cache.appendMutation(
+      QueuedMutation(
+        id: 'last',
+        method: 'PATCH',
+        path: '/trips/t/entries/5',
+        body: const {'title': '被拒絕的 optimistic 標題'},
+        type: 'entry.update',
+        cacheKey: daysKey,
+        args: const {'entryId': 5, 'title': '被拒絕的 optimistic 標題'},
+        createdAt: 't2',
+      ),
+    );
+    adapter.on('POST', '/trips/t/days/1/entries', [
+      const Scripted.json(200, {'ok': true}),
+    ]);
+    adapter.on('PATCH', '/trips/t/entries/5', [
+      const Scripted.json(400, {
+        'error': {'code': 'VALIDATION_ERROR', 'message': 'invalid'},
+      }),
+    ]);
+
+    final result = await client.flushQueue();
+
+    expect(result.synced, 1);
+    expect(result.conflicts.map((mutation) => mutation.id), ['last']);
+    expect(await cache.readQueue(), isEmpty);
+    expect(await cache.readResponse(daysKey), isNull);
+  });
+
   test('6. [P1] 同 trip 多筆 STALE → 整包 days GET 只打一次', () async {
     await cache.appendMutation(
       entryUpdateMut(
@@ -449,6 +499,75 @@ void main() {
     );
     expect(bodyOf(patch5)['expectedVersion'], 9);
     expect(bodyOf(patch6)['expectedVersion'], 11);
+  });
+
+  test('6b. 同一 entry 連續三筆 STALE 依序重抓，不誤判本機修改為衝突', () async {
+    await cache.appendMutation(
+      entryUpdateMut(
+        id: '1',
+        entryId: 5,
+        oursTitle: '本機版本 A',
+        baseTitle: '伺服器舊版',
+        expectedVersion: 1,
+      ),
+    );
+    await cache.appendMutation(
+      entryUpdateMut(
+        id: '2',
+        entryId: 5,
+        oursTitle: '本機版本 B',
+        baseTitle: '本機版本 A',
+        expectedVersion: 2,
+      ),
+    );
+    await cache.appendMutation(
+      entryUpdateMut(
+        id: '3',
+        entryId: 5,
+        oursTitle: '本機版本 C',
+        baseTitle: '本機版本 B',
+        expectedVersion: 3,
+      ),
+    );
+    adapter.on('PATCH', '/trips/t/entries/5', [
+      const Scripted.json(409, {
+        'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+      }),
+      const Scripted.json(200, {'ok': true}),
+      const Scripted.json(409, {
+        'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+      }),
+      const Scripted.json(200, {'ok': true}),
+      const Scripted.json(409, {
+        'error': {'code': 'STALE_ENTRY', 'message': 'stale'},
+      }),
+      const Scripted.json(200, {'ok': true}),
+    ]);
+    adapter.on('GET', '/trips/t/days', [
+      Scripted.json(200, daysWithEntry(entryId: 5, title: '伺服器舊版', version: 4)),
+      Scripted.json(
+        200,
+        daysWithEntry(entryId: 5, title: '本機版本 A', version: 5),
+      ),
+      Scripted.json(
+        200,
+        daysWithEntry(entryId: 5, title: '本機版本 B', version: 6),
+      ),
+    ]);
+
+    final result = await client.flushQueue();
+
+    expect(result.synced, 3);
+    expect(result.conflicts, isEmpty);
+    expect(await cache.readQueue(), isEmpty);
+    expect(await cache.readConflicts(), isEmpty);
+    expect(adapter.countOf('GET', '/trips/t/days'), 3);
+    final rebasedPatches = adapter.recorded
+        .where((request) => request.method == 'PATCH')
+        .map(bodyOf)
+        .where((body) => (body['expectedVersion'] as int) >= 4)
+        .toList();
+    expect(rebasedPatches.map((body) => body['expectedVersion']), [4, 5, 6]);
   });
 
   test('7. note.update STALE 無衝突 → 重抓 notes + 重送(snake→camel 欄位對齊)', () async {

@@ -53,6 +53,9 @@ List<dynamic> _removeById(List<dynamic> source, Object? id) => [
     if (!(r is Map && r['id'] == id)) r,
 ];
 
+bool _containsId(List<dynamic> source, Object? id) =>
+    source.any((row) => row is Map && row['id'] == id);
+
 /// 在指定 dayNum 的 timeline 末端插入一筆樂觀 entry(臨時負 id)。
 Object? _entryAdd(Object? cached, Map<String, dynamic> args) {
   if (cached is! List) return cached;
@@ -61,10 +64,16 @@ Object? _entryAdd(Object? cached, Map<String, dynamic> args) {
   return [
     for (final day in cached)
       if (day is Map && day['dayNum'] == dayNum)
-        {
-          ..._asMap(day),
-          'timeline': [...?(day['timeline'] as List?), newEntry],
-        }
+        if (_containsId(
+          (day['timeline'] as List?)?.cast<dynamic>() ?? const [],
+          newEntry['id'],
+        ))
+          day
+        else
+          {
+            ..._asMap(day),
+            'timeline': [...?(day['timeline'] as List?), newEntry],
+          }
       else
         day,
   ];
@@ -72,9 +81,12 @@ Object? _entryAdd(Object? cached, Map<String, dynamic> args) {
 
 /// 跨 day 找 entryId,merge 可編輯欄位。
 Object? _entryUpdate(Object? cached, Map<String, dynamic> args) {
-  if (cached is! List) return cached;
   final entryId = args['entryId'];
   final fields = _entryUpdateFields(args);
+  if (cached is Map) {
+    return cached['id'] == entryId ? {..._asMap(cached), ...fields} : cached;
+  }
+  if (cached is! List) return cached;
   return [
     for (final day in cached)
       if (day is Map && day['timeline'] is List)
@@ -160,6 +172,7 @@ Object? _noteCreate(Object? cached, Map<String, dynamic> args) {
     ..._camelKeys(args['fields'] as Map),
   };
   final section = (cached[sectionKey] as List?) ?? const [];
+  if (_containsId(section.cast<dynamic>(), tempId)) return cached;
   return {
     ..._asMap(cached),
     sectionKey: [...section, row],

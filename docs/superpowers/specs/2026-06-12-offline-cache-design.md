@@ -153,14 +153,14 @@ PendingMutation {
 
 每個支援的離線操作對應一個純函式:`(cachedJson, opArgs) → patchedJson`。涵蓋:
 
-- `entry.add` / `entry.update` / `entry.delete` / `entry.reorder` → patch `GET /trips/:id/days` 內對應 day 的 entries。
+- `entry.add` / `entry.update` / `entry.delete` / `entry.reorder` → patch `GET /trips/:id/days` 內對應 day 的 entries；`entry.update` 也會依 mutation path 精確同步 `GET /trips/:id/entries/:eid` 單筆快取。
 - `note.create` / `note.update` / `note.delete` / `note.reorder` → patch `GET /trips/:id/notes` 對應 section。
 - `segment.update` → patch `GET /trips/:id/segments`。
 
 要點:
-- 新增類(add/create)用**本機臨時 id**(負數或 `tmp-` 前綴),flush 成功後以 server 回應替換(透過 evict + refetch)。
+- 新增類(add/create)用**本機臨時 id**(負數或 `tmp-` 前綴),flush 成功後以 server 回應替換(透過 evict + refetch)；相同 tempId 重播必須冪等，讓 queue 已持久化但 cache 尚未寫入就中斷的情況可由 stale 讀取自我修復。
 - patcher 是純函式 → 易測;在「入隊」與「getStream 收到新 server 資料」兩處重用(維持核心不變式)。
-- `applyPendingPatches(key, baseJson, queue)`:對某 key 依序套用 queue 中所有 opType 命中該 key 的 patcher。
+- `applyPendingPatches(key, baseJson, queue)`:依 queue 順序套用同 key patch；對 `entry.update` 另以完整 GET key 等於 mutation path 的方式套用單筆 entry，不能用前綴或 entry id 猜測。若相同 optimistic `cacheKey` 已有 pending，後續寫入即使 API path 不同也必須排入 queue，不能先直送 server 超車或淘汰共用 rebase base。
 
 ### 4.7 `SyncEngine`
 
@@ -170,6 +170,8 @@ PendingMutation {
   - 成功 → `removeMutation` → 依失效表 evict → 受影響 provider invalidate。
   - 409 → 依 opArgs 重抓資源、rebase `expectedVersion`、重試一次;再失敗或資源已不存在 → 標記 conflict 後移出 queue,記錄到「衝突清單」provider 供 UI 上報。
   - 連線錯誤 → 中止本輪 flush(保留 queue,下次觸發再試)。
+  - queue 的檢查／append 與成功後 remove／cache eviction／flush 收尾必須使用同一個本機序列化區段；網路請求留在鎖外。相同 cacheKey 尚有 pending 時延後 eviction，避免 flush 收尾與新編輯交錯時遺失 rebase base 或把新 mutation 留到下一次重連。
+- `getStream` 從 stale cache 重播 pending patch 時，若結果有變更必須以原 `cachedAt` 寫回；這是 queue 已持久化但 cache patch 尚未落盤就中斷時的 crash-recovery 路徑，也確保下一筆同資源修改擷取到修復後的 base。
 - 觸發點:app `resumed`(WidgetsBindingObserver / AppLifecycleListener)、任一 GET 成功後(opportunistic)、UI 手動「立即重試」。
 - 暴露 `offlineQueueProvider`(待同步筆數)、`syncConflictsProvider`(衝突清單)供 UI。
 
@@ -185,7 +187,7 @@ PendingMutation {
 - **api**:用 `http_mock_adapter` + `InMemoryCacheStore`。
   - `getStream` SWR:無快取(只 emit fresh)、有快取(emit stale→fresh)、離線有快取(只 emit stale 不報錯)、離線無快取(報錯)。
   - `sendMutation`:線上成功 evict;離線入隊 + patch;不支援離線的 mutation 離線時 throw。
-  - `SyncEngine.flush`:依序重播、409 rebase 重試、連線錯誤中止、衝突上報。
+  - `SyncEngine.flush`:依序重播、409 rebase 重試、連線錯誤中止、衝突上報，以及 flush 成功收尾與同資源 enqueue 交錯的確定性 race test。
 - **screens**:既有 widget test 以 `StreamProvider` override(回 `Stream.value`)替代 `FutureProvider` override;新增離線橫幅/待同步標示測試。
 
 ## 7. PR 拆解

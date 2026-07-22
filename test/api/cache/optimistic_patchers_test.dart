@@ -76,6 +76,15 @@ void main() {
     expect(((original[0] as Map)['timeline'] as List), hasLength(1));
   });
 
+  test('entry.add 使用相同 tempId 重播時維持冪等', () {
+    const args = {'dayNum': 1, 'title': 'New', 'tempId': -99};
+    final once = applyOptimisticPatch('entry.add', makeDays(), args);
+    final twice = applyOptimisticPatch('entry.add', once, args) as List;
+
+    final timeline = (twice.first as Map)['timeline'] as List;
+    expect(timeline.where((row) => (row as Map)['id'] == -99), hasLength(1));
+  });
+
   test('entry.update 改對 entry 欄位', () {
     final out =
         applyOptimisticPatch('entry.update', makeDays(), {
@@ -85,6 +94,34 @@ void main() {
             as List;
     final e = ((out[1] as Map)['timeline'] as List).first as Map;
     expect(e['title'], 'B2');
+  });
+
+  test('entry.update 也能合併單筆 entry detail', () {
+    final out = applyOptimisticPatch(
+      'entry.update',
+      {'id': 201, 'description': '舊備註', 'startTime': '09:00', 'version': 2},
+      {'entryId': 201, 'description': '離線新備註', 'startTime': '10:00'},
+    );
+
+    expect(out, {
+      'id': 201,
+      'description': '離線新備註',
+      'startTime': '10:00',
+      'time': '10:00',
+      'version': 2,
+    });
+  });
+
+  test('entry.update 不會修改不同 id 的單筆 entry detail', () {
+    final cached = {'id': 201, 'description': '舊備註'};
+
+    final out = applyOptimisticPatch('entry.update', cached, {
+      'entryId': 202,
+      'description': '不應套用',
+    });
+
+    expect(out, same(cached));
+    expect(out, {'id': 201, 'description': '舊備註'});
   });
 
   test('entry.delete 移除指定 entry', () {
@@ -185,6 +222,19 @@ void main() {
         'tempId': -1,
       });
       expect(original['flights'] as List, hasLength(1));
+    });
+
+    test('note.create 使用相同 tempId 重播時維持冪等', () {
+      const args = {
+        'sectionKey': 'flights',
+        'fields': {'flight_no': 'BR123'},
+        'tempId': -77,
+      };
+      final once = applyOptimisticPatch('note.create', makeNotes(), args);
+      final twice = applyOptimisticPatch('note.create', once, args) as Map;
+
+      final flights = twice['flights'] as List;
+      expect(flights.where((row) => (row as Map)['id'] == -77), hasLength(1));
     });
   });
 }

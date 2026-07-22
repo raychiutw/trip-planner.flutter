@@ -412,11 +412,11 @@ Navigate to **Test and release → Testing → Closed testing**, create a track 
 
 Expected: Play Console accepts the upload certificate, shows version name `0.7.0`, version code `7`, and records the release under the `alpha` closed track. Resolve any Play review requirement before enabling API automation.
 
-- [ ] **Step 5: Authorize the Play app-signing certificate for Google Maps**
+- [x] **Step 5: Authorize the Play app-signing certificate for Google Maps**
 
 In Play Console, open **Protected with Play → Play Store distribution → Go to Play app signing**, copy the SHA-1 fingerprint under **App signing key certificate** rather than **Upload key certificate**. In Google Cloud Console, edit the same Android Maps key and add another Android application restriction using package `com.raychiu.tripline` plus that Google-held SHA-1. Keep the existing upload-certificate restriction for local signed builds.
 
-Expected: the Maps key has two Android application entries for `com.raychiu.tripline`: upload SHA-1 `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA` and the distinct Play app-signing SHA-1. The key remains restricted to Maps SDK for Android.
+Completed 2026-07-22: the Maps key has Android application entries for `com.raychiu.tripline` covering local debug, upload SHA-1 `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA`, and Play app-signing SHA-1 `C8:8D:F5:6B:FC:61:0A:BB:F9:82:00:6C:B5:34:54:17:5F:66:F1:A9`. The key remains restricted to Maps SDK for Android and Navigation SDK. The v0.9.4 Play-delivered APK exposed the missing Play certificate because Firebase Test Lab used the upload-signed path; final acceptance still requires a Play Store install and map-render check.
 
 - [ ] **Step 6: Configure the 12-person tester cohort**
 
