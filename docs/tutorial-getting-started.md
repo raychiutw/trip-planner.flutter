@@ -41,15 +41,16 @@ flutter run
 app 啟動後停在登入頁(沒有 session 時 router 自動導向 `/login`)。用測試帳號登入,逛一圈:
 
 - **行程** tab:卡片清單(下拉更新、尾端左滑刪除，並保留長按操作)
-- 點一張卡 → **時間軸**（單層「地圖＋DAY」selector 換日）→ 右上功能選單進**筆記**
-- **地圖**頁用「行程＋DAY」selector 與時間軸互切；POI 卡可左右滑動
-- 任一 root 畫面右上圓形 avatar → **帳號**統計、設定與登出
+- 點一張卡 → **時間軸**（單層 DAY selector 換日）→ 頁首切到**地圖**，右上功能選單進**筆記**
+- **地圖**頁用行程／DAY selector 切換範圍；POI 卡可左右滑動
+- **帳號** tab：查看統計、設定與登出
 
-> ⚠️ **本 app 連的是正式 API,沒有 staging。** 教學階段請只做唯讀操作 —
+> ⚠️ **未指定設定時，本 app 會連正式 API。** 教學階段請只做唯讀操作 —
 > **不要試左滑刪除或長按操作裡的刪除**,它會打真的 `DELETE /trips/:id` 刪掉後端資料(且無法復原)。
-> 等之後 `--dart-define=TRIPLINE_API_URL` 覆寫實作後才有安全的本機後端可玩。
+> 要測破壞性操作，請先依[本機後端指南](howto-local-backend.md)以
+> `--dart-define=TRIPLINE_API_ORIGIN=...` 指向本機環境。
 
-Root tab 固定為聊天、行程、地圖、收藏四項；帳號不占用 tab。
+Root tab 固定為聊天、行程、地圖、收藏、帳號五項。
 
 ## Step 4:改一行 UI(先讓測試告訴你改壞了)
 

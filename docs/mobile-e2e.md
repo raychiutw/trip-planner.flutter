@@ -31,7 +31,7 @@ The regular PR/push CI also runs the same app-owned flow on the host runner. It 
    - `FIREBASE_ANDROID_MODEL` (optional; default `MediumPhone.arm`)
    - `FIREBASE_ANDROID_VERSION` (optional; default `34`)
    - `FIREBASE_IOS_MODEL` (required for iOS)
-   - `FIREBASE_IOS_VERSION` (required for iOS and supported by the selected model)
+   - `FIREBASE_IOS_VERSION` (required for iOS and supported by both the selected model and the workflow's pinned Xcode version)
 5. Keep `GOOGLE_MAPS_ANDROID_API_KEY` and `GOOGLE_MAPS_IOS_API_KEY` as repository secrets. Restricted keys must allow both the platform Maps SDK and Navigation SDK service while retaining the app package/bundle restriction.
 
 Create the dedicated result bucket with uniform access, grant the Test Lab CI service account object-admin access on that bucket, and apply the checked-in 14-day lifecycle policy:
@@ -88,7 +88,9 @@ version reports support for the replacement Xcode version. Verify the live
 catalog before changing either pin:
 
 ```bash
-gcloud firebase test ios versions describe "$FIREBASE_IOS_VERSION" --format=json
+gcloud firebase test ios versions describe "$FIREBASE_IOS_VERSION" \
+  --project "$FIREBASE_PROJECT_ID" \
+  --format=json
 ```
 
 The replacement must appear in `supportedXcodeVersionIds`; CI performs the
