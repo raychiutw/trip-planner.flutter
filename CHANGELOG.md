@@ -9,6 +9,7 @@
 ### 修正
 
 - 修正 Firebase iOS Test Lab 可能被 SpringBoard 的「Edit Home Screen」教學提示遮住，導致登入後行程清單與原生地圖整合測試誤判失敗；兩條 Patrol 流程會在開始前精準關閉該系統提示並確認提示已消失。
+- 修正 iOS 實機 release 測試無法以 `WidgetTester.enterText` 寫入表單；app-owned Patrol 流程統一改走 Patrol 的實機文字輸入 driver，涵蓋登入、聊天與收藏搜尋。
 - 登入後流程驗證失敗時保留當下畫面文字，讓 Firebase Test Lab 報告可直接辨識實際停留畫面，而不會先被 mock 驗證訊息覆蓋。
 
 ## [0.9.5] - 2026-07-22

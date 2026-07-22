@@ -422,5 +422,20 @@ void main() {
       expect(appFlowFixture, contains('final visibleText ='));
       expect(appFlowFixture, contains('reason: visibleText'));
     });
+
+    test('iOS Patrol flow uses release-device-safe text entry', () {
+      expect(
+        RegExp(
+          r'enterText:\s*\(finder, text\)\s*=>\s*\$\.enterText\('
+          r'\s*finder,\s*text,\s*hideKeyboard:\s*false,?\s*\)',
+        ).hasMatch(appOwnedSmoke),
+        isTrue,
+      );
+      expect(
+        RegExp(r'tester\.enterText\b').allMatches(appFlowFixture).length,
+        1,
+        reason: 'shared flow steps must use the injected text-entry driver',
+      );
+    });
   });
 }

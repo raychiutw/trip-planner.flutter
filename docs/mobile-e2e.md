@@ -22,6 +22,12 @@ failure. App-owned post-submit login verification failures also attach the
 currently visible screen text to the assertion reason so the Firebase Test Lab
 report identifies the blocking UI.
 
+The app-owned Patrol target injects Patrol's text-entry driver for every form
+field instead of calling `WidgetTester.enterText` directly. Patrol registers and
+attaches the text-input connection required by release-mode tests on physical
+iOS devices; the host-runner integration test keeps the standard Flutter test
+driver through the same shared flow.
+
 The regular PR/push CI also runs the same app-owned flow on the host runner. It writes named geometry-review PNGs for chat, itinerary, Tripline POI, native-Google-POI callback state, favorites, trip picker, account, form, and destructive confirmation to `build/test-artifacts/app-owned/`. Every state is captured in Light/Dark, 100%/200% text, and Reduce Motion/Reduce Transparency coverage, then uploaded as the seven-day `tripline-ui-evidence-*` artifact even when a later CI step fails. Flutter host tests use the deterministic Ahem font, so these PNGs validate layout and state coverage; use Test Lab's device screenshots/video for readable platform typography and native map tiles. Screenshots are evidence, not pixel-perfect pass/fail goldens.
 
 ## One-time Google Cloud setup

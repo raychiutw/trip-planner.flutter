@@ -6,6 +6,10 @@ import 'support/ios_system_alerts.dart';
 void main() {
   patrolTest('app-owned release flow stays off production services', ($) async {
     await dismissStaleSpringBoardTutorial($);
-    await runAppOwnedReleaseFlow($.tester);
+    await runAppOwnedReleaseFlow(
+      $.tester,
+      enterText: (finder, text) =>
+          $.enterText(finder, text, hideKeyboard: false),
+    );
   });
 }
