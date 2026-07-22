@@ -79,10 +79,7 @@ class AppleRootTabBar extends StatelessWidget {
                   destination.icon,
                   key: ValueKey('root-tab-${destination.label}'),
                 ),
-                activeIcon: Icon(
-                  destination.selectedIcon,
-                  key: ValueKey('root-tab-${destination.label}'),
-                ),
+                activeIcon: Icon(destination.selectedIcon),
                 label: destination.label,
                 semanticLabel: destination.label,
                 glowColor: tones.accentDeep,

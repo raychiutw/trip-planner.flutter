@@ -437,5 +437,19 @@ void main() {
         reason: 'shared flow steps must use the injected text-entry driver',
       );
     });
+
+    test('release root tab navigation targets the app-owned key contract', () {
+      final helper = RegExp(
+        r'Finder _rootTab\(String label\) \{(?<body>[\s\S]*?)\n\}',
+      ).firstMatch(appFlowFixture)?.namedGroup('body');
+
+      expect(helper, isNotNull);
+      expect(helper, contains("ValueKey('root-tab-\$label')"));
+      expect(
+        helper,
+        isNot(anyOf(contains('bySemanticsLabel'), contains('GestureDetector'))),
+        reason: 'release tests cannot use debug semantics or package internals',
+      );
+    });
   });
 }
