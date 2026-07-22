@@ -14,6 +14,14 @@ The Patrol bundle contains two independent evidence suites:
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
+On iOS, both Patrol suites inspect SpringBoard before their first app
+interaction and dismiss a stale `Edit Home Screen` tutorial by its native alert
+and button labels. The guard confirms that the alert disappears; otherwise the
+test fails at setup instead of being misreported as an app navigation or map
+failure. App-owned post-submit login verification failures also attach the
+currently visible screen text to the assertion reason so the Firebase Test Lab
+report identifies the blocking UI.
+
 The regular PR/push CI also runs the same app-owned flow on the host runner. It writes named geometry-review PNGs for chat, itinerary, Tripline POI, native-Google-POI callback state, favorites, trip picker, account, form, and destructive confirmation to `build/test-artifacts/app-owned/`. Every state is captured in Light/Dark, 100%/200% text, and Reduce Motion/Reduce Transparency coverage, then uploaded as the seven-day `tripline-ui-evidence-*` artifact even when a later CI step fails. Flutter host tests use the deterministic Ahem font, so these PNGs validate layout and state coverage; use Test Lab's device screenshots/video for readable platform typography and native map tiles. Screenshots are evidence, not pixel-perfect pass/fail goldens.
 
 ## One-time Google Cloud setup
@@ -153,10 +161,11 @@ native map key is required.
 
 `patrol_cli` 4.4.0 can automate the iOS location permission dialog only when the
 simulator uses one of its supported languages. CI pins the Firebase iOS matrix
-to `en_US`. For a local run, use an English simulator or temporarily switch the
-simulator to `en-US`, then restore the developer's original locale after the
-test. This is a Patrol automation limitation, not a Tripline localization
-requirement.
+to `en_US`; the SpringBoard tutorial guard also matches the English
+`Edit Home Screen` and `Dismiss` labels. For a local run, use an English
+simulator or temporarily switch the simulator to `en-US`, then restore the
+developer's original locale after the test. These are test automation
+limitations, not Tripline localization requirements.
 
 ```bash
 dart pub global activate patrol_cli 4.4.0
