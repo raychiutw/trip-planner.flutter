@@ -82,6 +82,17 @@ Xcode build phases, CocoaPods scripts, and repository code never receive the
 key or its path. CI builds a release XCTest bundle, verifies the signatures of
 `Runner.app` and `RunnerUITests-Runner.app`, packages the result, and uploads it
 to Test Lab. Firebase re-signs valid inputs for its own physical devices.
+The workflow pins both the CI `DEVELOPER_DIR` and Test Lab
+`--xcode-version` to 26.2; update both together only after the selected iOS
+version reports support for the replacement Xcode version. Verify the live
+catalog before changing either pin:
+
+```bash
+gcloud firebase test ios versions describe "$FIREBASE_IOS_VERSION" --format=json
+```
+
+The replacement must appear in `supportedXcodeVersionIds`; CI performs the
+same check before importing Apple signing material or starting the iOS build.
 
 When rotating the Development certificate or either profile, update the exact
 certificate and profile names in `ios/Flutter/TestLabSigning.xcconfig` in the

@@ -58,6 +58,7 @@ env:
   FLUTTER_VERSION: '3.44.7'
   PATROL_CLI_VERSION: '4.4.0'
   PATROL_ANALYTICS_ENABLED: 'false'
+  FIREBASE_XCODE_VERSION: '26.2'
   FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_TEST_LAB_PROJECT_ID }}
   GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
   GCP_TEST_LAB_SERVICE_ACCOUNT: ${{ vars.GCP_TEST_LAB_SERVICE_ACCOUNT }}
@@ -196,6 +197,7 @@ jobs:
     env:
       FIREBASE_IOS_MODEL: ${{ vars.FIREBASE_IOS_MODEL }}
       FIREBASE_IOS_VERSION: ${{ vars.FIREBASE_IOS_VERSION }}
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
       IOS_APP_BUNDLE_ID: com.raychiu.tripline
       IOS_TEST_RUNNER_BUNDLE_ID: com.raychiu.tripline.RunnerUITests.xctrunner
       TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-ios
@@ -248,6 +250,16 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Verify Test Lab Xcode compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud firebase test ios versions describe "$FIREBASE_IOS_VERSION" \
+            --project "$FIREBASE_PROJECT_ID" \
+            --format=json |
+            jq -e --arg xcode "$FIREBASE_XCODE_VERSION" \
+              '.supportedXcodeVersionIds | index($xcode) != null'
 
       - name: Prepare iOS build dependencies
         shell: bash
@@ -334,6 +346,7 @@ jobs:
             --project "$FIREBASE_PROJECT_ID" \
             --test build/ios_integ/Build/Products/ios_tests.zip \
             --device "model=${FIREBASE_IOS_MODEL},version=${FIREBASE_IOS_VERSION},locale=en_US,orientation=portrait" \
+            --xcode-version "$FIREBASE_XCODE_VERSION" \
             --timeout 5m \
             --results-history-name tripline-mobile-e2e \
             --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
