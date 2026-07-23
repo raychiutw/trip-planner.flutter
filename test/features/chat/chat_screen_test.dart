@@ -90,7 +90,12 @@ void main() {
       displayName: 'Ray Chiu',
     ),
     ThemeData? theme,
+    ValueNotifier<int>? reselects,
   }) {
+    final screen = ChatScreen(
+      initialTripId: initialTripId,
+      initialPrefill: initialPrefill,
+    );
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
@@ -101,10 +106,9 @@ void main() {
       ],
       child: MaterialApp(
         theme: theme ?? AppTheme.light(),
-        home: ChatScreen(
-          initialTripId: initialTripId,
-          initialPrefill: initialPrefill,
-        ),
+        home: reselects == null
+            ? screen
+            : TpRootReselectScope(notifier: reselects, child: screen),
       ),
     );
   }
@@ -117,7 +121,7 @@ void main() {
     expect(find.text('沖繩'), findsWidgets);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
     expect(find.byType(PopupMenuButton<String>), findsNothing);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byType(TpRootScaffold), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-title-button')), findsOneWidget);
@@ -160,6 +164,59 @@ void main() {
       tester.getTopLeft(banner).dy,
       greaterThanOrEqualTo(TpRootGeometry.initialContentTop(context)),
     );
+  });
+
+  testWidgets('重點聊天 tab 會回到訊息頂端並保留草稿', (tester) async {
+    final reselects = ValueNotifier<int>(0);
+    addTearDown(reselects.dispose);
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          for (var index = 0; index < 30; index++)
+            _req(
+              id: index + 1,
+              message: '第 ${index + 1} 則行程討論訊息',
+              reply: '這是足以撐高聊天清單的回覆內容。',
+              status: RequestStatus.completed,
+            ),
+        ],
+        hasMore: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(initialPrefill: '保留的聊天草稿', reselects: reselects),
+    );
+    await tester.pumpAndSettle();
+
+    final list = find.byKey(const ValueKey('chat-list'));
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(of: list, matching: find.byType(Scrollable)),
+    );
+    await tester.drag(list, const Offset(0, 360));
+    await tester.pumpAndSettle();
+    expect(scrollable.position.pixels, greaterThan(0));
+    expect(
+      scrollable.position.pixels,
+      lessThan(scrollable.position.maxScrollExtent),
+    );
+
+    reselects.value++;
+    await tester.pumpAndSettle();
+
+    expect(scrollable.position.pixels, scrollable.position.maxScrollExtent);
+    final input = tester.widget<TextField>(
+      find.byKey(const ValueKey('chat-input')),
+    );
+    expect(input.controller!.text, '保留的聊天草稿');
   });
 
   testWidgets('聊天顯示自己名稱與協作者 email fallback，並使用動態 Indigo', (tester) async {

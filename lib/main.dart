@@ -16,9 +16,11 @@ import 'api/cache/drift_cache_store.dart';
 import 'api/providers.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
+import 'features/account/account_sheet.dart';
 import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
 import 'theme/app_theme.dart';
+import 'ui/tp_app_bar.dart';
 
 /// 現階段所有產品文案均為繁體中文；新增語系前須先完成整套字串在地化。
 const kSupportedLocales = [Locale('zh', 'TW')];
@@ -145,9 +147,12 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),
-      builder: (context, child) => AppKeyboardDismissRegion(
-        child: SlidableAutoCloseBehavior(
-          child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => TpAccountActionScope(
+        onOpen: (buttonContext) => unawaited(showAccountSheet(buttonContext)),
+        child: AppKeyboardDismissRegion(
+          child: SlidableAutoCloseBehavior(
+            child: child ?? const SizedBox.shrink(),
+          ),
         ),
       ),
     );

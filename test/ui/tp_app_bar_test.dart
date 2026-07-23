@@ -29,8 +29,13 @@ void main() {
   });
 
   testWidgets('detail app bar pops one route', (tester) async {
+    var accountOpened = false;
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => TpAccountActionScope(
+          onOpen: (_) => accountOpened = true,
+          child: child!,
+        ),
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () => Navigator.of(context).push(
@@ -51,6 +56,13 @@ void main() {
 
     await tester.tap(find.text('開啟'));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
+      const Size(44, 44),
+    );
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    expect(accountOpened, isTrue);
     await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
     await tester.pumpAndSettle();
 

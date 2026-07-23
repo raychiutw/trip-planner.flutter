@@ -402,7 +402,7 @@ void main() {
     registerFallbackValue(<({int id, int sortOrder, int? dayId})>[]);
   });
 
-  testWidgets('Root Glass Header 顯示行程選擇與功能選單，帳號移至第五個 Tab', (tester) async {
+  testWidgets('Root Glass Header 顯示行程選擇、功能選單與 Account 入口', (tester) async {
     await _pumpTimeline(tester);
 
     expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
@@ -422,7 +422,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(TextButton, '編輯'), findsNothing);
     expect(
       find.byKey(const ValueKey('trip-timeline-view-day-selector')),

@@ -85,7 +85,7 @@ void main() {
     expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
     expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
     expect(find.text('沖繩旅行'), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('global-trip-map-okinawa')),
@@ -157,7 +157,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('先建立行程'), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);
   });

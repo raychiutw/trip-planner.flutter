@@ -128,6 +128,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已送出列印'), findsOneWidget);
 
+    await tester.tap(find.byKey(const ValueKey('trip-print-more')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('trip-print-pdf')));
     await tester.pumpAndSettle();
 

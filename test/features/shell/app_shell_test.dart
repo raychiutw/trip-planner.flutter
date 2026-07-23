@@ -2,12 +2,14 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/features/shell/app_shell.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 GoRouter buildShellRouter() {
   StatefulShellBranch probe(String path, String marker) => StatefulShellBranch(
@@ -24,7 +26,6 @@ GoRouter buildShellRouter() {
           probe('/trips', 'PROBE-TRIPS'),
           probe('/map', 'PROBE-MAP'),
           probe('/favorites', 'PROBE-FAV'),
-          probe('/account', 'PROBE-ACCOUNT'),
         ],
       ),
     ],
@@ -54,7 +55,66 @@ GoRouter buildScrollableShellRouter() {
           probe('/trips', const Text('PROBE-TRIPS')),
           probe('/map', const Text('PROBE-MAP')),
           probe('/favorites', const Text('PROBE-FAV')),
-          probe('/account', const Text('PROBE-ACCOUNT')),
+        ],
+      ),
+    ],
+  );
+}
+
+GoRouter buildReselectShellRouter() {
+  StatefulShellBranch probe(String path, Widget child) => StatefulShellBranch(
+    routes: [GoRoute(path: path, builder: (_, _) => child)],
+  );
+  return GoRouter(
+    initialLocation: '/chat',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          probe('/chat', const _ReselectRootProbe()),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/trips',
+                builder: (_, _) => const Text('TRIPS-ROOT'),
+                routes: [
+                  GoRoute(
+                    path: 'detail',
+                    builder: (_, _) => const Text('TRIPS-DETAIL'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          probe('/map', const Text('PROBE-MAP')),
+          probe('/favorites', const Text('PROBE-FAV')),
+        ],
+      ),
+    ],
+  );
+}
+
+GoRouter buildStateShellRouter() {
+  StatefulShellBranch probe(String path, Widget child) => StatefulShellBranch(
+    routes: [GoRoute(path: path, builder: (_, _) => child)],
+  );
+  return GoRouter(
+    initialLocation: '/chat',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          probe(
+            '/chat',
+            const CircularProgressIndicator.adaptive(
+              key: ValueKey('loading-state'),
+            ),
+          ),
+          probe('/trips', const Text('EMPTY-STATE')),
+          probe('/map', const Text('OFFLINE-STATE')),
+          probe('/favorites', const Text('ERROR-STATE')),
         ],
       ),
     ],
@@ -62,8 +122,8 @@ GoRouter buildScrollableShellRouter() {
 }
 
 void main() {
-  group('AppShell 5-tab 導航', () {
-    testWidgets('5 個 tab,點擊切換到對應 branch', (tester) async {
+  group('AppShell 4-tab 導航', () {
+    testWidgets('4 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -89,10 +149,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('收藏'));
       await tester.pumpAndSettle();
       expect(find.text('PROBE-FAV'), findsOneWidget);
-
-      await tester.tap(find.bySemanticsLabel('帳號'));
-      await tester.pumpAndSettle();
-      expect(find.text('PROBE-ACCOUNT'), findsOneWidget);
+      expect(find.bySemanticsLabel('帳號'), findsNothing);
     });
 
     testWidgets('地圖 branch 跟隨深色主題並使用深色 Liquid Glass', (tester) async {
@@ -232,7 +289,117 @@ void main() {
       expect(find.bySemanticsLabel('聊天'), findsOneWidget);
     });
 
-    testWidgets('五個 tab 都有 label 且目前 tab 具 selected semantics', (tester) async {
+    testWidgets('重點 detail tab 回 root；重點 root 回頂端且保留輸入', (tester) async {
+      final router = buildReselectShellRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('root-draft-field')),
+        '保留的草稿',
+      );
+      await tester.tap(find.bySemanticsLabel('地圖'));
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('聊天'));
+      await tester.pumpAndSettle();
+      expect(find.text('保留的草稿'), findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const ValueKey('tp-root-scroll-view')),
+        const Offset(0, -600),
+        1200,
+      );
+      await tester.pumpAndSettle();
+      ScrollableState scrollable() => tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('tp-root-scroll-view')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(scrollable().position.pixels, greaterThan(0));
+
+      await tester.tapAt(tester.getCenter(find.bySemanticsLabel('聊天')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('保留的草稿'), findsOneWidget);
+      expect(scrollable().position.pixels, 0);
+
+      router.go('/trips/detail');
+      await tester.pumpAndSettle();
+      expect(find.text('TRIPS-DETAIL'), findsOneWidget);
+
+      await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
+      await tester.pumpAndSettle();
+      expect(find.text('TRIPS-ROOT'), findsOneWidget);
+    });
+
+    testWidgets('鍵盤顯示時隱藏 root tab bar', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(viewInsets: const EdgeInsets.only(bottom: 300)),
+              child: child!,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsNothing);
+    });
+
+    testWidgets('載入、空白、離線與錯誤狀態都保留四個可用 tabs', (tester) async {
+      final router = buildStateShellRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('loading-state')), findsOneWidget);
+      for (final target in [
+        ('行程', 'EMPTY-STATE'),
+        ('地圖', 'OFFLINE-STATE'),
+        ('收藏', 'ERROR-STATE'),
+      ]) {
+        await tester.tap(find.bySemanticsLabel(target.$1));
+        await tester.pumpAndSettle();
+        expect(find.text(target.$2), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('apple-root-tab-bar')),
+          findsOneWidget,
+        );
+        for (final label in ['聊天', '行程', '地圖', '收藏']) {
+          expect(find.bySemanticsLabel(label), findsOneWidget);
+        }
+      }
+    });
+
+    testWidgets('四個 tab 都有 label、系統圖示且目前 tab 具 selected semantics', (
+      tester,
+    ) async {
       final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         ProviderScope(
@@ -244,9 +411,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+      for (final label in ['聊天', '行程', '地圖', '收藏']) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
+      expect(find.bySemanticsLabel('帳號'), findsNothing);
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      expect(
+        find.descendant(of: bar, matching: find.byIcon(SFIcons.sf_suitcase)),
+        findsOneWidget,
+      );
       final selected = tester.getSemantics(find.bySemanticsLabel('聊天'));
       expect(
         selected.getSemanticsData().flagsCollection.isSelected,
@@ -255,7 +428,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('320pt 與 200% 文字下五個單字 label 完整可讀', (tester) async {
+    testWidgets('320pt 與 200% 文字下四個單字 label 完整可讀', (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -276,7 +449,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      for (final label in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+      for (final label in ['聊天', '行程', '地圖', '收藏']) {
         expect(find.bySemanticsLabel(label), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
@@ -341,4 +514,16 @@ void main() {
       expect(TpRootTabGeometry.expandedHeightFor(34), 80);
     });
   });
+}
+
+class _ReselectRootProbe extends StatelessWidget {
+  const _ReselectRootProbe();
+
+  @override
+  Widget build(BuildContext context) => const TpRootScrollView(
+    slivers: [
+      SliverToBoxAdapter(child: TextField(key: ValueKey('root-draft-field'))),
+      SliverToBoxAdapter(child: SizedBox(height: 1200)),
+    ],
+  );
 }

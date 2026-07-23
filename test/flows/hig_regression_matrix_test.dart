@@ -75,12 +75,14 @@ void main() {
       expect(find.byKey(const ValueKey('day-1-option')), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      for (var index = 0; index < 2; index++) {
-        expect(
-          tester.getSize(find.byKey(ValueKey('tp-root-header-action-$index'))),
-          const Size(44, 44),
-        );
-      }
+      expect(
+        tester.getSize(find.byKey(const ValueKey('tp-root-header-action-0'))),
+        const Size(44, 44),
+      );
+      expect(
+        tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
+        const Size(44, 44),
+      );
 
       await tester.ensureVisible(find.byKey(const ValueKey('day-2-option')));
       await tester.pumpAndSettle();
@@ -176,11 +178,6 @@ class _MatrixSceneState extends State<_MatrixScene> {
               tooltip: '筆記',
               onPressed: () {},
               child: const Icon(CupertinoIcons.doc_text, size: 20),
-            ),
-            TpToolbarGlassButton(
-              tooltip: '帳號',
-              onPressed: () {},
-              child: const Text('R'),
             ),
           ],
         ),

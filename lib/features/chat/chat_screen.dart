@@ -149,6 +149,8 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   final _composerKey = GlobalKey();
   late final TextEditingController _input;
   late final Future<void> _aiAuthorizationLoad;
+  ValueNotifier<int>? _reselects;
+  bool _active = true;
   bool? _aiAuthorized;
   bool _sendInProgress = false;
   double _composerHeight = 0;
@@ -168,7 +170,18 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _active = TickerMode.valuesOf(context).enabled;
+    final next = TpRootReselectScope.maybeOf(context);
+    if (next == _reselects) return;
+    _reselects?.removeListener(_scrollToTop);
+    _reselects = next?..addListener(_scrollToTop);
+  }
+
+  @override
   void dispose() {
+    _reselects?.removeListener(_scrollToTop);
     _scroll.dispose();
     _input.dispose();
     super.dispose();
@@ -181,6 +194,22 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         ref.read(chatControllerProvider(widget.tripId).notifier).loadOlder(),
       );
     }
+  }
+
+  void _scrollToTop() {
+    if (!_active || !_scroll.hasClients) return;
+    final top = _scroll.position.maxScrollExtent;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(top);
+      return;
+    }
+    unawaited(
+      _scroll.animateTo(
+        top,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   void _syncComposerHeight() {
