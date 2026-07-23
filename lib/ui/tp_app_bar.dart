@@ -122,6 +122,47 @@ class TpToolbarGlassButton extends StatelessWidget {
   }
 }
 
+/// 將開啟帳號 sheet 的動作提供給 App 內容頁 Header。
+class TpAccountActionScope extends InheritedWidget {
+  const TpAccountActionScope({
+    super.key,
+    required this.onOpen,
+    required super.child,
+  });
+
+  final ValueChanged<BuildContext> onOpen;
+
+  /// 取得最近一層提供的帳號開啟動作。
+  static ValueChanged<BuildContext>? maybeOpenOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<TpAccountActionScope>()
+          ?.onOpen;
+
+  @override
+  bool updateShouldNotify(TpAccountActionScope oldWidget) =>
+      onOpen != oldWidget.onOpen;
+}
+
+/// App 內容頁 Header 使用的 44pt 系統帳號動作。
+class TpAccountAvatarButton extends StatelessWidget {
+  const TpAccountAvatarButton({super.key, this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final openAccount = TpAccountActionScope.maybeOpenOf(context);
+    return TpToolbarGlassButton(
+      key: const ValueKey('account-avatar-button'),
+      tooltip: '帳號',
+      onPressed:
+          onPressed ??
+          (openAccount == null ? null : () => openAccount(context)),
+      child: const Icon(CupertinoIcons.person_crop_circle, size: 22),
+    );
+  }
+}
+
 /// Marks routes that are pushed inside the near-full-height sheet navigator.
 class TpLargeSheetNavigationScope extends InheritedWidget {
   const TpLargeSheetNavigationScope({
@@ -295,7 +336,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final largeSheetScope = TpLargeSheetNavigationScope.maybeOf(context);
     final leadingAction = _semanticLeading(context, largeSheetScope);
-    final resolvedActions = <Widget>[
+    final showsAccount = largeSheetScope == null && role == TpAppBarRole.detail;
+    final pageActions = <Widget>[
       ...actions,
       if (primaryActionLabel != null)
         TpToolbarTextButton(
@@ -304,9 +346,16 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           onPressed: primaryActionEnabled ? onPrimaryAction : null,
         ),
     ];
+    final resolvedActions = <Widget>[
+      ...pageActions,
+      if (showsAccount) const TpAccountAvatarButton(),
+    ];
     assert(
-      resolvedActions.length <= 2,
-      'Toolbar supports at most two actions.',
+      !showsAccount ||
+          (pageActions.length <= 2 &&
+              (pageActions.length <= 1 ||
+                  pageActions.any((action) => action is TpMoreMenuButton))),
+      'Content headers support one direct action; extra actions use More.',
     );
     final leadingWidth = leadingAction == null
         ? 0.0

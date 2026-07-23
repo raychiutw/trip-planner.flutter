@@ -1,4 +1,4 @@
-/// 帳號 hub 畫面：Root 第五個 tab，包含 profile、設定與登出。
+/// 帳號 hub 畫面：由內容頁右上角 Account sheet 開啟，包含 profile、設定與登出。
 library;
 
 import 'dart:async';

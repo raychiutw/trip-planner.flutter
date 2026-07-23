@@ -1,3 +1,36 @@
+# Handoff — 2026-07-23 HIG #84 四個根層分頁與帳號 Sheet
+
+## 本輪交付
+
+- #83 已透過 PR #98 合併至 `master`；本分支以該 merge commit `6bd1eb5` 為基底。
+- #84 已把 compact root shell 改為聊天、行程、地圖、收藏四個分頁，Account 不再占用第五個 branch。
+- 每個 app-owned 內容頁 Header 都以至少 44×44pt、VoiceOver label「帳號」的 `person.crop.circle` 開啟獨立 Navigation Stack sheet。
+- 舊 `/account`、`/settings/*`、`/developer/apps*` deep links 會從目前 branch 開啟 Account sheet，關閉後保留 branch、Day、搜尋、捲動與聊天草稿。
+- 已涵蓋 tab reselect、鍵盤開啟時隱藏 root bar、loading／empty／offline／error 狀態，以及 Header 單一直接 action 與 More overflow 規則。
+- #87 已明確排除 Apple ID／Sign in with Apple 登入實作與入口。
+
+## 驗證
+
+```powershell
+flutter analyze --no-fatal-infos
+$env:Path = 'C:\Program Files\Git\usr\bin;' + $env:Path
+flutter test --no-pub -r failures-only
+```
+
+結果：analyzer 0 issue；完整 1,425 tests 全數通過。Windows 本機 workflow tests 需要把 Git Bash `usr/bin` 放進 PATH；產品程式碼不需為此修改。
+
+## Git／交付狀態
+
+- 實作提交：`0c56b9b feat: 遷移四個根層分頁與帳號 sheet (#84)`。
+- 交付分支：`feat/hig-02-root-tabs-account-sheet`，目標為 `master`，PR 使用 `Closes #84`。
+- 本輪到 PR 建立即停止，不合併，也不開始 #85。
+
+## 尚未執行
+
+- 目前只偵測到 Windows、Chrome 與 Edge，沒有可用 iOS 裝置，因此未執行 `integration_test/app_owned_release_flow_test.dart` 的 iOS 實機驗證。
+
+---
+
 # Handoff — 2026-07-23 v0.9.6 Firebase iOS 驗證與雙商店發布
 
 ## v0.9.6 發布結案

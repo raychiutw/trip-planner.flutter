@@ -398,6 +398,8 @@ void main() {
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-more-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-map-notes-button')), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('tp-root-glass-header')),

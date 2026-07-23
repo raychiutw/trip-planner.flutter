@@ -160,7 +160,7 @@ void main() {
   });
 
   group('TripsListScreen 清單渲染', () {
-    testWidgets('功能選單收納新增行程，帳號入口只保留在第 5 tab', (tester) async {
+    testWidgets('功能選單收納新增行程，Account 入口固定在 Header', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -182,7 +182,10 @@ void main() {
       expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
       expect(find.byKey(const ValueKey('tp-app-bar-close')), findsNothing);
       expect(find.byKey(const ValueKey('trips-sort-button')), findsOneWidget);
-      expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('account-avatar-button')),
+        findsOneWidget,
+      );
       expect(find.byType(SliverAppBar), findsNothing);
       expect(find.byTooltip('更多'), findsOneWidget);
       expect(

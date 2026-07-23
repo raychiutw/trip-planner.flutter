@@ -1,6 +1,6 @@
 # 導航與路由參考(`lib/app/router.dart`)
 
-路由用 go_router 17 的 `StatefulShellRoute.indexedStack`：5 個 tab 各自保留 navigation stack（切 tab 再切回來，原本逛到哪還在哪）。帳號是第 5 branch；router 本身是 riverpod provider（`appRouterProvider`），認證 redirect 直接讀 `authStateProvider`。
+路由用 go_router 17 的 `StatefulShellRoute.indexedStack`：聊天、行程、地圖、收藏 4 個 root branches 各自保留 Navigation Stack（切換分頁再切回來，原本逛到哪還在哪）。帳號不占用 root branch，而是從內容頁 Header 開啟獨立 Navigation Stack sheet；router 本身是 Riverpod provider（`appRouterProvider`），認證 redirect 直接讀 `authStateProvider`。
 
 ## 路由表
 
@@ -30,17 +30,17 @@
 | `/favorites` | `FavoritesScreen` | tab 4(收藏清單) |
 | `/favorites/explore` | `ExploreScreen` | tab 4 子路由(探索) |
 | `/favorites/add-to-trip` | `AddToTripScreen` | tab 4 子路由(加入行程,extra `AddToTripArgs`) |
-| `/account` | `AccountScreen` | tab 5 帳號 hub（保留 deep link） |
-| `/settings/profile` | `ProfileEditScreen` | tab 5 設定子頁 |
-| `/settings/appearance` | `AppearanceScreen` | tab 5 設定子頁 |
-| `/settings/notifications` | `NotificationsScreen` | tab 5 設定子頁 |
-| `/account/notifications` | `NotificationsScreen` | tab 5 web 相容 alias |
-| `/settings/sessions` | `AccountSessionsScreen` | tab 5 設定子頁 |
-| `/settings/connected-apps` | `ConnectedAppsScreen` | tab 5 設定子頁 |
-| `/settings/developer-apps` | `DeveloperAppsScreen` | tab 5 設定子頁 |
-| `/settings/developer-apps/new` | `DeveloperAppNewScreen` | tab 5 設定子頁 |
-| `/developer/apps` | redirect `/settings/developer-apps` | web 相容 alias |
-| `/developer/apps/new` | redirect `/settings/developer-apps/new` | web 相容 alias |
+| `/account` | `AccountScreen` | Account sheet 根頁（保留 deep link） |
+| `/settings/profile` | `ProfileEditScreen` | Account sheet 設定子頁 |
+| `/settings/appearance` | `AppearanceScreen` | Account sheet 設定子頁 |
+| `/settings/notifications` | `NotificationsScreen` | Account sheet 設定子頁 |
+| `/account/notifications` | `NotificationsScreen` | Account sheet 的 Web 相容 alias |
+| `/settings/sessions` | `AccountSessionsScreen` | Account sheet 設定子頁 |
+| `/settings/connected-apps` | `ConnectedAppsScreen` | Account sheet 設定子頁 |
+| `/settings/developer-apps` | `DeveloperAppsScreen` | Account sheet 設定子頁 |
+| `/settings/developer-apps/new` | `DeveloperAppNewScreen` | Account sheet 設定子頁 |
+| `/developer/apps` | `DeveloperAppsScreen` | Account sheet 的 Web 相容 alias |
+| `/developer/apps/new` | `DeveloperAppNewScreen` | Account sheet 的 Web 相容 alias |
 | `/oauth/consent` | `OAuthConsentScreen` | shell 外公開 route |
 | `/s/:token` | `PublicShareScreen` | shell 外公開 route |
 
@@ -48,7 +48,7 @@ Web 相容 alias：`/trips?selected=:tripId&focus=:entryId` 會導到 `/trips/:t
 
 Legacy redirect：`/admin`、`/admin/` 會導到 `/trips`，`/manage`、`/manage/` 會導到 `/chat`。
 
-shell 外殼是 `AppShell`（`lib/features/shell/app_shell.dart`）：浮動 5 項 `AppleRootTabBar` 的 `onDestinationSelected` 呼叫 `navigationShell.goBranch(index)`。Account 與其設定 route 使用 branch 5，其他 Root Header 不再放帳號 avatar。
+shell 外殼是 `AppShell`（`lib/features/shell/app_shell.dart`）：浮動 4 項 `AppleRootTabBar` 的選取事件呼叫 `navigationShell.goBranch(index)`。內容頁 Header 固定提供 44pt `person.crop.circle` 帳號入口；Account 與 Settings deep links 會在目前 branch 上開啟對應 sheet 頁面，不建立第 5 個 branch。
 
 ## 認證 redirect 規則
 

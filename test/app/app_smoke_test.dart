@@ -24,7 +24,9 @@ class _FakeAuthNotifier extends AuthNotifier {
 class _MockTripRepository extends Mock implements TripRepository {}
 
 void main() {
-  testWidgets('已登入時顯示 5-tab Liquid Glass root bar', (tester) async {
+  testWidgets('已登入時顯示 4-tab Liquid Glass root bar 與 Account 入口', (
+    tester,
+  ) async {
     final mockTripRepository = _MockTripRepository();
     when(mockTripRepository.watchMyTrips).thenAnswer((_) => Stream.value([]));
 
@@ -44,13 +46,17 @@ void main() {
 
     final rootBar = find.byKey(const ValueKey('apple-root-tab-bar'));
     expect(rootBar, findsOneWidget);
-    for (final tabLabel in ['聊天', '行程', '地圖', '收藏', '帳號']) {
+    for (final tabLabel in ['聊天', '行程', '地圖', '收藏']) {
       expect(
         find.descendant(of: rootBar, matching: find.text(tabLabel)),
         findsAtLeast(1),
         reason: 'Root tab bar 應包含「$tabLabel」tab',
       );
     }
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(
+      find.descendant(of: rootBar, matching: find.text('帳號')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
   });
 }

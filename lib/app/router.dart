@@ -1,4 +1,4 @@
-/// 全 app 路由：StatefulShellRoute 5 branches + 認證 redirect。
+/// 全 app 路由：StatefulShellRoute 4 branches + 認證 redirect。
 library;
 
 import 'package:flutter/material.dart';
@@ -6,13 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
-import '../features/account/account_sessions_screen.dart';
-import '../features/account/account_screen.dart';
-import '../features/account/connected_apps_screen.dart';
-import '../features/account/developer_apps_screen.dart';
-import '../features/account/settings/appearance_screen.dart';
-import '../features/account/settings/notifications_screen.dart';
-import '../features/account/settings/profile_edit_screen.dart';
 import '../features/auth/account_flow_screens.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/oauth_consent_screen.dart';
@@ -50,6 +43,9 @@ final tripMapCanvasBuilderProvider = Provider<TripMapCanvasBuilder?>((ref) {
 /// app 路由（redirect 讀 authStateProvider；auth 變化經 refreshListenable 重算）。
 final appRouterProvider = Provider<GoRouter>((ref) {
   final mapBuilder = ref.watch(tripMapCanvasBuilderProvider);
+  var accountSheetOrigin = '/trips';
+  String accountSheetAlias(GoRouterState state, String page) =>
+      _accountSheetLocation(accountSheetOrigin, state, page);
   // 橋接 authStateProvider 變化 → GoRouter 重新評估 redirect
   final authChangeNotifier = ValueNotifier<int>(0);
   ref.onDispose(authChangeNotifier.dispose);
@@ -61,6 +57,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/trips',
     refreshListenable: authChangeNotifier,
     redirect: (context, state) {
+      if (_isShellContentLocation(state.uri.path) &&
+          !state.uri.queryParameters.containsKey('account')) {
+        accountSheetOrigin = state.uri.toString();
+      }
       final authState = ref.read(authStateProvider);
       // 認證狀態尚未解析時不 redirect，避免閃跳
       if (authState.isLoading) return null;
@@ -128,16 +128,56 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             _withQuery('/favorites/add-to-trip', state),
       ),
       GoRoute(
+        path: '/account',
+        redirect: (context, state) => accountSheetAlias(state, 'root'),
+      ),
+      GoRoute(
         path: '/account/appearance',
-        redirect: (context, state) => '/settings/appearance',
+        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
       ),
       GoRoute(
         path: '/account/sessions',
-        redirect: (context, state) => '/settings/sessions',
+        redirect: (context, state) => accountSheetAlias(state, 'sessions'),
       ),
       GoRoute(
         path: '/account/connected-apps',
-        redirect: (context, state) => '/settings/connected-apps',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'connected-apps'),
+      ),
+      GoRoute(
+        path: '/account/notifications',
+        redirect: (context, state) => accountSheetAlias(state, 'notifications'),
+      ),
+      GoRoute(
+        path: '/settings/appearance',
+        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
+      ),
+      GoRoute(
+        path: '/settings/profile',
+        redirect: (context, state) => accountSheetAlias(state, 'profile'),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        redirect: (context, state) => accountSheetAlias(state, 'notifications'),
+      ),
+      GoRoute(
+        path: '/settings/sessions',
+        redirect: (context, state) => accountSheetAlias(state, 'sessions'),
+      ),
+      GoRoute(
+        path: '/settings/connected-apps',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'connected-apps'),
+      ),
+      GoRoute(
+        path: '/settings/developer-apps',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'developer-apps'),
+      ),
+      GoRoute(
+        path: '/settings/developer-apps/new',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'developer-apps/new'),
       ),
       GoRoute(
         path: '/trip/:tripId',
@@ -258,11 +298,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/developer/apps',
-        redirect: (context, state) => '/settings/developer-apps',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'developer-apps'),
       ),
       GoRoute(
         path: '/developer/apps/new',
-        redirect: (context, state) => '/settings/developer-apps/new',
+        redirect: (context, state) =>
+            accountSheetAlias(state, 'developer-apps/new'),
       ),
       GoRoute(
         path: '/oauth/consent',
@@ -285,6 +327,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
           showRootTab: _isRootTabLocation(state.uri.path),
+          accountPage: state.uri.queryParameters['account'],
+          accountReturnLocation: _withoutAccount(state.uri),
         ),
         branches: [
           StatefulShellBranch(
@@ -292,7 +336,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/chat',
                 builder: (context, state) => ChatScreen(
-                  key: ValueKey(state.uri.toString()),
+                  key: ValueKey(_withoutAccount(state.uri)),
                   initialTripId: state.uri.queryParameters['tripId'],
                   initialPrefill: state.uri.queryParameters['prefill'],
                 ),
@@ -437,50 +481,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/account',
-                builder: (context, state) => const AccountScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'notifications',
-                    builder: (context, state) => const NotificationsScreen(),
-                  ),
-                ],
-              ),
-              GoRoute(
-                path: '/settings/appearance',
-                builder: (context, state) => const AppearanceScreen(),
-              ),
-              GoRoute(
-                path: '/settings/profile',
-                builder: (context, state) => const ProfileEditScreen(),
-              ),
-              GoRoute(
-                path: '/settings/notifications',
-                builder: (context, state) => const NotificationsScreen(),
-              ),
-              GoRoute(
-                path: '/settings/sessions',
-                builder: (context, state) => const AccountSessionsScreen(),
-              ),
-              GoRoute(
-                path: '/settings/connected-apps',
-                builder: (context, state) => const ConnectedAppsScreen(),
-              ),
-              GoRoute(
-                path: '/settings/developer-apps',
-                builder: (context, state) => const DeveloperAppsScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'new',
-                    builder: (context, state) => const DeveloperAppNewScreen(),
-                  ),
-                ],
-              ),
-            ],
-          ),
         ],
       ),
     ],
@@ -582,6 +582,29 @@ String _withQuery(String path, GoRouterState state) {
   return query.isEmpty ? path : '$path?$query';
 }
 
+String _accountSheetLocation(
+  String originLocation,
+  GoRouterState state,
+  String page,
+) {
+  final origin = Uri.parse(originLocation);
+  final query = <String, String>{
+    ...origin.queryParameters,
+    ...state.uri.queryParameters,
+  };
+  query['account'] = page;
+  return origin.replace(queryParameters: query).toString();
+}
+
+String _withoutAccount(Uri uri) {
+  final query = Map<String, String>.from(uri.queryParameters)
+    ..remove('account');
+  return Uri(
+    path: uri.path,
+    queryParameters: query.isEmpty ? null : query,
+  ).toString();
+}
+
 String _welcomeLocationWithRedirect(GoRouterState state) {
   final requestedLocation = state.uri.toString();
   if (requestedLocation == '/trips') return '/welcome';
@@ -621,10 +644,17 @@ bool _isRootTabLocation(String path) {
   if (path == '/chat' ||
       path == '/trips' ||
       path == '/map' ||
-      path == '/favorites' ||
-      path == '/account') {
+      path == '/favorites') {
     return true;
   }
   final segments = Uri.parse(path).pathSegments;
   return segments.length == 2 && segments.first == 'trips';
 }
+
+bool _isShellContentLocation(String path) =>
+    path == '/chat' ||
+    path == '/map' ||
+    path == '/trips' ||
+    path == '/favorites' ||
+    (path.startsWith('/trips/') && path != '/trips/new') ||
+    path.startsWith('/favorites/');

@@ -20,8 +20,10 @@ import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
+import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
+import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/favorites/explore/explore_screen.dart';
 import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
@@ -51,6 +53,7 @@ import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 import '../helpers/fake_trip_map.dart';
 
@@ -134,6 +137,12 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
       expiresAt: '2026-07-16T00:00:00.000Z',
     ),
   );
+  when(
+    () => mockCollabRepository.fetchMembers(any()),
+  ).thenAnswer((_) async => []);
+  when(
+    () => mockCollabRepository.fetchInvites(any()),
+  ).thenAnswer((_) async => []);
   when(
     mockFavoritesRepository.fetchFavorites,
   ).thenAnswer((_) async => const []);
@@ -797,7 +806,7 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('已登入可進入通知設定 route 與 web alias', (tester) async {
+  testWidgets('已登入的通知設定 route 與 web alias 進入 Account sheet', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
 
@@ -812,17 +821,69 @@ void main() {
     container.read(appRouterProvider).go('/settings/notifications');
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
     expect(find.byType(NotificationsScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(
+      container
+          .read(appRouterProvider)
+          .routerDelegate
+          .currentConfiguration
+          .uri
+          .toString(),
+      '/trips',
+    );
 
     container.read(appRouterProvider).go('/account/notifications');
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
     expect(find.byType(NotificationsScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('帳號頁是第五個 root branch 並顯示 tab bar', (tester) async {
+  testWidgets('舊版個人資料與開發者 routes 進入 Account sheet 對應頁', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    for (final target in <(String, Type)>[
+      ('/settings/profile', ProfileEditScreen),
+      ('/settings/developer-apps', DeveloperAppsScreen),
+      ('/settings/developer-apps/new', DeveloperAppNewScreen),
+      ('/developer/apps/new', DeveloperAppNewScreen),
+    ]) {
+      router.go(target.$1);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+      expect(find.byType(target.$2), findsOneWidget);
+      expect(find.byType(LoginScreen), findsNothing);
+
+      if (find
+          .byKey(const ValueKey('app-large-sheet-close'))
+          .evaluate()
+          .isEmpty) {
+        await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('帳號 deep link 在四個 root tabs 上開啟並返回原 branch', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
 
@@ -834,12 +895,108 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    container.read(appRouterProvider).go('/account');
+    final router = container.read(appRouterProvider);
+    for (final origin in ['/chat', '/trips', '/map', '/favorites']) {
+      router.go(origin);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      if (origin == '/chat') {
+        await tester.enterText(
+          find.byKey(const ValueKey('chat-input')),
+          '保留中的聊天草稿',
+        );
+      }
+      router.go('/account');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(AccountScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+      expect(find.byType(AppleRootTabBar), findsOneWidget);
+      expect(find.byKey(const ValueKey('root-tab-帳號')), findsNothing);
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        '$origin?account=root',
+      );
+
+      tester
+          .widget<TpToolbarGlassButton>(
+            find.byKey(const ValueKey('app-sheet-close')),
+          )
+          .onPressed!
+          .call();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byKey(const ValueKey('app-large-sheet')), findsNothing);
+      expect(router.routerDelegate.currentConfiguration.uri.toString(), origin);
+      if (origin == '/chat') {
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+              .controller!
+              .text,
+          '保留中的聊天草稿',
+        );
+      }
+    }
+  });
+
+  testWidgets('shell 外內容頁的帳號按鈕可開啟 Account sheet', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/collab/trip-1');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
     await tester.pumpAndSettle();
 
     expect(find.byType(AccountScreen), findsOneWidget);
-    expect(find.byType(AppleRootTabBar), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-close-button')), findsNothing);
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+  });
+
+  testWidgets('關閉 Account sheet 保留目前 branch stack 與 DAY', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/trips/trip-1?day=1');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+    expect(
+      tester
+          .widget<TripTimelineScreen>(find.byType(TripTimelineScreen))
+          .initialDayNum,
+      1,
+    );
+    expect(
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      '/trips/trip-1?day=1',
+    );
   });
 
   testWidgets('行程工具列切到地圖 root branch 並保留 DAY', (tester) async {
@@ -903,20 +1060,41 @@ void main() {
     container.read(appRouterProvider).go('/account/appearance');
     await tester.pumpAndSettle();
 
+    expect(
+      container
+          .read(appRouterProvider)
+          .routerDelegate
+          .currentConfiguration
+          .uri
+          .toString(),
+      '/trips?account=appearance',
+    );
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
     expect(find.byType(AppearanceScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
 
     container.read(appRouterProvider).go('/account/sessions');
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
     expect(find.byType(AccountSessionsScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
 
     container.read(appRouterProvider).go('/account/connected-apps');
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
     expect(find.byType(ConnectedAppsScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
 
     container.read(appRouterProvider).go('/explore');
     await tester.pump();

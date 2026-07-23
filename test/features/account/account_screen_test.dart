@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -11,11 +12,12 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/app_version.dart';
+import 'package:tripline/features/account/account_sheet.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/ui/tp_account_avatar_button.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -87,8 +89,14 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (_, _) => Scaffold(
-            appBar: AppBar(actions: const [TpAccountAvatarButton()]),
+          builder: (context, _) => Scaffold(
+            appBar: AppBar(
+              actions: [
+                TpAccountAvatarButton(
+                  onPressed: () => showAccountSheet(context),
+                ),
+              ],
+            ),
           ),
         ),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
@@ -130,14 +138,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('帳號入口顯示帳號首字母並和 toolbar 功能鍵同為 44pt glass', (tester) async {
+  testWidgets('帳號入口使用 person.crop.circle 系統圖示與 44pt glass', (tester) async {
     await pumpAccountEntry(tester);
 
     final accountButton = find.byKey(const ValueKey('account-avatar-button'));
     expect(
-      find.descendant(of: accountButton, matching: find.text('R')),
+      find.descendant(
+        of: accountButton,
+        matching: find.byIcon(CupertinoIcons.person_crop_circle),
+      ),
       findsOneWidget,
     );
+    expect(find.bySemanticsLabel('帳號'), findsOneWidget);
     final glass = find.descendant(
       of: accountButton,
       matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),

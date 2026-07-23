@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
@@ -83,8 +85,10 @@ class TpRootGlassHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(
-      config.actions.length <= 4,
-      'Root header supports at most four actions.',
+      config.actions.length <= 2 &&
+          (config.actions.length <= 1 ||
+              config.actions.any((action) => action is TpMoreMenuButton)),
+      'Root headers support one direct action; extra actions use More.',
     );
     return SizedBox(
       key: const ValueKey('tp-root-glass-header'),
@@ -122,25 +126,24 @@ class TpRootGlassHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              if (config.actions.isNotEmpty) ...[
-                const SizedBox(width: TpSpacing.s2),
-                TpHeaderActionRow(
-                  children: [
-                    for (var index = 0; index < config.actions.length; index++)
-                      if (config.actions[index] is TpToolbarTextButton)
-                        KeyedSubtree(
-                          key: ValueKey('tp-root-header-action-$index'),
-                          child: config.actions[index],
-                        )
-                      else
-                        SizedBox.square(
-                          key: ValueKey('tp-root-header-action-$index'),
-                          dimension: TpSpacing.tapMin,
-                          child: config.actions[index],
-                        ),
-                  ],
-                ),
-              ],
+              const SizedBox(width: TpSpacing.s2),
+              TpHeaderActionRow(
+                children: [
+                  for (var index = 0; index < config.actions.length; index++)
+                    if (config.actions[index] is TpToolbarTextButton)
+                      KeyedSubtree(
+                        key: ValueKey('tp-root-header-action-$index'),
+                        child: config.actions[index],
+                      )
+                    else
+                      SizedBox.square(
+                        key: ValueKey('tp-root-header-action-$index'),
+                        dimension: TpSpacing.tapMin,
+                        child: config.actions[index],
+                      ),
+                  const TpAccountAvatarButton(),
+                ],
+              ),
             ],
           ),
         ),
@@ -149,7 +152,20 @@ class TpRootGlassHeader extends StatelessWidget {
   }
 }
 
-class TpRootScrollView extends StatelessWidget {
+/// 已選取的 root tab 再次被點選時，通知目前作用中的 root branch。
+class TpRootReselectScope extends InheritedNotifier<ValueNotifier<int>> {
+  const TpRootReselectScope({
+    super.key,
+    required ValueNotifier<int> notifier,
+    required super.child,
+  }) : super(notifier: notifier);
+
+  static ValueNotifier<int>? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<TpRootReselectScope>()
+      ?.notifier;
+}
+
+class TpRootScrollView extends StatefulWidget {
   const TpRootScrollView({
     super.key,
     required this.slivers,
@@ -164,17 +180,70 @@ class TpRootScrollView extends StatelessWidget {
   final ScrollPhysics physics;
 
   @override
+  State<TpRootScrollView> createState() => _TpRootScrollViewState();
+}
+
+class _TpRootScrollViewState extends State<TpRootScrollView> {
+  ScrollController? _fallbackController;
+  ValueNotifier<int>? _reselects;
+  var _active = true;
+
+  ScrollController get _controller =>
+      widget.controller ?? (_fallbackController ??= ScrollController());
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _active = TickerMode.valuesOf(context).enabled;
+    final next = TpRootReselectScope.maybeOf(context);
+    if (next == _reselects) return;
+    _reselects?.removeListener(_scrollToTop);
+    _reselects = next?..addListener(_scrollToTop);
+  }
+
+  @override
+  void didUpdateWidget(covariant TpRootScrollView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == null && widget.controller != null) {
+      _fallbackController?.dispose();
+      _fallbackController = null;
+    }
+  }
+
+  void _scrollToTop() {
+    if (!_active || !_controller.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.jumpTo(0);
+      return;
+    }
+    unawaited(
+      _controller.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _reselects?.removeListener(_scrollToTop);
+    _fallbackController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scrollView = CustomScrollView(
       key: const ValueKey('tp-root-scroll-view'),
-      controller: controller,
-      physics: physics,
+      controller: _controller,
+      physics: widget.physics,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverToBoxAdapter(
           child: SizedBox(height: TpRootGeometry.initialContentTop(context)),
         ),
-        ...slivers,
+        ...widget.slivers,
         SliverToBoxAdapter(
           child: SizedBox(
             key: const ValueKey('root-scroll-bottom-inset'),
@@ -183,9 +252,12 @@ class TpRootScrollView extends StatelessWidget {
         ),
       ],
     );
-    return onRefresh == null
+    return widget.onRefresh == null
         ? scrollView
-        : RefreshIndicator.adaptive(onRefresh: onRefresh!, child: scrollView);
+        : RefreshIndicator.adaptive(
+            onRefresh: widget.onRefresh!,
+            child: scrollView,
+          );
   }
 }
 

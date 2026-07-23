@@ -15,6 +15,7 @@ import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import 'trip_pdf_service.dart';
 import 'trip_print_data.dart';
@@ -81,18 +82,26 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
                   )
                 : const Icon(CupertinoIcons.printer),
           ),
-          TpToolbarGlassButton(
-            key: const ValueKey('trip-print-pdf'),
-            tooltip: '匯出 PDF',
-            onPressed: data == null || busy
-                ? null
-                : () => unawaited(_runAction(_PrintAction.pdf, data)),
-            child: _busyAction == _PrintAction.pdf
+          TpMoreMenuButton<_PrintAction>(
+            key: const ValueKey('trip-print-more'),
+            enabled: data != null && !busy,
+            triggerChild: _busyAction == _PrintAction.pdf
                 ? const SizedBox.square(
                     dimension: 20,
                     child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                   )
-                : const Icon(Icons.picture_as_pdf_outlined),
+                : null,
+            onSelected: (action) {
+              if (data != null) unawaited(_runAction(action, data));
+            },
+            items: const [
+              TpActionItem(
+                key: ValueKey('trip-print-pdf'),
+                value: _PrintAction.pdf,
+                icon: Icons.picture_as_pdf_outlined,
+                label: '匯出 PDF',
+              ),
+            ],
           ),
         ],
       ),

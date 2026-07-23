@@ -146,7 +146,6 @@ void main() {
             title: Text('我的行程'),
             actions: [
               IconButton(onPressed: null, icon: Icon(Icons.upload_outlined)),
-              IconButton(onPressed: null, icon: Icon(Icons.swap_vert)),
             ],
           ),
           body: TpRootScrollView(

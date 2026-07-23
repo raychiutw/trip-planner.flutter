@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
@@ -20,7 +21,19 @@ TpRootScaffold _root({int actionCount = 0, Widget? body}) {
       title: const Text('京都五日行'),
       actions: [
         for (var index = 0; index < actionCount; index++)
-          SizedBox.square(key: ValueKey('source-action-$index'), dimension: 44),
+          if (index == 1)
+            TpMoreMenuButton<int>(
+              key: ValueKey('source-action-$index'),
+              onSelected: (_) {},
+              items: const [
+                TpActionItem(value: 1, icon: Icons.more_horiz, label: '更多'),
+              ],
+            )
+          else
+            SizedBox.square(
+              key: ValueKey('source-action-$index'),
+              dimension: 44,
+            ),
       ],
     ),
     body:
@@ -85,6 +98,37 @@ void main() {
     },
   );
 
+  testWidgets('Reduce Motion 下重點 root tab 會立即回頂端', (tester) async {
+    final reselects = ValueNotifier<int>(0);
+    addTearDown(reselects.dispose);
+    await tester.pumpWidget(
+      _app(
+        TpRootReselectScope(
+          notifier: reselects,
+          child: _root(
+            body: const TpRootScrollView(
+              slivers: [SliverToBoxAdapter(child: SizedBox(height: 1200))],
+            ),
+          ),
+        ),
+        mediaQueryData: const MediaQueryData(disableAnimations: true),
+      ),
+    );
+
+    final scrollView = find.byKey(const ValueKey('tp-root-scroll-view'));
+    await tester.drag(scrollView, const Offset(0, -300));
+    await tester.pump();
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(of: scrollView, matching: find.byType(Scrollable)),
+    );
+    expect(scrollable.position.pixels, greaterThan(0));
+
+    reselects.value++;
+    await tester.pump();
+
+    expect(scrollable.position.pixels, 0);
+  });
+
   testWidgets('root header is one fixed capsule over full bleed content', (
     tester,
   ) async {
@@ -105,16 +149,21 @@ void main() {
     expect(tester.getSize(header).height, 64);
     expect(find.byType(SliverAppBar), findsNothing);
     expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(TpAccountAvatarButton), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
+      const Size(44, 44),
+    );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('full-bleed-body'))).dy,
       0,
     );
   });
 
-  testWidgets('root header has one glass surface and supports four actions', (
+  testWidgets('root header has one glass surface, two actions and account', (
     tester,
   ) async {
-    await tester.pumpWidget(_app(_root(actionCount: 4)));
+    await tester.pumpWidget(_app(_root(actionCount: 2)));
 
     final header = find.byKey(const ValueKey('tp-root-glass-header'));
     expect(
@@ -129,10 +178,11 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('tp-root-header-action-3')),
+      find.byKey(const ValueKey('tp-root-header-action-1')),
       findsOneWidget,
     );
-    await tester.pumpWidget(_app(_root(actionCount: 5)));
+    expect(find.byType(TpAccountAvatarButton), findsOneWidget);
+    await tester.pumpWidget(_app(_root(actionCount: 3)));
     expect(tester.takeException(), isAssertionError);
   });
 
@@ -146,7 +196,12 @@ void main() {
             title: const Text('調整順序'),
             actions: [
               TpToolbarTextButton(label: '完成', onPressed: () {}),
-              const SizedBox.square(dimension: 44),
+              TpMoreMenuButton<int>(
+                onSelected: (_) {},
+                items: const [
+                  TpActionItem(value: 1, icon: Icons.more_horiz, label: '更多'),
+                ],
+              ),
             ],
           ),
           body: const SizedBox.expand(),
@@ -227,10 +282,15 @@ void main() {
     final second = tester.getRect(
       find.byKey(const ValueKey('tp-root-header-action-1')),
     );
+    final account = tester.getRect(
+      find.byKey(const ValueKey('account-avatar-button')),
+    );
     expect(first.size, const Size(44, 44));
     expect(second.size, const Size(44, 44));
+    expect(account.size, const Size(44, 44));
     expect(second.left - first.right, 8);
-    expect(header.right - second.right, 16);
+    expect(account.left - second.right, 8);
+    expect(header.right - account.right, 16);
     expect(find.text('京都五日行'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
