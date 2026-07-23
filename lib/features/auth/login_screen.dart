@@ -3,7 +3,8 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart'
+    show CupertinoActivityIndicator, CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 /// 密碼登入畫面（/login，shell 外）。
@@ -49,6 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     setState(() => _loginAttempted = true);
@@ -65,6 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// OAuth PKCE 登入(系統瀏覽器 + loopback);成功後 invalidate authState → router 跳轉。
   Future<void> _oauthLogin() async {
+    if (_oauthLoading || ref.read(authStateProvider).isLoading) return;
     setState(() {
       _oauthLoading = true;
       _oauthError = null;
@@ -90,12 +94,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return '登入失敗，請檢查網路後再試';
   }
 
+  void _togglePasswordVisibility() =>
+      setState(() => _obscurePassword = !_obscurePassword);
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final media = MediaQuery.of(context);
+    final platform = Theme.of(context).platform;
+    final theme =
+        (media.platformBrightness == Brightness.dark
+                ? AppTheme.higDark(highContrast: media.highContrast)
+                : AppTheme.higLight(highContrast: media.highContrast))
+            .copyWith(platform: platform);
+    return Theme(
+      data: theme,
+      child: Builder(builder: _buildContent),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final tones = theme.extension<TpTones>()!;
     final authState = ref.watch(authStateProvider);
     final isSubmitting = authState.isLoading;
+    final isBusy = isSubmitting || _oauthLoading;
+    final highContrast = MediaQuery.highContrastOf(context);
     final emailVerified =
         GoRouterState.of(context).uri.queryParameters['verified'] == '1';
 
@@ -119,12 +144,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // 品牌區（奶油底由 scaffold surface 提供）
                       Text(
                         'Tripline',
                         textAlign: TextAlign.center,
                         style: textTheme.displaySmall?.copyWith(
-                          color: colorScheme.primary,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: TpSpacing.s2),
@@ -137,40 +161,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: TpSpacing.s8),
                       if (emailVerified) ...[
-                        Container(
+                        Semantics(
                           key: const ValueKey('login-verified-banner'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: TpSpacing.s4,
-                            vertical: TpSpacing.s3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(TpRadius.md),
-                          ),
-                          child: Text(
-                            '信箱已驗證，請登入繼續。',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onPrimaryContainer,
+                          container: true,
+                          liveRegion: true,
+                          label: '成功：信箱已驗證，請登入繼續。',
+                          excludeSemantics: true,
+                          child: Container(
+                            key: const ValueKey('login-verified-surface'),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: TpSpacing.s4,
+                              vertical: TpSpacing.s3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: tones.success.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(TpRadius.md),
+                              border: highContrast
+                                  ? Border.all(color: colorScheme.onSurface)
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.check_mark_circled_solid,
+                                  color: tones.success,
+                                ),
+                                const SizedBox(width: TpSpacing.s2),
+                                Expanded(
+                                  child: Text(
+                                    '信箱已驗證，請登入繼續。',
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                         const SizedBox(height: TpSpacing.s4),
                       ],
                       if (_loginAttempted && authState.hasError) ...[
-                        Container(
+                        Semantics(
                           key: const ValueKey('login-error-banner'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: TpSpacing.s4,
-                            vertical: TpSpacing.s3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(TpRadius.md),
-                          ),
-                          child: Text(
-                            _loginErrorMessage(authState.error!),
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.error,
+                          container: true,
+                          liveRegion: true,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: TpSpacing.s4,
+                              vertical: TpSpacing.s3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(TpRadius.md),
+                            ),
+                            child: Text(
+                              _loginErrorMessage(authState.error!),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.error,
+                              ),
                             ),
                           ),
                         ),
@@ -186,7 +235,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           AutofillHints.email,
                         ],
                         textInputAction: TextInputAction.next,
-                        enabled: !isSubmitting,
+                        enabled: !isBusy,
                         decoration: const InputDecoration(labelText: 'Email'),
                         validator: (value) =>
                             (value == null || value.trim().isEmpty)
@@ -200,22 +249,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         obscureText: _obscurePassword,
                         autofillHints: const [AutofillHints.password],
                         textInputAction: TextInputAction.done,
-                        enabled: !isSubmitting,
+                        enabled: !isBusy,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
                           labelText: '密碼',
-                          suffixIcon: IconButton(
+                          suffixIcon: Semantics(
                             key: const ValueKey(
                               'login-password-visibility-toggle',
                             ),
-                            tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                            onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            ),
-                            icon: Icon(
-                              _obscurePassword
-                                  ? CupertinoIcons.eye
-                                  : CupertinoIcons.eye_slash,
+                            button: true,
+                            label: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                            onTap: _togglePasswordVisibility,
+                            child: Tooltip(
+                              message: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                              excludeFromSemantics: true,
+                              child: IconButton(
+                                onPressed: _togglePasswordVisibility,
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? CupertinoIcons.eye
+                                      : CupertinoIcons.eye_slash,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -225,19 +280,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: TpSpacing.s6),
                       FilledButton(
                         key: const ValueKey('login-submit-button'),
-                        onPressed: isSubmitting ? null : _submit,
+                        onPressed: isBusy ? null : _submit,
                         child: isSubmitting
                             ? const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   SizedBox.square(
                                     dimension: 18,
-                                    child: CircularProgressIndicator.adaptive(
-                                      strokeWidth: 2,
-                                    ),
+                                    child: CupertinoActivityIndicator(),
                                   ),
                                   SizedBox(width: TpSpacing.s2),
-                                  Text('登入'),
+                                  Text('登入中'),
                                 ],
                               )
                             : const Text('登入'),
@@ -245,25 +298,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       if (ref.watch(oauthEnabledProvider)) ...[
                         const SizedBox(height: TpSpacing.s4),
                         if (_oauthError != null) ...[
-                          Text(
-                            _oauthError!,
-                            textAlign: TextAlign.center,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.error,
+                          Semantics(
+                            container: true,
+                            liveRegion: true,
+                            child: Text(
+                              _oauthError!,
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.error,
+                              ),
                             ),
                           ),
                           const SizedBox(height: TpSpacing.s2),
                         ],
                         OutlinedButton(
                           key: const ValueKey('login-oauth-button'),
-                          onPressed: _oauthLoading ? null : _oauthLogin,
+                          onPressed: isBusy ? null : _oauthLogin,
                           child: _oauthLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator.adaptive(
-                                    strokeWidth: 2,
-                                  ),
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox.square(
+                                      dimension: 18,
+                                      child: CupertinoActivityIndicator(),
+                                    ),
+                                    SizedBox(width: TpSpacing.s2),
+                                    Text('OAuth 登入中'),
+                                  ],
                                 )
                               : const Text('用 OAuth 登入'),
                         ),
@@ -271,16 +332,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: TpSpacing.s3),
                       TextButton(
                         key: const ValueKey('login-forgot-password-link'),
-                        onPressed: isSubmitting
+                        onPressed: isBusy
                             ? null
                             : () => context.go('/login/forgot'),
                         child: const Text('忘記密碼？'),
                       ),
                       TextButton(
                         key: const ValueKey('login-signup-link'),
-                        onPressed: isSubmitting
-                            ? null
-                            : () => context.go('/signup'),
+                        onPressed: isBusy ? null : () => context.go('/signup'),
                         child: const Text('沒有帳號，建立帳號'),
                       ),
                     ],

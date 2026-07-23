@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +12,7 @@ import 'package:tripline/api/oauth/oauth_providers.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/models/oauth_tokens.dart';
+import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
@@ -64,6 +68,95 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
     await tester.pumpAndSettle();
     verify(() => oauthLogin.login()).called(1);
+  });
+
+  testWidgets('OAuth 登入中顯示 iOS progress、文字並禁止重複送出', (tester) async {
+    final pending = Completer<OAuthTokens>();
+    when(() => oauthLogin.login()).thenAnswer((_) => pending.future);
+
+    await pump(tester, oauthEnabled: true);
+    const buttonKey = ValueKey('login-oauth-button');
+    await tester.tap(find.byKey(buttonKey));
+    await tester.pump();
+
+    expect(
+      find.descendant(
+        of: find.byKey(buttonKey),
+        matching: find.byType(CupertinoActivityIndicator),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('OAuth 登入中'), findsOneWidget);
+    expect(
+      tester.widget<OutlinedButton>(find.byKey(buttonKey)).onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('login-submit-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('login-email-field')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.byKey(const ValueKey('login-forgot-password-link')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    pending.complete(
+      OAuthTokens(
+        accessToken: 'AT',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      ),
+    );
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('密碼登入中禁止啟動 OAuth', (tester) async {
+    final pending = Completer<UserInfo>();
+    when(
+      () => authRepo.login(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer((_) => pending.future);
+    await pump(tester, oauthEnabled: true);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'ray@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'secret',
+    );
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('login-oauth-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    pending.complete(const UserInfo(id: 'u1', email: 'ray@example.com'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('OAuth 登入失敗 → 顯示錯誤', (tester) async {

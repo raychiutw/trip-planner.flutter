@@ -13,8 +13,25 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final platform = Theme.of(context).platform;
+    final theme =
+        (media.platformBrightness == Brightness.dark
+                ? AppTheme.higDark(highContrast: media.highContrast)
+                : AppTheme.higLight(highContrast: media.highContrast))
+            .copyWith(platform: platform);
+    return Theme(
+      data: theme,
+      child: Builder(builder: _buildContent),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
+    final toolbarHeight = math.max(
+      56.0,
+      MediaQuery.textScalerOf(context).scale(20) + 20,
+    );
     return Scaffold(
       key: const ValueKey('welcome-screen'),
       body: CustomScrollView(
@@ -23,32 +40,18 @@ class WelcomeScreen extends StatelessWidget {
           SliverAppBar(
             pinned: true,
             automaticallyImplyLeading: false,
-            toolbarHeight: 56,
-            backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.94),
+            toolbarHeight: toolbarHeight,
+            backgroundColor: theme.colorScheme.surface,
             surfaceTintColor: Colors.transparent,
             scrolledUnderElevation: 0,
             titleSpacing: 18,
-            title: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: 'Trip'),
-                  TextSpan(
-                    text: 'line',
-                    style: TextStyle(color: tones.accentDeep),
-                  ),
-                ],
-              ),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
-              ),
-            ),
+            title: Text('Tripline', style: theme.textTheme.titleLarge),
             actions: [
               TextButton(
                 key: const ValueKey('welcome-login-top'),
                 onPressed: onLogin,
                 style: TextButton.styleFrom(
-                  foregroundColor: tones.accentDeep,
+                  foregroundColor: theme.colorScheme.primary,
                   minimumSize: const Size(TpSpacing.tapMin, TpSpacing.tapMin),
                   padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
                 ),
@@ -126,37 +129,20 @@ class _HeroCopy extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
-    final width = MediaQuery.sizeOf(context).width;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '旅遊行程規劃',
           style: theme.textTheme.labelSmall?.copyWith(
-            color: tones.accentDeep,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: TpSpacing.s3),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(text: '行程排壞了，'),
-              TextSpan(
-                text: '講一句話就好',
-                style: TextStyle(color: tones.accentDeep),
-              ),
-            ],
-          ),
+        Text(
+          '行程排壞了，講一句話就好',
           key: const ValueKey('welcome-headline'),
-          style: theme.textTheme.displaySmall?.copyWith(
-            fontSize: width >= 760 ? 48 : 32,
-            height: 1.2,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1,
-          ),
+          style: theme.textTheme.displaySmall,
         ),
         const SizedBox(height: TpSpacing.s3),
         ConstrainedBox(
@@ -215,13 +201,7 @@ class _Features extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '出發前你會反覆做的三件事',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
-          ),
+          Text('出發前你會反覆做的三件事', style: theme.textTheme.headlineSmall),
           const SizedBox(height: TpSpacing.s2),
           Text(
             '不是功能清單，是實際會發生的事。',
@@ -301,12 +281,7 @@ class _FeatureCard extends StatelessWidget {
         children: [
           _LandingArt(kind: kind, semanticsLabel: semanticsLabel),
           const SizedBox(height: TpSpacing.s4),
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(title, style: theme.textTheme.titleMedium),
           const SizedBox(height: TpSpacing.s2),
           Text(
             body,
@@ -348,9 +323,7 @@ class _ClosingCallToAction extends StatelessWidget {
             Text(
               '行程還在 Google Docs 裡？',
               textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: theme.textTheme.headlineSmall,
             ),
             const SizedBox(height: TpSpacing.s2),
             Text(
@@ -420,9 +393,7 @@ class _LoginButton extends StatelessWidget {
         minimumSize: const Size(0, 52),
         padding: const EdgeInsets.symmetric(horizontal: 26),
         shape: const StadiumBorder(),
-        textStyle: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        textStyle: Theme.of(context).textTheme.titleMedium,
       ),
       child: const Text('登入後開始使用'),
     );
@@ -528,7 +499,7 @@ class _LandingArtPainter extends CustomPainter {
       canvas,
       route,
       Paint()
-        ..color = tones.accent.withValues(alpha: 0.55)
+        ..color = scheme.onSurfaceVariant.withValues(alpha: 0.55)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
         ..strokeWidth = 2.5,
@@ -549,14 +520,14 @@ class _LandingArtPainter extends CustomPainter {
       const Rect.fromLTWH(70, 24, 238, 62),
       const Radius.circular(20),
     );
-    canvas.drawRRect(bubble, Paint()..color = tones.accentDeep);
+    canvas.drawRRect(bubble, Paint()..color = scheme.onSurface);
     canvas.drawPath(
       Path()
         ..moveTo(96, 86)
         ..lineTo(110, 86)
         ..lineTo(96, 102)
         ..close(),
-      Paint()..color = tones.accentDeep,
+      Paint()..color = scheme.onSurface,
     );
     _drawText(
       canvas,
@@ -616,7 +587,7 @@ class _LandingArtPainter extends CustomPainter {
         const Rect.fromLTWH(96, 66, 132, 34),
         const Radius.circular(17),
       ),
-      Paint()..color = tones.accentDeep,
+      Paint()..color = scheme.onSurface,
     );
     for (final rect in const [
       Rect.fromLTWH(112, 79, 72, 8),

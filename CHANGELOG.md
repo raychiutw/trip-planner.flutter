@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 變更
+
+- Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。
+
 ## [0.9.6] - 2026-07-23
 
 ### 修正
