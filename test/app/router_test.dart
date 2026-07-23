@@ -565,7 +565,7 @@ void main() {
     final updated = tester.widget<ChatScreen>(find.byType(ChatScreen));
     expect(updated.initialTripId, 'trip-2');
     expect(updated.initialPrefill, '改行程');
-    expect(updated.key, isNot(screen.key));
+    expect(updated.key, screen.key);
 
     container.read(appRouterProvider).go('/trips');
     await tester.pumpAndSettle();

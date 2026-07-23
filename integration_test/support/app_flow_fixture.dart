@@ -40,12 +40,20 @@ class MockFavoritesRepository extends Mock implements FavoritesRepository {}
 class MockMapRepository extends Mock implements MapRepository {}
 
 const releaseSmokeTrip = Trip(id: 'okinawa', name: 'okinawa', title: '沖繩家族之旅');
+const releaseSmokeTokyoTrip = Trip(id: 'tokyo', name: 'tokyo', title: '東京週末旅行');
 
 const releaseSmokeTrips = [
   TripSummary(
     tripId: 'okinawa',
     name: 'okinawa',
     title: '沖繩家族之旅',
+    totalDays: 2,
+    countries: 'JP',
+  ),
+  TripSummary(
+    tripId: 'tokyo',
+    name: 'tokyo',
+    title: '東京週末旅行',
     totalDays: 2,
     countries: 'JP',
   ),
@@ -81,6 +89,41 @@ const releaseSmokeDays = [
         startTime: '09:00',
         endTime: '10:00',
         title: '首里城',
+      ),
+    ],
+  ),
+];
+
+const releaseSmokeTokyoDays = [
+  TripDay(
+    id: 101,
+    dayNum: 1,
+    title: '抵達東京',
+    version: 0,
+    timeline: [
+      TimelineEntry(
+        id: 111,
+        sortOrder: 0,
+        version: 0,
+        startTime: '10:00',
+        endTime: '11:00',
+        title: '東京車站',
+      ),
+    ],
+  ),
+  TripDay(
+    id: 102,
+    dayNum: 2,
+    title: '淺草散策',
+    version: 0,
+    timeline: [
+      TimelineEntry(
+        id: 121,
+        sortOrder: 0,
+        version: 0,
+        startTime: '09:00',
+        endTime: '10:00',
+        title: '淺草寺',
       ),
     ],
   ),
@@ -164,6 +207,24 @@ class AppFlowFixture {
     ).thenAnswer((_) => Stream.value(const TripNotes()));
     when(
       () => trips.watchSegments(tripId: 'okinawa'),
+    ).thenAnswer((_) => Stream.value(const <TripSegment>[]));
+    when(
+      () => trips.watchTrip('tokyo'),
+    ).thenAnswer((_) => Stream.value(releaseSmokeTokyoTrip));
+    when(
+      () => trips.fetchTrip('tokyo'),
+    ).thenAnswer((_) async => releaseSmokeTokyoTrip);
+    when(
+      () => trips.watchDays('tokyo'),
+    ).thenAnswer((_) => Stream.value(releaseSmokeTokyoDays));
+    when(
+      () => trips.fetchDaySummaries('tokyo'),
+    ).thenAnswer((_) async => releaseSmokeTokyoDays);
+    when(
+      () => trips.watchNotes('tokyo'),
+    ).thenAnswer((_) => Stream.value(const TripNotes()));
+    when(
+      () => trips.watchSegments(tripId: 'tokyo'),
     ).thenAnswer((_) => Stream.value(const <TripSegment>[]));
 
     when(
@@ -417,6 +478,9 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
     findsOneWidget,
   );
+  await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+  await tester.pumpAndSettle();
+  expect(find.text('首里城'), findsOneWidget);
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
@@ -436,6 +500,11 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.text('從一個指令開始'));
   await tester.pump();
   expect(chatInput.focusNode.hasFocus, isFalse);
+  await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+  await tester.pumpAndSettle();
+  expect(find.text('東京週末旅行'), findsOneWidget);
   await captureState('chat');
 
   await tester.tap(_rootTab('行程'));
@@ -444,10 +513,45 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
     findsOneWidget,
   );
+  expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.text('淺草寺'), findsOneWidget);
+
+  await tester.tap(find.byKey(const ValueKey('trip-timeline-trip-picker')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('trip-picker-item-okinawa')));
+  await tester.pumpAndSettle();
+  expect(
+    find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    findsOneWidget,
+  );
+  expect(find.text('沖繩家族之旅'), findsOneWidget);
+  expect(find.text('首里城'), findsOneWidget);
+
+  await tester.tap(_rootTab('聊天'));
+  await tester.pumpAndSettle();
+  expect(find.text('沖繩家族之旅'), findsOneWidget);
+  expect(find.text('device smoke draft'), findsOneWidget);
 
   await tester.tap(_rootTab('地圖'));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
+  expect(find.byKey(const ValueKey('global-trip-map-okinawa')), findsOneWidget);
+
+  await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
+
+  await tester.tap(_rootTab('行程'));
+  await tester.pumpAndSettle();
+  expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.text('淺草寺'), findsOneWidget);
+
+  await tester.tap(_rootTab('聊天'));
+  await tester.pumpAndSettle();
+  expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.text('device smoke draft'), findsNothing);
 
   await tester.tap(_rootTab('收藏'));
   await tester.pumpAndSettle();

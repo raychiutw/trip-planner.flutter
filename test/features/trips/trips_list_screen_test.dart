@@ -236,7 +236,7 @@ void main() {
       }
     });
 
-    testWidgets('empty state：顯示「還沒有行程」hero 文案', (tester) async {
+    testWidgets('empty state：顯示「尚無行程」hero 文案', (tester) async {
       await _useWideSurface(tester);
       await tester.pumpWidget(
         ProviderScope(
@@ -251,7 +251,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TripCard), findsNothing);
-      expect(find.text('還沒有行程'), findsOneWidget);
+      expect(find.text('尚無行程'), findsOneWidget);
     });
 
     testWidgets('error state：顯示重試按鈕，點擊後重新載入成功', (tester) async {

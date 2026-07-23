@@ -336,7 +336,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/chat',
                 builder: (context, state) => ChatScreen(
-                  key: ValueKey(_withoutAccount(state.uri)),
+                  key: const ValueKey('chat-root'),
                   initialTripId: state.uri.queryParameters['tripId'],
                   initialPrefill: state.uri.queryParameters['prefill'],
                 ),

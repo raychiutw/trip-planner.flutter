@@ -45,10 +45,31 @@ final _day = TripDay(
   ],
 );
 
+final _dayTwo = TripDay(
+  id: 2,
+  dayNum: 2,
+  version: 1,
+  timeline: const [
+    TimelineEntry(
+      id: 22,
+      sortOrder: 0,
+      title: '淺草寺',
+      version: 1,
+      master: EntryPoiInfo(
+        poiId: 220,
+        name: '淺草寺',
+        lat: 35.7148,
+        lng: 139.7967,
+      ),
+    ),
+  ],
+);
+
 void main() {
   Widget buildApp({
     List<TripSummary> trips = _trips,
     List<TripDay>? days,
+    Map<String, List<TripDay>>? daysByTrip,
     InMemoryCacheStore? cacheStore,
     TripMapLocationService? locationService,
     ValueChanged<TripMapCanvasConfig>? onMapConfig,
@@ -60,7 +81,7 @@ void main() {
         ),
         myTripsProvider.overrideWith((ref) => Stream.value(trips)),
         tripDaysProvider.overrideWith(
-          (ref, tripId) => Stream.value(days ?? [_day]),
+          (ref, tripId) => Stream.value(daysByTrip?[tripId] ?? days ?? [_day]),
         ),
       ],
       child: MaterialApp(
@@ -126,6 +147,48 @@ void main() {
     expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
   });
 
+  testWidgets('切換行程保留可用 DAY，缺少時回 Day 1 並清除舊 POI', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      buildApp(
+        daysByTrip: {
+          'okinawa': [_day, _dayTwo],
+          'tokyo': [_day],
+        },
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.onGooglePoiSelected!(
+      const GoogleMapPoiSelection(
+        placeId: 'old-trip-poi',
+        name: '舊行程景點',
+        point: TripMapPoint(35.7, 139.8),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-okinawa')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-22')), findsNothing);
+  });
+
   testWidgets('從持久 cache 恢復上次查看的行程', (tester) async {
     final store = InMemoryCacheStore();
     await store.writeResponse('ui:last-map-trip', 'tokyo');
@@ -156,7 +219,7 @@ void main() {
     await tester.pumpWidget(buildApp(trips: const []));
     await tester.pumpAndSettle();
 
-    expect(find.text('先建立行程'), findsOneWidget);
+    expect(find.text('尚無行程'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);

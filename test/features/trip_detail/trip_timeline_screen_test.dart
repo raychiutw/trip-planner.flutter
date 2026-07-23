@@ -197,6 +197,7 @@ Future<void> _pumpTimeline(
   DayWeatherFetcher? dayWeatherFetcher,
   bool disableAnimations = false,
   TextScaler? textScaler,
+  List<TripSummary>? trips,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$tripId',
@@ -287,6 +288,8 @@ Future<void> _pumpTimeline(
         tripSegmentsProvider(
           tripId,
         ).overrideWith((ref) => Stream.value(segments)),
+        if (trips != null)
+          myTripsProvider.overrideWith((ref) => Stream.value(trips)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
         if (dayWeatherFetcher != null)
           dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
@@ -1342,6 +1345,33 @@ void main() {
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
 
     expect(find.byKey(const ValueKey('timeline-skeleton')), findsOneWidget);
+  });
+
+  testWidgets('detail 載入中仍以目前行程摘要顯示 selector title', (tester) async {
+    final neverCompletes = Completer<Trip>();
+    await _pumpTimeline(
+      tester,
+      fetchTrip: () => neverCompletes.future,
+      trips: const [
+        TripSummary(tripId: _tripId, name: 'okinawa', title: '沖繩摘要名稱'),
+      ],
+    );
+
+    expect(find.text('沖繩摘要名稱'), findsOneWidget);
+  });
+
+  testWidgets('detail 沒有 title 時不以 slug 覆蓋摘要顯示名稱', (tester) async {
+    await _pumpTimeline(
+      tester,
+      fetchTrip: () => const Trip(id: _tripId, name: 'okinawa'),
+      trips: const [
+        TripSummary(tripId: _tripId, name: 'okinawa', title: '沖繩摘要名稱'),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩摘要名稱'), findsOneWidget);
+    expect(find.text('okinawa'), findsNothing);
   });
 
   testWidgets('error 顯示重試按鈕，點擊後重新載入', (tester) async {

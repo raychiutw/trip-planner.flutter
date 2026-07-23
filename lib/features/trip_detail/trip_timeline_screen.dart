@@ -23,6 +23,7 @@ import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../../ui/tp_scope_menu.dart';
 import '../../ui/swipe_to_delete.dart';
+import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import '../trips/audit/trip_audit_screen.dart';
@@ -78,13 +79,20 @@ class TripTimelineScreen extends ConsumerStatefulWidget {
 }
 
 class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
-  var _isEditing = false;
   int? _activeDayNum;
+  String? _editingTripId;
 
   @override
   void initState() {
     super.initState();
     _activeDayNum = widget.initialDayNum;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(
+          ref.read(currentTripIdProvider.notifier).select(widget.tripId),
+        );
+      }
+    });
   }
 
   @override
@@ -93,7 +101,15 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     if (oldWidget.tripId != widget.tripId ||
         oldWidget.initialDayNum != widget.initialDayNum) {
       _activeDayNum = widget.initialDayNum;
-      if (oldWidget.tripId != widget.tripId) _isEditing = false;
+    }
+    if (oldWidget.tripId != widget.tripId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(
+            ref.read(currentTripIdProvider.notifier).select(widget.tripId),
+          );
+        }
+      });
     }
   }
 
@@ -101,24 +117,24 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     unawaited(showAppScreenSheet<void>(context, builder: (_) => screen));
   }
 
-  void _handleTripAction(_TripMoreAction action) {
+  void _handleTripAction(_TripMoreAction action, String tripId) {
     switch (action) {
       case _TripMoreAction.editMode:
-        setState(() => _isEditing = true);
+        setState(() => _editingTripId = tripId);
       case _TripMoreAction.notes:
-        _openActionSheet(TripNotesScreen(tripId: widget.tripId));
+        _openActionSheet(TripNotesScreen(tripId: tripId));
       case _TripMoreAction.editInfo:
-        _openActionSheet(EditTripScreen(tripId: widget.tripId));
+        _openActionSheet(EditTripScreen(tripId: tripId));
       case _TripMoreAction.print:
-        _openActionSheet(TripPrintScreen(tripId: widget.tripId));
+        _openActionSheet(TripPrintScreen(tripId: tripId));
       case _TripMoreAction.audit:
-        _openActionSheet(TripAuditScreen(tripId: widget.tripId));
+        _openActionSheet(TripAuditScreen(tripId: tripId));
       case _TripMoreAction.share:
-        _openActionSheet(ShareScreen(tripId: widget.tripId));
+        _openActionSheet(ShareScreen(tripId: tripId));
       case _TripMoreAction.collab:
-        _openActionSheet(CollabScreen(tripId: widget.tripId));
+        _openActionSheet(CollabScreen(tripId: tripId));
       case _TripMoreAction.health:
-        _openActionSheet(TripHealthScreen(tripId: widget.tripId));
+        _openActionSheet(TripHealthScreen(tripId: tripId));
     }
   }
 
@@ -129,14 +145,41 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       child: child,
     );
 
-    final tripAsync = ref.watch(tripDetailProvider(widget.tripId));
-    final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final trips = switch (ref.watch(myTripsProvider)) {
       AsyncData(:final value) => value,
       _ => const <TripSummary>[],
     };
+    final selectedAsync = ref.watch(currentTripIdProvider);
+    final currentTrip = resolveCurrentTrip(trips, selectedAsync.value);
+    final tripId = currentTrip?.tripId ?? widget.tripId;
+    final isEditing = _editingTripId == tripId;
+    if (!selectedAsync.isLoading &&
+        currentTrip != null &&
+        selectedAsync.value != tripId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(
+            ref.read(currentTripIdProvider.notifier).select(currentTrip.tripId),
+          );
+        }
+      });
+    }
+    final tripAsync = ref.watch(tripDetailProvider(tripId));
+    final daysAsync = ref.watch(tripDaysProvider(tripId));
     final trip = tripAsync.value;
-    final tripTitle = trip?.title ?? trip?.name ?? '行程';
+    final detailTitle = trip?.title?.trim();
+    final detailName = trip?.name.trim();
+    final summaryTitle = currentTrip?.title?.trim();
+    final summaryName = currentTrip?.name.trim();
+    final tripTitle = detailTitle?.isNotEmpty ?? false
+        ? detailTitle!
+        : summaryTitle?.isNotEmpty ?? false
+        ? summaryTitle!
+        : detailName?.isNotEmpty ?? false
+        ? detailName!
+        : summaryName?.isNotEmpty ?? false
+        ? summaryName!
+        : '行程';
     final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
 
     return TpRootScaffold(
@@ -148,18 +191,28 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           tooltip: '返回行程列表',
           onPressed: () => context.go('/trips'),
         ),
-        title: _isEditing
+        title: isEditing
             ? const Text('調整順序')
             : TripTitleButton(
                 key: const ValueKey('trip-timeline-trip-picker'),
-                currentTripId: widget.tripId,
+                currentTripId: tripId,
                 currentTitle: tripTitle,
                 trips: trips,
-                onSelected: (tripId) =>
-                    context.go('/trips/${Uri.encodeComponent(tripId)}'),
+                onSelected: (selectedTripId) {
+                  unawaited(
+                    ref
+                        .read(currentTripIdProvider.notifier)
+                        .select(selectedTripId),
+                  );
+                  final dayNum = _activeDayNum ?? fallbackDayNum;
+                  context.go(
+                    '/trips/${Uri.encodeComponent(selectedTripId)}'
+                    '${dayNum == null ? '' : '?day=$dayNum'}',
+                  );
+                },
               ),
         actions: [
-          if (!_isEditing)
+          if (!isEditing)
             TpToolbarIconButton(
               key: const ValueKey('trip-timeline-map'),
               icon: CupertinoIcons.map,
@@ -167,21 +220,21 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
               onPressed: () {
                 final dayNum = _activeDayNum ?? fallbackDayNum;
                 context.go(
-                  '/map?tripId=${Uri.encodeQueryComponent(widget.tripId)}'
+                  '/map?tripId=${Uri.encodeQueryComponent(tripId)}'
                   '${dayNum == null ? '' : '&day=$dayNum'}',
                 );
               },
             ),
-          if (_isEditing)
+          if (isEditing)
             TpToolbarTextButton(
               key: const ValueKey('tp-root-header-primary-action'),
               label: '完成',
-              onPressed: () => setState(() => _isEditing = false),
+              onPressed: () => setState(() => _editingTripId = null),
             )
           else
             TpMoreMenuButton<_TripMoreAction>(
               key: const ValueKey('trip-actions-menu'),
-              onSelected: _handleTripAction,
+              onSelected: (action) => _handleTripAction(action, tripId),
               items: const [
                 TpActionItem(
                   key: ValueKey('trip-edit-mode'),
@@ -241,19 +294,21 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
             ? initiallyBelowHeader(const _EmptyTimeline())
             : _TimelineBody(
                 days: days,
-                tripId: widget.tripId,
-                initialEntryId: widget.initialEntryId,
-                initialDayNum: widget.initialDayNum,
-                isEditing: _isEditing,
-                onStartEditing: () => setState(() => _isEditing = true),
+                tripId: tripId,
+                initialEntryId: tripId == widget.tripId
+                    ? widget.initialEntryId
+                    : null,
+                initialDayNum: _activeDayNum ?? widget.initialDayNum,
+                isEditing: isEditing,
+                onStartEditing: () => setState(() => _editingTripId = tripId),
                 onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
         error: (error, stackTrace) => initiallyBelowHeader(
           _TimelineError(
             onRetry: () {
-              ref.invalidate(tripDetailProvider(widget.tripId));
-              ref.invalidate(tripDaysProvider(widget.tripId));
+              ref.invalidate(tripDetailProvider(tripId));
+              ref.invalidate(tripDaysProvider(tripId));
             },
           ),
         ),

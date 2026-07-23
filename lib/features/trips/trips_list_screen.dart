@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_selector/file_selector.dart';
@@ -16,6 +17,7 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../../ui/swipe_to_delete.dart';
+import 'current_trip_provider.dart';
 import 'trip_card.dart';
 
 const int _maxTripImportBytes = 512 * 1024;
@@ -475,6 +477,7 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       if (!mounted) return;
       ref.invalidate(myTripsProvider);
       _showActionMessage('匯入成功');
+      unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
       context.go('/trips/$tripId');
     } on FormatException {
       if (!mounted) return;
@@ -549,7 +552,12 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             child: TripCard(
               trip: trip,
               currentUserId: currentUserId,
-              onTap: () => context.go('/trips/${trip.tripId}'),
+              onTap: () {
+                unawaited(
+                  ref.read(currentTripIdProvider.notifier).select(trip.tripId),
+                );
+                context.go('/trips/${trip.tripId}');
+              },
               onLongPress: () => _showTripActions(context, trip),
               onMorePressed: () => _showTripActions(context, trip),
             ),
@@ -655,7 +663,7 @@ class _EmptyHero extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('還沒有行程', style: theme.textTheme.titleLarge),
+          Text('尚無行程', style: theme.textTheme.titleLarge),
           const SizedBox(height: TpSpacing.s2),
           Text(
             '建立第一趟旅程，開始規劃你的旅行。',
