@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -35,7 +38,17 @@ void main() {
   Future<void> pumpLoginScreen(
     WidgetTester tester, {
     String initialLocation = '/',
+    Size size = const Size(390, 844),
+    double textScale = 1,
+    Brightness brightness = Brightness.light,
+    TargetPlatform platform = TargetPlatform.iOS,
+    bool boldText = false,
+    bool highContrast = false,
+    bool reduceMotion = false,
+    EdgeInsets viewInsets = EdgeInsets.zero,
   }) async {
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final fakeRouter = GoRouter(
       initialLocation: initialLocation,
       routes: [
@@ -58,8 +71,25 @@ void main() {
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
         ],
         child: MaterialApp.router(
-          theme: AppTheme.light(),
+          theme:
+              (brightness == Brightness.light
+                      ? AppTheme.light()
+                      : AppTheme.dark())
+                  .copyWith(platform: platform),
+          themeMode: ThemeMode.light,
           routerConfig: fakeRouter,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              size: size,
+              textScaler: TextScaler.linear(textScale),
+              platformBrightness: brightness,
+              boldText: boldText,
+              highContrast: highContrast,
+              disableAnimations: reduceMotion,
+              viewInsets: viewInsets,
+            ),
+            child: child!,
+          ),
         ),
       ),
     );
@@ -89,6 +119,81 @@ void main() {
 
       final passwordTextField = innerTextFieldOf(tester, passwordFieldKey);
       expect(passwordTextField.obscureText, isTrue);
+
+      final context = tester.element(find.byKey(const ValueKey('auth-card')));
+      final brand = tester.widget<Text>(find.text('Tripline'));
+      expect(brand.style?.color, Theme.of(context).colorScheme.onSurface);
+      expect(
+        brand.style?.fontSize,
+        Theme.of(context).textTheme.displaySmall?.fontSize,
+      );
+    });
+
+    testWidgets('iOS／Android 的 Light／Dark 共用同一個 Login 結構', (tester) async {
+      for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+        for (final brightness in [Brightness.light, Brightness.dark]) {
+          await pumpLoginScreen(
+            tester,
+            platform: platform,
+            brightness: brightness,
+          );
+
+          final context = tester.element(
+            find.byKey(const ValueKey('auth-card')),
+          );
+          expect(Theme.of(context).platform, platform);
+          expect(Theme.of(context).brightness, brightness);
+          expect(
+            Theme.of(context).colorScheme.surface,
+            brightness == Brightness.light
+                ? TpSystemColorsLight.background
+                : TpSystemColorsDark.background,
+          );
+          expect(
+            Theme.of(context).colorScheme.primary,
+            brightness == Brightness.light
+                ? TpSystemColorsLight.tint
+                : TpSystemColorsDark.tint,
+          );
+          expect(find.byKey(emailFieldKey), findsOneWidget);
+          expect(find.byKey(passwordFieldKey), findsOneWidget);
+          expect(find.byKey(submitButtonKey), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+      }
+    });
+
+    testWidgets('欄位與 controls 具正確 semantics 且至少 44×44pt', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpLoginScreen(tester);
+
+      for (final key in [
+        emailFieldKey,
+        passwordFieldKey,
+        passwordToggleKey,
+        submitButtonKey,
+      ]) {
+        final finder = find.byKey(key);
+        final size = tester.getSize(finder);
+        expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
+        expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
+      }
+      expect(find.bySemanticsLabel('Email'), findsOneWidget);
+      expect(find.bySemanticsLabel('密碼'), findsOneWidget);
+      final passwordToggleSemantics = tester
+          .getSemantics(find.byKey(passwordToggleKey))
+          .getSemanticsData();
+      expect(passwordToggleSemantics.label, contains('顯示密碼'));
+      expect(passwordToggleSemantics.hasAction(SemanticsAction.tap), isTrue);
+      expect(
+        tester
+            .getSemantics(find.byKey(submitButtonKey))
+            .getSemanticsData()
+            .label,
+        contains('登入'),
+      );
+
+      semantics.dispose();
     });
 
     testWidgets('密碼顯示切換：點 suffix icon 後 obscureText 變 false', (tester) async {
@@ -102,13 +207,30 @@ void main() {
     });
 
     testWidgets('verified query 顯示信箱已驗證提示', (tester) async {
-      await pumpLoginScreen(tester, initialLocation: '/?verified=1');
+      await pumpLoginScreen(
+        tester,
+        initialLocation: '/?verified=1',
+        highContrast: true,
+      );
 
       expect(
         find.byKey(const ValueKey('login-verified-banner')),
         findsOneWidget,
       );
       expect(find.text('信箱已驗證，請登入繼續。'), findsOneWidget);
+      final context = tester.element(find.byKey(const ValueKey('auth-card')));
+      final text = tester.widget<Text>(find.text('信箱已驗證，請登入繼續。'));
+      expect(text.style?.color, Theme.of(context).colorScheme.onSurface);
+      final surface = tester.widget<Container>(
+        find.byKey(const ValueKey('login-verified-surface')),
+      );
+      final decoration = surface.decoration! as BoxDecoration;
+      expect(decoration.border, isNotNull);
+      final semantics = tester
+          .getSemantics(find.byKey(const ValueKey('login-verified-banner')))
+          .getSemanticsData();
+      expect(semantics.flagsCollection.isLiveRegion, isTrue);
+      expect(semantics.label, contains('成功'));
     });
 
     testWidgets('可從登入頁前往忘記密碼流程', (tester) async {
@@ -196,14 +318,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(submitButtonKey),
-          matching: find.byType(CircularProgressIndicator),
+          matching: find.byType(CupertinoActivityIndicator),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byKey(submitButtonKey),
-          matching: find.text('登入'),
+          matching: find.text('登入中'),
         ),
         findsOneWidget,
       );
@@ -225,6 +347,90 @@ void main() {
       pendingLogin.complete(loggedInUser);
       await tester.pumpAndSettle();
     });
+
+    testWidgets('鍵盤 Next 移到密碼，Done 送出既有 login contract', (tester) async {
+      when(
+        () => mockAuthRepository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => loggedInUser);
+      await pumpLoginScreen(tester);
+
+      await tester.enterText(find.byKey(emailFieldKey), 'ray@example.com');
+      await tester.tap(find.byKey(emailFieldKey));
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pump();
+
+      final passwordEditable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(passwordFieldKey),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(passwordEditable.focusNode.hasFocus, isTrue);
+
+      await tester.enterText(find.byKey(passwordFieldKey), 'secret');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockAuthRepository.login(
+          email: 'ray@example.com',
+          password: 'secret',
+        ),
+      ).called(1);
+    });
+  });
+
+  testWidgets('Accessibility Size、Bold Text、提高對比、Reduce Motion 與鍵盤不裁切', (
+    tester,
+  ) async {
+    await pumpLoginScreen(
+      tester,
+      textScale: 3.2,
+      boldText: true,
+      highContrast: true,
+      reduceMotion: true,
+      viewInsets: const EdgeInsets.only(bottom: 320),
+    );
+
+    final signupLink = find.byKey(const ValueKey('login-signup-link'));
+    await tester.ensureVisible(signupLink);
+    await tester.pumpAndSettle();
+
+    final tagline = find.text('把每段旅程，安排得剛剛好');
+    final richTagline = tester.widget<RichText>(
+      find.descendant(of: tagline, matching: find.byType(RichText)),
+    );
+    expect(
+      richTagline.text.style?.fontWeight?.value,
+      greaterThan(AppTheme.higLight().textTheme.bodyLarge!.fontWeight!.value),
+    );
+    final context = tester.element(find.byKey(const ValueKey('auth-card')));
+    expect(TpMotion.resolve(context, TpMotion.normal), Duration.zero);
+    expect(
+      Theme.of(context).colorScheme.outlineVariant,
+      const Color(0xFF3C3C43),
+    );
+    expect(Theme.of(context).colorScheme.surface.a, 1);
+    expect(tester.takeException(), isNull);
+    expect(tester.getBottomRight(signupLink).dy, lessThanOrEqualTo(844));
+  });
+
+  testWidgets('320pt compact 與 regular width 都可完成登入流程', (tester) async {
+    for (final size in const [Size(320, 568), Size(1024, 768)]) {
+      await pumpLoginScreen(tester, size: size);
+
+      final signupLink = find.byKey(const ValueKey('login-signup-link'));
+      await tester.ensureVisible(signupLink);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(emailFieldKey), findsOneWidget);
+      expect(find.byKey(passwordFieldKey), findsOneWidget);
+      expect(find.byKey(submitButtonKey), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: '$size');
+    }
   });
 
   group('錯誤顯示', () {
@@ -260,6 +466,8 @@ void main() {
 
       expect(find.byKey(errorBannerKey), findsOneWidget);
       expect(find.text('帳號或密碼錯誤'), findsOneWidget);
+      final semantics = tester.getSemantics(find.byKey(errorBannerKey));
+      expect(semantics.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
     });
 
     testWidgets('LOGIN_RATE_LIMITED 英文 message：改用繁中人話 fallback', (
