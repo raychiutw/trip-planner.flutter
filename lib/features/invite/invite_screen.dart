@@ -48,6 +48,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
       body: SafeArea(
         child: ListView(
           key: const ValueKey('invite-page'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(
             TpSpacing.s4,
             TpSpacing.s4,
@@ -253,7 +254,7 @@ class _ChecklistCard extends StatelessWidget {
           children: [
             _SummaryRow(
               title: '邀請連結有效',
-              body: _expiryLabel(invitation.expiresAt),
+              body: _expiryLabel(context, invitation.expiresAt),
               trailing: Icons.check_rounded,
               tone: _SummaryTone.success,
             ),
@@ -553,27 +554,31 @@ class _ProblemPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.errorContainer.withValues(alpha: 0.58),
-        border: Border.all(color: colors.error.withValues(alpha: 0.28)),
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: colors.error,
-                fontWeight: FontWeight.w700,
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.errorContainer.withValues(alpha: 0.58),
+          border: Border.all(color: colors.error.withValues(alpha: 0.28)),
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colors.error,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: TpSpacing.s1),
-            Text(message, style: theme.textTheme.bodyMedium),
-          ],
+              const SizedBox(height: TpSpacing.s1),
+              Text(message, style: theme.textTheme.bodyMedium),
+            ],
+          ),
         ),
       ),
     );
@@ -585,18 +590,23 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Semantics(
       key: const ValueKey('invite-loading'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: TpSpacing.s4),
-            Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
-          ],
+      container: true,
+      liveRegion: true,
+      label: '載入邀請資料',
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: TpSpacing.s4),
+              Text('載入邀請資料...', style: Theme.of(context).textTheme.bodyLarge),
+            ],
+          ),
         ),
       ),
     );
@@ -636,14 +646,13 @@ Color _toneColor(BuildContext context, _SummaryTone tone) {
   };
 }
 
-String _expiryLabel(String expiresAt) {
+String _expiryLabel(BuildContext context, String expiresAt) {
   final parsed = DateTime.tryParse(expiresAt);
   if (parsed == null) return '尚未過期或被接受';
-  final local = parsed.toLocal();
-  final year = local.year.toString().padLeft(4, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final day = local.day.toString().padLeft(2, '0');
-  return '有效至 $year/$month/$day';
+  final date = MaterialLocalizations.of(
+    context,
+  ).formatCompactDate(parsed.toLocal());
+  return '有效至 $date';
 }
 
 String _accountTitle(InviteAccountStatus status) {

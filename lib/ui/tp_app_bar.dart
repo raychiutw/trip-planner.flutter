@@ -6,7 +6,7 @@ import '../theme/tokens.dart';
 import 'tp_action_item.dart';
 import 'tp_glass_surface.dart';
 
-enum TpAppBarRole { standalone, detail, modalContent, modalForm }
+enum TpAppBarRole { standalone, detail, publicDetail, modalContent, modalForm }
 
 /// The single typography owner for titles rendered inside compact headers.
 class TpHeaderTitle extends StatelessWidget {
@@ -303,6 +303,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.role,
     this.actions = const [],
+    this.onBack,
     this.onCancel,
     this.primaryActionLabel,
     this.primaryActionKey,
@@ -323,6 +324,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
   final TpAppBarRole role;
   final List<Widget> actions;
+  final VoidCallback? onBack;
   final VoidCallback? onCancel;
   final String? primaryActionLabel;
   final Key? primaryActionKey;
@@ -476,10 +478,11 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       case TpAppBarRole.standalone:
         return null;
       case TpAppBarRole.detail:
+      case TpAppBarRole.publicDetail:
         return TpToolbarGlassButton(
           key: const ValueKey('tp-app-bar-back'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: () => closeAppRouteOrSheet(context),
+          onPressed: onBack ?? () => closeAppRouteOrSheet(context),
           child: const Icon(CupertinoIcons.back, size: 22),
         );
       case TpAppBarRole.modalContent:

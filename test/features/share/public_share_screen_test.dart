@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -91,7 +94,13 @@ void main() {
     WidgetTester tester, {
     UserInfo? user,
     String token = 's1',
+    Locale locale = const Locale('zh', 'TW'),
+    Size size = const Size(390, 844),
+    double textScale = 1,
+    bool settle = true,
   }) async {
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final router = GoRouter(
       initialLocation: '/s/$token',
       routes: [
@@ -122,12 +131,25 @@ void main() {
           authStateProvider.overrideWith(() => FakeAuthNotifier(user)),
         ],
         child: MaterialApp.router(
+          locale: locale,
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const [Locale('zh', 'TW'), Locale('en', 'US')],
           theme: AppTheme.light(),
           routerConfig: router,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(size: size, textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
   }
 
   setUp(() {
@@ -146,14 +168,46 @@ void main() {
 
     expect(find.text('由 Ray 分享給你'), findsOneWidget);
     expect(find.text('沖繩家族旅行'), findsOneWidget);
-    expect(find.text('2026-10-01 · 那霸 · 1 天'), findsOneWidget);
+    expect(find.text('2026/10/1 · 那霸 · 1 天'), findsOneWidget);
     expect(find.text('Day 1'), findsOneWidget);
-    expect(find.text('09:00-10:30'), findsOneWidget);
+    expect(find.textContaining('9:00'), findsOneWidget);
+    expect(find.textContaining('10:30'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('高鐵 · 18 分 · 0.9km'), findsOneWidget);
     expect(find.text('不需計算路程'), findsOneWidget);
     expect(find.text('航班'), findsOneWidget);
     expect(find.text('BR112'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(
+      tester
+          .widget<ListView>(find.byKey(const ValueKey('public-share-page')))
+          .keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
+  });
+
+  testWidgets('公開分享日期依目前 locale 顯示', (tester) async {
+    await pumpScreen(tester, locale: const Locale('en', 'US'));
+
+    expect(find.text('10/1/2026 · 那霸 · 1 天'), findsOneWidget);
+    expect(find.textContaining('10/1/2026'), findsNWidgets(2));
+    expect(find.text('9:00 AM–10:30 AM'), findsOneWidget);
+  });
+
+  testWidgets('公開分享在 compact Accessibility Size 可捲動完成主要操作', (tester) async {
+    await pumpScreen(tester, size: const Size(320, 568), textScale: 3.2);
+
+    expect(tester.takeException(), isNull);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('public-share-clone')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const ValueKey('public-share-clone')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('public-share-clone'))).height,
+      greaterThanOrEqualTo(44),
+    );
   });
 
   testWidgets('未登入點複製會前往 login', (tester) async {
@@ -175,6 +229,48 @@ void main() {
 
     verify(() => repository.clonePublicTripShare('s1')).called(1);
     expect(find.text('trip cln-trip-1'), findsOneWidget);
+  });
+
+  testWidgets('已登入連點複製只送出一次', (tester) async {
+    const user = UserInfo(id: 'user-1', email: 'ray@example.com');
+    final pending = Completer<String>();
+    when(
+      () => repository.clonePublicTripShare(any()),
+    ).thenAnswer((_) => pending.future);
+    await pumpScreen(tester, user: user);
+
+    final clone = find.byKey(const ValueKey('public-share-clone'));
+    await tester.tap(clone);
+    await tester.pump();
+    await tester.tap(clone, warnIfMissed: false);
+    await tester.pump();
+
+    verify(() => repository.clonePublicTripShare('s1')).called(1);
+    pending.complete('cln-trip-1');
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('複製失敗保留公開內容並向 screen reader 宣告', (tester) async {
+    const user = UserInfo(id: 'user-1', email: 'ray@example.com');
+    when(
+      () => repository.clonePublicTripShare(any()),
+    ).thenThrow(Exception('clone failed'));
+    await pumpScreen(tester, user: user);
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+    final error = find.byKey(const ValueKey('public-share-clone-error'));
+    expect(error, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(error)
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
   });
 
   testWidgets('點列印會用公開分享資料建立列印文件', (tester) async {
@@ -210,5 +306,13 @@ void main() {
 
     expect(find.byKey(const ValueKey('public-share-notfound')), findsOneWidget);
     expect(find.text('連結已失效'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('public-share-notfound')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
   });
 }

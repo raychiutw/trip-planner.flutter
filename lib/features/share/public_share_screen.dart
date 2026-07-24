@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../app/app_feedback.dart';
 import '../../models/day.dart';
@@ -142,9 +143,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppNotice(context, message);
   }
 }
 
@@ -174,6 +173,7 @@ class _ShareContent extends StatelessWidget {
     final actionBusy = busyAction != null;
     return ListView(
       key: const ValueKey('public-share-page'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(
         TpSpacing.s4,
         TpSpacing.s4,
@@ -252,7 +252,7 @@ class _ShareHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final meta = [
-      share.dateRange,
+      _localizedDateRange(context, share),
       share.destinationsLabel,
       share.days.isEmpty ? '' : '${share.days.length} 天',
     ].where((part) => part.trim().isNotEmpty).join(' · ');
@@ -338,7 +338,7 @@ class _DaySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dateLine = [
-      day.date,
+      _localizedDate(context, day.date),
       day.dayOfWeek == null ? null : '（${day.dayOfWeek}）',
       day.label,
     ].whereType<String>().where((part) => part.isNotEmpty).join(' ');
@@ -405,12 +405,13 @@ class _EntryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final travelLine = formatTravelLine(entry.travel);
+    final timeLine = _timeLine(context, entry);
     return ListTile(
       title: Text(entry.title),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_timeLine(entry).isNotEmpty) Text(_timeLine(entry)),
+          if (timeLine.isNotEmpty) Text(timeLine),
           if (entry.description?.trim().isNotEmpty == true)
             Text(entry.description!.trim()),
           if (entry.note?.trim().isNotEmpty == true) Text(entry.note!.trim()),
@@ -643,28 +644,33 @@ class _NotFoundState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Semantics(
       key: const ValueKey('public-share-notfound'),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.link_off_outlined,
-              size: 40,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            Text('連結已失效', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: TpSpacing.s2),
-            const Text(
-              '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            FilledButton(onPressed: onRetry, child: const Text('重試')),
-          ],
+      container: true,
+      liveRegion: true,
+      label: '連結已失效',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.link_off_outlined,
+                size: 40,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: TpSpacing.s3),
+              Text('連結已失效', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: TpSpacing.s2),
+              const Text(
+                '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
         ),
       ),
     );
@@ -679,26 +685,75 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer,
-        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s3),
-        child: Text(
-          message,
-          style: TextStyle(color: colorScheme.onErrorContainer),
+    return Semantics(
+      key: const ValueKey('public-share-clone-error'),
+      container: true,
+      liveRegion: true,
+      label: '錯誤：$message',
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s3),
+          child: Text(
+            message,
+            style: TextStyle(color: colorScheme.onErrorContainer),
+          ),
         ),
       ),
     );
   }
 }
 
-String _timeLine(TimelineEntry entry) {
+String _timeLine(BuildContext context, TimelineEntry entry) {
   final start = entry.startTime?.trim() ?? '';
   final end = entry.endTime?.trim() ?? '';
-  if (start.isNotEmpty && end.isNotEmpty) return '$start-$end';
-  if (entry.time?.trim().isNotEmpty == true) return entry.time!.trim();
-  return start.isNotEmpty ? start : end;
+  if (start.isNotEmpty && end.isNotEmpty) {
+    return '${_localizedTime(context, start)}–${_localizedTime(context, end)}';
+  }
+  if (entry.time?.trim().isNotEmpty == true) {
+    return _localizedTime(context, entry.time!.trim());
+  }
+  return _localizedTime(context, start.isNotEmpty ? start : end);
+}
+
+String _localizedDateRange(BuildContext context, PublicTripShare share) {
+  final dates = share.days
+      .map((day) => day.date?.trim())
+      .whereType<String>()
+      .where((date) => date.isNotEmpty)
+      .toList();
+  if (dates.isEmpty) return '';
+  final first = _localizedDate(context, dates.first);
+  final last = _localizedDate(context, dates.last);
+  return dates.first == dates.last ? first : '$first – $last';
+}
+
+String _localizedDate(BuildContext context, String? value) {
+  final raw = value?.trim() ?? '';
+  final date = DateTime.tryParse(raw);
+  if (date == null) return raw;
+  return MaterialLocalizations.of(context).formatCompactDate(date.toLocal());
+}
+
+String _localizedTime(BuildContext context, String value) {
+  final parts = value.split(':');
+  if (parts.length < 2) return value;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null ||
+      minute == null ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59) {
+    return value;
+  }
+  return MaterialLocalizations.of(context).formatTimeOfDay(
+    TimeOfDay(hour: hour, minute: minute),
+    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+  );
 }

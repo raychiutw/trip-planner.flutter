@@ -6,6 +6,7 @@
 
 ### 變更
 
+- 註冊、信箱驗證、密碼重設與 OAuth 改用 inline Header 與防重複提交；邀請與公開分享補齊在地日期／時間、Dynamic Type、鍵盤操作與 screen reader 狀態，並維持既有登入方式、不加入 Apple ID 登入。
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。
 - Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。

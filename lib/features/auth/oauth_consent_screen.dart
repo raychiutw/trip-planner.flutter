@@ -38,11 +38,19 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
   Widget build(BuildContext context) {
     final request = widget.request;
     return Scaffold(
-      appBar: const TpAppBar(
-        role: TpAppBarRole.standalone,
-        title: Text('授權請求'),
+      appBar: TpAppBar(
+        role: TpAppBarRole.modalForm,
+        title: const Text('授權請求'),
+        onCancel: request.isComplete
+            ? () => unawaited(_submit('deny'))
+            : () => closeAppRouteOrSheet(context),
+        primaryActionLabel: _isSubmitting ? '授權中…' : '同意',
+        primaryActionKey: const Key('oauth-consent-allow'),
+        onPrimaryAction: () => unawaited(_submit('allow')),
+        primaryActionEnabled: request.isComplete && !_isSubmitting,
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [
           if (!request.isComplete) ...[
@@ -99,39 +107,6 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
               ],
             ),
           ),
-          const SizedBox(height: TpSpacing.s5),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  key: const Key('oauth-consent-deny'),
-                  onPressed: request.isComplete && !_isSubmitting
-                      ? () => unawaited(_submit('deny'))
-                      : null,
-                  icon: const Icon(CupertinoIcons.xmark),
-                  label: const Text('拒絕'),
-                ),
-              ),
-              const SizedBox(width: TpSpacing.s3),
-              Expanded(
-                child: FilledButton.icon(
-                  key: const Key('oauth-consent-allow'),
-                  onPressed: request.isComplete && !_isSubmitting
-                      ? () => unawaited(_submit('allow'))
-                      : null,
-                  icon: _isSubmitting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(CupertinoIcons.checkmark),
-                  label: const Text('同意'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -149,6 +124,7 @@ class _OAuthConsentScreenState extends ConsumerState<OAuthConsentScreen> {
   }
 
   Future<void> _submit(String decision) async {
+    if (_isSubmitting) return;
     setState(() {
       _isSubmitting = true;
       _result = null;
@@ -192,23 +168,28 @@ class _ConsentResultPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      color: colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '已送出授權',
-              style: TextStyle(
-                color: colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
+    return Semantics(
+      key: const ValueKey('oauth-consent-result'),
+      container: true,
+      liveRegion: true,
+      child: Card(
+        color: colorScheme.primaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '已送出授權',
+                style: TextStyle(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            Text(result.redirectLocation ?? '沒有 redirect location'),
-          ],
+              const SizedBox(height: TpSpacing.s2),
+              Text(result.redirectLocation ?? '沒有 redirect location'),
+            ],
+          ),
         ),
       ),
     );
@@ -223,25 +204,30 @@ class _ConsentErrorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      color: colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_circle,
-              color: colorScheme.onErrorContainer,
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onErrorContainer),
+    return Semantics(
+      key: const ValueKey('oauth-consent-error'),
+      container: true,
+      liveRegion: true,
+      child: Card(
+        color: colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_circle,
+                color: colorScheme.onErrorContainer,
               ),
-            ),
-          ],
+              const SizedBox(width: TpSpacing.s3),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(color: colorScheme.onErrorContainer),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
