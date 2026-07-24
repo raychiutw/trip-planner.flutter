@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -336,6 +338,16 @@ List<TripDay> _longDays(String label) {
   ];
 }
 
+List<TripDay> _selectorDays() => [
+  for (var day = 1; day <= 8; day++)
+    TripDay(
+      id: day,
+      dayNum: day,
+      date: '2026-08-${day.toString().padLeft(2, '0')}',
+      version: 1,
+    ),
+];
+
 List<TripDay> _scrollSpyDays() => [
   for (var day = 1; day <= 2; day++)
     TripDay(
@@ -478,17 +490,15 @@ void main() {
     expect(find.text('map-page-$_tripId-1'), findsOneWidget);
   });
 
-  testWidgets('切換到不同 Trip 會重設 DAY 1，不沿用舊 Trip 的 DAY', (tester) async {
+  testWidgets('切換 Trip 會重設 DAY 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
     const otherTripId = 'tokyo-2026';
-    const days = [
-      TripDay(id: 1, dayNum: 1, version: 1),
-      TripDay(id: 2, dayNum: 2, version: 1),
-    ];
     final activeTripId = ValueNotifier(_tripId);
+    final repo = _MockTripRepository();
     addTearDown(activeTripId.dispose);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          tripRepositoryProvider.overrideWithValue(repo),
           tripDetailProvider(
             _tripId,
           ).overrideWith((ref) => Stream.value(_fakeTrip)),
@@ -497,10 +507,12 @@ void main() {
               const Trip(id: otherTripId, name: '東京', title: '東京五日'),
             ),
           ),
-          tripDaysProvider(_tripId).overrideWith((ref) => Stream.value(days)),
+          tripDaysProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
           tripDaysProvider(
             otherTripId,
-          ).overrideWith((ref) => Stream.value(days)),
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
           tripSegmentsProvider(
             _tripId,
           ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
@@ -551,6 +563,56 @@ void main() {
     activeTripId.value = _tripId;
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
+    final finishEditing = find.byKey(
+      const ValueKey('tp-root-header-primary-action'),
+    );
+    if (finishEditing.evaluate().isNotEmpty) {
+      await tester.tap(finishEditing);
+      await tester.pumpAndSettle();
+    }
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, 1000),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-11')));
+    await tester.pumpAndSettle();
+    activeTripId.value = otherTripId;
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-2')));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    );
+
+    activeTripId.value = _tripId;
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, 1000),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-copy-11')));
+    await tester.pumpAndSettle();
+    activeTripId.value = otherTripId;
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-copy-to-day-2')));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repo.copyEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        targetDayId: any(named: 'targetDayId'),
+      ),
+    );
   });
 
   testWidgets('排序請求中切換 Trip，交通重算仍只作用於原行程', (tester) async {
@@ -869,13 +931,13 @@ void main() {
   testWidgets('entry tile 不因 master.type 恢復三色圓點', (tester) async {
     await _pumpTimeline(tester);
 
-    expect(_entryDotColor(tester, 11), TpColorsLight.accentDeep);
-    expect(_entryDotColor(tester, 12), TpColorsLight.accentDeep);
+    expect(_entryDotColor(tester, 11), TpSystemColorsLight.tintDeep);
+    expect(_entryDotColor(tester, 12), TpSystemColorsLight.tintDeep);
 
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    expect(_entryDotColor(tester, 21), TpColorsLight.accentDeep);
+    expect(_entryDotColor(tester, 21), TpSystemColorsLight.tintDeep);
   });
 
   testWidgets('travel pill 使用出發 entry 的 travel 顯示各相鄰路段', (tester) async {
@@ -1278,6 +1340,107 @@ void main() {
     },
   );
 
+  testWidgets('Day selector 支援左右方向鍵切換目前行程日', (tester) async {
+    await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    var selector = tester.widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    expect(selector.value, 2);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    selector = tester.widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    expect(selector.value, 1);
+  });
+
+  testWidgets('Day selector 以總天數與已選取狀態提供語意', (tester) async {
+    await _pumpTimeline(tester);
+    await tester.pumpAndSettle();
+
+    final selected = tester
+        .getSemantics(find.byKey(const ValueKey('day-pill-1')))
+        .getSemanticsData();
+
+    expect(selected.label, '第 1 天，共 2 天');
+    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+  });
+
+  testWidgets('窄螢幕 Day selector 露出下一項並將指定 Day 置中', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimeline(tester, fetchDays: _selectorDays, initialDayNum: 5);
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final selected = find.byKey(const ValueKey('day-pill-5'));
+    expect(
+      tester.getCenter(selected).dx,
+      closeTo(tester.getCenter(selector).dx, 1),
+    );
+
+    await _pumpTimeline(tester, fetchDays: _selectorDays, initialDayNum: 1);
+    await tester.pumpAndSettle();
+    final firstSelector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final nextEdge = tester.getRect(find.byKey(const ValueKey('day-pill-4')));
+    final selectorEdge = tester.getRect(firstSelector);
+    expect(nextEdge.left, lessThan(selectorEdge.right));
+    expect(nextEdge.right, greaterThan(selectorEdge.right));
+  });
+
+  testWidgets('3.2 倍輔助文字下 Day selector 與固定 header 隨內容增高', (tester) async {
+    await _pumpTimeline(tester, textScaler: const TextScaler.linear(3.2));
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final selectorRect = tester.getRect(selector);
+    final selectedLabelRect = tester.getRect(find.text('DAY 1'));
+
+    expect(tester.takeException(), isNull);
+    expect(selectorRect.height, greaterThan(TpSpacing.tapMin));
+    expect(selectedLabelRect.top, greaterThanOrEqualTo(selectorRect.top));
+    expect(selectedLabelRect.bottom, lessThanOrEqualTo(selectorRect.bottom));
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('day-section-1'))).dy,
+      greaterThanOrEqualTo(selectorRect.bottom - 1),
+    );
+  });
+
+  testWidgets('水平拖曳只瀏覽 Day，點選才變更目前行程日', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pumpTimeline(tester, fetchDays: _selectorDays);
+    await tester.pumpAndSettle();
+
+    final selectorFinder = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    await tester.drag(selectorFinder, const Offset(-180, 0));
+    await tester.pumpAndSettle();
+
+    var selector = tester.widget<TpHorizontalSelector<int>>(selectorFinder);
+    expect(selector.value, 1);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-4')));
+    await tester.pumpAndSettle();
+    selector = tester.widget<TpHorizontalSelector<int>>(selectorFinder);
+    expect(selector.value, 4);
+  });
+
   testWidgets('Reduce Motion 直接切換 Day，不建立零秒捲動動畫', (tester) async {
     await _pumpTimeline(
       tester,
@@ -1300,6 +1463,28 @@ void main() {
     );
   });
 
+  testWidgets('Reduce Motion 在窄螢幕直接定位遠距 Day selector', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimeline(
+      tester,
+      fetchDays: _selectorDays,
+      initialDayNum: 5,
+      disableAnimations: true,
+    );
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('day-pill-5'))).dx,
+      closeTo(tester.getCenter(selector).dx, 1),
+    );
+  });
+
   testWidgets('指定 initialDayNum：初始啟用該日 pill', (tester) async {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
@@ -1312,8 +1497,26 @@ void main() {
     );
     expect(
       selected.settings?.glassColor,
-      TpColorsLight.dayThumb.withValues(alpha: 0.64),
+      TpSystemColorsLight.tint.withValues(alpha: 0.18),
     );
+  });
+
+  testWidgets('無效 day deep link fallback 後地圖導覽使用實際 Day 1', (tester) async {
+    await _pumpTimeline(tester, initialDayNum: 99);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -1328,6 +1531,24 @@ void main() {
 
     expect(border.top.color, AppTheme.light().colorScheme.primary);
     expect(border.top.width, 2);
+  });
+
+  testWidgets('entry deep link 聚焦後地圖導覽使用 entry 所在 Day', (tester) async {
+    await _pumpTimeline(tester, initialEntryId: 22);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-2'), findsOneWidget);
   });
 
   testWidgets('days refresh preserves current scroll offset', (tester) async {
@@ -1353,11 +1574,43 @@ void main() {
     expect(tester.getTopLeft(daySection).dy, before);
   });
 
+  testWidgets('days refresh 移除目前 Day 時同步 selector 與後續導覽 Day', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    days.add([_fakeDays.first]);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+  });
+
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
 
     expect(find.byKey(const ValueKey('timeline-skeleton')), findsOneWidget);
+    final semantics = tester
+        .getSemantics(find.byKey(const ValueKey('timeline-loading-state')))
+        .getSemanticsData();
+    expect(semantics.label, '正在載入行程時間軸');
+    expect(semantics.flagsCollection.isLiveRegion, isTrue);
   });
 
   testWidgets('detail 載入中仍以目前行程摘要顯示 selector title', (tester) async {
@@ -1401,6 +1654,14 @@ void main() {
     );
 
     expect(find.text('重試'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('timeline-error-state')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
 
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
@@ -1420,6 +1681,23 @@ void main() {
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+  });
+
+  testWidgets('時間軸資料刷新保留已展開的停留點', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
+
+    days.add(List<TripDay>.from(_fakeDays));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
   });
 
   testWidgets('展開備選後可設為正選並重算當日交通', (tester) async {
@@ -1477,7 +1755,7 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
-  testWidgets('景點更多選單固定六項三組，編輯由選單路由進入', (tester) async {
+  testWidgets('景點更多選單固定六項三組，編輯使用短任務表單 sheet', (tester) async {
     await _pumpTimeline(tester);
     await tester.tap(find.byKey(const ValueKey('entry-more-11')));
     await tester.pumpAndSettle();
@@ -1490,7 +1768,10 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
     await tester.pumpAndSettle();
-    expect(find.text('entry-edit-11'), findsOneWidget);
+    expect(find.text('編輯停留點'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-edit-submit')), findsOneWidget);
+    expect(find.text('取消'), findsWidgets);
+    expect(find.text('entry-edit-11'), findsNothing);
   });
 
   testWidgets('只有一天時移動與複製停用並說明原因', (tester) async {
@@ -1508,14 +1789,225 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('移至其他 Day 使用短任務 sheet，並只送出一次 batch', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-11')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('移至其他 Day'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-move-to-day-2')), findsOneWidget);
+    expect(find.text('entry-move-11'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-2')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntries(
+        tripId: _tripId,
+        updates: [
+          (id: 12, sortOrder: 0, dayId: 1),
+          (id: 13, sortOrder: 1, dayId: 1),
+          (id: 14, sortOrder: 2, dayId: 1),
+          (id: 21, sortOrder: 0, dayId: 2),
+          (id: 22, sortOrder: 1, dayId: 2),
+          (id: 11, sortOrder: 2, dayId: 2),
+        ],
+      ),
+    ).called(1);
+    verifyNever(
+      () => repo.moveEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        targetDayId: any(named: 'targetDayId'),
+      ),
+    );
+  });
+
+  testWidgets('複製到其他 Day 使用短任務 sheet，pending 與失敗保留目標', (tester) async {
+    final repo = _MockTripRepository();
+    final firstAttempt = Completer<int>();
+    var attempts = 0;
+    when(
+      () => repo.copyEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        targetDayId: any(named: 'targetDayId'),
+      ),
+    ).thenAnswer((_) {
+      attempts++;
+      return attempts == 1 ? firstAttempt.future : Future.value(99);
+    });
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-copy-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('複製到其他 Day'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-copy-to-day-2')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('entry-copy-progress')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('app-selection-cancel')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    firstAttempt.completeError(Exception('offline'));
+    await tester.pumpAndSettle();
+    expect(find.text('複製到其他 Day'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-copy-error')), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-copy-to-day-2')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-copy-to-day-2')));
+    await tester.pumpAndSettle();
+    expect(attempts, 2);
+    expect(find.text('複製到其他 Day'), findsNothing);
+  });
+
+  testWidgets('移動 sheet 開啟後資料重排，依 entry ID 重找位置再送 batch', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo, daysStream: days.stream);
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-11')));
+    await tester.pumpAndSettle();
+
+    final first = _fakeDays.first;
+    days.add([
+      TripDay(
+        id: first.id,
+        dayNum: first.dayNum,
+        date: first.date,
+        dayOfWeek: first.dayOfWeek,
+        title: first.title,
+        version: first.version + 1,
+        timeline: [
+          first.timeline[1],
+          first.timeline[2],
+          first.timeline[0],
+          first.timeline[3],
+        ],
+      ),
+      _fakeDays.last,
+    ]);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-2')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntries(
+        tripId: _tripId,
+        updates: [
+          (id: 12, sortOrder: 0, dayId: 1),
+          (id: 13, sortOrder: 1, dayId: 1),
+          (id: 14, sortOrder: 2, dayId: 1),
+          (id: 21, sortOrder: 0, dayId: 2),
+          (id: 22, sortOrder: 1, dayId: 2),
+          (id: 11, sortOrder: 2, dayId: 2),
+        ],
+      ),
+    ).called(1);
+  });
+
+  testWidgets('移動 sheet 開啟後 entry 已被跨 Day 移動，拒絕 stale intent', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    final repo = _MockTripRepository();
+    await _pumpTimeline(tester, repo: repo, daysStream: days.stream);
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-11')));
+    await tester.pumpAndSettle();
+
+    final source = _fakeDays.first;
+    final target = _fakeDays.last;
+    days.add([
+      TripDay(
+        id: source.id,
+        dayNum: source.dayNum,
+        date: source.date,
+        dayOfWeek: source.dayOfWeek,
+        title: source.title,
+        version: source.version + 1,
+        timeline: source.timeline.skip(1).toList(),
+      ),
+      TripDay(
+        id: target.id,
+        dayNum: target.dayNum,
+        date: target.date,
+        dayOfWeek: target.dayOfWeek,
+        title: target.title,
+        version: target.version + 1,
+        timeline: [source.timeline.first, ...target.timeline],
+      ),
+    ]);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('行程內容已更新，請重新操作'), findsOneWidget);
+    verifyNever(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    );
+  });
+
   testWidgets('景點選單刪除先確認，確認前不呼叫 API', (tester) async {
     final repo = _MockTripRepository();
+    final pendingDelete = Completer<void>();
     when(
       () => repo.deleteEntry(
         tripId: any(named: 'tripId'),
         entryId: any(named: 'entryId'),
       ),
-    ).thenAnswer((_) async {});
+    ).thenAnswer((_) => pendingDelete.future);
     when(
       () => repo.recomputeTravel(
         tripId: any(named: 'tripId'),
@@ -1529,12 +2021,94 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
     await tester.pumpAndSettle();
     verifyNever(() => repo.deleteEntry(tripId: _tripId, entryId: 11));
+    expect(find.textContaining('相關交通時間將重新計算'), findsOneWidget);
+    expect(find.textContaining('無法復原'), findsOneWidget);
 
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+    pendingDelete.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('刪除失敗保留資料並可重試，成功前不關閉資料狀態', (tester) async {
+    final repo = _MockTripRepository();
+    var attempts = 0;
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw Exception('offline');
+    });
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entry-11')), findsOneWidget);
+    expect(find.text('刪除失敗，原資料已保留'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(attempts, 2);
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(2);
+  });
+
+  testWidgets('DELETE 成功後即使交通重算失敗也只刪除一次', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenThrow(StateError('recompute disposed'));
+    await _pumpTimeline(tester, repo: repo);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+    expect(find.text('刪除失敗，原資料已保留'), findsNothing);
+    expect(find.text('重試'), findsNothing);
   });
 
   testWidgets('一般模式左滑 entry → 確認 → 刪除後重算交通', (tester) async {
@@ -1575,7 +2149,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -1613,6 +2190,84 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-12')), findsOneWidget);
   });
 
+  testWidgets('拖曳 handle 提供上移、下移與移至其他 Day 輔助操作，並共用 batch', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    final semantics = tester.widget<Semantics>(
+      find.byKey(const ValueKey('entry-drag-12')),
+    );
+    final actions = semantics.properties.customSemanticsActions!;
+    expect(actions.keys.map((action) => action.label), [
+      '上移',
+      '下移',
+      '移至其他 Day',
+    ]);
+
+    actions.entries.singleWhere((entry) => entry.key.label == '上移').value();
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntries(
+        tripId: _tripId,
+        updates: [
+          (id: 12, sortOrder: 0, dayId: 1),
+          (id: 11, sortOrder: 1, dayId: 1),
+          (id: 13, sortOrder: 2, dayId: 1),
+          (id: 14, sortOrder: 3, dayId: 1),
+        ],
+      ),
+    ).called(1);
+  });
+
+  testWidgets('Full Keyboard Access 方向鍵與拖曳共用 batch 排序', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+    await _enableTimelineEditing(tester);
+
+    final handle = find.byKey(const ValueKey('entry-drag-12'));
+    Focus.of(tester.element(handle)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderEntries(
+        tripId: _tripId,
+        updates: any(named: 'updates'),
+      ),
+    ).called(1);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('entry-12'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const ValueKey('entry-11'))).dy),
+    );
+  });
+
   testWidgets('拖曳 feedback 維持原行程卡寬度', (tester) async {
     tester.view.physicalSize = const Size(393, 1800);
     tester.view.devicePixelRatio = 1;
@@ -1635,6 +2290,39 @@ void main() {
 
     await gesture.cancel();
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('拖曳停在邊緣時持續自動捲動，結束後立即停止', (tester) async {
+    tester.view.physicalSize = const Size(393, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpTimeline(tester);
+    await _enableTimelineEditing(tester);
+
+    final scroll = tester
+        .widget<CustomScrollView>(
+          find.byKey(const ValueKey('trip-timeline-scroll')),
+        )
+        .controller!;
+    expect(scroll.position.maxScrollExtent, greaterThan(0));
+
+    final handle = find.byKey(const ValueKey('entry-drag-11'));
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await gesture.moveTo(Offset(tester.getCenter(handle).dx, 690));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -1));
+    await tester.pump(const Duration(milliseconds: 60));
+    final firstOffset = scroll.offset;
+
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(scroll.offset, greaterThan(firstOffset));
+
+    await gesture.cancel();
+    await tester.pump();
+    final stoppedOffset = scroll.offset;
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(scroll.offset, stoppedOffset);
   });
 
   testWidgets('短按拖曳 handle 同日排序，畫面與 API 順序一致', (tester) async {
@@ -1680,6 +2368,15 @@ void main() {
             as List<({int id, int sortOrder, int? dayId})>;
     expect(captured.map((item) => item.id), [12, 13, 11, 14]);
     expect(captured.every((item) => item.dayId == 1), isTrue);
+    final busyHandle = tester.widget<Semantics>(
+      find.byKey(const ValueKey('entry-drag-12')),
+    );
+    expect(busyHandle.properties.enabled, isFalse);
+    expect(busyHandle.properties.value, '正在更新');
+    expect(
+      busyHandle.properties.customSemanticsActions,
+      anyOf(isNull, isEmpty),
+    );
 
     pendingReorder.complete();
     await tester.pumpAndSettle();

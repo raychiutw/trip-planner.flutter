@@ -47,28 +47,6 @@ void main() {
     });
   });
 
-  group('AccountStats.fromJson', () {
-    test('解析 3 個統計欄位', () {
-      final stats = AccountStats.fromJson({
-        'tripCount': 2,
-        'totalDays': 10,
-        'collaboratorCount': 3,
-      });
-
-      expect(stats.tripCount, 2);
-      expect(stats.totalDays, 10);
-      expect(stats.collaboratorCount, 3);
-    });
-
-    test('欄位缺漏時預設 0', () {
-      final stats = AccountStats.fromJson({});
-
-      expect(stats.tripCount, 0);
-      expect(stats.totalDays, 0);
-      expect(stats.collaboratorCount, 0);
-    });
-  });
-
   group('AccountNotificationPreferences.fromJson', () {
     test('解析 camelCase 欄位', () {
       final prefs = AccountNotificationPreferences.fromJson({

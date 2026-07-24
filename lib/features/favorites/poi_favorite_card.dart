@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../models/poi_favorite.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'poi_rating_label.dart';
 
-/// 收藏 POI 卡片：共用 Tripline accent + rating/note/usages + 取消收藏 heart。
+/// 收藏 POI 卡片：共用 Tripline accent + rating/note/usages + 刪除入口。
 class PoiFavoriteCard extends StatelessWidget {
   const PoiFavoriteCard({
     super.key,
@@ -34,7 +33,6 @@ class PoiFavoriteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
 
     return GestureDetector(
       onLongPress: onLongPress ?? onAddToTrip,
@@ -74,13 +72,13 @@ class PoiFavoriteCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: tones.accentBg,
+                color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(TpRadius.md),
               ),
               child: Icon(
                 CupertinoIcons.location_solid,
                 size: 20,
-                color: tones.accentDeep,
+                color: theme.colorScheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(width: TpSpacing.s3),
@@ -126,7 +124,10 @@ class PoiFavoriteCard extends StatelessWidget {
                       padding: const EdgeInsets.only(top: TpSpacing.s1),
                       child: Text(
                         '用於 ${favorite.usages.length} 個行程',
-                        style: TextStyle(fontSize: 11, color: tones.accentDeep),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
                       ),
                     ),
                 ],
@@ -134,8 +135,11 @@ class PoiFavoriteCard extends StatelessWidget {
             ),
             IconButton(
               key: ValueKey('favorite-remove-${favorite.id}'),
-              tooltip: '取消收藏',
-              icon: Icon(CupertinoIcons.heart_fill, color: tones.accentDeep),
+              tooltip: '刪除',
+              icon: Icon(
+                CupertinoIcons.heart_fill,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
               onPressed: onRemove,
             ),
           ],

@@ -86,7 +86,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'meal_takeaway': '外帶',
   'meal_delivery': '外送',
   'food': '餐廳',
-  // 景點・文化（看 → 柔褐）
+  // 景點・文化
   'tourist_attraction': '景點',
   'aquarium': '水族館',
   'art_gallery': '美術館',
@@ -122,7 +122,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'ferris_wheel': '摩天輪',
   'point_of_interest': '景點',
   'landmark': '地標',
-  // 購物（買 → 柔褐）
+  // 購物
   'shopping_mall': '購物中心',
   'shopping_center': '購物中心',
   'department_store': '百貨公司',
@@ -149,7 +149,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'discount_store': '折扣店',
   'store': '商店',
   'wholesaler': '批發',
-  // 住宿（住 → sage）
+  // 住宿
   'lodging': '飯店',
   'motel': '汽車旅館',
   'hostel': '青年旅館',
@@ -161,7 +161,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'cottage': '小屋',
   'inn': '旅館',
   'extended_stay_hotel': '長租旅館',
-  // 交通（移動 → sage）
+  // 交通
   'airport': '機場',
   'international_airport': '國際機場',
   'train_station': '火車站',
@@ -176,7 +176,7 @@ const Map<String, String> _googlePrimaryTypeLabels = {
   'ev_charging_station': '充電站',
   'rest_stop': '休息站',
   'car_rental': '租車',
-  // 活動・娛樂（玩 → 柔褐）
+  // 活動・娛樂
   'movie_theater': '電影院',
   'night_club': '夜店',
   'casino': '賭場',

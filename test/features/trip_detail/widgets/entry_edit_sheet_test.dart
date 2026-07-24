@@ -37,6 +37,7 @@ Future<void> _open(
   EntryEditArgs args, {
   TargetPlatform platform = TargetPlatform.android,
   Stream<TimelineEntry>? entryStream,
+  bool alwaysUse24HourFormat = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -53,6 +54,12 @@ Future<void> _open(
       ],
       child: MaterialApp(
         theme: AppTheme.light().copyWith(platform: platform),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(alwaysUse24HourFormat: alwaysUse24HourFormat),
+          child: child!,
+        ),
         home: Scaffold(
           body: Builder(
             builder: (context) => ElevatedButton(
@@ -168,6 +175,42 @@ void main() {
     );
   });
 
+  testWidgets('時間欄位顯示與讀法跟隨系統 12 小時制', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      alwaysUse24HourFormat: false,
+    );
+
+    expect(find.text('開始 9:00 AM'), findsOneWidget);
+    expect(
+      tester
+          .widget<InputChip>(find.byKey(const ValueKey('entry-edit-start')))
+          .tooltip,
+      '開始時間 9:00 AM',
+    );
+  });
+
+  testWidgets('時間欄位顯示與讀法跟隨系統 24 小時制', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      alwaysUse24HourFormat: true,
+    );
+
+    expect(find.text('開始 09:00'), findsOneWidget);
+    expect(
+      tester
+          .widget<InputChip>(find.byKey(const ValueKey('entry-edit-start')))
+          .tooltip,
+      '開始時間 09:00',
+    );
+  });
+
   testWidgets('備註使用可捲動的多行文字視圖與換行鍵盤', (tester) async {
     final repo = _MockTripRepository();
     await _open(tester, repo, const EntryEditExisting(_entry));
@@ -248,8 +291,52 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.minuteInterval, 5);
+    expect(picker.use24hFormat, isFalse);
     expect(find.text('取消'), findsWidgets);
     expect(find.text('完成'), findsOneWidget);
+  });
+
+  testWidgets('時間錯誤顯示在結束欄位下方，並保留使用者輸入', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      platform: TargetPlatform.iOS,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
+    await tester.pumpAndSettle();
+    tester
+        .widget<CupertinoDatePicker>(find.byType(CupertinoDatePicker))
+        .onDateTimeChanged(DateTime(2026, 1, 1, 11));
+    await tester.pump();
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('開始 11:00 AM'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-end-group')),
+        matching: find.byKey(const ValueKey('entry-edit-end-error')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('entry-edit-submit')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
   });
 
   testWidgets('新增模式：送出呼叫 addEntryToDay(source custom)', (tester) async {

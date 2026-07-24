@@ -34,6 +34,6 @@ flutter test         # 全綠才算環境就緒；數量以當次輸出為準
 
 - mutating request 一律走 `ApiClient`(它負責 `Origin` CSRF header)— 不要用 raw dio 打 API
 - fromJson 遵守[通用解析規則](docs/reference-models.md#通用解析規則)(camelCase、num 轉型、0/1 bool)
-- UI 變更遵守[設計系統參考](docs/reference-theme.md)：取色走 `colorScheme`/`TpTones`、平台差異走 `app/adaptive.dart`、寬版內容走 `AppAdaptiveContent`
+- UI 變更先遵守根目錄 [`design.md`](design.md)，再參考[設計系統實作說明](docs/reference-theme.md)：Widget 取色走 `Theme.of(context).colorScheme`、平台控制走 `app/adaptive.dart`、寬版內容走 `AppAdaptiveContent`
 - 成功或低風險狀態用 `showAppNotice`；真正錯誤用可關閉、可重試的 `showAppError`，不可用短暫 toast 取代
 - 待辦進 [TODOS.md](TODOS.md),範圍變更先改 [docs/PORTING_PLAN.md](docs/PORTING_PLAN.md)

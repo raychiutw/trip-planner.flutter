@@ -1,16 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../theme/tokens.dart';
+import '../app/accessibility_scope.dart';
 
 enum TpNavigationGlassRecipe { regular, platformView }
+
+/// 依 Increased Contrast 與 Reduce Transparency 的個別系統狀態，
+/// 將任一 glass recipe 收斂為相同的不透明、無 blur accessibility fallback。
+LiquidGlassSettings tpResolveGlassSettings(
+  BuildContext context,
+  LiquidGlassSettings settings, {
+  Color? opaqueColor,
+}) {
+  final increasedContrast = MediaQuery.highContrastOf(context);
+  final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
+    context,
+  );
+  if (!increasedContrast && !reduceTransparency) return settings;
+
+  final fallback = (opaqueColor ?? Theme.of(context).colorScheme.surface)
+      .withValues(alpha: 1);
+  return settings.copyWith(
+    glassColor: fallback,
+    backerColor: fallback,
+    platformViewFallbackColor: fallback,
+    thickness: 0,
+    blur: 0,
+    chromaticAberration: 0,
+    lightIntensity: 0,
+    ambientStrength: 0,
+    refractiveIndex: 1,
+    saturation: 1,
+    glowIntensity: 0,
+    standardOpacityMultiplier: 1,
+    shadowElevation: 0,
+  );
+}
 
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final baseColor = isDark ? TpColorsDark.secondary : TpColorsLight.background;
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final baseColor = isDark
+      ? theme.colorScheme.surfaceContainerLow
+      : theme.colorScheme.surface;
   final platformView = recipe == TpNavigationGlassRecipe.platformView;
   final tint = baseColor.withValues(
     alpha: platformView ? (isDark ? 0.62 : 0.56) : (isDark ? 0.48 : 0.40),
@@ -28,26 +63,7 @@ LiquidGlassSettings tpNavigationGlassSettings(
     standardOpacityMultiplier: 1,
     platformViewFallbackColor: tint,
   );
-  if (!MediaQuery.highContrastOf(context)) return settings;
-  final opaqueColor =
-      (isDark ? TpColorsDark.background : TpColorsLight.background).withValues(
-        alpha: 0.96,
-      );
-  return settings.copyWith(
-    glassColor: opaqueColor,
-    backerColor: opaqueColor,
-    platformViewFallbackColor: opaqueColor,
-    thickness: 0,
-    blur: 0,
-    chromaticAberration: 0,
-    lightIntensity: 0,
-    ambientStrength: 0,
-    refractiveIndex: 1,
-    saturation: 1,
-    glowIntensity: 0,
-    standardOpacityMultiplier: 1,
-    shadowElevation: 0,
-  );
+  return tpResolveGlassSettings(context, settings);
 }
 
 class TpGlassSurface extends StatelessWidget {
@@ -73,19 +89,25 @@ class TpGlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final highContrast = MediaQuery.highContrastOf(context);
+    final increasedContrast = MediaQuery.highContrastOf(context);
+    final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
+      context,
+    );
+    final useOpaqueFallback = increasedContrast || reduceTransparency;
     final isDark = theme.brightness == Brightness.dark;
     final defaultTint = isDark
-        ? TpColorsDark.secondary.withValues(alpha: highContrast ? 0.96 : 0.68)
-        : TpColorsLight.background.withValues(
-            alpha: highContrast ? 0.96 : 0.58,
+        ? theme.colorScheme.surfaceContainerLow.withValues(
+            alpha: useOpaqueFallback ? 1 : 0.68,
+          )
+        : theme.colorScheme.surface.withValues(
+            alpha: useOpaqueFallback ? 1 : 0.58,
           );
     final tint = tintColor == null
         ? defaultTint
-        : tintColor!.withValues(alpha: highContrast ? 0.96 : tintColor!.a);
+        : tintColor!.withValues(alpha: useOpaqueFallback ? 1 : tintColor!.a);
     final border = isDark
-        ? Colors.white.withValues(alpha: highContrast ? 0.64 : 0.18)
-        : Colors.white.withValues(alpha: highContrast ? 1 : 0.88);
+        ? Colors.white.withValues(alpha: increasedContrast ? 0.64 : 0.18)
+        : Colors.white.withValues(alpha: increasedContrast ? 1 : 0.88);
     final radius = borderRadius.topLeft.x;
     final defaultSettings = LiquidGlassSettings(
       glassColor: tint,
@@ -104,23 +126,11 @@ class TpGlassSurface extends StatelessWidget {
       platformViewFallbackColor: tint,
     );
     final baseSettings = glassSettings ?? defaultSettings;
-    final resolvedSettings = highContrast
-        ? baseSettings.copyWith(
-            glassColor: tint,
-            backerColor: tint,
-            platformViewFallbackColor: tint,
-            thickness: 0,
-            blur: 0,
-            chromaticAberration: 0,
-            lightIntensity: 0,
-            ambientStrength: 0,
-            refractiveIndex: 1,
-            saturation: 1,
-            glowIntensity: 0,
-            standardOpacityMultiplier: 1,
-            shadowElevation: 0,
-          )
-        : baseSettings;
+    final resolvedSettings = tpResolveGlassSettings(
+      context,
+      baseSettings,
+      opaqueColor: tint,
+    );
 
     return GlassContainer(
       padding: padding,

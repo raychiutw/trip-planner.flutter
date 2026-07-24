@@ -28,7 +28,7 @@ import '../trips/trips_list_screen.dart';
 import 'google_poi_accessory_card.dart';
 import 'trip_providers.dart';
 
-/// 行程地圖：Header 行程 action + 總覽／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
+/// 行程地圖：Header 行程 action + 全部／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
 class TripMapScreen extends ConsumerStatefulWidget {
   const TripMapScreen({
     super.key,
@@ -37,6 +37,7 @@ class TripMapScreen extends ConsumerStatefulWidget {
     this.initialDayNum,
     this.mapBuilder,
     this.locationService,
+    this.locationSettingsOpener,
     this.onTripSelected,
     this.onActiveDayChanged,
     this.externalLauncher = const GoogleMapsExternalLauncher(),
@@ -55,6 +56,11 @@ class TripMapScreen extends ConsumerStatefulWidget {
 
   /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
   final TripMapLocationService? locationService;
+
+  /// 測試注入點：production 開啟系統設定，widget test 驗證目標與失敗回饋。
+  final Future<bool> Function(TripMapLocationSettingsTarget)?
+  locationSettingsOpener;
+
   final ValueChanged<String>? onTripSelected;
   final ValueChanged<int?>? onActiveDayChanged;
   final GoogleMapsExternalLauncher externalLauncher;
@@ -160,6 +166,7 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             initialDayNum: widget.initialDayNum,
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
+            locationSettingsOpener: widget.locationSettingsOpener,
             externalLauncher: widget.externalLauncher,
             onActiveDayChanged: (dayNum) {
               _activeDayNum = dayNum;
@@ -229,6 +236,7 @@ class _TripMapView extends ConsumerStatefulWidget {
     this.initialDayNum,
     this.mapBuilder,
     this.locationService,
+    this.locationSettingsOpener,
     required this.externalLauncher,
     required this.onActiveDayChanged,
   });
@@ -239,6 +247,8 @@ class _TripMapView extends ConsumerStatefulWidget {
   final int? initialDayNum;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
+  final Future<bool> Function(TripMapLocationSettingsTarget)?
+  locationSettingsOpener;
   final GoogleMapsExternalLauncher externalLauncher;
   final ValueChanged<int?> onActiveDayChanged;
 
@@ -259,23 +269,28 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   double get _poiAccessoryHeight {
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final additionalHeight = ((scale - 1) * 70).clamp(0.0, 56.0);
+    final additionalHeight = ((scale - 1) * 120).clamp(0.0, 220.0);
     return TpBottomAccessory.height + additionalHeight;
   }
 
-  EdgeInsets get _mapPadding => EdgeInsets.fromLTRB(
+  double get _daySelectorHeight =>
+      TpHorizontalSelector.preferredHeight(context);
+
+  EdgeInsets _mapPadding({required bool hasAccessory}) => EdgeInsets.fromLTRB(
     TpSpacing.s10,
     TpRootGeometry.headerBottom(context) +
         TpSpacing.s2 +
-        TpSpacing.tapMin +
+        _daySelectorHeight +
         TpSpacing.s2 +
         TpSpacing.tapMin +
         TpSpacing.s4,
     TpSpacing.s10,
-    _poiAccessoryHeight + TpRootTabGeometry.clearance(context) + TpSpacing.s6,
+    (hasAccessory ? _poiAccessoryHeight : 0) +
+        TpRootTabGeometry.clearance(context) +
+        TpSpacing.s6,
   );
 
-  /// 0 = 總覽；i = 第 i 日（widget.days[i - 1]）。
+  /// 0 = 全部；i = 第 i 日（widget.days[i - 1]）。
   int _selectedTabIndex = 0;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
@@ -464,7 +479,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       }
       return;
     }
-    setState(() => _loadingRoutes = true);
+    setState(() {
+      _routeSegments = const [];
+      _loadingRoutes = true;
+    });
     final repository = ref.read(mapRepositoryProvider);
     final segments = await Future.wait([
       for (final (index, pair) in pairs.indexed)
@@ -575,11 +593,17 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _previewStop(_MapStop stop) {
-    if (_previewEntryId == stop.entry.id && _selectedGooglePoi == null) return;
+    if (_activeEntryId == stop.entry.id &&
+        _previewEntryId == stop.entry.id &&
+        _selectedGooglePoi == null) {
+      return;
+    }
     setState(() {
+      _activeEntryId = stop.entry.id;
       _previewEntryId = stop.entry.id;
       _selectedGooglePoi = null;
     });
+    _focusStop(stop);
   }
 
   void _selectGooglePoi(GoogleMapPoiSelection selection) {
@@ -613,17 +637,42 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       _mapController.move(point, 15);
     } on TripMapLocationException catch (error) {
       if (!mounted) return;
-      _showLocationError(error.message);
+      _showLocationError(error);
     } on Exception {
       if (!mounted) return;
-      _showLocationError('無法取得目前位置');
+      _showLocationError(const TripMapLocationException('無法取得目前位置，請稍後重試'));
     } finally {
       if (mounted) setState(() => _locating = false);
     }
   }
 
-  void _showLocationError(String message) {
-    showAppError(context, message, onRetry: _locateMe);
+  void _showLocationError(TripMapLocationException error) {
+    final settingsTarget = error.settingsTarget;
+    showAppError(
+      context,
+      error.message,
+      onRetry: settingsTarget == null
+          ? _locateMe
+          : () => unawaited(_openLocationSettings(settingsTarget)),
+      retryLabel: settingsTarget == null ? '重試' : '開啟設定',
+    );
+  }
+
+  Future<void> _openLocationSettings(
+    TripMapLocationSettingsTarget target,
+  ) async {
+    final opener = widget.locationSettingsOpener ?? openTripMapLocationSettings;
+    try {
+      if (await opener(target)) return;
+    } catch (_) {
+      // False and platform failures share one persistent recovery state.
+    }
+    if (!mounted) return;
+    showAppError(
+      context,
+      '無法自動開啟設定，請手動前往系統「設定」允許定位',
+      onRetry: () => unawaited(_openLocationSettings(target)),
+    );
   }
 
   void _handleMapReady() {
@@ -657,6 +706,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   ) {
     final initialCenter =
         _centerForPins(visiblePins) ?? allPins.firstOrNull?.point;
+    final hasAccessory = visibleStops.isNotEmpty || _selectedGooglePoi != null;
     return Stack(
       children: [
         Positioned.fill(
@@ -667,7 +717,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               initialFitPoints: const [],
               initialCenter: initialCenter,
               initialZoom: _focusZoom,
-              initialPadding: _mapPadding,
+              initialPadding: _mapPadding(hasAccessory: hasAccessory),
               onMapReady: _handleMapReady,
               onTap: (_) => _clearGooglePoi(),
               onGooglePoiSelected: _selectGooglePoi,
@@ -711,11 +761,16 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             platformViewBackdrop: true,
             value: _selectedTabIndex,
             options: [
-              const TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(
+                value: 0,
+                label: '全部',
+                semanticsLabel: '全部，共 ${widget.days.length} 天',
+              ),
               for (final (index, day) in widget.days.indexed)
                 TpScopeOption(
                   value: index + 1,
-                  label: 'DAY ${day.dayNum}',
+                  label: 'Day ${day.dayNum}',
+                  semanticsLabel: '第 ${day.dayNum} 天，共 ${widget.days.length} 天',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
                 ),
             ],
@@ -726,7 +781,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           top:
               TpRootGeometry.headerBottom(context) +
               TpSpacing.s2 +
-              TpSpacing.tapMin +
+              _daySelectorHeight +
               TpSpacing.s2,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
@@ -740,7 +795,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             top:
                 TpRootGeometry.headerBottom(context) +
                 TpSpacing.s2 +
-                TpSpacing.tapMin +
+                _daySelectorHeight +
                 TpSpacing.s2 +
                 TpSpacing.tapMin +
                 TpSpacing.s4,
@@ -756,15 +811,16 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               ),
             ),
           ),
-        _buildPoiAccessory(visibleStops),
+        if (hasAccessory) _buildPoiAccessory(visibleStops),
       ],
     );
   }
 
   TripMapMarker _buildMarker(_MapStop pin, {required int number}) {
-    // 白底圓形 chip + 日別色外圈／數字；聚焦點改 accent 填底並放大（對齊 web）。
+    // 白底圓形 chip + 日別色外圈／數字；聚焦點改 adaptive app tint 填底並放大。
     final style = tripMapMarkerStyle(
       dayColor: pin.color,
+      focusColor: Theme.of(context).colorScheme.primary,
       isFocused: pin.entry.id == _activeEntryId,
     );
     return TripMapMarker(
@@ -976,15 +1032,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                       children: [
                         Text(
                           stop.entry.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          key: ValueKey('entry-card-title-${stop.entry.id}'),
                           style: theme.textTheme.titleMedium,
                         ),
                         Text(
                           timeLabel,
                           key: ValueKey('entry-card-time-${stop.entry.id}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontFeatures: const [FontFeature.tabularFigures()],
@@ -993,8 +1046,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                         Text(
                           categoryLabel,
                           key: ValueKey('entry-card-category-${stop.entry.id}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: stop.point == null
                                 ? theme.colorScheme.error

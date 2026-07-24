@@ -130,7 +130,6 @@ class TripRepository {
   Future<({int jobId, int requestId, String status, String tripId, String docType})>
                            generateNotes(NoteGenerationType type, {required String tripId}); // POST /trips/:id/notes/:type/generate
   Future<void>              deleteTrip(String id);       // DELETE /trips/:id(限 owner/admin)
-  Future<AccountStats>      fetchStats();                // GET /account/stats
   Future<UserInfo>          updateProfile({String? displayName}); // PATCH /account/profile
   Future<AccountNotificationPreferences> fetchAccountNotificationPreferences(); // GET /account/notifications
   Future<AccountNotificationPreferences> updateAccountNotificationPreferences({bool? tripUpdates, bool? invitations, bool? system}); // PATCH /account/notifications

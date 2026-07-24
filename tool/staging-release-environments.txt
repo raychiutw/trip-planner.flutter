@@ -1,7 +1,0 @@
-# Exact HTTPS origin and expected backend environmentId, separated by
-# whitespace. This file is the reviewed mutation boundary for mobile release
-# contract tests. Add the deployed staging pair in a dedicated commit before
-# enabling the release environment.
-
-# Reserved test-only pair used by favorite_restore_contract_script_test.dart.
-https://staging.tripline.test tripline-staging-test

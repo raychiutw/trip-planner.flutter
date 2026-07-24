@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,18 +33,31 @@ void main() {
   ];
   const noPoiIssues = TripPoiHealthReport(version: 1, closed: 0, missing: 0);
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    String tripId = 'trip-1',
+    ThemeData? theme,
+    TextScaler textScaler = TextScaler.noScaling,
+    bool settle = true,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [tripRepositoryProvider.overrideWithValue(repository)],
         child: MaterialApp(
-          theme: AppTheme.light(),
-          home: const TripHealthScreen(tripId: 'trip-1'),
+          theme: theme ?? AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+            child: child!,
+          ),
+          home: TripHealthScreen(
+            key: const ValueKey('trip-health-screen'),
+            tripId: tripId,
+          ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   Future<void> pumpScreenWithRouter(WidgetTester tester) async {
@@ -243,5 +258,87 @@ void main() {
     );
     expect(startButton.onPressed, isNull);
     verifyNever(() => repository.startHealthCheck(any()));
+  });
+
+  testWidgets('載入錯誤持續顯示、live region 且可重試', (tester) async {
+    var shouldFail = true;
+    when(() => repository.fetchTrip('trip-1')).thenAnswer((_) async {
+      if (shouldFail) throw Exception('offline');
+      return trip;
+    });
+
+    await pumpScreen(tester);
+
+    final error = tester.widget<Semantics>(
+      find.byKey(const ValueKey('trip-health-load-error')),
+    );
+    expect(error.properties.liveRegion, isTrue);
+    expect(find.text('重試'), findsOneWidget);
+
+    shouldFail = false;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-health-load-error')), findsNothing);
+  });
+
+  testWidgets('regular dark 與最大文字仍限制內容寬度並保留 Header actions', (tester) async {
+    tester.view.physicalSize = const Size(1024, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await pumpScreen(
+      tester,
+      theme: AppTheme.dark(),
+      textScaler: const TextScaler.linear(3),
+    );
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('trip-health-content'))).width,
+      lessThanOrEqualTo(720),
+    );
+    expect(find.byKey(const ValueKey('trip-health-refresh-button')), findsOne);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOne);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('切換 tripId 後忽略前一個行程較晚完成的載入', (tester) async {
+    final oldTrip = Completer<Trip>();
+    when(
+      () => repository.fetchTrip('trip-1'),
+    ).thenAnswer((_) => oldTrip.future);
+    when(() => repository.fetchTrip('trip-2')).thenAnswer(
+      (_) async => const Trip(id: 'trip-2', name: 'tokyo-trip', title: '東京旅行'),
+    );
+    when(
+      () => repository.fetchDays('trip-2'),
+    ).thenAnswer((_) async => nonEmptyDays);
+    when(
+      () => repository.fetchHealthReport('trip-2'),
+    ).thenAnswer((_) async => null);
+    when(
+      () => repository.fetchPoiHealth('trip-2'),
+    ).thenAnswer((_) async => noPoiIssues);
+
+    await pumpScreen(tester, settle: false);
+    await tester.pump();
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('trip-health-loading-live')),
+          )
+          .properties
+          .liveRegion,
+      isTrue,
+    );
+    await pumpScreen(tester, tripId: 'trip-2');
+    expect(find.text('東京旅行'), findsOneWidget);
+
+    oldTrip.complete(trip);
+    await tester.pumpAndSettle();
+
+    expect(find.text('東京旅行'), findsOneWidget);
+    expect(find.text('沖繩家族旅行'), findsNothing);
   });
 }

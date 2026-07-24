@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -6,7 +8,7 @@ import '../theme/tokens.dart';
 import 'tp_action_item.dart';
 import 'tp_glass_surface.dart';
 
-enum TpAppBarRole { standalone, detail, modalContent, modalForm }
+enum TpAppBarRole { standalone, detail, publicDetail, modalContent, modalForm }
 
 /// The single typography owner for titles rendered inside compact headers.
 class TpHeaderTitle extends StatelessWidget {
@@ -89,6 +91,9 @@ class TpToolbarGlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final resolvedSettings = glassSettings == null
+        ? tpNavigationGlassSettings(context)
+        : tpResolveGlassSettings(context, glassSettings!);
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
       child: Tooltip(
@@ -114,7 +119,7 @@ class TpToolbarGlassButton extends StatelessWidget {
                   Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
             ),
           ),
-          settings: glassSettings ?? tpNavigationGlassSettings(context),
+          settings: resolvedSettings,
           child: child,
         ),
       ),
@@ -175,6 +180,17 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
 
   static TpLargeSheetNavigationScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TpLargeSheetNavigationScope>();
+
+  /// Close 可直接離開乾淨的 sheet；若目前 route 有 PopScope guard，
+  /// 先交給 route 顯示未儲存確認，不可繞過後直接 pop root dialog。
+  Future<void> requestClose(BuildContext context) async {
+    final route = ModalRoute.of(context);
+    if (route?.popDisposition == RoutePopDisposition.doNotPop) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    onClose();
+  }
 
   @override
   bool updateShouldNotify(TpLargeSheetNavigationScope oldWidget) => false;
@@ -303,6 +319,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.role,
     this.actions = const [],
+    this.onBack,
     this.onCancel,
     this.primaryActionLabel,
     this.primaryActionKey,
@@ -323,6 +340,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
   final TpAppBarRole role;
   final List<Widget> actions;
+  final VoidCallback? onBack;
   final VoidCallback? onCancel;
   final String? primaryActionLabel;
   final Key? primaryActionKey;
@@ -431,7 +449,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                         tooltip: MaterialLocalizations.of(
                           context,
                         ).closeButtonTooltip,
-                        onPressed: largeSheetScope.onClose,
+                        onPressed: () =>
+                            unawaited(largeSheetScope.requestClose(context)),
                         child: Icon(
                           CupertinoIcons.xmark,
                           size: 19,
@@ -476,10 +495,11 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       case TpAppBarRole.standalone:
         return null;
       case TpAppBarRole.detail:
+      case TpAppBarRole.publicDetail:
         return TpToolbarGlassButton(
           key: const ValueKey('tp-app-bar-back'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: () => closeAppRouteOrSheet(context),
+          onPressed: onBack ?? () => closeAppRouteOrSheet(context),
           child: const Icon(CupertinoIcons.back, size: 22),
         );
       case TpAppBarRole.modalContent:

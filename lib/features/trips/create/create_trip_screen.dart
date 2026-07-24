@@ -155,13 +155,18 @@ class _DateModeSection extends StatelessWidget {
   String _ymd(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  String _dateLabel(BuildContext context, String? value, String fallback) {
+    final date = value == null ? null : DateTime.tryParse(value);
+    return date == null ? fallback : formatAppFullDate(context, date);
+  }
+
   Future<void> _pickFixed(BuildContext context, {required bool isStart}) async {
     final now = DateTime.now();
     final first = isStart
         ? now
         : (state.fixedStart != null ? DateTime.parse(state.fixedStart!) : now);
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showAppDatePicker(
+      context,
       initialDate: first,
       firstDate: first,
       lastDate: now.add(const Duration(days: 730)),
@@ -195,7 +200,7 @@ class _DateModeSection extends StatelessWidget {
                 child: OutlinedButton(
                   key: const ValueKey('create-date-start'),
                   onPressed: () => _pickFixed(context, isStart: true),
-                  child: Text(state.fixedStart ?? '開始日期'),
+                  child: Text(_dateLabel(context, state.fixedStart, '開始日期')),
                 ),
               ),
               const SizedBox(width: TpSpacing.s2),
@@ -203,7 +208,7 @@ class _DateModeSection extends StatelessWidget {
                 child: OutlinedButton(
                   key: const ValueKey('create-date-end'),
                   onPressed: () => _pickFixed(context, isStart: false),
-                  child: Text(state.fixedEnd ?? '結束日期'),
+                  child: Text(_dateLabel(context, state.fixedEnd, '結束日期')),
                 ),
               ),
             ],

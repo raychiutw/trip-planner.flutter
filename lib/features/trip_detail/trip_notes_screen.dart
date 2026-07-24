@@ -5,15 +5,16 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
+import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
+import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../models/trip_request.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
-import '../../ui/tp_glass_expansion_section.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
@@ -48,22 +49,40 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     final notesAsync = ref.watch(tripNotesProvider(widget.tripId));
     return Scaffold(
       appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('行程筆記')),
-      body: notesAsync.when(
-        loading: () =>
-            const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(TpSpacing.s6),
-            child: Text('載入失敗：$error', textAlign: TextAlign.center),
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.feed,
+        contentKey: const ValueKey('trip-notes-content'),
+        child: notesAsync.when(
+          loading: () =>
+              const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),
+          error: (error, _) => Center(
+            child: Semantics(
+              key: const ValueKey('trip-notes-error'),
+              liveRegion: true,
+              child: Padding(
+                padding: const EdgeInsets.all(TpSpacing.s6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('載入失敗：$error', textAlign: TextAlign.center),
+                    const SizedBox(height: TpSpacing.s2),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(tripNotesProvider(widget.tripId)),
+                      child: const Text('重試'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
+          data: (notes) => _buildSections(context, notes),
         ),
-        data: (notes) => _buildSections(context, notes),
       ),
     );
   }
 
   Widget _buildSections(BuildContext context, TripNotes notes) {
-    final tones = Theme.of(context).extension<TpTones>()!;
     final aiBusy = _aiSubmitting || _aiJob != null;
     return ListView(
       key: const ValueKey('trip-notes-list'),
@@ -88,7 +107,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           tripId: widget.tripId,
           section: NoteSection.flights,
           icon: CupertinoIcons.airplane,
-          iconColor: tones.sageDeep,
           title: '航班',
           // mobile 預設展開航班（對齊 web TripNotesPage 行為）
           initiallyExpanded: true,
@@ -106,7 +124,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           tripId: widget.tripId,
           section: NoteSection.lodgings,
           icon: CupertinoIcons.bed_double,
-          iconColor: tones.sageDeep,
           title: '住宿',
           rows: [
             for (final l in notes.lodgings)
@@ -122,7 +139,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           tripId: widget.tripId,
           section: NoteSection.reservations,
           icon: CupertinoIcons.ticket,
-          iconColor: tones.pinkDeep,
           title: '預訂',
           rows: [
             for (final r in notes.reservations)
@@ -138,7 +154,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           tripId: widget.tripId,
           section: NoteSection.pretrip,
           icon: CupertinoIcons.list_bullet,
-          iconColor: tones.accentDeep,
           title: '行前須知',
           aiActions: [
             const _NoteAiAction(type: NoteGenerationType.tips, label: '一般'),
@@ -166,7 +181,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           tripId: widget.tripId,
           section: NoteSection.emergency,
           icon: Icons.support_agent_outlined,
-          iconColor: tones.accentDeep,
           title: '緊急聯絡',
           aiActions: const [
             _NoteAiAction(type: NoteGenerationType.emergency, label: 'AI'),
@@ -243,9 +257,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     if (event.status == RequestStatus.completed && event.error == null) {
       setState(() => _aiJob = null);
       ref.invalidate(tripNotesProvider(widget.tripId));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('AI 生成完成（${type.pendingLabel}）')));
+      showAppNotice(context, 'AI 生成完成（${type.pendingLabel}）');
       return;
     }
 
@@ -294,15 +306,15 @@ class _NotesAiPendingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
+    final colors = theme.colorScheme;
     return Container(
       key: const ValueKey('notes-ai-pending'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
       padding: const EdgeInsets.all(TpSpacing.s3),
       decoration: BoxDecoration(
-        color: tones.accentSubtle,
+        color: colors.secondaryContainer,
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
-        border: Border.all(color: tones.accent),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         children: [
@@ -311,7 +323,7 @@ class _NotesAiPendingPanel extends StatelessWidget {
             height: 18,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: tones.accentDeep,
+              color: colors.primary,
             ),
           ),
           const SizedBox(width: TpSpacing.s3),
@@ -319,7 +331,7 @@ class _NotesAiPendingPanel extends StatelessWidget {
             child: Text(
               'AI 正在生成$label，完成後會自動更新。通常需 3-7 分鐘。',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: tones.accentDeep,
+                color: colors.onSecondaryContainer,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -398,7 +410,6 @@ class _NotesSection extends ConsumerWidget {
     required this.tripId,
     required this.section,
     required this.icon,
-    required this.iconColor,
     required this.title,
     required this.rows,
     this.initiallyExpanded = false,
@@ -411,7 +422,6 @@ class _NotesSection extends ConsumerWidget {
   final String tripId;
   final NoteSection section;
   final IconData icon;
-  final Color iconColor;
   final String title;
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
@@ -424,7 +434,7 @@ class _NotesSection extends ConsumerWidget {
     return confirmAndDelete(
       context,
       title: '刪除筆記',
-      message: '確定要刪除這筆嗎？',
+      message: '「$title」中的這筆資料會永久刪除，且無法復原。',
       delete: () => ref
           .read(tripRepositoryProvider)
           .deleteNote(section, tripId: tripId, rowId: rowId),
@@ -459,115 +469,144 @@ class _NotesSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
-    return TpGlassExpansionSection(
+    final colors = theme.colorScheme;
+    return Card(
+      key: ValueKey('notes-section-${section.name}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      initiallyExpanded: initiallyExpanded,
-      iconColor: theme.colorScheme.onSurfaceVariant,
-      leading: Icon(icon, size: 20, color: iconColor),
-      title: Row(
-        children: [
-          Text(title, style: theme.textTheme.titleMedium),
-          const SizedBox(width: TpSpacing.s2),
-          Container(
-            key: ValueKey('notes-count-${section.name}'),
-            padding: const EdgeInsets.symmetric(
-              horizontal: TpSpacing.s2,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: tones.accentSubtle,
-              borderRadius: const BorderRadius.all(Radius.circular(999)),
-            ),
-            child: Text(
-              '${rows.length}',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: tones.accentDeep,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-        ],
-      ),
-      children: [
-        if (aiActions.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: TpSpacing.s3),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: TpSpacing.s2,
-                runSpacing: TpSpacing.s2,
-                children: [
-                  for (final action in aiActions) ...[
-                    OutlinedButton.icon(
-                      key: ValueKey('note-ai-${action.type.pathSegment}'),
-                      onPressed:
-                          aiBusy || !action.enabled || onGenerateNotes == null
-                          ? null
-                          : () => onGenerateNotes!(action.type),
-                      icon: const Icon(Icons.auto_awesome_outlined),
-                      label: Text(
-                        activeAiType == action.type ? '生成中...' : action.label,
-                      ),
-                    ),
-                    if (!action.enabled && action.disabledText != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: TpSpacing.s2),
-                        child: Text(
-                          action.disabledText!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        if (rows.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '尚無資料',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          shape: const Border(),
+          collapsedShape: const Border(),
+          iconColor: colors.onSurfaceVariant,
+          collapsedIconColor: colors.onSurfaceVariant,
+          leading: Icon(icon, size: 20, color: colors.onSurfaceVariant),
+          title: Row(
+            children: [
+              Flexible(child: Text(title, style: theme.textTheme.titleMedium)),
+              const SizedBox(width: TpSpacing.s2),
+              Container(
+                key: ValueKey('notes-count-${section.name}'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TpSpacing.s2,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: const BorderRadius.all(Radius.circular(999)),
+                ),
+                child: Text(
+                  '${rows.length}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
-            ),
-          )
-        else
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: rows.length,
-            onReorderItem: (oldIndex, newIndex) =>
-                _reorder(context, ref, oldIndex, newIndex),
-            itemBuilder: (context, i) => _NoteRowTile(
-              key: ValueKey('note-row-${section.name}-${rows[i].id}'),
-              section: section,
-              tripId: tripId,
-              row: rows[i],
-              index: i,
-              onDelete: () => _delete(context, ref, rows[i].id),
-            ),
+            ],
           ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('note-add-${section.name}'),
-            onPressed: () =>
-                showNoteEditSheet(context, tripId: tripId, section: section),
-            icon: const Icon(CupertinoIcons.add),
-            label: Text('新增$title'),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            TpSpacing.s4,
+            0,
+            TpSpacing.s4,
+            TpSpacing.s4,
           ),
+          children: [
+            if (aiActions.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: TpSpacing.s2,
+                    runSpacing: TpSpacing.s2,
+                    children: [
+                      for (final action in aiActions) ...[
+                        OutlinedButton.icon(
+                          key: ValueKey('note-ai-${action.type.pathSegment}'),
+                          onPressed:
+                              aiBusy ||
+                                  !action.enabled ||
+                                  onGenerateNotes == null
+                              ? null
+                              : () => onGenerateNotes!(action.type),
+                          icon: const Icon(Icons.auto_awesome_outlined),
+                          label: Text(
+                            activeAiType == action.type
+                                ? '生成中...'
+                                : action.label,
+                          ),
+                        ),
+                        if (!action.enabled && action.disabledText != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: TpSpacing.s2),
+                            child: Text(
+                              action.disabledText!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            if (rows.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '尚無資料',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: rows.length,
+                onReorderItem: (oldIndex, newIndex) =>
+                    _reorder(context, ref, oldIndex, newIndex),
+                itemBuilder: (context, i) => _NoteRowTile(
+                  key: ValueKey('note-row-${section.name}-${rows[i].id}'),
+                  section: section,
+                  tripId: tripId,
+                  row: rows[i],
+                  index: i,
+                  onDelete: () => _delete(context, ref, rows[i].id),
+                  onMoveUp: i == 0
+                      ? null
+                      : () => _reorder(context, ref, i, i - 1),
+                  onMoveDown: i == rows.length - 1
+                      ? null
+                      : () => _reorder(context, ref, i, i + 1),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: ValueKey('note-add-${section.name}'),
+                onPressed: () => showNoteEditSheet(
+                  context,
+                  tripId: tripId,
+                  section: section,
+                ),
+                icon: const Icon(CupertinoIcons.add),
+                label: Text('新增$title'),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -581,6 +620,8 @@ class _NoteRowTile extends StatelessWidget {
     required this.row,
     required this.index,
     required this.onDelete,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   final NoteSection section;
@@ -588,6 +629,8 @@ class _NoteRowTile extends StatelessWidget {
   final _NoteRowData row;
   final int index;
   final Future<void> Function() onDelete;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
@@ -616,6 +659,8 @@ class _NoteRowTile extends StatelessWidget {
           ReorderDragHandle(
             index: index,
             iconKey: ValueKey('note-drag-${section.name}-${row.id}'),
+            onMoveUp: onMoveUp,
+            onMoveDown: onMoveDown,
           ),
         ],
       ),
@@ -767,28 +812,20 @@ class _ReservationRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
-    // 舊類型對照保留資料相容性；sage／pink token 已映射中性色。
-    final (chipBg, chipFg) = switch (reservation.kind) {
-      'restaurant' => (tones.pinkBg, tones.pinkDeep),
-      'transport' => (tones.sageBg, tones.sageDeep),
-      _ => (tones.accentBg, tones.accentDeep),
-    };
+    final colors = theme.colorScheme;
     return _NoteRowCard(
       children: [
         Row(
           children: [
             _KindChip(
               label: _kindLabels[reservation.kind] ?? reservation.kind,
-              bg: chipBg,
-              fg: chipFg,
+              bg: colors.surfaceContainerHighest,
+              fg: colors.onSurfaceVariant,
             ),
             const SizedBox(width: TpSpacing.s2),
             Expanded(
               child: Text(
                 reservation.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleMedium,
               ),
             ),
@@ -851,24 +888,19 @@ class _EmergencyContactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
+    final colors = theme.colorScheme;
     return _NoteRowCard(
       children: [
         Row(
           children: [
             Expanded(
-              child: Text(
-                contact.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium,
-              ),
+              child: Text(contact.name, style: theme.textTheme.titleMedium),
             ),
             const SizedBox(width: TpSpacing.s2),
             _KindChip(
               label: _kindLabels[contact.kind] ?? contact.kind,
-              bg: tones.accentBg,
-              fg: tones.accentDeep,
+              bg: colors.surfaceContainerHighest,
+              fg: colors.onSurfaceVariant,
             ),
           ],
         ),

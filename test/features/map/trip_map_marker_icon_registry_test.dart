@@ -57,5 +57,9 @@ TripMapMarker _marker({
   point: const TripMapPoint(25.033, 121.565),
   color: color,
   glyph: glyph,
-  style: tripMapMarkerStyle(dayColor: color, isFocused: focused),
+  style: tripMapMarkerStyle(
+    dayColor: color,
+    focusColor: Colors.brown,
+    isFocused: focused,
+  ),
 );

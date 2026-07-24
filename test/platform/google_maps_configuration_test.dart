@@ -41,6 +41,23 @@ void main() {
     expect(infoPlist, contains('不會在背景持續追蹤'));
   });
 
+  test('iOS 透過 EventChannel 提供 Reduce Transparency current value 與變更事件', () {
+    final appDelegate = read('ios/Runner/AppDelegate.swift');
+
+    expect(appDelegate, contains('tripline/accessibility/reduce-transparency'));
+    expect(appDelegate, contains('FlutterEventChannel'));
+    expect(
+      appDelegate,
+      contains('UIAccessibility.isReduceTransparencyEnabled'),
+    );
+    expect(
+      appDelegate,
+      contains('UIAccessibility.reduceTransparencyStatusDidChangeNotification'),
+    );
+    expect(appDelegate, contains('NotificationCenter.default.addObserver'));
+    expect(appDelegate, contains('ReduceTransparencyPlugin.register'));
+  });
+
   test('Android manifest placeholder 從 ignored properties 或環境變數注入', () {
     final manifest = read('android/app/src/main/AndroidManifest.xml');
     final gradle = read('android/app/build.gradle.kts');
@@ -82,13 +99,13 @@ void main() {
     expect(workflow, contains(r'runs-on: ${{ inputs.runner }}'));
     expect(
       workflow,
-      contains(r"if: ${{ github.event_name != 'workflow_dispatch' }}"),
+      isNot(contains(r"if: ${{ github.event_name != 'workflow_dispatch' }}")),
     );
-    expect('flutter test'.allMatches(workflow).length, greaterThanOrEqualTo(2));
+    expect('flutter test'.allMatches(workflow).length, 1);
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 
-  test('商店上傳不等待外部裝置測試證據', () {
+  test('商店上傳必須等待外部裝置與人工輔助使用證據', () {
     final workflow = read('.github/workflows/mobile.yml');
     final testflightJob = workflow.substring(
       workflow.indexOf('  testflight:'),
@@ -99,10 +116,15 @@ void main() {
     );
 
     expect(workflow, contains('  external_device_gate:'));
-    expect(testflightJob, isNot(contains('needs: external_device_gate')));
-    expect(testflightJob, isNot(contains('needs.external_device_gate.result')));
-    expect(androidJob, isNot(contains('needs: external_device_gate')));
-    expect(androidJob, isNot(contains('needs.external_device_gate.result')));
+    expect(workflow, contains('  manual_evidence_gate:'));
+    expect(
+      testflightJob,
+      contains('needs: [ci, external_device_gate, manual_evidence_gate]'),
+    );
+    expect(
+      androidJob,
+      contains('needs: [ci, external_device_gate, manual_evidence_gate]'),
+    );
   });
 
   test('workflow 手動發布 Android internal testing 且沒有 production 權限', () {

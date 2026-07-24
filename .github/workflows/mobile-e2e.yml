@@ -70,10 +70,11 @@ jobs:
     if: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || inputs.platform == 'android' || inputs.platform == 'all') }}
     runs-on: ubuntu-24.04
     environment: mobile-e2e
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       FIREBASE_ANDROID_MODEL: ${{ vars.FIREBASE_ANDROID_MODEL || 'MediumPhone.arm' }}
       FIREBASE_ANDROID_VERSION: ${{ vars.FIREBASE_ANDROID_VERSION || '34' }}
+      INTEGRATION_TEST_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-android-integration
       TEST_LAB_RESULTS_DIR: github-${{ github.run_id }}-${{ github.run_attempt }}-android
     steps:
       - name: Check out source
@@ -122,7 +123,7 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build Patrol instrumentation APKs
+      - name: Build integration and Patrol instrumentation APKs
         shell: bash
         env:
           GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
@@ -134,6 +135,20 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
+          flutter build apk --debug
+          pushd android
+          ./gradlew app:assembleAndroidTest \
+            -PstandardIntegrationTest=true
+          ./gradlew app:assembleDebug \
+            -PstandardIntegrationTest=true \
+            -Ptarget=integration_test/app_smoke_test.dart
+          popd
+          mkdir -p build/integration-test
+          cp build/app/outputs/apk/debug/app-debug.apk \
+            build/integration-test/app-debug.apk
+          cp build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+            build/integration-test/app-debug-androidTest.apk
+
           dart pub global activate patrol_cli "$PATROL_CLI_VERSION"
           patrol build android \
             --target patrol_test/native_map_smoke_test.dart \
@@ -141,6 +156,25 @@ jobs:
             --dart-define E2E_EXPECT_GOOGLE_POI=true
           test -f build/app/outputs/apk/debug/app-debug.apk
           test -f build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+      - name: Run Flutter integration matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          gcloud firebase test android run \
+            --project "$FIREBASE_PROJECT_ID" \
+            --type instrumentation \
+            --use-orchestrator \
+            --app build/integration-test/app-debug.apk \
+            --test build/integration-test/app-debug-androidTest.apk \
+            --device "model=${FIREBASE_ANDROID_MODEL},version=${FIREBASE_ANDROID_VERSION},locale=en,orientation=portrait" \
+            --environment-variables clearPackageData=true \
+            --timeout 5m \
+            --record-video \
+            --results-history-name tripline-flutter-integration \
+            --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
+            --results-dir "$INTEGRATION_TEST_RESULTS_DIR" \
+            2>&1 | tee test-lab-android-integration.log
 
       - name: Run Android matrix
         shell: bash
@@ -169,8 +203,11 @@ jobs:
           mkdir -p test-lab-results/android
           touch test-lab-results/android/.tripline-test-lab-evidence-root
           gcloud storage cp --recursive \
+            "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${INTEGRATION_TEST_RESULTS_DIR}" \
+            test-lab-results/android/integration
+          gcloud storage cp --recursive \
             "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
-            test-lab-results/android
+            test-lab-results/android/patrol
 
       - name: Sanitize Android Test Lab evidence
         id: sanitize_android_evidence
@@ -183,6 +220,7 @@ jobs:
         with:
           name: mobile-e2e-android-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            test-lab-android-integration.log
             test-lab-android.log
             test-lab-results/android
           if-no-files-found: warn

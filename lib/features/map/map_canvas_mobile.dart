@@ -179,6 +179,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
             color: item.members.first.color,
             style: tripMapMarkerStyle(
               dayColor: item.members.first.color,
+              focusColor: Theme.of(context).colorScheme.primary,
               isFocused: false,
             ),
             title: '${item.members.length} 個景點',
@@ -208,6 +209,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
       TripMapCameraPosition(
         target: _fromNative(position.target),
         zoom: position.zoom,
+        bearing: position.bearing,
       ),
     );
     if (widget.config.clusterMarkers && _zoom.floor() != previousBucket) {

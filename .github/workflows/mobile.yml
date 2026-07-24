@@ -10,7 +10,7 @@ on:
       release_target:
         description: Mobile release destination
         required: true
-        default: testflight
+        default: both
         type: choice
         options:
           - testflight
@@ -24,11 +24,33 @@ on:
         options:
           - macos-26
           - tripline-release
-      run_optional_evidence:
-        description: Also run staging contract and Firebase device evidence
+      manual_evidence_sha:
+        description: 人工輔助使用驗收所對應的完整 commit SHA
+        required: true
+        type: string
+      manual_evidence_url:
+        description: 人工輔助使用驗收證據的 HTTPS URL
+        required: true
+        type: string
+      manual_evidence_result:
+        description: 人工輔助使用驗收結果
+        required: true
+        default: BLOCKED
+        type: choice
+        options:
+          - BLOCKED
+          - FAIL
+          - PASS
+      manual_evidence_waiver:
+        description: 缺少人工證據時是否使用可稽核發布例外
         required: true
         default: false
         type: boolean
+      manual_evidence_waiver_reason:
+        description: 發布例外原因（會寫入工作流程摘要）
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -40,9 +62,8 @@ env:
 jobs:
   ci:
     name: Analyze and test
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -64,10 +85,13 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Test
+      - name: Run full Flutter test suite
         run: flutter test
 
       - name: Preserve deterministic UI evidence
@@ -76,7 +100,7 @@ jobs:
         with:
           name: tripline-ui-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/test-artifacts
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
       - name: Build Android debug
@@ -87,34 +111,10 @@ jobs:
           : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
           flutter build apk --debug
 
-  favorite_restore_contract:
-    name: Verify staging favorite restore
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
-    runs-on: ubuntu-24.04
-    environment: mobile-release
-    timeout-minutes: 10
-    concurrency:
-      group: favorite-restore-contract-${{ github.repository }}
-      cancel-in-progress: false
-    env:
-      STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
-      STAGING_ORIGIN: ${{ secrets.STAGING_ORIGIN }}
-      STAGING_SESSION_COOKIE: ${{ secrets.STAGING_SESSION_COOKIE }}
-      STAGING_CSRF_TOKEN: ${{ secrets.STAGING_CSRF_TOKEN }}
-      STAGING_OTHER_SESSION_COOKIE: ${{ secrets.STAGING_OTHER_SESSION_COOKIE }}
-      STAGING_OTHER_CSRF_TOKEN: ${{ secrets.STAGING_OTHER_CSRF_TOKEN }}
-      STAGING_FAVORITE_POI_ID: ${{ secrets.STAGING_FAVORITE_POI_ID }}
-      STAGING_CONTRACT_GUARD: ${{ secrets.STAGING_CONTRACT_GUARD }}
-    steps:
-      - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Verify staging favorite restore
-        run: tool/verify_favorite_restore_contract.sh
-
   external_device_gate:
     name: External device evidence
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    needs: ci
     permissions:
       contents: read
       id-token: write
@@ -134,9 +134,76 @@ jobs:
       APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
       APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
+  manual_evidence_gate:
+    name: Manual accessibility evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    needs: [ci, external_device_gate]
+    runs-on: ubuntu-24.04
+    environment: mobile-release
+    timeout-minutes: 5
+    steps:
+      - name: Check out evidence validator
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate exact-SHA manual evidence or release waiver
+        env:
+          EVIDENCE_RESULT: ${{ inputs.manual_evidence_result }}
+          EVIDENCE_SHA: ${{ inputs.manual_evidence_sha }}
+          EVIDENCE_URL: ${{ inputs.manual_evidence_url }}
+          EVIDENCE_WAIVER: ${{ inputs.manual_evidence_waiver }}
+          EVIDENCE_WAIVER_REASON: ${{ inputs.manual_evidence_waiver_reason }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVIDENCE_SHA" != "$RELEASE_SHA" ]]; then
+            echo "Manual evidence SHA must exactly match the release SHA" >&2
+            exit 1
+          fi
+          waiver_reason=
+          case "$EVIDENCE_RESULT" in
+            PASS)
+              bash tool/validate_manual_evidence.sh "$EVIDENCE_URL" "$RELEASE_SHA"
+              summary_result=PASS
+              summary_label=Evidence
+              ;;
+            BLOCKED)
+              if [[ "$EVIDENCE_WAIVER" != "true" ]]; then
+                echo "BLOCKED manual evidence requires an explicit release waiver" >&2
+                exit 1
+              fi
+              waiver_reason="${EVIDENCE_WAIVER_REASON//$'\r'/ }"
+              waiver_reason="${waiver_reason//$'\n'/ }"
+              if [[ ! "$waiver_reason" =~ [^[:space:]] ]]; then
+                echo "Release waiver reason must not be empty" >&2
+                exit 1
+              fi
+              if [[ ! "$EVIDENCE_URL" =~ ^https://[^/?#[:space:]]+([/?#][^[:space:]]*)?$ ]]; then
+                echo "Release waiver record must be a valid HTTPS URL with a host" >&2
+                exit 1
+              fi
+              echo "::warning title=Manual accessibility evidence waiver::Evidence remains BLOCKED; release waiver recorded."
+              summary_result="BLOCKED (release waiver)"
+              summary_label="Waiver record"
+              ;;
+            *)
+              echo "Manual accessibility evidence must be PASS, or BLOCKED with an explicit release waiver" >&2
+              exit 1
+              ;;
+          esac
+          {
+            echo "## Manual accessibility evidence"
+            echo "- Result: $summary_result"
+            echo "- SHA: \`$EVIDENCE_SHA\`"
+            echo "- $summary_label: $EVIDENCE_URL"
+            if [[ -n "$waiver_reason" ]]; then
+              echo "- Waiver reason: $waiver_reason"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   testflight:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'testflight' || inputs.release_target == 'both') }}
+    needs: [ci, external_device_gate, manual_evidence_gate]
     runs-on: ${{ inputs.runner }}
     environment: mobile-release
     timeout-minutes: 75
@@ -156,12 +223,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos
-
-      - name: Test
-        run: flutter test
 
       - name: Write iOS build secrets
         env:
@@ -199,7 +260,6 @@ jobs:
           flutter build ipa \
             --release \
             --build-number="$build_number" \
-            --dart-define=FAVORITE_RESTORE_ENABLED=true \
             --export-options-plist=ios/ExportOptions.plist
 
       - name: Resolve IPA path
@@ -226,6 +286,7 @@ jobs:
   android_internal:
     name: Upload to Google Play internal testing
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'android-internal' || inputs.release_target == 'both') }}
+    needs: [ci, external_device_gate, manual_evidence_gate]
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 45
@@ -245,12 +306,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos
-
-      - name: Test
-        run: flutter test
 
       - name: Validate Android release secrets and decode upload key
         env:
@@ -291,8 +346,7 @@ jobs:
           fi
           flutter build appbundle \
             --release \
-            --build-number="$version_code" \
-            --dart-define=FAVORITE_RESTORE_ENABLED=true
+            --build-number="$version_code"
           test -f build/app/outputs/bundle/release/app-release.aab
 
       - name: Preserve signed Android App Bundle

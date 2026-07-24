@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 /// 可重用的 Tripline AI owner 授權卡。
@@ -64,10 +63,9 @@ class _AiAuthorizeCardState extends ConsumerState<AiAuthorizeCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final tones = theme.extension<TpTones>()!;
     return Card(
       key: const ValueKey('ai-authorize-card'),
-      color: tones.accentSubtle,
+      color: colors.primaryContainer,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(TpRadius.md),
@@ -81,7 +79,7 @@ class _AiAuthorizeCardState extends ConsumerState<AiAuthorizeCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(CupertinoIcons.sparkles, color: tones.accentDeep),
+                Icon(CupertinoIcons.sparkles, color: colors.onPrimaryContainer),
                 const SizedBox(width: TpSpacing.s3),
                 Expanded(
                   child: Column(
@@ -111,7 +109,7 @@ class _AiAuthorizeCardState extends ConsumerState<AiAuthorizeCard> {
                 children: [
                   Icon(
                     CupertinoIcons.check_mark_circled,
-                    color: tones.accentDeep,
+                    color: colors.onPrimaryContainer,
                     size: 20,
                   ),
                   const SizedBox(width: TpSpacing.s2),

@@ -96,6 +96,8 @@ class TpSettingsRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.destructive = false,
+    this.selected,
+    this.inMutuallyExclusiveGroup = false,
   });
 
   final String title;
@@ -105,6 +107,8 @@ class TpSettingsRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool destructive;
+  final bool? selected;
+  final bool inMutuallyExclusiveGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -182,6 +186,8 @@ class TpSettingsRow extends StatelessWidget {
     return Semantics(
       button: onTap != null,
       label: title,
+      selected: selected,
+      inMutuallyExclusiveGroup: inMutuallyExclusiveGroup,
       child: onTap == null ? content : InkWell(onTap: onTap, child: content),
     );
   }

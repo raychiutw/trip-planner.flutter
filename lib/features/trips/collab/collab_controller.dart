@@ -115,6 +115,9 @@ class CollabController extends Notifier<CollabState> {
     }
   }
 
+  /// 保留目前內容並重新載入頁面資料。
+  Future<void> retry() => _load();
+
   /// 邀請列表失敗不阻擋成員顯示(best-effort)。
   Future<List<TripInvite>> _safeInvites() async {
     try {
@@ -135,17 +138,18 @@ class CollabController extends Notifier<CollabState> {
     }
   }
 
-  Future<void> invite(String email, String role) async {
+  Future<bool> invite(String email, String role) async {
     final e = email.trim();
-    if (e.isEmpty || state.adding) return;
+    if (e.isEmpty || state.adding) return false;
     state = state.copyWith(adding: true, actionError: null);
     try {
       await _repo.invite(tripId: tripId, email: e, role: role);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(adding: false);
+      return true;
     } on ApiError catch (err) {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(
         adding: false,
         actionError: switch (err.status) {
@@ -154,9 +158,11 @@ class CollabController extends Notifier<CollabState> {
           _ => '新增失敗,請稍後再試',
         },
       );
+      return false;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(adding: false, actionError: '新增失敗,請稍後再試');
+      return false;
     }
   }
 
@@ -174,31 +180,35 @@ class CollabController extends Notifier<CollabState> {
     }
   }
 
-  Future<void> removeMember(int permissionId) async {
-    if (state.removingId != null) return;
+  Future<bool> removeMember(int permissionId) async {
+    if (state.removingId != null) return false;
     state = state.copyWith(removingId: permissionId, actionError: null);
     try {
       await _repo.removeMember(permissionId);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(removingId: null);
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(removingId: null, actionError: '移除失敗,請稍後再試');
+      return false;
     }
   }
 
-  Future<void> revokeInvite(String email) async {
-    if (state.revokingEmail != null) return;
+  Future<bool> revokeInvite(String email) async {
+    if (state.revokingEmail != null) return false;
     state = state.copyWith(revokingEmail: email, actionError: null);
     try {
       await _repo.revokeInvite(tripId: tripId, email: email);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(revokingEmail: null);
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(revokingEmail: null, actionError: '撤銷失敗,請稍後再試');
+      return false;
     }
   }
 }

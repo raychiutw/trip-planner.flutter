@@ -14,7 +14,6 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 /// 密碼登入畫面（/login，shell 外）。
@@ -98,25 +97,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() => _obscurePassword = !_obscurePassword);
 
   @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final platform = Theme.of(context).platform;
-    final theme =
-        (media.platformBrightness == Brightness.dark
-                ? AppTheme.higDark(highContrast: media.highContrast)
-                : AppTheme.higLight(highContrast: media.highContrast))
-            .copyWith(platform: platform);
-    return Theme(
-      data: theme,
-      child: Builder(builder: _buildContent),
-    );
-  }
+  Widget build(BuildContext context) => _buildContent(context);
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final tones = theme.extension<TpTones>()!;
+    final successColor = theme.brightness == Brightness.dark
+        ? TpSystemColorsDark.success
+        : TpSystemColorsLight.success;
     final authState = ref.watch(authStateProvider);
     final isSubmitting = authState.isLoading;
     final isBusy = isSubmitting || _oauthLoading;
@@ -174,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               vertical: TpSpacing.s3,
                             ),
                             decoration: BoxDecoration(
-                              color: tones.success.withValues(alpha: 0.12),
+                              color: successColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(TpRadius.md),
                               border: highContrast
                                   ? Border.all(color: colorScheme.onSurface)
@@ -184,7 +173,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               children: [
                                 Icon(
                                   CupertinoIcons.check_mark_circled_solid,
-                                  color: tones.success,
+                                  color: successColor,
                                 ),
                                 const SizedBox(width: TpSpacing.s2),
                                 Expanded(

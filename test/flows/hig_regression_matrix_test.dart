@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
@@ -18,22 +19,27 @@ class _HigState {
     required this.brightness,
     this.textScale = 1,
     this.reduceMotion = false,
+    this.increasedContrast = false,
     this.reduceTransparency = false,
   });
 
   final Brightness brightness;
   final double textScale;
   final bool reduceMotion;
+  final bool increasedContrast;
   final bool reduceTransparency;
 
   String get name {
     final appearance = brightness == Brightness.dark ? 'dark' : 'light';
     final text = textScale == 1 ? 'text100' : 'text200';
     final motion = reduceMotion ? 'motion-reduced' : 'motion-full';
+    final contrast = increasedContrast
+        ? 'contrast-increased'
+        : 'contrast-normal';
     final transparency = reduceTransparency
         ? 'transparency-reduced'
-        : 'transparency-glass';
-    return 'shared-ios-$appearance-$text-$motion-$transparency';
+        : 'transparency-normal';
+    return 'shared-ios-$appearance-$text-$motion-$contrast-$transparency';
   }
 }
 
@@ -42,16 +48,12 @@ const _states = [
   _HigState(brightness: Brightness.dark),
   _HigState(brightness: Brightness.light, textScale: 2),
   _HigState(brightness: Brightness.dark, textScale: 2),
-  _HigState(
-    brightness: Brightness.light,
-    reduceMotion: true,
-    reduceTransparency: true,
-  ),
-  _HigState(
-    brightness: Brightness.dark,
-    reduceMotion: true,
-    reduceTransparency: true,
-  ),
+  _HigState(brightness: Brightness.light, reduceMotion: true),
+  _HigState(brightness: Brightness.dark, reduceMotion: true),
+  _HigState(brightness: Brightness.light, increasedContrast: true),
+  _HigState(brightness: Brightness.dark, increasedContrast: true),
+  _HigState(brightness: Brightness.light, reduceTransparency: true),
+  _HigState(brightness: Brightness.dark, reduceTransparency: true),
 ];
 
 void main() {
@@ -103,11 +105,19 @@ void main() {
         ),
       );
       final fallbackAlpha = headerGlass.settings!.platformViewFallbackColor!.a;
+      final expectsOpaqueGlass =
+          state.increasedContrast || state.reduceTransparency;
       expect(
         fallbackAlpha,
-        state.reduceTransparency
+        expectsOpaqueGlass
             ? greaterThanOrEqualTo(0.95)
             : closeTo(state.brightness == Brightness.dark ? 0.48 : 0.40, 0.01),
+      );
+      expect(headerGlass.settings!.blur, expectsOpaqueGlass ? 0 : 16);
+      expect(headerGlass.settings!.thickness, expectsOpaqueGlass ? 0 : 16);
+      expect(
+        headerGlass.settings!.refractiveIndex,
+        expectsOpaqueGlass ? 1 : 1.06,
       );
 
       await tester.fling(
@@ -136,19 +146,22 @@ class _MatrixApp extends StatelessWidget {
     final theme = state.brightness == Brightness.dark
         ? AppTheme.dark()
         : AppTheme.light();
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      home: MediaQuery(
-        data: MediaQueryData(
-          size: const Size(390, 844),
-          padding: const EdgeInsets.only(top: 47),
-          viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
-          textScaler: TextScaler.linear(state.textScale),
-          disableAnimations: state.reduceMotion,
-          highContrast: state.reduceTransparency,
+    return AppAccessibilityScope(
+      reduceTransparency: state.reduceTransparency,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: theme,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: const Size(390, 844),
+            padding: const EdgeInsets.only(top: 47),
+            viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            textScaler: TextScaler.linear(state.textScale),
+            disableAnimations: state.reduceMotion,
+            highContrast: state.increasedContrast,
+          ),
+          child: const _MatrixScene(),
         ),
-        child: const _MatrixScene(),
       ),
     );
   }

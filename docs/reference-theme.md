@@ -1,23 +1,23 @@
 # Tripline Theme 與共用 UI 參考
 
-> 更新：2026-07-21。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-21-trip-entry-card-menu-keyboard-glass.md`](superpowers/plans/2026-07-21-trip-entry-card-menu-keyboard-glass.md) 為準。
+> 更新：2026-07-24。視覺與互動驗收以 repository root 的 `/design.md` 為唯一 Source of Truth；本文件只說明目前共用元件。
 
 ## 取色
 
-- Widget 只從 `Theme.of(context).colorScheme` 或 `TpTones` 取色，不直接引用 Light／Dark 常數。
-- 柔褐 accent 是唯一品牌強調色；sage／pink 只保留舊 API 相容別名，現在映射到中性色。
+- Widget 只從 `Theme.of(context).colorScheme` 取色，不直接引用 Light／Dark 常數。
+- adaptive 暖褐 tint 是唯一品牌強調色；舊 `TpTones`、`TpColorsLight/Dark` 與 sage／pink alias 已移除。
 - POI、收藏、行程卡與設定列皆使用中性 surface。只有 error／success／warning 與地圖逐日資料視覺化可使用語意色。
-- Dark 是獨立中性深色 palette，不是 Light 反色。
+- Light／Dark／High Contrast 皆由 `TpSystemColors*` 對應 iOS system semantic roles。
 
-| Token | Light | Dark | 用途 |
+| 語意角色 | Light | Dark | 用途 |
 |---|---|---|---|
-| background | `#FFFBF5` | `#1C1C1E` | 頁面底色 |
-| secondary | `#FAF4EA` | `#2C2C2E` | grouped surface |
-| tertiary | `#F2EAD9` | `#3A3A3C` | 次級／選取 surface |
-| accent | `#A97A4A` | `#CBA06E` | 選取、主要動作 |
-| foreground | `#2A1F18` | `#F5F5F7` | 主要文字 |
-| muted | `#6F5A47` | `#A1A1A6` | 次要文字 |
-| border | `#EADFCF` | `#38383A` | inset separator |
+| background | system background（white） | system background（black） | 頁面底色 |
+| secondary | secondary system background | secondary system background | grouped surface |
+| tertiary | tertiary system background | tertiary system background | 次級 surface |
+| tint | `#8A6038` | `#D0A576` | 選取、link、主要動作 |
+| foreground | system label | system label | 主要文字 |
+| muted | secondary system label | secondary system label | 次要文字 |
+| outline | system separator | system separator | inset separator |
 
 ## 字體
 
@@ -25,38 +25,42 @@
 
 | HIG role | TextTheme | size |
 |---|---|---:|
-| Large title | `displaySmall` | 34 |
-| Title 1 | `headlineMedium` | 28 |
-| Title 2 | `headlineSmall` | 22 |
-| Title 3 | `titleLarge` | 20 |
-| Headline / body | `titleMedium` / `bodyLarge` | 17 |
-| Subheadline | `titleSmall` / `bodyMedium` | 15 |
-| Footnote | `bodySmall` / `labelMedium` | 13 |
-| Caption 1 | `labelSmall` | 12 |
+| Title 1 | `displaySmall` | 28 |
+| Title 2 | `headlineMedium` | 22 |
+| Title 3 | `headlineSmall` | 20 |
+| Headline | `titleLarge` | 17 |
+| Subheadline / body | `titleMedium` / `bodyLarge` | 15 |
+| Footnote | `titleSmall` / `bodyMedium` | 13 |
+| Caption 1 | `bodySmall` / `labelMedium` | 12 |
+| Caption 2 | `labelSmall` | 11 |
+
+全 App 不提供 Large Title；頁面標題使用 system inline navigation title。
 
 ## 導覽
 
-- Root tab 固定五項：聊天、行程、地圖、收藏、帳號。
-- Account 是第 5 branch；其他 root Header 不再重複 avatar，`/account` deep link 保留。
+- Root tab 固定四項：聊天、行程、地圖、收藏。
+- Account 不建立 root branch；每個內容頁 Header 的 `person.crop.circle` 開啟獨立 Navigation Stack sheet，`/account` deep link 保留。
 - 浮動 tab 使用 `AppleRootTabBar`，左右 margin `16`、可見高度 `64`、安全區上方留白由 `TpRootTabGeometry` 統一計算。
 - `AppShell` 開啟 `extendBody`。根頁底部淨空一律使用 `TpRootScrollScaffold` 或 `TpRootTabGeometry.clearance(context)`，不得另寫 magic number。
 - 最小 tap target `44×44`；selection 使用 haptic；reduced motion 由 `TpMotion.resolve` 處理。
 
 ## 行程與地圖
 
-- 行程頁 selector：`DAY 1 | DAY 2...`；地圖頁 selector：`總覽 | DAY 1 | DAY 2...`。
-- 行程／地圖在 Root Header 互切並保留 day；切換到另一行程預設回 DAY 1。
+- 行程頁 selector：`DAY 1 | DAY 2...`；地圖頁 selector：`全部 | DAY 1 | DAY 2...`。
+- 行程／地圖在 Root Header 互切並保留 Day；切換行程時，原 Day 在新行程存在就保留，否則回 DAY 1。
 - 目前行程標題可點擊，開啟含搜尋、目前 checkmark、最近行程的 bottom sheet。
 - 預設進入、切換行程、切換 Day 與明確 POI focus 的 zoom 都固定 `13`，避免互動後跳成其他層級。
 - POI 卡以 `PageView(viewportFraction: .74)` 左右滑動；滑動只更新預覽，點卡片或 marker 才以 zoom `13` 移動地圖。卡片使用相同中性 surface，底部淨空不得被 root tab 遮住。
 - Timeline 景點卡使用四列資訊；卡片 tap 展開備選，`…` 提供六項三組命令。排序只用短按 handle，支援同日與跨 Day drop。
-- 起訖時間使用 compact chips 與平台 picker；卡片上的 Google/Apple links 由 `EntryMapLinks` 提供。
+- 日期使用共用 HIG sheet 內的 system calendar；單獨時間使用只含時、分的 time wheel，並跟隨系統 12／24 小時偏好。卡片上的 Google/Apple links 由 `EntryMapLinks` 提供。
 
 ## 內容與設定元件
 
 - 內容層使用實色 grouped surface；玻璃只用於 tab、浮動 toolbar 與 sheet。
 - 設定頁使用 `TpSettingsGroup`：無外框、無陰影、圓角 grouped surface、內縮 separator。
-- 帳號列、通知 switch、外觀 checkmark 均使用原生熟悉的 HIG 動線。
+- 帳號列與通知 switch 使用原生熟悉的 HIG 動線。
+- Account 使用有 section header 的 grouped list；compact width 使用近滿版 sheet，一般寬度使用置中 form sheet。
+- 外觀固定跟隨系統，Account 不提供外觀覆寫，也不重複提供 Dynamic Type、accessibility、鍵盤或捲動等系統已有的偏好。
 - 卡片不靠彩色分類表達資訊；階層以字重、留白與 separator 建立。
 - Navigation regular glass 使用 Light/Dark alpha `.40/.48`，PlatformView 使用 `.56/.62`，High Contrast 使用 `.96` opaque fallback；內容卡不套 glass。
 
@@ -70,7 +74,11 @@
 - `EntryMapLinks`：景點 Google／Apple 導航。
 - `SwipeToDelete`：左滑只揭露紅色刪除，點擊後才進確認。
 - `AppKeyboardDismissRegion`：全 App 點外部／拖曳收鍵盤並保留草稿。
-- `AppSearchField` / `showAppActionSheet` / `showAppConfirm` / `showAppTimePicker`：平台自適應互動。
+- `AppSearchField` / `showAppActionSheet` / `showAppConfirm` / `showAppAlert` / `showAppDatePicker` / `showAppTimePicker`：全平台共用 Apple HIG 產品語意。
+
+## 系統權限
+
+`NotificationPermissionService` 是通知設定唯一的 app-owned platform boundary，只提供 `getStatus`、`request` 與 `openSettings`。通知頁初次顯示及從系統設定回到 App 時會同步 OS 狀態，但不會因此要求權限；只有使用者啟用通知時，才先說明具體用途並顯示系統 prompt。拒絕後改顯示持續可見的系統設定入口，不重複要求；狀態讀取失敗可明確重試，未知的原生回傳值採 fail-closed。
 
 ## 例外
 

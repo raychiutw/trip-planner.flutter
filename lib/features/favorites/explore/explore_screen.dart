@@ -9,8 +9,6 @@ import '../../../app/adaptive_content.dart';
 import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
-import '../../../theme/app_theme.dart';
-import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -63,40 +61,40 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
   Future<void> _openCustomRegion() async {
     final textController = TextEditingController();
+    final formController = AppSheetFormController()
+      ..attach(() async => true)
+      ..update(canSubmit: true);
     try {
-      final result = await showAdaptiveDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog.adaptive(
-          title: const Text('自訂地區'),
-          content: TextField(
+      final submitted = await showAppFormSheet(
+        context,
+        title: '自訂地區',
+        submitLabel: '切換',
+        controller: formController,
+        builder: (_) => SingleChildScrollView(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: TextField(
+            key: const ValueKey('explore-custom-region-field'),
             controller: textController,
             autofocus: true,
+            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               labelText: '地區名稱',
-              hintText: '例如:大阪、曼谷、巴黎',
+              hintText: '例如：大阪、曼谷、巴黎',
             ),
-            onSubmitted: (v) => Navigator.of(dialogContext).pop(v),
+            onChanged: (_) => formController.update(dirty: true),
+            onSubmitted: (_) => formController.submit(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(textController.text),
-              child: const Text('切換'),
-            ),
-          ],
         ),
       );
-      if (result != null) {
+      if (submitted ?? false) {
+        final region = textController.text.trim();
         ref
             .read(exploreControllerProvider.notifier)
-            .setRegion(result.trim().isEmpty ? '全部地區' : result.trim());
+            .setRegion(region.isEmpty ? '全部地區' : region);
       }
     } finally {
       textController.dispose();
+      formController.dispose();
     }
   }
 
@@ -179,7 +177,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       key: const ValueKey('explore-category-all'),
                       label: '為你推薦',
                       count: state.results.length,
-                      poiType: 'attraction',
                       selected: state.category == 'all',
                       onSelected: () => ref
                           .read(exploreControllerProvider.notifier)
@@ -192,7 +189,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       key: ValueKey('explore-category-${category.label}'),
                       label: category.label,
                       count: category.count,
-                      poiType: category.poiType,
                       selected: state.category == category.label,
                       onSelected: () => ref
                           .read(exploreControllerProvider.notifier)
@@ -203,7 +199,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     key: const ValueKey('explore-more-categories'),
                     label: selectedOverflow?.label ?? '更多',
                     count: selectedOverflow?.count,
-                    poiType: selectedOverflow?.poiType ?? 'attraction',
                     selected: selectedOverflow != null,
                     onSelected: () => _openMoreCategories(overflowCategories),
                   );
@@ -221,23 +216,26 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     required Key key,
     required String label,
     required int? count,
-    required String poiType,
     required bool selected,
     required VoidCallback onSelected,
   }) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
-    final tone = resolvePoiTone(tones, poiType);
     return ChoiceChip(
       key: key,
       label: Text(count == null ? label : '$label  $count'),
       selected: selected,
       showCheckmark: false,
-      backgroundColor: tone.subtle,
-      selectedColor: tone.bg,
-      side: BorderSide(color: selected ? tone.deep : tone.base),
+      backgroundColor: theme.colorScheme.surfaceContainerHigh,
+      selectedColor: theme.colorScheme.primaryContainer,
+      side: BorderSide(
+        color: selected
+            ? theme.colorScheme.primary
+            : theme.colorScheme.outlineVariant,
+      ),
       labelStyle: theme.textTheme.labelLarge?.copyWith(
-        color: tone.deep,
+        color: selected
+            ? theme.colorScheme.onPrimaryContainer
+            : theme.colorScheme.onSurface,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
       ),
       onSelected: (_) => onSelected(),
@@ -327,32 +325,32 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       );
     }
 
-    return GridView.builder(
+    return SingleChildScrollView(
+      key: const ValueKey('explore-results-list'),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(TpSpacing.s4),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 260,
-        mainAxisSpacing: TpSpacing.s3,
-        crossAxisSpacing: TpSpacing.s3,
-        childAspectRatio: 0.82,
+      child: Column(
+        children: [
+          for (var index = 0; index < filtered.length; index++) ...[
+            if (index > 0) const SizedBox(height: TpSpacing.s3),
+            PoiSearchCard(
+              poi: filtered[index],
+              isSaved: state.isSaved(filtered[index]),
+              isSaving: state.savingPlaceIds.contains(filtered[index].placeId),
+              onToggleFavorite: () {
+                HapticFeedback.selectionClick();
+                ref
+                    .read(exploreControllerProvider.notifier)
+                    .toggleFavorite(filtered[index]);
+              },
+              onAddToTrip: () => context.go(
+                '/favorites/add-to-trip',
+                extra: AddToTripDirect(poi: filtered[index]),
+              ),
+            ),
+          ],
+        ],
       ),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        final poi = filtered[index];
-        return PoiSearchCard(
-          poi: poi,
-          isSaved: state.isSaved(poi),
-          isSaving: state.savingPlaceIds.contains(poi.placeId),
-          onToggleFavorite: () {
-            HapticFeedback.selectionClick();
-            ref.read(exploreControllerProvider.notifier).toggleFavorite(poi);
-          },
-          onAddToTrip: () => context.go(
-            '/favorites/add-to-trip',
-            extra: AddToTripDirect(poi: poi),
-          ),
-        );
-      },
     );
   }
 }

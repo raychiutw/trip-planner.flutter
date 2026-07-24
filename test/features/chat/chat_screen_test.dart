@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoColors;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,6 +106,7 @@ void main() {
 
   Widget buildApp({
     SpeechService? speech,
+    ChatAttachmentPicker? attachmentPicker,
     String? initialTripId,
     String? initialPrefill,
     UserInfo currentUser = const UserInfo(
@@ -129,6 +131,8 @@ void main() {
         authRepositoryProvider.overrideWithValue(authRepo),
         authStateProvider.overrideWith(() => _StubAuth(currentUser)),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
+        if (attachmentPicker != null)
+          chatAttachmentPickerProvider.overrideWithValue(attachmentPicker),
       ],
       child: MaterialApp(
         theme: theme ?? AppTheme.light(),
@@ -404,6 +408,102 @@ void main() {
     expect(find.text('ray'), findsOneWidget);
   });
 
+  testWidgets('composer 提供加入入口，並由一行長到四行後停止增高', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const ValueKey('chat-input'));
+    expect(find.byKey(const ValueKey('chat-add-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-mic-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-send')), findsNothing);
+    final oneLineHeight = tester.getSize(input).height;
+
+    await tester.enterText(input, '一\n二\n三\n四');
+    await tester.pump();
+    final fourLineHeight = tester.getSize(input).height;
+    expect(fourLineHeight, greaterThan(oneLineHeight));
+    expect(find.byKey(const ValueKey('chat-mic-button')), findsNothing);
+    expect(find.byKey(const ValueKey('chat-send')), findsOneWidget);
+
+    await tester.enterText(input, '一\n二\n三\n四\n五');
+    await tester.pump();
+    expect(tester.getSize(input).height, fourLineHeight);
+
+    await tester.tap(find.byKey(const ValueKey('chat-add-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('加入附件'), findsOneWidget);
+    expect(find.text('新增行程項目'), findsOneWidget);
+  });
+
+  testWidgets('附件選擇器失敗會保留草稿並顯示可理解提示', (tester) async {
+    await tester.pumpWidget(
+      buildApp(
+        attachmentPicker: () async =>
+            throw PlatformException(code: 'picker-unavailable'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      '附件仍要保留這段草稿',
+    );
+
+    await tester.tap(find.byKey(const ValueKey('chat-add-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入附件'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法開啟附件選擇器，請稍後再試。'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '附件仍要保留這段草稿',
+    );
+  });
+
+  testWidgets('Return 保留換行語意，Command-Return 才送出', (tester) async {
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 81, message: '第一行\n第二行', status: RequestStatus.processing),
+    );
+    when(() => reqRepo.fetchRequest(81)).thenAnswer(
+      (_) async =>
+          _req(id: 81, message: '第一行\n第二行', status: RequestStatus.completed),
+    );
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const ValueKey('chat-input'));
+    final field = tester.widget<TextField>(input);
+    expect(field.textInputAction, TextInputAction.newline);
+    await tester.enterText(input, '第一行\n第二行');
+    await tester.tap(input);
+    await tester.pump();
+    verifyNever(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => reqRepo.sendRequest(tripId: 'okinawa', message: '第一行\n第二行'),
+    ).called(1);
+  });
+
   testWidgets('深色協作者氣泡使用較強的動態 Indigo tint', (tester) async {
     when(
       () => reqRepo.fetchRequests(
@@ -491,6 +591,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '保留這段話');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pumpAndSettle();
 
@@ -518,6 +619,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '先等授權');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pump();
 
@@ -543,6 +645,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '只送一次');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pump();
@@ -562,6 +665,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '離線訊息');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pumpAndSettle();
 
@@ -599,6 +703,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '再試一次');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pumpAndSettle();
 
@@ -644,6 +749,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '排晚餐');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('chat-send')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ai-consent-authorize')));
@@ -897,6 +1003,75 @@ void main() {
     );
   });
 
+  testWidgets('app lifecycle 暫停與恢復不會清除目前行程草稿', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      '暫時離開仍要保留',
+    );
+
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pump();
+    for (final state in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '暫時離開仍要保留',
+    );
+  });
+
+  testWidgets('320pt 與最大字級仍保留 44pt controls 與可讀 semantics', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(
+          disableAnimations: true,
+          reduceMotion: true,
+        );
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    for (final key in ['chat-add-button', 'chat-mic-button']) {
+      final size = tester.getSize(find.byKey(ValueKey(key)));
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+    }
+    expect(find.bySemanticsLabel('加入內容'), findsOneWidget);
+    expect(find.bySemanticsLabel('語音輸入'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '最大字級訊息');
+    await tester.pump();
+    final sendSize = tester.getSize(find.byKey(const ValueKey('chat-send')));
+    expect(sendSize.width, greaterThanOrEqualTo(44));
+    expect(sendSize.height, greaterThanOrEqualTo(44));
+    expect(find.bySemanticsLabel('送出訊息'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
   testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {
     var calls = 0;
     when(
@@ -992,7 +1167,7 @@ void main() {
       expect(mic.onPressed, isNotNull);
     });
 
-    testWidgets('點麥克風 → 才 init + listen 被呼叫', (tester) async {
+    testWidgets('點麥克風先說明用途，繼續後才 init + listen', (tester) async {
       final speech = _MockSpeechService();
       when(() => speech.isAvailable).thenReturn(true);
       when(speech.init).thenAnswer((_) async => true);
@@ -1005,6 +1180,13 @@ void main() {
       verifyNever(speech.init);
 
       await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('使用語音輸入？'), findsOneWidget);
+      expect(find.text('Tripline 會使用麥克風把你說的話轉成目前行程的文字指令。'), findsOneWidget);
+      verifyNever(speech.init);
+
+      await tester.tap(find.text('繼續'));
       await tester.pumpAndSettle();
 
       verify(speech.init).called(1);
@@ -1027,6 +1209,8 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('繼續'));
+      await tester.pumpAndSettle();
 
       final field = tester.widget<TextField>(
         find.byKey(const ValueKey('chat-input')),
@@ -1034,21 +1218,54 @@ void main() {
       expect(field.controller!.text, '幫我規劃晚餐');
     });
 
-    testWidgets('init() 回 false(權限拒絕)→ SnackBar 提示且不 listen', (tester) async {
+    testWidgets('init() 回 false 後不重複請求，並提供系統設定恢復動線', (tester) async {
       final speech = _MockSpeechService();
+      when(tripRepo.watchMyTrips).thenAnswer(
+        (_) => Stream.value(const [
+          TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+          TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+        ]),
+      );
       when(() => speech.isAvailable).thenReturn(false);
       when(speech.init).thenAnswer((_) async => false);
       when(() => speech.listen(any())).thenAnswer((_) async {});
+      when(speech.openSettings).thenAnswer((_) async => true);
 
       await tester.pumpWidget(buildApp(speech: speech));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('繼續'));
+      await tester.pumpAndSettle();
 
       verify(speech.init).called(1);
       verifyNever(() => speech.listen(any()));
-      expect(find.text('需要麥克風與語音辨識權限才能語音輸入'), findsOneWidget);
+      expect(find.text('無法使用語音輸入'), findsOneWidget);
+      expect(find.text('前往系統設定'), findsOneWidget);
+
+      await tester.tap(find.text('稍後再說'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trip-picker-item-kyoto')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('使用語音輸入？'), findsNothing);
+      expect(find.text('無法使用語音輸入'), findsOneWidget);
+      verifyNever(speech.init);
+      await tester.tap(find.text('前往系統設定'));
+      await tester.pumpAndSettle();
+      verify(speech.openSettings).called(1);
+
+      when(speech.init).thenAnswer((_) async => true);
+      await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+      await tester.pumpAndSettle();
+      verify(speech.init).called(1);
+      verify(() => speech.listen(any())).called(1);
     });
 
     testWidgets('sending 中麥克風 disabled', (tester) async {

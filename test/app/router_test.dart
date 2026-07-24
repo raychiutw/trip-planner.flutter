@@ -21,7 +21,6 @@ import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
-import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
@@ -82,7 +81,10 @@ const _loggedInUser = UserInfo(
 
 const _entry = TimelineEntry(id: 11, sortOrder: 0, title: '首里城', version: 2);
 
-ProviderContainer _buildContainer({required UserInfo? currentUser}) {
+ProviderContainer _buildContainer({
+  required UserInfo? currentUser,
+  List<TripSummary>? trips,
+}) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
   final mockFavoritesRepository = _MockFavoritesRepository();
@@ -100,7 +102,9 @@ ProviderContainer _buildContainer({required UserInfo? currentUser}) {
     () => mockTripRepository.fetchDaySummaries(any()),
   ).thenAnswer((_) async => <TripDay>[]);
   when(mockTripRepository.watchMyTrips).thenAnswer(
-    (_) => Stream.value(const [TripSummary(tripId: 'trip-1', name: '沖繩')]),
+    (_) => Stream.value(
+      trips ?? const [TripSummary(tripId: 'trip-1', name: '沖繩')],
+    ),
   );
   when(() => mockTripRepository.watchDays(any())).thenAnswer(
     (_) => Stream.value(const [TripDay(id: 1, dayNum: 1, version: 0)]),
@@ -587,12 +591,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
     container.read(appRouterProvider).go('/trip/trip-1/health');
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -732,7 +738,7 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('新增停留點'), findsWidgets);
-    expect(find.byType(AppleRootTabBar), findsNothing);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -776,7 +782,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
-    expect(find.text('收藏'), findsOneWidget);
+    expect(find.text('收藏'), findsWidgets);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -883,6 +889,78 @@ void main() {
     }
   });
 
+  testWidgets('帳號安全與開發者 deep link 依序返回 Account 再關閉至原 branch', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/favorites');
+    await tester.pumpAndSettle();
+
+    for (final target in <(String, Type)>[
+      ('/account/sessions', AccountSessionsScreen),
+      ('/account/connected-apps', ConnectedAppsScreen),
+      ('/settings/developer-apps', DeveloperAppsScreen),
+    ]) {
+      router.go(target.$1);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(target.$2), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AccountScreen), findsOneWidget);
+      expect(find.byType(target.$2), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+      await tester.pumpAndSettle();
+
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/favorites');
+    }
+  });
+
+  testWidgets('新增開發者應用 deep link 的 Back 先回應用清單再回 Account', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/favorites');
+    await tester.pumpAndSettle();
+    router.go('/settings/developer-apps/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DeveloperAppNewScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(DeveloperAppsScreen), findsOneWidget);
+    expect(find.byType(AccountScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(AccountScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/favorites');
+  });
+
   testWidgets('帳號 deep link 在四個 root tabs 上開啟並返回原 branch', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -940,6 +1018,173 @@ void main() {
         );
       }
     }
+  });
+
+  testWidgets('行程搜尋、篩選與捲動位置通過 root tab 及詳情往返後仍保留', (tester) async {
+    final trips = [
+      for (var index = 0; index < 24; index++)
+        TripSummary(
+          tripId: 'trip-$index',
+          name: 'trip-$index',
+          title: '行程 $index',
+          ownerUserId: _loggedInUser.id,
+        ),
+    ];
+    final container = _buildContainer(currentUser: _loggedInUser, trips: trips);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/trips');
+    await tester.pumpAndSettle();
+
+    final searchField = find.byKey(const ValueKey('trips-search-field'));
+    await tester.enterText(searchField, '行程');
+    await tester.tap(find.text('我的'));
+    await tester.pumpAndSettle();
+    await tester.fling(
+      find.byKey(const ValueKey('tp-root-scroll-view')),
+      const Offset(0, -900),
+      1600,
+    );
+    await tester.pumpAndSettle();
+
+    final listScroll = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('tp-root-scroll-view')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    final listOffset = listScroll.position.pixels;
+    expect(listOffset, greaterThan(0));
+
+    tester.widget<AppleRootTabBar>(find.byType(AppleRootTabBar)).onSelected(3);
+    await tester.pumpAndSettle();
+    tester.widget<AppleRootTabBar>(find.byType(AppleRootTabBar)).onSelected(1);
+    await tester.pumpAndSettle();
+
+    expect(router.routerDelegate.currentConfiguration.uri.toString(), '/trips');
+    final retainedSearchField = find.byKey(
+      const ValueKey('trips-search-field'),
+      skipOffstage: false,
+    );
+    expect(retainedSearchField, findsOneWidget);
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: retainedSearchField,
+              matching: find.byType(EditableText, skipOffstage: false),
+            ),
+          )
+          .controller
+          .text,
+      '行程',
+    );
+    expect(
+      tester
+          .widget<SegmentedButton<TripFilter>>(
+            find.byType(SegmentedButton<TripFilter>, skipOffstage: false),
+          )
+          .selected,
+      {TripFilter.mine},
+    );
+    expect(listScroll.position.pixels, closeTo(listOffset, 0.5));
+
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+
+    router.go('/trips');
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: retainedSearchField,
+              matching: find.byType(EditableText, skipOffstage: false),
+            ),
+          )
+          .controller
+          .text,
+      '行程',
+    );
+    expect(
+      tester
+          .widget<SegmentedButton<TripFilter>>(
+            find.byType(SegmentedButton<TripFilter>, skipOffstage: false),
+          )
+          .selected,
+      {TripFilter.mine},
+    );
+    expect(listScroll.position.pixels, closeTo(listOffset, 0.5));
+  });
+
+  testWidgets('1024pt regular width 下行程清單與時間軸關鍵控制維持可用', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      trips: const [
+        TripSummary(
+          tripId: 'trip-1',
+          name: 'okinawa',
+          title: '沖繩家庭旅行',
+          ownerUserId: 'user-1',
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/trips');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripsListScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trips-search-field')), findsOneWidget);
+    expect(find.byType(SegmentedButton<TripFilter>), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('trips-search-field')),
+      '沖繩',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩家庭旅行'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('day-pill-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shell 外內容頁的帳號按鈕可開啟 Account sheet', (tester) async {
@@ -1067,10 +1312,11 @@ void main() {
           .currentConfiguration
           .uri
           .toString(),
-      '/trips?account=appearance',
+      '/trips?account=root',
     );
     expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
-    expect(find.byType(AppearanceScreen), findsOneWidget);
+    expect(find.byType(AccountScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-appearance')), findsNothing);
     expect(find.byType(LoginScreen), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
@@ -1101,6 +1347,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
     container
@@ -1109,6 +1356,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AddToTripScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.text('加入行程：美麗海水族館'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 

@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/adaptive.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 /// 在第一次送出 AI 指令前顯示明確的 owner 授權說明。
@@ -80,7 +79,6 @@ class _AiConsentFormState extends State<_AiConsentForm> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final tones = theme.extension<TpTones>();
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s5),
       children: [
@@ -90,12 +88,12 @@ class _AiConsentFormState extends State<_AiConsentForm> {
             width: TpSpacing.tapMin,
             height: TpSpacing.tapMin,
             decoration: BoxDecoration(
-              color: tones?.accentSubtle ?? colors.primaryContainer,
+              color: colors.primaryContainer,
               borderRadius: BorderRadius.circular(TpRadius.md),
             ),
             child: Icon(
               CupertinoIcons.sparkles,
-              color: tones?.accentDeep ?? colors.primary,
+              color: colors.onPrimaryContainer,
             ),
           ),
         ),

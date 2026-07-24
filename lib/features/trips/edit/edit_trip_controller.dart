@@ -84,12 +84,37 @@ class EditTripState {
   static const _sentinel = Object();
 }
 
+enum DayDeletionResolution {
+  committed,
+  targetStillPresent,
+  verificationRequired,
+}
+
+typedef DayDeletionResult = ({
+  DayDeletionResolution resolution,
+  int? removedEntryCount,
+});
+
+class _PendingDayDeletion {
+  const _PendingDayDeletion({
+    required this.targetId,
+    required this.commitKnown,
+    this.removedEntryCount,
+  });
+
+  final int targetId;
+  final bool commitKnown;
+  final int? removedEntryCount;
+}
+
 class EditTripController extends Notifier<EditTripState> {
   EditTripController(this.tripId);
 
   final String tripId;
 
   bool _disposed = false;
+  _PendingDayDeletion? _pendingDayDeletion;
+  bool _dayDeletionResolutionInFlight = false;
   // 原始值(算 diff)。
   String _origTitle = '';
   String _origDescription = '';
@@ -258,11 +283,11 @@ class EditTripController extends Notifier<EditTripState> {
     }
   }
 
-  /// POST /trips/:id/days，以 insert/date 補回中間缺漏日期。
-  Future<bool> restoreDay(String date) async {
+  /// POST /trips/:id/days，以 insert/date 新增中間缺少的日期。
+  Future<bool> addMissingDay(String date) async {
     if (state.loading || state.daysMutating || state.shifting) return false;
-    final restoreDate = date.trim();
-    if (!_isIsoDate(restoreDate)) {
+    final missingDate = date.trim();
+    if (!_isIsoDate(missingDate)) {
       state = state.copyWith(error: '請輸入 YYYY-MM-DD 日期');
       return false;
     }
@@ -271,7 +296,7 @@ class EditTripController extends Notifier<EditTripState> {
       await _repo.createDay(
         tripId: tripId,
         position: 'insert',
-        date: restoreDate,
+        date: missingDate,
       );
       final days = await _repo.fetchDaySummaries(tripId);
       if (_disposed) return false;
@@ -286,20 +311,68 @@ class EditTripController extends Notifier<EditTripState> {
       return true;
     } on Exception {
       if (_disposed) return false;
-      state = state.copyWith(daysMutating: false, error: '加回天數失敗,請稍後再試');
+      state = state.copyWith(daysMutating: false, error: '新增缺少日期失敗,請稍後再試');
       return false;
     }
   }
 
-  /// DELETE /trips/:id/days/:num，刪除一天並刷新 day 摘要。
-  Future<int?> deleteDay(int dayNum) async {
+  /// DELETE /trips/:id/days/:num，並以 stable Day id 解決 response ambiguity。
+  ///
+  /// request 例外不代表 server 未 commit；此時只以 network-only summaries 驗證
+  /// target id 是否仍存在，不會自動重送 positional dayNum DELETE。
+  Future<DayDeletionResult?> deleteDay(TripDay target) async {
     if (state.loading || state.daysMutating || state.shifting) return null;
     state = state.copyWith(daysMutating: true, error: null);
     try {
-      final removed = await _repo.deleteDay(tripId: tripId, dayNum: dayNum);
-      final days = await _repo.fetchDaySummaries(tripId);
-      if (_disposed) return null;
+      final removed = await _repo.deleteDay(
+        tripId: tripId,
+        dayNum: target.dayNum,
+      );
+      _pendingDayDeletion = _PendingDayDeletion(
+        targetId: target.id,
+        commitKnown: true,
+        removedEntryCount: removed,
+      );
       _invalidateTripDays();
+    } on Exception {
+      _pendingDayDeletion = _PendingDayDeletion(
+        targetId: target.id,
+        commitKnown: false,
+      );
+    }
+    if (_disposed) return null;
+    return resolvePendingDayDeletion();
+  }
+
+  /// 只用 network-only summaries 解決待確認刪除；絕不重送 DELETE。
+  Future<DayDeletionResult?> resolvePendingDayDeletion() async {
+    final pending = _pendingDayDeletion;
+    if (pending == null || _dayDeletionResolutionInFlight) {
+      return null;
+    }
+    _dayDeletionResolutionInFlight = true;
+    if (!_disposed) {
+      state = state.copyWith(daysMutating: true, error: null);
+    }
+    try {
+      final days = await _repo.fetchDaySummaries(
+        tripId,
+        fallbackToCache: false,
+      );
+      if (_disposed) return null;
+      final targetStillPresent = days.any((day) => day.id == pending.targetId);
+      if (pending.commitKnown && targetStillPresent) {
+        state = state.copyWith(
+          daysMutating: true,
+          error: '行程日已刪除，但 server 尚未回傳更新後的行程日',
+        );
+        return (
+          resolution: DayDeletionResolution.verificationRequired,
+          removedEntryCount: pending.removedEntryCount,
+        );
+      }
+
+      _pendingDayDeletion = null;
       state = state.copyWith(
         daysMutating: false,
         days: days,
@@ -307,11 +380,63 @@ class EditTripController extends Notifier<EditTripState> {
         endDate: _lastDate(days) ?? state.endDate,
         error: null,
       );
-      return removed;
+      if (targetStillPresent) {
+        return (
+          resolution: DayDeletionResolution.targetStillPresent,
+          removedEntryCount: null,
+        );
+      }
+      if (!pending.commitKnown) _invalidateTripDays();
+      return (
+        resolution: DayDeletionResolution.committed,
+        removedEntryCount: pending.removedEntryCount,
+      );
     } on Exception {
       if (_disposed) return null;
-      state = state.copyWith(daysMutating: false, error: '刪除天數失敗,請稍後再試');
-      return null;
+      state = state.copyWith(
+        daysMutating: true,
+        error: pending.commitKnown
+            ? '行程日已刪除，但重新整理失敗，請再試一次'
+            : '無法確認行程日是否已刪除，請再試一次',
+      );
+      return (
+        resolution: DayDeletionResolution.verificationRequired,
+        removedEntryCount: pending.removedEntryCount,
+      );
+    } finally {
+      _dayDeletionResolutionInFlight = false;
+    }
+  }
+
+  TripDay? dayById(int id) {
+    for (final day in state.days) {
+      if (day.id == id) return day;
+    }
+    return null;
+  }
+
+  /// 重新確認 stable Day id 時只讀取 server 最新狀態，不送出 DELETE。
+  Future<bool> refreshDaysForDeletionRetry() async {
+    if (state.loading || state.daysMutating || state.shifting) return false;
+    state = state.copyWith(daysMutating: true, error: null);
+    try {
+      final days = await _repo.fetchDaySummaries(
+        tripId,
+        fallbackToCache: false,
+      );
+      if (_disposed) return false;
+      state = state.copyWith(
+        daysMutating: false,
+        days: days,
+        startDate: _firstDate(days) ?? state.startDate,
+        endDate: _lastDate(days) ?? state.endDate,
+        error: null,
+      );
+      return true;
+    } on Exception {
+      if (_disposed) return false;
+      state = state.copyWith(daysMutating: false, error: '無法重新確認行程日，請再試一次');
+      return false;
     }
   }
 

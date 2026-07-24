@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
@@ -12,6 +13,43 @@ import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  testWidgets(
+    'TpToolbarGlassButton resolves custom settings for Reduce Transparency',
+    (tester) async {
+      const customSettings = LiquidGlassSettings(
+        glassColor: Color(0x332196F3),
+        blur: 24,
+        thickness: 20,
+        refractiveIndex: 1.2,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppAccessibilityScope(
+            reduceTransparency: true,
+            child: Scaffold(
+              body: TpToolbarGlassButton(
+                tooltip: '更多',
+                onPressed: () {},
+                glassSettings: customSettings,
+                child: const Icon(Icons.more_horiz),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final settings = tester
+          .widget<GlassButton>(find.byType(GlassButton))
+          .settings!;
+      expect(settings.glassColor.a, 1);
+      expect(settings.backerColor?.a, 1);
+      expect(settings.platformViewFallbackColor?.a, 1);
+      expect(settings.blur, 0);
+      expect(settings.thickness, 0);
+      expect(settings.refractiveIndex, 1);
+    },
+  );
+
   testWidgets('standalone app bar never implies a leading action', (
     tester,
   ) async {
@@ -299,7 +337,7 @@ void main() {
       final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
       expect(
         item.style?.foregroundColor?.resolve(<WidgetState>{}),
-        TpColorsLight.foreground,
+        TpSystemColorsLight.label,
       );
       expect(
         find.descendant(
@@ -344,7 +382,7 @@ void main() {
     final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
     expect(
       item.style?.foregroundColor?.resolve(<WidgetState>{}),
-      TpColorsDark.accent,
+      TpSystemColorsDark.tint,
     );
   });
 

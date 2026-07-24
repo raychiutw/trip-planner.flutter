@@ -2,11 +2,14 @@
 /// 儲存成功 → pop。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/adaptive.dart';
+import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../theme/tokens.dart';
@@ -94,7 +97,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                       if (nextDate == null) return;
                       final ok = await ctrl.shiftStartDate(nextDate);
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '出發日期已變更');
+                        showAppNotice(context, '出發日期已變更');
                       }
                     },
                   ),
@@ -106,32 +109,22 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onAddStart: () async {
                       final ok = await ctrl.addDay('start');
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已在最前加入一天');
+                        showAppNotice(context, '已在最前加入一天');
                       }
                     },
                     onAddEnd: () async {
                       final ok = await ctrl.addDay('end');
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已在最後加入一天');
+                        showAppNotice(context, '已在最後加入一天');
                       }
                     },
-                    onRestore: (date) async {
-                      final ok = await ctrl.restoreDay(date);
+                    onCreateMissingDay: (date) async {
+                      final ok = await ctrl.addMissingDay(date);
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已加回 $date');
+                        showAppNotice(context, '已新增 $date');
                       }
                     },
-                    onDelete: (day) async {
-                      final confirmed = await _confirmDeleteDay(context, day);
-                      if (!confirmed) return;
-                      final removed = await ctrl.deleteDay(day.dayNum);
-                      if (context.mounted && removed != null) {
-                        final message = removed > 0
-                            ? 'Day ${day.dayNum} 已刪除（連同 $removed 個景點）'
-                            : 'Day ${day.dayNum} 已刪除';
-                        _showSnackBar(context, message);
-                      }
-                    },
+                    onDelete: (day) => _deleteDay(ctrl, day),
                   ),
                   const SizedBox(height: TpSpacing.s5),
                   _title(context, '描述（用於 SEO,選填）'),
@@ -190,6 +183,122 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     padding: const EdgeInsets.only(bottom: TpSpacing.s2),
     child: Text(t, style: Theme.of(context).textTheme.titleMedium),
   );
+
+  Future<void> _deleteDay(
+    EditTripController controller,
+    TripDay day, {
+    bool requiresConfirmation = true,
+  }) async {
+    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    if (requiresConfirmation) {
+      final confirmed = await showAppConfirm(
+        context,
+        title: '刪除行程日',
+        message:
+            '確定要刪除「$label」嗎？'
+            '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
+        confirmLabel: '刪除',
+        isDestructive: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
+
+    final result = await controller.deleteDay(day);
+    if (!mounted) return;
+    if (result == null) {
+      showAppError(
+        context,
+        '刪除「$label」失敗，請稍後再試',
+        onRetry: () => unawaited(_deleteDay(controller, day)),
+      );
+      return;
+    }
+    _handleDayDeletionResult(controller, day, result);
+  }
+
+  void _handleDayDeletionResult(
+    EditTripController controller,
+    TripDay day,
+    DayDeletionResult result,
+  ) {
+    final label = 'DAY ${day.dayNum}・${day.displayTitle}';
+    switch (result.resolution) {
+      case DayDeletionResolution.committed:
+        showAppNotice(
+          context,
+          _dayDeletedMessage(day, result.removedEntryCount),
+        );
+        return;
+      case DayDeletionResolution.targetStillPresent:
+        final latestDay = controller.dayById(day.id) ?? day;
+        final latestLabel = 'DAY ${latestDay.dayNum}・${latestDay.displayTitle}';
+        showAppError(
+          context,
+          '無法確認「$latestLabel」已刪除；重新整理後仍找到同一個行程日',
+          onRetry: () =>
+              unawaited(_retryDayDeletionWithFreshIdentity(controller, day.id)),
+        );
+        return;
+      case DayDeletionResolution.verificationRequired:
+        final commitKnown = result.removedEntryCount != null;
+        showAppError(
+          context,
+          commitKnown ? '「$label」已刪除，但無法重新整理行程日' : '無法確認「$label」是否已刪除，請重試確認',
+          allowDismiss: false,
+          onRetry: () =>
+              unawaited(_retryDayDeletionResolution(controller, day)),
+        );
+        return;
+    }
+  }
+
+  Future<void> _retryDayDeletionResolution(
+    EditTripController controller,
+    TripDay day,
+  ) async {
+    final result = await controller.resolvePendingDayDeletion();
+    if (!mounted) return;
+    if (result == null) {
+      showAppError(
+        context,
+        '無法確認行程日刪除結果，請再試一次',
+        allowDismiss: false,
+        onRetry: () => unawaited(_retryDayDeletionResolution(controller, day)),
+      );
+      return;
+    }
+    _handleDayDeletionResult(controller, day, result);
+  }
+
+  Future<void> _retryDayDeletionWithFreshIdentity(
+    EditTripController controller,
+    int targetId,
+  ) async {
+    final refreshed = await controller.refreshDaysForDeletionRetry();
+    if (!mounted) return;
+    if (!refreshed) {
+      showAppError(
+        context,
+        '無法重新確認行程日，請再試一次',
+        allowDismiss: false,
+        onRetry: () =>
+            unawaited(_retryDayDeletionWithFreshIdentity(controller, targetId)),
+      );
+      return;
+    }
+
+    final latestDay = controller.dayById(targetId);
+    if (latestDay == null) {
+      showAppNotice(context, '此行程日已不存在');
+      return;
+    }
+    await _deleteDay(controller, latestDay);
+  }
+
+  String _dayDeletedMessage(TripDay day, int? removedEntryCount) =>
+      removedEntryCount != null && removedEntryCount > 0
+      ? 'Day ${day.dayNum} 已刪除（連同 $removedEntryCount 個景點）'
+      : 'Day ${day.dayNum} 已刪除';
 }
 
 class _DayManagementSection extends StatelessWidget {
@@ -198,7 +307,7 @@ class _DayManagementSection extends StatelessWidget {
     required this.mutating,
     required this.onAddStart,
     required this.onAddEnd,
-    required this.onRestore,
+    required this.onCreateMissingDay,
     required this.onDelete,
   });
 
@@ -206,7 +315,7 @@ class _DayManagementSection extends StatelessWidget {
   final bool mutating;
   final VoidCallback onAddStart;
   final VoidCallback onAddEnd;
-  final ValueChanged<String> onRestore;
+  final ValueChanged<String> onCreateMissingDay;
   final ValueChanged<TripDay> onDelete;
 
   @override
@@ -241,6 +350,24 @@ class _DayManagementSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: TpSpacing.s3),
+          if (mutating) ...[
+            Semantics(
+              key: const ValueKey('edit-day-mutation-progress'),
+              liveRegion: true,
+              label: '正在更新行程日',
+              child: const Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  ),
+                  SizedBox(width: TpSpacing.s2),
+                  Text('正在更新行程日…'),
+                ],
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s3),
+          ],
           if (days.isEmpty)
             Text(
               '尚無日程資料',
@@ -261,7 +388,7 @@ class _DayManagementSection extends StatelessWidget {
                     _MissingDayRow(
                       date: missingDate,
                       mutating: mutating,
-                      onRestore: () => onRestore(missingDate),
+                      onCreate: () => onCreateMissingDay(missingDate),
                     ),
                   if (index != days.length - 1)
                     const Divider(height: TpSpacing.s4),
@@ -278,12 +405,12 @@ class _MissingDayRow extends StatelessWidget {
   const _MissingDayRow({
     required this.date,
     required this.mutating,
-    required this.onRestore,
+    required this.onCreate,
   });
 
   final String date;
   final bool mutating;
-  final VoidCallback onRestore;
+  final VoidCallback onCreate;
 
   @override
   Widget build(BuildContext context) {
@@ -304,10 +431,10 @@ class _MissingDayRow extends StatelessWidget {
             ),
           ),
           TextButton.icon(
-            key: ValueKey('edit-restore-day-$date'),
-            onPressed: mutating ? null : onRestore,
+            key: ValueKey('edit-create-missing-day-$date'),
+            onPressed: mutating ? null : onCreate,
             icon: const Icon(Icons.add),
-            label: const Text('加回'),
+            label: const Text('新增缺少日期'),
           ),
         ],
       ),
@@ -385,7 +512,10 @@ class _ShiftDateSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_dateRangeLabel(startDate, endDate), style: textTheme.bodyLarge),
+          Text(
+            _dateRangeLabel(context, startDate, endDate),
+            style: textTheme.bodyLarge,
+          ),
           const SizedBox(height: TpSpacing.s1),
           Text(
             '整體平移所有日程日期，停留點順序不變。',
@@ -414,69 +544,36 @@ class _ShiftDateSection extends StatelessWidget {
   }
 }
 
-Future<String?> _showShiftDateDialog(BuildContext context, String? startDate) =>
-    showDialog<String>(
-      context: context,
-      builder: (dialogContext) => _ShiftDateDialog(startDate: startDate),
-    );
-
-class _ShiftDateDialog extends StatefulWidget {
-  const _ShiftDateDialog({this.startDate});
-
-  final String? startDate;
-
-  @override
-  State<_ShiftDateDialog> createState() => _ShiftDateDialogState();
+Future<String?> _showShiftDateDialog(
+  BuildContext context,
+  String? startDate,
+) async {
+  final now = DateTime.now();
+  final selected = await showAppDatePicker(
+    context,
+    initialDate: _parseIsoDate(startDate) ?? now,
+    firstDate: DateTime(2000),
+    lastDate: DateTime(now.year + 10, 12, 31),
+  );
+  return selected == null ? null : _formatIsoDate(selected);
 }
 
-class _ShiftDateDialogState extends State<_ShiftDateDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.startDate ?? '');
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('平移出發日期'),
-      content: TextField(
-        key: const ValueKey('edit-shift-start-date'),
-        controller: _controller,
-        keyboardType: TextInputType.datetime,
-        decoration: const InputDecoration(
-          labelText: '新的 Day 1 日期',
-          hintText: 'YYYY-MM-DD',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('套用'),
-        ),
-      ],
-    );
-  }
-}
-
-String _dateRangeLabel(String? startDate, String? endDate) {
+String _dateRangeLabel(
+  BuildContext context,
+  String? startDate,
+  String? endDate,
+) {
   if (startDate == null || startDate.isEmpty) return '尚無日期資料';
+  final start = _parseIsoDate(startDate);
+  final startLabel = start == null
+      ? startDate
+      : formatAppFullDate(context, start);
   if (endDate == null || endDate.isEmpty || endDate == startDate) {
-    return startDate;
+    return startLabel;
   }
-  return '$startDate → $endDate';
+  final end = _parseIsoDate(endDate);
+  final endLabel = end == null ? endDate : formatAppFullDate(context, end);
+  return '$startLabel → $endLabel';
 }
 
 List<String> _missingDatesAfter(List<TripDay> days, int index) {
@@ -517,32 +614,4 @@ String _formatIsoDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '$year-$month-$day';
-}
-
-Future<bool> _confirmDeleteDay(BuildContext context, TripDay day) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text('刪除 Day ${day.dayNum}'),
-      content: const Text('這會刪除當天日程並重新編號後續天數。'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('刪除'),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
-}
-
-void _showSnackBar(BuildContext context, String message) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..removeCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
 }

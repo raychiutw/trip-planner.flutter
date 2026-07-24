@@ -72,19 +72,6 @@ class TripAuditRow {
   Map<String, dynamic>? get snapshotRow => _decodeObject(snapshot);
 }
 
-class TripAuditRollbackResult {
-  const TripAuditRollbackResult({required this.ok, required this.rolledBack});
-
-  final bool ok;
-  final String rolledBack;
-
-  factory TripAuditRollbackResult.fromJson(Map<String, dynamic> json) =>
-      TripAuditRollbackResult(
-        ok: json['ok'] == true,
-        rolledBack: _stringValue(json['rolledBack'] ?? json['rolled_back']),
-      );
-}
-
 Map<String, dynamic>? _decodeObject(String? jsonText) {
   if (jsonText == null) return null;
   final decoded = jsonDecode(jsonText);

@@ -15,7 +15,7 @@ Tripline 對標 Apple Music 的資訊階層、內容優先與平台熟悉感，�
 AppTheme + 系統字 + Dynamic Type
           │
           ├── 平台：Cupertino / Material 自適應控制項
-          ├── 寬度：compact tab bar / wide navigation rail
+          ├── 寬度：compact bottom tabs / regular top tabs + trip split view
           ├── 狀態：skeleton / persistent error / transient notice
           └── feature：行程、時間軸、地圖、收藏、建立流程
 ```
@@ -31,7 +31,8 @@ Apple Music 在這裡是品質基準，不是元件庫。實作遵循四個優�
 
 | 面向 | 採用的原則 | Tripline 實作 | 反方意見與結論 |
 |---|---|---|---|
-| 頂層導覽 | 少量、穩定、可保留分頁狀態 | 五個 branch 固定順序，一律使用浮動玻璃 `AppleRootTabBar`（2026-07-16 更正：先前記載的 `CupertinoTabBar` / `NavigationBar` / `NavigationRail` 依寬度切換**從未實作**，`AppShell` 無條件只用 `AppleRootTabBar`） | 「全部做成 Cupertino 才像 Apple Music」忽略 Android 熟悉度；改以單一玻璃 Tab bar 統一兩平台，並保留 label 與 selected semantics |
+| 頂層導覽 | 少量、穩定、可保留分頁狀態 | 四個 `StatefulShellRoute` branch 固定順序；compact 使用底部 `AppleRootTabBar`，可用寬度達 720pt 時改為頂部 inline tabs。iOS 與 Android 共用同一套 width-based 規則，不使用 `NavigationRail` | 「依作業系統分兩套導覽」會讓 Android tablet 與 iPad 行為漂移；改以可用寬度決定配置，並保留 branch stack、label 與 selected semantics |
+| 行程寬版 | 清單與 detail 並排但共用同一份狀態 | 一般寬度在行程 detail 左側顯示 320pt 清單；compact、橫直向與 multitasking resize 維持同一個 detail subtree、目前行程與 Day，不建立 tablet 專用 domain state | 「把手機畫面等比例放大」沒有利用寬版空間；「另建 tablet store」則會產生同步問題，因此只改 layout |
 | 資訊階層 | 統一頁首、明確主動作、次要動作收斂 | inline 頁首（56pt 單行 + 最多兩個功能鍵）、空狀態 CTA、時間軸 More 選單、可見的收藏選取模式（2026-07-16 更正：large app bar 已移除） | 「所有動作都露出」會增加 chrome；主動作外露、低頻動作進 More。大標題只有部分頁面有，反而讓 app 讀起來像兩套設計 |
 | 排版 | 少字型、角色清楚、尊重使用者字級 | 系統字、HIG 字階、中文零字距、Dynamic Type | 「打包 Inter 比較一致」會犧牲平台字型調校與 accessibility；因此不打包 Inter |
 | 寬版閱讀 | 內容有焦點，不因螢幕變大而無限拉長 | form `720`、conversation `860`、feed `920` | 「全寬顯示資訊更多」對表單與段落反而增加視線移動；地圖等空間型內容仍可全寬 |
@@ -59,7 +60,7 @@ Apple Music 的紅色品牌、媒體封面、播放控制與內容推薦模型�
 
 ## 取捨
 
-- 平台分支增加少量測試面，但換得 iOS/Android 都熟悉的操作。
+- 尺寸分支增加少量測試面，但換得 iPhone、iPad、Android 手機與平板一致且可預期的自適應行為。
 - 固定內容最大寬度犧牲部分資訊密度，但提升長文字與表單可讀性。
 - 靜態 skeleton 比 shimmer 低調，但耗能、干擾與 accessibility 風險更低。
 - 持續錯誤 banner 佔用畫面空間，但使用者不會錯過失敗原因與重試入口。

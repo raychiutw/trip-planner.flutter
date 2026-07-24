@@ -1,10 +1,11 @@
-/// showAppConfirm 平台自適應行為測試(iOS → Cupertino、Android → Material)。
+/// 產品控制在所有平台共用 Apple HIG 行為。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_action_item.dart';
@@ -23,6 +24,157 @@ void main() {
       ),
     );
   }
+
+  testWidgets('iOS 日期選擇器沿用 locale 並停用範圍外日期', (tester) async {
+    const locale = Locale('zh', 'TW');
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        supportedLocales: const [locale],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => unawaited(
+                showAppDatePicker(
+                  context,
+                  initialDate: DateTime(2026, 4, 24),
+                  firstDate: DateTime(2026, 4, 23),
+                  lastDate: DateTime(2026, 4, 25),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final picker = tester.widget<CalendarDatePicker>(
+      find.byType(CalendarDatePicker),
+    );
+    expect(picker.initialDate, DateTime(2026, 4, 24));
+    expect(picker.firstDate, DateTime(2026, 4, 23));
+    expect(picker.lastDate, DateTime(2026, 4, 25));
+    expect(
+      Localizations.localeOf(tester.element(find.byType(CalendarDatePicker))),
+      locale,
+    );
+  });
+
+  testWidgets('iOS 日期選擇器取消不回寫，完成才回傳選取日期', (tester) async {
+    late Future<DateTime?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        result = showAppDatePicker(
+          context,
+          initialDate: DateTime(2026, 4, 24),
+          firstDate: DateTime(2026, 4, 23),
+          lastDate: DateTime(2026, 4, 25),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    tester
+        .widget<CalendarDatePicker>(find.byType(CalendarDatePicker))
+        .onDateChanged(DateTime(2026, 4, 25));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(await result, DateTime(2026, 4, 25));
+  });
+
+  testWidgets('Android 日期也使用同一個 calendar sheet', (tester) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        unawaited(
+          showAppDatePicker(
+            context,
+            initialDate: DateTime(2026, 4, 24),
+            firstDate: DateTime(2026, 4, 23),
+            lastDate: DateTime(2026, 4, 25),
+          ),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
+    expect(find.byType(CupertinoDatePicker), findsNothing);
+    expect(find.byType(DatePickerDialog), findsNothing);
+  });
+
+  testWidgets('iOS 完成回傳 wheel 顯示的五分鐘值，取消不回寫', (tester) async {
+    late Future<TimeOfDay?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        result = showAppTimePicker(
+          context,
+          initialTime: const TimeOfDay(hour: 10, minute: 7),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.initialDateTime, DateTime(2000, 1, 1, 10, 5));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(await result, const TimeOfDay(hour: 10, minute: 5));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+  });
+
+  testWidgets('Android 也使用五分鐘 wheel，完成回傳所見值且取消不回寫', (tester) async {
+    late Future<TimeOfDay?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        result = showAppTimePicker(
+          context,
+          initialTime: const TimeOfDay(hour: 10, minute: 7),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.minuteInterval, 5);
+    expect(picker.initialDateTime, DateTime(2000, 1, 1, 10, 5));
+    picker.onDateTimeChanged(DateTime(2000, 1, 1, 10, 10));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    expect(await result, const TimeOfDay(hour: 10, minute: 10));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+  });
 
   testWidgets('iOS → CupertinoAlertDialog + 破壞性 action;確認回傳 true', (
     tester,
@@ -44,13 +196,43 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    final actions = tester
+        .widgetList<CupertinoDialogAction>(find.byType(CupertinoDialogAction))
+        .toList();
+    expect(actions.first.isDefaultAction, isTrue);
+    expect(actions.last.isDestructiveAction, isTrue);
+    expect(actions.last.isDefaultAction, isFalse);
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
     expect(await future, isTrue);
   });
 
-  testWidgets('Android → Material AlertDialog;取消回傳 false', (tester) async {
+  testWidgets('Android 破壞性確認也由安全選項取得預設動作', (tester) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        unawaited(
+          showAppConfirm(
+            context,
+            title: '刪除收藏',
+            confirmLabel: '刪除',
+            isDestructive: true,
+          ),
+        );
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+    final actions = tester
+        .widgetList<CupertinoDialogAction>(find.byType(CupertinoDialogAction))
+        .toList();
+    expect(actions.first.isDefaultAction, isTrue);
+    expect(actions.last.isDestructiveAction, isTrue);
+  });
+
+  testWidgets('Android → CupertinoAlertDialog;取消回傳 false', (tester) async {
     late Future<bool> future;
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
@@ -60,10 +242,10 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.byType(CupertinoAlertDialog), findsNothing);
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
 
-    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
     await tester.pumpAndSettle();
     expect(await future, isFalse);
   });
@@ -95,9 +277,7 @@ void main() {
     expect(await future, 'delete');
   });
 
-  testWidgets('Android → bottom sheet(ListTile);取消(點外部)回傳 null', (
-    tester,
-  ) async {
+  testWidgets('Android → CupertinoActionSheet;取消回傳 null', (tester) async {
     late Future<String?> future;
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
@@ -112,17 +292,14 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CupertinoActionSheet), findsNothing);
-    expect(find.widgetWithText(ListTile, '分享'), findsOneWidget);
-    // 點 barrier 關閉 → null
-    await tester.tapAt(const Offset(10, 10));
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '取消'));
     await tester.pumpAndSettle();
     expect(await future, isNull);
   });
 
-  testWidgets('Android action sheet preserves divider and disabled state', (
-    tester,
-  ) async {
+  testWidgets('Android action sheet 保留 disabled 語意', (tester) async {
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
         showAppActionSheet<String>(
@@ -145,65 +322,72 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Divider), findsOneWidget);
-    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '刪除'));
-    expect(tile.enabled, isFalse);
-    expect(tester.getSize(find.widgetWithText(ListTile, '刪除')).height, 56);
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    final disabledAction = find.widgetWithText(
+      CupertinoActionSheetAction,
+      '刪除',
+    );
+    expect(disabledAction, findsOneWidget);
+    expect(
+      tester
+          .widgetList<Semantics>(
+            find.ancestor(of: disabledAction, matching: find.byType(Semantics)),
+          )
+          .any((widget) => widget.properties.enabled == false),
+      isTrue,
+    );
   });
 
-  testWidgets(
-    'Android action sheet scrolls long command lists on short screens',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Android Cupertino action sheet 可在短螢幕捲動長清單', (tester) async {
+    tester.view.physicalSize = const Size(390, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      late Future<String?> future;
-      await tester.pumpWidget(
-        host(TargetPlatform.android, (context) {
-          future = showAppActionSheet<String>(
-            context,
-            actions: const [
-              TpActionItem(label: '分享', value: 'share', icon: Icons.share),
-              TpActionItem(label: '共編設定', value: 'collab', icon: Icons.group),
-              TpActionItem(
-                label: 'AI 健檢',
-                value: 'health',
-                icon: Icons.health_and_safety,
-              ),
-              TpActionItem(
-                label: '匯出 JSON',
-                value: 'export',
-                icon: Icons.download,
-              ),
-              TpActionItem(
-                label: '刪除行程',
-                value: 'delete',
-                icon: CupertinoIcons.delete,
-                dividerBefore: true,
-                role: TpActionRole.destructive,
-              ),
-            ],
-          );
-        }),
-      );
+    late Future<String?> future;
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        future = showAppActionSheet<String>(
+          context,
+          actions: const [
+            TpActionItem(label: '分享', value: 'share', icon: Icons.share),
+            TpActionItem(label: '共編設定', value: 'collab', icon: Icons.group),
+            TpActionItem(
+              label: 'AI 健檢',
+              value: 'health',
+              icon: Icons.health_and_safety,
+            ),
+            TpActionItem(
+              label: '匯出 JSON',
+              value: 'export',
+              icon: Icons.download,
+            ),
+            TpActionItem(
+              label: '刪除行程',
+              value: 'delete',
+              icon: CupertinoIcons.delete,
+              dividerBefore: true,
+              role: TpActionRole.destructive,
+            ),
+          ],
+        );
+      }),
+    );
 
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('刪除行程'),
-        100,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('刪除行程'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('刪除行程'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刪除行程'));
+    await tester.pumpAndSettle();
 
-      expect(await future, 'delete');
-      expect(tester.takeException(), isNull);
-    },
-  );
+    expect(await future, 'delete');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('action sheets render the shared selected checkmark', (
     tester,
@@ -227,8 +411,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    final tile = tester.widget<ListTile>(find.widgetWithText(ListTile, '最近加入'));
-    expect((tile.leading! as Icon).icon, CupertinoIcons.check_mark);
+    expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
   });
 
   testWidgets('iOS action sheet does not dispatch a disabled action', (
@@ -272,20 +455,69 @@ void main() {
 
     expect(find.text('已登出該裝置'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
+    expect(
+      tester
+          .widgetList<Semantics>(find.byType(Semantics))
+          .any(
+            (widget) =>
+                widget.properties.liveRegion == true &&
+                widget.properties.label == '已登出該裝置',
+          ),
+      isTrue,
+    );
     // 不推進到 2.5s;測試結束時 tree 拆除須取消 timer,否則框架報 pending timer。
   });
 
-  testWidgets('Android → Material SnackBar 顯示訊息', (tester) async {
+  testWidgets('Android → 頂部橫幅顯示訊息而非 SnackBar', (tester) async {
     await tester.pumpWidget(
       host(TargetPlatform.android, (context) {
         showAppNotice(context, '已刪除');
       }),
     );
     await tester.tap(find.text('open'));
-    await tester.pump(); // 顯示 SnackBar
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
     expect(find.text('已刪除'), findsOneWidget);
+  });
+
+  testWidgets('頂部橫幅不攔截底下 44pt toolbar 動作', (tester) async {
+    var actionCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: AppBar(
+            actions: [
+              SizedBox.square(
+                dimension: 44,
+                child: IconButton(
+                  key: const ValueKey('notice-underlying-action'),
+                  onPressed: () => actionCount++,
+                  icon: const Icon(CupertinoIcons.ellipsis),
+                ),
+              ),
+            ],
+          ),
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showAppNotice(context, '已完成'),
+              child: const Text('顯示提示'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('顯示提示'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('已完成'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('notice-underlying-action'))),
+      const Size(44, 44),
+    );
+    await tester.tap(find.byKey(const ValueKey('notice-underlying-action')));
+    expect(actionCount, 1);
   });
 
   testWidgets('unsaved guard coalesces concurrent close requests', (
@@ -317,30 +549,6 @@ void main() {
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
   });
 
-  testWidgets('Undo notice renders one six-second action and dispatches it', (
-    tester,
-  ) async {
-    var undoCount = 0;
-    await tester.pumpWidget(
-      host(TargetPlatform.iOS, (context) {
-        showAppUndoNotice(context, message: '已移除收藏', onUndo: () => undoCount++);
-      }),
-    );
-
-    await tester.tap(find.text('open'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.duration, const Duration(seconds: 6));
-    expect(find.text('已移除收藏'), findsOneWidget);
-    expect(find.text('復原'), findsOneWidget);
-
-    await tester.tap(find.text('復原'));
-    await tester.pump();
-    expect(undoCount, 1);
-  });
-
   Widget searchHost(TargetPlatform platform, TextEditingController controller) {
     return MaterialApp(
       theme: ThemeData(platform: platform),
@@ -368,25 +576,18 @@ void main() {
     expect(controller.text, '沖繩');
   });
 
-  testWidgets('AppSearchField Android → TextField;有字才顯示清除鈕,點擊清空', (
+  testWidgets('AppSearchField Android → CupertinoSearchTextField', (
     tester,
   ) async {
     final controller = TextEditingController();
     addTearDown(controller.dispose);
     await tester.pumpWidget(searchHost(TargetPlatform.android, controller));
 
-    expect(find.byType(TextField), findsOneWidget);
-    expect(find.byType(CupertinoSearchTextField), findsNothing);
-    // 空 → 無清除鈕
-    expect(find.byIcon(CupertinoIcons.clear), findsNothing);
+    expect(find.byType(CupertinoSearchTextField), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
 
     await tester.enterText(find.byKey(const ValueKey('search')), '釜山');
-    await tester.pump();
-    expect(find.byIcon(CupertinoIcons.clear), findsOneWidget);
-
-    await tester.tap(find.byIcon(CupertinoIcons.clear));
-    await tester.pump();
-    expect(controller.text, isEmpty);
+    expect(controller.text, '釜山');
   });
 
   testWidgets('AppSearchField debounce 只送出停止輸入後的最新文字', (tester) async {

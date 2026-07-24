@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
 import 'package:flutter/services.dart';
@@ -14,8 +15,8 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/trip.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_action_item.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trips/current_trip_provider.dart';
@@ -26,6 +27,14 @@ import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
 import 'speech_service.dart';
+
+/// 可替換的附件選擇器；測試可注入失敗，不直接觸發 platform channel。
+typedef ChatAttachmentPicker = Future<XFile?> Function();
+
+/// 聊天附件入口使用的系統檔案選擇器。
+final chatAttachmentPickerProvider = Provider<ChatAttachmentPicker>(
+  (ref) => openFile,
+);
 
 /// 空對話時顯示的 4 個示範建議 prompt。
 const List<String> _suggestedPrompts = [
@@ -56,6 +65,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _pendingRouteTripId;
   String? _renderedTripId;
   final _drafts = <String, String>{};
+  bool? _speechAvailable;
+  bool _speechPurposeAccepted = false;
 
   @override
   void initState() {
@@ -93,6 +104,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _consumePrefill() {
     if (_pendingPrefill == null || !mounted) return;
     setState(() => _pendingPrefill = null);
+  }
+
+  void _setSpeechAvailable(bool? value) {
+    if (_speechAvailable == value || !mounted) return;
+    setState(() => _speechAvailable = value);
+  }
+
+  void _acceptSpeechPurpose() {
+    if (_speechPurposeAccepted || !mounted) return;
+    setState(() => _speechPurposeAccepted = true);
   }
 
   @override
@@ -188,6 +209,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             initialPrefill: pendingPrefill ?? _drafts[tripId],
             onInitialPrefillConsumed: _consumePrefill,
             onDraftChanged: (draft) => _drafts[tripId] = draft,
+            speechAvailable: _speechAvailable,
+            speechPurposeAccepted: _speechPurposeAccepted,
+            onSpeechAvailableChanged: _setSpeechAvailable,
+            onSpeechPurposeAccepted: _acceptSpeechPurpose,
           );
         },
       ),
@@ -202,6 +227,10 @@ class _ChatBody extends ConsumerStatefulWidget {
     required this.tripId,
     required this.onInitialPrefillConsumed,
     required this.onDraftChanged,
+    required this.speechAvailable,
+    required this.speechPurposeAccepted,
+    required this.onSpeechAvailableChanged,
+    required this.onSpeechPurposeAccepted,
     this.initialPrefill,
   });
 
@@ -209,6 +238,10 @@ class _ChatBody extends ConsumerStatefulWidget {
   final String? initialPrefill;
   final VoidCallback onInitialPrefillConsumed;
   final ValueChanged<String> onDraftChanged;
+  final bool? speechAvailable;
+  final bool speechPurposeAccepted;
+  final ValueChanged<bool?> onSpeechAvailableChanged;
+  final VoidCallback onSpeechPurposeAccepted;
 
   @override
   ConsumerState<_ChatBody> createState() => _ChatBodyState();
@@ -466,9 +499,14 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
             child: SizeChangedLayoutNotifier(
               key: _composerKey,
               child: _Composer(
+                tripId: widget.tripId,
                 input: _input,
                 sending: state.sending,
                 onSend: _send,
+                speechAvailable: widget.speechAvailable,
+                speechPurposeAccepted: widget.speechPurposeAccepted,
+                onSpeechAvailableChanged: widget.onSpeechAvailableChanged,
+                onSpeechPurposeAccepted: widget.onSpeechPurposeAccepted,
               ),
             ),
           ),
@@ -503,7 +541,6 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final tones = theme.extension<TpTones>()!;
 
     final isAssistant = message.role == ChatRole.assistant;
     final normalizedMyEmail = myEmail?.trim().toLowerCase();
@@ -523,7 +560,7 @@ class _MessageBubble extends StatelessWidget {
     } else if (isAssistant) {
       bg = scheme.surfaceContainerHigh;
     } else if (isSelf) {
-      bg = tones.accentSubtle;
+      bg = scheme.primaryContainer;
     } else {
       bg = Color.alphaBlend(
         collaboratorAccent.withValues(
@@ -546,7 +583,7 @@ class _MessageBubble extends StatelessWidget {
       label = displayName?.isNotEmpty == true
           ? displayName!
           : _emailLocalPart(myEmail) ?? '你';
-      labelColor = tones.accentDeep;
+      labelColor = scheme.onPrimaryContainer;
     } else {
       final senderName = message.senderName?.trim();
       label = senderName?.isNotEmpty == true
@@ -644,34 +681,103 @@ class _MessageBubble extends StatelessWidget {
 }
 
 /// 輸入列:多行 TextField + 語音鈕 + 送出鈕(送出中顯示 spinner)。
-/// 語音鈕 lazy:進頁不請求權限;點擊時才 init SpeechService(請求麥克風/語音
-/// 辨識權限)→ 成功則 listen,辨識文字回填輸入框;init 失敗(權限拒絕/不支援)
-/// → SnackBar 提示且不 listen。聆聽中切換 icon/配色,再點則 stop。
+/// 語音鈕 lazy:進頁不請求權限;第一次點擊先說明用途，確認後才 init
+/// SpeechService(請求麥克風/語音辨識權限)→ 成功則 listen，辨識文字回填
+/// 輸入框；init 失敗(權限拒絕/不支援)→ 提供系統設定恢復動線且不 listen。
+/// 聆聽中切換 icon/配色，再點則 stop。
+enum _ComposerAction { attachment, addEntry }
+
 class _Composer extends ConsumerStatefulWidget {
   const _Composer({
+    required this.tripId,
     required this.input,
     required this.sending,
     required this.onSend,
+    required this.speechAvailable,
+    required this.speechPurposeAccepted,
+    required this.onSpeechAvailableChanged,
+    required this.onSpeechPurposeAccepted,
   });
 
+  final String tripId;
   final TextEditingController input;
   final bool sending;
   final VoidCallback onSend;
+  final bool? speechAvailable;
+  final bool speechPurposeAccepted;
+  final ValueChanged<bool?> onSpeechAvailableChanged;
+  final VoidCallback onSpeechPurposeAccepted;
 
   @override
   ConsumerState<_Composer> createState() => _ComposerState();
 }
 
 class _ComposerState extends ConsumerState<_Composer> {
-  /// null = 尚未初始化過;true/false = 最近一次 init 結果(快取,避免重複請求)。
-  bool? _speechAvailable;
   bool _listening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.input.addListener(_inputChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.input == widget.input) return;
+    oldWidget.input.removeListener(_inputChanged);
+    widget.input.addListener(_inputChanged);
+  }
+
+  void _inputChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.input.removeListener(_inputChanged);
+    super.dispose();
+  }
+
+  Future<void> _onAdd() async {
+    final action = await showAppActionSheet<_ComposerAction>(
+      context,
+      title: '加入內容',
+      actions: const [
+        TpActionItem(
+          value: _ComposerAction.attachment,
+          label: '加入附件',
+          icon: CupertinoIcons.paperclip,
+        ),
+        TpActionItem(
+          value: _ComposerAction.addEntry,
+          label: '新增行程項目',
+          icon: CupertinoIcons.add_circled,
+        ),
+      ],
+    );
+    if (!mounted || action == null) return;
+    if (action == _ComposerAction.addEntry) {
+      context.push('/trips/${Uri.encodeComponent(widget.tripId)}/entries/new');
+      return;
+    }
+    try {
+      final file = await ref.read(chatAttachmentPickerProvider)();
+      if (mounted && file != null) {
+        showAppNotice(context, '已選擇 ${file.name}');
+      }
+    } on Exception {
+      if (mounted) {
+        showAppNotice(context, '無法開啟附件選擇器，請稍後再試。');
+      }
+    }
+  }
 
   /// lazy init:第一次成功後快取結果,後續沿用不再請求權限。
   Future<bool> _ensureInit() async {
-    if (_speechAvailable == true) return true;
+    if (widget.speechAvailable == true) return true;
     final ok = await ref.read(speechServiceProvider).init();
-    if (mounted) setState(() => _speechAvailable = ok);
+    if (mounted) widget.onSpeechAvailableChanged(ok);
     return ok;
   }
 
@@ -683,10 +789,24 @@ class _ComposerState extends ConsumerState<_Composer> {
       if (mounted) setState(() => _listening = false);
       return;
     }
+    if (widget.speechAvailable == false) {
+      await _showSpeechPermissionRecovery();
+      return;
+    }
+    if (!widget.speechPurposeAccepted) {
+      final accepted = await showAppConfirm(
+        context,
+        title: '使用語音輸入？',
+        message: 'Tripline 會使用麥克風把你說的話轉成目前行程的文字指令。',
+        confirmLabel: '繼續',
+      );
+      if (!mounted || !accepted) return;
+      widget.onSpeechPurposeAccepted();
+    }
     final ok = await _ensureInit();
     if (!mounted) return;
     if (!ok) {
-      showAppNotice(context, '需要麥克風與語音辨識權限才能語音輸入');
+      await _showSpeechPermissionRecovery();
       return;
     }
     setState(() => _listening = true);
@@ -697,9 +817,28 @@ class _ComposerState extends ConsumerState<_Composer> {
     });
   }
 
+  Future<void> _showSpeechPermissionRecovery() async {
+    final openSettings = await showAppConfirm(
+      context,
+      title: '無法使用語音輸入',
+      message: '請到系統設定允許 Tripline 使用麥克風與語音辨識；你的聊天草稿會保留。',
+      confirmLabel: '前往系統設定',
+      cancelLabel: '稍後再說',
+    );
+    if (!mounted || !openSettings) return;
+    final opened = await ref.read(speechServiceProvider).openSettings();
+    if (!mounted) return;
+    if (opened) {
+      widget.onSpeechAvailableChanged(null);
+    } else {
+      showAppNotice(context, '無法開啟系統設定，請手動到設定調整權限。');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final hasText = widget.input.text.trim().isNotEmpty;
     // lazy:預設 enabled,僅送出中 disable;權限在點擊時才檢查。
     final micEnabled = !widget.sending;
 
@@ -719,56 +858,80 @@ class _ComposerState extends ConsumerState<_Composer> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                IconButton(
+                  key: const ValueKey('chat-add-button'),
+                  tooltip: '加入內容',
+                  onPressed: widget.sending ? null : () => unawaited(_onAdd()),
+                  icon: const Icon(CupertinoIcons.add, semanticLabel: '加入內容'),
+                ),
+                const SizedBox(width: TpSpacing.s1),
                 Expanded(
-                  child: TextField(
-                    key: const ValueKey('chat-input'),
-                    controller: widget.input,
-                    minLines: 1,
-                    maxLines: 4,
-                    textInputAction: TextInputAction.send,
-                    onTapOutside: (_) =>
-                        FocusManager.instance.primaryFocus?.unfocus(),
-                    onSubmitted: (_) => widget.onSend(),
-                    // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
-                    decoration: InputDecoration(
-                      hintText: '輸入訊息或語音指令',
-                      isDense: true,
-                      filled: true,
-                      fillColor: scheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: TpSpacing.s4,
-                        vertical: TpSpacing.s3,
+                  child: CallbackShortcuts(
+                    bindings: {
+                      const SingleActivator(
+                        LogicalKeyboardKey.enter,
+                        meta: true,
+                      ): widget.onSend,
+                    },
+                    child: TextField(
+                      key: const ValueKey('chat-input'),
+                      controller: widget.input,
+                      minLines: 1,
+                      maxLines: 4,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      // iMessage 風格:圓角膠囊 + subtle 填色,無硬框(各狀態一致)。
+                      decoration: InputDecoration(
+                        hintText: '輸入訊息或語音指令',
+                        isDense: true,
+                        filled: true,
+                        fillColor: scheme.surfaceContainerHighest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: TpSpacing.s4,
+                          vertical: TpSpacing.s3,
+                        ),
+                        border: _composerPillBorder,
+                        enabledBorder: _composerPillBorder,
+                        focusedBorder: _composerPillBorder,
                       ),
-                      border: _composerPillBorder,
-                      enabledBorder: _composerPillBorder,
-                      focusedBorder: _composerPillBorder,
                     ),
                   ),
                 ),
                 const SizedBox(width: TpSpacing.s2),
-                IconButton(
-                  key: const ValueKey('chat-mic-button'),
-                  tooltip: _listening ? '停止語音輸入' : '語音輸入',
-                  onPressed: micEnabled ? () => unawaited(_onMic()) : null,
-                  color: _listening ? scheme.primary : null,
-                  icon: Icon(
-                    _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
-                  ),
-                ),
-                const SizedBox(width: TpSpacing.s1),
-                IconButton.filled(
-                  key: const ValueKey('chat-send'),
-                  onPressed: widget.sending ? null : widget.onSend,
-                  icon: widget.sending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
+                if (hasText)
+                  IconButton.filled(
+                    key: const ValueKey('chat-send'),
+                    tooltip: '送出訊息',
+                    onPressed: widget.sending ? null : widget.onSend,
+                    icon: widget.sending
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: Semantics(
+                              label: '送出中',
+                              child: CircularProgressIndicator.adaptive(
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : const Icon(
+                            CupertinoIcons.arrow_up_circle_fill,
+                            semanticLabel: '送出訊息',
                           ),
-                        )
-                      : const Icon(CupertinoIcons.arrow_up_circle_fill),
-                ),
+                  )
+                else
+                  IconButton(
+                    key: const ValueKey('chat-mic-button'),
+                    tooltip: _listening ? '停止語音輸入' : '語音輸入',
+                    onPressed: micEnabled ? () => unawaited(_onMic()) : null,
+                    color: _listening ? scheme.primary : null,
+                    icon: Icon(
+                      _listening ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+                      semanticLabel: _listening ? '停止語音輸入' : '語音輸入',
+                    ),
+                  ),
               ],
             ),
           ),
@@ -788,9 +951,9 @@ class _EmptyStatePrompts extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s6),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(TpSpacing.s6),
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

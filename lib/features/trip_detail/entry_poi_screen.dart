@@ -10,6 +10,7 @@ import '../../api/providers.dart';
 import '../../api/trip_repository.dart' show CustomEntryPoi;
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
@@ -53,12 +54,13 @@ class EntryPoiScreen extends ConsumerWidget {
   ({String tripId, int entryId}) get _key => (tripId: tripId, entryId: entryId);
 
   /// 跑一個 POI 操作 → 成功重抓 entryDetail + tripDays;409 重抓 + 提示。
-  Future<void> _run(
+  Future<bool> _run(
     BuildContext context,
     WidgetRef ref,
     Future<void> Function() op, {
     required String success,
     bool recomputeTravel = false,
+    bool showFailure = true,
   }) async {
     try {
       await op();
@@ -68,17 +70,25 @@ class EntryPoiScreen extends ConsumerWidget {
       // 守衛必須在 ref.invalidate 之前 —— await 期間使用者可能已離開,此時碰 ref
       // 會擲 StateError。StateError 不是 Exception 子類,底下的 `on Exception`
       // 攔不到,會一路逃成未捕捉例外把 App 打掛。
-      if (!context.mounted) return;
+      if (!context.mounted) return true;
       ref.invalidate(entryDetailProvider(_key));
       ref.invalidate(tripDaysProvider(tripId));
       showAppNotice(context, success);
+      return true;
     } on ApiError catch (error) {
-      if (!context.mounted) return;
+      if (!context.mounted) return false;
       ref.invalidate(entryDetailProvider(_key));
-      showAppError(context, error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試');
-    } on Exception {
-      if (!context.mounted) return;
-      showAppError(context, '操作失敗，請稍後再試');
+      if (showFailure) {
+        showAppError(
+          context,
+          error.status == 409 ? '地點已更新，已重新載入' : '操作失敗，請稍後再試',
+        );
+      }
+      return false;
+    } on Object {
+      if (!context.mounted) return false;
+      if (showFailure) showAppError(context, '操作失敗，請稍後再試');
+      return false;
     }
   }
 
@@ -245,19 +255,12 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
     EntryPoiInfo alternate,
-  ) async {
-    final confirmed = await showAppConfirm(
+  ) {
+    return confirmAndDelete(
       context,
       title: '移除備選景點？',
       message: '移除「${alternate.name ?? '未命名地點'}」後無法復原。',
-      confirmLabel: '刪除',
-      isDestructive: true,
-    );
-    if (!confirmed || !context.mounted) return;
-    await _run(
-      context,
-      ref,
-      () => ref
+      delete: () => ref
           .read(tripRepositoryProvider)
           .removeEntryAlternate(
             tripId: tripId,
@@ -265,7 +268,10 @@ class EntryPoiScreen extends ConsumerWidget {
             poiId: alternate.poiId,
             entryPoisVersion: entry.entryPoisVersion,
           ),
-      success: '已移除備選',
+      onSuccess: () {
+        ref.invalidate(entryDetailProvider(_key));
+        ref.invalidate(tripDaysProvider(tripId));
+      },
     );
   }
 
@@ -277,39 +283,15 @@ class EntryPoiScreen extends ConsumerWidget {
     List<TimelineEntry> sameDayEntries,
   ) async {
     final warning = _crossRegionWarning(alternate, sameDayEntries, entry.id);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('設為正選？'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'),
-            if (warning != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Text(
-                warning,
-                style: TextStyle(
-                  color: Theme.of(dialogContext).colorScheme.error,
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('設為正選'),
-          ),
-        ],
-      ),
+    final ok = await showAppConfirm(
+      context,
+      title: '設為正選？',
+      message:
+          '要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'
+          '${warning == null ? '' : '\n\n$warning'}',
+      confirmLabel: '設為正選',
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
     await _run(
       context,
       ref,
@@ -331,29 +313,39 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     EntryPoiInfo poi,
   ) async {
-    final result =
-        await showAdaptiveDialog<
-          ({String? note, String type, String? reservation})
-        >(
-          context: context,
-          builder: (_) => _PoiInfoDialog(poi: poi),
-        );
-    if (result == null || !context.mounted) return;
-    await _run(
-      context,
-      ref,
-      () => ref
-          .read(tripRepositoryProvider)
-          .updateEntryPoi(
-            tripId: tripId,
-            entryId: entryId,
-            poiId: poi.poiId,
-            note: result.note,
-            poiType: result.type,
-            reservation: result.reservation,
+    final controller = AppSheetFormController();
+    try {
+      await showAppFormSheet(
+        context,
+        title: '編輯地點資訊',
+        submitLabel: '儲存',
+        submitKey: const ValueKey('poi-save'),
+        cancelKey: const ValueKey('poi-cancel'),
+        controller: controller,
+        builder: (_) => _PoiInfoForm(
+          poi: poi,
+          formController: controller,
+          onSubmit: (result) => _run(
+            context,
+            ref,
+            () => ref
+                .read(tripRepositoryProvider)
+                .updateEntryPoi(
+                  tripId: tripId,
+                  entryId: entryId,
+                  poiId: poi.poiId,
+                  note: result.note,
+                  poiType: result.type,
+                  reservation: result.reservation,
+                ),
+            success: '已儲存',
+            showFailure: false,
           ),
-      success: '已儲存',
-    );
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _moveAlternate(
@@ -388,28 +380,51 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showAppSelectionSheet<_EntryPoiPick>(
-      context,
-      title: '選擇地點',
-      builder: (sheetContext, select) =>
-          _AlternateSearchSheet(onSelected: select),
-    );
-    if (selected == null || !context.mounted) return;
-    await _run(
-      context,
-      ref,
-      () => ref
-          .read(tripRepositoryProvider)
-          .addEntryAlternate(
-            tripId: tripId,
-            entryId: entryId,
-            poiId: selected.poiId,
-            poi: selected.poi,
-            customPoi: selected.customPoi,
-            entryPoisVersion: entry.entryPoisVersion,
-          ),
-      success: '已加入備選',
-    );
+    final dismissalLocked = ValueNotifier(false);
+    final hasUnsavedChanges = ValueNotifier(false);
+    try {
+      await showAppSelectionSheet<_EntryPoiPick>(
+        context,
+        title: '選擇地點',
+        dismissalLocked: dismissalLocked,
+        hasUnsavedChanges: hasUnsavedChanges,
+        builder: (sheetContext, select) => _AlternateSearchSheet(
+          onCustomDirtyChanged: (dirty) => hasUnsavedChanges.value = dirty,
+          onSelected: (selected) async {
+            dismissalLocked.value = true;
+            try {
+              final succeeded = await _run(
+                context,
+                ref,
+                () => ref
+                    .read(tripRepositoryProvider)
+                    .addEntryAlternate(
+                      tripId: tripId,
+                      entryId: entryId,
+                      poiId: selected.poiId,
+                      poi: selected.poi,
+                      customPoi: selected.customPoi,
+                      entryPoisVersion: entry.entryPoisVersion,
+                    ),
+                success: '已加入備選',
+                showFailure: false,
+              );
+              if (succeeded) {
+                dismissalLocked.value = false;
+                hasUnsavedChanges.value = false;
+                if (sheetContext.mounted) select(selected);
+              }
+              return succeeded;
+            } finally {
+              dismissalLocked.value = false;
+            }
+          },
+        ),
+      );
+    } finally {
+      dismissalLocked.dispose();
+      hasUnsavedChanges.dispose();
+    }
   }
 
   Future<void> _changeMaster(
@@ -417,25 +432,52 @@ class EntryPoiScreen extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
   ) async {
-    final selected = await showAppSelectionSheet<_EntryPoiPick>(
-      context,
-      title: '選擇地點',
-      builder: (sheetContext, select) =>
-          _AlternateSearchSheet(hintText: '搜尋地點置換正選', onSelected: select),
-    );
-    if (selected == null || !context.mounted) return;
-    await _run(context, ref, () async {
-      await ref
-          .read(tripRepositoryProvider)
-          .changeEntryPoi(
-            tripId: tripId,
-            entryId: entryId,
-            poiId: selected.poiId,
-            poi: selected.poi,
-            customPoi: selected.customPoi,
-            entryPoisVersion: entry.entryPoisVersion,
-          );
-    }, success: '已置換正選');
+    final dismissalLocked = ValueNotifier(false);
+    final hasUnsavedChanges = ValueNotifier(false);
+    try {
+      await showAppSelectionSheet<_EntryPoiPick>(
+        context,
+        title: '選擇地點',
+        dismissalLocked: dismissalLocked,
+        hasUnsavedChanges: hasUnsavedChanges,
+        builder: (sheetContext, select) => _AlternateSearchSheet(
+          hintText: '搜尋地點置換正選',
+          onCustomDirtyChanged: (dirty) => hasUnsavedChanges.value = dirty,
+          onSelected: (selected) async {
+            dismissalLocked.value = true;
+            try {
+              final succeeded = await _run(
+                context,
+                ref,
+                () => ref
+                    .read(tripRepositoryProvider)
+                    .changeEntryPoi(
+                      tripId: tripId,
+                      entryId: entryId,
+                      poiId: selected.poiId,
+                      poi: selected.poi,
+                      customPoi: selected.customPoi,
+                      entryPoisVersion: entry.entryPoisVersion,
+                    ),
+                success: '已置換正選',
+                showFailure: false,
+              );
+              if (succeeded) {
+                dismissalLocked.value = false;
+                hasUnsavedChanges.value = false;
+                if (sheetContext.mounted) select(selected);
+              }
+              return succeeded;
+            } finally {
+              dismissalLocked.value = false;
+            }
+          },
+        ),
+      );
+    } finally {
+      dismissalLocked.dispose();
+      hasUnsavedChanges.dispose();
+    }
   }
 }
 
@@ -527,11 +569,10 @@ class _PoiCard extends StatelessWidget {
                           IconButton(
                             key: ValueKey('poi-reservation-link-${poi.poiId}'),
                             tooltip: '開啟訂位連結',
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints.tightFor(
-                              width: 32,
-                              height: 32,
+                              width: TpSpacing.tapMin,
+                              height: TpSpacing.tapMin,
                             ),
                             iconSize: 18,
                             icon: const Icon(Icons.open_in_new_rounded),
@@ -648,21 +689,34 @@ Future<void> _openReservationUrl(
   }
 }
 
-/// per-POI 資訊編輯 dialog（自持 controller,route 移除時才 dispose,避免關閉動畫
-/// 期間用到已 dispose 的 controller）。回傳 note/type/reservation 的 record。
-class _PoiInfoDialog extends StatefulWidget {
-  const _PoiInfoDialog({required this.poi});
+typedef _PoiInfoValue = ({String? note, String type, String? reservation});
+
+/// per-POI 短任務表單；失敗保留輸入，成功後由共用 form sheet 關閉。
+class _PoiInfoForm extends StatefulWidget {
+  const _PoiInfoForm({
+    required this.poi,
+    required this.formController,
+    required this.onSubmit,
+  });
 
   final EntryPoiInfo poi;
+  final AppSheetFormController formController;
+  final Future<bool> Function(_PoiInfoValue) onSubmit;
 
   @override
-  State<_PoiInfoDialog> createState() => _PoiInfoDialogState();
+  State<_PoiInfoForm> createState() => _PoiInfoFormState();
 }
 
-class _PoiInfoDialogState extends State<_PoiInfoDialog> {
+class _PoiInfoFormState extends State<_PoiInfoForm> {
   late final TextEditingController _note;
   late final TextEditingController _resv;
   late String _type;
+  late final String _baseNote;
+  late final String _baseReservation;
+  late final String _baseType;
+  bool _dirty = false;
+  bool _submitting = false;
+  String? _error;
 
   @override
   void initState() {
@@ -670,20 +724,78 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
     _note = TextEditingController(text: widget.poi.note ?? '');
     _resv = TextEditingController(text: widget.poi.reservation ?? '');
     _type = widget.poi.type ?? 'attraction';
+    _baseNote = _note.text;
+    _baseReservation = _resv.text;
+    _baseType = _type;
+    _note.addListener(_markChanged);
+    _resv.addListener(_markChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.formController.attach(_submit);
+      _syncFormState();
+    });
   }
 
   @override
   void dispose() {
+    _note.removeListener(_markChanged);
+    _resv.removeListener(_markChanged);
     _note.dispose();
     _resv.dispose();
     super.dispose();
   }
 
+  void _markChanged() {
+    final dirty =
+        _note.text != _baseNote ||
+        _resv.text != _baseReservation ||
+        _type != _baseType;
+    setState(() {
+      _dirty = dirty;
+      _error = null;
+    });
+    _syncFormState();
+  }
+
+  void _syncFormState() {
+    widget.formController.update(
+      dirty: _dirty,
+      canSubmit: _dirty && !_submitting,
+      submitting: _submitting,
+    );
+  }
+
+  Future<bool> _submit() async {
+    if (_submitting || !_dirty) return false;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    _syncFormState();
+    final note = _note.text.trim();
+    final reservation = _resv.text.trim();
+    final succeeded = await widget.onSubmit((
+      note: note.isEmpty ? null : note,
+      type: _type,
+      reservation: reservation.isEmpty ? null : reservation,
+    ));
+    if (!mounted) return succeeded;
+    setState(() {
+      _submitting = false;
+      if (!succeeded) {
+        _error = '儲存失敗，輸入內容已保留，請重試';
+      }
+    });
+    _syncFormState();
+    return succeeded;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog.adaptive(
-      title: const Text('編輯地點資訊'),
-      content: SingleChildScrollView(
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,6 +803,7 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
             TextField(
               key: const ValueKey('poi-note'),
               controller: _note,
+              enabled: !_submitting,
               decoration: const InputDecoration(labelText: '備註'),
               maxLines: 2,
             ),
@@ -705,7 +818,14 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
                     key: ValueKey('poi-type-${e.key}'),
                     label: Text(e.value),
                     selected: _type == e.key,
-                    onSelected: (_) => setState(() => _type = e.key),
+                    onSelected: _submitting
+                        ? null
+                        : (_) {
+                            setState(() {
+                              _type = e.key;
+                            });
+                            _markChanged();
+                          },
                   ),
               ],
             ),
@@ -713,30 +833,33 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
             TextField(
               key: const ValueKey('poi-reservation'),
               controller: _resv,
+              enabled: !_submitting,
               decoration: const InputDecoration(labelText: '訂位資訊'),
             ),
+            if (_submitting) ...[
+              const SizedBox(height: TpSpacing.s3),
+              Semantics(
+                liveRegion: true,
+                label: '正在儲存地點資訊',
+                child: const LinearProgressIndicator(
+                  key: ValueKey('poi-info-progress'),
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: TpSpacing.s3),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  _error!,
+                  key: const ValueKey('poi-info-error'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          key: const ValueKey('poi-save'),
-          onPressed: () {
-            final note = _note.text.trim();
-            final resv = _resv.text.trim();
-            Navigator.of(context).pop((
-              note: note.isEmpty ? null : note,
-              type: _type,
-              reservation: resv.isEmpty ? null : resv,
-            ));
-          },
-          child: const Text('儲存'),
-        ),
-      ],
     );
   }
 }
@@ -745,10 +868,12 @@ class _PoiInfoDialogState extends State<_PoiInfoDialog> {
 class _AlternateSearchSheet extends ConsumerStatefulWidget {
   const _AlternateSearchSheet({
     required this.onSelected,
+    this.onCustomDirtyChanged,
     this.hintText = '搜尋地點加入備選',
   });
 
-  final ValueChanged<_EntryPoiPick> onSelected;
+  final Future<bool> Function(_EntryPoiPick) onSelected;
+  final ValueChanged<bool>? onCustomDirtyChanged;
   final String hintText;
 
   @override
@@ -773,6 +898,9 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   String? _favoritesError;
   String _customPoiType = 'attraction';
   String? _customError;
+  bool _submitting = false;
+  String? _submitError;
+  bool _customDirty = false;
 
   @override
   void dispose() {
@@ -867,6 +995,33 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
     );
   }
 
+  Future<void> _submitPick(_EntryPoiPick pick) async {
+    if (_submitting) return;
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+    final succeeded = await widget.onSelected(pick);
+    if (!mounted) return;
+    setState(() {
+      _submitting = false;
+      if (!succeeded) {
+        _submitError = '操作失敗，選取內容已保留，請重試';
+      }
+    });
+  }
+
+  void _syncCustomDirty() {
+    final dirty =
+        _customNameCtrl.text.isNotEmpty ||
+        _customLatCtrl.text.isNotEmpty ||
+        _customLngCtrl.text.isNotEmpty ||
+        _customPoiType != 'attraction';
+    if (_customDirty == dirty) return;
+    _customDirty = dirty;
+    widget.onCustomDirtyChanged?.call(dirty);
+  }
+
   void _submitCustom() {
     final name = _customNameCtrl.text.trim();
     final lat = double.tryParse(_customLatCtrl.text.trim());
@@ -875,7 +1030,7 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
       setState(() => _customError = '請輸入名稱與有效座標');
       return;
     }
-    widget.onSelected(
+    _submitPick(
       _EntryPoiPick.custom(
         CustomEntryPoi(name: name, lat: lat, lng: lng, poiType: _customPoiType),
       ),
@@ -885,87 +1040,73 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                _tabButton(
-                  tab: _PoiPickerTab.search,
-                  label: '搜尋',
-                  key: const ValueKey('poi-picker-tab-search'),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                _tabButton(
-                  tab: _PoiPickerTab.favorites,
-                  label: '收藏',
-                  key: const ValueKey('poi-picker-tab-favorites'),
-                ),
-                const SizedBox(width: TpSpacing.s2),
-                _tabButton(
-                  tab: _PoiPickerTab.custom,
-                  label: '自訂',
-                  key: const ValueKey('poi-picker-tab-custom'),
-                ),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            if (_tab == _PoiPickerTab.search) ...[
-              AppSearchField(
-                fieldKey: const ValueKey('alt-search-field'),
-                controller: _ctrl,
-                placeholder: widget.hintText,
-                debounce: const Duration(milliseconds: 300),
-                onChanged: (_) => _search(),
-                onSubmitted: (_) => _search(),
-              ),
-              if (_searching) ...[
-                const SizedBox(height: TpSpacing.s1),
-                const LinearProgressIndicator(minHeight: 2),
-              ],
-              const SizedBox(height: TpSpacing.s3),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  shrinkWrap: true,
-                  children: [
-                    for (final poi in _results)
-                      ListTile(
-                        key: ValueKey('alt-result-${poi.placeId}'),
-                        title: Text(poi.name),
-                        subtitle: poi.address == null
-                            ? null
-                            : Text(poi.address!),
-                        onTap: () =>
-                            widget.onSelected(_EntryPoiPick.search(poi)),
-                      ),
-                  ],
-                ),
-              ),
-            ] else if (_tab == _PoiPickerTab.favorites) ...[
-              if (_favoritesLoading)
-                const SizedBox(
-                  height: 180,
-                  child: AppListLoadingSkeleton(
-                    key: ValueKey('entry-poi-favorites-loading'),
-                    itemCount: 1,
+      child: IgnorePointer(
+        ignoring: _submitting,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _tabButton(
+                    tab: _PoiPickerTab.search,
+                    label: '搜尋',
+                    key: const ValueKey('poi-picker-tab-search'),
                   ),
-                )
-              else if (_favoritesError != null)
-                Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s4),
-                  child: Text(_favoritesError!),
-                )
-              else if (_favoritesLoaded && _favorites.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(TpSpacing.s4),
-                  child: Text('還沒有收藏景點'),
-                )
-              else
+                  const SizedBox(width: TpSpacing.s2),
+                  _tabButton(
+                    tab: _PoiPickerTab.favorites,
+                    label: '收藏',
+                    key: const ValueKey('poi-picker-tab-favorites'),
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                  _tabButton(
+                    tab: _PoiPickerTab.custom,
+                    label: '自訂',
+                    key: const ValueKey('poi-picker-tab-custom'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TpSpacing.s3),
+              if (_submitting) ...[
+                Semantics(
+                  liveRegion: true,
+                  label: '正在儲存地點',
+                  child: const LinearProgressIndicator(
+                    key: ValueKey('poi-picker-submit-progress'),
+                    minHeight: 2,
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s2),
+              ],
+              if (_submitError != null) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _submitError!,
+                    key: const ValueKey('poi-picker-submit-error'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s2),
+              ],
+              if (_tab == _PoiPickerTab.search) ...[
+                AppSearchField(
+                  fieldKey: const ValueKey('alt-search-field'),
+                  controller: _ctrl,
+                  placeholder: widget.hintText,
+                  debounce: const Duration(milliseconds: 300),
+                  onChanged: (_) => _search(),
+                  onSubmitted: (_) => _search(),
+                ),
+                if (_searching) ...[
+                  const SizedBox(height: TpSpacing.s1),
+                  const LinearProgressIndicator(minHeight: 2),
+                ],
+                const SizedBox(height: TpSpacing.s3),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: ListView(
@@ -973,114 +1114,167 @@ class _AlternateSearchSheetState extends ConsumerState<_AlternateSearchSheet> {
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     shrinkWrap: true,
                     children: [
-                      for (final favorite in _favorites)
+                      for (final poi in _results)
                         ListTile(
-                          key: ValueKey('poi-picker-favorite-${favorite.id}'),
-                          title: Text(favorite.displayName),
-                          subtitle: favorite.poiAddress == null
+                          key: ValueKey('alt-result-${poi.placeId}'),
+                          title: Text(poi.name),
+                          subtitle: poi.address == null
                               ? null
-                              : Text(favorite.poiAddress!),
-                          onTap: () => widget.onSelected(
-                            _EntryPoiPick.favorite(favorite.poiId),
-                          ),
+                              : Text(poi.address!),
+                          onTap: _submitting
+                              ? null
+                              : () => _submitPick(_EntryPoiPick.search(poi)),
                         ),
                     ],
                   ),
                 ),
-            ] else ...[
-              TextField(
-                key: const ValueKey('poi-picker-custom-name'),
-                controller: _customNameCtrl,
-                autofocus: true,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: '名稱',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (_) {
-                  if (_customError != null) setState(() => _customError = null);
-                },
-              ),
-              const SizedBox(height: TpSpacing.s2),
-              DropdownButtonFormField<String>(
-                key: const ValueKey('poi-picker-custom-type'),
-                initialValue: _customPoiType,
-                decoration: const InputDecoration(
-                  labelText: '類型',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final entry in kPoiTypeLabels.entries)
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value),
+              ] else if (_tab == _PoiPickerTab.favorites) ...[
+                if (_favoritesLoading)
+                  const SizedBox(
+                    height: 180,
+                    child: AppListLoadingSkeleton(
+                      key: ValueKey('entry-poi-favorites-loading'),
+                      itemCount: 1,
                     ),
-                ],
-                onChanged: (value) =>
-                    setState(() => _customPoiType = value ?? _customPoiType),
-              ),
-              const SizedBox(height: TpSpacing.s2),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const ValueKey('poi-picker-custom-lat'),
-                      controller: _customLatCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '緯度',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) {
-                        if (_customError != null) {
-                          setState(() => _customError = null);
-                        }
-                      },
+                  )
+                else if (_favoritesError != null)
+                  Padding(
+                    padding: const EdgeInsets.all(TpSpacing.s4),
+                    child: Text(_favoritesError!),
+                  )
+                else if (_favoritesLoaded && _favorites.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(TpSpacing.s4),
+                    child: Text('還沒有收藏景點'),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: ListView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      shrinkWrap: true,
+                      children: [
+                        for (final favorite in _favorites)
+                          ListTile(
+                            key: ValueKey('poi-picker-favorite-${favorite.id}'),
+                            title: Text(favorite.displayName),
+                            subtitle: favorite.poiAddress == null
+                                ? null
+                                : Text(favorite.poiAddress!),
+                            onTap: _submitting
+                                ? null
+                                : () => _submitPick(
+                                    _EntryPoiPick.favorite(favorite.poiId),
+                                  ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: TpSpacing.s2),
-                  Expanded(
-                    child: TextField(
-                      key: const ValueKey('poi-picker-custom-lng'),
-                      controller: _customLngCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        signed: true,
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: '經度',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) {
-                        if (_customError != null) {
-                          setState(() => _customError = null);
-                        }
-                      },
-                    ),
+              ] else ...[
+                TextField(
+                  key: const ValueKey('poi-picker-custom-name'),
+                  controller: _customNameCtrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: '名稱',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              if (_customError != null) ...[
+                  onChanged: (_) {
+                    _syncCustomDirty();
+                    if (_customError != null) {
+                      setState(() => _customError = null);
+                    }
+                  },
+                ),
                 const SizedBox(height: TpSpacing.s2),
-                Text(
-                  _customError!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('poi-picker-custom-type'),
+                  initialValue: _customPoiType,
+                  decoration: const InputDecoration(
+                    labelText: '類型',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final entry in kPoiTypeLabels.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _customPoiType = value ?? _customPoiType);
+                    _syncCustomDirty();
+                  },
+                ),
+                const SizedBox(height: TpSpacing.s2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const ValueKey('poi-picker-custom-lat'),
+                        controller: _customLatCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '緯度',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {
+                          _syncCustomDirty();
+                          if (_customError != null) {
+                            setState(() => _customError = null);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: TpSpacing.s2),
+                    Expanded(
+                      child: TextField(
+                        key: const ValueKey('poi-picker-custom-lng'),
+                        controller: _customLngCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: '經度',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {
+                          _syncCustomDirty();
+                          if (_customError != null) {
+                            setState(() => _customError = null);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                if (_customError != null) ...[
+                  const SizedBox(height: TpSpacing.s2),
+                  Text(
+                    _customError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: TpSpacing.s3),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: const ValueKey('poi-picker-custom-submit'),
+                    onPressed: _submitting ? null : _submitCustom,
+                    child: Text(_submitting ? '處理中…' : '使用自訂地點'),
+                  ),
                 ),
               ],
-              const SizedBox(height: TpSpacing.s3),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const ValueKey('poi-picker-custom-submit'),
-                  onPressed: _submitCustom,
-                  child: const Text('使用自訂地點'),
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

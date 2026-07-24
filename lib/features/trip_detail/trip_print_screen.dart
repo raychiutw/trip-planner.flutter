@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/adaptive_content.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../app/app_feedback.dart';
 import '../../models/day.dart';
@@ -20,6 +21,13 @@ import '../../ui/tp_app_bar.dart';
 import 'trip_pdf_service.dart';
 import 'trip_print_data.dart';
 
+final _tripPrintNotesProvider = FutureProvider.family<TripNotes, String>((
+  ref,
+  tripId,
+) {
+  return ref.watch(tripRepositoryProvider).fetchNotes(tripId);
+});
+
 /// Loads the authenticated trip print document.
 final tripPrintDataProvider = FutureProvider.family<TripPrintData, String>((
   ref,
@@ -28,15 +36,9 @@ final tripPrintDataProvider = FutureProvider.family<TripPrintData, String>((
   final repository = ref.watch(tripRepositoryProvider);
   final tripFuture = repository.fetchTrip(tripId);
   final daysFuture = repository.fetchDays(tripId);
-  Future<TripNotes> fetchNotesOrEmpty() async {
-    try {
-      return await repository.fetchNotes(tripId);
-    } catch (_) {
-      return const TripNotes();
-    }
-  }
-
-  final notesFuture = fetchNotesOrEmpty();
+  final notesFuture = ref
+      .watch(_tripPrintNotesProvider(tripId).future)
+      .onError((_, _) => const TripNotes());
   return TripPrintData(
     trip: await tripFuture,
     days: await daysFuture,
@@ -58,10 +60,21 @@ class TripPrintScreen extends ConsumerStatefulWidget {
 
 class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
   _PrintAction? _busyAction;
+  var _actionGeneration = 0;
+
+  @override
+  void didUpdateWidget(covariant TripPrintScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tripId != widget.tripId) {
+      _actionGeneration++;
+      _busyAction = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final dataAsync = ref.watch(tripPrintDataProvider(widget.tripId));
+    final notesAsync = ref.watch(_tripPrintNotesProvider(widget.tripId));
     final data = dataAsync.value;
     final busy = _busyAction != null;
     return Scaffold(
@@ -76,9 +89,13 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
                 ? null
                 : () => unawaited(_runAction(_PrintAction.print, data)),
             child: _busyAction == _PrintAction.print
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                ? Semantics(
+                    liveRegion: true,
+                    label: '正在送出列印',
+                    child: const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    ),
                   )
                 : const Icon(CupertinoIcons.printer),
           ),
@@ -86,9 +103,13 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
             key: const ValueKey('trip-print-more'),
             enabled: data != null && !busy,
             triggerChild: _busyAction == _PrintAction.pdf
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                ? Semantics(
+                    liveRegion: true,
+                    label: '正在建立 PDF',
+                    child: const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    ),
                   )
                 : null,
             onSelected: (action) {
@@ -107,43 +128,65 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
       ),
       body: SafeArea(
         child: dataAsync.when(
-          loading: () =>
-              const AppListLoadingSkeleton(key: ValueKey('trip-print-loading')),
+          loading: () => Semantics(
+            key: ValueKey('trip-print-loading-live'),
+            liveRegion: true,
+            label: '正在載入列印預覽',
+            child: const ExcludeSemantics(
+              child: AppListLoadingSkeleton(
+                key: ValueKey('trip-print-loading'),
+              ),
+            ),
+          ),
           error: (error, stackTrace) => _PrintError(
             onRetry: () => ref.invalidate(tripPrintDataProvider(widget.tripId)),
           ),
-          data: (printData) => _TripPrintDocument(data: printData),
+          data: (printData) => _TripPrintDocument(
+            data: printData,
+            notesPartial: notesAsync.hasError,
+            onRetryNotes: () =>
+                ref.invalidate(_tripPrintNotesProvider(widget.tripId)),
+          ),
         ),
       ),
     );
   }
 
   Future<void> _runAction(_PrintAction action, TripPrintData data) async {
+    if (_busyAction != null) return;
+    final generation = ++_actionGeneration;
+    final tripId = widget.tripId;
     setState(() => _busyAction = action);
     try {
       final actions = ref.read(tripPrintActionsProvider);
       switch (action) {
         case _PrintAction.print:
           await actions.print(data);
-          if (!mounted) return;
+          if (!_isCurrent(generation, tripId)) return;
           _showMessage('已送出列印');
           return;
         case _PrintAction.pdf:
           await actions.sharePdf(data);
-          if (!mounted) return;
+          if (!_isCurrent(generation, tripId)) return;
           _showMessage('PDF 已建立');
           return;
       }
     } on Exception {
+      if (!_isCurrent(generation, tripId)) return;
       if (!mounted) return;
       showAppError(
         context,
         action == _PrintAction.print ? '列印失敗，請稍後再試' : 'PDF 建立失敗，請稍後再試',
       );
     } finally {
-      if (mounted) setState(() => _busyAction = null);
+      if (_isCurrent(generation, tripId)) {
+        setState(() => _busyAction = null);
+      }
     }
   }
+
+  bool _isCurrent(int generation, String tripId) =>
+      mounted && generation == _actionGeneration && widget.tripId == tripId;
 
   void _showMessage(String message) {
     showAppNotice(context, message);
@@ -151,9 +194,15 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
 }
 
 class _TripPrintDocument extends StatelessWidget {
-  const _TripPrintDocument({required this.data});
+  const _TripPrintDocument({
+    required this.data,
+    required this.notesPartial,
+    required this.onRetryNotes,
+  });
 
   final TripPrintData data;
+  final bool notesPartial;
+  final VoidCallback onRetryNotes;
 
   @override
   Widget build(BuildContext context) {
@@ -166,13 +215,26 @@ class _TripPrintDocument extends StatelessWidget {
         TpSpacing.s8,
       ),
       children: [
-        _PrintHeader(data: data),
-        const SizedBox(height: TpSpacing.s5),
-        if (data.days.isEmpty)
-          const _EmptyPrintDocument()
-        else
-          for (final day in data.days) _PrintDaySection(day: day),
-        _PrintNotesSection(notes: data.notes),
+        AppAdaptiveContent(
+          maxWidth: AppContentWidth.form,
+          contentKey: const ValueKey('trip-print-content'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (notesPartial) ...[
+                _PartialDataNotice(onRetry: onRetryNotes),
+                const SizedBox(height: TpSpacing.s4),
+              ],
+              _PrintHeader(data: data),
+              const SizedBox(height: TpSpacing.s5),
+              if (data.days.isEmpty)
+                const _EmptyPrintDocument()
+              else
+                for (final day in data.days) _PrintDaySection(day: day),
+              _PrintNotesSection(notes: data.notes),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -512,20 +574,65 @@ class _PrintError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Semantics(
       key: const ValueKey('trip-print-error'),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '行程載入失敗，請稍後重試',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            FilledButton(onPressed: onRetry, child: const Text('重試')),
-          ],
+      liveRegion: true,
+      container: true,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '行程載入失敗，請稍後重試',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: TpSpacing.s3),
+              FilledButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PartialDataNotice extends StatelessWidget {
+  const _PartialDataNotice({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      key: const ValueKey('trip-print-partial-notice'),
+      liveRegion: true,
+      container: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Wrap(
+            spacing: TpSpacing.s2,
+            runSpacing: TpSpacing.s2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '部分內容未載入：行程筆記載入失敗。',
+                style: TextStyle(color: colors.onErrorContainer),
+              ),
+              TextButton(
+                key: const ValueKey('trip-print-notes-retry'),
+                onPressed: onRetry,
+                child: const Text('重試'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -8,6 +8,7 @@ import 'package:tripline/theme/app_theme.dart';
 Future<void> pumpCard(
   WidgetTester tester, {
   required bool isSaved,
+  TextScaler textScaler = TextScaler.noScaling,
   PoiSearchResult poi = const PoiSearchResult(
     placeId: 'p1',
     name: '暖暮拉麵',
@@ -21,13 +22,18 @@ Future<void> pumpCard(
   return tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.light(),
-      home: Scaffold(
-        body: PoiSearchCard(
-          poi: poi,
-          isSaved: isSaved,
-          isSaving: false,
-          onToggleFavorite: onToggle ?? () {},
-          onAddToTrip: onAddToTrip,
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: textScaler),
+        child: Scaffold(
+          body: SingleChildScrollView(
+            child: PoiSearchCard(
+              poi: poi,
+              isSaved: isSaved,
+              isSaving: false,
+              onToggleFavorite: onToggle ?? () {},
+              onAddToTrip: onAddToTrip,
+            ),
+          ),
         ),
       ),
     ),
@@ -77,5 +83,24 @@ void main() {
     await pumpCard(tester, isSaved: false, onAddToTrip: () => added++);
     await tester.tap(find.byKey(const ValueKey('poi-add-to-trip-p1')));
     expect(added, 1);
+  });
+
+  testWidgets('Accessibility Size 仍自然增高並完整顯示名稱與地址', (tester) async {
+    await pumpCard(
+      tester,
+      isSaved: false,
+      textScaler: const TextScaler.linear(3.2),
+      poi: const PoiSearchResult(
+        placeId: 'p-long',
+        name: '這是一個需要換行顯示的完整景點名稱',
+        address: '這是一段很長的完整地址，放大文字後仍不可被固定卡片高度裁切',
+        category: 'tourist_attraction',
+        rating: 4.8,
+      ),
+    );
+
+    expect(find.text('這是一個需要換行顯示的完整景點名稱'), findsOneWidget);
+    expect(find.text('這是一段很長的完整地址，放大文字後仍不可被固定卡片高度裁切'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

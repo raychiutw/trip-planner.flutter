@@ -12,6 +12,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
+import '../../../app/notification_permission.dart';
 import '../../../models/user.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
@@ -33,9 +34,35 @@ class NotificationsScreen extends ConsumerStatefulWidget {
       _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
+    with WidgetsBindingObserver {
   String? _busyKey;
   String? _mutationError;
+  String? _permissionError;
+  bool _permissionDenied = false;
+  bool _permissionFlowBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_syncPermissionStatus());
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncPermissionStatus());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,9 +83,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           child: _NotificationsList(
             preferences: preferences,
             busyKey: _busyKey,
-            mutationError: _mutationError,
-            onRetry: () =>
-                ref.invalidate(accountNotificationPreferencesProvider),
+            mutationError: _permissionError ?? _mutationError,
+            permissionDenied: _permissionDenied,
+            interactionLocked: _permissionFlowBusy,
+            onRetry: () => unawaited(_retry()),
+            onOpenSettings: () =>
+                ref.read(notificationPermissionServiceProvider).openSettings(),
             onChanged: _updatePreference,
           ),
         ),
@@ -70,6 +100,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     _NotificationSetting setting,
     bool value,
   ) async {
+    if (_busyKey != null || _permissionFlowBusy) return;
+    if (value) {
+      setState(() => _permissionFlowBusy = true);
+      var canEnable = false;
+      try {
+        canEnable = await _canEnableNotifications();
+      } on Exception {
+        if (mounted) {
+          setState(() => _permissionError = '無法讀取通知權限，請稍後再試');
+        }
+      } finally {
+        if (mounted) setState(() => _permissionFlowBusy = false);
+      }
+      if (!mounted) return;
+      if (!canEnable) return;
+    }
     setState(() {
       _busyKey = setting.key;
       _mutationError = null;
@@ -101,6 +147,65 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  Future<bool> _canEnableNotifications() async {
+    final permission = ref.read(notificationPermissionServiceProvider);
+    final currentStatus = await permission.getStatus();
+    if (!mounted) return false;
+    if (currentStatus == NotificationPermissionStatus.granted) {
+      setState(() => _permissionDenied = false);
+      return true;
+    }
+    if (currentStatus == NotificationPermissionStatus.denied) {
+      setState(() => _permissionDenied = true);
+      return false;
+    }
+
+    final shouldRequest = await showAppConfirm(
+      context,
+      title: '允許 Tripline 傳送通知？',
+      message: '開啟後，Tripline 可在行程異動、旅伴邀請或重要服務消息發生時通知你。',
+      confirmLabel: '允許通知',
+      cancelLabel: '暫時不要',
+    );
+    if (!shouldRequest || !mounted) return false;
+
+    final requestedStatus = await permission.request();
+    if (!mounted) return false;
+    final granted = requestedStatus == NotificationPermissionStatus.granted;
+    setState(() => _permissionDenied = !granted);
+    return granted;
+  }
+
+  Future<void> _syncPermissionStatus() async {
+    if (_permissionFlowBusy) return;
+    setState(() => _permissionFlowBusy = true);
+    try {
+      final status = await ref
+          .read(notificationPermissionServiceProvider)
+          .getStatus();
+      if (!mounted) return;
+      setState(() {
+        _permissionDenied = status == NotificationPermissionStatus.denied;
+        _permissionError = null;
+      });
+    } on Exception {
+      if (mounted) {
+        setState(() => _permissionError = '無法讀取通知權限，請稍後再試');
+      }
+    } finally {
+      if (mounted) setState(() => _permissionFlowBusy = false);
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() {
+      _mutationError = null;
+      _permissionError = null;
+    });
+    ref.invalidate(accountNotificationPreferencesProvider);
+    await _syncPermissionStatus();
+  }
+
   String _errorMessage(Object error) {
     if (error is ApiError) return error.detail ?? error.message;
     return '更新通知設定失敗，請稍後再試';
@@ -112,7 +217,10 @@ class _NotificationsList extends StatelessWidget {
     required this.preferences,
     required this.busyKey,
     required this.mutationError,
+    required this.permissionDenied,
+    required this.interactionLocked,
     required this.onRetry,
+    required this.onOpenSettings,
     required this.onChanged,
   });
 
@@ -140,7 +248,10 @@ class _NotificationsList extends StatelessWidget {
   final AccountNotificationPreferences preferences;
   final String? busyKey;
   final String? mutationError;
+  final bool permissionDenied;
+  final bool interactionLocked;
   final VoidCallback onRetry;
+  final VoidCallback onOpenSettings;
   final Future<void> Function(_NotificationSetting setting, bool value)
   onChanged;
 
@@ -150,6 +261,16 @@ class _NotificationsList extends StatelessWidget {
       key: const ValueKey('notifications-page'),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
+        if (permissionDenied)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              TpSpacing.s4,
+              TpSpacing.s4,
+              TpSpacing.s4,
+              0,
+            ),
+            child: _PermissionDeniedPanel(onOpenSettings: onOpenSettings),
+          ),
         if (mutationError != null) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -168,7 +289,7 @@ class _NotificationsList extends StatelessWidget {
                 setting: setting,
                 value: _valueFor(setting.key),
                 isBusy: busyKey == setting.key,
-                isDisabled: busyKey != null,
+                isDisabled: busyKey != null || interactionLocked,
                 onChanged: (nextValue) =>
                     unawaited(onChanged(setting, nextValue)),
               ),
@@ -185,6 +306,40 @@ class _NotificationsList extends StatelessWidget {
       'system' => preferences.system,
       _ => true,
     };
+  }
+}
+
+class _PermissionDeniedPanel extends StatelessWidget {
+  const _PermissionDeniedPanel({required this.onOpenSettings});
+
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(TpRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('通知權限尚未開啟', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s1),
+            const Text('Tripline 不會重複顯示系統提示；你可從系統設定開啟通知。'),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                key: const ValueKey('notifications-open-settings'),
+                onPressed: onOpenSettings,
+                child: const Text('前往系統設定'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

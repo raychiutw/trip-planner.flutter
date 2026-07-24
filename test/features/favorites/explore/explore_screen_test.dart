@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,7 +104,7 @@ void main() {
     await tester.tap(more);
     await tester.pumpAndSettle();
 
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
     expect(find.text('地鐵站  1'), findsOneWidget);
 
     await tester.tapAt(const Offset(8, 8));
@@ -126,7 +127,11 @@ void main() {
     await tester.pumpAndSettle();
     clearInteractions(poi);
     expect(
-      tester.widget<GridView>(find.byType(GridView)).keyboardDismissBehavior,
+      tester
+          .widget<SingleChildScrollView>(
+            find.byKey(const ValueKey('explore-results-list')),
+          )
+          .keyboardDismissBehavior,
       ScrollViewKeyboardDismissBehavior.onDrag,
     );
 
@@ -201,7 +206,7 @@ void main() {
     await tester.pumpWidget(app(const ExploreScreen()));
     await tester.pumpAndSettle();
 
-    final searchField = tester.widget<TextField>(
+    final searchField = tester.widget<CupertinoSearchTextField>(
       find.byKey(const ValueKey('explore-search-field')),
     );
     expect(searchField.controller?.text, '大阪景點');

@@ -6,12 +6,12 @@
 
 **P0（已完成）**
 - 登入（email/密碼 → `tripline_session` cookie，flutter_secure_storage 持久化）
-- 5-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏 / 帳號）— go_router StatefulShellRoute + auth redirect
+- 4-tab Liquid Glass shell（聊天 / 行程 / 地圖 / 收藏）— go_router StatefulShellRoute + auth redirect；帳號由各內容頁 Header 開啟獨立 Navigation Stack sheet
 - 行程清單（中性 grouped surface、pull-to-refresh、尾端左滑刪除，並保留長按操作）
 - 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
-- 帳號（profile、統計、版本資訊、隱私權政策、刪除帳號、登出）
+- 帳號（profile、通知、登入裝置、隱私權政策、不可復原刪除與登出；外觀跟隨系統）
 - 未登入首頁（功能導覽、隱私權政策入口與登入後開始使用）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
@@ -30,10 +30,10 @@ flutter run        # 連 prod API（注意：請用測試帳號）
 
 ```
 lib/
-  theme/        # 暖白／中性深色 design tokens + ThemeData + 語意色 ThemeExtension
+  theme/        # iOS 系統語意色 tokens + Light／Dark／High Contrast ThemeData
   models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
   api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
-  app/          # go_router（5-tab StatefulShellRoute + auth redirect）
+  app/          # go_router（4-tab StatefulShellRoute、Account sheet + auth redirect）
   features/     # auth / trips / trip_detail（timeline·map·notes）/ account / shell
 docs/
   PORTING_PLAN.md   # 移植藍圖與架構決策
@@ -72,4 +72,4 @@ docs/
 
 ## 設計
 
-Flutter 的互動與版型以本 repo 的 [設計系統參考](docs/reference-theme.md)為準。方向是保留 Tripline 柔褐品牌，以暖白／中性深色 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例呈現；舊三色內容分類已退場。
+Flutter 的互動與版型以根目錄 [`design.md`](design.md) 為唯一設計 SOT，[設計系統參考](docs/reference-theme.md)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。

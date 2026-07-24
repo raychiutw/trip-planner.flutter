@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../features/map/map_style.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -12,19 +11,7 @@ class WelcomeScreen extends StatelessWidget {
   final VoidCallback onLogin;
 
   @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final platform = Theme.of(context).platform;
-    final theme =
-        (media.platformBrightness == Brightness.dark
-                ? AppTheme.higDark(highContrast: media.highContrast)
-                : AppTheme.higLight(highContrast: media.highContrast))
-            .copyWith(platform: platform);
-    return Theme(
-      data: theme,
-      child: Builder(builder: _buildContent),
-    );
-  }
+  Widget build(BuildContext context) => _buildContent(context);
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
@@ -450,7 +437,9 @@ class _LandingArt extends StatelessWidget {
             painter: _LandingArtPainter(
               kind: kind,
               scheme: Theme.of(context).colorScheme,
-              tones: Theme.of(context).extension<TpTones>()!,
+              successColor: Theme.of(context).brightness == Brightness.dark
+                  ? TpSystemColorsDark.success
+                  : TpSystemColorsLight.success,
             ),
           ),
         ),
@@ -463,12 +452,12 @@ class _LandingArtPainter extends CustomPainter {
   const _LandingArtPainter({
     required this.kind,
     required this.scheme,
-    required this.tones,
+    required this.successColor,
   });
 
   final _LandingArtKind kind;
   final ColorScheme scheme;
-  final TpTones tones;
+  final Color successColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -668,7 +657,7 @@ class _LandingArtPainter extends CustomPainter {
         ),
         Paint()
           ..color = healthy
-              ? tones.success
+              ? successColor
               : scheme.error.withValues(alpha: 0.8),
       );
     }
@@ -720,6 +709,6 @@ class _LandingArtPainter extends CustomPainter {
   bool shouldRepaint(covariant _LandingArtPainter oldDelegate) {
     return oldDelegate.kind != kind ||
         oldDelegate.scheme != scheme ||
-        oldDelegate.tones != tones;
+        oldDelegate.successColor != successColor;
   }
 }

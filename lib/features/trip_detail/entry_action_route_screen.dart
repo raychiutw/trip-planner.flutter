@@ -8,6 +8,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 
 /// Web 相容的停留點跨日操作。
@@ -53,6 +54,7 @@ class _EntryActionRouteScreenState
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
+    final days = daysAsync.value ?? const <TripDay>[];
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _targetDayId != null,
@@ -65,7 +67,7 @@ class _EntryActionRouteScreenState
           primaryActionLabel: widget.action.submitLabel,
           primaryActionKey: const ValueKey('entry-action-submit'),
           primaryActionEnabled: _targetDayId != null && !_submitting,
-          onPrimaryAction: _submit,
+          onPrimaryAction: () => _submit(days),
         ),
         body: daysAsync.when(
           loading: () => const AppListLoadingSkeleton(
@@ -106,12 +108,33 @@ class _EntryActionRouteScreenState
         Text('選擇目標日期', style: theme.textTheme.titleMedium),
         const SizedBox(height: TpSpacing.s3),
         for (final day in days) _dayTile(context, day),
+        if (_submitting) ...[
+          const SizedBox(height: TpSpacing.s2),
+          Semantics(
+            key: const ValueKey('entry-action-progress'),
+            liveRegion: true,
+            child: Row(
+              children: [
+                const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: TpSpacing.s2),
+                Text('${widget.action.submitLabel}中…'),
+              ],
+            ),
+          ),
+        ],
         if (_error != null) ...[
           const SizedBox(height: TpSpacing.s2),
-          Text(
-            _error!,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
+          Semantics(
+            key: const ValueKey('entry-action-error'),
+            liveRegion: true,
+            child: Text(
+              _error!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],
@@ -144,7 +167,7 @@ class _EntryActionRouteScreenState
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(List<TripDay> days) async {
     final targetDayId = _targetDayId;
     if (targetDayId == null) return;
     setState(() {
@@ -162,14 +185,40 @@ class _EntryActionRouteScreenState
             targetDayId: targetDayId,
           );
         case EntryRouteAction.move:
-          await repo.moveEntry(
-            tripId: widget.tripId,
-            entryId: widget.entryId,
+          final sourceDay = days
+              .where(
+                (day) =>
+                    day.timeline.any((entry) => entry.id == widget.entryId),
+              )
+              .firstOrNull;
+          if (sourceDay == null) {
+            throw Exception('Entry is not present in the current itinerary');
+          }
+          final sourceIndex = sourceDay.timeline.indexWhere(
+            (entry) => entry.id == widget.entryId,
+          );
+          final targetEntries = days
+              .where((day) => day.id == targetDayId)
+              .firstOrNull
+              ?.timeline;
+          if (targetEntries == null) {
+            throw Exception('Target day is not present in the itinerary');
+          }
+          final plan = planEntryReorder(
+            {for (final day in days) day.id: day.timeline},
+            sourceDayId: sourceDay.id,
+            sourceIndex: sourceIndex,
             targetDayId: targetDayId,
+            targetIndex: targetEntries.length,
+            idOf: (entry) => entry.id,
+          );
+          await repo.reorderEntries(
+            tripId: widget.tripId,
+            updates: plan.updates,
           );
       }
-      ref.invalidate(tripDaysProvider(widget.tripId));
       if (!mounted) return;
+      ref.invalidate(tripDaysProvider(widget.tripId));
       context.go('/trips/${Uri.encodeComponent(widget.tripId)}');
     } on Exception {
       if (!mounted) return;

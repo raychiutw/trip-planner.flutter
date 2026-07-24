@@ -34,6 +34,8 @@ class ConnectedAppsScreen extends ConsumerStatefulWidget {
 class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   String? _busyClientId;
   String? _mutationError;
+  ConnectedApp? _failedApp;
+  final Set<String> _revokedClientIds = {};
   int _aiAuthorizationRevision = 0;
 
   @override
@@ -52,57 +54,70 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
         error: (error, stackTrace) => _ConnectedAppsLoadError(
           onRetry: () => ref.invalidate(connectedAppsProvider),
         ),
-        data: (apps) => RefreshIndicator.adaptive(
-          onRefresh: _refreshAll,
-          child: ListView(
-            padding: const EdgeInsets.all(TpSpacing.s4),
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              AiAuthorizeCard(
-                key: ValueKey(_aiAuthorizationRevision),
-                onAuthorized: () => ref.invalidate(connectedAppsProvider),
-              ),
-              const SizedBox(height: TpSpacing.s4),
-              if (_mutationError != null) ...[
-                _InlineErrorPanel(
-                  message: _mutationError!,
-                  onRetry: () => ref.invalidate(connectedAppsProvider),
+        data: (apps) {
+          final visibleApps = apps
+              .where((app) => !_revokedClientIds.contains(app.clientId))
+              .toList();
+          return RefreshIndicator.adaptive(
+            onRefresh: _refreshAll,
+            child: ListView(
+              padding: const EdgeInsets.all(TpSpacing.s4),
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                AiAuthorizeCard(
+                  key: ValueKey(_aiAuthorizationRevision),
+                  onAuthorized: () {
+                    setState(_revokedClientIds.clear);
+                    ref.invalidate(connectedAppsProvider);
+                  },
                 ),
                 const SizedBox(height: TpSpacing.s4),
-              ],
-              if (apps.isEmpty)
-                const _EmptyConnectedAppsState()
-              else
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < apps.length; index++) ...[
-                        _ConnectedAppTile(
-                          app: apps[index],
-                          isBusy: _busyClientId == apps[index].clientId,
-                          onRevoke: () =>
-                              unawaited(_confirmRevoke(apps[index])),
-                        ),
-                        if (index != apps.length - 1)
-                          Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                      ],
-                    ],
+                if (_mutationError != null) ...[
+                  _InlineErrorPanel(
+                    message: _mutationError!,
+                    onRetry: _failedApp == null
+                        ? () => ref.invalidate(connectedAppsProvider)
+                        : () => unawaited(_confirmRevoke(_failedApp!)),
                   ),
-                ),
-            ],
-          ),
-        ),
+                  const SizedBox(height: TpSpacing.s4),
+                ],
+                if (visibleApps.isEmpty)
+                  const _EmptyConnectedAppsState()
+                else
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        for (final (index, app) in visibleApps.indexed) ...[
+                          _ConnectedAppTile(
+                            app: app,
+                            isBusy: _busyClientId == app.clientId,
+                            onRevoke: () => unawaited(_confirmRevoke(app)),
+                          ),
+                          if (index != visibleApps.length - 1)
+                            Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
   Future<void> _refreshAll() async {
-    setState(() => _aiAuthorizationRevision++);
+    setState(() {
+      _aiAuthorizationRevision++;
+    });
     ref.invalidate(connectedAppsProvider);
     try {
       await ref.read(connectedAppsProvider.future);
@@ -115,7 +130,8 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     final shouldRevoke = await showAppConfirm(
       context,
       title: '撤銷 ${app.appName}？',
-      message: '撤銷後，這個應用程式將無法再使用你的 Tripline 帳號存取資料。',
+      message:
+          '這會立即撤銷 ${app.appName} 的存取權與既有授權，應用程式將無法再讀取你的 Tripline 資料。這項操作無法復原；之後必須重新授權。',
       confirmLabel: '撤銷',
       isDestructive: true,
     );
@@ -124,17 +140,22 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
     setState(() {
       _busyClientId = app.clientId;
       _mutationError = null;
+      _failedApp = null;
     });
     try {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
-      setState(() => _aiAuthorizationRevision++);
+      setState(() {
+        _revokedClientIds.add(app.clientId);
+        _aiAuthorizationRevision++;
+      });
       ref.invalidate(connectedAppsProvider);
       showAppNotice(context, '已撤銷 ${app.appName}');
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _mutationError = _errorMessage(error);
+        _failedApp = app;
       });
     } finally {
       if (mounted) {
@@ -200,6 +221,7 @@ class _ConnectedAppTile extends StatelessWidget {
       trailing: TextButton(
         key: Key('connected-app-revoke-${app.clientId}'),
         style: TextButton.styleFrom(
+          minimumSize: const Size(TpSpacing.tapMin, TpSpacing.tapMin),
           foregroundColor: theme.colorScheme.error,
           shape: const StadiumBorder(),
         ),
@@ -238,26 +260,29 @@ class _InlineErrorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      color: colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_circle,
-              color: colorScheme.onErrorContainer,
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onErrorContainer),
+    return Semantics(
+      liveRegion: true,
+      child: Card(
+        color: colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_circle,
+                color: colorScheme.onErrorContainer,
               ),
-            ),
-            TextButton(onPressed: onRetry, child: const Text('重試')),
-          ],
+              const SizedBox(width: TpSpacing.s3),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(color: colorScheme.onErrorContainer),
+                ),
+              ),
+              TextButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
         ),
       ),
     );

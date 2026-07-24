@@ -4,11 +4,20 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-24
+
 ### 變更
 
+- 行程清單搜尋支援鍵盤 Search、清除與跨 root tab／詳情往返狀態保留；時間軸 Day selector 補齊左右方向鍵、完整 VoiceOver 語意、窄螢幕置中與僅點選換日。行程與行程日刪除統一為不可復原流程，伺服器成功前鎖定並保留內容，失敗時提供持續重試；缺少日期改以「新增」而非「加回」表達。
+- Account 採用有 section header 與 inset separator 的系統設定列；compact width 維持近滿版 Navigation Stack sheet，一般寬度改用置中 form sheet。外觀預設跟隨系統，個人資料支援正確焦點與 Dynamic Type；通知只在使用者啟用項目時說明用途並請求系統權限，並在回到 App 時同步系統狀態，拒絕後不重複提示。刪除帳號會列出影響、要求重新驗證，且僅在伺服器成功後清除本機帳號資料；純 OAuth 帳號在尚無 fresh-auth 契約時會安全阻擋 App 內刪除並導向身分核對說明。
+- 收藏刪除改為不可復原：卡片、左滑、選單與批次入口都先顯示具名確認，伺服器成功後才移除；失敗時保留資料與選取並提供重試。Flutter restore API、Undo、feature flag 與 staging release verifier 已移除。
+- 註冊、信箱驗證、密碼重設與 OAuth 改用 inline Header 與防重複提交；邀請與公開分享補齊在地日期／時間、Dynamic Type、鍵盤操作與 screen reader 狀態，並維持既有登入方式、不加入 Apple ID 登入。
+- 聊天輸入列新增附件／行程項目入口、1–4 行文字輸入、空白時麥克風與有文字時送出切換，並支援 Command–Return 送出；首次語音輸入會先說明用途，權限不可用時提供前往系統設定的恢復動線。
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。
 - Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。
+- Root navigation 依可用寬度在 compact bottom tabs 與 regular top tabs 間切換；一般寬度的行程 detail 加入共用狀態的清單 split view，resize 會保留目前 branch、選取與輸入內容。
+- 地圖改用「全部／Day」水平 selector；行程 POI 卡與 marker 雙向聚焦，無 POI 時隱藏底部配件，外部 POI 關閉後會還原原 Day、卡片與 marker 選取，定位受限時提供清楚的設定入口。
 
 ## [0.9.6] - 2026-07-23
 
@@ -327,7 +336,8 @@ P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽
 - 專案 CLAUDE.md(agent 開發指南)
 - PORTING_PLAN/CONTRACTS 與實作同步(riverpod 3.x、歷史契約標註)
 
-[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.6...v0.10.0
 [0.9.6]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.3...v0.9.4

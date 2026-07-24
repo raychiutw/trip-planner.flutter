@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +16,6 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/ui/tp_glass_expansion_section.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -77,11 +78,32 @@ TripNotes _sampleNotes() {
   );
 }
 
+const _sortableFlightNotes = TripNotes(
+  flights: [
+    TripFlight(
+      id: 1,
+      sortOrder: 0,
+      version: 1,
+      airline: '長榮航空',
+      flightNo: 'BR112',
+    ),
+    TripFlight(
+      id: 6,
+      sortOrder: 1,
+      version: 1,
+      airline: '中華航空',
+      flightNo: 'CI120',
+    ),
+  ],
+);
+
 Widget _buildScreen(
   TripNotes notes, {
   _MockTripRepository? repo,
   _MockRequestsRepository? requestsRepo,
   Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
+  ThemeData? theme,
+  TextScaler? textScaler,
 }) {
   final router = GoRouter(
     routes: [
@@ -100,6 +122,7 @@ Widget _buildScreen(
     ],
   );
   return ProviderScope(
+    retry: (retryCount, error) => null,
     overrides: [
       tripNotesProvider.overrideWith(
         notesBuilder ?? (ref, tripId) => Stream.value(notes),
@@ -108,7 +131,16 @@ Widget _buildScreen(
       if (requestsRepo != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepo),
     ],
-    child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: theme ?? AppTheme.light(),
+      builder: textScaler == null
+          ? null
+          : (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              child: child!,
+            ),
+      routerConfig: router,
+    ),
   );
 }
 
@@ -130,7 +162,20 @@ void main() {
     expect(find.text('預訂'), findsOneWidget);
     expect(find.text('行前須知'), findsOneWidget);
     expect(find.text('緊急聯絡'), findsOneWidget);
-    expect(find.byType(TpGlassExpansionSection), findsNWidgets(5));
+    expect(find.byKey(const ValueKey('notes-section-flights')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notes-section-lodgings')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notes-section-reservations')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('notes-section-pretrip')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notes-section-emergency')),
+      findsOneWidget,
+    );
 
     const expectedCounts = {
       'flights': '1',
@@ -149,6 +194,77 @@ void main() {
         reason: 'section $sectionSuffix 的 count badge 應為 $count',
       );
     });
+  });
+
+  testWidgets('regular width 置中限制筆記內容寬度', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_buildScreen(_sampleNotes()));
+    await tester.pumpAndSettle();
+
+    final content = tester.getRect(
+      find.byKey(const ValueKey('trip-notes-content')),
+    );
+    expect(content.width, 920);
+    expect(content.center.dx, 600);
+  });
+
+  testWidgets('compact dark 與最大 Dynamic Type 保留內容及 44pt Account', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        theme: AppTheme.dark(),
+        textScaler: const TextScaler.linear(2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('notes-section-flights')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
+      const Size(44, 44),
+    );
+  });
+
+  testWidgets('載入失敗持續顯示且可重試', (tester) async {
+    var attempts = 0;
+    final firstAttempt = StreamController<TripNotes>();
+    addTearDown(firstAttempt.close);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        notesBuilder: (ref, tripId) {
+          attempts += 1;
+          return attempts == 1
+              ? firstAttempt.stream
+              : Stream.value(_sampleNotes());
+        },
+      ),
+    );
+    await tester.pump();
+    firstAttempt.addError(Exception('offline'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-notes-error')), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-notes-list')), findsOneWidget);
+    expect(attempts, 2);
   });
 
   testWidgets('從筆記 scope 可回到行程', (tester) async {
@@ -283,7 +399,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -310,6 +429,69 @@ void main() {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('note-drag-flights-1')), findsOneWidget);
+  });
+
+  testWidgets('VoiceOver 排序動作與拖曳共用 reorderNotes mutation', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderNotes(
+        any(),
+        tripId: any(named: 'tripId'),
+        items: any(named: 'items'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(_buildScreen(_sortableFlightNotes, repo: repo));
+    await tester.pumpAndSettle();
+
+    final semantics = tester.widget<Semantics>(
+      find.byKey(const ValueKey('note-drag-flights-6')),
+    );
+    final actions = semantics.properties.customSemanticsActions!;
+    expect(actions.keys.map((action) => action.label), ['上移']);
+    actions.values.single();
+    await tester.pumpAndSettle();
+
+    final items =
+        verify(
+              () => repo.reorderNotes(
+                NoteSection.flights,
+                tripId: 'trip-1',
+                items: captureAny(named: 'items'),
+              ),
+            ).captured.single
+            as List<({int id, int sortOrder})>;
+    expect(items, [(id: 6, sortOrder: 0), (id: 1, sortOrder: 1)]);
+  });
+
+  testWidgets('Full Keyboard Access 方向鍵與拖曳共用 reorderNotes mutation', (
+    tester,
+  ) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.reorderNotes(
+        any(),
+        tripId: any(named: 'tripId'),
+        items: any(named: 'items'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(_buildScreen(_sortableFlightNotes, repo: repo));
+    await tester.pumpAndSettle();
+
+    final handle = find.byKey(const ValueKey('note-drag-flights-6'));
+    Focus.of(tester.element(handle)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.reorderNotes(
+        NoteSection.flights,
+        tripId: 'trip-1',
+        items: any(named: 'items'),
+      ),
+    ).called(1);
   });
 
   testWidgets('展開行前須知後可觸發一般 AI 生成並顯示 pending 狀態', (tester) async {

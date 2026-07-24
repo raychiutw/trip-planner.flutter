@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -161,6 +163,10 @@ void main() {
 
     final link = find.byKey(const ValueKey('poi-reservation-link-502'));
     expect(link, findsOneWidget);
+    expect(
+      tester.getSize(link).shortestSide,
+      greaterThanOrEqualTo(TpSpacing.tapMin),
+    );
 
     await tester.tap(link);
     await tester.pump();
@@ -199,7 +205,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '設為正選'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '設為正選'));
     await tester.pumpAndSettle();
 
     verify(
@@ -250,7 +256,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(
@@ -268,7 +274,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
     await tester.pumpAndSettle();
 
     verifyNever(
@@ -279,6 +285,82 @@ void main() {
         entryPoisVersion: any(named: 'entryPoisVersion'),
       ),
     );
+  });
+
+  testWidgets('備選刪除 pending 顯示進度、鎖定返回且不重複送出', (tester) async {
+    final repo = _MockTripRepository();
+    final pending = Completer<void>();
+    when(
+      () => repo.removeEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) => pending.future);
+    await _pump(tester, repo);
+
+    await _openAlternateDelete(tester, 502);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    verify(
+      () => repo.removeEntryAlternate(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    ).called(1);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
+    verifyNoMoreInteractions(repo);
+
+    pending.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('備選刪除失敗保留資料與持續錯誤，重試不需重新確認', (tester) async {
+    final repo = _MockTripRepository();
+    var attempts = 0;
+    when(
+      () => repo.removeEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw Exception('offline');
+    });
+    await _pump(tester, repo);
+
+    await _openAlternateDelete(tester, 502);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('玉陵'), findsOneWidget);
+    expect(find.text('刪除失敗，原資料已保留'), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 2);
+    verify(
+      () => repo.removeEntryAlternate(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 502,
+        entryPoisVersion: '4',
+      ),
+    ).called(2);
+    expect(find.text('刪除失敗，原資料已保留'), findsNothing);
   });
 
   testWidgets('操作未回來就離開地點管理 → 不得因 use-after-dispose 崩潰', (tester) async {
@@ -298,7 +380,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
 
     // 回應抵達前離開頁面。
@@ -352,6 +434,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('poi-note')), '記得拍照');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('poi-save')));
     await tester.pumpAndSettle();
 
@@ -365,6 +448,114 @@ void main() {
         reservation: any(named: 'reservation'),
       ),
     ).called(1);
+  });
+
+  testWidgets('編輯資訊使用 form sheet，pending 鎖定且失敗保留全部輸入', (tester) async {
+    final repo = _MockTripRepository();
+    final firstAttempt = Completer<void>();
+    var attempts = 0;
+    when(
+      () => repo.updateEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        reservation: any(named: 'reservation'),
+      ),
+    ).thenAnswer((_) {
+      attempts++;
+      return attempts == 1 ? firstAttempt.future : Future.value();
+    });
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯地點資訊'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    await tester.enterText(find.byKey(const ValueKey('poi-note')), '記得拍照');
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-reservation')),
+      'https://example.com/book',
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-save')));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('poi-info-progress')), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('poi-note'))).enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('poi-reservation')))
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('poi-cancel')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    firstAttempt.completeError(Exception('offline'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('編輯地點資訊'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('poi-note')))
+          .controller!
+          .text,
+      '記得拍照',
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('poi-reservation')))
+          .controller!
+          .text,
+      'https://example.com/book',
+    );
+    expect(find.byKey(const ValueKey('poi-info-error')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('poi-save')));
+    await tester.pumpAndSettle();
+    expect(attempts, 2);
+    expect(find.text('編輯地點資訊'), findsNothing);
+  });
+
+  testWidgets('編輯資訊改後還原時 Save disabled，取消可直接關閉', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('poi-note')), '暫存內容');
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('poi-note')), '世界遺產');
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('poi-save')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('poi-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯地點資訊'), findsNothing);
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
   });
 
   testWidgets('加入備選 → 搜尋選結果 → addEntryAlternate', (tester) async {
@@ -440,6 +631,113 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('加入備選 pending 鎖定重複提交，失敗保留搜尋與選取供重試', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    final firstAttempt = Completer<void>();
+    var attempts = 0;
+    when(
+      () => repo.addEntryAlternate(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poi: any(named: 'poi'),
+        entryPoisVersion: any(named: 'entryPoisVersion'),
+      ),
+    ).thenAnswer((_) {
+      attempts++;
+      return attempts == 1 ? firstAttempt.future : Future.value();
+    });
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [PoiSearchResult(placeId: 'p9', name: '通堂拉麵')],
+    );
+    await _pump(tester, repo, poiRepo: poiRepo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('alt-search-field')),
+      '拉麵',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('alt-result-p9')));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('poi-picker-submit-progress')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<ListTile>(find.byKey(const ValueKey('alt-result-p9')))
+          .onTap,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('app-selection-cancel')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<Semantics>(
+            find
+                .ancestor(
+                  of: find.byKey(const ValueKey('poi-picker-submit-progress')),
+                  matching: find.byType(Semantics),
+                )
+                .first,
+          )
+          .properties
+          .liveRegion,
+      isTrue,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('選擇地點'), findsOneWidget);
+    expect(attempts, 1);
+
+    firstAttempt.completeError(Exception('offline'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('選擇地點'), findsOneWidget);
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const ValueKey('alt-search-field')),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text,
+      '拉麵',
+    );
+    expect(find.byKey(const ValueKey('alt-result-p9')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('poi-picker-submit-error')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('alt-result-p9')));
+    await tester.pumpAndSettle();
+    expect(attempts, 2);
+    expect(find.text('選擇地點'), findsNothing);
   });
 
   testWidgets('加入備選 → 收藏選結果 → addEntryAlternate(poiId)', (tester) async {
@@ -519,6 +817,41 @@ void main() {
     expect(customPoi.name, '秘密觀景台');
     expect(customPoi.lat, 26.2);
     expect(customPoi.lng, 127.6);
+  });
+
+  testWidgets('自訂地點已修改時取消會先確認捨棄', (tester) async {
+    final repo = _MockTripRepository();
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const ValueKey('add-alternate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-picker-tab-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-picker-custom-name')),
+      '尚未儲存的地點',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('app-selection-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('離開後，本次修改不會保留。'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('取消'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('選擇地點'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-selection-cancel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('捨棄'));
+    await tester.pumpAndSettle();
+    expect(find.text('選擇地點'), findsNothing);
   });
 
   testWidgets('置換正選 → 搜尋選結果 → changeEntryPoi', (tester) async {

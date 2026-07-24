@@ -1,12 +1,17 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/features/shell/app_shell.dart';
+import 'package:tripline/features/trips/current_trip_provider.dart';
+import 'package:tripline/features/trips/trips_list_screen.dart';
+import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
@@ -121,8 +126,430 @@ GoRouter buildStateShellRouter() {
   );
 }
 
+GoRouter buildSplitShellRouter() {
+  StatefulShellBranch probe(String path, String marker) => StatefulShellBranch(
+    routes: [GoRoute(path: path, builder: (_, _) => Text(marker))],
+  );
+  return GoRouter(
+    initialLocation: '/trips/trip-1',
+    routes: [
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          probe('/chat', 'PROBE-CHAT'),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/trips',
+                builder: (_, _) => const Text('TRIPS-ROOT'),
+                routes: [
+                  GoRoute(
+                    path: ':tripId',
+                    builder: (_, state) => AdaptiveTripDetail(
+                      selectedTripId: state.pathParameters['tripId']!,
+                      child: const _AdaptiveDetailStateProbe(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          probe('/map', 'PROBE-MAP'),
+          probe('/favorites', 'PROBE-FAV'),
+        ],
+      ),
+    ],
+  );
+}
+
 void main() {
   group('AppShell 4-tab 導航', () {
+    testWidgets('iOS／Android 尺寸矩陣依可用寬度選擇導覽', (tester) async {
+      final cases = [
+        (
+          name: 'iPhone 直向',
+          size: const Size(390, 844),
+          platform: TargetPlatform.iOS,
+          regular: false,
+        ),
+        (
+          name: 'iPhone 橫向',
+          size: const Size(844, 390),
+          platform: TargetPlatform.iOS,
+          regular: true,
+        ),
+        (
+          name: 'iPad',
+          size: const Size(1024, 768),
+          platform: TargetPlatform.iOS,
+          regular: true,
+        ),
+        (
+          name: 'iPad Split View',
+          size: const Size(600, 820),
+          platform: TargetPlatform.iOS,
+          regular: false,
+        ),
+        (
+          name: 'Android 手機',
+          size: const Size(412, 915),
+          platform: TargetPlatform.android,
+          regular: false,
+        ),
+        (
+          name: 'Android 平板',
+          size: const Size(1280, 800),
+          platform: TargetPlatform.android,
+          regular: true,
+        ),
+      ];
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final testCase in cases) {
+        tester.view.physicalSize = testCase.size;
+        final router = buildShellRouter();
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp.router(
+              theme: AppTheme.light().copyWith(platform: testCase.platform),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('apple-regular-root-tabs')),
+          testCase.regular ? findsOneWidget : findsNothing,
+          reason: testCase.name,
+        );
+        expect(
+          find.byType(NavigationRail),
+          findsNothing,
+          reason: testCase.name,
+        );
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        router.dispose();
+      }
+    });
+
+    testWidgets('依可用寬度切換 compact bottom tabs 與 regular top tabs', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildShellRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('apple-regular-root-tabs')),
+        findsNothing,
+      );
+
+      tester.view.physicalSize = const Size(1024, 768);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('apple-regular-root-tabs')),
+        findsOneWidget,
+      );
+      expect(find.byType(NavigationRail), findsNothing);
+      for (final label in ['聊天', '行程', '地圖', '收藏']) {
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+      }
+    });
+
+    testWidgets('regular top tabs 支援外接鍵盤焦點與啟用', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildShellRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('regular-root-tab-地圖')),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
+
+      final tripsButton = tester.widget<TextButton>(
+        find.byKey(const ValueKey('regular-root-tab-行程')),
+      );
+      tripsButton.focusNode!.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('PROBE-TRIPS'), findsOneWidget);
+    });
+
+    testWidgets('regular top tabs 避開頂部 safe area', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 44);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+      final router = buildShellRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      expect(tester.getTopLeft(bar).dy, greaterThanOrEqualTo(44));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('compact／regular resize 保留 branch 與未送出內容', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildReselectShellRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('root-draft-field')),
+        '跨尺寸保留',
+      );
+
+      tester.view.physicalSize = const Size(1024, 768);
+      await tester.pumpAndSettle();
+      expect(find.text('跨尺寸保留'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('apple-regular-root-tabs')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.bySemanticsLabel('地圖'));
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
+
+      tester.view.physicalSize = const Size(600, 820);
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('apple-regular-root-tabs')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
+    });
+
+    testWidgets('regular width 行程 detail 使用保留選取的 split view', (tester) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildSplitShellRouter();
+      addTearDown(router.dispose);
+      final trips = [
+        TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩旅行'),
+        TripSummary(tripId: 'trip-2', name: 'tokyo', title: '東京旅行'),
+        for (var index = 3; index <= 24; index++)
+          TripSummary(
+            tripId: 'trip-$index',
+            name: 'trip-$index',
+            title: '行程 $index',
+          ),
+      ];
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('trip-regular-split-view')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('trip-detail-probe')), findsOneWidget);
+      final selected = tester.getSemantics(
+        find.byKey(const ValueKey('trip-sidebar-item-trip-1')),
+      );
+      expect(
+        selected.getSemanticsData().flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('trip-sidebar-item-trip-2')));
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/trips/trip-2');
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(AdaptiveTripDetail)),
+      );
+      expect(container.read(currentTripIdProvider).value, 'trip-2');
+      final sidebarList = find.byKey(
+        const PageStorageKey('trip-regular-sidebar-list'),
+      );
+      await tester.drag(sidebarList, const Offset(0, -300));
+      await tester.pump();
+      final sidebarScrollBeforeResize = tester
+          .state<ScrollableState>(
+            find
+                .descendant(of: sidebarList, matching: find.byType(Scrollable))
+                .first,
+          )
+          .position
+          .pixels;
+      expect(sidebarScrollBeforeResize, greaterThan(0));
+      await tester.enterText(
+        find.byKey(const ValueKey('trip-detail-draft')),
+        '保留 detail 狀態',
+      );
+      await tester.tap(find.byKey(const ValueKey('trip-detail-next-day')));
+      await tester.drag(
+        find.byKey(const ValueKey('trip-detail-scroll')),
+        const Offset(0, -300),
+      );
+      await tester.pump();
+      final scrollBeforeResize = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('trip-detail-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position
+          .pixels;
+      expect(scrollBeforeResize, greaterThan(0));
+
+      tester.view.physicalSize = const Size(600, 820);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('trip-regular-split-view')),
+        findsNothing,
+      );
+      expect(router.state.uri.path, '/trips/trip-2');
+      expect(find.text('保留 detail 狀態'), findsOneWidget);
+      expect(find.text('DAY 2'), findsOneWidget);
+      final scrollAfterResize = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('trip-detail-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position
+          .pixels;
+      expect(scrollAfterResize, closeTo(scrollBeforeResize, 0.1));
+
+      tester.view.physicalSize = const Size(1024, 768);
+      await tester.pumpAndSettle();
+      final restoredSidebarScrollable = tester.state<ScrollableState>(
+        find
+            .descendant(of: sidebarList, matching: find.byType(Scrollable))
+            .first,
+      );
+      expect(
+        restoredSidebarScrollable.position.pixels,
+        closeTo(sidebarScrollBeforeResize, 0.1),
+      );
+      restoredSidebarScrollable.position.jumpTo(0);
+      await tester.pump();
+      final restoredSelected = tester.getSemantics(
+        find.byKey(const ValueKey('trip-sidebar-item-trip-2')),
+      );
+      expect(
+        restoredSelected.getSemanticsData().flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+      expect(container.read(currentTripIdProvider).value, 'trip-2');
+      semantics.dispose();
+    });
+
+    testWidgets('resize 保留深層 branch stack，系統返回仍回上一層', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = buildReselectShellRouter();
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      router.go('/trips/detail');
+      await tester.pumpAndSettle();
+      expect(find.text('TRIPS-DETAIL'), findsOneWidget);
+
+      tester.view.physicalSize = const Size(1024, 768);
+      await tester.pumpAndSettle();
+      expect(router.state.uri.path, '/trips/detail');
+      expect(find.text('TRIPS-DETAIL'), findsOneWidget);
+
+      tester.view.physicalSize = const Size(600, 820);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(router.state.uri.path, '/trips');
+      expect(find.text('TRIPS-ROOT'), findsOneWidget);
+    });
+
     testWidgets('4 個 tab,點擊切換到對應 branch', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -179,9 +606,9 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         glass.indicatorColor,
-        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsDark.tint.withValues(alpha: 0.68),
       );
-      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
+      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
     });
 
     testWidgets('root branches keep content visible through Liquid Glass', (
@@ -229,10 +656,42 @@ void main() {
         map.indicatorSettings?.refractiveIndex,
         map.settings?.refractiveIndex,
       );
-      expect(TpColorsLight.rootTabSelection, TpColorsLight.dayThumb);
+      expect(
+        map.indicatorColor,
+        TpSystemColorsLight.tint.withValues(alpha: 0.68),
+      );
+    });
+
+    testWidgets('Reduce Transparency 使用不透明且無模糊的 root tab 選取底色', (tester) async {
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: true,
+          child: ProviderScope(
+            child: MaterialApp.router(
+              theme: AppTheme.light(),
+              routerConfig: buildShellRouter(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(GlassTabBar),
+        ),
+      );
+      expect(glass.indicatorSettings?.blur, 0);
+      expect(glass.indicatorSettings?.glassColor.a, 1);
+      expect(glass.indicatorColor?.a, 1);
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -456,6 +915,10 @@ void main() {
     });
 
     testWidgets('root tab 使用套件原生 16/64/32 Liquid Glass 幾何', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -481,7 +944,7 @@ void main() {
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         glass.indicatorColor,
-        TpColorsLight.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsLight.tint.withValues(alpha: 0.68),
       );
       expect(glass.settings?.chromaticAberration, 0);
       expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
@@ -504,9 +967,9 @@ void main() {
       );
       expect(
         glass.indicatorColor,
-        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsDark.tint.withValues(alpha: 0.68),
       );
-      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
+      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
       expect(glass.settings?.chromaticAberration, 0);
     });
 
@@ -526,4 +989,48 @@ class _ReselectRootProbe extends StatelessWidget {
       SliverToBoxAdapter(child: SizedBox(height: 1200)),
     ],
   );
+}
+
+class _AdaptiveDetailStateProbe extends StatefulWidget {
+  const _AdaptiveDetailStateProbe();
+
+  @override
+  State<_AdaptiveDetailStateProbe> createState() =>
+      _AdaptiveDetailStateProbeState();
+}
+
+class _AdaptiveDetailStateProbeState extends State<_AdaptiveDetailStateProbe> {
+  final _scrollController = ScrollController();
+  var _day = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text('TRIPS-DETAIL', key: ValueKey('trip-detail-probe')),
+        Text('DAY $_day'),
+        TextButton(
+          key: const ValueKey('trip-detail-next-day'),
+          onPressed: () => setState(() => _day++),
+          child: const Text('下一天'),
+        ),
+        const TextField(key: ValueKey('trip-detail-draft')),
+        Expanded(
+          child: ListView.builder(
+            key: const ValueKey('trip-detail-scroll'),
+            controller: _scrollController,
+            itemCount: 40,
+            itemBuilder: (_, index) =>
+                SizedBox(height: 44, child: Text('ENTRY $index')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 }

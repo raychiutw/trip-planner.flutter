@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
@@ -19,6 +20,8 @@ import 'package:tripline/models/trip_doc.dart';
 import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/user.dart';
+
+class _MockApiClient extends Mock implements ApiClient {}
 
 void main() {
   late Dio dio;
@@ -460,6 +463,30 @@ void main() {
     expect(days.single.timeline, isEmpty);
   });
 
+  test('fetchDaySummaries 可明確關閉 cache fallback 取得 server truth', () async {
+    final client = _MockApiClient();
+    when(
+      () => client.get(
+        '/trips/okinawa-trip-2026-Ray/days',
+        fallbackToCache: false,
+      ),
+    ).thenAnswer((_) async => <dynamic>[]);
+    final repository = TripRepository(client: client);
+
+    final days = await repository.fetchDaySummaries(
+      'okinawa-trip-2026-Ray',
+      fallbackToCache: false,
+    );
+
+    expect(days, isEmpty);
+    verify(
+      () => client.get(
+        '/trips/okinawa-trip-2026-Ray/days',
+        fallbackToCache: false,
+      ),
+    ).called(1);
+  });
+
   test('fetchDay：GET /trips/:id/days/:num 解析完整單日', () async {
     dioAdapter.onGet(
       '/trips/okinawa-trip-2026-Ray/days/1',
@@ -760,42 +787,10 @@ void main() {
     expect(rows.single.diff?['title'], {'old': 'A', 'new': 'B'});
   });
 
-  test('rollbackAudit：POST /trips/:id/audit/:aid/rollback 回 result', () async {
-    dioAdapter.onPost(
-      '/trips/okinawa/audit/99/rollback',
-      (server) =>
-          server.reply(200, {'ok': true, 'rolled_back': 'update->revert'}),
-    );
-
-    final result = await tripRepository.rollbackAudit(
-      tripId: 'okinawa',
-      auditId: 99,
-    );
-
-    expect(result.ok, isTrue);
-    expect(result.rolledBack, 'update->revert');
-  });
-
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 
     await expectLater(tripRepository.deleteTrip('old-trip'), completes);
-  });
-
-  test('fetchStats：GET /account/stats', () async {
-    dioAdapter.onGet(
-      '/account/stats',
-      (server) => server.reply(200, {
-        'tripCount': 2,
-        'totalDays': 10,
-        'collaboratorCount': 1,
-      }),
-    );
-
-    final accountStats = await tripRepository.fetchStats();
-
-    expect(accountStats.tripCount, 2);
-    expect(accountStats.totalDays, 10);
   });
 
   test('updateProfile：PATCH /account/profile 回 UserInfo', () async {
@@ -2183,7 +2178,7 @@ void main() {
       );
     });
 
-    test('deleteEntry 離線 → 入佇列(entry.delete)+ days 快取移除', () async {
+    test('deleteEntry 離線 → 不排入佇列且保留 days 快取', () async {
       await cache.writeResponse(daysKey, [
         {
           'dayNum': 1,
@@ -2203,12 +2198,15 @@ void main() {
         ),
       );
 
-      await repo.deleteEntry(tripId: 'okinawa', entryId: 77);
+      await expectLater(
+        repo.deleteEntry(tripId: 'okinawa', entryId: 77),
+        throwsA(isA<DioException>()),
+      );
 
       final q = await cache.readQueue();
-      expect(q.single.type, 'entry.delete');
+      expect(q, isEmpty);
       final days = (await cache.readResponse(daysKey))!.data as List;
-      expect((days.first as Map)['timeline'] as List, isEmpty);
+      expect((days.first as Map)['timeline'] as List, hasLength(1));
     });
 
     test('createNote(pretrip)離線 → 入佇列 + patch 對到 pretripNotes 段', () async {

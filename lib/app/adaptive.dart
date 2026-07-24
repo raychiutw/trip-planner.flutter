@@ -1,19 +1,20 @@
-/// 平台自適應 UI helper。
+/// 全平台共用 Apple HIG 產品語意的 UI helper。
 ///
-/// iOS/macOS 走 Cupertino 慣例、其餘平台走 Material。
-/// 用 `Theme.of(context).platform`(而非 defaultTargetPlatform),
-/// 方便測試以 `ThemeData(platform: ...)` override。
+/// 僅系統整合與平台原生能力可分流；日期、確認、動作選單、搜尋與通知
+/// 在所有平台維持同一套互動契約。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
 import '../ui/tp_action_item.dart';
 import '../ui/tp_app_bar.dart';
+import '../ui/tp_glass_surface.dart';
 
 /// 全 App 的鍵盤收合規則：點欄位外或拖曳任何 scroll view 都只移除焦點。
 /// [TextFieldTapRegion] 內的附屬控制仍由 Flutter 排除在 outside tap 之外。
@@ -47,19 +48,75 @@ class AppKeyboardDismissRegion extends StatelessWidget {
   }
 }
 
-/// iOS 使用底部 wheel，其他平台使用原生 Material time picker。
+/// 使用 HIG sheet 與 calendar；取消時不回寫，日期範圍外無法選取。
+Future<DateTime?> showAppDatePicker(
+  BuildContext context, {
+  required DateTime initialDate,
+  required DateTime firstDate,
+  required DateTime lastDate,
+}) {
+  var selected = initialDate;
+  return showCupertinoModalPopup<DateTime>(
+    context: context,
+    builder: (sheetContext) => Material(
+      color: Theme.of(sheetContext).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 410,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(selected),
+                      child: const Text('完成'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: CalendarDatePicker(
+                  initialDate: initialDate,
+                  firstDate: firstDate,
+                  lastDate: lastDate,
+                  onDateChanged: (value) => selected = value,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 以裝置 locale 顯示完整日期；資料層仍維持 date-only wire format。
+String formatAppFullDate(BuildContext context, DateTime date) =>
+    MaterialLocalizations.of(context).formatFullDate(date);
+
+/// 以裝置 locale 與 12/24 小時偏好顯示日期時間。
+String formatAppDateTime(BuildContext context, DateTime dateTime) =>
+    '${formatAppFullDate(context, dateTime)} '
+    '${TimeOfDay.fromDateTime(dateTime).format(context)}';
+
+/// 全平台使用符合 iOS HIG 的底部 time wheel，固定五分鐘間隔。
 Future<TimeOfDay?> showAppTimePicker(
   BuildContext context, {
   required TimeOfDay initialTime,
-}) {
-  final platform = Theme.of(context).platform;
-  final isApple =
-      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-  if (!isApple) {
-    return showTimePicker(context: context, initialTime: initialTime);
-  }
-
-  var selected = initialTime;
+}) async {
+  final pickerInitialTime = TimeOfDay(
+    hour: initialTime.hour,
+    minute: initialTime.minute - initialTime.minute % 5,
+  );
+  var selected = pickerInitialTime;
   return showCupertinoModalPopup<TimeOfDay>(
     context: context,
     builder: (sheetContext) => Material(
@@ -89,13 +146,14 @@ Future<TimeOfDay?> showAppTimePicker(
               Expanded(
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.time,
-                  use24hFormat: true,
+                  minuteInterval: 5,
+                  use24hFormat: MediaQuery.alwaysUse24HourFormatOf(context),
                   initialDateTime: DateTime(
                     2000,
                     1,
                     1,
-                    initialTime.hour,
-                    initialTime.minute,
+                    pickerInitialTime.hour,
+                    pickerInitialTime.minute,
                   ),
                   onDateTimeChanged: (value) => selected = TimeOfDay(
                     hour: value.hour,
@@ -111,11 +169,7 @@ Future<TimeOfDay?> showAppTimePicker(
   );
 }
 
-/// 顯示自適應「確認 / 取消」對話框,回傳使用者是否確認。
-///
-/// - iOS/macOS → [CupertinoAlertDialog];破壞性操作([isDestructive])用紅字
-///   destructive action。
-/// - 其餘平台 → Material [AlertDialog];破壞性操作用 error 色 [FilledButton]。
+/// 顯示 HIG「確認 / 取消」對話框,回傳使用者是否確認。
 ///
 /// 使用者關閉(點外部/返回)視同取消,回傳 `false`。
 Future<bool> showAppConfirm(
@@ -126,51 +180,20 @@ Future<bool> showAppConfirm(
   String cancelLabel = '取消',
   bool isDestructive = false,
 }) async {
-  final platform = Theme.of(context).platform;
-  final isApple =
-      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-  if (isApple) {
-    final result = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: message == null ? null : Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(cancelLabel),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: isDestructive,
-            isDefaultAction: !isDestructive,
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
-  final scheme = Theme.of(context).colorScheme;
-  final result = await showDialog<bool>(
+  final result = await showCupertinoDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
+    builder: (dialogContext) => CupertinoAlertDialog(
       title: Text(title),
       content: message == null ? null : Text(message),
       actions: [
-        TextButton(
+        CupertinoDialogAction(
+          isDefaultAction: isDestructive,
           onPressed: () => Navigator.of(dialogContext).pop(false),
           child: Text(cancelLabel),
         ),
-        FilledButton(
-          style: isDestructive
-              ? FilledButton.styleFrom(
-                  backgroundColor: scheme.error,
-                  foregroundColor: scheme.onError,
-                )
-              : null,
+        CupertinoDialogAction(
+          isDestructiveAction: isDestructive,
+          isDefaultAction: !isDestructive,
           onPressed: () => Navigator.of(dialogContext).pop(true),
           child: Text(confirmLabel),
         ),
@@ -180,10 +203,32 @@ Future<bool> showAppConfirm(
   return result ?? false;
 }
 
-/// 顯示自適應動作選單,回傳使用者選擇的動作值(取消回傳 `null`)。
-///
-/// - iOS/macOS → [CupertinoActionSheet](底部彈出、破壞性紅字、獨立取消鈕)。
-/// - 其餘平台 → 附 drag handle 的 Material bottom sheet(ListTile 清單)。
+/// 顯示只有單一確認動作的 HIG 提示對話框。
+Future<void> showAppAlert(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String actionLabel = '好',
+  Key? key,
+}) {
+  return showCupertinoDialog<void>(
+    context: context,
+    builder: (dialogContext) => CupertinoAlertDialog(
+      key: key,
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text(actionLabel),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 顯示 HIG 動作選單,回傳使用者選擇的動作值(取消回傳 `null`)。
 Future<T?> showAppActionSheet<T>(
   BuildContext context, {
   String? title,
@@ -191,89 +236,47 @@ Future<T?> showAppActionSheet<T>(
   required List<TpActionItem<T>> actions,
   String cancelLabel = '取消',
 }) {
-  final platform = Theme.of(context).platform;
-  final isApple =
-      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-  if (isApple) {
-    return showCupertinoModalPopup<T>(
-      context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: title == null ? null : Text(title),
-        message: message == null ? null : Text(message),
-        actions: [
-          for (final action in actions)
-            if (action.enabled)
-              CupertinoActionSheetAction(
-                isDestructiveAction: action.role == TpActionRole.destructive,
-                onPressed: () => Navigator.of(sheetContext).pop(action.value),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (action.selected) ...[
-                      const Icon(CupertinoIcons.check_mark, size: 18),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(action.label),
-                  ],
-                ),
-              )
-            else
-              Semantics(
-                button: true,
-                enabled: false,
-                label: action.label,
-                child: ExcludeSemantics(
-                  child: CupertinoActionSheetAction(
-                    onPressed: () {},
-                    child: Opacity(opacity: 0.45, child: Text(action.label)),
-                  ),
-                ),
-              ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: Text(cancelLabel),
-        ),
-      ),
-    );
-  }
-
-  return showModalBottomSheet<T>(
+  return showCupertinoModalPopup<T>(
     context: context,
-    showDragHandle: true,
-    builder: (sheetContext) {
-      final error = Theme.of(sheetContext).colorScheme.error;
-      return SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          children: [
-            for (final action in actions) ...[
-              if (action.dividerBefore) const Divider(height: 1),
-              ListTile(
-                key: action.key,
-                enabled: action.enabled,
-                leading: Icon(
-                  action.selected ? CupertinoIcons.check_mark : action.icon,
-                  color: action.role == TpActionRole.destructive ? error : null,
-                ),
-                title: Text(
-                  action.label,
-                  style: action.role == TpActionRole.destructive
-                      ? TextStyle(color: error, fontWeight: FontWeight.w600)
-                      : null,
-                ),
-                onTap: action.enabled
-                    ? () => Navigator.of(sheetContext).pop(action.value)
-                    : null,
+    builder: (sheetContext) => CupertinoActionSheet(
+      title: title == null ? null : Text(title),
+      message: message == null ? null : Text(message),
+      actions: [
+        for (final action in actions)
+          if (action.enabled)
+            CupertinoActionSheetAction(
+              isDestructiveAction: action.role == TpActionRole.destructive,
+              onPressed: () => Navigator.of(sheetContext).pop(action.value),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (action.selected) ...[
+                    const Icon(CupertinoIcons.check_mark, size: 18),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(action.label),
+                ],
               ),
-            ],
-          ],
-        ),
-      );
-    },
+            )
+          else
+            Semantics(
+              button: true,
+              enabled: false,
+              label: action.label,
+              child: ExcludeSemantics(
+                child: CupertinoActionSheetAction(
+                  onPressed: () {},
+                  child: Opacity(opacity: 0.45, child: Text(action.label)),
+                ),
+              ),
+            ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        onPressed: () => Navigator.of(sheetContext).pop(),
+        child: Text(cancelLabel),
+      ),
+    ),
   );
 }
 
@@ -412,9 +415,11 @@ typedef _AppSheetBuilder<T> =
     );
 
 LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return LiquidGlassSettings(
-    glassColor: isDark ? const Color(0xB3121214) : const Color(0xC7FFFBF5),
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final surface = theme.colorScheme.surface;
+  final settings = LiquidGlassSettings(
+    glassColor: surface.withValues(alpha: isDark ? 0.70 : 0.78),
     thickness: isDark ? 28 : 24,
     blur: 24,
     chromaticAberration: isDark ? 0.003 : 0.004,
@@ -422,10 +427,9 @@ LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
     ambientStrength: isDark ? 0.08 : 0.14,
     refractiveIndex: 1.10,
     saturation: isDark ? 1.04 : 1.06,
-    platformViewFallbackColor: isDark
-        ? const Color(0xF21C1C1E)
-        : const Color(0xF2FFFBF5),
+    platformViewFallbackColor: surface.withValues(alpha: 0.95),
   );
+  return tpResolveGlassSettings(context, settings);
 }
 
 Future<T?> _showAppSheet<T>({
@@ -506,8 +510,8 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 保留同一個 child widget identity，避免外觀切換重建 dialog page 時把
-    // sheet 內部 Navigator 的子頁（例如「外觀」）退回帳號首頁。
+    // 保留同一個 child widget identity，避免系統外觀變更時重建 dialog page
+    // 而把 sheet 內部 Navigator 的子頁退回帳號首頁。
     _sheet ??= widget.builder(context, _requestClose);
   }
 
@@ -537,9 +541,8 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
 
   @override
   Widget build(BuildContext context) {
-    // 必須在 build 內依賴 Theme；外觀切換後 sheet 材質與內容才會同一幀更新。
+    // 必須在 build 內依賴 Theme；系統外觀變更後 sheet 材質與內容才會同幀更新。
     final settings = _appLargeSheetSettings(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopScope<T>(
       canPop: _isClosing,
       onPopInvokedWithResult: (didPop, result) {
@@ -554,9 +557,7 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         fullSize: widget.largeSize,
         settings: settings,
         halfSettings: settings,
-        expandedColor: isDark
-            ? const Color(0xFF1C1C1E)
-            : const Color(0xFFFFFBF5),
+        expandedColor: Theme.of(context).colorScheme.surface,
         quality: GlassQuality.standard,
         // 定版近滿版 sheet 是「實色內容畫布＋玻璃控制元件」；只在進場時
         // 保留玻璃過渡，固定於 93% detent 後即使用完整 canvas 色，避免
@@ -586,6 +587,8 @@ Future<T?> showAppSelectionSheet<T>(
   BuildContext context, {
   required String title,
   required Widget Function(BuildContext, ValueChanged<T>) builder,
+  ValueListenable<bool>? dismissalLocked,
+  ValueListenable<bool>? hasUnsavedChanges,
 }) {
   return _showAppSheet<T>(
     context: context,
@@ -593,16 +596,41 @@ Future<T?> showAppSelectionSheet<T>(
     mediumSize: 0.93,
     largeSize: 0.93,
     resizable: false,
+    canDismiss: dismissalLocked == null && hasUnsavedChanges == null
+        ? null
+        : () async {
+            if (dismissalLocked?.value ?? false) return false;
+            if (!(hasUnsavedChanges?.value ?? false)) return true;
+            return showAppConfirm(
+              context,
+              title: '捨棄未儲存的變更？',
+              message: '離開後，本次修改不會保留。',
+              confirmLabel: '捨棄',
+              isDestructive: true,
+            );
+          },
     builder: (sheetContext, close) => Material(
       color: Colors.transparent,
       child: Column(
         children: [
           TpSheetHeader(
             title: title,
-            leading: TpToolbarTextButton(
-              label: '取消',
-              onPressed: () => unawaited(close()),
-            ),
+            leading: dismissalLocked == null
+                ? TpToolbarTextButton(
+                    key: const ValueKey('app-selection-cancel'),
+                    label: '取消',
+                    onPressed: () => unawaited(close()),
+                  )
+                : AnimatedBuilder(
+                    animation: dismissalLocked,
+                    builder: (_, _) => TpToolbarTextButton(
+                      key: const ValueKey('app-selection-cancel'),
+                      label: '取消',
+                      onPressed: dismissalLocked.value
+                          ? null
+                          : () => unawaited(close()),
+                    ),
+                  ),
           ),
           Expanded(
             child: builder(sheetContext, (value) => unawaited(close(value))),
@@ -617,8 +645,23 @@ Future<T?> showAppContentSheet<T>(
   BuildContext context, {
   required String title,
   required WidgetBuilder builder,
+  bool dismissible = true,
 }) {
   final sheetNavigatorKey = GlobalKey<NavigatorState>();
+  final size = MediaQuery.sizeOf(context);
+  if (size.width >= 720 && size.height >= 700) {
+    return showDialog<T>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => _RegularAppContentSheet<T>(
+        title: title,
+        contentBuilder: builder,
+        navigatorKey: sheetNavigatorKey,
+        dismissible: dismissible,
+      ),
+    );
+  }
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
@@ -627,16 +670,88 @@ Future<T?> showAppContentSheet<T>(
     resizable: false,
     onSystemBack: () async {
       final navigator = sheetNavigatorKey.currentState;
-      if (navigator == null) return false;
-      return navigator.maybePop();
+      if (navigator != null && await navigator.maybePop()) return true;
+      return !dismissible;
     },
     builder: (sheetContext, close) => _AppContentSheet<T>(
       title: title,
       contentBuilder: builder,
       onClose: close,
       navigatorKey: sheetNavigatorKey,
+      dismissible: dismissible,
     ),
   );
+}
+
+class _RegularAppContentSheet<T> extends StatefulWidget {
+  const _RegularAppContentSheet({
+    required this.title,
+    required this.contentBuilder,
+    required this.navigatorKey,
+    required this.dismissible,
+  });
+
+  final String title;
+  final WidgetBuilder contentBuilder;
+  final GlobalKey<NavigatorState> navigatorKey;
+  final bool dismissible;
+
+  @override
+  State<_RegularAppContentSheet<T>> createState() =>
+      _RegularAppContentSheetState<T>();
+}
+
+class _RegularAppContentSheetState<T>
+    extends State<_RegularAppContentSheet<T>> {
+  bool _closing = false;
+  bool _handlingBack = false;
+
+  Future<void> _close([T? result]) async {
+    if (_closing) return;
+    setState(() => _closing = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(result);
+  }
+
+  Future<void> _handleBack([T? result]) async {
+    if (_closing || _handlingBack) return;
+    _handlingBack = true;
+    final handled = await widget.navigatorKey.currentState?.maybePop() ?? false;
+    _handlingBack = false;
+    if (!mounted || handled || !widget.dismissible) return;
+    await _close(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope<T>(
+      canPop: _closing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handleBack(result));
+      },
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(TpSpacing.s4),
+        clipBehavior: Clip.antiAlias,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+          child: SizedBox(
+            key: const ValueKey('app-regular-content-sheet'),
+            width: 560,
+            height: 720,
+            child: _AppContentSheet<T>(
+              title: widget.title,
+              contentBuilder: widget.contentBuilder,
+              onClose: _close,
+              navigatorKey: widget.navigatorKey,
+              dismissible: widget.dismissible,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<T?> showAppScreenSheet<T>(
@@ -734,12 +849,14 @@ class _AppContentSheet<T> extends StatelessWidget {
     required this.contentBuilder,
     required this.onClose,
     required this.navigatorKey,
+    required this.dismissible,
   });
 
   final String title;
   final WidgetBuilder contentBuilder;
   final Future<void> Function([T? result]) onClose;
   final GlobalKey<NavigatorState> navigatorKey;
+  final bool dismissible;
 
   @override
   Widget build(BuildContext context) {
@@ -771,7 +888,9 @@ class _AppContentSheet<T> extends StatelessWidget {
                               tooltip: MaterialLocalizations.of(
                                 pageContext,
                               ).closeButtonTooltip,
-                              onPressed: () => unawaited(onClose()),
+                              onPressed: dismissible
+                                  ? () => unawaited(onClose())
+                                  : null,
                               child: const Icon(CupertinoIcons.xmark, size: 19),
                             ),
                           ),
@@ -831,11 +950,8 @@ class _AppScreenSheet<T> extends StatelessWidget {
 
 /// 平台自適應搜尋輸入列。
 ///
-/// - iOS/macOS → [CupertinoSearchTextField](灰底圓角、內建放大鏡與清除鈕)。
-/// - 其餘平台 → Material [TextField](放大鏡 prefix;有字時顯示清除鈕)。
-///
 /// [fieldKey] 直接掛在底層欄位上,widget test 以 `find.byKey` + `enterText` 操作
-/// 兩種平台皆通。
+/// 各平台皆通。
 class AppSearchField extends StatefulWidget {
   const AppSearchField({
     super.key,
@@ -869,26 +985,9 @@ class _AppSearchFieldState extends State<AppSearchField> {
   Timer? _debounceTimer;
 
   @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
-  }
-
-  @override
   void dispose() {
     _debounceTimer?.cancel();
-    widget.controller.removeListener(_onTextChanged);
     super.dispose();
-  }
-
-  /// 僅為 Material branch「有字才顯示清除鈕」重繪;iOS 自帶清除鈕。
-  void _onTextChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _clear() {
-    widget.controller.clear();
-    _changed('');
   }
 
   void _changed(String value) {
@@ -908,66 +1007,21 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    final platform = Theme.of(context).platform;
-    final isApple =
-        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-    if (isApple) {
-      return CupertinoSearchTextField(
-        key: widget.fieldKey,
-        controller: widget.controller,
-        placeholder: widget.placeholder,
-        onChanged: _changed,
-        onSubmitted: _submitted,
-        autofocus: widget.autofocus,
-        enabled: widget.enabled,
-        backgroundColor: widget.embedded ? Colors.transparent : null,
-      );
-    }
-
-    return TextField(
+    return CupertinoSearchTextField(
       key: widget.fieldKey,
       controller: widget.controller,
-      autofocus: widget.autofocus,
-      enabled: widget.enabled,
-      textInputAction: TextInputAction.search,
+      placeholder: widget.placeholder,
       onChanged: _changed,
       onSubmitted: _submitted,
-      decoration: InputDecoration(
-        hintText: widget.placeholder,
-        isDense: true,
-        prefixIcon: const Icon(CupertinoIcons.search),
-        suffixIcon: widget.controller.text.isEmpty
-            ? null
-            : IconButton(
-                icon: const Icon(CupertinoIcons.clear),
-                onPressed: _clear,
-              ),
-        border: widget.embedded ? InputBorder.none : const OutlineInputBorder(),
-      ),
+      autofocus: widget.autofocus,
+      enabled: widget.enabled,
+      backgroundColor: widget.embedded ? Colors.transparent : null,
     );
   }
 }
 
-/// 顯示短暫通知(取代 Material SnackBar 的跨平台一致 API)。
-///
-/// - iOS/macOS → 頂部滑入橫幅(安全區內、約 2.5 秒自動滑出消失),更貼近 iOS
-///   系統通知,而非 Android 底部 SnackBar。
-/// - 其餘平台 → Material [SnackBar]。
+/// 顯示頂部滑入橫幅（安全區內、約 2.5 秒後消失）。
 void showAppNotice(BuildContext context, String message) {
-  final platform = Theme.of(context).platform;
-  final isApple =
-      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-  if (!isApple) {
-    // 先清掉排隊中/顯示中的 SnackBar,讓最新訊息立即取代(避免 ScaffoldMessenger
-    // 佇列造成後續訊息被延後顯示)。
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
-    return;
-  }
-
   final overlay = Overlay.of(context, rootOverlay: true);
   late OverlayEntry entry;
   var removed = false;
@@ -984,35 +1038,7 @@ void showAppNotice(BuildContext context, String message) {
   overlay.insert(entry);
 }
 
-/// 顯示可復原的單一動作通知。
-///
-/// Undo 必須在使用者仍可看到原畫面時立即操作，因此所有平台都使用固定在
-/// Root tab 上方的浮動 SnackBar，而不使用無 action 的 iOS 頂部橫幅。
-void showAppUndoNotice(
-  BuildContext context, {
-  required String message,
-  required VoidCallback onUndo,
-}) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..clearSnackBars()
-    ..showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          0,
-          TpSpacing.s4,
-          TpRootTabGeometry.clearance(context) + TpSpacing.s2,
-        ),
-        duration: const Duration(seconds: 6),
-        content: Text(message),
-        action: SnackBarAction(label: '復原', onPressed: onUndo),
-      ),
-    );
-}
-
-/// iOS 頂部通知橫幅:下一幀滑入、停留約 2.5 秒後滑出,結束時呼叫 [onDismissed]。
+/// 頂部通知橫幅:下一幀滑入、停留約 2.5 秒後滑出,結束時呼叫 [onDismissed]。
 class _TopNoticeBanner extends StatefulWidget {
   const _TopNoticeBanner({required this.message, required this.onDismissed});
 
@@ -1058,34 +1084,42 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
       top: 0,
       left: 0,
       right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s3),
-          child: AnimatedSlide(
-            duration: slideDuration,
-            curve: TpMotion.appleEase,
-            offset: _visible ? Offset.zero : const Offset(0, -1.6),
-            onEnd: _handleAnimationEnd,
-            child: AnimatedOpacity(
-              duration: fadeDuration,
-              opacity: _visible ? 1 : 0,
-              child: Material(
-                color: theme.colorScheme.inverseSurface,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(TpRadius.lg),
-                ),
-                elevation: 6,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TpSpacing.s4,
-                    vertical: TpSpacing.s3,
-                  ),
-                  child: Text(
-                    widget.message,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onInverseSurface,
+      child: IgnorePointer(
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.all(TpSpacing.s3),
+            child: AnimatedSlide(
+              duration: slideDuration,
+              curve: TpMotion.appleEase,
+              offset: _visible ? Offset.zero : const Offset(0, -1.6),
+              onEnd: _handleAnimationEnd,
+              child: AnimatedOpacity(
+                duration: fadeDuration,
+                opacity: _visible ? 1 : 0,
+                child: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  label: widget.message,
+                  excludeSemantics: true,
+                  child: Material(
+                    color: theme.colorScheme.inverseSurface,
+                    borderRadius: const BorderRadius.all(
+                      Radius.circular(TpRadius.lg),
+                    ),
+                    elevation: 6,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TpSpacing.s4,
+                        vertical: TpSpacing.s3,
+                      ),
+                      child: Text(
+                        widget.message,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onInverseSurface,
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -13,10 +13,9 @@
                         <viewControllerLayoutGuide type="top" id="Ydg-fD-yQy"/>
                         <viewControllerLayoutGuide type="bottom" id="xbc-2k-c8Z"/>
                     </layoutGuides>
-                    <!-- 刻意只有一片畫布色,沒有 logo:HIG 要求 launch screen「近似 app 的
-                         第一個畫面」,並明言別把它當品牌展示。色值對齊 TpColors*.background
-                         (light #FFFBF5 / dark #121214),隨系統深淺色調適 —— 先前寫死白色,
-                         深色模式啟動會閃一下白。 -->
+                    <!-- 刻意只有一片系統背景色,沒有 logo:HIG 要求 launch screen「近似 app 的
+                         第一個畫面」,並明言別把它當品牌展示。LaunchBackground 隨系統深淺色
+                         切換 white / black，避免啟動時使用品牌裝飾色。 -->
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" name="LaunchBackground"/>
@@ -29,7 +28,7 @@
     </scenes>
     <resources>
         <namedColor name="LaunchBackground">
-            <color red="1" green="0.98431372549019602" blue="0.96078431372549022" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

@@ -132,7 +132,11 @@ TripMapMarker _marker(String id) => TripMapMarker(
   id: id,
   point: const TripMapPoint(25.033, 121.565),
   color: Colors.blue,
-  style: tripMapMarkerStyle(dayColor: Colors.blue, isFocused: false),
+  style: tripMapMarkerStyle(
+    dayColor: Colors.blue,
+    focusColor: Colors.brown,
+    isFocused: false,
+  ),
   glyph: '1',
 );
 

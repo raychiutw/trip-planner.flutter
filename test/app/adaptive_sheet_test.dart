@@ -1,10 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('large sheet uses the opaque Reduce Transparency fallback', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AppAccessibilityScope(
+        reduceTransparency: true,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showAppContentSheet<void>(
+                context,
+                title: '帳號',
+                builder: (_) => const Text('帳號內容'),
+              ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final settings = tester
+        .widget<GlassModalSheetScaffold>(find.byType(GlassModalSheetScaffold))
+        .settings!;
+    expect(settings.glassColor.a, 1);
+    expect(settings.backerColor?.a, 1);
+    expect(settings.platformViewFallbackColor?.a, 1);
+    expect(settings.blur, 0);
+    expect(settings.thickness, 0);
+    expect(settings.refractiveIndex, 1);
+  });
+
   testWidgets('共用鍵盤區域可點外部或拖曳收合，且保留草稿', (tester) async {
     final controller = TextEditingController();
     final focusNode = FocusNode();
@@ -97,7 +133,10 @@ void main() {
     expect(sheet.showDragIndicator, isFalse);
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('東京五日行'))).colorScheme.surface,
+    );
 
     await tester.tap(find.text('東京五日行'));
     await tester.pumpAndSettle();
@@ -134,7 +173,10 @@ void main() {
     expect(sheet.showDragIndicator, isFalse);
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
+    );
   });
 
   testWidgets('fixed content sheet uses a neutral opaque dark canvas', (
@@ -164,7 +206,10 @@ void main() {
     );
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFF1C1C1E));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
+    );
   });
 
   testWidgets('system Back returns from a nested content-sheet page first', (
@@ -204,6 +249,58 @@ void main() {
     expect(find.text('外觀設定'), findsNothing);
     expect(find.text('帳號'), findsOneWidget);
     expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
+  });
+
+  testWidgets('regular content sheet Close 不會繞過子頁未儲存保護', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = AppUnsavedChangesController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (sheetContext) => FilledButton(
+                onPressed: () => Navigator.of(sheetContext).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AppUnsavedChangesGuard(
+                      controller: controller,
+                      hasChanges: true,
+                      child: const Scaffold(
+                        appBar: TpAppBar(
+                          role: TpAppBarRole.detail,
+                          title: Text('編輯個人資料'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('編輯'),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('編輯'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('編輯個人資料'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('app-regular-content-sheet')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('dirty form asks before Cancel and stays open when kept', (

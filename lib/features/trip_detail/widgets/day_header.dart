@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../models/day.dart';
 import '../../../models/segment.dart';
-import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 
 /// 計算當日時間範圍字串「HH：MM - HH：MM」（D1 定版）。
@@ -54,7 +53,6 @@ class DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final timeRange = dayTimeRange(day);
     final stopCount = day.timeline.length;
     final totalM = dayTotalDistanceM(day, segments);
@@ -75,7 +73,7 @@ class DayHeader extends StatelessWidget {
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
-                color: tones.accent,
+                color: theme.colorScheme.primary,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),

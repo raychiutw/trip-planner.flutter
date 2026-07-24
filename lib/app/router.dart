@@ -133,7 +133,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/account/appearance',
-        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
+        redirect: (context, state) => accountSheetAlias(state, 'root'),
       ),
       GoRoute(
         path: '/account/sessions',
@@ -150,7 +150,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/settings/appearance',
-        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
+        redirect: (context, state) => accountSheetAlias(state, 'root'),
       ),
       GoRoute(
         path: '/settings/profile',
@@ -326,7 +326,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
-          showRootTab: _isRootTabLocation(state.uri.path),
+          showRootTab: _isShellContentLocation(state.uri.path),
           accountPage: state.uri.queryParameters['account'],
           accountReturnLocation: _withoutAccount(state.uri),
         ),
@@ -352,10 +352,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':tripId',
-                    builder: (context, state) => TripTimelineScreen(
-                      tripId: state.pathParameters['tripId']!,
-                      initialEntryId: _entryFocusFromQuery(state.uri),
-                      initialDayNum: _dayFocusFromQuery(state.uri),
+                    builder: (context, state) => AdaptiveTripDetail(
+                      selectedTripId: state.pathParameters['tripId']!,
+                      child: TripTimelineScreen(
+                        tripId: state.pathParameters['tripId']!,
+                        initialEntryId: _entryFocusFromQuery(state.uri),
+                        initialDayNum: _dayFocusFromQuery(state.uri),
+                      ),
                     ),
                     routes: [
                       GoRoute(
@@ -638,17 +641,6 @@ bool _isPublicShellOutsideRoute(GoRouterState state) {
   if (_publicShellOutsideRoutes.contains(state.matchedLocation)) return true;
   final pathSegments = state.uri.pathSegments;
   return pathSegments.length == 2 && pathSegments.first == 's';
-}
-
-bool _isRootTabLocation(String path) {
-  if (path == '/chat' ||
-      path == '/trips' ||
-      path == '/map' ||
-      path == '/favorites') {
-    return true;
-  }
-  final segments = Uri.parse(path).pathSegments;
-  return segments.length == 2 && segments.first == 'trips';
 }
 
 bool _isShellContentLocation(String path) =>
