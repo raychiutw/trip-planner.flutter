@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -47,19 +48,88 @@ class AppKeyboardDismissRegion extends StatelessWidget {
   }
 }
 
-/// iOS 使用底部 wheel，其他平台使用原生 Material time picker。
-Future<TimeOfDay?> showAppTimePicker(
+/// 使用平台原生日期選擇器；取消時不回寫，日期範圍外無法選取。
+Future<DateTime?> showAppDatePicker(
   BuildContext context, {
-  required TimeOfDay initialTime,
+  required DateTime initialDate,
+  required DateTime firstDate,
+  required DateTime lastDate,
 }) {
   final platform = Theme.of(context).platform;
   final isApple =
       platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
   if (!isApple) {
-    return showTimePicker(context: context, initialTime: initialTime);
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
   }
 
-  var selected = initialTime;
+  var selected = initialDate;
+  return showCupertinoModalPopup<DateTime>(
+    context: context,
+    builder: (sheetContext) => Material(
+      color: Theme.of(sheetContext).colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 360,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(selected),
+                      child: const Text('完成'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: initialDate,
+                  minimumDate: firstDate,
+                  maximumDate: lastDate,
+                  onDateTimeChanged: (value) => selected = value,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 以裝置 locale 顯示完整日期；資料層仍維持 date-only wire format。
+String formatAppFullDate(BuildContext context, DateTime date) =>
+    MaterialLocalizations.of(context).formatFullDate(date);
+
+/// 以裝置 locale 與 12/24 小時偏好顯示日期時間。
+String formatAppDateTime(BuildContext context, DateTime dateTime) =>
+    '${formatAppFullDate(context, dateTime)} '
+    '${TimeOfDay.fromDateTime(dateTime).format(context)}';
+
+/// 全平台使用符合 iOS HIG 的底部 time wheel，固定五分鐘間隔。
+Future<TimeOfDay?> showAppTimePicker(
+  BuildContext context, {
+  required TimeOfDay initialTime,
+}) async {
+  final pickerInitialTime = TimeOfDay(
+    hour: initialTime.hour,
+    minute: initialTime.minute - initialTime.minute % 5,
+  );
+  var selected = pickerInitialTime;
   return showCupertinoModalPopup<TimeOfDay>(
     context: context,
     builder: (sheetContext) => Material(
@@ -89,13 +159,14 @@ Future<TimeOfDay?> showAppTimePicker(
               Expanded(
                 child: CupertinoDatePicker(
                   mode: CupertinoDatePickerMode.time,
-                  use24hFormat: true,
+                  minuteInterval: 5,
+                  use24hFormat: MediaQuery.alwaysUse24HourFormatOf(context),
                   initialDateTime: DateTime(
                     2000,
                     1,
                     1,
-                    initialTime.hour,
-                    initialTime.minute,
+                    pickerInitialTime.hour,
+                    pickerInitialTime.minute,
                   ),
                   onDateTimeChanged: (value) => selected = TimeOfDay(
                     hour: value.hour,
@@ -589,6 +660,8 @@ Future<T?> showAppSelectionSheet<T>(
   BuildContext context, {
   required String title,
   required Widget Function(BuildContext, ValueChanged<T>) builder,
+  ValueListenable<bool>? dismissalLocked,
+  ValueListenable<bool>? hasUnsavedChanges,
 }) {
   return _showAppSheet<T>(
     context: context,
@@ -596,16 +669,41 @@ Future<T?> showAppSelectionSheet<T>(
     mediumSize: 0.93,
     largeSize: 0.93,
     resizable: false,
+    canDismiss: dismissalLocked == null && hasUnsavedChanges == null
+        ? null
+        : () async {
+            if (dismissalLocked?.value ?? false) return false;
+            if (!(hasUnsavedChanges?.value ?? false)) return true;
+            return showAppConfirm(
+              context,
+              title: '捨棄未儲存的變更？',
+              message: '離開後，本次修改不會保留。',
+              confirmLabel: '捨棄',
+              isDestructive: true,
+            );
+          },
     builder: (sheetContext, close) => Material(
       color: Colors.transparent,
       child: Column(
         children: [
           TpSheetHeader(
             title: title,
-            leading: TpToolbarTextButton(
-              label: '取消',
-              onPressed: () => unawaited(close()),
-            ),
+            leading: dismissalLocked == null
+                ? TpToolbarTextButton(
+                    key: const ValueKey('app-selection-cancel'),
+                    label: '取消',
+                    onPressed: () => unawaited(close()),
+                  )
+                : AnimatedBuilder(
+                    animation: dismissalLocked,
+                    builder: (_, _) => TpToolbarTextButton(
+                      key: const ValueKey('app-selection-cancel'),
+                      label: '取消',
+                      onPressed: dismissalLocked.value
+                          ? null
+                          : () => unawaited(close()),
+                    ),
+                  ),
           ),
           Expanded(
             child: builder(sheetContext, (value) => unawaited(close(value))),

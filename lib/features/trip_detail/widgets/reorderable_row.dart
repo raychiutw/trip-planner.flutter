@@ -1,6 +1,8 @@
 /// trip_detail 共用的可拖曳排序 row 元件（timeline entry 與 notes 共用）。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,16 +28,50 @@ Future<void> confirmAndDelete(
     isDestructive: true,
   );
   if (!ok) return;
-  try {
-    await delete();
-    onSuccess();
-    HapticFeedback.mediumImpact();
+
+  Future<void> runDelete() async {
     if (!context.mounted) return;
-    showAppNotice(context, '已刪除');
-  } on Exception {
-    if (!context.mounted) return;
-    showAppError(context, '刪除失敗，請稍後再試');
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const PopScope(
+          canPop: false,
+          child: AlertDialog(
+            key: ValueKey('delete-progress'),
+            content: Row(
+              children: [
+                SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: TpSpacing.s3),
+                Expanded(child: Text('正在刪除…')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    try {
+      await delete();
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      onSuccess();
+      HapticFeedback.mediumImpact();
+      showAppNotice(context, '已刪除');
+    } on Exception {
+      if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      showAppError(
+        context,
+        '刪除失敗，原資料已保留',
+        onRetry: () => unawaited(runDelete()),
+      );
+    }
   }
+
+  await runDelete();
 }
 
 /// 拖曳排序 handle（須置於 ReorderableListView 內；按住即可拖動）。

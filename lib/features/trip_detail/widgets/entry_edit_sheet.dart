@@ -731,19 +731,12 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             Wrap(
               spacing: TpSpacing.s2,
               runSpacing: TpSpacing.s2,
-              children: [_timeField(true), _timeField(false)],
+              crossAxisAlignment: WrapCrossAlignment.start,
+              children: [
+                _timeField(true),
+                _timeField(false, errorText: timeValid ? null : '結束時間需晚於開始時間'),
+              ],
             ),
-            if (!timeValid)
-              Padding(
-                padding: const EdgeInsets.only(top: TpSpacing.s2),
-                child: Text(
-                  '結束時間需晚於開始時間',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
             const SizedBox(height: TpSpacing.s3),
             TextField(
               key: const ValueKey('entry-edit-desc'),
@@ -792,32 +785,57 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     );
   }
 
-  Widget _timeField(bool isStart) {
+  Widget _timeField(bool isStart, {String? errorText}) {
     final t = isStart ? _start : _end;
-    return InputChip(
-      key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
-      avatar: const Icon(CupertinoIcons.clock, size: 18),
-      label: Text('${isStart ? '開始' : '結束'} ${_fmt(t) ?? '未設定'}'),
-      onPressed: _submitting ? null : () => _pick(isStart),
-      deleteIcon: t == null
-          ? null
-          : Icon(
-              CupertinoIcons.xmark_circle_fill,
-              key: ValueKey(
-                isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
-              ),
-              size: 18,
+    final displayTime = t?.format(context) ?? '未設定';
+    return Column(
+      key: ValueKey(
+        isStart ? 'entry-edit-start-group' : 'entry-edit-end-group',
+      ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InputChip(
+          key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
+          avatar: const Icon(CupertinoIcons.clock, size: 18),
+          label: Text('${isStart ? '開始' : '結束'} $displayTime'),
+          tooltip: '${isStart ? '開始時間' : '結束時間'} $displayTime',
+          onPressed: _submitting ? null : () => _pick(isStart),
+          deleteIcon: t == null
+              ? null
+              : Icon(
+                  CupertinoIcons.xmark_circle_fill,
+                  key: ValueKey(
+                    isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
+                  ),
+                  size: 18,
+                ),
+          onDeleted: t == null || _submitting
+              ? null
+              : () {
+                  if (isStart) {
+                    _start = null;
+                  } else {
+                    _end = null;
+                  }
+                  _markTimeChanged(isStart);
+                },
+        ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(
+              start: TpSpacing.s2,
+              top: TpSpacing.s1,
             ),
-      onDeleted: t == null || _submitting
-          ? null
-          : () {
-              if (isStart) {
-                _start = null;
-              } else {
-                _end = null;
-              }
-              _markTimeChanged(isStart);
-            },
+            child: Text(
+              errorText,
+              key: const ValueKey('entry-edit-end-error'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 11,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

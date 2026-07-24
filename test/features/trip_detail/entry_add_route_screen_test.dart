@@ -543,6 +543,103 @@ void main() {
     expect(find.text('trip trip-1'), findsOneWidget);
   });
 
+  testWidgets('多選部分失敗只保留未送出項目，重試不重複新增已成功項目', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    final submittedTitles = <String>[];
+    var marketShouldFail = true;
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        PoiSearchResult(
+          placeId: 'p1',
+          name: '美麗海水族館',
+          address: '沖繩縣國頭郡本部町',
+          lat: 26.694,
+          lng: 127.878,
+          category: 'aquarium',
+        ),
+        PoiSearchResult(
+          placeId: 'p2',
+          name: '牧志市場',
+          address: '沖繩縣那霸市松尾',
+          lat: 26.215,
+          lng: 127.687,
+          category: 'restaurant',
+        ),
+      ],
+    );
+    _stubResolvePlace(poiRepo);
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        description: any(named: 'description'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((invocation) async {
+      final title = invocation.namedArguments[#title]! as String;
+      submittedTitles.add(title);
+      if (title == '牧志市場' && marketShouldFail) {
+        marketShouldFail = false;
+        throw Exception('offline');
+      }
+    });
+    await tester.pumpWidget(
+      _buildScreen(repo, poiRepo: poiRepo, initialMode: EntryAddMode.search),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '沖繩',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p2')));
+    await tester.pump();
+
+    final confirm = find.byKey(const ValueKey('entry-add-confirm'));
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+
+    expect(submittedTitles, ['美麗海水族館', '牧志市場']);
+    expect(find.text('已選 1 個'), findsOneWidget);
+    expect(find.text('加入行程失敗，請稍後再試'), findsOneWidget);
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const ValueKey('entry-add-search-field')),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text,
+      '沖繩',
+    );
+
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(submittedTitles, ['美麗海水族館', '牧志市場', '牧志市場']);
+    expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
   testWidgets('搜尋 POI 時會沿用初始地區', (tester) async {
     final repo = _MockTripRepository();
     final poiRepo = _MockPoiRepository();

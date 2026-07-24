@@ -618,12 +618,8 @@ class TripRepository {
 
   /// DELETE /trips/:id/entries/:eid（後端回 200 {ok:true},忽略 body）。
   Future<void> deleteEntry({required String tripId, required int entryId}) {
-    return _client.sendMutation(
-      'DELETE',
+    return _client.delete(
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId',
-      optimistic: OfflineOp('entry.delete', _daysKey(tripId), {
-        'entryId': entryId,
-      }),
     );
   }
 

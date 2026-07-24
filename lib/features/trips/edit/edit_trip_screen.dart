@@ -512,7 +512,10 @@ class _ShiftDateSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_dateRangeLabel(startDate, endDate), style: textTheme.bodyLarge),
+          Text(
+            _dateRangeLabel(context, startDate, endDate),
+            style: textTheme.bodyLarge,
+          ),
           const SizedBox(height: TpSpacing.s1),
           Text(
             '整體平移所有日程日期，停留點順序不變。',
@@ -541,69 +544,36 @@ class _ShiftDateSection extends StatelessWidget {
   }
 }
 
-Future<String?> _showShiftDateDialog(BuildContext context, String? startDate) =>
-    showDialog<String>(
-      context: context,
-      builder: (dialogContext) => _ShiftDateDialog(startDate: startDate),
-    );
-
-class _ShiftDateDialog extends StatefulWidget {
-  const _ShiftDateDialog({this.startDate});
-
-  final String? startDate;
-
-  @override
-  State<_ShiftDateDialog> createState() => _ShiftDateDialogState();
+Future<String?> _showShiftDateDialog(
+  BuildContext context,
+  String? startDate,
+) async {
+  final now = DateTime.now();
+  final selected = await showAppDatePicker(
+    context,
+    initialDate: _parseIsoDate(startDate) ?? now,
+    firstDate: DateTime(2000),
+    lastDate: DateTime(now.year + 10, 12, 31),
+  );
+  return selected == null ? null : _formatIsoDate(selected);
 }
 
-class _ShiftDateDialogState extends State<_ShiftDateDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.startDate ?? '');
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('平移出發日期'),
-      content: TextField(
-        key: const ValueKey('edit-shift-start-date'),
-        controller: _controller,
-        keyboardType: TextInputType.datetime,
-        decoration: const InputDecoration(
-          labelText: '新的 Day 1 日期',
-          hintText: 'YYYY-MM-DD',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('套用'),
-        ),
-      ],
-    );
-  }
-}
-
-String _dateRangeLabel(String? startDate, String? endDate) {
+String _dateRangeLabel(
+  BuildContext context,
+  String? startDate,
+  String? endDate,
+) {
   if (startDate == null || startDate.isEmpty) return '尚無日期資料';
+  final start = _parseIsoDate(startDate);
+  final startLabel = start == null
+      ? startDate
+      : formatAppFullDate(context, start);
   if (endDate == null || endDate.isEmpty || endDate == startDate) {
-    return startDate;
+    return startLabel;
   }
-  return '$startDate → $endDate';
+  final end = _parseIsoDate(endDate);
+  final endLabel = end == null ? endDate : formatAppFullDate(context, end);
+  return '$startLabel → $endLabel';
 }
 
 List<String> _missingDatesAfter(List<TripDay> days, int index) {

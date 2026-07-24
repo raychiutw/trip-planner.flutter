@@ -239,21 +239,36 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('2026-04-23 → 2026-04-27'), findsOneWidget);
+    final localizations = MaterialLocalizations.of(
+      tester.element(find.byKey(const ValueKey('edit-shift-days'))),
+    );
+    expect(
+      find.text(
+        '${localizations.formatFullDate(DateTime(2026, 4, 23))} → '
+        '${localizations.formatFullDate(DateTime(2026, 4, 27))}',
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('edit-shift-days')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('edit-shift-start-date')),
-      '2026-05-01',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, '套用'));
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1').last);
+    await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
     verify(
       () => tripRepo.shiftDays(tripId: 'okinawa', startDate: '2026-05-01'),
     ).called(1);
-    expect(find.text('2026-05-01 → 2026-05-05'), findsOneWidget);
+    expect(
+      find.text(
+        '${localizations.formatFullDate(DateTime(2026, 5, 1))} → '
+        '${localizations.formatFullDate(DateTime(2026, 5, 5))}',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('出發日期已變更'), findsOneWidget);
   });
 

@@ -117,11 +117,9 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
         : DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds;
   }
 
-  String get _customExpiryLabel {
+  String _customExpiryLabel(BuildContext context) {
     final date = _customExpiryDate;
-    return date == null
-        ? '選擇日期'
-        : '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}';
+    return date == null ? '選擇日期' : formatAppFullDate(context, date);
   }
 
   void _toggleSection(String key, bool selected) {
@@ -136,8 +134,8 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
   Future<void> _pickCustomExpiryDate() async {
     final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
+    final selected = await showAppDatePicker(
+      context,
       initialDate: _customExpiryDate ?? now,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(now.year + 5, 12, 31),
@@ -304,7 +302,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     key: const ValueKey('share-custom-expiry-date'),
                     onPressed: _pickCustomExpiryDate,
                     icon: const Icon(Icons.event_outlined, size: 18),
-                    label: Text(_customExpiryLabel),
+                    label: Text(_customExpiryLabel(context)),
                   ),
                 ],
                 CheckboxListTile(
@@ -444,8 +442,6 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     );
   }
 }
-
-String _pad2(int value) => value.toString().padLeft(2, '0');
 
 class _CreatedCard extends StatefulWidget {
   const _CreatedCard({
@@ -684,11 +680,9 @@ class _EditShareDialogState extends State<_EditShareDialog> {
   bool get _clearExpiresAt =>
       _expiryKey == 'never' && widget.share.expiresAt != null;
 
-  String get _customExpiryLabel {
+  String _customExpiryLabel(BuildContext context) {
     final date = _customExpiryDate;
-    return date == null
-        ? '選擇日期'
-        : '${date.year}-${_pad2(date.month)}-${_pad2(date.day)}';
+    return date == null ? '選擇日期' : formatAppFullDate(context, date);
   }
 
   void _toggleSection(String key, bool selected) {
@@ -703,8 +697,8 @@ class _EditShareDialogState extends State<_EditShareDialog> {
 
   Future<void> _pickCustomExpiryDate() async {
     final now = DateTime.now();
-    final selected = await showDatePicker(
-      context: context,
+    final selected = await showAppDatePicker(
+      context,
       initialDate: _customExpiryDate ?? now,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(now.year + 5, 12, 31),
@@ -777,7 +771,7 @@ class _EditShareDialogState extends State<_EditShareDialog> {
                 key: const ValueKey('share-edit-custom-expiry-date'),
                 onPressed: _pickCustomExpiryDate,
                 icon: const Icon(Icons.event_outlined, size: 18),
-                label: Text(_customExpiryLabel),
+                label: Text(_customExpiryLabel(context)),
               ),
             ],
             CheckboxListTile(

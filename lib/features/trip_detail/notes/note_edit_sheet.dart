@@ -143,15 +143,15 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
 
   Future<void> _pickDateTime(String key) async {
     final current = DateTime.tryParse(_dts[key] ?? '');
-    final date = await showDatePicker(
-      context: context,
+    final date = await showAppDatePicker(
+      context,
       initialDate: current ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
+    final time = await showAppTimePicker(
+      context,
       initialTime: current == null
           ? const TimeOfDay(hour: 9, minute: 0)
           : TimeOfDay(hour: current.hour, minute: current.minute),
@@ -328,6 +328,10 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
         );
       case NoteFieldType.datetime:
         final value = _dts[spec.key] ?? '';
+        final parsed = DateTime.tryParse(value);
+        final displayValue = parsed == null
+            ? (value.isEmpty ? '未設定' : value)
+            : formatAppDateTime(context, parsed);
         return Row(
           children: [
             Expanded(
@@ -336,7 +340,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                 onPressed: () => _pickDateTime(spec.key),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('${spec.label}　${value.isEmpty ? '未設定' : value}'),
+                  child: Text('${spec.label}　$displayValue'),
                 ),
               ),
             ),

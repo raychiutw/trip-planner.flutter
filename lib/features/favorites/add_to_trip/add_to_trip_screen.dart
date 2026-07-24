@@ -123,8 +123,8 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   }
 
   Future<void> _pickTime(bool isStart) async {
-    final picked = await showTimePicker(
-      context: context,
+    final picked = await showAppTimePicker(
+      context,
       initialTime: isStart ? _start : _end,
     );
     if (picked != null) {

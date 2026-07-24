@@ -2210,7 +2210,7 @@ void main() {
       );
     });
 
-    test('deleteEntry 離線 → 入佇列(entry.delete)+ days 快取移除', () async {
+    test('deleteEntry 離線 → 不排入佇列且保留 days 快取', () async {
       await cache.writeResponse(daysKey, [
         {
           'dayNum': 1,
@@ -2230,12 +2230,15 @@ void main() {
         ),
       );
 
-      await repo.deleteEntry(tripId: 'okinawa', entryId: 77);
+      await expectLater(
+        repo.deleteEntry(tripId: 'okinawa', entryId: 77),
+        throwsA(isA<DioException>()),
+      );
 
       final q = await cache.readQueue();
-      expect(q.single.type, 'entry.delete');
+      expect(q, isEmpty);
       final days = (await cache.readResponse(daysKey))!.data as List;
-      expect((days.first as Map)['timeline'] as List, isEmpty);
+      expect((days.first as Map)['timeline'] as List, hasLength(1));
     });
 
     test('createNote(pretrip)離線 → 入佇列 + patch 對到 pretripNotes 段', () async {

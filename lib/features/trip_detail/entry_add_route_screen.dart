@@ -236,6 +236,11 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             lng: poi.lng,
             source: 'google',
           );
+          if (!mounted) return;
+          setState(() {
+            _selectedPlaceIds.remove(poi.placeId);
+            _searchPoiTypeOverrides.remove(poi.placeId);
+          });
         }
       } else {
         for (final favorite in selectedFavorites) {
@@ -249,6 +254,8 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
             lng: favorite.poiLng,
             source: 'favorite',
           );
+          if (!mounted) return;
+          setState(() => _selectedFavoriteIds.remove(favorite.id));
         }
       }
       ref.invalidate(tripDaysProvider(widget.tripId));

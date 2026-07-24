@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_action_item.dart';
@@ -23,6 +24,135 @@ void main() {
       ),
     );
   }
+
+  testWidgets('iOS 日期選擇器沿用 locale 並停用範圍外日期', (tester) async {
+    const locale = Locale('zh', 'TW');
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        supportedLocales: const [locale],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => unawaited(
+                showAppDatePicker(
+                  context,
+                  initialDate: DateTime(2026, 4, 24),
+                  firstDate: DateTime(2026, 4, 23),
+                  lastDate: DateTime(2026, 4, 25),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.mode, CupertinoDatePickerMode.date);
+    expect(picker.minimumDate, DateTime(2026, 4, 23));
+    expect(picker.maximumDate, DateTime(2026, 4, 25));
+    expect(
+      Localizations.localeOf(tester.element(find.byType(CupertinoDatePicker))),
+      locale,
+    );
+  });
+
+  testWidgets('iOS 日期選擇器取消不回寫，完成才回傳選取日期', (tester) async {
+    late Future<DateTime?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        result = showAppDatePicker(
+          context,
+          initialDate: DateTime(2026, 4, 24),
+          firstDate: DateTime(2026, 4, 23),
+          lastDate: DateTime(2026, 4, 25),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    tester
+        .widget<CupertinoDatePicker>(find.byType(CupertinoDatePicker))
+        .onDateTimeChanged(DateTime(2026, 4, 25));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(await result, DateTime(2026, 4, 25));
+  });
+
+  testWidgets('iOS 完成回傳 wheel 顯示的五分鐘值，取消不回寫', (tester) async {
+    late Future<TimeOfDay?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.iOS, (context) {
+        result = showAppTimePicker(
+          context,
+          initialTime: const TimeOfDay(hour: 10, minute: 7),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.initialDateTime, DateTime(2000, 1, 1, 10, 5));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(await result, const TimeOfDay(hour: 10, minute: 5));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+  });
+
+  testWidgets('Android 也使用五分鐘 wheel，完成回傳所見值且取消不回寫', (tester) async {
+    late Future<TimeOfDay?> result;
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        result = showAppTimePicker(
+          context,
+          initialTime: const TimeOfDay(hour: 10, minute: 7),
+        );
+      }),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    final picker = tester.widget<CupertinoDatePicker>(
+      find.byType(CupertinoDatePicker),
+    );
+    expect(picker.minuteInterval, 5);
+    expect(picker.initialDateTime, DateTime(2000, 1, 1, 10, 5));
+    picker.onDateTimeChanged(DateTime(2000, 1, 1, 10, 10));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+
+    expect(await result, const TimeOfDay(hour: 10, minute: 10));
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(await result, isNull);
+  });
 
   testWidgets('iOS → CupertinoAlertDialog + 破壞性 action;確認回傳 true', (
     tester,
