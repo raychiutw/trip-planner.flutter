@@ -154,11 +154,13 @@ void main() {
       );
     });
 
-    test('release evidence failure blocks both store uploads', () {
+    test('release evidence fails closed unless BLOCKED is waived', () {
       expect(releaseWorkflow, isNot(contains('run_optional_evidence')));
       expect(releaseWorkflow, contains('manual_evidence_sha:'));
       expect(releaseWorkflow, contains('manual_evidence_url:'));
       expect(releaseWorkflow, contains('manual_evidence_result:'));
+      expect(releaseWorkflow, contains('manual_evidence_waiver:'));
+      expect(releaseWorkflow, contains('manual_evidence_waiver_reason:'));
       expect(releaseWorkflow, contains('manual_evidence_gate:'));
       expect(
         RegExp(
@@ -168,12 +170,35 @@ void main() {
       );
       expect(releaseWorkflow, contains('EVIDENCE_RESULT'));
       expect(releaseWorkflow, contains('EVIDENCE_SHA'));
+      expect(releaseWorkflow, contains('EVIDENCE_WAIVER'));
+      expect(releaseWorkflow, contains('EVIDENCE_WAIVER_REASON'));
       expect(releaseWorkflow, contains('RELEASE_SHA'));
       expect(manualEvidenceValidator, contains('https://'));
       expect(releaseWorkflow, contains('          - FAIL'));
+      expect(releaseWorkflow, contains('case "\$EVIDENCE_RESULT" in'));
+      expect(releaseWorkflow, contains('            PASS)'));
+      expect(releaseWorkflow, contains('            BLOCKED)'));
       expect(
         releaseWorkflow,
-        contains('if [[ "\$EVIDENCE_RESULT" != "PASS" ]]'),
+        contains('if [[ "\$EVIDENCE_WAIVER" != "true" ]]'),
+      );
+      expect(
+        releaseWorkflow,
+        contains('Release waiver reason must not be empty'),
+      );
+      expect(
+        releaseWorkflow,
+        contains('Release waiver record must be a valid HTTPS URL with a host'),
+      );
+      expect(
+        releaseWorkflow,
+        contains('summary_result="BLOCKED (release waiver)"'),
+      );
+      expect(
+        releaseWorkflow,
+        contains(
+          'Manual accessibility evidence must be PASS, or BLOCKED with an explicit release waiver',
+        ),
       );
       expect(
         releaseWorkflow,
@@ -190,6 +215,10 @@ void main() {
       expect(manualEvidenceValidator, contains('--max-filesize'));
       expect(manualEvidenceValidator, contains('report_bytes'));
       expect(manualEvidenceValidator, contains('jq -e'));
+      expect(
+        releaseWorkflow.indexOf('if [[ "\$EVIDENCE_SHA" != "\$RELEASE_SHA" ]]'),
+        lessThan(releaseWorkflow.indexOf('case "\$EVIDENCE_RESULT" in')),
+      );
     });
 
     test('release CI enforces format, analyzer and one full test suite', () {

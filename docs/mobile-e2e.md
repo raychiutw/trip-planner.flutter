@@ -81,15 +81,19 @@ The regular PR/push CI also runs the same app-owned flow on the host runner. It 
 | `LAYOUT-KEYBOARD` | 搜尋／對話輸入時 keyboard、composer、焦點與 root navigation 不互相遮擋 |
 | `NAV-EDGE-BACK` | iOS edge-back、sheet 關閉與返回後原 branch 狀態 |
 
-上表所有 case 與欄位都是必要項目。每筆 case 的 `result` 都必須是 `PASS`；任一 case 為 `FAIL` 或 `BLOCKED`、case ID 重複、缺少必要 case、缺少必要欄位、`source_sha` 不符、`version`／`build` 不一致、`evidence` 不是 HTTPS URL、內容裁切、焦點被 Header／keyboard／tab bar／sheet／POI accessory 遮住，或 control 小於 44×44pt，都會阻擋發布且不得將整份報告標記為 PASS。發布 workflow 的三個必要輸入為：
+上表所有 case 與欄位都是必要項目。每筆 case 的 `result` 都必須是 `PASS`；任一 case 為 `FAIL` 或 `BLOCKED`、case ID 重複、缺少必要 case、缺少必要欄位、`source_sha` 不符、`version`／`build` 不一致、`evidence` 不是 HTTPS URL、內容裁切、焦點被 Header／keyboard／tab bar／sheet／POI accessory 遮住，或 control 小於 44×44pt，都會阻擋發布且不得將整份報告標記為 PASS。發布 workflow 的必要輸入為：
 
 - `manual_evidence_sha`：必須與 `${{ github.sha }}` 完全相同。
-- `manual_evidence_url`：指向上述完整報告的 HTTPS URL。
+- `manual_evidence_url`：指向上述完整報告，或發布例外紀錄的 HTTPS URL。
 - `manual_evidence_result`：只有全部 case 通過時才能選 `PASS`；預設為 `BLOCKED`。
+- `manual_evidence_waiver`：只有證據仍為 `BLOCKED` 且已決定承擔發布風險時才能設為 `true`；預設為 `false`。
+- `manual_evidence_waiver_reason`：使用發布例外時必填，需清楚記錄缺少的證據與已完成的驗證。
 
 `manual_evidence_gate` 只接受 HTTPS，使用 `curl --fail` 並限制連線／總時間與 1 MiB 檔案大小，再由 `jq` 驗證 JSON、完整 case matrix 與上述欄位。HTTP 錯誤、redirect 到非 HTTPS、timeout、超過大小限制、無效 JSON、舊 schema 或任何驗證失敗都會 fail closed。
 
-Store jobs 同時依賴 `ci`、`external_device_gate` 與 `manual_evidence_gate`。任何核心流程、格式、analyzer、test、Patrol、44pt、裁切或輔助使用失敗都會阻擋 TestFlight 與 Google Play internal upload。Repository 的 `master` ruleset 也必須把 PR 的 `Analyze and test` 設為 required status check；若尚未設定，發布負責人必須先完成設定，不得把 workflow 本身誤當作 branch protection。
+沒有完整人工報告時，可將結果維持 `BLOCKED`，同時提供精確 SHA、HTTPS 紀錄、`manual_evidence_waiver=true` 與非空白原因。Gate 會在工作流程摘要留下 `BLOCKED (release waiver)`、紀錄 URL 與原因；`FAIL`、錯誤 SHA、無效 URL、未明確啟用例外或空白原因仍會阻擋發布。這個例外只適用人工輔助使用證據，不會略過 `ci` 或 `external_device_gate`。
+
+Store jobs 同時依賴 `ci`、`external_device_gate` 與 `manual_evidence_gate`。任何核心流程、格式、analyzer、test、Patrol、44pt、裁切或輔助使用失敗都會阻擋 TestFlight 與 Google Play internal upload；只有上述已記錄的人工證據 `BLOCKED` 例外可以通過人工閘門。Repository 的 `master` ruleset 也必須把 PR 的 `Analyze and test` 設為 required status check；若尚未設定，發布負責人必須先完成設定，不得把 workflow 本身誤當作 branch protection。
 
 ## One-time Google Cloud setup
 
