@@ -9,6 +9,7 @@
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。
 - Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。
+- Root navigation 依可用寬度在 compact bottom tabs 與 regular top tabs 間切換；一般寬度的行程 detail 加入共用狀態的清單 split view，resize 會保留目前 branch、選取與輸入內容。
 
 ## [0.9.6] - 2026-07-23
 

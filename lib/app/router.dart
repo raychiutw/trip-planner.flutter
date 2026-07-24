@@ -352,10 +352,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':tripId',
-                    builder: (context, state) => TripTimelineScreen(
-                      tripId: state.pathParameters['tripId']!,
-                      initialEntryId: _entryFocusFromQuery(state.uri),
-                      initialDayNum: _dayFocusFromQuery(state.uri),
+                    builder: (context, state) => AdaptiveTripDetail(
+                      selectedTripId: state.pathParameters['tripId']!,
+                      child: TripTimelineScreen(
+                        tripId: state.pathParameters['tripId']!,
+                        initialEntryId: _entryFocusFromQuery(state.uri),
+                        initialDayNum: _dayFocusFromQuery(state.uri),
+                      ),
                     ),
                     routes: [
                       GoRoute(
