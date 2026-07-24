@@ -720,6 +720,19 @@ Future<T?> showAppContentSheet<T>(
   required WidgetBuilder builder,
 }) {
   final sheetNavigatorKey = GlobalKey<NavigatorState>();
+  final size = MediaQuery.sizeOf(context);
+  if (size.width >= 720 && size.height >= 700) {
+    return showDialog<T>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => _RegularAppContentSheet<T>(
+        title: title,
+        contentBuilder: builder,
+        navigatorKey: sheetNavigatorKey,
+      ),
+    );
+  }
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
@@ -738,6 +751,74 @@ Future<T?> showAppContentSheet<T>(
       navigatorKey: sheetNavigatorKey,
     ),
   );
+}
+
+class _RegularAppContentSheet<T> extends StatefulWidget {
+  const _RegularAppContentSheet({
+    required this.title,
+    required this.contentBuilder,
+    required this.navigatorKey,
+  });
+
+  final String title;
+  final WidgetBuilder contentBuilder;
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  @override
+  State<_RegularAppContentSheet<T>> createState() =>
+      _RegularAppContentSheetState<T>();
+}
+
+class _RegularAppContentSheetState<T>
+    extends State<_RegularAppContentSheet<T>> {
+  bool _closing = false;
+  bool _handlingBack = false;
+
+  Future<void> _close([T? result]) async {
+    if (_closing) return;
+    setState(() => _closing = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(result);
+  }
+
+  Future<void> _handleBack([T? result]) async {
+    if (_closing || _handlingBack) return;
+    _handlingBack = true;
+    final handled = await widget.navigatorKey.currentState?.maybePop() ?? false;
+    _handlingBack = false;
+    if (!mounted || handled) return;
+    await _close(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope<T>(
+      canPop: _closing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_handleBack(result));
+      },
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(TpSpacing.s4),
+        clipBehavior: Clip.antiAlias,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+          child: SizedBox(
+            key: const ValueKey('app-regular-content-sheet'),
+            width: 560,
+            height: 720,
+            child: _AppContentSheet<T>(
+              title: widget.title,
+              contentBuilder: widget.contentBuilder,
+              onClose: _close,
+              navigatorKey: widget.navigatorKey,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<T?> showAppScreenSheet<T>(

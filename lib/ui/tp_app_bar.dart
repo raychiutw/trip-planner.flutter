@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -175,6 +177,17 @@ class TpLargeSheetNavigationScope extends InheritedWidget {
 
   static TpLargeSheetNavigationScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TpLargeSheetNavigationScope>();
+
+  /// Close 可直接離開乾淨的 sheet；若目前 route 有 PopScope guard，
+  /// 先交給 route 顯示未儲存確認，不可繞過後直接 pop root dialog。
+  Future<void> requestClose(BuildContext context) async {
+    final route = ModalRoute.of(context);
+    if (route?.popDisposition == RoutePopDisposition.doNotPop) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    onClose();
+  }
 
   @override
   bool updateShouldNotify(TpLargeSheetNavigationScope oldWidget) => false;
@@ -433,7 +446,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                         tooltip: MaterialLocalizations.of(
                           context,
                         ).closeButtonTooltip,
-                        onPressed: largeSheetScope.onClose,
+                        onPressed: () =>
+                            unawaited(largeSheetScope.requestClose(context)),
                         child: Icon(
                           CupertinoIcons.xmark,
                           size: 19,

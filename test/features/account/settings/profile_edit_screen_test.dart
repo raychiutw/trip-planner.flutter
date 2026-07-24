@@ -28,7 +28,7 @@ void main() {
     );
   });
 
-  Widget buildApp() {
+  Widget buildApp({TextScaler textScaler = TextScaler.noScaling}) {
     final router = GoRouter(
       initialLocation: '/settings/profile',
       routes: [
@@ -43,7 +43,14 @@ void main() {
         authRepositoryProvider.overrideWithValue(authRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
       ],
-      child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.light(),
+        routerConfig: router,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
+      ),
     );
   }
 
@@ -69,6 +76,19 @@ void main() {
           .onPressed,
       isNull,
     );
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const ValueKey('profile-display-name')),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .focusNode
+          .hasFocus,
+      isTrue,
+    );
+    expect(find.text('個人資料'), findsNWidgets(2));
 
     await tester.enterText(
       find.byKey(const ValueKey('profile-display-name')),
@@ -102,5 +122,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+  });
+
+  testWidgets('200% Dynamic Type 下個人資料欄位與儲存動作不裁切', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(buildApp(textScaler: const TextScaler.linear(2)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('profile-display-name')), findsOneWidget);
+    expect(find.byKey(const ValueKey('profile-save')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

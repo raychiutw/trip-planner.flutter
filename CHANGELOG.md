@@ -7,6 +7,7 @@
 ### 變更
 
 - 行程清單搜尋支援鍵盤 Search、清除與跨 root tab／詳情往返狀態保留；時間軸 Day selector 補齊左右方向鍵、完整 VoiceOver 語意、窄螢幕置中與僅點選換日。行程與行程日刪除統一為不可復原流程，伺服器成功前鎖定並保留內容，失敗時提供持續重試；缺少日期改以「新增」而非「加回」表達。
+- Account 採用有 section header 與 inset separator 的系統設定列；compact width 維持近滿版 Navigation Stack sheet，一般寬度改用置中 form sheet。外觀預設跟隨系統，個人資料支援正確焦點與 Dynamic Type；通知只在使用者啟用項目時說明用途並請求系統權限，並在回到 App 時同步系統狀態，拒絕後不重複提示。刪除帳號會列出影響、要求重新驗證，且僅在伺服器成功後清除本機帳號資料；純 OAuth 帳號在尚無 fresh-auth 契約時會安全阻擋 App 內刪除並導向身分核對說明。
 - 收藏刪除改為不可復原：卡片、左滑、選單與批次入口都先顯示具名確認，伺服器成功後才移除；失敗時保留資料與選取並提供重試。Flutter restore API、Undo、feature flag 與 staging release verifier 已移除。
 - 註冊、信箱驗證、密碼重設與 OAuth 改用 inline Header 與防重複提交；邀請與公開分享補齊在地日期／時間、Dynamic Type、鍵盤操作與 screen reader 狀態，並維持既有登入方式、不加入 Apple ID 登入。
 - 聊天輸入列新增附件／行程項目入口、1–4 行文字輸入、空白時麥克風與有文字時送出切換，並支援 Command–Return 送出；首次語音輸入會先說明用途，權限不可用時提供前往系統設定的恢復動線。

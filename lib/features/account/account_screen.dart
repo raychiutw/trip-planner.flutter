@@ -113,7 +113,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 ),
               ],
             ),
-            const _SettingsGroup(compact: true),
+            const _SettingsGroup(embedded: true),
             _PrivacyAndAccountGroup(
               loadingDeletion: _loadingAccountDeletion,
               onPrivacyPolicy: openPrivacyPolicy,
@@ -284,6 +284,35 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       final preview = await repository.fetchAccountDeletionPreview();
       if (!mounted) return;
       setState(() => _loadingAccountDeletion = false);
+      if (!preview.hasPassword) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            key: const ValueKey('oauth-account-deletion-blocked-dialog'),
+            title: const Text('需要重新驗證才能刪除'),
+            content: const Text(
+              '此帳號沒有可在 App 內重新驗證的密碼。目前無法在 App 內安全地重新驗證，'
+              '因此不會送出刪除要求。你可以查看安全刪除方式，使用註冊信箱提出申請。',
+            ),
+            actions: [
+              TextButton(
+                autofocus: true,
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  unawaited(openAccountDeletionHelp());
+                },
+                child: const Text('查看安全刪除方式'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
       final deleted = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -595,58 +624,36 @@ class _StatCard extends StatelessWidget {
 
 /// 設定群組：iOS grouped inset 風格,依語意分「帳號」「偏好」「安全性」三 section。
 class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup({this.compact = false});
+  const _SettingsGroup({this.embedded = false});
 
-  final bool compact;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
-    if (compact) {
-      return TpSettingsGroup(
-        children: [
-          TpSettingsRow(
-            key: const ValueKey('settings-appearance'),
-            title: '外觀',
-            onTap: () => _openSheetPage(context, const AppearanceScreen()),
-          ),
-          TpSettingsRow(
-            key: const ValueKey('settings-notifications'),
-            title: '通知',
-            onTap: () => _openSheetPage(context, const NotificationsScreen()),
-          ),
-          TpSettingsRow(
-            key: const ValueKey('settings-sessions'),
-            title: '登入裝置',
-            onTap: () => _openSheetPage(context, const AccountSessionsScreen()),
-          ),
-          TpSettingsRow(
-            key: const ValueKey('settings-connected-apps'),
-            title: '已連結的應用程式',
-            onTap: () => _openSheetPage(context, const ConnectedAppsScreen()),
-          ),
-          TpSettingsRow(
-            key: const ValueKey('settings-developer-apps'),
-            title: '開發者 App',
-            onTap: () => _openSheetPage(context, const DeveloperAppsScreen()),
-          ),
-        ],
-      );
+    void open(String location, Widget page) {
+      if (embedded) {
+        _openSheetPage(context, page);
+      } else {
+        context.push(location);
+      }
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TpSettingsGroup(
-          title: '帳號',
-          children: [
-            TpSettingsRow(
-              key: const ValueKey('settings-profile'),
-              leading: const Icon(CupertinoIcons.person),
-              title: '個人資料',
-              onTap: () => context.push('/settings/profile'),
-            ),
-          ],
-        ),
+        if (!embedded)
+          TpSettingsGroup(
+            title: '帳號',
+            children: [
+              TpSettingsRow(
+                key: const ValueKey('settings-profile'),
+                leading: const Icon(CupertinoIcons.person),
+                title: '個人資料',
+                onTap: () =>
+                    open('/settings/profile', const ProfileEditScreen()),
+              ),
+            ],
+          ),
         TpSettingsGroup(
           title: '偏好',
           children: [
@@ -654,13 +661,15 @@ class _SettingsGroup extends StatelessWidget {
               key: const ValueKey('settings-appearance'),
               leading: const Icon(CupertinoIcons.paintbrush),
               title: '外觀',
-              onTap: () => context.push('/settings/appearance'),
+              onTap: () =>
+                  open('/settings/appearance', const AppearanceScreen()),
             ),
             TpSettingsRow(
               key: const ValueKey('settings-notifications'),
               leading: const Icon(CupertinoIcons.bell),
               title: '通知',
-              onTap: () => context.push('/settings/notifications'),
+              onTap: () =>
+                  open('/settings/notifications', const NotificationsScreen()),
             ),
           ],
         ),
@@ -671,13 +680,15 @@ class _SettingsGroup extends StatelessWidget {
               key: const ValueKey('settings-sessions'),
               leading: const Icon(CupertinoIcons.device_phone_portrait),
               title: '登入裝置',
-              onTap: () => context.push('/settings/sessions'),
+              onTap: () =>
+                  open('/settings/sessions', const AccountSessionsScreen()),
             ),
             TpSettingsRow(
               key: const ValueKey('settings-connected-apps'),
               leading: const Icon(CupertinoIcons.square_grid_2x2),
               title: '已連結的應用程式',
-              onTap: () => context.push('/settings/connected-apps'),
+              onTap: () =>
+                  open('/settings/connected-apps', const ConnectedAppsScreen()),
             ),
             TpSettingsRow(
               key: const ValueKey('settings-developer-apps'),
@@ -685,7 +696,8 @@ class _SettingsGroup extends StatelessWidget {
                 CupertinoIcons.chevron_left_slash_chevron_right,
               ),
               title: '開發者應用',
-              onTap: () => context.push('/settings/developer-apps'),
+              onTap: () =>
+                  open('/settings/developer-apps', const DeveloperAppsScreen()),
             ),
           ],
         ),
@@ -818,7 +830,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               autocorrect: false,
               enableSuggestions: false,
               decoration: InputDecoration(
-                labelText: preview.hasPassword ? '輸入密碼' : '輸入 DELETE 確認',
+                labelText: preview.hasPassword ? '目前密碼（重新驗證）' : '輸入 DELETE 確認',
                 errorText: _error,
               ),
               onSubmitted: (_) => _delete(),
@@ -828,6 +840,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       ),
       actions: [
         TextButton(
+          autofocus: true,
           onPressed: _submitting
               ? null
               : () => Navigator.of(context).pop(false),

@@ -50,6 +50,8 @@ Legacy redirect：`/admin`、`/admin/` 會導到 `/trips`，`/manage`、`/manage
 
 shell 外殼是 `AppShell`（`lib/features/shell/app_shell.dart`）：浮動 4 項 `AppleRootTabBar` 的選取事件呼叫 `navigationShell.goBranch(index)`。內容頁 Header 固定提供 44pt `person.crop.circle` 帳號入口；Account 與 Settings deep links 會在目前 branch 上開啟對應 sheet 頁面，不建立第 5 個 branch。
 
+Account sheet 在 compact width 使用近滿版內容 sheet；寬度至少 `720pt` 且高度足夠時，改用最大 `560×720pt` 的置中 form sheet。兩種版型都共用 sheet 內的 `Navigator`：設定子頁在同一個 Navigation Stack push，返回只回上一層，關閉才離開整個 Account；子頁有未儲存內容時，Close 也必須先經過該 route 的離開保護。原 branch、Day、捲動位置、表單與聊天草稿不會因開關 sheet 重建。
+
 ## 認證 redirect 規則
 
 ```dart

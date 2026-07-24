@@ -78,11 +78,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> pumpAccountEntry(WidgetTester tester) async {
+  Future<void> pumpAccountEntry(
+    WidgetTester tester, {
+    Size size = const Size(390, 844),
+    TextScaler textScaler = TextScaler.noScaling,
+  }) async {
     when(
       () => mockAuthRepository.currentUser(),
     ).thenAnswer((_) async => verifiedUser);
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final router = GoRouter(
@@ -128,6 +132,7 @@ void main() {
               data: MediaQuery.of(context).copyWith(
                 padding: const EdgeInsets.only(top: 59, bottom: 34),
                 viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+                textScaler: textScaler,
               ),
               child: child!,
             ),
@@ -170,6 +175,8 @@ void main() {
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-sheet-profile')), findsOneWidget);
     expect(find.text('帳號資訊與個人資料'), findsOneWidget);
+    expect(find.text('偏好'), findsOneWidget);
+    expect(find.text('安全性'), findsOneWidget);
     expect(find.text('版本 0.9.1（12）'), findsOneWidget);
     expect(find.text('行程數'), findsNothing);
     expect(find.text('旅程天數'), findsNothing);
@@ -192,6 +199,55 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
     await tester.pumpAndSettle();
     expect(sheet, findsNothing);
+  });
+
+  testWidgets('一般寬度使用置中的 form sheet 並保留同一 Navigation Stack', (tester) async {
+    await pumpAccountEntry(tester, size: const Size(1024, 768));
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    final regularSheet = find.byKey(
+      const ValueKey('app-regular-content-sheet'),
+    );
+    expect(regularSheet, findsOneWidget);
+    expect(find.byType(GlassModalSheetScaffold), findsNothing);
+    expect(tester.getSize(regularSheet).width, lessThanOrEqualTo(560));
+    expect(tester.getSize(regularSheet).height, lessThan(768));
+
+    await tester.tap(find.byKey(const ValueKey('settings-appearance')));
+    await tester.pumpAndSettle();
+    expect(find.text('外觀'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  });
+
+  testWidgets('Account grouped list 在 200% Dynamic Type 維持可捲動與可辨識語意', (
+    tester,
+  ) async {
+    await pumpAccountEntry(tester, textScaler: const TextScaler.linear(2));
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel(RegExp('Ray')), findsOneWidget);
+    final deleteRow = find.byKey(const ValueKey('settings-delete-account'));
+    await tester.scrollUntilVisible(
+      deleteRow,
+      500,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('account-sheet-content')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel(RegExp('刪除帳號')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('帳號頁底部顯示版本與 build number', (tester) async {
@@ -510,6 +566,13 @@ void main() {
     expect(find.textContaining('5 位共編者'), findsOneWidget);
     expect(find.text('此操作無法復原。'), findsNothing);
     expect(find.textContaining('此操作無法復原'), findsOneWidget);
+    expect(find.text('目前密碼（重新驗證）'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, '取消'))
+          .autofocus,
+      isTrue,
+    );
     final confirmButton = find.byKey(
       const ValueKey('delete-account-confirm-button'),
     );
@@ -533,7 +596,7 @@ void main() {
     expect(find.byKey(const ValueKey('delete-account-dialog')), findsOneWidget);
   });
 
-  testWidgets('純 OAuth 帳號只有輸入大寫 DELETE 才可確認', (tester) async {
+  testWidgets('純 OAuth 帳號無 fresh-auth 契約時安全阻擋刪除', (tester) async {
     when(() => mockAuthRepository.fetchAccountDeletionPreview()).thenAnswer(
       (_) async => const AccountDeletionPreview(
         hasPassword: false,
@@ -554,28 +617,23 @@ void main() {
     await tester.tap(deleteRow);
     await tester.pumpAndSettle();
 
-    final field = find.byKey(
-      const ValueKey('delete-account-confirmation-field'),
+    expect(
+      find.byKey(const ValueKey('oauth-account-deletion-blocked-dialog')),
+      findsOneWidget,
     );
-    final confirmButton = find.byKey(
-      const ValueKey('delete-account-confirm-button'),
+    expect(find.text('需要重新驗證才能刪除'), findsOneWidget);
+    expect(find.textContaining('目前無法在 App 內安全地重新驗證'), findsOneWidget);
+    expect(find.text('查看安全刪除方式'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('delete-account-confirmation-field')),
+      findsNothing,
     );
-    await tester.enterText(field, 'delete');
-    await tester.pump();
-    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNull);
-    await tester.enterText(field, 'DELETE');
-    await tester.pump();
-    expect(tester.widget<FilledButton>(confirmButton).onPressed, isNotNull);
-    await tester.tap(confirmButton);
-    await tester.pumpAndSettle();
-
-    verify(
+    verifyNever(
       () => mockAuthRepository.deleteAccount(
-        hasPassword: false,
-        confirmation: 'DELETE',
+        hasPassword: any(named: 'hasPassword'),
+        confirmation: any(named: 'confirmation'),
       ),
-    ).called(1);
-    expect(find.byKey(const ValueKey('delete-account-dialog')), findsNothing);
+    );
   });
 
   testWidgets('點登出 row 出現確認對話框，確認後呼叫 logout', (tester) async {

@@ -11,6 +11,7 @@ import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_settings_group.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
@@ -95,27 +96,40 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _initialName ??= currentName;
     _draft ??= currentName;
     return ListView(
-      padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        TextFormField(
-          key: const ValueKey('profile-display-name'),
-          initialValue: _draft,
-          decoration: const InputDecoration(
-            labelText: '顯示名稱',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (value) => setState(() => _draft = value),
+        TpSettingsGroup(
+          title: '個人資料',
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TpSpacing.s4,
+                vertical: TpSpacing.s2,
+              ),
+              child: TextFormField(
+                key: const ValueKey('profile-display-name'),
+                initialValue: _draft,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: '顯示名稱',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) => setState(() => _draft = value),
+                onFieldSubmitted: (_) {
+                  if (_hasChanges && !_saving) _save();
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: TpSpacing.s4),
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: TpSpacing.s2),
+            padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
             child: Text(
               _error!,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        const SizedBox(height: TpSpacing.s2),
       ],
     );
   }
