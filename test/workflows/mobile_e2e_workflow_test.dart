@@ -39,6 +39,12 @@ void main() {
   final testLabSigning = File(
     'ios/Flutter/TestLabSigning.xcconfig',
   ).readAsStringSync();
+  final nativeGestureBridge = File(
+    'ios/RunnerUITests/RunnerUITests.m',
+  ).readAsStringSync();
+  final androidNativeGestureBridge = File(
+    'android/app/src/androidTest/java/com/raychiu/tripline/MainActivityTest.java',
+  ).readAsStringSync();
 
   group('external mobile integration evidence', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
@@ -709,14 +715,59 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('onMapStyleApplied'));
         expect(nativeMapSmoke, contains('grantPermissionWhenInUse'));
         expect(nativeMapSmoke, contains('.swipe('));
-        expect(nativeMapSmoke, contains('.platform.android.doubleTap('));
+        expect(nativeMapSmoke, isNot(contains('.platform.mobile.doubleTap(')));
         expect(nativeMapSmoke, isNot(contains('.startGesture(')));
+        expect(nativeMapSmoke, contains('ensureSemantics'));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
-        expect(
+        for (final requestLabel in [
+          'Tripline native map pinch request',
+          'Tripline native map rotate request',
+          'Tripline native map double tap request',
+        ]) {
+          expect(nativeMapSmoke, contains(requestLabel));
+          expect(nativeGestureBridge, contains(requestLabel));
+          expect(androidNativeGestureBridge, contains(requestLabel));
+        }
+        for (final source in [
           nativeMapSmoke,
-          contains(
-            'https://github.com/raychiutw/trip-planner.flutter/issues/104',
-          ),
+          nativeGestureBridge,
+          androidNativeGestureBridge,
+        ]) {
+          expect(source, contains('native Google Map renders'));
+        }
+        expect(nativeGestureBridge, contains('pinchWithScale:'));
+        expect(nativeGestureBridge, contains('rotate:'));
+        expect(nativeGestureBridge, contains('[target doubleTap]'));
+        expect(androidNativeGestureBridge, contains('.pinchOut('));
+        expect(
+          androidNativeGestureBridge,
+          contains('.performTwoPointerGesture('),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('!request.equals(activeRequest)'),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('dartTestName.contains(NATIVE_MAP_TEST_NAME)'),
+        );
+        expect(androidNativeGestureBridge, contains('gestureBridge.join('));
+        expect(
+          androidNativeGestureBridge,
+          contains('setUncaughtExceptionHandler'),
+        );
+        expect(androidNativeGestureBridge, contains('addSuppressed'));
+        expect(
+          androidNativeGestureBridge,
+          contains('device.click(centerX, centerY)'),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('SystemClock.sleep(DOUBLE_TAP_INTERVAL_MS)'),
+        );
+        expect(
+          nativeGestureBridge,
+          contains('containsString:@"native Google Map renders"'),
         );
         expect(nativeMapSmoke, contains('_poiTapOffsets'));
         expect(nativeMapSmoke, contains('#toggleMapLifecycle'));

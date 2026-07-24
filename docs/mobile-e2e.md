@@ -234,6 +234,33 @@ patrol test -t patrol_test/app_owned_flow_test.dart --device DEVICE_ID
 patrol test -t patrol_test/native_map_smoke_test.dart --device DEVICE_ID
 ```
 
+iOS 真機需要 release XCTest build。本機 development signing 必須與 App Store、
+Test Lab 的 profiles 分開：
+
+```bash
+XCODE_XCCONFIG_FILE="$PWD/ios/Flutter/LocalDeviceSigning.xcconfig" \
+  patrol test \
+  --release \
+  --target patrol_test/native_map_smoke_test.dart \
+  --device DEVICE_ID
+```
+
+請保持裝置解鎖。若 Wi-Fi 配對的裝置無法在 Patrol CLI 4.4.0 的一秒
+destination timeout 內就緒，先 build 一次，再交由 Xcode 等待 tunnel：
+
+```bash
+XCODE_XCCONFIG_FILE="$PWD/ios/Flutter/LocalDeviceSigning.xcconfig" \
+  patrol build ios \
+  --release \
+  --target patrol_test/native_map_smoke_test.dart
+
+xcodebuild test-without-building \
+  -xctestrun XCTESTRUN_PATH \
+  -only-testing RunnerUITests/RunnerUITests \
+  -destination "platform=iOS,id=DEVICE_ID" \
+  -destination-timeout 120
+```
+
 Run the deterministic product flow directly on a local Flutter device:
 
 ```bash

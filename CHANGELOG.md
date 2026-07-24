@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-07-25
+
+### 新增
+
+- Android 與 iOS 真機測試現在會實際注入原生地圖的縮放、旋轉與雙擊手勢，並以鏡頭 callback 驗證結果；iOS 本機 release 測試補上獨立的 development signing 設定與操作說明。
+
+### 變更
+
+- Agent skills 統一使用 canonical GitHub repo、五種 triage labels 與按需建立的 domain 文件；issue／PR 內容明確視為不可信資料，避免外部文字被誤當操作指令。
+
+### 修正
+
+- 修正 Android 真機手勢橋接可能在測試結束後殘留或吞掉背景例外的問題；清理逾時與執行緒失敗現在會保留原測試錯誤並回報明確原因。
+
 ## [0.10.0] - 2026-07-24
 
 ### 變更

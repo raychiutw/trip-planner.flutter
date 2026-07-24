@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,14 +14,11 @@ const _taipei101 = TripMapPoint(25.033968, 121.564468);
 const _zoomCheckPoint = TripMapPoint(25.1676, 121.4450);
 const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
 const _nativeMapEvidenceLabel = 'Tripline native map evidence canvas';
-const _multitouchEvidenceIssue =
-    'https://github.com/raychiutw/trip-planner.flutter/issues/104';
+const _nativePinchRequestLabel = 'Tripline native map pinch request';
+const _nativeRotateRequestLabel = 'Tripline native map rotate request';
+const _nativeDoubleTapRequestLabel = 'Tripline native map double tap request';
 
-final _nativeAndroidMapSelector = AndroidSelector(
-  contentDescription: _nativeMapEvidenceLabel,
-);
-
-enum _NativeGesture { pan, doubleTap }
+enum _NativeGesture { pan, pinch, rotate, doubleTap }
 
 const _poiTapOffsets = <Offset>[
   Offset(0.5, 0.5),
@@ -85,26 +82,29 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
-    debugPrint(
-      'BLOCKED: Patrol 4.6.1 cannot inject native pinch/rotate; '
-      'tracked at $_multitouchEvidenceIssue',
-    );
+    final semantics = $.tester.ensureSemantics();
+    try {
+      await $.tester.pump();
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
+      await $(#armPinchCheck).tap();
+      await $(
+        #nativeMapPinchObserved,
+      ).waitUntilExists(timeout: const Duration(seconds: 15));
+      expect($(#nativeMapPinchObserved), findsOneWidget);
+
+      await $(#armRotateCheck).tap();
+      await $(
+        #nativeMapRotateObserved,
+      ).waitUntilExists(timeout: const Duration(seconds: 15));
+      expect($(#nativeMapRotateObserved), findsOneWidget);
+
       await $(#armDoubleTapCheck).tap();
-      await $.platform.android.doubleTap(
-        _nativeAndroidMapSelector,
-        delayBetweenTaps: const Duration(milliseconds: 50),
-      );
       await $(
         #nativeMapDoubleTapObserved,
       ).waitUntilExists(timeout: const Duration(seconds: 15));
       expect($(#nativeMapDoubleTapObserved), findsOneWidget);
-    } else {
-      debugPrint(
-        'BLOCKED: iOS XCTest cannot select the Flutter-hosted native map for '
-        'double-tap; tracked at $_multitouchEvidenceIssue',
-      );
+    } finally {
+      semantics.dispose();
     }
 
     await $(#requestLocationPermission).tap();
@@ -222,7 +222,10 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
           position.target,
           tolerance: 1e-5,
         ),
+        _NativeGesture.pinch ||
         _NativeGesture.doubleTap => (start.zoom - position.zoom).abs() >= 0.25,
+        _NativeGesture.rotate =>
+          _bearingDelta(start.bearing, position.bearing) >= 5,
       };
       if (!observed) return;
       setState(() {
@@ -359,6 +362,8 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                     ),
                     for (final (gesture, key, label) in const [
                       (_NativeGesture.pan, 'armPanCheck', 'Pan'),
+                      (_NativeGesture.pinch, 'armPinchCheck', 'Pinch'),
+                      (_NativeGesture.rotate, 'armRotateCheck', 'Rotate'),
                       (
                         _NativeGesture.doubleTap,
                         'armDoubleTapCheck',
@@ -368,7 +373,18 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                       FilledButton(
                         key: ValueKey(key),
                         onPressed: () => _armGesture(gesture),
-                        child: Text(label),
+                        child: Text(switch ((_expectedGesture, gesture)) {
+                          (_NativeGesture.pinch, _NativeGesture.pinch) =>
+                            _nativePinchRequestLabel,
+                          (_NativeGesture.rotate, _NativeGesture.rotate) =>
+                            _nativeRotateRequestLabel,
+                          (
+                            _NativeGesture.doubleTap,
+                            _NativeGesture.doubleTap,
+                          ) =>
+                            _nativeDoubleTapRequestLabel,
+                          _ => label,
+                        }),
                       ),
                     FilledButton(
                       key: const ValueKey('requestLocationPermission'),
@@ -410,6 +426,14 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapPanObserved')),
               ),
+            if (_observedGestures.contains(_NativeGesture.pinch))
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapPinchObserved')),
+              ),
+            if (_observedGestures.contains(_NativeGesture.rotate))
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapRotateObserved')),
+              ),
             if (_observedGestures.contains(_NativeGesture.doubleTap))
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapDoubleTapObserved')),
@@ -436,3 +460,8 @@ bool _near(
 }) =>
     (first.latitude - second.latitude).abs() < tolerance &&
     (first.longitude - second.longitude).abs() < tolerance;
+
+double _bearingDelta(double first, double second) {
+  final delta = (first - second).abs() % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
