@@ -37,6 +37,29 @@ class _StubAuth extends AuthNotifier {
   Future<UserInfo?> build() async => user;
 }
 
+class _ChatQueryHarness extends StatefulWidget {
+  const _ChatQueryHarness({super.key});
+
+  @override
+  State<_ChatQueryHarness> createState() => _ChatQueryHarnessState();
+}
+
+class _ChatQueryHarnessState extends State<_ChatQueryHarness> {
+  String _tripId = 'okinawa';
+  String? _prefill;
+
+  void showTrip(String tripId, {String? prefill}) {
+    setState(() {
+      _tripId = tripId;
+      _prefill = prefill;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      ChatScreen(initialTripId: _tripId, initialPrefill: _prefill);
+}
+
 const _trips = [TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩')];
 
 TripRequest _req({
@@ -91,11 +114,14 @@ void main() {
     ),
     ThemeData? theme,
     ValueNotifier<int>? reselects,
+    Widget? home,
   }) {
-    final screen = ChatScreen(
-      initialTripId: initialTripId,
-      initialPrefill: initialPrefill,
-    );
+    final screen =
+        home ??
+        ChatScreen(
+          initialTripId: initialTripId,
+          initialPrefill: initialPrefill,
+        );
     return ProviderScope(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
@@ -114,6 +140,13 @@ void main() {
   }
 
   testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet', (tester) async {
+    when(tripRepo.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
+        TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+        TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+      ]),
+    );
+
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
@@ -689,13 +722,14 @@ void main() {
     expect(find.text('思考中…'), findsWidgets);
   });
 
-  testWidgets('my-trips 空 → 「先建立行程」提示', (tester) async {
+  testWidgets('my-trips 空 → 「尚無行程」與新增入口', (tester) async {
     when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(const []));
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('先建立行程'), findsOneWidget);
+    expect(find.text('尚無行程'), findsNWidgets(2));
+    expect(find.widgetWithText(FilledButton, '新增行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-trip-dropdown')), findsNothing);
   });
 
@@ -733,6 +767,15 @@ void main() {
         TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
       ]),
     );
+    when(
+      () => reqRepo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          _req(id: 99, message: '京都晚餐草稿', status: RequestStatus.completed),
+    );
 
     await tester.pumpWidget(
       buildApp(initialTripId: 'kyoto', initialPrefill: '幫我安排晚餐'),
@@ -753,6 +796,7 @@ void main() {
       find.byKey(const ValueKey('chat-input')),
     );
     expect(input.controller!.text, '幫我安排晚餐');
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '京都晚餐草稿');
 
     await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
     await tester.pumpAndSettle();
@@ -763,6 +807,94 @@ void main() {
       find.byKey(const ValueKey('chat-input')),
     );
     expect(nextInput.controller!.text, isEmpty);
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '沖繩早餐草稿');
+
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-kyoto')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '京都晚餐草稿',
+    );
+
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pumpAndSettle();
+    verify(
+      () => reqRepo.sendRequest(tripId: 'kyoto', message: '京都晚餐草稿'),
+    ).called(1);
+  });
+
+  testWidgets('query 更新不會重建 ChatScreen 或清除各行程草稿', (tester) async {
+    when(tripRepo.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
+        TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+        TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+      ]),
+    );
+    final harnessKey = GlobalKey<_ChatQueryHarnessState>();
+
+    await tester.pumpWidget(buildApp(home: _ChatQueryHarness(key: harnessKey)));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      '沖繩 query 草稿',
+    );
+
+    harnessKey.currentState!.showTrip('kyoto');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+
+    harnessKey.currentState!.showTrip('okinawa');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '沖繩 query 草稿',
+    );
+
+    harnessKey.currentState!.showTrip('okinawa', prefill: '新的深連結指令');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '新的深連結指令',
+    );
+
+    harnessKey.currentState!.showTrip('kyoto', prefill: '新的深連結指令');
+    await tester.pumpAndSettle();
+    expect(find.text('京都'), findsWidgets);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '新的深連結指令',
+    );
+
+    harnessKey.currentState!.showTrip('okinawa');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '新的深連結指令',
+    );
   });
 
   testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {

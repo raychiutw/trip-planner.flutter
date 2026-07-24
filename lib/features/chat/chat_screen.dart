@@ -18,6 +18,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'ai_consent_sheet.dart';
@@ -51,14 +52,42 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  String? _tripId;
   String? _pendingPrefill;
+  String? _pendingRouteTripId;
+  String? _renderedTripId;
+  final _drafts = <String, String>{};
 
   @override
   void initState() {
     super.initState();
-    _tripId = widget.initialTripId;
     _pendingPrefill = widget.initialPrefill;
+    final tripId = widget.initialTripId;
+    _pendingRouteTripId = tripId;
+    if (tripId != null) _selectRouteTripAfterBuild(tripId);
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTripId != oldWidget.initialTripId) {
+      _pendingRouteTripId = widget.initialTripId;
+      if (widget.initialTripId != null) {
+        _selectRouteTripAfterBuild(widget.initialTripId!);
+      }
+    }
+    if (widget.initialPrefill != oldWidget.initialPrefill ||
+        (widget.initialTripId != oldWidget.initialTripId &&
+            widget.initialPrefill != null)) {
+      _pendingPrefill = widget.initialPrefill;
+    }
+  }
+
+  void _selectRouteTripAfterBuild(String tripId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingRouteTripId != tripId) return;
+      unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
+      setState(() => _pendingRouteTripId = null);
+    });
   }
 
   void _consumePrefill() {
@@ -75,19 +104,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final tripsAsync = ref.watch(myTripsProvider);
     final trips = tripsAsync.value ?? const <TripSummary>[];
-    final tripId = trips.isEmpty
-        ? null
-        : trips.any((trip) => trip.tripId == _tripId)
-        ? _tripId!
-        : trips.first.tripId;
-    final currentTrip = tripId == null
-        ? null
-        : trips.firstWhere((trip) => trip.tripId == tripId);
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    final selectedAsync = isActiveBranch
+        ? ref.watch(currentTripIdProvider)
+        : ref.read(currentTripIdProvider);
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        !selectedAsync.isLoading) {
+      _renderedTripId = selectedAsync.value;
+    }
+    final selectedTripId =
+        _pendingRouteTripId ??
+        (isActiveBranch ? selectedAsync.value : _renderedTripId);
+    final currentTrip = resolveCurrentTrip(trips, selectedTripId);
+    final tripId = currentTrip?.tripId;
+    final selectedTrip = trips
+        .where((trip) => trip.tripId == selectedAsync.value)
+        .firstOrNull;
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        widget.initialTripId != null &&
+        selectedTrip != null &&
+        widget.initialTripId != selectedTrip.tripId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          GoRouter.maybeOf(context)?.go(
+            '/chat?tripId=${Uri.encodeQueryComponent(selectedTrip.tripId)}',
+          );
+        }
+      });
+    }
 
     return TpRootScaffold(
       header: TpRootHeaderConfig(
         title: currentTrip == null
-            ? const Text('行程')
+            ? Text(tripsAsync.isLoading || tripsAsync.hasError ? '行程' : '尚無行程')
             : TripTitleButton(
                 key: const ValueKey('chat-trip-dropdown'),
                 currentTripId: currentTrip.tripId,
@@ -95,7 +146,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ? currentTrip.title!.trim()
                     : currentTrip.name,
                 trips: trips,
-                onSelected: (value) => setState(() => _tripId = value),
+                onSelected: (value) => unawaited(
+                  ref.read(currentTripIdProvider.notifier).select(value),
+                ),
               ),
         actions: const [],
       ),
@@ -109,17 +162,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         data: (trips) {
           if (trips.isEmpty) {
             return initiallyBelowHeader(
-              const _CenteredHint(
-                title: '先建立行程',
+              _CenteredHint(
+                title: '尚無行程',
                 body: '建立行程後,就能在這裡用 AI 助手調整行程。',
+                actionLabel: '新增行程',
+                onAction: () => context.push('/new-trip'),
               ),
             );
           }
+          if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
+              (_pendingRouteTripId != null && tripId != _pendingRouteTripId)) {
+            return initiallyBelowHeader(
+              const Center(child: CircularProgressIndicator.adaptive()),
+            );
+          }
+          final pendingPrefill =
+              _pendingPrefill != null &&
+                  (widget.initialTripId == null ||
+                      widget.initialTripId == tripId)
+              ? _pendingPrefill
+              : null;
           return _ChatBody(
             key: ValueKey(tripId),
             tripId: tripId!,
-            initialPrefill: _pendingPrefill,
+            initialPrefill: pendingPrefill ?? _drafts[tripId],
             onInitialPrefillConsumed: _consumePrefill,
+            onDraftChanged: (draft) => _drafts[tripId] = draft,
           );
         },
       ),
@@ -133,12 +201,14 @@ class _ChatBody extends ConsumerStatefulWidget {
     super.key,
     required this.tripId,
     required this.onInitialPrefillConsumed,
+    required this.onDraftChanged,
     this.initialPrefill,
   });
 
   final String tripId;
   final String? initialPrefill;
   final VoidCallback onInitialPrefillConsumed;
+  final ValueChanged<String> onDraftChanged;
 
   @override
   ConsumerState<_ChatBody> createState() => _ChatBodyState();
@@ -159,6 +229,8 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   void initState() {
     super.initState();
     _input = TextEditingController(text: widget.initialPrefill);
+    _input.addListener(_saveDraft);
+    _saveDraft();
     _scroll.addListener(_onScroll);
     _aiAuthorizationLoad = _loadAiAuthorization();
     unawaited(_aiAuthorizationLoad);
@@ -167,6 +239,20 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
         if (mounted) widget.onInitialPrefillConsumed();
       });
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final prefill = widget.initialPrefill;
+    if (prefill == null || prefill == oldWidget.initialPrefill) return;
+    _input.value = TextEditingValue(
+      text: prefill,
+      selection: TextSelection.collapsed(offset: prefill.length),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onInitialPrefillConsumed();
+    });
   }
 
   @override
@@ -183,9 +269,12 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   void dispose() {
     _reselects?.removeListener(_scrollToTop);
     _scroll.dispose();
+    _input.removeListener(_saveDraft);
     _input.dispose();
     super.dispose();
   }
+
+  void _saveDraft() => widget.onDraftChanged(_input.text);
 
   // reverse list:接近「頂端」= 接近 maxScrollExtent → 載入更舊。
   void _onScroll() {
@@ -739,11 +828,19 @@ class _EmptyStatePrompts extends StatelessWidget {
 
 /// 置中提示(空清單 / 空對話 / 錯誤)。
 class _CenteredHint extends StatelessWidget {
-  const _CenteredHint({required this.title, required this.body, this.onRetry});
+  const _CenteredHint({
+    required this.title,
+    required this.body,
+    this.onRetry,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final String title;
   final String body;
   final VoidCallback? onRetry;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -770,6 +867,9 @@ class _CenteredHint extends StatelessWidget {
                 onPressed: onRetry,
                 child: const Text('重試'),
               ),
+            ] else if (onAction != null && actionLabel != null) ...[
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),

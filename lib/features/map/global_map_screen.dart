@@ -8,16 +8,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/providers.dart';
-import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trip_detail/trip_map_screen.dart';
+import '../trips/current_trip_provider.dart';
 import '../trips/trips_list_screen.dart';
 import 'map_adapter.dart';
 import 'map_location.dart';
-
-const _lastMapTripCacheKey = 'ui:last-map-trip';
 
 class GlobalMapScreen extends ConsumerStatefulWidget {
   const GlobalMapScreen({
@@ -40,57 +37,54 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 }
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
-  String? _selectedTripId;
+  int? _activeDayNum;
+  String? _pendingRouteTripId;
+  String? _renderedTripId;
 
   @override
   void initState() {
     super.initState();
-    _selectedTripId = widget.initialTripId;
-    if (_selectedTripId == null) {
-      unawaited(_loadLastTrip());
-    } else {
-      unawaited(_rememberTrip(_selectedTripId!));
-    }
+    _activeDayNum = widget.initialDayNum;
+    final tripId = widget.initialTripId;
+    _pendingRouteTripId = tripId;
+    if (tripId != null) _selectRouteTripAfterBuild(tripId);
   }
 
   @override
   void didUpdateWidget(covariant GlobalMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     final explicitTripId = widget.initialTripId;
-    if (explicitTripId != null && explicitTripId != _selectedTripId) {
-      setState(() => _selectedTripId = explicitTripId);
-      unawaited(_rememberTrip(explicitTripId));
+    if (explicitTripId != oldWidget.initialTripId) {
+      _pendingRouteTripId = explicitTripId;
+      if (explicitTripId != null) {
+        _selectRouteTripAfterBuild(explicitTripId);
+      }
+    }
+    if (widget.initialDayNum != oldWidget.initialDayNum) {
+      _activeDayNum = widget.initialDayNum;
     }
   }
 
-  Future<void> _loadLastTrip() async {
-    final cached = await ref
-        .read(cacheStoreProvider)
-        .readResponse(_lastMapTripCacheKey);
-    final value = cached?.data;
-    if (!mounted ||
-        _selectedTripId != null ||
-        value is! String ||
-        value.isEmpty) {
-      return;
-    }
-    setState(() => _selectedTripId = value);
-  }
-
-  Future<void> _selectTrip(String tripId) async {
-    setState(() => _selectedTripId = tripId);
-    await _rememberTrip(tripId);
-  }
-
-  Future<void> _rememberTrip(String tripId) async {
-    await ref
-        .read(cacheStoreProvider)
-        .writeResponse(_lastMapTripCacheKey, tripId);
+  void _selectRouteTripAfterBuild(String tripId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingRouteTripId != tripId) return;
+      unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
+      setState(() => _pendingRouteTripId = null);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    final selectedAsync = isActiveBranch
+        ? ref.watch(currentTripIdProvider)
+        : ref.read(currentTripIdProvider);
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        !selectedAsync.isLoading) {
+      _renderedTripId = selectedAsync.value;
+    }
     return tripsAsync.when(
       loading: () => _rootState(
         context,
@@ -112,37 +106,65 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
             context,
             _MapState(
               icon: CupertinoIcons.map,
-              title: '先建立行程',
+              title: '尚無行程',
               body: '建立行程並加入地點後，就能在地圖上查看每日路線。',
               actionLabel: '新增行程',
               onAction: () => context.push('/new-trip'),
             ),
+            title: '尚無行程',
           );
         }
-        final selected = _resolveSelectedTrip(trips);
-        if (_selectedTripId != selected.tripId) {
+        if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
+            (_pendingRouteTripId != null &&
+                !trips.any((trip) => trip.tripId == _pendingRouteTripId))) {
+          return _rootState(
+            context,
+            const Center(child: CircularProgressIndicator.adaptive()),
+          );
+        }
+        final selected = resolveCurrentTrip(
+          trips,
+          _pendingRouteTripId ??
+              (isActiveBranch ? selectedAsync.value : _renderedTripId),
+        )!;
+        final sharedTrip = trips
+            .where((trip) => trip.tripId == selectedAsync.value)
+            .firstOrNull;
+        if (isActiveBranch &&
+            _pendingRouteTripId == null &&
+            widget.initialTripId != null &&
+            sharedTrip != null &&
+            widget.initialTripId != sharedTrip.tripId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _selectedTripId != selected.tripId) {
-              unawaited(_selectTrip(selected.tripId));
-            }
+            if (!mounted) return;
+            final day = _activeDayNum;
+            GoRouter.maybeOf(context)?.go(
+              '/map?tripId=${Uri.encodeQueryComponent(sharedTrip.tripId)}'
+              '${day == null ? '' : '&day=$day'}',
+            );
           });
         }
         return TripMapScreen(
           key: ValueKey('global-trip-map-${selected.tripId}'),
           tripId: selected.tripId,
-          initialEntryId: widget.initialEntryId,
-          initialDayNum: widget.initialDayNum,
+          initialEntryId: selected.tripId == widget.initialTripId
+              ? widget.initialEntryId
+              : null,
+          initialDayNum: _activeDayNum,
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
-          onTripSelected: (tripId) => unawaited(_selectTrip(tripId)),
+          onTripSelected: (tripId) => unawaited(
+            ref.read(currentTripIdProvider.notifier).select(tripId),
+          ),
+          onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
         );
       },
     );
   }
 
-  Widget _rootState(BuildContext context, Widget body) {
+  Widget _rootState(BuildContext context, Widget body, {String title = '地圖'}) {
     return TpRootScaffold(
-      header: const TpRootHeaderConfig(title: Text('地圖')),
+      header: TpRootHeaderConfig(title: Text(title)),
       body: Padding(
         padding: EdgeInsets.only(
           top: TpRootGeometry.initialContentTop(context),
@@ -150,16 +172,6 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
         child: body,
       ),
     );
-  }
-
-  TripSummary _resolveSelectedTrip(List<TripSummary> trips) {
-    final selectedId = _selectedTripId;
-    if (selectedId != null) {
-      for (final trip in trips) {
-        if (trip.tripId == selectedId) return trip;
-      }
-    }
-    return trips.first;
   }
 }
 

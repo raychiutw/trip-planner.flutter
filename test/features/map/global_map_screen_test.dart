@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +9,7 @@ import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
+import 'package:tripline/features/trips/current_trip_provider.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
@@ -45,27 +48,53 @@ final _day = TripDay(
   ],
 );
 
+final _dayTwo = TripDay(
+  id: 2,
+  dayNum: 2,
+  version: 1,
+  timeline: const [
+    TimelineEntry(
+      id: 22,
+      sortOrder: 0,
+      title: '淺草寺',
+      version: 1,
+      master: EntryPoiInfo(
+        poiId: 220,
+        name: '淺草寺',
+        lat: 35.7148,
+        lng: 139.7967,
+      ),
+    ),
+  ],
+);
+
 void main() {
   Widget buildApp({
     List<TripSummary> trips = _trips,
+    Stream<List<TripSummary>>? tripsStream,
     List<TripDay>? days,
+    Map<String, List<TripDay>>? daysByTrip,
     InMemoryCacheStore? cacheStore,
     TripMapLocationService? locationService,
     ValueChanged<TripMapCanvasConfig>? onMapConfig,
+    String? initialTripId,
   }) {
     return ProviderScope(
       overrides: [
         cacheStoreProvider.overrideWithValue(
           cacheStore ?? InMemoryCacheStore(),
         ),
-        myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+        myTripsProvider.overrideWith(
+          (ref) => tripsStream ?? Stream.value(trips),
+        ),
         tripDaysProvider.overrideWith(
-          (ref, tripId) => Stream.value(days ?? [_day]),
+          (ref, tripId) => Stream.value(daysByTrip?[tripId] ?? days ?? [_day]),
         ),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
         home: GlobalMapScreen(
+          initialTripId: initialTripId,
           mapBuilder: (config) {
             onMapConfig?.call(config);
             return fakeTripMapBuilder(config);
@@ -126,6 +155,70 @@ void main() {
     expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
   });
 
+  testWidgets('切換行程保留目標也存在的 DAY', (tester) async {
+    await tester.pumpWidget(
+      buildApp(
+        daysByTrip: {
+          'okinawa': [_day, _dayTwo],
+          'tokyo': [_day, _dayTwo],
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-22')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+  });
+
+  testWidgets('切換行程缺少原 DAY 時回 Day 1 並清除舊 POI', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      buildApp(
+        daysByTrip: {
+          'okinawa': [_day, _dayTwo],
+          'tokyo': [_day],
+        },
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.onGooglePoiSelected!(
+      const GoogleMapPoiSelection(
+        placeId: 'old-trip-poi',
+        name: '舊行程景點',
+        point: TripMapPoint(35.7, 139.8),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('google-poi-accessory')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-okinawa')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-22')), findsNothing);
+  });
+
   testWidgets('從持久 cache 恢復上次查看的行程', (tester) async {
     final store = InMemoryCacheStore();
     await store.writeResponse('ui:last-map-trip', 'tokyo');
@@ -134,6 +227,82 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('東京週末'), findsOneWidget);
+    expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
+  });
+
+  testWidgets('cache 行程失效時先顯示第一筆且保留選擇等待 fresh list', (tester) async {
+    final store = InMemoryCacheStore();
+    await store.writeResponse('ui:last-map-trip', 'deleted-trip');
+
+    await tester.pumpWidget(buildApp(cacheStore: store));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('global-trip-map-okinawa')),
+      findsOneWidget,
+    );
+    expect(
+      (await store.readResponse('ui:last-map-trip'))?.data,
+      'deleted-trip',
+    );
+  });
+
+  testWidgets('stale list 缺少深連結行程時 fresh list 仍恢復正確行程', (tester) async {
+    final tripsStream = StreamController<List<TripSummary>>();
+    addTearDown(tripsStream.close);
+    tripsStream.add([_trips.first]);
+
+    await tester.pumpWidget(
+      buildApp(tripsStream: tripsStream.stream, initialTripId: 'tokyo'),
+    );
+    await tester.pumpAndSettle();
+    tripsStream.add(_trips);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
+  });
+
+  testWidgets('offstage 時延後套用共享行程，回到地圖才重建', (tester) async {
+    final store = InMemoryCacheStore();
+    await store.writeResponse('ui:last-map-trip', 'okinawa');
+    final tripsStream = StreamController<List<TripSummary>>();
+    addTearDown(tripsStream.close);
+    tripsStream.add(_trips);
+    final container = ProviderContainer(
+      overrides: [
+        cacheStoreProvider.overrideWithValue(store),
+        myTripsProvider.overrideWith((ref) => tripsStream.stream),
+        tripDaysProvider.overrideWith((ref, tripId) => Stream.value([_day])),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(currentTripIdProvider.future);
+
+    Widget app({required bool active}) => UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        home: TickerMode(
+          enabled: active,
+          child: GlobalMapScreen(mapBuilder: fakeTripMapBuilder),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(app(active: true));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(app(active: false));
+    await tester.pumpAndSettle();
+    await container.read(currentTripIdProvider.notifier).select('tokyo');
+    tripsStream.add(List.of(_trips));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('global-trip-map-okinawa')),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(app(active: true));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
   });
 
@@ -156,7 +325,7 @@ void main() {
     await tester.pumpWidget(buildApp(trips: const []));
     await tester.pumpAndSettle();
 
-    expect(find.text('先建立行程'), findsOneWidget);
+    expect(find.text('尚無行程'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '新增行程'), findsOneWidget);
     expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsNothing);

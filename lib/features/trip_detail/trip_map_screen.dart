@@ -38,6 +38,7 @@ class TripMapScreen extends ConsumerStatefulWidget {
     this.mapBuilder,
     this.locationService,
     this.onTripSelected,
+    this.onActiveDayChanged,
     this.externalLauncher = const GoogleMapsExternalLauncher(),
   });
 
@@ -55,6 +56,7 @@ class TripMapScreen extends ConsumerStatefulWidget {
   /// 測試注入點：production 用 geolocator，widget test 傳入 fake。
   final TripMapLocationService? locationService;
   final ValueChanged<String>? onTripSelected;
+  final ValueChanged<int?>? onActiveDayChanged;
   final GoogleMapsExternalLauncher externalLauncher;
 
   @override
@@ -159,7 +161,10 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             externalLauncher: widget.externalLauncher,
-            onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
+            onActiveDayChanged: (dayNum) {
+              _activeDayNum = dayNum;
+              widget.onActiveDayChanged?.call(dayNum);
+            },
           ),
         ),
       ),
@@ -298,7 +303,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       initialPage: initialPage,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_loadRoutes());
+      if (!mounted) return;
+      widget.onActiveDayChanged(_dayNumForTab(_selectedTabIndex));
+      unawaited(_loadRoutes());
     });
   }
 
@@ -321,6 +328,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       unawaited(_loadRoutes());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
+        widget.onActiveDayChanged(_dayNumForTab(_selectedTabIndex));
         if (_pageController.hasClients) _pageController.jumpToPage(initialPage);
         if (_mapIsReady) _applyInitialFocus();
       });
@@ -400,6 +408,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     return widget.days.isEmpty ? 0 : 1;
   }
 
+  int? _dayNumForTab(int tabIndex) =>
+      tabIndex == 0 ? null : widget.days[tabIndex - 1].dayNum;
+
   int _initialStopPage(List<_MapStop> stops) {
     final entryId = widget.initialEntryId;
     if (entryId == null) return 0;
@@ -426,9 +437,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
       _activeEntryId = null;
       _selectedGooglePoi = null;
     });
-    widget.onActiveDayChanged(
-      tabIndex == 0 ? null : widget.days[tabIndex - 1].dayNum,
-    );
+    widget.onActiveDayChanged(_dayNumForTab(tabIndex));
     if (_pageController.hasClients) _pageController.jumpToPage(0);
     _focusDay(_pinsForTab(tabIndex));
     unawaited(_loadRoutes());

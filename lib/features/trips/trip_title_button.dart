@@ -35,10 +35,24 @@ class TripTitleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return KeyedSubtree(
+    final hasTrips = trips.isNotEmpty;
+    final canSelect = trips.length > 1;
+    return Semantics(
       key: const ValueKey('trip-title-button'),
+      container: true,
+      button: true,
+      enabled: canSelect,
+      label: '目前行程',
+      value: currentTitle,
+      hint: canSelect
+          ? '點兩下切換行程'
+          : hasTrips
+          ? '只有一個行程'
+          : null,
+      onTap: canSelect ? () => _openPicker(context) : null,
+      excludeSemantics: true,
       child: TextButton(
-        onPressed: trips.isEmpty ? null : () => _openPicker(context),
+        onPressed: canSelect ? () => _openPicker(context) : null,
         style: TextButton.styleFrom(
           foregroundColor: Theme.of(context).colorScheme.onSurface,
           minimumSize: const Size(44, 44),
@@ -58,8 +72,10 @@ class TripTitleButton extends StatelessWidget {
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            const SizedBox(width: TpSpacing.s1),
-            const Icon(CupertinoIcons.chevron_down, size: 14),
+            if (canSelect) ...[
+              const SizedBox(width: TpSpacing.s1),
+              const Icon(CupertinoIcons.chevron_down, size: 14),
+            ],
           ],
         ),
       ),
@@ -165,6 +181,7 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
                     ].join(' · ');
                     return ListTile(
                       key: ValueKey('trip-picker-item-${trip.tripId}'),
+                      selected: selected,
                       minTileHeight: 56,
                       leading: Icon(
                         CupertinoIcons.map,
