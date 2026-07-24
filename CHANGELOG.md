@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-24
+
 ### 變更
 
 - 行程清單搜尋支援鍵盤 Search、清除與跨 root tab／詳情往返狀態保留；時間軸 Day selector 補齊左右方向鍵、完整 VoiceOver 語意、窄螢幕置中與僅點選換日。行程與行程日刪除統一為不可復原流程，伺服器成功前鎖定並保留內容，失敗時提供持續重試；缺少日期改以「新增」而非「加回」表達。
@@ -334,7 +336,8 @@ P0 里程碑:trip-planner 的 iOS/Android 唯讀版可用 — 登入後能瀏覽
 - 專案 CLAUDE.md(agent 開發指南)
 - PORTING_PLAN/CONTRACTS 與實作同步(riverpod 3.x、歷史契約標註)
 
-[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.6...v0.10.0
 [0.9.6]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/raychiutw/trip-planner.flutter/compare/v0.9.3...v0.9.4
