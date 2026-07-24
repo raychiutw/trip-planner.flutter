@@ -276,6 +276,101 @@ void main() {
     expect(await cache.readResponse(invitesKey), isNull);
   });
 
+  test('developer app PATCH 成功後 list/detail 不可回退舊快取', () async {
+    final listKey = cacheKeyFor('GET', '/dev/apps');
+    final detailKey = cacheKeyFor('GET', '/dev/apps/tp_dev');
+    await cache.writeResponse(listKey, [
+      {'clientId': 'tp_dev', 'appName': 'Old App'},
+    ]);
+    await cache.writeResponse(detailKey, {
+      'clientId': 'tp_dev',
+      'appName': 'Old App',
+    });
+    adapter.onPatch(
+      '/dev/apps/tp_dev',
+      (server) =>
+          server.reply(200, {'clientId': 'tp_dev', 'appName': 'New App'}),
+      data: {'appName': 'New App'},
+    );
+    adapter.onGet(
+      '/dev/apps/tp_dev',
+      (server) => server.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/dev/apps/tp_dev'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+    );
+
+    await client.patch('/dev/apps/tp_dev', body: {'appName': 'New App'});
+
+    expect(await cache.readResponse(listKey), isNull);
+    expect(await cache.readResponse(detailKey), isNull);
+    await expectLater(
+      client.get('/dev/apps/tp_dev'),
+      throwsA(isA<DioException>()),
+    );
+  });
+
+  test('session DELETE 成功後不可回退舊清單快取', () async {
+    final sessionsKey = cacheKeyFor('GET', '/account/sessions');
+    await cache.writeResponse(sessionsKey, [
+      {'id': 'session-1'},
+    ]);
+    adapter.onDelete(
+      '/account/sessions/session-1',
+      (server) => server.reply(204, null),
+    );
+    adapter.onGet(
+      '/account/sessions',
+      (server) => server.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/account/sessions'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+    );
+
+    await client.delete('/account/sessions/session-1');
+
+    expect(await cache.readResponse(sessionsKey), isNull);
+    await expectLater(
+      client.get('/account/sessions'),
+      throwsA(isA<DioException>()),
+    );
+  });
+
+  test('connected app DELETE 成功後不可回退舊清單快取', () async {
+    final connectedAppsKey = cacheKeyFor('GET', '/account/connected-apps');
+    await cache.writeResponse(connectedAppsKey, [
+      {'clientId': 'tp_alpha'},
+    ]);
+    adapter.onDelete(
+      '/account/connected-apps/tp_alpha',
+      (server) => server.reply(204, null),
+    );
+    adapter.onGet(
+      '/account/connected-apps',
+      (server) => server.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/account/connected-apps'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+    );
+
+    await client.delete('/account/connected-apps/tp_alpha');
+
+    expect(await cache.readResponse(connectedAppsKey), isNull);
+    await expectLater(
+      client.get('/account/connected-apps'),
+      throwsA(isA<DioException>()),
+    );
+  });
+
   test('userinfo 離線 → 回退最後快取身分(離線保持登入)', () async {
     final key = cacheKeyFor('GET', '/oauth/userinfo');
     await cache.writeResponse(key, {'id': 'u1', 'email': 'a@b.c'});
