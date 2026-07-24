@@ -39,6 +39,12 @@ void main() {
   final testLabSigning = File(
     'ios/Flutter/TestLabSigning.xcconfig',
   ).readAsStringSync();
+  final nativeGestureBridge = File(
+    'ios/RunnerUITests/RunnerUITests.m',
+  ).readAsStringSync();
+  final androidNativeGestureBridge = File(
+    'android/app/src/androidTest/java/com/raychiu/tripline/MainActivityTest.java',
+  ).readAsStringSync();
 
   group('external mobile integration evidence', () {
     test('Patrol suites run on Firebase Test Lab for Android and iOS', () {
@@ -711,11 +717,26 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('.swipe('));
         expect(nativeMapSmoke, contains('.platform.mobile.doubleTap('));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
+        expect(nativeMapSmoke, contains('Tripline native map pinch request'));
+        expect(nativeMapSmoke, contains('Tripline native map rotate request'));
+        expect(nativeGestureBridge, contains('pinchWithScale:'));
+        expect(nativeGestureBridge, contains('rotate:'));
+        expect(androidNativeGestureBridge, contains('.pinchOut('));
         expect(
-          nativeMapSmoke,
-          contains(
-            'https://github.com/raychiutw/trip-planner.flutter/issues/104',
-          ),
+          androidNativeGestureBridge,
+          contains('.performTwoPointerGesture('),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('!request.equals(activeRequest)'),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('dartTestName.contains(NATIVE_MAP_TEST_NAME)'),
+        );
+        expect(
+          nativeGestureBridge,
+          contains('containsString:@"native Google Map renders"'),
         );
         expect(nativeMapSmoke, contains('_poiTapOffsets'));
         expect(nativeMapSmoke, contains('#toggleMapLifecycle'));

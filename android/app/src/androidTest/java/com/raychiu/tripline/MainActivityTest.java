@@ -1,6 +1,13 @@
 package com.raychiu.tripline;
 
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.os.SystemClock;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.uiautomator.UiDevice;
+import androidx.test.uiautomator.UiObject;
+import androidx.test.uiautomator.UiObjectNotFoundException;
+import androidx.test.uiautomator.UiSelector;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -9,6 +16,11 @@ import pl.leancode.patrol.PatrolJUnitRunner;
 
 @RunWith(Parameterized.class)
 public class MainActivityTest {
+    private static final String MAP_LABEL = "Tripline native map evidence canvas";
+    private static final String PINCH_REQUEST_LABEL = "Tripline native map pinch request";
+    private static final String ROTATE_REQUEST_LABEL = "Tripline native map rotate request";
+    private static final String NATIVE_MAP_TEST_NAME = "native Google Map renders";
+
     @Parameters(name = "{0}")
     public static Object[] testCases() {
         PatrolJUnitRunner instrumentation =
@@ -28,6 +40,60 @@ public class MainActivityTest {
     public void runDartTest() {
         PatrolJUnitRunner instrumentation =
                 (PatrolJUnitRunner) InstrumentationRegistry.getInstrumentation();
-        instrumentation.runDartTest(dartTestName);
+        Thread gestureBridge = dartTestName.contains(NATIVE_MAP_TEST_NAME)
+                ? startNativeMapGestureBridge(instrumentation)
+                : null;
+        try {
+            instrumentation.runDartTest(dartTestName);
+        } finally {
+            if (gestureBridge != null) {
+                gestureBridge.interrupt();
+            }
+        }
+    }
+
+    private static Thread startNativeMapGestureBridge(PatrolJUnitRunner instrumentation) {
+        Thread bridge = new Thread(() -> {
+            UiDevice device = UiDevice.getInstance(instrumentation);
+            UiObject map = device.findObject(new UiSelector().description(MAP_LABEL));
+            String activeRequest = null;
+
+            while (!Thread.currentThread().isInterrupted()) {
+                String request = device.findObject(new UiSelector().description(PINCH_REQUEST_LABEL)).exists()
+                        ? PINCH_REQUEST_LABEL
+                        : (device.findObject(new UiSelector().description(ROTATE_REQUEST_LABEL)).exists()
+                                ? ROTATE_REQUEST_LABEL
+                                : null);
+                if (request == null) {
+                    activeRequest = null;
+                } else if (!request.equals(activeRequest) && injectGesture(map, request)) {
+                    activeRequest = request;
+                }
+                SystemClock.sleep(250);
+            }
+        }, "tripline-native-map-gestures");
+        bridge.start();
+        return bridge;
+    }
+
+    private static boolean injectGesture(UiObject map, String request) {
+        try {
+            if (PINCH_REQUEST_LABEL.equals(request)) {
+                return map.pinchOut(60, 30);
+            }
+
+            Rect bounds = map.getBounds();
+            int centerX = bounds.centerX();
+            int centerY = bounds.centerY();
+            int radius = Math.min(bounds.width(), bounds.height()) / 5;
+            return map.performTwoPointerGesture(
+                    new Point(centerX - radius, centerY),
+                    new Point(centerX + radius, centerY),
+                    new Point(centerX, centerY - radius),
+                    new Point(centerX, centerY + radius),
+                    40);
+        } catch (UiObjectNotFoundException ignored) {
+            return false;
+        }
     }
 }

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,8 +14,8 @@ const _taipei101 = TripMapPoint(25.033968, 121.564468);
 const _zoomCheckPoint = TripMapPoint(25.1676, 121.4450);
 const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
 const _nativeMapEvidenceLabel = 'Tripline native map evidence canvas';
-const _iosMultitouchEvidenceIssue =
-    'https://github.com/raychiutw/trip-planner.flutter/issues/104';
+const _nativePinchRequestLabel = 'Tripline native map pinch request';
+const _nativeRotateRequestLabel = 'Tripline native map rotate request';
 
 final _nativeMapSelector = MobileSelector(
   android: AndroidSelector(contentDescription: _nativeMapEvidenceLabel),
@@ -86,53 +86,17 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
-    final mapRect = $.tester.getRect(
-      find.byKey(const ValueKey('google-trip-map-canvas')),
-    );
-    final mapCenter = mapRect.center;
+    await $(#armPinchCheck).tap();
+    await $(
+      #nativeMapPinchObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapPinchObserved), findsOneWidget);
 
-    if (Platform.isIOS) {
-      debugPrint(
-        'BLOCKED: Patrol 4.6.1 cannot inject native iOS pinch/rotate; '
-        'tracked at $_iosMultitouchEvidenceIssue',
-      );
-    } else {
-      await $(#armPinchCheck).tap();
-      final pinchLeft = await $.tester.startGesture(
-        mapCenter - const Offset(36, 0),
-        pointer: 1,
-      );
-      final pinchRight = await $.tester.startGesture(
-        mapCenter + const Offset(36, 0),
-        pointer: 2,
-      );
-      await pinchLeft.moveTo(mapCenter - const Offset(96, 0));
-      await pinchRight.moveTo(mapCenter + const Offset(96, 0));
-      await pinchLeft.up();
-      await pinchRight.up();
-      await $(
-        #nativeMapPinchObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapPinchObserved), findsOneWidget);
-
-      await $(#armRotateCheck).tap();
-      final rotateLeft = await $.tester.startGesture(
-        mapCenter - const Offset(56, 0),
-        pointer: 3,
-      );
-      final rotateRight = await $.tester.startGesture(
-        mapCenter + const Offset(56, 0),
-        pointer: 4,
-      );
-      await rotateLeft.moveTo(mapCenter - const Offset(0, 56));
-      await rotateRight.moveTo(mapCenter + const Offset(0, 56));
-      await rotateLeft.up();
-      await rotateRight.up();
-      await $(
-        #nativeMapRotateObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapRotateObserved), findsOneWidget);
-    }
+    await $(#armRotateCheck).tap();
+    await $(
+      #nativeMapRotateObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapRotateObserved), findsOneWidget);
 
     await $(#armDoubleTapCheck).tap();
     await $.platform.mobile.doubleTap(_nativeMapSelector);
@@ -407,7 +371,13 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                       FilledButton(
                         key: ValueKey(key),
                         onPressed: () => _armGesture(gesture),
-                        child: Text(label),
+                        child: Text(switch ((_expectedGesture, gesture)) {
+                          (_NativeGesture.pinch, _NativeGesture.pinch) =>
+                            _nativePinchRequestLabel,
+                          (_NativeGesture.rotate, _NativeGesture.rotate) =>
+                            _nativeRotateRequestLabel,
+                          _ => label,
+                        }),
                       ),
                     FilledButton(
                       key: const ValueKey('requestLocationPermission'),
