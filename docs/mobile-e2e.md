@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable, and every release dispatch now runs the matching Test Lab matrix before either store upload. Formatter, analyzer, Flutter tests, the app-owned integration flow, external-device evidence, and exact-SHA manual accessibility evidence are release blockers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. Store uploads are independent: a manual `Mobile CI / Releases` dispatch starts the selected store jobs directly. Both Test Lab jobs remain master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
 Android Test Lab first runs the standard Flutter
 `integration_test/app_smoke_test.dart` instrumentation APKs, then runs the
@@ -34,11 +34,11 @@ attaches the text-input connection required by release-mode tests on physical
 iOS devices; the host-runner integration test keeps the standard Flutter test
 driver through the same shared flow.
 
-The regular PR/push CI also runs the same app-owned flow on the host runner. It writes 14 named product states to `build/test-artifacts/app-owned/` for each of ten pairwise profiles: compact Light／Dark, compact Light／Dark at 300% maximum Accessibility Size, landscape, regular tablet, regular split width, Reduce Motion, Increased Contrast, and Reduce Transparency. The resulting 140 PNGs include Welcome, Login, trips, chat, itinerary, Tripline POI, native-Google-POI callback state, favorites, trip picker, account, form, destructive confirmation, offline, and error. Flutter host tests use the deterministic Ahem font, so these PNGs validate geometry and state coverage; use Test Lab screenshots/video for readable platform typography and native map tiles. Production iOS reads Reduce Transparency through the app-owned `AppAccessibilityScope` EventChannel, while the deterministic artifact profile injects the same scope seam directly. Increased Contrast and Reduce Transparency remain separate profiles and may not be inferred from each other. The host artifact is not a substitute for the required manual-device Reduce Transparency case.
+The regular PR/push CI runs formatter, analyzer, the root-app smoke test, the host-runner app-owned release flow, and the mobile workflow contract test. Full tests and the complete deterministic visual matrix run in `ship` before landing. Host smoke results are not a substitute for readable platform typography, native map tiles, or manual-device accessibility evidence.
 
 ## 發布證據格式
 
-每次發布必須先建立一份可透過 HTTPS 存取、UTF-8 編碼且 machine-readable 的 JSON 人工驗收報告；Markdown、HTML、登入頁或舊版自由格式報告都不接受。最上層必須是 `{"schema_version": 1, "cases": [...]}`。報告的 `source_sha` 必須是準備發布的完整 40 字元 commit SHA；所有 case 必須針對同一個 SHA、`version` 與 `build`。`cases` 不得有重複的 `case_id`，每筆 case 使用以下必填字串欄位：
+獨立人工驗收可建立一份透過 HTTPS 存取、UTF-8 編碼且 machine-readable 的 JSON 報告；Markdown、HTML、登入頁或舊版自由格式報告都不接受。最上層必須是 `{"schema_version": 1, "cases": [...]}`。報告的 `source_sha` 必須是驗收版本的完整 40 字元 commit SHA；所有 case 必須針對同一個 SHA、`version` 與 `build`。`cases` 不得有重複的 `case_id`，每筆 case 使用以下必填字串欄位：
 
 | 欄位 | 內容 |
 | --- | --- |
@@ -81,19 +81,15 @@ The regular PR/push CI also runs the same app-owned flow on the host runner. It 
 | `LAYOUT-KEYBOARD` | 搜尋／對話輸入時 keyboard、composer、焦點與 root navigation 不互相遮擋 |
 | `NAV-EDGE-BACK` | iOS edge-back、sheet 關閉與返回後原 branch 狀態 |
 
-上表所有 case 與欄位都是必要項目。每筆 case 的 `result` 都必須是 `PASS`；任一 case 為 `FAIL` 或 `BLOCKED`、case ID 重複、缺少必要 case、缺少必要欄位、`source_sha` 不符、`version`／`build` 不一致、`evidence` 不是 HTTPS URL、內容裁切、焦點被 Header／keyboard／tab bar／sheet／POI accessory 遮住，或 control 小於 44×44pt，都會阻擋發布且不得將整份報告標記為 PASS。發布 workflow 的必要輸入為：
+上表所有 case 與欄位都是必要項目。每筆 case 的 `result` 都必須是 `PASS`；任一 case 為 `FAIL` 或 `BLOCKED`、case ID 重複、缺少必要 case、缺少必要欄位、`source_sha` 不符、`version`／`build` 不一致、`evidence` 不是 HTTPS URL、內容裁切、焦點被 Header／keyboard／tab bar／sheet／POI accessory 遮住，或 control 小於 44×44pt，都不得將整份報告標記為 PASS。
 
-- `manual_evidence_sha`：必須與 `${{ github.sha }}` 完全相同。
-- `manual_evidence_url`：指向上述完整報告，或發布例外紀錄的 HTTPS URL。
-- `manual_evidence_result`：只有全部 case 通過時才能選 `PASS`；預設為 `BLOCKED`。
-- `manual_evidence_waiver`：只有證據仍為 `BLOCKED` 且已決定承擔發布風險時才能設為 `true`；預設為 `false`。
-- `manual_evidence_waiver_reason`：使用發布例外時必填，需清楚記錄缺少的證據與已完成的驗證。
+使用保留的獨立 validator 檢查報告：
 
-`manual_evidence_gate` 只接受 HTTPS，使用 `curl --fail` 並限制連線／總時間與 1 MiB 檔案大小，再由 `jq` 驗證 JSON、完整 case matrix 與上述欄位。HTTP 錯誤、redirect 到非 HTTPS、timeout、超過大小限制、無效 JSON、舊 schema 或任何驗證失敗都會 fail closed。
+```bash
+bash tool/validate_manual_evidence.sh <https-report-url> <full-source-sha>
+```
 
-沒有完整人工報告時，可將結果維持 `BLOCKED`，同時提供精確 SHA、HTTPS 紀錄、`manual_evidence_waiver=true` 與非空白原因。Gate 會在工作流程摘要留下 `BLOCKED (release waiver)`、紀錄 URL 與原因；`FAIL`、錯誤 SHA、無效 URL、未明確啟用例外或空白原因仍會阻擋發布。這個例外只適用人工輔助使用證據，不會略過 `ci` 或 `external_device_gate`。
-
-Store jobs 同時依賴 `ci`、`external_device_gate` 與 `manual_evidence_gate`。任何核心流程、格式、analyzer、test、Patrol、44pt、裁切或輔助使用失敗都會阻擋 TestFlight 與 Google Play internal upload；只有上述已記錄的人工證據 `BLOCKED` 例外可以通過人工閘門。Repository 的 `master` ruleset 也必須把 PR 的 `Analyze and test` 設為 required status check；若尚未設定，發布負責人必須先完成設定，不得把 workflow 本身誤當作 branch protection。
+商店上傳不等待這份報告；結果應另外連回對應 issue 或 release record。
 
 ## One-time Google Cloud setup
 
@@ -183,7 +179,7 @@ same change as the protected GitHub secrets.
 
 In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. Before GitHub uploads the seven-day artifact, `tool/sanitize_test_lab_evidence.sh` applies an evidence-only allowlist and removes signed APK/XCTest archives plus unknown binary formats. GitHub therefore retains the matrix log, JUnit/XML results, logcat, video, screenshots, and text metadata without republishing installable test inputs.
 
-Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Select `release_target=both` for the normal release path: the TestFlight and Google Play jobs then share one `GITHUB_RUN_NUMBER`／`GITHUB_RUN_ATTEMPT` pair and therefore receive the same build number. Use a platform-specific target only to recover or republish one store. Supply the exact release SHA, HTTPS manual-report URL, and explicit PASS result. The workflow first runs CI, then the matching Firebase matrix, then validates the manual report; store jobs cannot start unless all three gates succeed. A Test Lab configuration, quota, infrastructure, accessibility, layout, or evidence failure is a release blocker, not a publish-first exception. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
+Manual **Mobile CI / Releases** dispatches are accepted only from `master`. Select `release_target=both` for the normal release path: TestFlight on `macos-26` and Google Play on Ubuntu start in parallel and share one `GITHUB_RUN_NUMBER`／`GITHUB_RUN_ATTEMPT` pair, so they receive the same build number. Use a platform-specific target only to recover or republish one store. TestFlight waits for App Store processing; Google Play uploads the signed AAB directly without retaining a public GitHub artifact. CI, Firebase Test Lab, and manual evidence remain independent workflows and do not delay store jobs.
 
 收藏已採不可復原刪除，release workflow 不再執行收藏 restore staging
 contract，也不再向 release build 注入 restore feature flag。已部署的後端

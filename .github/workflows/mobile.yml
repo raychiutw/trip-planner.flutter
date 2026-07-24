@@ -16,42 +16,6 @@ on:
           - testflight
           - android-internal
           - both
-      runner:
-        description: Runner used for the manual TestFlight release
-        required: true
-        default: macos-26
-        type: choice
-        options:
-          - macos-26
-          - tripline-release
-      manual_evidence_sha:
-        description: 人工輔助使用驗收所對應的完整 commit SHA
-        required: true
-        type: string
-      manual_evidence_url:
-        description: 人工輔助使用驗收證據的 HTTPS URL
-        required: true
-        type: string
-      manual_evidence_result:
-        description: 人工輔助使用驗收結果
-        required: true
-        default: BLOCKED
-        type: choice
-        options:
-          - BLOCKED
-          - FAIL
-          - PASS
-      manual_evidence_waiver:
-        description: 缺少人工證據時是否使用可稽核發布例外
-        required: true
-        default: false
-        type: boolean
-      manual_evidence_waiver_reason:
-        description: 發布例外原因（會寫入工作流程摘要）
-        required: false
-        default: ''
-        type: string
-
 permissions:
   contents: read
 
@@ -62,8 +26,9 @@ env:
 jobs:
   ci:
     name: Analyze and test
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -91,120 +56,17 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Run full Flutter test suite
-        run: flutter test
-
-      - name: Preserve deterministic UI evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tripline-ui-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/test-artifacts
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Build Android debug
-        env:
-          GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+      - name: Run smoke test suite
         run: |
-          set -euo pipefail
-          : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
-          flutter build apk --debug
-
-  external_device_gate:
-    name: External device evidence
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
-    needs: ci
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/mobile-e2e.yml
-    with:
-      platform: ${{ inputs.release_target == 'both' && 'all' || inputs.release_target == 'testflight' && 'ios' || 'android' }}
-    secrets:
-      GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      GOOGLE_MAPS_IOS_API_KEY: ${{ secrets.GOOGLE_MAPS_IOS_API_KEY }}
-      APPLE_DEVELOPMENT_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_P12 }}
-      APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPMENT_CERTIFICATE_PASSWORD }}
-      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-
-  manual_evidence_gate:
-    name: Manual accessibility evidence
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
-    needs: [ci, external_device_gate]
-    runs-on: ubuntu-24.04
-    environment: mobile-release
-    timeout-minutes: 5
-    steps:
-      - name: Check out evidence validator
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Validate exact-SHA manual evidence or release waiver
-        env:
-          EVIDENCE_RESULT: ${{ inputs.manual_evidence_result }}
-          EVIDENCE_SHA: ${{ inputs.manual_evidence_sha }}
-          EVIDENCE_URL: ${{ inputs.manual_evidence_url }}
-          EVIDENCE_WAIVER: ${{ inputs.manual_evidence_waiver }}
-          EVIDENCE_WAIVER_REASON: ${{ inputs.manual_evidence_waiver_reason }}
-          RELEASE_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVIDENCE_SHA" != "$RELEASE_SHA" ]]; then
-            echo "Manual evidence SHA must exactly match the release SHA" >&2
-            exit 1
-          fi
-          waiver_reason=
-          case "$EVIDENCE_RESULT" in
-            PASS)
-              bash tool/validate_manual_evidence.sh "$EVIDENCE_URL" "$RELEASE_SHA"
-              summary_result=PASS
-              summary_label=Evidence
-              ;;
-            BLOCKED)
-              if [[ "$EVIDENCE_WAIVER" != "true" ]]; then
-                echo "BLOCKED manual evidence requires an explicit release waiver" >&2
-                exit 1
-              fi
-              waiver_reason="${EVIDENCE_WAIVER_REASON//$'\r'/ }"
-              waiver_reason="${waiver_reason//$'\n'/ }"
-              if [[ ! "$waiver_reason" =~ [^[:space:]] ]]; then
-                echo "Release waiver reason must not be empty" >&2
-                exit 1
-              fi
-              if [[ ! "$EVIDENCE_URL" =~ ^https://[^/?#[:space:]]+([/?#][^[:space:]]*)?$ ]]; then
-                echo "Release waiver record must be a valid HTTPS URL with a host" >&2
-                exit 1
-              fi
-              echo "::warning title=Manual accessibility evidence waiver::Evidence remains BLOCKED; release waiver recorded."
-              summary_result="BLOCKED (release waiver)"
-              summary_label="Waiver record"
-              ;;
-            *)
-              echo "Manual accessibility evidence must be PASS, or BLOCKED with an explicit release waiver" >&2
-              exit 1
-              ;;
-          esac
-          {
-            echo "## Manual accessibility evidence"
-            echo "- Result: $summary_result"
-            echo "- SHA: \`$EVIDENCE_SHA\`"
-            echo "- $summary_label: $EVIDENCE_URL"
-            if [[ -n "$waiver_reason" ]]; then
-              echo "- Waiver reason: $waiver_reason"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          flutter test \
+            test/app/app_smoke_test.dart \
+            test/workflows/mobile_e2e_workflow_test.dart
+          flutter test test/flows/app_owned_release_flow_test.dart
 
   testflight:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'testflight' || inputs.release_target == 'both') }}
-    needs: [ci, external_device_gate, manual_evidence_gate]
-    runs-on: ${{ inputs.runner }}
+    runs-on: macos-26
     environment: mobile-release
     timeout-minutes: 75
     concurrency:
@@ -286,7 +148,6 @@ jobs:
   android_internal:
     name: Upload to Google Play internal testing
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'android-internal' || inputs.release_target == 'both') }}
-    needs: [ci, external_device_gate, manual_evidence_gate]
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 45
@@ -348,14 +209,6 @@ jobs:
             --release \
             --build-number="$version_code"
           test -f build/app/outputs/bundle/release/app-release.aab
-
-      - name: Preserve signed Android App Bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tripline-android-internal-${{ github.run_number }}-${{ github.run_attempt }}
-          path: build/app/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Upload AAB to Google Play internal testing
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5

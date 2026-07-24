@@ -116,28 +116,23 @@ void main() {
       expect(setupGuide, contains('.github/test-lab-results-lifecycle.json'));
     });
 
-    test('deterministic product-state screenshots are always uploaded', () {
-      expect(releaseWorkflow, contains('build/test-artifacts'));
-      expect(releaseWorkflow, contains('if: \${{ always() }}'));
-      expect(releaseWorkflow, contains('tripline-ui-evidence-'));
-      expect(
-        releaseWorkflow,
-        contains(
-          '          path: build/test-artifacts\n'
-          '          if-no-files-found: error',
-        ),
-      );
+    test('smoke CI does not upload absent visual artifacts', () {
+      expect(releaseWorkflow, isNot(contains('build/test-artifacts')));
+      expect(releaseWorkflow, isNot(contains('tripline-ui-evidence-')));
     });
 
-    test('release target selects its matching external device platform', () {
+    test('manual release bypasses device and manual evidence gates', () {
+      expect(releaseWorkflow, isNot(contains('external_device_gate:')));
+      expect(releaseWorkflow, isNot(contains('manual_evidence_gate:')));
+      expect(releaseWorkflow, isNot(contains('manual_evidence_sha:')));
+      expect(releaseWorkflow, isNot(contains('manual_evidence_url:')));
+      expect(releaseWorkflow, isNot(contains('manual_evidence_result:')));
+      expect(releaseWorkflow, isNot(contains('manual_evidence_waiver:')));
       expect(
         releaseWorkflow,
-        contains("inputs.release_target == 'both' && 'all' ||"),
+        isNot(contains('manual_evidence_waiver_reason:')),
       );
-      expect(
-        releaseWorkflow,
-        isNot(contains('with:\n      platform: android')),
-      );
+      expect(releaseWorkflow, isNot(contains('needs:')));
     });
 
     test('one dispatch can release both stores with the same build number', () {
@@ -155,7 +150,7 @@ void main() {
         RegExp(
           r"inputs\.release_target == 'both'",
         ).allMatches(releaseWorkflow).length,
-        greaterThanOrEqualTo(3),
+        2,
       );
       expect(
         RegExp(
@@ -165,98 +160,48 @@ void main() {
       );
     });
 
-    test('release evidence fails closed unless BLOCKED is waived', () {
-      expect(releaseWorkflow, isNot(contains('run_optional_evidence')));
-      expect(releaseWorkflow, contains('manual_evidence_sha:'));
-      expect(releaseWorkflow, contains('manual_evidence_url:'));
-      expect(releaseWorkflow, contains('manual_evidence_result:'));
-      expect(releaseWorkflow, contains('manual_evidence_waiver:'));
-      expect(releaseWorkflow, contains('manual_evidence_waiver_reason:'));
-      expect(releaseWorkflow, contains('manual_evidence_gate:'));
-      expect(
-        RegExp(
-          r'needs: \[ci, external_device_gate, manual_evidence_gate\]',
-        ).allMatches(releaseWorkflow).length,
-        2,
-      );
-      expect(releaseWorkflow, contains('EVIDENCE_RESULT'));
-      expect(releaseWorkflow, contains('EVIDENCE_SHA'));
-      expect(releaseWorkflow, contains('EVIDENCE_WAIVER'));
-      expect(releaseWorkflow, contains('EVIDENCE_WAIVER_REASON'));
-      expect(releaseWorkflow, contains('RELEASE_SHA'));
-      expect(manualEvidenceValidator, contains('https://'));
-      expect(releaseWorkflow, contains('          - FAIL'));
-      expect(releaseWorkflow, contains('case "\$EVIDENCE_RESULT" in'));
-      expect(releaseWorkflow, contains('            PASS)'));
-      expect(releaseWorkflow, contains('            BLOCKED)'));
-      expect(
-        releaseWorkflow,
-        contains('if [[ "\$EVIDENCE_WAIVER" != "true" ]]'),
-      );
-      expect(
-        releaseWorkflow,
-        contains('Release waiver reason must not be empty'),
-      );
-      expect(
-        releaseWorkflow,
-        contains('Release waiver record must be a valid HTTPS URL with a host'),
-      );
-      expect(
-        releaseWorkflow,
-        contains('summary_result="BLOCKED (release waiver)"'),
-      );
-      expect(
-        releaseWorkflow,
-        contains(
-          'Manual accessibility evidence must be PASS, or BLOCKED with an explicit release waiver',
-        ),
-      );
-      expect(
-        releaseWorkflow,
-        contains(
-          'bash tool/validate_manual_evidence.sh '
-          '"\$EVIDENCE_URL" "\$RELEASE_SHA"',
-        ),
-      );
-      expect(manualEvidenceValidator, contains('curl \\'));
-      expect(manualEvidenceValidator, contains('--fail'));
-      expect(manualEvidenceValidator, contains("--proto '=https'"));
-      expect(manualEvidenceValidator, contains('--connect-timeout 10'));
-      expect(manualEvidenceValidator, contains('--max-time 30'));
-      expect(manualEvidenceValidator, contains('--max-filesize'));
-      expect(manualEvidenceValidator, contains('report_bytes'));
-      expect(manualEvidenceValidator, contains('jq -e'));
-      expect(
-        releaseWorkflow.indexOf('if [[ "\$EVIDENCE_SHA" != "\$RELEASE_SHA" ]]'),
-        lessThan(releaseWorkflow.indexOf('case "\$EVIDENCE_RESULT" in')),
-      );
-    });
-
-    test('release CI enforces format, analyzer and one full test suite', () {
+    test('release CI enforces format, analyzer and the smoke suite', () {
       expect(
         releaseWorkflow,
         contains('dart format --output=none --set-exit-if-changed .'),
       );
       expect(releaseWorkflow, contains('flutter analyze --no-fatal-infos'));
-      expect(releaseWorkflow, contains('flutter test'));
       expect(
         releaseWorkflow,
-        isNot(
-          contains('flutter test test/flows/app_owned_release_flow_test.dart'),
+        contains(
+          'flutter test \\\n'
+          '            test/app/app_smoke_test.dart \\\n'
+          '            test/workflows/mobile_e2e_workflow_test.dart',
         ),
       );
       expect(
         releaseWorkflow,
-        isNot(contains("github.event_name != 'workflow_dispatch'")),
+        contains('flutter test test/flows/app_owned_release_flow_test.dart'),
       );
-      expect(releaseWorkflow, contains('needs: ci'));
+      expect(
+        releaseWorkflow,
+        contains("github.event_name != 'workflow_dispatch'"),
+      );
+      expect(releaseWorkflow, isNot(contains('flutter build apk --debug')));
+    });
+
+    test('store uploads use the shortest selected path', () {
+      expect(releaseWorkflow, isNot(contains('      runner:')));
+      expect(releaseWorkflow, contains('runs-on: macos-26'));
+      expect(releaseWorkflow, contains("wait-for-processing: 'true'"));
+      expect(
+        releaseWorkflow,
+        isNot(contains('Preserve signed Android App Bundle')),
+      );
+      expect(releaseWorkflow, contains('Upload AAB to Google Play internal'));
     });
 
     test('manual accessibility evidence uses a traceable case schema', () {
       expect(setupGuide, contains('## 發布證據格式'));
-      expect(setupGuide, contains('manual_evidence_sha'));
-      expect(setupGuide, contains('manual_evidence_url'));
-      expect(setupGuide, contains('manual_evidence_result'));
+      expect(setupGuide, contains('bash tool/validate_manual_evidence.sh'));
+      expect(setupGuide, isNot(contains('manual_evidence_sha')));
+      expect(setupGuide, isNot(contains('manual_evidence_url')));
+      expect(setupGuide, isNot(contains('manual_evidence_result')));
       expect(setupGuide, contains('A11Y-VOICEOVER'));
       expect(setupGuide, contains('A11Y-BOLD-TEXT'));
       expect(setupGuide, contains('A11Y-REDUCE-TRANSPARENCY'));
@@ -448,17 +393,20 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
       }
     });
 
-    test('manual releases are master-only and use a protected environment', () {
-      expect(releaseWorkflow, contains("github.ref == 'refs/heads/master'"));
-      expect(releaseWorkflow, contains('environment: mobile-release'));
-      expect(releaseWorkflow, isNot(contains('secrets: inherit')));
-      expect(
-        releaseWorkflow,
-        isNot(contains('permissions:\n  contents: read\n  id-token: write')),
-      );
-      expect(releaseWorkflow, contains('raven-actions/actionlint@'));
-      expect(releaseWorkflow, contains('version: 1.7.12'));
-    });
+    test(
+      'manual releases are master-only and use environment-scoped secrets',
+      () {
+        expect(releaseWorkflow, contains("github.ref == 'refs/heads/master'"));
+        expect(releaseWorkflow, contains('environment: mobile-release'));
+        expect(releaseWorkflow, isNot(contains('secrets: inherit')));
+        expect(
+          releaseWorkflow,
+          isNot(contains('permissions:\n  contents: read\n  id-token: write')),
+        );
+        expect(releaseWorkflow, contains('raven-actions/actionlint@'));
+        expect(releaseWorkflow, contains('version: 1.7.12'));
+      },
+    );
 
     test(
       'direct Test Lab dispatch is master-only and environment protected',

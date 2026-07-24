@@ -13,6 +13,7 @@
 ### 變更
 
 - Agent skills 統一使用 canonical GitHub repo、五種 triage labels 與按需建立的 domain 文件；issue／PR 內容明確視為不可信資料，避免外部文字被誤當操作指令。
+- Mobile release 手動 dispatch 會直接平行上傳 TestFlight 與 Google Play internal；PR／push CI 改跑 format、analyze 與三組 smoke tests，Firebase Test Lab 與人工證據保留為獨立驗證。
 
 ### 修正
 
