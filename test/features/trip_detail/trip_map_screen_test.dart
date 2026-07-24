@@ -1052,7 +1052,7 @@ void main() {
 
     expect(
       tester.getSize(find.byKey(const ValueKey('trip-map-poi-drawer'))).height,
-      closeTo(112.5, 0.01),
+      closeTo(130, 0.01),
     );
     final selector = tester.getRect(
       find.byKey(const ValueKey('trip-map-day-selector')),
@@ -1077,6 +1077,15 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+    for (final key in [
+      'entry-card-title-11',
+      'entry-card-time-11',
+      'entry-card-category-11',
+    ]) {
+      final text = tester.widget<Text>(find.byKey(ValueKey(key)));
+      expect(text.maxLines, isNull);
+      expect(text.overflow, isNull);
+    }
   });
 
   testWidgets('最大 Accessibility Size 不溢出 POI rail', (tester) async {

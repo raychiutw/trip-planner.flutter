@@ -624,6 +624,7 @@ class _DeveloperAppFormScreenState
     await showAppContentSheet<void>(
       context,
       title: '應用建立成功',
+      dismissible: app.clientSecret == null,
       builder: (sheetContext) => ListView(
         padding: const EdgeInsets.all(TpSpacing.s4),
         children: [

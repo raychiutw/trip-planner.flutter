@@ -490,17 +490,15 @@ void main() {
     expect(find.text('map-page-$_tripId-1'), findsOneWidget);
   });
 
-  testWidgets('切換到不同 Trip 會重設 DAY 1，不沿用舊 Trip 的 DAY', (tester) async {
+  testWidgets('切換 Trip 會重設 DAY 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
     const otherTripId = 'tokyo-2026';
-    const days = [
-      TripDay(id: 1, dayNum: 1, version: 1),
-      TripDay(id: 2, dayNum: 2, version: 1),
-    ];
     final activeTripId = ValueNotifier(_tripId);
+    final repo = _MockTripRepository();
     addTearDown(activeTripId.dispose);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          tripRepositoryProvider.overrideWithValue(repo),
           tripDetailProvider(
             _tripId,
           ).overrideWith((ref) => Stream.value(_fakeTrip)),
@@ -509,10 +507,12 @@ void main() {
               const Trip(id: otherTripId, name: '東京', title: '東京五日'),
             ),
           ),
-          tripDaysProvider(_tripId).overrideWith((ref) => Stream.value(days)),
+          tripDaysProvider(
+            _tripId,
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
           tripDaysProvider(
             otherTripId,
-          ).overrideWith((ref) => Stream.value(days)),
+          ).overrideWith((ref) => Stream.value(_fakeDays)),
           tripSegmentsProvider(
             _tripId,
           ).overrideWith((ref) => Stream.value(const <TripSegment>[])),
@@ -563,6 +563,56 @@ void main() {
     activeTripId.value = _tripId;
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
+    final finishEditing = find.byKey(
+      const ValueKey('tp-root-header-primary-action'),
+    );
+    if (finishEditing.evaluate().isNotEmpty) {
+      await tester.tap(finishEditing);
+      await tester.pumpAndSettle();
+    }
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, 1000),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-move-11')));
+    await tester.pumpAndSettle();
+    activeTripId.value = otherTripId;
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-move-to-day-2')));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repo.reorderEntries(
+        tripId: any(named: 'tripId'),
+        updates: any(named: 'updates'),
+      ),
+    );
+
+    activeTripId.value = _tripId;
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, 1000),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-copy-11')));
+    await tester.pumpAndSettle();
+    activeTripId.value = otherTripId;
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('entry-copy-to-day-2')));
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => repo.copyEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        targetDayId: any(named: 'targetDayId'),
+      ),
+    );
   });
 
   testWidgets('排序請求中切換 Trip，交通重算仍只作用於原行程', (tester) async {

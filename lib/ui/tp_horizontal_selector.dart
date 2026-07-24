@@ -147,9 +147,13 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     final selectedTint = theme.colorScheme.primary.withValues(
       alpha: isDark ? 0.24 : 0.18,
     );
-    final selectedSettings = trackSettings.copyWith(
-      glassColor: selectedTint,
-      platformViewFallbackColor: selectedTint,
+    final selectedSettings = tpResolveGlassSettings(
+      context,
+      trackSettings.copyWith(
+        glassColor: selectedTint,
+        platformViewFallbackColor: selectedTint,
+      ),
+      opaqueColor: theme.colorScheme.primaryContainer,
     );
     final height = TpHorizontalSelector.preferredHeight(context);
     return Focus(

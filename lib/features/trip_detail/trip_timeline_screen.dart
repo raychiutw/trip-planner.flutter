@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -563,12 +562,14 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   }
 
   Future<void> _moveEntryToDay(_EntryDragData data) async {
+    final tripId = widget.tripId;
+    final days = widget.days;
     final targetDayId = await showAppSelectionSheet<int>(
       context,
       title: '移至其他 Day',
       builder: (sheetContext, select) => ListView(
         children: [
-          for (final day in widget.days)
+          for (final day in days)
             if (day.id != data.sourceDayId)
               ListTile(
                 key: ValueKey('entry-move-to-day-${day.id}'),
@@ -578,7 +579,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
         ],
       ),
     );
-    if (!mounted || targetDayId == null) return;
+    if (!mounted || targetDayId == null || widget.tripId != tripId) return;
     await _reorderEntry(
       data,
       targetDayId,
@@ -587,6 +588,8 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   }
 
   Future<void> _copyEntryToDay(TimelineEntry entry, int sourceDayId) async {
+    final tripId = widget.tripId;
+    final days = widget.days;
     final dismissalLocked = ValueNotifier(false);
     try {
       await showAppSelectionSheet<int>(
@@ -594,7 +597,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
         title: '複製到其他 Day',
         dismissalLocked: dismissalLocked,
         builder: (sheetContext, select) => _EntryCopyDaySheet(
-          days: widget.days.where((day) => day.id != sourceDayId).toList(),
+          days: days.where((day) => day.id != sourceDayId).toList(),
           onSelected: (targetDayId) async {
             dismissalLocked.value = true;
             try {
@@ -604,16 +607,18 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
               final targetExists = _visibleEntriesByDayId.containsKey(
                 targetDayId,
               );
-              if (!stillExists || !targetExists) return false;
+              if (!stillExists || !targetExists || widget.tripId != tripId) {
+                return false;
+              }
               await ref
                   .read(tripRepositoryProvider)
                   .copyEntry(
-                    tripId: widget.tripId,
+                    tripId: tripId,
                     entryId: entry.id,
                     targetDayId: targetDayId,
                   );
               if (!mounted) return true;
-              ref.invalidate(tripDaysProvider(widget.tripId));
+              ref.invalidate(tripDaysProvider(tripId));
               dismissalLocked.value = false;
               if (sheetContext.mounted) select(targetDayId);
               return true;
@@ -957,14 +962,6 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
           height: extent,
           child: child,
         ),
-        if (overlapsContent)
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: -12,
-            height: 12,
-            child: _TimelineScrollEdge(),
-          ),
       ],
     );
   }
@@ -974,34 +971,6 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
     return oldDelegate.extent != extent ||
         oldDelegate.topInset != topInset ||
         oldDelegate.child != child;
-  }
-}
-
-class _TimelineScrollEdge extends StatelessWidget {
-  const _TimelineScrollEdge();
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
-    return IgnorePointer(
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  surface.withValues(alpha: 0.12),
-                  surface.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

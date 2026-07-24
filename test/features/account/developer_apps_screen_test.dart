@@ -695,10 +695,26 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('我已複製，繼續'), findsOneWidget);
+    expect(
+      tester
+          .widget<TpToolbarGlassButton>(
+            find.byKey(const ValueKey('app-sheet-close')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('請立即複製 client_secret'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('developer-app-copy-client-secret')));
     final copied = await Clipboard.getData('text/plain');
     expect(copied?.text, 'secret-once');
+
+    await tester.tap(find.byKey(const Key('developer-app-secret-acknowledge')));
+    await tester.pumpAndSettle();
+    expect(find.text('請立即複製 client_secret'), findsNothing);
   });
 
   testWidgets('sheet 內建立成功後回到 developer apps 清單', (tester) async {

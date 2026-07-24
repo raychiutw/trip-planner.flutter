@@ -569,11 +569,10 @@ class _PoiCard extends StatelessWidget {
                           IconButton(
                             key: ValueKey('poi-reservation-link-${poi.poiId}'),
                             tooltip: '開啟訂位連結',
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints.tightFor(
-                              width: 32,
-                              height: 32,
+                              width: TpSpacing.tapMin,
+                              height: TpSpacing.tapMin,
                             ),
                             iconSize: 18,
                             icon: const Icon(Icons.open_in_new_rounded),

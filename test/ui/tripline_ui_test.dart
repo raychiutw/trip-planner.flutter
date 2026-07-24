@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
@@ -15,12 +16,19 @@ import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 import 'package:tripline/ui/tp_state_view.dart';
 
-Widget app(Widget child, {double textScale = 1}) {
+Widget app(
+  Widget child, {
+  double textScale = 1,
+  bool reduceTransparency = false,
+}) {
   return MaterialApp(
     theme: AppTheme.light(),
-    home: MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-      child: child,
+    home: AppAccessibilityScope(
+      reduceTransparency: reduceTransparency,
+      child: MediaQuery(
+        data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+        child: child,
+      ),
     ),
   );
 }
@@ -416,6 +424,28 @@ void main() {
       );
     },
   );
+
+  testWidgets('Reduce Transparency 使用不透明且無模糊的 selector 選取底色', (tester) async {
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            value: 1,
+            options: const [
+              TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(value: 1, label: 'DAY 1'),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+        reduceTransparency: true,
+      ),
+    );
+
+    final selected = tester.widget<GlassButton>(find.byType(GlassButton));
+    expect(selected.settings?.blur, 0);
+    expect(selected.settings?.glassColor.a, 1);
+  });
 
   testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
     tester.view.physicalSize = const Size(240, 400);

@@ -18,6 +18,7 @@ import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -162,6 +163,10 @@ void main() {
 
     final link = find.byKey(const ValueKey('poi-reservation-link-502'));
     expect(link, findsOneWidget);
+    expect(
+      tester.getSize(link).shortestSide,
+      greaterThanOrEqualTo(TpSpacing.tapMin),
+    );
 
     await tester.tap(link);
     await tester.pump();

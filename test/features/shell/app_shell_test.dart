@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/features/shell/app_shell.dart';
 import 'package:tripline/features/trips/current_trip_provider.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -659,6 +660,31 @@ void main() {
         map.indicatorColor,
         TpSystemColorsLight.tint.withValues(alpha: 0.68),
       );
+    });
+
+    testWidgets('Reduce Transparency 使用不透明且無模糊的 root tab 選取底色', (tester) async {
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: true,
+          child: ProviderScope(
+            child: MaterialApp.router(
+              theme: AppTheme.light(),
+              routerConfig: buildShellRouter(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(GlassTabBar),
+        ),
+      );
+      expect(glass.indicatorSettings?.blur, 0);
+      expect(glass.indicatorSettings?.glassColor.a, 1);
+      expect(glass.indicatorColor?.a, 1);
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {

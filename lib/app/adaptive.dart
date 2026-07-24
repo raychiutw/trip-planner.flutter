@@ -645,6 +645,7 @@ Future<T?> showAppContentSheet<T>(
   BuildContext context, {
   required String title,
   required WidgetBuilder builder,
+  bool dismissible = true,
 }) {
   final sheetNavigatorKey = GlobalKey<NavigatorState>();
   final size = MediaQuery.sizeOf(context);
@@ -657,6 +658,7 @@ Future<T?> showAppContentSheet<T>(
         title: title,
         contentBuilder: builder,
         navigatorKey: sheetNavigatorKey,
+        dismissible: dismissible,
       ),
     );
   }
@@ -668,14 +670,15 @@ Future<T?> showAppContentSheet<T>(
     resizable: false,
     onSystemBack: () async {
       final navigator = sheetNavigatorKey.currentState;
-      if (navigator == null) return false;
-      return navigator.maybePop();
+      if (navigator != null && await navigator.maybePop()) return true;
+      return !dismissible;
     },
     builder: (sheetContext, close) => _AppContentSheet<T>(
       title: title,
       contentBuilder: builder,
       onClose: close,
       navigatorKey: sheetNavigatorKey,
+      dismissible: dismissible,
     ),
   );
 }
@@ -685,11 +688,13 @@ class _RegularAppContentSheet<T> extends StatefulWidget {
     required this.title,
     required this.contentBuilder,
     required this.navigatorKey,
+    required this.dismissible,
   });
 
   final String title;
   final WidgetBuilder contentBuilder;
   final GlobalKey<NavigatorState> navigatorKey;
+  final bool dismissible;
 
   @override
   State<_RegularAppContentSheet<T>> createState() =>
@@ -714,7 +719,7 @@ class _RegularAppContentSheetState<T>
     _handlingBack = true;
     final handled = await widget.navigatorKey.currentState?.maybePop() ?? false;
     _handlingBack = false;
-    if (!mounted || handled) return;
+    if (!mounted || handled || !widget.dismissible) return;
     await _close(result);
   }
 
@@ -740,6 +745,7 @@ class _RegularAppContentSheetState<T>
               contentBuilder: widget.contentBuilder,
               onClose: _close,
               navigatorKey: widget.navigatorKey,
+              dismissible: widget.dismissible,
             ),
           ),
         ),
@@ -843,12 +849,14 @@ class _AppContentSheet<T> extends StatelessWidget {
     required this.contentBuilder,
     required this.onClose,
     required this.navigatorKey,
+    required this.dismissible,
   });
 
   final String title;
   final WidgetBuilder contentBuilder;
   final Future<void> Function([T? result]) onClose;
   final GlobalKey<NavigatorState> navigatorKey;
+  final bool dismissible;
 
   @override
   Widget build(BuildContext context) {
@@ -880,7 +888,9 @@ class _AppContentSheet<T> extends StatelessWidget {
                               tooltip: MaterialLocalizations.of(
                                 pageContext,
                               ).closeButtonTooltip,
-                              onPressed: () => unawaited(onClose()),
+                              onPressed: dismissible
+                                  ? () => unawaited(onClose())
+                                  : null,
                               child: const Icon(CupertinoIcons.xmark, size: 19),
                             ),
                           ),

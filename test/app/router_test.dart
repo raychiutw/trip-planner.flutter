@@ -591,12 +591,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
     container.read(appRouterProvider).go('/trip/trip-1/health');
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHealthScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -736,7 +738,7 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('新增停留點'), findsWidgets);
-    expect(find.byType(AppleRootTabBar), findsNothing);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -780,7 +782,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
-    expect(find.text('收藏'), findsOneWidget);
+    expect(find.text('收藏'), findsWidgets);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -1345,6 +1347,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(ExploreScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 
     container
@@ -1353,6 +1356,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AddToTripScreen), findsOneWidget);
+    expect(find.byType(AppleRootTabBar), findsOneWidget);
     expect(find.text('加入行程：美麗海水族館'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
 

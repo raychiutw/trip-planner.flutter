@@ -269,7 +269,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   double get _poiAccessoryHeight {
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final additionalHeight = ((scale - 1) * 70).clamp(0.0, 140.0);
+    final additionalHeight = ((scale - 1) * 120).clamp(0.0, 220.0);
     return TpBottomAccessory.height + additionalHeight;
   }
 
@@ -1032,15 +1032,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                       children: [
                         Text(
                           stop.entry.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          key: ValueKey('entry-card-title-${stop.entry.id}'),
                           style: theme.textTheme.titleMedium,
                         ),
                         Text(
                           timeLabel,
                           key: ValueKey('entry-card-time-${stop.entry.id}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontFeatures: const [FontFeature.tabularFigures()],
@@ -1049,8 +1046,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
                         Text(
                           categoryLabel,
                           key: ValueKey('entry-card-category-${stop.entry.id}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: stop.point == null
                                 ? theme.colorScheme.error

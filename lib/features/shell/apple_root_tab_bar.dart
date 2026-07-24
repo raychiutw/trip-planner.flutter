@@ -79,10 +79,15 @@ class AppleRootTabBar extends StatelessWidget {
     final unselectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
       fontWeight: FontWeight.w500,
     );
-    final indicatorSettings = glassSettings.copyWith(
-      glassColor: selectionTint.withValues(alpha: 0.68),
-      platformViewFallbackColor: selectionTint.withValues(alpha: 0.68),
+    final indicatorSettings = tpResolveGlassSettings(
+      context,
+      glassSettings.copyWith(
+        glassColor: selectionTint.withValues(alpha: 0.68),
+        platformViewFallbackColor: selectionTint.withValues(alpha: 0.68),
+      ),
+      opaqueColor: theme.colorScheme.primaryContainer,
     );
+    final indicatorColor = indicatorSettings.glassColor;
     final tabBar = inline
         ? GlassTabBar.inline(
             tabs: tabs,
@@ -100,7 +105,7 @@ class AppleRootTabBar extends StatelessWidget {
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: selectionTint.withValues(alpha: 0.68),
+            indicatorColor: indicatorColor,
             indicatorSettings: indicatorSettings,
             magnification: 1,
             blendAmount: 4,
@@ -121,7 +126,7 @@ class AppleRootTabBar extends StatelessWidget {
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: selectionTint.withValues(alpha: 0.68),
+            indicatorColor: indicatorColor,
             indicatorSettings: indicatorSettings,
             magnification: 1,
             blendAmount: 4,
