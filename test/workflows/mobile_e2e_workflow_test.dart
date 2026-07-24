@@ -716,6 +716,7 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('grantPermissionWhenInUse'));
         expect(nativeMapSmoke, contains('.swipe('));
         expect(nativeMapSmoke, contains('.platform.mobile.doubleTap('));
+        expect(nativeMapSmoke, isNot(contains('.startGesture(')));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
         expect(nativeMapSmoke, contains('Tripline native map pinch request'));
         expect(nativeMapSmoke, contains('Tripline native map rotate request'));

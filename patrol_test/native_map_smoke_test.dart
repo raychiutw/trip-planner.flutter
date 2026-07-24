@@ -99,11 +99,17 @@ void main() {
     expect($(#nativeMapRotateObserved), findsOneWidget);
 
     await $(#armDoubleTapCheck).tap();
-    await $.platform.mobile.doubleTap(_nativeMapSelector);
-    await $(
-      #nativeMapDoubleTapObserved,
-    ).waitUntilExists(timeout: const Duration(seconds: 15));
-    expect($(#nativeMapDoubleTapObserved), findsOneWidget);
+    final semantics = $.tester.ensureSemantics();
+    try {
+      await $.tester.pump();
+      await $.platform.mobile.doubleTap(_nativeMapSelector);
+      await $(
+        #nativeMapDoubleTapObserved,
+      ).waitUntilExists(timeout: const Duration(seconds: 15));
+      expect($(#nativeMapDoubleTapObserved), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
 
     await $(#requestLocationPermission).tap();
     await $.platform.mobile.grantPermissionWhenInUse();
