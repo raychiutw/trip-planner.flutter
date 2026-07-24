@@ -180,7 +180,7 @@ class _SelectorOption<T> extends StatelessWidget {
       key: option.key,
       button: true,
       selected: selected,
-      label: option.label,
+      label: option.semanticsLabel ?? option.label,
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

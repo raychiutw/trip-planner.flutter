@@ -5,6 +5,7 @@ void showAppError(
   BuildContext context,
   String message, {
   VoidCallback? onRetry,
+  String retryLabel = '重試',
 }) {
   final messenger = ScaffoldMessenger.of(context);
 
@@ -36,7 +37,7 @@ void showAppError(
                 dismiss();
                 onRetry();
               },
-              child: const Text('重試'),
+              child: Text(retryLabel),
             ),
           TextButton(onPressed: dismiss, child: const Text('關閉')),
         ],

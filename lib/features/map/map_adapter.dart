@@ -222,10 +222,15 @@ class _PendingCameraOperation {
 
 @immutable
 class TripMapCameraPosition {
-  const TripMapCameraPosition({required this.target, required this.zoom});
+  const TripMapCameraPosition({
+    required this.target,
+    required this.zoom,
+    this.bearing = 0,
+  });
 
   final TripMapPoint target;
   final double zoom;
+  final double bearing;
 }
 
 @immutable

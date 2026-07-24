@@ -8,6 +8,7 @@ class TpScopeOption<T> {
   const TpScopeOption({
     required this.value,
     required this.label,
+    this.semanticsLabel,
     this.icon,
     this.indicatorColor,
     this.isAction = false,
@@ -16,6 +17,7 @@ class TpScopeOption<T> {
 
   final T value;
   final String label;
+  final String? semanticsLabel;
   final IconData? icon;
   final Color? indicatorColor;
   final bool isAction;
