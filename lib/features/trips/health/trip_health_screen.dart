@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/day.dart';
 import '../../../models/trip.dart';
@@ -38,6 +39,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   TripHealthReport? _report;
   TripPoiHealthReport? _poiHealth;
   Timer? _pollTimer;
+  var _generation = 0;
 
   int get _entryCount =>
       _days.fold<int>(0, (count, day) => count + day.timeline.length);
@@ -55,17 +57,27 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId) {
       _pollTimer?.cancel();
+      _trip = null;
+      _days = const [];
+      _report = null;
+      _poiHealth = null;
+      _starting = false;
       _load();
     }
   }
 
   @override
   void dispose() {
+    _generation++;
     _pollTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _load() async {
+    if (!mounted || _starting) return;
+    final generation = ++_generation;
+    final tripId = widget.tripId;
+    _pollTimer?.cancel();
     setState(() {
       _loading = true;
       _error = null;
@@ -73,12 +85,12 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     try {
       final repository = ref.read(tripRepositoryProvider);
       final results = await Future.wait<Object?>([
-        repository.fetchTrip(widget.tripId),
-        repository.fetchDays(widget.tripId),
-        repository.fetchHealthReport(widget.tripId),
-        repository.fetchPoiHealth(widget.tripId),
+        repository.fetchTrip(tripId),
+        repository.fetchDays(tripId),
+        repository.fetchHealthReport(tripId),
+        repository.fetchPoiHealth(tripId),
       ]);
-      if (!mounted) return;
+      if (!_isCurrent(generation, tripId)) return;
       final report = results[2] as TripHealthReport?;
       setState(() {
         _trip = results[0] as Trip;
@@ -86,17 +98,22 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
         _report = report;
         _poiHealth = results[3] as TripPoiHealthReport;
       });
-      _schedulePoll(report);
+      _schedulePoll(report, generation, tripId);
     } on Exception catch (error) {
-      if (!mounted) return;
+      if (!_isCurrent(generation, tripId)) return;
       setState(() => _error = _healthErrorMessage(error, '載入健檢資料失敗，請稍後重試'));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrent(generation, tripId)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _startHealthCheck() async {
     if (_starting || _isPending || _entryCount == 0) return;
+    final generation = ++_generation;
+    final tripId = widget.tripId;
+    _pollTimer?.cancel();
     setState(() {
       _starting = true;
       _error = null;
@@ -104,32 +121,40 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     try {
       final report = await ref
           .read(tripRepositoryProvider)
-          .startHealthCheck(widget.tripId);
-      if (!mounted) return;
+          .startHealthCheck(tripId);
+      if (!_isCurrent(generation, tripId)) return;
       setState(() => _report = report);
-      _schedulePoll(report);
+      _schedulePoll(report, generation, tripId);
     } on Exception catch (error) {
-      if (!mounted) return;
+      if (!_isCurrent(generation, tripId)) return;
       setState(() => _error = _healthErrorMessage(error, '觸發健檢失敗，請稍後再試'));
     } finally {
-      if (mounted) setState(() => _starting = false);
+      if (_isCurrent(generation, tripId)) {
+        setState(() => _starting = false);
+      }
     }
   }
 
-  void _schedulePoll(TripHealthReport? report) {
+  bool _isCurrent(int generation, String tripId) =>
+      mounted && generation == _generation && widget.tripId == tripId;
+
+  void _schedulePoll(TripHealthReport? report, int generation, String tripId) {
     _pollTimer?.cancel();
-    if (report?.status != TripHealthStatus.pending) return;
+    if (!_isCurrent(generation, tripId) ||
+        report?.status != TripHealthStatus.pending) {
+      return;
+    }
     _pollTimer = Timer(_pollInterval, () async {
       try {
         final next = await ref
             .read(tripRepositoryProvider)
-            .fetchHealthReport(widget.tripId);
-        if (!mounted || next == null) return;
+            .fetchHealthReport(tripId);
+        if (!_isCurrent(generation, tripId) || next == null) return;
         setState(() => _report = next);
-        _schedulePoll(next);
+        _schedulePoll(next, generation, tripId);
       } on Exception {
-        if (!mounted) return;
-        _schedulePoll(_report);
+        if (!_isCurrent(generation, tripId)) return;
+        _schedulePoll(_report, generation, tripId);
       }
     });
   }
@@ -145,18 +170,27 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
           TpToolbarIconButton(
             key: const ValueKey('trip-health-refresh-button'),
             tooltip: '重新整理',
-            onPressed: _loading ? null : _load,
+            onPressed: _loading || _starting ? null : _load,
             icon: Icons.refresh,
           ),
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const AppListLoadingSkeleton(key: ValueKey('trip-health-loading'))
+        child: _loading && _trip == null
+            ? Semantics(
+                key: ValueKey('trip-health-loading-live'),
+                liveRegion: true,
+                label: '正在載入健檢資料',
+                child: const ExcludeSemantics(
+                  child: AppListLoadingSkeleton(
+                    key: ValueKey('trip-health-loading'),
+                  ),
+                ),
+              )
             : _trip == null
             ? _ErrorState(message: _error ?? '載入健檢資料失敗，請稍後重試', onRetry: _load)
             : RefreshIndicator(
-                onRefresh: _load,
+                onRefresh: _starting ? () async {} : _load,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(
@@ -166,30 +200,53 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
                     TpSpacing.s8,
                   ),
                   children: [
-                    _Header(
-                      title: tripTitle,
-                      entryCount: _entryCount,
-                      report: _report,
+                    AppAdaptiveContent(
+                      maxWidth: AppContentWidth.form,
+                      contentKey: const ValueKey('trip-health-content'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_loading) ...[
+                            Semantics(
+                              key: const ValueKey('trip-health-refreshing'),
+                              liveRegion: true,
+                              label: '正在更新健檢資料',
+                              child: const LinearProgressIndicator(),
+                            ),
+                            const SizedBox(height: TpSpacing.s3),
+                          ],
+                          _Header(
+                            title: tripTitle,
+                            entryCount: _entryCount,
+                            report: _report,
+                          ),
+                          const SizedBox(height: TpSpacing.s4),
+                          if (_error != null) ...[
+                            _InlineError(message: _error!),
+                            const SizedBox(height: TpSpacing.s4),
+                          ],
+                          if (_entryCount == 0) ...[
+                            const _EmptyTripGuard(),
+                            const SizedBox(height: TpSpacing.s4),
+                          ],
+                          _StartButton(
+                            report: _report,
+                            starting: _starting,
+                            enabled:
+                                !_starting && !_isPending && _entryCount > 0,
+                            onPressed: _startHealthCheck,
+                          ),
+                          const SizedBox(height: TpSpacing.s4),
+                          if (_poiHealth != null)
+                            _PoiHealthCard(report: _poiHealth!),
+                          const SizedBox(height: TpSpacing.s4),
+                          _ReportSection(
+                            report: _report,
+                            tripId: widget.tripId,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: TpSpacing.s4),
-                    if (_error != null) ...[
-                      _InlineError(message: _error!),
-                      const SizedBox(height: TpSpacing.s4),
-                    ],
-                    if (_entryCount == 0) ...[
-                      const _EmptyTripGuard(),
-                      const SizedBox(height: TpSpacing.s4),
-                    ],
-                    _StartButton(
-                      report: _report,
-                      starting: _starting,
-                      enabled: !_starting && !_isPending && _entryCount > 0,
-                      onPressed: _startHealthCheck,
-                    ),
-                    const SizedBox(height: TpSpacing.s4),
-                    if (_poiHealth != null) _PoiHealthCard(report: _poiHealth!),
-                    const SizedBox(height: TpSpacing.s4),
-                    _ReportSection(report: _report, tripId: widget.tripId),
                   ],
                 ),
               ),
@@ -400,6 +457,7 @@ class _PendingReport extends StatelessWidget {
       icon: Icons.hourglass_top,
       title: 'AI 健檢進行中',
       message: '通常 3-7 分鐘完成。你可以先離開，稍後回來查看結果。',
+      liveRegion: true,
     );
   }
 }
@@ -416,6 +474,7 @@ class _FailedReport extends StatelessWidget {
       icon: Icons.error_outline,
       title: '健檢失敗',
       message: message ?? 'AI 處理時發生錯誤，可重新生成再試。',
+      liveRegion: true,
     );
   }
 }
@@ -554,7 +613,7 @@ class _SeverityChip extends StatelessWidget {
     final (bg, fg) = switch (severity) {
       TripHealthSeverity.high => (
         colorScheme.errorContainer,
-        colorScheme.error,
+        colorScheme.onErrorContainer,
       ),
       TripHealthSeverity.medium => (
         colorScheme.tertiaryContainer,
@@ -580,30 +639,35 @@ class _StatePanel extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.liveRegion = false,
   });
 
   final IconData icon;
   final String title;
   final String message;
+  final bool liveRegion;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TpRadius.md),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: colorScheme.primary),
-            const SizedBox(height: TpSpacing.s3),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: TpSpacing.s2),
-            Text(message),
-          ],
+    return Semantics(
+      liveRegion: liveRegion,
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TpRadius.md),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: colorScheme.primary),
+              const SizedBox(height: TpSpacing.s3),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: TpSpacing.s2),
+              Text(message),
+            ],
+          ),
         ),
       ),
     );
@@ -627,7 +691,7 @@ class _EmptyTripGuard extends StatelessWidget {
         '此行程尚無景點，請先加入景點再執行健檢。',
         style: Theme.of(
           context,
-        ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+        ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
       ),
     );
   }
@@ -641,18 +705,21 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
+    return Semantics(
       key: const ValueKey('trip-health-error'),
-      padding: const EdgeInsets.all(TpSpacing.s4),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-      ),
-      child: Text(
-        message,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(TpRadius.md),
+        ),
+        child: Text(
+          message,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
+        ),
       ),
     );
   }
@@ -666,16 +733,21 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, key: const ValueKey('trip-health-load-error')),
-            const SizedBox(height: TpSpacing.s4),
-            FilledButton(onPressed: onRetry, child: const Text('重試')),
-          ],
+    return Semantics(
+      key: const ValueKey('trip-health-load-error'),
+      liveRegion: true,
+      container: true,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(message),
+              const SizedBox(height: TpSpacing.s4),
+              FilledButton(onPressed: onRetry, child: const Text('重試')),
+            ],
+          ),
         ),
       ),
     );

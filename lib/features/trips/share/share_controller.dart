@@ -116,6 +116,9 @@ class ShareController extends Notifier<ShareState> {
     }
   }
 
+  /// 保留目前表單與清單並重新載入頁面資料。
+  Future<void> retry() => _load();
+
   Future<void> _reload() async {
     try {
       final shares = await _repo.fetchShares(tripId);
@@ -127,7 +130,7 @@ class ShareController extends Notifier<ShareState> {
   }
 
   /// 建立分享連結;成功後 lastCreated 帶 ShareLink(供顯示/複製)。
-  Future<void> create(
+  Future<bool> create(
     String label, {
     List<String>? visibleSections,
     int? expiresAt,
@@ -138,7 +141,7 @@ class ShareController extends Notifier<ShareState> {
         state.revokingId != null ||
         state.rotatingId != null ||
         state.deletingId != null) {
-      return;
+      return false;
     }
     state = state.copyWith(creating: true, error: null, lastCreated: null);
     try {
@@ -150,37 +153,42 @@ class ShareController extends Notifier<ShareState> {
         anonymous: anonymous,
       );
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(creating: false, lastCreated: link);
+      return true;
     } on ApiError catch (e) {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(
         creating: false,
         error: e.status == 403 ? '沒有權限建立分享' : '建立失敗,請稍後再試',
       );
+      return false;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(creating: false, error: '建立失敗,請稍後再試');
+      return false;
     }
   }
 
   /// 撤銷分享連結;成功後保留 row 統計並重新載入清單。
-  Future<void> revoke(int shareId) async {
+  Future<bool> revoke(int shareId) async {
     if (state.updatingId != null ||
         state.revokingId != null ||
         state.rotatingId != null ||
         state.deletingId != null) {
-      return;
+      return false;
     }
     state = state.copyWith(revokingId: shareId, error: null);
     try {
       await _repo.revokeShare(tripId, shareId);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(revokingId: null);
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(revokingId: null, error: '撤銷失敗,請稍後再試');
+      return false;
     }
   }
 
@@ -212,27 +220,29 @@ class ShareController extends Notifier<ShareState> {
   }
 
   /// 永久刪除分享連結;成功後重新載入清單。
-  Future<void> delete(int shareId) async {
+  Future<bool> delete(int shareId) async {
     if (state.updatingId != null ||
         state.deletingId != null ||
         state.revokingId != null ||
         state.rotatingId != null) {
-      return;
+      return false;
     }
     state = state.copyWith(deletingId: shareId, error: null);
     try {
       await _repo.deleteShare(tripId, shareId);
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(deletingId: null);
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(deletingId: null, error: '刪除失敗,請稍後再試');
+      return false;
     }
   }
 
   /// 更新分享連結設定;成功後重新載入清單。
-  Future<void> update(
+  Future<bool> update(
     int shareId, {
     String? label,
     List<String>? visibleSections,
@@ -244,7 +254,7 @@ class ShareController extends Notifier<ShareState> {
         state.deletingId != null ||
         state.revokingId != null ||
         state.rotatingId != null) {
-      return;
+      return false;
     }
     state = state.copyWith(updatingId: shareId, error: null);
     try {
@@ -258,11 +268,13 @@ class ShareController extends Notifier<ShareState> {
         anonymous: anonymous,
       );
       await _reload();
-      if (_disposed) return;
+      if (_disposed) return true;
       state = state.copyWith(updatingId: null);
+      return true;
     } on Exception {
-      if (_disposed) return;
+      if (_disposed) return false;
       state = state.copyWith(updatingId: null, error: '儲存失敗,請稍後再試');
+      return false;
     }
   }
 }

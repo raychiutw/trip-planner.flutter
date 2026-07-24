@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,7 @@ import 'package:tripline/api/share_repository.dart';
 import 'package:tripline/features/trips/share/share_screen.dart';
 import 'package:tripline/models/trip_share.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockShareRepo extends Mock implements ShareRepository {}
 
@@ -20,20 +23,142 @@ void main() {
     when(() => repo.fetchShares(any())).thenAnswer((_) async => _shares);
   });
 
-  Widget buildApp({Future<void> Function(String url)? shareLink}) =>
-      ProviderScope(
-        overrides: [shareRepositoryProvider.overrideWithValue(repo)],
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          home: ShareScreen(tripId: 't', shareLink: shareLink),
-        ),
-      );
+  Widget buildApp({
+    Future<void> Function(String url)? shareLink,
+    ThemeData? theme,
+    TextScaler? textScaler,
+  }) => ProviderScope(
+    retry: (retryCount, error) => null,
+    overrides: [shareRepositoryProvider.overrideWithValue(repo)],
+    child: MaterialApp(
+      theme: theme ?? AppTheme.light(),
+      builder: textScaler == null
+          ? null
+          : (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+              child: child!,
+            ),
+      home: ShareScreen(tripId: 't', shareLink: shareLink),
+    ),
+  );
 
   testWidgets('渲染現有連結', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
     expect(find.text('給爸媽'), findsOneWidget);
     expect(find.textContaining('已被檢視 2 次'), findsOneWidget);
+  });
+
+  testWidgets('regular width 置中限制分享內容寬度', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final content = tester.getRect(find.byKey(const ValueKey('share-content')));
+    expect(content.width, 720);
+    expect(content.center.dx, 600);
+  });
+
+  testWidgets('建立失敗保留使用者輸入並提供重試', (tester) async {
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenThrow(Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), '家人');
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('share-label')))
+          .controller!
+          .text,
+      '家人',
+    );
+    expect(find.byKey(const ValueKey('share-error')), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+  });
+
+  testWidgets('建立中鎖定建立表單且以 live region 宣告進度', (tester) async {
+    final completed = Completer<ShareLink>();
+    when(
+      () => repo.createShare(
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenAnswer((_) => completed.future);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-label')), '處理中');
+    await tester.tap(find.byKey(const ValueKey('share-create')));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<AbsorbPointer>(
+            find.byKey(const ValueKey('share-create-form')),
+          )
+          .absorbing,
+      isTrue,
+    );
+    final progress = tester.widget<Semantics>(
+      find.byKey(const ValueKey('share-create-progress')),
+    );
+    expect(progress.properties.liveRegion, isTrue);
+    expect(progress.properties.label, '正在建立分享連結');
+
+    await tester.tap(
+      find.byKey(const ValueKey('share-section-reservations')),
+      warnIfMissed: false,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('share-create')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('share-label')))
+          .controller!
+          .text,
+      '處理中',
+    );
+    expect(
+      tester
+          .widget<FilterChip>(
+            find.byKey(const ValueKey('share-section-reservations')),
+          )
+          .selected,
+      isFalse,
+    );
+    verify(
+      () => repo.createShare(
+        't',
+        label: '處理中',
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: false,
+      ),
+    ).called(1);
+
+    completed.complete(
+      const ShareLink(id: 13, token: 'pending', url: '/s/pending'),
+    );
+    await tester.pumpAndSettle();
   });
 
   testWidgets('建立 → 顯示完整 URL + 複製鈕', (tester) async {
@@ -259,13 +384,25 @@ void main() {
   });
 
   testWidgets('撤銷 → 確認 → 呼叫 revoke', (tester) async {
-    when(() => repo.revokeShare(any(), any())).thenAnswer((_) async {});
+    final completed = Completer<void>();
+    when(
+      () => repo.revokeShare(any(), any()),
+    ).thenAnswer((_) => completed.future);
 
     await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-revoke-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '撤銷')); // 對話框確認
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('irreversible-action-progress')),
+      findsOneWidget,
+    );
+    completed.complete();
     await tester.pumpAndSettle();
 
     verify(() => repo.revokeShare('t', 1)).called(1);
@@ -275,6 +412,8 @@ void main() {
     when(() => repo.deleteShare(any(), any())).thenAnswer((_) async {});
 
     await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-delete-1')));
     await tester.pumpAndSettle();
@@ -310,6 +449,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('share-2')), findsOneWidget);
     expect(find.text('給同事'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('share-actions-2')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('share-delete-2')), findsOneWidget);
   });
 
@@ -326,13 +467,16 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('share-edit-label')),
       '旅伴',
     );
-    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
     await tester.pumpAndSettle();
 
     final sections =
@@ -347,6 +491,88 @@ void main() {
             ).captured.single
             as List<String>;
     expect(sections, isEmpty);
+  });
+
+  testWidgets('編輯後取消會確認捨棄並保留 sheet 草稿', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('share-edit-label')),
+      '尚未儲存',
+    );
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '尚未儲存'), findsOneWidget);
+  });
+
+  testWidgets('編輯內容改回初始值會恢復 clean 並可直接取消', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+
+    final submit = find.byKey(const ValueKey('share-edit-submit'));
+    expect(tester.widget<TpToolbarTextButton>(submit).onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('share-edit-label')),
+      '暫時名稱',
+    );
+    await tester.pump();
+    expect(tester.widget<TpToolbarTextButton>(submit).onPressed, isNotNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('share-edit-label')),
+      '給爸媽',
+    );
+    await tester.pump();
+    expect(tester.widget<TpToolbarTextButton>(submit).onPressed, isNull);
+
+    await tester.tap(find.widgetWithText(TpToolbarTextButton, '取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
+    expect(find.byKey(const ValueKey('share-edit-label')), findsNothing);
+  });
+
+  testWidgets('編輯儲存失敗保留全部輸入並留在 sheet', (tester) async {
+    when(
+      () => repo.updateShare(
+        any(),
+        any(),
+        label: any(named: 'label'),
+        visibleSections: any(named: 'visibleSections'),
+        anonymous: any(named: 'anonymous'),
+      ),
+    ).thenThrow(Exception('offline'));
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('share-edit-label')),
+      '離線草稿',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('儲存失敗，輸入內容已保留，請重試。'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '離線草稿'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-edit-submit')), findsOneWidget);
   });
 
   testWidgets('編輯設定 → 公開區塊與匿名一起更新', (tester) async {
@@ -372,13 +598,16 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('share-edit-section-reservations')),
     );
     await tester.tap(find.byKey(const ValueKey('share-edit-anonymous')));
-    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
     await tester.pumpAndSettle();
 
     final sections =
@@ -410,10 +639,13 @@ void main() {
     final before = DateTime.now().millisecondsSinceEpoch;
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-btn-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-edit-expiry-7d')));
-    await tester.tap(find.widgetWithText(FilledButton, '儲存'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('share-edit-submit')));
     await tester.pumpAndSettle();
     final after = DateTime.now().millisecondsSinceEpoch;
 
@@ -448,6 +680,8 @@ void main() {
 
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-rotate-1')));
     await tester.pumpAndSettle();
 
@@ -466,5 +700,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('只有可編輯'), findsOneWidget);
     expect(find.byKey(const ValueKey('share-create')), findsNothing);
+  });
+
+  testWidgets('最大 Dynamic Type 下 row 只保留 44pt 動作選單且不溢位', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      buildApp(theme: AppTheme.dark(), textScaler: const TextScaler.linear(2)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('share-actions-1'))),
+      const Size(44, 44),
+    );
+    expect(find.byKey(const ValueKey('share-edit-btn-1')), findsNothing);
   });
 }

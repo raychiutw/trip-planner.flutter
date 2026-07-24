@@ -10,6 +10,7 @@ import '../../api/providers.dart';
 import '../../api/trip_repository.dart' show CustomEntryPoi;
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
@@ -23,7 +24,6 @@ import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import '../favorites/favorites_providers.dart';
 import 'trip_providers.dart';
-import 'widgets/reorderable_row.dart';
 
 /// 開啟 POI 訂位連結的注入點，讓測試可替換外部瀏覽器呼叫。
 typedef ReservationUrlLauncher = Future<void> Function(Uri url);

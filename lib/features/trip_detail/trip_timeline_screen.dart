@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/irreversible_action.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/poi_type.dart';

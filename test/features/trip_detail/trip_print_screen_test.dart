@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +83,12 @@ void main() {
     flights: [TripFlight(id: 1, sortOrder: 0, version: 1, flightNo: 'BR112')],
   );
 
-  Future<void> pumpScreen(WidgetTester tester) async {
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    ThemeData? theme,
+    TextScaler textScaler = TextScaler.noScaling,
+    bool settle = true,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         retry: (retryCount, error) => null,
@@ -90,12 +97,16 @@ void main() {
           tripPrintActionsProvider.overrideWithValue(printActions),
         ],
         child: MaterialApp(
-          theme: AppTheme.light(),
+          theme: theme ?? AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+            child: child!,
+          ),
           home: const TripPrintScreen(tripId: 'trip-1'),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   setUp(() {
@@ -121,6 +132,29 @@ void main() {
     expect(find.text('BR112'), findsOneWidget);
   });
 
+  testWidgets('初始 loading 透過 live region 宣告', (tester) async {
+    final pending = Completer<Trip>();
+    when(
+      () => repository.fetchTrip('trip-1'),
+    ).thenAnswer((_) => pending.future);
+
+    await pumpScreen(tester, settle: false);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('trip-print-loading-live')),
+          )
+          .properties
+          .liveRegion,
+      isTrue,
+    );
+
+    pending.complete(trip);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('列印與 PDF 按鈕呼叫注入的 action service', (tester) async {
     await pumpScreen(tester);
 
@@ -143,26 +177,76 @@ void main() {
     expect(find.text('PDF 已建立'), findsOneWidget);
   });
 
-  testWidgets('notes 載入失敗時仍顯示列印文件主體', (tester) async {
-    when(
-      () => repository.fetchNotes('trip-1'),
-    ).thenThrow(Exception('notes down'));
+  testWidgets('notes 載入失敗顯示 partial-data notice 且可重試', (tester) async {
+    var shouldFail = true;
+    when(() => repository.fetchNotes('trip-1')).thenAnswer((_) async {
+      if (shouldFail) throw Exception('notes down');
+      return notes;
+    });
 
     await pumpScreen(tester);
 
     expect(find.text('沖繩家族旅行'), findsOneWidget);
     expect(find.text('首里城公園'), findsOneWidget);
     expect(find.text('航班'), findsNothing);
+    final notice = tester.widget<Semantics>(
+      find.byKey(const ValueKey('trip-print-partial-notice')),
+    );
+    expect(notice.properties.liveRegion, isTrue);
+    expect(find.textContaining('行程筆記載入失敗'), findsOneWidget);
+
+    shouldFail = false;
+    await tester.tap(find.byKey(const ValueKey('trip-print-notes-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('航班'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('trip-print-partial-notice')),
+      findsNothing,
+    );
   });
 
-  testWidgets('行程載入失敗時顯示 error state', (tester) async {
-    when(
-      () => repository.fetchTrip('trip-1'),
-    ).thenThrow(Exception('trip down'));
+  testWidgets('行程載入失敗時顯示可重試 live error state', (tester) async {
+    var shouldFail = true;
+    when(() => repository.fetchTrip('trip-1')).thenAnswer((_) async {
+      if (shouldFail) throw Exception('trip down');
+      return trip;
+    });
 
     await pumpScreen(tester);
 
-    expect(find.byKey(const ValueKey('trip-print-error')), findsOneWidget);
+    final error = tester.widget<Semantics>(
+      find.byKey(const ValueKey('trip-print-error')),
+    );
+    expect(error.properties.liveRegion, isTrue);
     expect(find.text('行程載入失敗，請稍後重試'), findsOneWidget);
+
+    shouldFail = false;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-print-document')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-print-error')), findsNothing);
+  });
+
+  testWidgets('regular dark 與最大文字仍限制內容寬度並保留 Header actions', (tester) async {
+    tester.view.physicalSize = const Size(1024, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await pumpScreen(
+      tester,
+      theme: AppTheme.dark(),
+      textScaler: const TextScaler.linear(3),
+    );
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('trip-print-content'))).width,
+      lessThanOrEqualTo(720),
+    );
+    expect(find.byKey(const ValueKey('trip-print-do')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-print-more')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

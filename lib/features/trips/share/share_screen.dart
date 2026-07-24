@@ -4,6 +4,7 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
@@ -13,10 +14,13 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../api/api_client.dart' show kTriplineOrigin;
 import '../../../app/adaptive.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
+import '../../../app/irreversible_action.dart';
 import '../../../models/trip_share.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_action_item.dart';
 import '../../../ui/tp_app_bar.dart';
 import 'share_controller.dart';
 
@@ -52,6 +56,8 @@ const _expiryLabels = {
 
 /// 分享公開行程連結的 callback。
 typedef ShareLinkInvoker = Future<void> Function(String url);
+
+enum _ShareRowAction { edit, rotate, revoke, delete }
 
 /// 呼叫系統分享面板分享公開行程連結。
 Future<void> shareTripLink(String url) async {
@@ -144,34 +150,73 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     setState(() => _customExpiryDate = selected);
   }
 
-  Future<bool> _confirm(
-    String message, {
-    required String title,
-    required String confirmText,
-  }) {
-    return showAppConfirm(
-      context,
-      title: title,
-      message: message,
-      confirmLabel: confirmText,
-      isDestructive: true,
-    );
+  Future<void> _editShare(TripShare share) async {
+    final formController = AppSheetFormController();
+    try {
+      await showAppFormSheet(
+        context,
+        title: '編輯分享連結',
+        submitLabel: '儲存',
+        submitKey: const ValueKey('share-edit-submit'),
+        controller: formController,
+        builder: (_) => _EditShareForm(
+          share: share,
+          formController: formController,
+          onSubmit: (next) => _ctrl.update(
+            share.id,
+            label: next.label,
+            visibleSections: next.visibleSections,
+            expiresAt: next.expiresAt,
+            clearExpiresAt: next.clearExpiresAt,
+            anonymous: next.anonymous,
+          ),
+        ),
+      );
+    } finally {
+      formController.dispose();
+    }
   }
 
-  Future<void> _editShare(TripShare share) async {
-    final next = await showDialog<_ShareEditSettings>(
-      context: context,
-      builder: (ctx) => _EditShareDialog(share: share),
+  Future<void> _runShareAction(_ShareRowAction action, TripShare share) async {
+    switch (action) {
+      case _ShareRowAction.edit:
+        await _editShare(share);
+      case _ShareRowAction.rotate:
+        await _ctrl.rotate(share.id);
+      case _ShareRowAction.revoke:
+        await confirmAndRunIrreversibleAction(
+          context,
+          title: '撤銷「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
+          message: '這個分享連結將立即失效，且無法復原。',
+          actionLabel: '撤銷',
+          progressLabel: '正在撤銷…',
+          successMessage: '已撤銷分享連結',
+          failureMessage: '撤銷失敗，原連結已保留',
+          action: () => _ctrl.revoke(share.id),
+        );
+      case _ShareRowAction.delete:
+        await confirmAndRunIrreversibleAction(
+          context,
+          title: '刪除「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
+          message: '這個分享連結與瀏覽統計會永久刪除，且無法復原。',
+          actionLabel: '刪除',
+          progressLabel: '正在刪除…',
+          successMessage: '已刪除分享連結',
+          failureMessage: '刪除失敗，原連結已保留',
+          action: () => _ctrl.delete(share.id),
+        );
+    }
+  }
+
+  Future<void> _createShare() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final succeeded = await _ctrl.create(
+      _label.text,
+      visibleSections: _visibleSections,
+      expiresAt: _expiresAt,
+      anonymous: _anonymous,
     );
-    if (!mounted || next == null) return;
-    await _ctrl.update(
-      share.id,
-      label: next.label,
-      visibleSections: next.visibleSections,
-      expiresAt: next.expiresAt,
-      clearExpiresAt: next.clearExpiresAt,
-      anonymous: next.anonymous,
-    );
+    if (succeeded) _label.clear();
   }
 
   Future<void> _copy(String url) async {
@@ -198,160 +243,206 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
 
     return Scaffold(
       appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('分享連結')),
-      body: state.loading
-          ? const AppListLoadingSkeleton(key: ValueKey('share-loading'))
-          : !state.canManage
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(TpSpacing.s6),
-                child: Text('只有可編輯此行程的人能管理分享連結。', textAlign: TextAlign.center),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.all(TpSpacing.s4),
-              children: [
-                if (state.lastCreated != null)
-                  _CreatedCard(
-                    url: state.lastCreated!.fullUrl(kTriplineOrigin),
-                    onCopy: _copy,
-                    onShare: _share,
+      body: AppAdaptiveContent(
+        maxWidth: AppContentWidth.form,
+        contentKey: const ValueKey('share-content'),
+        child: state.loading
+            ? const AppListLoadingSkeleton(key: ValueKey('share-loading'))
+            : !state.canManage
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(TpSpacing.s6),
+                  child: Text(
+                    '只有可編輯此行程的人能管理分享連結。',
+                    textAlign: TextAlign.center,
                   ),
-                Text(
-                  '使用中的連結（${activeShares.length}）',
-                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: TpSpacing.s2),
-                if (activeShares.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: TpSpacing.s2),
-                    child: Text(
-                      '目前沒有使用中的分享連結。',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(TpSpacing.s4),
+                children: [
+                  if (state.lastCreated != null)
+                    _CreatedCard(
+                      url: state.lastCreated!.fullUrl(kTriplineOrigin),
+                      onCopy: _copy,
+                      onShare: _share,
                     ),
+                  Text(
+                    '使用中的連結（${activeShares.length}）',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                for (final s in activeShares) _shareTile(s, state),
-                if (revokedShares.isNotEmpty) ...[
                   const SizedBox(height: TpSpacing.s2),
-                  TextButton.icon(
-                    key: const ValueKey('share-revoked-toggle'),
-                    onPressed: () =>
-                        setState(() => _showRevoked = !_showRevoked),
-                    icon: Icon(
-                      _showRevoked
-                          ? Icons.expand_less_outlined
-                          : Icons.expand_more_outlined,
-                    ),
-                    label: Text('已關閉的連結（${revokedShares.length}）'),
-                  ),
-                  if (_showRevoked)
-                    for (final s in revokedShares) _shareTile(s, state),
-                ],
-                const SizedBox(height: TpSpacing.s5),
-                Text('建立新連結', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: TpSpacing.s2),
-                TextField(
-                  key: const ValueKey('share-label'),
-                  controller: _label,
-                  decoration: const InputDecoration(
-                    labelText: '標籤（選填,如「給爸媽」）',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: TpSpacing.s3),
-                Text('公開區塊', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: TpSpacing.s1),
-                Wrap(
-                  spacing: TpSpacing.s1,
-                  runSpacing: TpSpacing.s1,
-                  children: [
-                    for (final section in _shareSectionOrder)
-                      FilterChip(
-                        key: ValueKey('share-section-$section'),
-                        label: Text(_shareSectionLabels[section] ?? section),
-                        selected: _sections.contains(section),
-                        onSelected: (selected) =>
-                            _toggleSection(section, selected),
+                  if (activeShares.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: TpSpacing.s2,
                       ),
-                  ],
-                ),
-                const SizedBox(height: TpSpacing.s3),
-                Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: TpSpacing.s1),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    selected: {_expiryKey},
-                    onSelectionChanged: (next) =>
-                        setState(() => _expiryKey = next.single),
-                    segments: [
-                      for (final key in _expiryPresets.keys)
-                        ButtonSegment(
-                          value: key,
-                          label: Text(_expiryLabels[key] ?? key),
+                      child: Text(
+                        '目前沒有使用中的分享連結。',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                    ],
-                  ),
-                ),
-                if (_expiryKey == 'custom') ...[
+                      ),
+                    ),
+                  for (final s in activeShares) _shareTile(s, state),
+                  if (revokedShares.isNotEmpty) ...[
+                    const SizedBox(height: TpSpacing.s2),
+                    TextButton.icon(
+                      key: const ValueKey('share-revoked-toggle'),
+                      onPressed: () =>
+                          setState(() => _showRevoked = !_showRevoked),
+                      icon: Icon(
+                        _showRevoked
+                            ? Icons.expand_less_outlined
+                            : Icons.expand_more_outlined,
+                      ),
+                      label: Text('已關閉的連結（${revokedShares.length}）'),
+                    ),
+                    if (_showRevoked)
+                      for (final s in revokedShares) _shareTile(s, state),
+                  ],
+                  const SizedBox(height: TpSpacing.s5),
+                  Text('建立新連結', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: TpSpacing.s2),
-                  OutlinedButton.icon(
-                    key: const ValueKey('share-custom-expiry-date'),
-                    onPressed: _pickCustomExpiryDate,
-                    icon: const Icon(Icons.event_outlined, size: 18),
-                    label: Text(_customExpiryLabel(context)),
-                  ),
-                ],
-                CheckboxListTile(
-                  key: const ValueKey('share-anonymous'),
-                  value: _anonymous,
-                  onChanged: (value) =>
-                      setState(() => _anonymous = value ?? false),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  title: const Text('匿名分享'),
-                ),
-                const SizedBox(height: TpSpacing.s2),
-                if (state.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: TpSpacing.s2),
-                    child: Text(
-                      state.error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                  AbsorbPointer(
+                    key: const ValueKey('share-create-form'),
+                    absorbing: state.creating,
+                    child: ExcludeFocus(
+                      excluding: state.creating,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            key: const ValueKey('share-label'),
+                            controller: _label,
+                            decoration: const InputDecoration(
+                              labelText: '標籤（選填,如「給爸媽」）',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: TpSpacing.s3),
+                          Text(
+                            '公開區塊',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: TpSpacing.s1),
+                          Wrap(
+                            spacing: TpSpacing.s1,
+                            runSpacing: TpSpacing.s1,
+                            children: [
+                              for (final section in _shareSectionOrder)
+                                FilterChip(
+                                  key: ValueKey('share-section-$section'),
+                                  label: Text(
+                                    _shareSectionLabels[section] ?? section,
+                                  ),
+                                  selected: _sections.contains(section),
+                                  onSelected: (selected) =>
+                                      _toggleSection(section, selected),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: TpSpacing.s3),
+                          Text(
+                            '有效期限',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: TpSpacing.s1),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SegmentedButton<String>(
+                              showSelectedIcon: false,
+                              selected: {_expiryKey},
+                              onSelectionChanged: (next) =>
+                                  setState(() => _expiryKey = next.single),
+                              segments: [
+                                for (final key in _expiryPresets.keys)
+                                  ButtonSegment(
+                                    value: key,
+                                    label: Text(_expiryLabels[key] ?? key),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (_expiryKey == 'custom') ...[
+                            const SizedBox(height: TpSpacing.s2),
+                            OutlinedButton.icon(
+                              key: const ValueKey('share-custom-expiry-date'),
+                              onPressed: _pickCustomExpiryDate,
+                              icon: const Icon(Icons.event_outlined, size: 18),
+                              label: Text(_customExpiryLabel(context)),
+                            ),
+                          ],
+                          CheckboxListTile(
+                            key: const ValueKey('share-anonymous'),
+                            value: _anonymous,
+                            onChanged: (value) =>
+                                setState(() => _anonymous = value ?? false),
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            title: const Text('匿名分享'),
+                          ),
+                          const SizedBox(height: TpSpacing.s2),
+                          if (state.error != null)
+                            Semantics(
+                              key: const ValueKey('share-error'),
+                              liveRegion: true,
+                              container: true,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: TpSpacing.s2,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        state.error!,
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: _ctrl.retry,
+                                      child: const Text('重試'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          FilledButton(
+                            key: const ValueKey('share-create'),
+                            onPressed: state.creating ? null : _createShare,
+                            child: state.creating
+                                ? Semantics(
+                                    key: const ValueKey(
+                                      'share-create-progress',
+                                    ),
+                                    liveRegion: true,
+                                    label: '正在建立分享連結',
+                                    child: const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator.adaptive(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : const Text('建立分享連結'),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                FilledButton(
-                  key: const ValueKey('share-create'),
-                  onPressed: state.creating
-                      ? null
-                      : () {
-                          _ctrl.create(
-                            _label.text,
-                            visibleSections: _visibleSections,
-                            expiresAt: _expiresAt,
-                            anonymous: _anonymous,
-                          );
-                          _label.clear();
-                        },
-                  child: state.creating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text('建立分享連結'),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -370,75 +461,44 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       contentPadding: EdgeInsets.zero,
       title: Text(s.label.isEmpty ? '(無標籤)' : s.label),
       subtitle: Text('$status · 已被檢視 ${s.viewCount} 次'),
-      trailing: Wrap(
-        spacing: TpSpacing.s1,
-        children: [
-          if (s.isActive)
-            _rowIconButton(
+      trailing: TpMoreMenuButton<_ShareRowAction>(
+        key: ValueKey('share-actions-${s.id}'),
+        tooltip: '分享連結動作',
+        enabled: !busy,
+        items: [
+          if (s.isActive) ...[
+            TpActionItem(
               key: ValueKey('share-edit-btn-${s.id}'),
-              tooltip: '編輯',
+              value: _ShareRowAction.edit,
+              label: '編輯',
               icon: Icons.edit_outlined,
-              onPressed: busy ? null : () async => _editShare(s),
             ),
-          if (s.isActive)
-            _rowIconButton(
+            TpActionItem(
               key: ValueKey('share-rotate-${s.id}'),
-              tooltip: state.rotatingId == s.id ? '更新中' : '重產生',
+              value: _ShareRowAction.rotate,
+              label: '重新產生',
               icon: Icons.refresh,
-              onPressed: busy ? null : () async => _ctrl.rotate(s.id),
             ),
-          if (s.isActive)
-            _rowIconButton(
+            TpActionItem(
               key: ValueKey('share-revoke-${s.id}'),
-              tooltip: '撤銷',
+              value: _ShareRowAction.revoke,
+              label: '撤銷',
               icon: Icons.link_off_outlined,
-              onPressed: busy
-                  ? null
-                  : () async {
-                      if (await _confirm(
-                        '此連結將立即失效,無法復原。',
-                        title: '撤銷分享連結',
-                        confirmText: '撤銷',
-                      )) {
-                        await _ctrl.revoke(s.id);
-                      }
-                    },
+              dividerBefore: true,
+              role: TpActionRole.destructive,
             ),
-          _rowIconButton(
+          ],
+          TpActionItem(
             key: ValueKey('share-delete-${s.id}'),
-            tooltip: state.deletingId == s.id ? '刪除中' : '刪除',
+            value: _ShareRowAction.delete,
+            label: '刪除',
             icon: Icons.delete_outline,
-            onPressed: busy
-                ? null
-                : () async {
-                    if (await _confirm(
-                      '此連結與瀏覽統計會永久刪除,無法復原。',
-                      title: '刪除分享連結',
-                      confirmText: '刪除',
-                    )) {
-                      await _ctrl.delete(s.id);
-                    }
-                  },
+            dividerBefore: !s.isActive,
+            role: TpActionRole.destructive,
           ),
         ],
+        onSelected: (action) => _runShareAction(action, s),
       ),
-    );
-  }
-
-  Widget _rowIconButton({
-    required Key key,
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback? onPressed,
-  }) {
-    return IconButton(
-      key: key,
-      tooltip: tooltip,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-      padding: EdgeInsets.zero,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 20),
     );
   }
 }
@@ -620,21 +680,36 @@ class _ShareEditSettings {
   final bool anonymous;
 }
 
-class _EditShareDialog extends StatefulWidget {
-  const _EditShareDialog({required this.share});
+class _EditShareForm extends StatefulWidget {
+  const _EditShareForm({
+    required this.share,
+    required this.formController,
+    required this.onSubmit,
+  });
 
   final TripShare share;
+  final AppSheetFormController formController;
+  final Future<bool> Function(_ShareEditSettings settings) onSubmit;
 
   @override
-  State<_EditShareDialog> createState() => _EditShareDialogState();
+  State<_EditShareForm> createState() => _EditShareFormState();
 }
 
-class _EditShareDialogState extends State<_EditShareDialog> {
+class _EditShareFormState extends State<_EditShareForm> {
   late final TextEditingController _label;
   late final Set<String> _sections;
   late String _expiryKey;
   DateTime? _customExpiryDate;
   late bool _anonymous;
+  late final ({
+    String label,
+    List<String> visibleSections,
+    String expiryKey,
+    int? customExpiryDay,
+    bool anonymous,
+  })
+  _initial;
+  String? _error;
 
   @override
   void initState() {
@@ -646,10 +721,24 @@ class _EditShareDialogState extends State<_EditShareDialog> {
         ? null
         : DateTime.fromMillisecondsSinceEpoch(widget.share.expiresAt!);
     _anonymous = widget.share.anonymous;
+    _initial = (
+      label: widget.share.label,
+      visibleSections: List.unmodifiable(_visibleSections),
+      expiryKey: _expiryKey,
+      customExpiryDay: _customExpiryDay,
+      anonymous: widget.share.anonymous,
+    );
+    _label.addListener(_markChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.formController.attach(_submit);
+      widget.formController.update(dirty: false, canSubmit: false);
+    });
   }
 
   @override
   void dispose() {
+    _label.removeListener(_markChanged);
     _label.dispose();
     super.dispose();
   }
@@ -680,9 +769,42 @@ class _EditShareDialogState extends State<_EditShareDialog> {
   bool get _clearExpiresAt =>
       _expiryKey == 'never' && widget.share.expiresAt != null;
 
+  int? get _customExpiryDay {
+    final date = _customExpiryDate;
+    return date == null
+        ? null
+        : DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+  }
+
+  bool get _isDirty =>
+      _label.text != _initial.label ||
+      !listEquals(_visibleSections, _initial.visibleSections) ||
+      _expiryKey != _initial.expiryKey ||
+      _customExpiryDay != _initial.customExpiryDay ||
+      _anonymous != _initial.anonymous;
+
   String _customExpiryLabel(BuildContext context) {
     final date = _customExpiryDate;
     return date == null ? '選擇日期' : formatAppFullDate(context, date);
+  }
+
+  _ShareEditSettings get _settings => _ShareEditSettings(
+    label: _label.text,
+    visibleSections: _visibleSections,
+    expiresAt: _expiresAt,
+    clearExpiresAt: _clearExpiresAt,
+    anonymous: _anonymous,
+  );
+
+  void _markChanged() {
+    if (!mounted) return;
+    setState(() => _error = null);
+    _syncFormState();
+  }
+
+  void _syncFormState() {
+    final dirty = _isDirty;
+    widget.formController.update(dirty: dirty, canSubmit: dirty);
   }
 
   void _toggleSection(String key, bool selected) {
@@ -692,7 +814,9 @@ class _EditShareDialogState extends State<_EditShareDialog> {
       } else {
         _sections.remove(key);
       }
+      _error = null;
     });
+    _syncFormState();
   }
 
   Future<void> _pickCustomExpiryDate() async {
@@ -704,106 +828,116 @@ class _EditShareDialogState extends State<_EditShareDialog> {
       lastDate: DateTime(now.year + 5, 12, 31),
     );
     if (selected == null || !mounted) return;
-    setState(() => _customExpiryDate = selected);
+    setState(() {
+      _customExpiryDate = selected;
+      _error = null;
+    });
+    _syncFormState();
+  }
+
+  Future<bool> _submit() async {
+    final succeeded = await widget.onSubmit(_settings);
+    if (!succeeded && mounted) {
+      setState(() => _error = '儲存失敗，輸入內容已保留，請重試。');
+    }
+    return succeeded;
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('編輯分享連結'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.all(TpSpacing.s4),
+      children: [
+        TextField(
+          key: const ValueKey('share-edit-label'),
+          controller: _label,
+          autofocus: true,
+          maxLength: 80,
+          decoration: const InputDecoration(
+            labelText: '連結名稱',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: TpSpacing.s2),
+        Text('公開區塊', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: TpSpacing.s1),
+        Wrap(
+          spacing: TpSpacing.s1,
+          runSpacing: TpSpacing.s1,
           children: [
-            TextField(
-              key: const ValueKey('share-edit-label'),
-              controller: _label,
-              autofocus: true,
-              maxLength: 80,
-              decoration: const InputDecoration(
-                labelText: '連結名稱',
-                border: OutlineInputBorder(),
-                isDense: true,
+            for (final section in _shareSectionOrder)
+              FilterChip(
+                key: ValueKey('share-edit-section-$section'),
+                label: Text(_shareSectionLabels[section] ?? section),
+                selected: _sections.contains(section),
+                onSelected: (selected) => _toggleSection(section, selected),
               ),
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            Text('公開區塊', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: TpSpacing.s1),
-            Wrap(
-              spacing: TpSpacing.s1,
-              runSpacing: TpSpacing.s1,
-              children: [
-                for (final section in _shareSectionOrder)
-                  FilterChip(
-                    key: ValueKey('share-edit-section-$section'),
-                    label: Text(_shareSectionLabels[section] ?? section),
-                    selected: _sections.contains(section),
-                    onSelected: (selected) => _toggleSection(section, selected),
-                  ),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: TpSpacing.s1),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<String>(
-                showSelectedIcon: false,
-                selected: {_expiryKey},
-                onSelectionChanged: (next) =>
-                    setState(() => _expiryKey = next.single),
-                segments: [
-                  for (final key in _expiryPresets.keys)
-                    ButtonSegment(
-                      value: key,
-                      label: Text(
-                        _expiryLabels[key] ?? key,
-                        key: ValueKey('share-edit-expiry-$key'),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_expiryKey == 'custom') ...[
-              const SizedBox(height: TpSpacing.s2),
-              OutlinedButton.icon(
-                key: const ValueKey('share-edit-custom-expiry-date'),
-                onPressed: _pickCustomExpiryDate,
-                icon: const Icon(Icons.event_outlined, size: 18),
-                label: Text(_customExpiryLabel(context)),
-              ),
-            ],
-            CheckboxListTile(
-              key: const ValueKey('share-edit-anonymous'),
-              value: _anonymous,
-              onChanged: (value) => setState(() => _anonymous = value ?? false),
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              title: const Text('匿名分享'),
-            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+        const SizedBox(height: TpSpacing.s2),
+        Text('有效期限', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: TpSpacing.s1),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<String>(
+            showSelectedIcon: false,
+            selected: {_expiryKey},
+            onSelectionChanged: (next) {
+              setState(() {
+                _expiryKey = next.single;
+                _error = null;
+              });
+              _syncFormState();
+            },
+            segments: [
+              for (final key in _expiryPresets.keys)
+                ButtonSegment(
+                  value: key,
+                  label: Text(
+                    _expiryLabels[key] ?? key,
+                    key: ValueKey('share-edit-expiry-$key'),
+                  ),
+                ),
+            ],
+          ),
         ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(
-            _ShareEditSettings(
-              label: _label.text,
-              visibleSections: _visibleSections,
-              expiresAt: _expiresAt,
-              clearExpiresAt: _clearExpiresAt,
-              anonymous: _anonymous,
+        if (_expiryKey == 'custom') ...[
+          const SizedBox(height: TpSpacing.s2),
+          OutlinedButton.icon(
+            key: const ValueKey('share-edit-custom-expiry-date'),
+            onPressed: _pickCustomExpiryDate,
+            icon: const Icon(Icons.event_outlined, size: 18),
+            label: Text(_customExpiryLabel(context)),
+          ),
+        ],
+        CheckboxListTile(
+          key: const ValueKey('share-edit-anonymous'),
+          value: _anonymous,
+          onChanged: (value) {
+            setState(() {
+              _anonymous = value ?? false;
+              _error = null;
+            });
+            _syncFormState();
+          },
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          title: const Text('匿名分享'),
+        ),
+        if (_error != null)
+          Semantics(
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.only(top: TpSpacing.s2),
+              child: Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           ),
-          child: const Text('儲存'),
-        ),
       ],
     );
   }
