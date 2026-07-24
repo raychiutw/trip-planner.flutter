@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
@@ -50,12 +51,78 @@ void main() {
       ),
     );
 
-    expect(resolved!.glassColor.a, greaterThanOrEqualTo(0.95));
-    expect(resolved!.platformViewFallbackColor!.a, greaterThanOrEqualTo(0.95));
+    expect(resolved!.glassColor.a, 1);
+    expect(resolved!.platformViewFallbackColor!.a, 1);
     expect(resolved!.blur, 0);
     expect(resolved!.thickness, 0);
     expect(resolved!.refractiveIndex, 1);
   });
+
+  testWidgets(
+    'navigation glass becomes opaque when Reduce Transparency is enabled',
+    (tester) async {
+      LiquidGlassSettings? resolved;
+      bool? highContrast;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppAccessibilityScope(
+            reduceTransparency: true,
+            child: Builder(
+              builder: (context) {
+                highContrast = MediaQuery.highContrastOf(context);
+                resolved = tpNavigationGlassSettings(context);
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(highContrast, isFalse);
+      expect(resolved!.glassColor.a, 1);
+      expect(resolved!.platformViewFallbackColor!.a, 1);
+      expect(resolved!.blur, 0);
+      expect(resolved!.thickness, 0);
+      expect(resolved!.refractiveIndex, 1);
+    },
+  );
+
+  testWidgets(
+    'TpGlassSurface resolves custom settings for Reduce Transparency',
+    (tester) async {
+      const customSettings = LiquidGlassSettings(
+        glassColor: Color(0x332196F3),
+        blur: 30,
+        thickness: 26,
+        refractiveIndex: 1.2,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppAccessibilityScope(
+            reduceTransparency: true,
+            child: const Scaffold(
+              body: TpGlassSurface(
+                glassSettings: customSettings,
+                tintColor: Color(0xFF2196F3),
+                child: SizedBox(width: 120, height: 44),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final settings = tester
+          .widget<GlassContainer>(find.byType(GlassContainer))
+          .settings!;
+      const opaqueBlue = Color(0xFF2196F3);
+      expect(settings.glassColor, opaqueBlue);
+      expect(settings.backerColor, opaqueBlue);
+      expect(settings.platformViewFallbackColor, opaqueBlue);
+      expect(settings.blur, 0);
+      expect(settings.thickness, 0);
+      expect(settings.refractiveIndex, 1);
+    },
+  );
 
   testWidgets('淺色 glass 使用系統 surface', (tester) async {
     await tester.pumpWidget(

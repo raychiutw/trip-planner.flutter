@@ -133,6 +133,18 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#locationPermissionGranted), findsOneWidget);
 
+    await $(#toggleMapLifecycle).tap();
+    await $(
+      #nativeMapRemounted,
+    ).waitUntilExists(timeout: const Duration(seconds: 30));
+    expect($(#nativeMapRemounted), findsOneWidget);
+
+    await $(#focusAtZoom13).tap();
+    await $(
+      #nativeMapRemountCameraObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapRemountCameraObserved), findsOneWidget);
+
     if (!_expectGooglePoi) return;
 
     // The release behavior stays at zoom 13. For the strict Test Lab-only POI
@@ -187,8 +199,11 @@ class _NativeMapSmokeHarness extends StatefulWidget {
 class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
   Brightness _brightness = Brightness.light;
   bool _ready = false;
+  bool _mapMounted = true;
+  int _readyCount = 0;
   bool _expectingZoom13 = false;
   bool _observedZoom13 = false;
+  bool _remountCameraObserved = false;
   _NativeGesture? _expectedGesture;
   final _observedGestures = <_NativeGesture>{};
   bool _darkStyleApplied = false;
@@ -212,6 +227,7 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
       setState(() {
         _expectingZoom13 = false;
         _observedZoom13 = true;
+        if (_readyCount >= 2) _remountCameraObserved = true;
       });
       return;
     }
@@ -259,6 +275,18 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
     });
   }
 
+  Future<void> _remountMap() async {
+    setState(() {
+      _mapMounted = false;
+      _ready = false;
+      _observedZoom13 = false;
+      _remountCameraObserved = false;
+    });
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    setState(() => _mapMounted = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -278,46 +306,52 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
       home: Scaffold(
         body: Stack(
           children: [
-            Positioned.fill(
-              child: buildTripMapCanvas(
-                TripMapCanvasConfig(
-                  controller: widget.controller,
-                  tilePreset: kTripMapTilePresets.first,
-                  initialFitPoints: const [_taipei101],
-                  initialCenter: _taipei101,
-                  initialZoom: 13,
-                  initialMaxZoom: 13,
-                  routes: const [
-                    TripMapRoute(
-                      id: 'smoke-route',
-                      points: [TripMapPoint(25.028, 121.559), _taipei101],
-                      color: Color(0xFFC48B4A),
-                      strokeWidth: 6,
-                    ),
-                  ],
-                  markers: const [
-                    TripMapMarker(
-                      id: 'smoke-marker-1',
-                      point: TripMapPoint(25.028, 121.559),
-                      color: Color(0xFFC48B4A),
-                      glyph: '1',
-                      title: 'Tripline smoke marker',
-                    ),
-                  ],
-                  onMapReady: () {
-                    if (mounted) setState(() => _ready = true);
-                    widget.onReady();
-                  },
-                  onCameraIdle: _handleCameraIdle,
-                  onMapStyleApplied: (brightness) {
-                    if (brightness == Brightness.dark && mounted) {
-                      setState(() => _darkStyleApplied = true);
-                    }
-                  },
-                  onGooglePoiSelected: widget.onGooglePoiSelected,
+            if (_mapMounted)
+              Positioned.fill(
+                child: buildTripMapCanvas(
+                  TripMapCanvasConfig(
+                    controller: widget.controller,
+                    tilePreset: kTripMapTilePresets.first,
+                    initialFitPoints: const [_taipei101],
+                    initialCenter: _taipei101,
+                    initialZoom: 13,
+                    initialMaxZoom: 13,
+                    routes: const [
+                      TripMapRoute(
+                        id: 'smoke-route',
+                        points: [TripMapPoint(25.028, 121.559), _taipei101],
+                        color: Color(0xFFC48B4A),
+                        strokeWidth: 6,
+                      ),
+                    ],
+                    markers: const [
+                      TripMapMarker(
+                        id: 'smoke-marker-1',
+                        point: TripMapPoint(25.028, 121.559),
+                        color: Color(0xFFC48B4A),
+                        glyph: '1',
+                        title: 'Tripline smoke marker',
+                      ),
+                    ],
+                    onMapReady: () {
+                      if (mounted) {
+                        setState(() {
+                          _ready = true;
+                          _readyCount++;
+                        });
+                      }
+                      widget.onReady();
+                    },
+                    onCameraIdle: _handleCameraIdle,
+                    onMapStyleApplied: (brightness) {
+                      if (brightness == Brightness.dark && mounted) {
+                        setState(() => _darkStyleApplied = true);
+                      }
+                    },
+                    onGooglePoiSelected: widget.onGooglePoiSelected,
+                  ),
                 ),
               ),
-            ),
             SafeArea(
               child: Align(
                 alignment: Alignment.topCenter,
@@ -361,6 +395,11 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                       onPressed: _requestLocationPermission,
                       child: const Text('Location'),
                     ),
+                    FilledButton(
+                      key: const ValueKey('toggleMapLifecycle'),
+                      onPressed: _remountMap,
+                      child: const Text('Remount'),
+                    ),
                   ],
                 ),
               ),
@@ -368,6 +407,16 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
             if (_ready)
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapReady')),
+              ),
+            if (_readyCount >= 2)
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapRemounted')),
+              ),
+            if (_remountCameraObserved)
+              const IgnorePointer(
+                child: SizedBox(
+                  key: ValueKey('nativeMapRemountCameraObserved'),
+                ),
               ),
             if (_observedZoom13)
               const IgnorePointer(

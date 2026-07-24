@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +20,7 @@ import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/map/map_adapter.dart';
+import 'package:tripline/features/offline/offline_sync.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/day.dart';
@@ -57,7 +61,7 @@ const releaseSmokeTrips = [
     tripId: 'tokyo',
     name: 'tokyo',
     title: '東京週末旅行',
-    totalDays: 2,
+    totalDays: 1,
     countries: 'JP',
   ),
 ];
@@ -76,6 +80,13 @@ const releaseSmokeDays = [
         startTime: '10:00',
         endTime: '11:00',
         title: '那霸機場',
+        master: EntryPoiInfo(
+          poiId: 1001,
+          name: '那霸機場',
+          lat: 26.2065,
+          lng: 127.6461,
+          type: 'transport',
+        ),
       ),
     ],
   ),
@@ -92,6 +103,13 @@ const releaseSmokeDays = [
         startTime: '09:00',
         endTime: '10:00',
         title: '首里城',
+        master: EntryPoiInfo(
+          poiId: 1002,
+          name: '首里城',
+          lat: 26.217,
+          lng: 127.7195,
+          type: 'attraction',
+        ),
       ),
     ],
   ),
@@ -111,22 +129,13 @@ const releaseSmokeTokyoDays = [
         startTime: '10:00',
         endTime: '11:00',
         title: '東京車站',
-      ),
-    ],
-  ),
-  TripDay(
-    id: 102,
-    dayNum: 2,
-    title: '淺草散策',
-    version: 0,
-    timeline: [
-      TimelineEntry(
-        id: 121,
-        sortOrder: 0,
-        version: 0,
-        startTime: '09:00',
-        endTime: '10:00',
-        title: '淺草寺',
+        master: EntryPoiInfo(
+          poiId: 1101,
+          name: '東京車站',
+          lat: 35.6812,
+          lng: 139.7671,
+          type: 'transport',
+        ),
       ),
     ],
   ),
@@ -164,6 +173,8 @@ class AppFlowFixture {
     required this.map,
     required this.apiClient,
     required this.speech,
+    required this.favoritesStream,
+    required this.pendingCountStream,
   });
 
   factory AppFlowFixture.loggedOut() {
@@ -174,6 +185,8 @@ class AppFlowFixture {
     final map = MockMapRepository();
     final apiClient = MockApiClient();
     final speech = MockSpeechService();
+    final favoritesStream = StreamController<List<PoiFavorite>>.broadcast();
+    final pendingCountStream = StreamController<int>.broadcast();
 
     when(
       () => apiClient.queueFlushRequests,
@@ -279,6 +292,8 @@ class AppFlowFixture {
       map: map,
       apiClient: apiClient,
       speech: speech,
+      favoritesStream: favoritesStream,
+      pendingCountStream: pendingCountStream,
     );
   }
 
@@ -289,6 +304,13 @@ class AppFlowFixture {
   final MockMapRepository map;
   final MockApiClient apiClient;
   final MockSpeechService speech;
+  final StreamController<List<PoiFavorite>> favoritesStream;
+  final StreamController<int> pendingCountStream;
+
+  Future<void> dispose() async {
+    await favoritesStream.close();
+    await pendingCountStream.close();
+  }
 
   Widget get app => ProviderScope(
     overrides: [
@@ -297,6 +319,10 @@ class AppFlowFixture {
       tripRepositoryProvider.overrideWithValue(trips),
       requestsRepositoryProvider.overrideWithValue(requests),
       favoritesRepositoryProvider.overrideWithValue(favorites),
+      favoritesProvider.overrideWith((ref) => favoritesStream.stream),
+      offlinePendingCountProvider.overrideWith(
+        (ref) => pendingCountStream.stream,
+      ),
       mapRepositoryProvider.overrideWithValue(map),
       speechServiceProvider.overrideWithValue(speech),
       settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
@@ -351,6 +377,12 @@ class _FakeTripMapCanvasState extends State<_FakeTripMapCanvas> {
 }
 
 Finder _rootTab(String label) {
+  if (find
+      .byKey(const ValueKey('apple-regular-root-tabs'))
+      .evaluate()
+      .isNotEmpty) {
+    return find.byKey(ValueKey('regular-root-tab-$label'));
+  }
   return find.byKey(ValueKey('root-tab-$label'));
 }
 
@@ -373,15 +405,19 @@ Future<void> runAppOwnedReleaseFlow(
   final typeText = enterText ?? tester.enterText;
 
   final fixture = AppFlowFixture.loggedOut();
+  addTearDown(fixture.dispose);
   final app = fixture.app;
   await tester.pumpWidget(appWrapper?.call(app) ?? app);
   await tester.pumpAndSettle();
 
   expect(find.byType(WelcomeScreen), findsOneWidget);
   await captureState('welcome');
+  await tester.ensureVisible(find.byKey(const ValueKey('welcome-login-hero')));
+  await tester.pump();
   await tester.tap(find.byKey(const ValueKey('welcome-login-hero')));
   await tester.pumpAndSettle();
   expect(find.byType(LoginScreen), findsOneWidget);
+  await captureState('login');
   await typeText(
     find.byKey(const ValueKey('login-email-field')),
     'ray@example.com',
@@ -403,6 +439,7 @@ Future<void> runAppOwnedReleaseFlow(
     reason: visibleText,
   );
   expect(find.byType(TripsListScreen), findsOneWidget, reason: visibleText);
+  await captureState('trips');
 
   await tester.drag(
     find.byKey(const ValueKey('trip-dismiss-okinawa')),
@@ -453,7 +490,11 @@ Future<void> runAppOwnedReleaseFlow(
   expect(find.text('全部'), findsOneWidget);
   expect(tester.widget<PageView>(find.byType(PageView)).pageSnapping, isFalse);
   await captureState('map-tripline-poi');
-  await tester.tap(find.byKey(const ValueKey('fake-google-poi-trigger')));
+  tester
+      .widget<GestureDetector>(
+        find.byKey(const ValueKey('fake-google-poi-trigger')),
+      )
+      .onTap!();
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('google-poi-accessory')), findsOneWidget);
   await captureState('map-native-google-poi');
@@ -526,8 +567,15 @@ Future<void> runAppOwnedReleaseFlow(
   expect(find.byKey(const ValueKey('chat-send')), findsOneWidget);
   expect(find.byKey(const ValueKey('chat-mic-button')), findsNothing);
   if (setKeyboardVisible != null) {
+    final rootNavigationKey =
+        find
+            .byKey(const ValueKey('apple-regular-root-tabs'))
+            .evaluate()
+            .isNotEmpty
+        ? const ValueKey('apple-regular-root-tabs')
+        : const ValueKey('apple-root-tab-bar');
     await setKeyboardVisible(true);
-    expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsNothing);
+    expect(find.byKey(rootNavigationKey), findsNothing);
     expect(
       tester
           .getBottomLeft(find.byKey(const ValueKey('chat-composer-glass')))
@@ -539,7 +587,7 @@ Future<void> runAppOwnedReleaseFlow(
       ),
     );
     await setKeyboardVisible(false);
-    expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
+    expect(find.byKey(rootNavigationKey), findsOneWidget);
   }
 
   await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
@@ -556,7 +604,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
   await tester.pumpAndSettle();
-  expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.text('東京週末旅行'), findsWidgets);
   expect(find.byKey(const ValueKey('chat-mic-button')), findsOneWidget);
   await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
   await tester.pumpAndSettle();
@@ -582,8 +630,9 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
     findsOneWidget,
   );
-  expect(find.text('東京週末旅行'), findsOneWidget);
-  expect(find.text('淺草寺'), findsOneWidget);
+  expect(find.text('東京週末旅行'), findsWidgets);
+  expect(find.byKey(const ValueKey('day-pill-1')), findsOneWidget);
+  expect(find.text('東京車站'), findsOneWidget);
 
   await tester.tap(find.byKey(const ValueKey('trip-timeline-trip-picker')));
   await tester.pumpAndSettle();
@@ -593,12 +642,23 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
     findsOneWidget,
   );
-  expect(find.text('沖繩家族之旅'), findsOneWidget);
-  expect(find.text('首里城'), findsOneWidget);
+  expect(find.text('沖繩家族之旅'), findsWidgets);
+  await tester.ensureVisible(find.byKey(const ValueKey('day-pill-2')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+  await tester.pumpAndSettle();
+  expect(
+    tester
+        .getSemantics(find.byKey(const ValueKey('day-pill-2')))
+        .getSemanticsData()
+        .flagsCollection
+        .isSelected,
+    Tristate.isTrue,
+  );
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
-  expect(find.text('沖繩家族之旅'), findsOneWidget);
+  expect(find.text('沖繩家族之旅'), findsWidgets);
   expect(find.text('device smoke draft'), findsOneWidget);
   await tester.tap(find.byKey(const ValueKey('chat-send')));
   await tester.pumpAndSettle();
@@ -629,15 +689,18 @@ Future<void> runAppOwnedReleaseFlow(
 
   await tester.tap(_rootTab('行程'));
   await tester.pumpAndSettle();
-  expect(find.text('東京週末旅行'), findsOneWidget);
-  expect(find.text('淺草寺'), findsOneWidget);
+  expect(find.text('東京週末旅行'), findsWidgets);
+  expect(find.byKey(const ValueKey('day-pill-1')), findsOneWidget);
+  expect(find.text('東京車站'), findsOneWidget);
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
-  expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.text('東京週末旅行'), findsWidgets);
   expect(find.text('device smoke draft'), findsNothing);
 
   await tester.tap(_rootTab('收藏'));
+  await tester.pump();
+  fixture.favoritesStream.add(releaseSmokeFavorites);
   await tester.pumpAndSettle();
   expect(find.text('美麗海水族館'), findsOneWidget);
   await captureState('favorites');
@@ -645,11 +708,51 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pump();
   expect(find.text('暖暮拉麵'), findsOneWidget);
   expect(find.text('美麗海水族館'), findsNothing);
+
+  await tester.tap(_rootTab('聊天'));
+  await tester.pumpAndSettle();
+  await tester.tap(_rootTab('收藏'));
+  await tester.pumpAndSettle();
+  final favoritesSearch = find.byKey(const ValueKey('favorites-search-input'));
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: favoritesSearch,
+            matching: find.byType(EditableText),
+          ),
+        )
+        .controller
+        .text,
+    '牧志',
+  );
+  expect(find.text('暖暮拉麵'), findsOneWidget);
+
   await typeText(find.byKey(const ValueKey('favorites-search-input')), '');
   await tester.pump();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-oldest')));
+  await tester.pumpAndSettle();
+  expect(find.text('美麗海水族館'), findsOneWidget);
+
+  fixture.pendingCountStream.add(1);
+  await tester.pumpAndSettle();
+  expect(find.text('1 筆變更待同步'), findsOneWidget);
+  expect(_rootTab('收藏'), findsOneWidget);
+  await captureState('offline');
+
+  fixture.pendingCountStream.add(0);
+  fixture.favoritesStream.addError(StateError('release fixture error'));
+  await tester.pumpAndSettle();
+  expect(find.text('載入失敗'), findsOneWidget);
+  expect(find.text('無法取得收藏清單，請檢查網路後再試一次。'), findsOneWidget);
+  expect(_rootTab('收藏'), findsOneWidget);
+  await captureState('error');
+
+  await tester.tap(find.text('重試'));
+  await tester.pump();
+  fixture.favoritesStream.add(releaseSmokeFavorites);
   await tester.pumpAndSettle();
   expect(find.text('美麗海水族館'), findsOneWidget);
 

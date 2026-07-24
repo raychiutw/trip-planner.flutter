@@ -91,6 +91,9 @@ class TpToolbarGlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final resolvedSettings = glassSettings == null
+        ? tpNavigationGlassSettings(context)
+        : tpResolveGlassSettings(context, glassSettings!);
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
       child: Tooltip(
@@ -116,7 +119,7 @@ class TpToolbarGlassButton extends StatelessWidget {
                   Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
             ),
           ),
-          settings: glassSettings ?? tpNavigationGlassSettings(context),
+          settings: resolvedSettings,
           child: child,
         ),
       ),

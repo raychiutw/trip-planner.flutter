@@ -14,6 +14,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../theme/tokens.dart';
 import '../ui/tp_action_item.dart';
 import '../ui/tp_app_bar.dart';
+import '../ui/tp_glass_surface.dart';
 
 /// 全 App 的鍵盤收合規則：點欄位外或拖曳任何 scroll view 都只移除焦點。
 /// [TextFieldTapRegion] 內的附屬控制仍由 Flutter 排除在 outside tap 之外。
@@ -417,7 +418,7 @@ LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
   final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
   final surface = theme.colorScheme.surface;
-  return LiquidGlassSettings(
+  final settings = LiquidGlassSettings(
     glassColor: surface.withValues(alpha: isDark ? 0.70 : 0.78),
     thickness: isDark ? 28 : 24,
     blur: 24,
@@ -428,6 +429,7 @@ LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
     saturation: isDark ? 1.04 : 1.06,
     platformViewFallbackColor: surface.withValues(alpha: 0.95),
   );
+  return tpResolveGlassSettings(context, settings);
 }
 
 Future<T?> _showAppSheet<T>({

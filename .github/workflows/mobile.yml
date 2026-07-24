@@ -10,7 +10,7 @@ on:
       release_target:
         description: Mobile release destination
         required: true
-        default: testflight
+        default: both
         type: choice
         options:
           - testflight
@@ -24,11 +24,23 @@ on:
         options:
           - macos-26
           - tripline-release
-      run_optional_evidence:
-        description: Also run Firebase device evidence
+      manual_evidence_sha:
+        description: 人工輔助使用驗收所對應的完整 commit SHA
         required: true
-        default: false
-        type: boolean
+        type: string
+      manual_evidence_url:
+        description: 人工輔助使用驗收證據的 HTTPS URL
+        required: true
+        type: string
+      manual_evidence_result:
+        description: 人工輔助使用驗收結果
+        required: true
+        default: BLOCKED
+        type: choice
+        options:
+          - BLOCKED
+          - FAIL
+          - PASS
 
 permissions:
   contents: read
@@ -40,9 +52,8 @@ env:
 jobs:
   ci:
     name: Analyze and test
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -64,10 +75,13 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Test
+      - name: Run full Flutter test suite
         run: flutter test
 
       - name: Preserve deterministic UI evidence
@@ -76,7 +90,7 @@ jobs:
         with:
           name: tripline-ui-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/test-artifacts
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
       - name: Build Android debug
@@ -89,7 +103,8 @@ jobs:
 
   external_device_gate:
     name: External device evidence
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    needs: ci
     permissions:
       contents: read
       id-token: write
@@ -109,9 +124,45 @@ jobs:
       APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
       APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
 
+  manual_evidence_gate:
+    name: Manual accessibility evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' }}
+    needs: [ci, external_device_gate]
+    runs-on: ubuntu-24.04
+    environment: mobile-release
+    timeout-minutes: 5
+    steps:
+      - name: Check out evidence validator
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate exact-SHA manual evidence
+        env:
+          EVIDENCE_RESULT: ${{ inputs.manual_evidence_result }}
+          EVIDENCE_SHA: ${{ inputs.manual_evidence_sha }}
+          EVIDENCE_URL: ${{ inputs.manual_evidence_url }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVIDENCE_RESULT" != "PASS" ]]; then
+            echo "Manual accessibility evidence must be PASS" >&2
+            exit 1
+          fi
+          if [[ "$EVIDENCE_SHA" != "$RELEASE_SHA" ]]; then
+            echo "Manual evidence SHA must exactly match the release SHA" >&2
+            exit 1
+          fi
+          bash tool/validate_manual_evidence.sh "$EVIDENCE_URL" "$RELEASE_SHA"
+          {
+            echo "## Manual accessibility evidence"
+            echo "- Result: PASS"
+            echo "- SHA: \`$EVIDENCE_SHA\`"
+            echo "- Evidence: $EVIDENCE_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   testflight:
     name: Upload to TestFlight
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'testflight' || inputs.release_target == 'both') }}
+    needs: [ci, external_device_gate, manual_evidence_gate]
     runs-on: ${{ inputs.runner }}
     environment: mobile-release
     timeout-minutes: 75
@@ -131,12 +182,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos
-
-      - name: Test
-        run: flutter test
 
       - name: Write iOS build secrets
         env:
@@ -200,6 +245,7 @@ jobs:
   android_internal:
     name: Upload to Google Play internal testing
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && (inputs.release_target == 'android-internal' || inputs.release_target == 'both') }}
+    needs: [ci, external_device_gate, manual_evidence_gate]
     runs-on: ubuntu-24.04
     environment: mobile-release
     timeout-minutes: 45
@@ -219,12 +265,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze --no-fatal-infos
-
-      - name: Test
-        run: flutter test
 
       - name: Validate Android release secrets and decode upload key
         env:

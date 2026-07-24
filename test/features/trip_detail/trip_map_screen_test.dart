@@ -1079,6 +1079,21 @@ void main() {
     expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
   });
 
+  testWidgets('最大 Accessibility Size 不溢出 POI rail', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _buildScreen([_dayOne], textScaler: const TextScaler.linear(3)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+  });
+
   testWidgets('長行程 page indicator 不會水平溢出', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;

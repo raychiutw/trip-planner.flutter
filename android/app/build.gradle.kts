@@ -38,6 +38,8 @@ val hasReleaseSigning = listOf(
     androidKeyPassword,
 ).all { !it.isNullOrBlank() }
 val signDebugWithRelease = System.getenv("ANDROID_SIGN_DEBUG_WITH_RELEASE") == "true"
+val standardIntegrationTest =
+    providers.gradleProperty("standardIntegrationTest").orNull == "true"
 
 android {
     namespace = "com.raychiu.tripline"
@@ -60,8 +62,23 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["googleMapsApiKey"] = googleMapsAndroidApiKey
-        testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
+        testInstrumentationRunner =
+            if (standardIntegrationTest) {
+                "androidx.test.runner.AndroidJUnitRunner"
+            } else {
+                "pl.leancode.patrol.PatrolJUnitRunner"
+            }
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+    }
+
+    sourceSets {
+        getByName("androidTest") {
+            if (standardIntegrationTest) {
+                java.setSrcDirs(
+                    listOf("src/standardIntegrationAndroidTest/java"),
+                )
+            }
+        }
     }
 
     signingConfigs {

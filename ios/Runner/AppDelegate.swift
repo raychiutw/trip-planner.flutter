@@ -26,6 +26,58 @@ import UserNotifications
       forPlugin: "TriplineNotificationPermission"
     )
     NotificationPermissionPlugin.register(with: registrar)
+    let accessibilityRegistrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "TriplineAccessibility"
+    )
+    ReduceTransparencyPlugin.register(with: accessibilityRegistrar)
+  }
+}
+
+private final class ReduceTransparencyPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
+  private static let channelName = "tripline/accessibility/reduce-transparency"
+
+  private var eventSink: FlutterEventSink?
+  private var observer: NSObjectProtocol?
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterEventChannel(
+      name: channelName,
+      binaryMessenger: registrar.messenger()
+    )
+    channel.setStreamHandler(ReduceTransparencyPlugin())
+  }
+
+  func onListen(
+    withArguments arguments: Any?,
+    eventSink events: @escaping FlutterEventSink
+  ) -> FlutterError? {
+    stopObserving()
+    eventSink = events
+    events(UIAccessibility.isReduceTransparencyEnabled)
+    observer = NotificationCenter.default.addObserver(
+      forName: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.eventSink?(UIAccessibility.isReduceTransparencyEnabled)
+    }
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    stopObserving()
+    eventSink = nil
+    return nil
+  }
+
+  deinit {
+    stopObserving()
+  }
+
+  private func stopObserving() {
+    guard let observer else { return }
+    NotificationCenter.default.removeObserver(observer)
+    self.observer = nil
   }
 }
 

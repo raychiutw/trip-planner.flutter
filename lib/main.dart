@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'api/cache/cache_migration.dart';
 import 'api/cache/drift_cache_store.dart';
 import 'api/providers.dart';
+import 'app/accessibility_scope.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'features/account/account_sheet.dart';
@@ -92,12 +93,14 @@ Future<void> main() async {
     LiquidGlassWidgets.wrap(
       theme: _triplineGlassTheme,
       adaptiveQuality: true,
-      child: ProviderScope(
-        overrides: [
-          if (cacheStore != null)
-            cacheStoreProvider.overrideWithValue(cacheStore),
-        ],
-        child: const TriplineApp(),
+      child: AppAccessibilityScope(
+        child: ProviderScope(
+          overrides: [
+            if (cacheStore != null)
+              cacheStoreProvider.overrideWithValue(cacheStore),
+          ],
+          child: const TriplineApp(),
+        ),
       ),
     ),
   );

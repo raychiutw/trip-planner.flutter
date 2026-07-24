@@ -269,7 +269,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   double get _poiAccessoryHeight {
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final additionalHeight = ((scale - 1) * 70).clamp(0.0, 56.0);
+    final additionalHeight = ((scale - 1) * 70).clamp(0.0, 140.0);
     return TpBottomAccessory.height + additionalHeight;
   }
 

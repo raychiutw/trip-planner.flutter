@@ -1,10 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  testWidgets('large sheet uses the opaque Reduce Transparency fallback', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AppAccessibilityScope(
+        reduceTransparency: true,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showAppContentSheet<void>(
+                context,
+                title: '帳號',
+                builder: (_) => const Text('帳號內容'),
+              ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final settings = tester
+        .widget<GlassModalSheetScaffold>(find.byType(GlassModalSheetScaffold))
+        .settings!;
+    expect(settings.glassColor.a, 1);
+    expect(settings.backerColor?.a, 1);
+    expect(settings.platformViewFallbackColor?.a, 1);
+    expect(settings.blur, 0);
+    expect(settings.thickness, 0);
+    expect(settings.refractiveIndex, 1);
+  });
+
   testWidgets('共用鍵盤區域可點外部或拖曳收合，且保留草稿', (tester) async {
     final controller = TextEditingController();
     final focusNode = FocusNode();
