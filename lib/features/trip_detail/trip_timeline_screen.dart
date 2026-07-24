@@ -355,8 +355,6 @@ class _TimelineBody extends ConsumerStatefulWidget {
 }
 
 class _TimelineBodyState extends ConsumerState<_TimelineBody> {
-  static const _selectorExtent = TpSpacing.tapMin + TpSpacing.s1;
-
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
   late _EntriesSnapshot _visibleEntriesByDayId;
@@ -378,6 +376,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     _activeDayNum =
         _initialDayNum() ??
         (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
+    _notifyActiveDayAfterFrame();
     _scheduleInitialFocusScroll();
   }
 
@@ -400,27 +399,42 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       _activeDayNum =
           _initialDayNum() ??
           (widget.days.isEmpty ? 1 : widget.days.first.dayNum);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) widget.onActiveDayChanged(_activeDayNum);
-      });
+      _notifyActiveDayAfterFrame();
       _scheduleInitialFocusScroll();
       return;
     }
     if (!oldWidget.isEditing && widget.isEditing) {
       _expandedEntryId = null;
     }
-    if (daysChanged ||
-        oldWidget.initialEntryId != widget.initialEntryId ||
-        oldWidget.initialDayNum != widget.initialDayNum) {
+    final entryFocusChanged = oldWidget.initialEntryId != widget.initialEntryId;
+    final dayFocusChanged =
+        oldWidget.initialDayNum != widget.initialDayNum &&
+        _initialDayNum() != _activeDayNum;
+    if (daysChanged || entryFocusChanged || dayFocusChanged) {
       _rebuildKeys();
+      final previousActiveDayNum = _activeDayNum;
       final initialDayNum = _initialDayNum();
       if (initialDayNum != null) {
         _activeDayNum = initialDayNum;
       } else if (!widget.days.any((day) => day.dayNum == _activeDayNum)) {
         _activeDayNum = widget.days.isEmpty ? 1 : widget.days.first.dayNum;
       }
-      _scheduleInitialFocusScroll();
+      if (_activeDayNum != previousActiveDayNum) {
+        _notifyActiveDayAfterFrame();
+      }
+      if (entryFocusChanged || dayFocusChanged) {
+        _scheduleInitialFocusScroll();
+      }
     }
+  }
+
+  void _notifyActiveDayAfterFrame() {
+    final activeDayNum = _activeDayNum;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _activeDayNum == activeDayNum) {
+        widget.onActiveDayChanged(activeDayNum);
+      }
+    });
   }
 
   void _rebuildKeys() {
@@ -659,9 +673,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     final viewport = RenderAbstractViewport.of(object);
     final reveal = viewport.getOffsetToReveal(object, 0).offset;
     final position = _scrollController.position;
-    final target = (reveal - _selectorTop(targetContext) - _selectorExtent)
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
+    final target =
+        (reveal - _selectorTop(targetContext) - _selectorExtent(targetContext))
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
     final generation = ++_programmaticScrollGeneration;
     _programmaticDayNum = dayNum;
     setState(() => _activeDayNum = dayNum);
@@ -698,7 +713,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
           SliverPersistentHeader(
             pinned: true,
             delegate: _DaySelectorHeaderDelegate(
-              extent: _selectorExtent,
+              extent: _selectorExtent(context),
               topInset: _selectorTop(context),
               child: KeyedSubtree(
                 key: _selectorAnchorKey,
@@ -761,6 +776,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
             TpScopeOption(
               value: day.dayNum,
               label: 'DAY ${day.dayNum}',
+              semanticsLabel: '第 ${day.dayNum} 天，共 ${widget.days.length} 天',
               key: ValueKey('day-pill-${day.dayNum}'),
             ),
         ],
@@ -774,6 +790,9 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
 
   double _selectorTop(BuildContext context) =>
       TpRootGeometry.headerBottom(context) + TpSpacing.s2;
+
+  double _selectorExtent(BuildContext context) =>
+      TpHorizontalSelector.preferredHeight(context) + TpSpacing.s1;
 }
 
 class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -1647,24 +1666,29 @@ class _TimelineSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      key: const ValueKey('timeline-skeleton'),
-      padding: const EdgeInsets.all(TpSpacing.s4),
-      children: const [
-        _SkeletonBlock(width: 120, height: 14),
-        SizedBox(height: TpSpacing.s3),
-        _SkeletonBlock(height: 72),
-        SizedBox(height: TpSpacing.s3),
-        _SkeletonBlock(height: 72),
-        SizedBox(height: TpSpacing.s3),
-        _SkeletonBlock(height: 72),
-        SizedBox(height: TpSpacing.s6),
-        _SkeletonBlock(width: 120, height: 14),
-        SizedBox(height: TpSpacing.s3),
-        _SkeletonBlock(height: 72),
-        SizedBox(height: TpSpacing.s3),
-        _SkeletonBlock(height: 72),
-      ],
+    return Semantics(
+      key: const ValueKey('timeline-loading-state'),
+      liveRegion: true,
+      label: '正在載入行程時間軸',
+      child: ListView(
+        key: const ValueKey('timeline-skeleton'),
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        children: const [
+          _SkeletonBlock(width: 120, height: 14),
+          SizedBox(height: TpSpacing.s3),
+          _SkeletonBlock(height: 72),
+          SizedBox(height: TpSpacing.s3),
+          _SkeletonBlock(height: 72),
+          SizedBox(height: TpSpacing.s3),
+          _SkeletonBlock(height: 72),
+          SizedBox(height: TpSpacing.s6),
+          _SkeletonBlock(width: 120, height: 14),
+          SizedBox(height: TpSpacing.s3),
+          _SkeletonBlock(height: 72),
+          SizedBox(height: TpSpacing.s3),
+          _SkeletonBlock(height: 72),
+        ],
+      ),
     );
   }
 }
@@ -1698,25 +1722,30 @@ class _TimelineError extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            CupertinoIcons.exclamationmark_circle,
-            size: 32,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: TpSpacing.s2),
-          Text(
-            '行程載入失敗，請檢查網路後再試',
-            style: theme.textTheme.bodyMedium?.copyWith(
+    return Semantics(
+      key: const ValueKey('timeline-error-state'),
+      liveRegion: true,
+      label: '行程時間軸載入失敗',
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              size: 32,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(height: TpSpacing.s4),
-          FilledButton(onPressed: onRetry, child: const Text('重試')),
-        ],
+            const SizedBox(height: TpSpacing.s2),
+            Text(
+              '行程載入失敗，請檢查網路後再試',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: TpSpacing.s4),
+            FilledButton(onPressed: onRetry, child: const Text('重試')),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
@@ -19,6 +20,8 @@ import 'package:tripline/models/trip_doc.dart';
 import 'package:tripline/models/trip_health.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/user.dart';
+
+class _MockApiClient extends Mock implements ApiClient {}
 
 void main() {
   late Dio dio;
@@ -458,6 +461,30 @@ void main() {
     expect(days.single.dayNum, 1);
     expect(days.single.displayTitle, '2026-04-23（四）');
     expect(days.single.timeline, isEmpty);
+  });
+
+  test('fetchDaySummaries 可明確關閉 cache fallback 取得 server truth', () async {
+    final client = _MockApiClient();
+    when(
+      () => client.get(
+        '/trips/okinawa-trip-2026-Ray/days',
+        fallbackToCache: false,
+      ),
+    ).thenAnswer((_) async => <dynamic>[]);
+    final repository = TripRepository(client: client);
+
+    final days = await repository.fetchDaySummaries(
+      'okinawa-trip-2026-Ray',
+      fallbackToCache: false,
+    );
+
+    expect(days, isEmpty);
+    verify(
+      () => client.get(
+        '/trips/okinawa-trip-2026-Ray/days',
+        fallbackToCache: false,
+      ),
+    ).called(1);
   });
 
   test('fetchDay：GET /trips/:id/days/:num 解析完整單日', () async {

@@ -263,11 +263,14 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     return TpBottomAccessory.height + additionalHeight;
   }
 
+  double get _daySelectorHeight =>
+      TpHorizontalSelector.preferredHeight(context);
+
   EdgeInsets get _mapPadding => EdgeInsets.fromLTRB(
     TpSpacing.s10,
     TpRootGeometry.headerBottom(context) +
         TpSpacing.s2 +
-        TpSpacing.tapMin +
+        _daySelectorHeight +
         TpSpacing.s2 +
         TpSpacing.tapMin +
         TpSpacing.s4,
@@ -726,7 +729,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           top:
               TpRootGeometry.headerBottom(context) +
               TpSpacing.s2 +
-              TpSpacing.tapMin +
+              _daySelectorHeight +
               TpSpacing.s2,
           right: TpSpacing.s4,
           child: TripMapLocateButton(
@@ -740,7 +743,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
             top:
                 TpRootGeometry.headerBottom(context) +
                 TpSpacing.s2 +
-                TpSpacing.tapMin +
+                _daySelectorHeight +
                 TpSpacing.s2 +
                 TpSpacing.tapMin +
                 TpSpacing.s4,

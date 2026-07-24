@@ -232,8 +232,14 @@ class TripRepository {
   );
 
   /// GET /trips/:id/days（僅 day 摘要，不含 timeline）。
-  Future<List<TripDay>> fetchDaySummaries(String id) async => _list(
-    await _client.get('/trips/${Uri.encodeComponent(id)}/days'),
+  Future<List<TripDay>> fetchDaySummaries(
+    String id, {
+    bool fallbackToCache = true,
+  }) async => _list(
+    await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/days',
+      fallbackToCache: fallbackToCache,
+    ),
     TripDay.fromJson,
   );
 

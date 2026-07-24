@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -278,12 +281,41 @@ void main() {
 
       expect(find.text('重試'), findsOneWidget);
       expect(find.byType(TripCard), findsNothing);
+      expect(
+        tester
+            .getSemantics(find.byKey(const ValueKey('trips-error-state')))
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
 
       await tester.tap(find.text('重試'));
       await tester.pump();
       await tester.pump();
 
       expect(find.byType(TripCard), findsNWidgets(3));
+    });
+
+    testWidgets('loading state 使用 VoiceOver 即時語意', (tester) async {
+      final neverCompletes = Completer<List<TripSummary>>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith(
+              (ref) => Stream.fromFuture(neverCompletes.future),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      final semantics = tester
+          .getSemantics(find.byKey(const ValueKey('trips-loading-state')))
+          .getSemanticsData();
+      expect(semantics.label, '正在載入行程清單');
+      expect(semantics.flagsCollection.isLiveRegion, isTrue);
     });
   });
 
@@ -338,6 +370,54 @@ void main() {
       await tester.pump();
 
       // 全部卡片還原
+      expect(find.byType(TripCard), findsNWidgets(3));
+    });
+
+    testWidgets('鍵盤 Search 收合鍵盤但保留查詢，清除鈕還原完整清單', (tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      final searchField = find.byKey(const ValueKey('trips-search-field'));
+      expect(
+        tester.widget<TextField>(searchField).textInputAction,
+        TextInputAction.search,
+      );
+
+      await tester.enterText(searchField, '沖繩');
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: searchField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .focusNode
+            .hasFocus,
+        isFalse,
+      );
+      expect(tester.widget<TextField>(searchField).controller!.text, '沖繩');
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+      expect(find.byType(TripCard), findsOneWidget);
+
+      await tester.tap(find.byIcon(CupertinoIcons.clear));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(searchField).controller!.text, isEmpty);
       expect(find.byType(TripCard), findsNWidgets(3));
     });
 
@@ -801,6 +881,99 @@ void main() {
         verify(() => mockTripRepository.watchMyTrips()).called(2);
       },
     );
+
+    testWidgets('刪除確認說明影響與不可復原，送出後鎖定卡片直到伺服器成功', (tester) async {
+      await _useWideSurface(tester);
+      final deleteCompleter = Completer<void>();
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).thenAnswer((_) => deleteCompleter.future);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('確定要刪除「沖繩家族之旅」嗎？這會刪除其中所有行程日與景點。此動作無法復原。'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('刪除'));
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('trip-delete-progress-okinawa-trip-2026')),
+        findsOneWidget,
+      );
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+      final deletingCard = tester.widget<TripCard>(
+        find.ancestor(of: find.text('沖繩家族之旅'), matching: find.byType(TripCard)),
+      );
+      expect(deletingCard.onTap, isNull);
+      expect(deletingCard.onLongPress, isNull);
+      expect(deletingCard.onMorePressed, isNull);
+
+      deleteCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('沖繩家族之旅'), findsNothing);
+      verify(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).called(1);
+    });
+
+    testWidgets('刪除行程失敗保留卡片並顯示可重試的持續錯誤', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).thenThrow(Exception('offline'));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+      expect(find.text('刪除「沖繩家族之旅」失敗，請稍後再試'), findsOneWidget);
+
+      await tester.tap(find.text('重試'));
+      await tester.pumpAndSettle();
+      verify(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).called(2);
+    });
 
     testWidgets('刪除確認對話框按「取消」→ 不呼叫 deleteTrip', (tester) async {
       await _useWideSurface(tester);

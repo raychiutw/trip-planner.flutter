@@ -55,4 +55,25 @@ void main() {
 
     expect(find.byKey(const ValueKey('app-error-banner')), findsNothing);
   });
+
+  testWidgets('不可關閉的錯誤必須提供重試 recovery', (tester) async {
+    late BuildContext scaffoldContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              scaffoldContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      () => showAppError(scaffoldContext, '無法恢復', allowDismiss: false),
+      throwsAssertionError,
+    );
+  });
 }

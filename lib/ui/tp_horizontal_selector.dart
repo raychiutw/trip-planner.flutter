@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/app_theme.dart';
@@ -21,6 +24,21 @@ class TpHorizontalSelector<T> extends StatefulWidget {
   final ValueChanged<T> onSelected;
   final bool platformViewBackdrop;
 
+  /// 選擇器依目前 Dynamic Type 實際行高增高，且永遠保留 44pt 觸控高度。
+  static double preferredHeight(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+    );
+    final painter = TextPainter(
+      text: TextSpan(text: 'DAY 00', style: style),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    return math.max(TpSpacing.tapMin, painter.height + 10);
+  }
+
   @override
   State<TpHorizontalSelector<T>> createState() =>
       _TpHorizontalSelectorState<T>();
@@ -30,6 +48,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   // 13pt HIG label + Dynamic Type breathing room (DAY 01 still fits).
   static const _tabWidth = 76.0;
   final ScrollController _controller = ScrollController();
+  final FocusNode _focusNode = FocusNode(debugLabel: 'TpHorizontalSelector');
 
   @override
   void initState() {
@@ -49,7 +68,32 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final direction = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowLeft => -1,
+      LogicalKeyboardKey.arrowRight => 1,
+      _ => 0,
+    };
+    if (direction == 0) return KeyEventResult.ignored;
+
+    final currentIndex = widget.options.indexWhere(
+      (option) => option.value == widget.value,
+    );
+    final nextIndex = currentIndex + direction;
+    if (currentIndex < 0 ||
+        nextIndex < 0 ||
+        nextIndex >= widget.options.length) {
+      return KeyEventResult.handled;
+    }
+    widget.onSelected(widget.options[nextIndex].value);
+    return KeyEventResult.handled;
   }
 
   void _scheduleSelectedVisibility() {
@@ -75,13 +119,15 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
         0.0,
         position.maxScrollExtent,
       );
-      _controller.animateTo(
-        target,
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : TpMotion.normal,
-        curve: TpMotion.appleEase,
-      );
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.jumpTo(target);
+      } else {
+        _controller.animateTo(
+          target,
+          duration: TpMotion.normal,
+          curve: TpMotion.appleEase,
+        );
+      }
     });
   }
 
@@ -108,35 +154,44 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       glassColor: selectedTint,
       platformViewFallbackColor: selectedTint,
     );
-    return SizedBox(
-      height: TpSpacing.tapMin,
-      child: GlassContainer(
-        useOwnLayer: true,
-        quality: GlassQuality.standard,
-        platformViewBackdrop: widget.platformViewBackdrop,
-        clipBehavior: Clip.antiAlias,
-        shape: LiquidRoundedSuperellipse(
-          borderRadius: 22,
-          side: BorderSide(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.18),
+    final height = TpHorizontalSelector.preferredHeight(context);
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: SizedBox(
+        height: height,
+        child: GlassContainer(
+          useOwnLayer: true,
+          quality: GlassQuality.standard,
+          platformViewBackdrop: widget.platformViewBackdrop,
+          clipBehavior: Clip.antiAlias,
+          shape: LiquidRoundedSuperellipse(
+            borderRadius: height / 2,
+            side: BorderSide(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.18),
+            ),
           ),
-        ),
-        settings: trackSettings,
-        child: SingleChildScrollView(
-          controller: _controller,
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final option in widget.options)
-                _SelectorOption<T>(
-                  option: option,
-                  selected: option.value == widget.value,
-                  width: _optionWidth(option),
-                  selectedSettings: selectedSettings,
-                  accentColor: tones.accentDeep,
-                  onTap: () => widget.onSelected(option.value),
-                ),
-            ],
+          settings: trackSettings,
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final option in widget.options)
+                  _SelectorOption<T>(
+                    option: option,
+                    selected: option.value == widget.value,
+                    width: _optionWidth(option),
+                    height: height,
+                    selectedSettings: selectedSettings,
+                    accentColor: tones.accentDeep,
+                    onTap: () {
+                      _focusNode.requestFocus();
+                      widget.onSelected(option.value);
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -144,9 +199,9 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   }
 
   double _optionWidth(TpScopeOption<T> option) {
-    final textScale = (MediaQuery.textScalerOf(context).scale(13) / 13).clamp(
-      1.0,
-      2.0,
+    final textScale = math.max(
+      1,
+      MediaQuery.textScalerOf(context).scale(13) / 13,
     );
     final baseWidth =
         (_tabWidth + (option.label.characters.length - 5).clamp(0, 4) * 10)
@@ -160,6 +215,7 @@ class _SelectorOption<T> extends StatelessWidget {
     required this.option,
     required this.selected,
     required this.width,
+    required this.height,
     required this.selectedSettings,
     required this.accentColor,
     required this.onTap,
@@ -168,6 +224,7 @@ class _SelectorOption<T> extends StatelessWidget {
   final TpScopeOption<T> option;
   final bool selected;
   final double width;
+  final double height;
   final LiquidGlassSettings selectedSettings;
   final Color accentColor;
   final VoidCallback onTap;
@@ -180,14 +237,14 @@ class _SelectorOption<T> extends StatelessWidget {
       key: option.key,
       button: true,
       selected: selected,
-      label: option.label,
+      label: option.semanticsLabel ?? option.label,
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: SizedBox(
           width: width,
-          height: TpSpacing.tapMin,
+          height: height,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
             child: selected
@@ -195,8 +252,10 @@ class _SelectorOption<T> extends StatelessWidget {
                     child: GlassButton.custom(
                       label: option.label,
                       width: width - 6,
-                      height: 34,
-                      shape: const LiquidRoundedSuperellipse(borderRadius: 17),
+                      height: height - 10,
+                      shape: LiquidRoundedSuperellipse(
+                        borderRadius: (height - 10) / 2,
+                      ),
                       settings: selectedSettings,
                       quality: GlassQuality.standard,
                       interactionScale: 1,

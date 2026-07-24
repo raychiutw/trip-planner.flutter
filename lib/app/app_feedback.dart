@@ -5,7 +5,12 @@ void showAppError(
   BuildContext context,
   String message, {
   VoidCallback? onRetry,
+  bool allowDismiss = true,
 }) {
+  assert(
+    allowDismiss || onRetry != null,
+    'A non-dismissible error must provide a retry action.',
+  );
   final messenger = ScaffoldMessenger.of(context);
 
   void dismiss() => messenger.hideCurrentMaterialBanner();
@@ -38,7 +43,8 @@ void showAppError(
               },
               child: const Text('重試'),
             ),
-          TextButton(onPressed: dismiss, child: const Text('關閉')),
+          if (allowDismiss)
+            TextButton(onPressed: dismiss, child: const Text('關閉')),
         ],
       ),
     );

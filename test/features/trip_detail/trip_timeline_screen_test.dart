@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -335,6 +337,16 @@ List<TripDay> _longDays(String label) {
     ),
   ];
 }
+
+List<TripDay> _selectorDays() => [
+  for (var day = 1; day <= 8; day++)
+    TripDay(
+      id: day,
+      dayNum: day,
+      date: '2026-08-${day.toString().padLeft(2, '0')}',
+      version: 1,
+    ),
+];
 
 List<TripDay> _scrollSpyDays() => [
   for (var day = 1; day <= 2; day++)
@@ -1278,6 +1290,107 @@ void main() {
     },
   );
 
+  testWidgets('Day selector 支援左右方向鍵切換目前行程日', (tester) async {
+    await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    var selector = tester.widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    expect(selector.value, 2);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    selector = tester.widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    );
+    expect(selector.value, 1);
+  });
+
+  testWidgets('Day selector 以總天數與已選取狀態提供語意', (tester) async {
+    await _pumpTimeline(tester);
+    await tester.pumpAndSettle();
+
+    final selected = tester
+        .getSemantics(find.byKey(const ValueKey('day-pill-1')))
+        .getSemanticsData();
+
+    expect(selected.label, '第 1 天，共 2 天');
+    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+  });
+
+  testWidgets('窄螢幕 Day selector 露出下一項並將指定 Day 置中', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimeline(tester, fetchDays: _selectorDays, initialDayNum: 5);
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final selected = find.byKey(const ValueKey('day-pill-5'));
+    expect(
+      tester.getCenter(selected).dx,
+      closeTo(tester.getCenter(selector).dx, 1),
+    );
+
+    await _pumpTimeline(tester, fetchDays: _selectorDays, initialDayNum: 1);
+    await tester.pumpAndSettle();
+    final firstSelector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final nextEdge = tester.getRect(find.byKey(const ValueKey('day-pill-4')));
+    final selectorEdge = tester.getRect(firstSelector);
+    expect(nextEdge.left, lessThan(selectorEdge.right));
+    expect(nextEdge.right, greaterThan(selectorEdge.right));
+  });
+
+  testWidgets('3.2 倍輔助文字下 Day selector 與固定 header 隨內容增高', (tester) async {
+    await _pumpTimeline(tester, textScaler: const TextScaler.linear(3.2));
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final selectorRect = tester.getRect(selector);
+    final selectedLabelRect = tester.getRect(find.text('DAY 1'));
+
+    expect(tester.takeException(), isNull);
+    expect(selectorRect.height, greaterThan(TpSpacing.tapMin));
+    expect(selectedLabelRect.top, greaterThanOrEqualTo(selectorRect.top));
+    expect(selectedLabelRect.bottom, lessThanOrEqualTo(selectorRect.bottom));
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('day-section-1'))).dy,
+      greaterThanOrEqualTo(selectorRect.bottom - 1),
+    );
+  });
+
+  testWidgets('水平拖曳只瀏覽 Day，點選才變更目前行程日', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pumpTimeline(tester, fetchDays: _selectorDays);
+    await tester.pumpAndSettle();
+
+    final selectorFinder = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    await tester.drag(selectorFinder, const Offset(-180, 0));
+    await tester.pumpAndSettle();
+
+    var selector = tester.widget<TpHorizontalSelector<int>>(selectorFinder);
+    expect(selector.value, 1);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-4')));
+    await tester.pumpAndSettle();
+    selector = tester.widget<TpHorizontalSelector<int>>(selectorFinder);
+    expect(selector.value, 4);
+  });
+
   testWidgets('Reduce Motion 直接切換 Day，不建立零秒捲動動畫', (tester) async {
     await _pumpTimeline(
       tester,
@@ -1300,6 +1413,28 @@ void main() {
     );
   });
 
+  testWidgets('Reduce Motion 在窄螢幕直接定位遠距 Day selector', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpTimeline(
+      tester,
+      fetchDays: _selectorDays,
+      initialDayNum: 5,
+      disableAnimations: true,
+    );
+    await tester.pumpAndSettle();
+
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('day-pill-5'))).dx,
+      closeTo(tester.getCenter(selector).dx, 1),
+    );
+  });
+
   testWidgets('指定 initialDayNum：初始啟用該日 pill', (tester) async {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
@@ -1316,6 +1451,24 @@ void main() {
     );
   });
 
+  testWidgets('無效 day deep link fallback 後地圖導覽使用實際 Day 1', (tester) async {
+    await _pumpTimeline(tester, initialDayNum: 99);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+  });
+
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
     await _pumpTimeline(tester, initialEntryId: 22);
     await tester.pumpAndSettle();
@@ -1328,6 +1481,24 @@ void main() {
 
     expect(border.top.color, AppTheme.light().colorScheme.primary);
     expect(border.top.width, 2);
+  });
+
+  testWidgets('entry deep link 聚焦後地圖導覽使用 entry 所在 Day', (tester) async {
+    await _pumpTimeline(tester, initialEntryId: 22);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-2'), findsOneWidget);
   });
 
   testWidgets('days refresh preserves current scroll offset', (tester) async {
@@ -1353,11 +1524,43 @@ void main() {
     expect(tester.getTopLeft(daySection).dy, before);
   });
 
+  testWidgets('days refresh 移除目前 Day 時同步 selector 與後續導覽 Day', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    days.add([_fakeDays.first]);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.pumpAndSettle();
+    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+  });
+
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
     final neverCompletes = Completer<List<TripDay>>();
     await _pumpTimeline(tester, fetchDays: () => neverCompletes.future);
 
     expect(find.byKey(const ValueKey('timeline-skeleton')), findsOneWidget);
+    final semantics = tester
+        .getSemantics(find.byKey(const ValueKey('timeline-loading-state')))
+        .getSemanticsData();
+    expect(semantics.label, '正在載入行程時間軸');
+    expect(semantics.flagsCollection.isLiveRegion, isTrue);
   });
 
   testWidgets('detail 載入中仍以目前行程摘要顯示 selector title', (tester) async {
@@ -1401,6 +1604,14 @@ void main() {
     );
 
     expect(find.text('重試'), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('timeline-error-state')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
 
     await tester.tap(find.text('重試'));
     await tester.pumpAndSettle();
@@ -1420,6 +1631,23 @@ void main() {
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+  });
+
+  testWidgets('時間軸資料刷新保留已展開的停留點', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream);
+
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
+
+    days.add(List<TripDay>.from(_fakeDays));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
   });
 
   testWidgets('展開備選後可設為正選並重算當日交通', (tester) async {

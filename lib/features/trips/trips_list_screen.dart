@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
@@ -166,6 +167,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   TripFilter _filterTab = TripFilter.all;
   bool _isImporting = false;
   String? _exportingTripId;
+  final Set<String> _deletingTripIds = {};
+  final Set<String> _hiddenTripIds = {};
 
   @override
   void initState() {
@@ -423,9 +426,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   ) {
     return myTripsAsync.when(
       data: (trips) {
+        final visibleTrips = trips
+            .where((trip) => !_hiddenTripIds.contains(trip.tripId))
+            .toList();
         // 串接:filter(分頁) → search(關鍵字) → sort(排序)。
-        final filtered = _sort(_search(_filterByTab(trips, currentUserId)));
-        if (trips.isEmpty) {
+        final filtered = _sort(
+          _search(_filterByTab(visibleTrips, currentUserId)),
+        );
+        if (visibleTrips.isEmpty) {
           return const [
             SliverFillRemaining(hasScrollBody: false, child: _EmptyHero()),
           ];
@@ -447,9 +455,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         ),
       ],
       loading: () => [
-        const SliverFillRemaining(
+        SliverFillRemaining(
           hasScrollBody: false,
-          child: Center(child: CircularProgressIndicator.adaptive()),
+          child: Semantics(
+            key: const ValueKey('trips-loading-state'),
+            liveRegion: true,
+            label: '正在載入行程清單',
+            child: const Center(child: CircularProgressIndicator.adaptive()),
+          ),
         ),
       ],
     );
@@ -546,20 +559,55 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             const SizedBox(height: TpSpacing.s3),
         itemBuilder: (context, index) {
           final trip = trips[index];
-          return SwipeToDelete(
-            dismissKey: ValueKey('trip-dismiss-${trip.tripId}'),
-            onDelete: () => _confirmAndDeleteTrip(context, trip),
-            child: TripCard(
-              trip: trip,
-              currentUserId: currentUserId,
-              onTap: () {
-                unawaited(
-                  ref.read(currentTripIdProvider.notifier).select(trip.tripId),
-                );
-                context.go('/trips/${trip.tripId}');
-              },
-              onLongPress: () => _showTripActions(context, trip),
-              onMorePressed: () => _showTripActions(context, trip),
+          final isDeleting = _deletingTripIds.contains(trip.tripId);
+          return IgnorePointer(
+            ignoring: isDeleting,
+            child: SwipeToDelete(
+              dismissKey: ValueKey('trip-dismiss-${trip.tripId}'),
+              onDelete: () => _confirmAndDeleteTrip(context, trip),
+              child: Stack(
+                children: [
+                  TripCard(
+                    trip: trip,
+                    currentUserId: currentUserId,
+                    onTap: isDeleting
+                        ? null
+                        : () {
+                            unawaited(
+                              ref
+                                  .read(currentTripIdProvider.notifier)
+                                  .select(trip.tripId),
+                            );
+                            context.go('/trips/${trip.tripId}');
+                          },
+                    onLongPress: isDeleting
+                        ? null
+                        : () => _showTripActions(context, trip),
+                    onMorePressed: isDeleting
+                        ? null
+                        : () => _showTripActions(context, trip),
+                  ),
+                  if (isDeleting)
+                    Positioned.fill(
+                      child: Semantics(
+                        key: ValueKey('trip-delete-progress-${trip.tripId}'),
+                        liveRegion: true,
+                        label: '正在刪除「${trip.displayTitle}」',
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(TpRadius.md),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator.adaptive(),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },
@@ -629,22 +677,40 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     BuildContext context,
     TripSummary trip,
   ) async {
+    if (_deletingTripIds.contains(trip.tripId)) return;
     final confirmedDelete = await showAppConfirm(
       context,
       title: '刪除行程',
-      message: '確定要刪除「${trip.displayTitle}」嗎？此動作無法復原。',
+      message:
+          '確定要刪除「${trip.displayTitle}」嗎？'
+          '這會刪除其中所有行程日與景點。此動作無法復原。',
       confirmLabel: '刪除',
       isDestructive: true,
     );
     if (!confirmedDelete || !context.mounted) return;
+    await _deleteTrip(context, trip);
+  }
 
+  Future<void> _deleteTrip(BuildContext context, TripSummary trip) async {
+    if (_deletingTripIds.contains(trip.tripId)) return;
+    setState(() => _deletingTripIds.add(trip.tripId));
     try {
       await ref.read(tripRepositoryProvider).deleteTrip(trip.tripId);
+      if (!mounted) return;
+      setState(() => _hiddenTripIds.add(trip.tripId));
       ref.invalidate(myTripsProvider);
       HapticFeedback.mediumImpact();
     } on Exception {
       if (!context.mounted) return;
-      showAppNotice(context, '刪除失敗，請稍後再試');
+      showAppError(
+        context,
+        '刪除「${trip.displayTitle}」失敗，請稍後再試',
+        onRetry: () => unawaited(_deleteTrip(context, trip)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _deletingTripIds.remove(trip.tripId));
+      }
     }
   }
 }
@@ -693,21 +759,26 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('載入失敗', style: theme.textTheme.titleMedium),
-          const SizedBox(height: TpSpacing.s2),
-          Text(
-            '無法取得行程清單，請檢查網路後再試一次。',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    return Semantics(
+      key: const ValueKey('trips-error-state'),
+      liveRegion: true,
+      label: '行程清單載入失敗',
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('載入失敗', style: theme.textTheme.titleMedium),
+            const SizedBox(height: TpSpacing.s2),
+            Text(
+              '無法取得行程清單，請檢查網路後再試一次。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: TpSpacing.s4),
-          FilledButton(onPressed: onRetry, child: const Text('重試')),
-        ],
+            const SizedBox(height: TpSpacing.s4),
+            FilledButton(onPressed: onRetry, child: const Text('重試')),
+          ],
+        ),
       ),
     );
   }
