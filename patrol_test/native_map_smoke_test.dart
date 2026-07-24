@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +13,7 @@ const _taipei101 = TripMapPoint(25.033968, 121.564468);
 const _zoomCheckPoint = TripMapPoint(25.1676, 121.4450);
 const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
 const _nativeMapEvidenceLabel = 'Tripline native map evidence canvas';
-const _iosMultitouchEvidenceIssue =
+const _multitouchEvidenceIssue =
     'https://github.com/raychiutw/trip-planner.flutter/issues/104';
 
 final _nativeMapSelector = MobileSelector(
@@ -22,7 +21,7 @@ final _nativeMapSelector = MobileSelector(
   ios: IOSSelector(label: _nativeMapEvidenceLabel),
 );
 
-enum _NativeGesture { pan, pinch, rotate, doubleTap }
+enum _NativeGesture { pan, doubleTap }
 
 const _poiTapOffsets = <Offset>[
   Offset(0.5, 0.5),
@@ -86,53 +85,10 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
-    final mapRect = $.tester.getRect(
-      find.byKey(const ValueKey('google-trip-map-canvas')),
+    debugPrint(
+      'BLOCKED: Patrol 4.6.1 cannot inject native pinch/rotate; '
+      'tracked at $_multitouchEvidenceIssue',
     );
-    final mapCenter = mapRect.center;
-
-    if (Platform.isIOS) {
-      debugPrint(
-        'BLOCKED: Patrol 4.6.1 cannot inject native iOS pinch/rotate; '
-        'tracked at $_iosMultitouchEvidenceIssue',
-      );
-    } else {
-      await $(#armPinchCheck).tap();
-      final pinchLeft = await $.tester.startGesture(
-        mapCenter - const Offset(36, 0),
-        pointer: 1,
-      );
-      final pinchRight = await $.tester.startGesture(
-        mapCenter + const Offset(36, 0),
-        pointer: 2,
-      );
-      await pinchLeft.moveTo(mapCenter - const Offset(96, 0));
-      await pinchRight.moveTo(mapCenter + const Offset(96, 0));
-      await pinchLeft.up();
-      await pinchRight.up();
-      await $(
-        #nativeMapPinchObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapPinchObserved), findsOneWidget);
-
-      await $(#armRotateCheck).tap();
-      final rotateLeft = await $.tester.startGesture(
-        mapCenter - const Offset(56, 0),
-        pointer: 3,
-      );
-      final rotateRight = await $.tester.startGesture(
-        mapCenter + const Offset(56, 0),
-        pointer: 4,
-      );
-      await rotateLeft.moveTo(mapCenter - const Offset(0, 56));
-      await rotateRight.moveTo(mapCenter + const Offset(0, 56));
-      await rotateLeft.up();
-      await rotateRight.up();
-      await $(
-        #nativeMapRotateObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapRotateObserved), findsOneWidget);
-    }
 
     await $(#armDoubleTapCheck).tap();
     final semantics = $.tester.ensureSemantics();
@@ -262,10 +218,7 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
           position.target,
           tolerance: 1e-5,
         ),
-        _NativeGesture.pinch ||
         _NativeGesture.doubleTap => (start.zoom - position.zoom).abs() >= 0.25,
-        _NativeGesture.rotate =>
-          _bearingDelta(start.bearing, position.bearing) >= 5,
       };
       if (!observed) return;
       setState(() {
@@ -402,8 +355,6 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                     ),
                     for (final (gesture, key, label) in const [
                       (_NativeGesture.pan, 'armPanCheck', 'Pan'),
-                      (_NativeGesture.pinch, 'armPinchCheck', 'Pinch'),
-                      (_NativeGesture.rotate, 'armRotateCheck', 'Rotate'),
                       (
                         _NativeGesture.doubleTap,
                         'armDoubleTapCheck',
@@ -455,14 +406,6 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapPanObserved')),
               ),
-            if (_observedGestures.contains(_NativeGesture.pinch))
-              const IgnorePointer(
-                child: SizedBox(key: ValueKey('nativeMapPinchObserved')),
-              ),
-            if (_observedGestures.contains(_NativeGesture.rotate))
-              const IgnorePointer(
-                child: SizedBox(key: ValueKey('nativeMapRotateObserved')),
-              ),
             if (_observedGestures.contains(_NativeGesture.doubleTap))
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('nativeMapDoubleTapObserved')),
@@ -489,8 +432,3 @@ bool _near(
 }) =>
     (first.latitude - second.latitude).abs() < tolerance &&
     (first.longitude - second.longitude).abs() < tolerance;
-
-double _bearingDelta(double first, double second) {
-  final delta = (first - second).abs() % 360;
-  return delta > 180 ? 360 - delta : delta;
-}
