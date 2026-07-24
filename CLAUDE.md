@@ -64,3 +64,17 @@ models 帶 `version` 欄位;後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY`
 ## 測試慣例
 
 三層鏡像 `lib/`:models(純 fromJson + edge case)、api(`http_mock_adapter` + `InMemorySessionStore`,不碰 `SecureSessionStore`)、screens(widget test + `ProviderScope` override,mocktail mock repository,假 GoRouter 當導航探針)。具體手法見 `docs/howto-test-with-providers.md`。
+
+## Agent skills
+
+### Issue tracker
+
+Issues 與 PRD 使用 GitHub Issues（`raychiutw/trip-planner.flutter`），透過 `gh` CLI 操作。詳見 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用預設五種 triage labels：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。詳見 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+採 single-context 架構；根目錄 `CONTEXT.md` 與 `docs/adr/` 按需建立。詳見 `docs/agents/domain.md`。
