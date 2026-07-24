@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +32,7 @@ void main() {
   Future<void> pumpScreen(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
@@ -102,11 +105,90 @@ void main() {
 
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('撤銷 Alpha App？'), findsOneWidget);
+    expect(find.textContaining('無法復原'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
     await tester.pumpAndSettle();
 
     verify(() => mockTripRepository.revokeConnectedApp('tp_alpha')).called(1);
     expect(find.text('已撤銷 Alpha App'), findsOneWidget);
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
+  });
+
+  testWidgets('撤銷成功後 manual refresh 不會讓舊快取項目復活', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('connected-app-revoke-tp_alpha')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
+
+    final refreshIndicator = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await refreshIndicator.onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
+    verify(
+      () => mockTripRepository.fetchConnectedApps(),
+    ).called(greaterThanOrEqualTo(3));
+  });
+
+  testWidgets('撤銷 pending 期間鎖定操作，失敗時保留 app 與重試入口', (tester) async {
+    final revokeCompleter = Completer<void>();
+    when(
+      () => mockTripRepository.revokeConnectedApp('tp_alpha'),
+    ).thenAnswer((_) => revokeCompleter.future);
+    await pumpScreen(tester);
+
+    final revokeFinder = find.byKey(const Key('connected-app-revoke-tp_alpha'));
+    expect(tester.getSize(revokeFinder).height, greaterThanOrEqualTo(44));
+
+    await tester.tap(revokeFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.pump();
+
+    expect(tester.widget<TextButton>(revokeFinder).onPressed, isNull);
+    expect(
+      find.descendant(
+        of: revokeFinder,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    verify(() => mockTripRepository.revokeConnectedApp('tp_alpha')).called(1);
+
+    revokeCompleter.completeError(Exception('offline'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsOneWidget);
+    expect(find.text('撤銷應用程式失敗，請稍後再試'), findsOneWidget);
+    expect(tester.widget<TextButton>(revokeFinder).onPressed, isNotNull);
+    expect(find.widgetWithText(TextButton, '重試'), findsOneWidget);
+  });
+
+  testWidgets('載入失敗仍保留返回與重試，空狀態可辨識', (tester) async {
+    when(
+      () => mockTripRepository.fetchConnectedApps(),
+    ).thenAnswer((_) => Future<List<ConnectedApp>>.error(Exception('offline')));
+    await pumpScreen(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsOneWidget);
+    expect(find.text('無法載入已連結的應用程式'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '重試'), findsOneWidget);
+
+    when(
+      () => mockTripRepository.fetchConnectedApps(),
+    ).thenAnswer((_) async => const <ConnectedApp>[]);
+    await tester.tap(find.widgetWithText(TextButton, '重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('目前沒有已連結的應用程式'), findsOneWidget);
+    expect(find.byKey(const ValueKey('tp-app-bar-back')), findsOneWidget);
   });
 }

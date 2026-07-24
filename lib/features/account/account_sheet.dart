@@ -33,29 +33,33 @@ class _AccountSheetContentState extends State<_AccountSheetContent> {
   @override
   void initState() {
     super.initState();
-    final page = _pageFor(widget.page);
-    if (page == null) return;
+    final pages = _pagesFor(widget.page);
+    if (pages.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(
-        Navigator.of(
-          context,
-        ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
-      );
+      final navigator = Navigator.of(context);
+      for (final page in pages) {
+        unawaited(
+          navigator.push<void>(MaterialPageRoute<void>(builder: (_) => page)),
+        );
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) => const AccountScreen(embedded: true);
 
-  Widget? _pageFor(String? page) => switch (page) {
-    'appearance' => const AppearanceScreen(),
-    'profile' => const ProfileEditScreen(),
-    'notifications' => const NotificationsScreen(),
-    'sessions' => const AccountSessionsScreen(),
-    'connected-apps' => const ConnectedAppsScreen(),
-    'developer-apps' => const DeveloperAppsScreen(),
-    'developer-apps/new' => const DeveloperAppNewScreen(),
-    _ => null,
+  List<Widget> _pagesFor(String? page) => switch (page) {
+    'appearance' => const [AppearanceScreen()],
+    'profile' => const [ProfileEditScreen()],
+    'notifications' => const [NotificationsScreen()],
+    'sessions' => const [AccountSessionsScreen()],
+    'connected-apps' => const [ConnectedAppsScreen()],
+    'developer-apps' => const [DeveloperAppsScreen()],
+    'developer-apps/new' => const [
+      DeveloperAppsScreen(),
+      DeveloperAppNewScreen(),
+    ],
+    _ => const [],
   };
 }

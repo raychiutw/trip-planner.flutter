@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
+import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/settings/theme_mode_controller.dart';
+import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+class MockAuthRepository extends Mock implements AuthRepository {}
 
 class _FakeAuthNotifier extends AuthNotifier {
   _FakeAuthNotifier(this._user, this.logoutCalls);
@@ -30,6 +36,7 @@ class _FakeAuthNotifier extends AuthNotifier {
 
 void main() {
   late MockTripRepository mockTripRepository;
+  late MockAuthRepository mockAuthRepository;
   late List<void> logoutCalls;
 
   const currentSession = AccountSession(
@@ -58,6 +65,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        authRepositoryProvider.overrideWithValue(mockAuthRepository),
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
         ),
@@ -81,7 +89,11 @@ void main() {
 
   setUp(() {
     mockTripRepository = MockTripRepository();
+    mockAuthRepository = MockAuthRepository();
     logoutCalls = <void>[];
+    when(
+      mockAuthRepository.fetchAiAuthorization,
+    ).thenAnswer((_) async => false);
     when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
       (_) async => const AccountSessionsPage(
         currentSid: 'sid-current',
@@ -94,6 +106,9 @@ void main() {
     when(
       () => mockTripRepository.revokeOtherAccountSessions(),
     ).thenAnswer((_) async => 1);
+    when(
+      () => mockTripRepository.fetchConnectedApps(),
+    ).thenAnswer((_) async => const <ConnectedApp>[]);
   });
 
   testWidgets('裝置列表不直接鋪 destructive action，詳情才顯示登出', (tester) async {
@@ -120,13 +135,76 @@ void main() {
 
     await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('account-session-details')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('app-sheet-close')), findsNothing);
     expect(find.text('取消'), findsNothing);
     expect(
       find.byKey(const Key('account-session-revoke-sid-phone')),
       findsOneWidget,
     );
     expect(find.textContaining('IP 指紋'), findsNothing);
+  });
+
+  testWidgets('裝置詳情與已連結應用沿用同一個 Account Navigation Stack', (tester) async {
+    var closeCalls = 0;
+    final container = ProviderContainer(
+      overrides: [
+        tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        authRepositoryProvider.overrideWithValue(mockAuthRepository),
+        authStateProvider.overrideWith(
+          () => _FakeAuthNotifier(loggedInUser, logoutCalls),
+        ),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: TpLargeSheetNavigationScope(
+            onClose: () => closeCalls++,
+            child: Navigator(
+              onGenerateRoute: (_) => MaterialPageRoute<void>(
+                builder: (_) => const AccountSessionsScreen(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('account-session-details')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
+    expect(closeCalls, 0);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
+    expect(closeCalls, 0);
+
+    await tester.tap(find.byKey(const Key('account-sessions-connected-apps')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ConnectedAppsScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-large-sheet-back')), findsOneWidget);
+    expect(closeCalls, 0);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
+    expect(closeCalls, 0);
   });
 
   testWidgets('登出單一非目前裝置會呼叫 repository 並顯示成功提示', (tester) async {
@@ -137,26 +215,61 @@ void main() {
     await tester.tap(find.byKey(const Key('account-session-revoke-sid-phone')));
     await tester.pumpAndSettle();
 
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.textContaining('無法復原'), findsOneWidget);
+    verifyNever(() => mockTripRepository.revokeAccountSession(any()));
+
+    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.pumpAndSettle();
+
     verify(
       () => mockTripRepository.revokeAccountSession('sid-phone'),
     ).called(1);
     expect(find.text('已登出該裝置'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-session-details')), findsNothing);
   });
 
-  testWidgets('登出其他裝置需確認，確認後呼叫 repository', (tester) async {
+  testWidgets('登出裝置失敗會保留詳情、錯誤與可重試的 44pt 操作', (tester) async {
+    when(
+      () => mockTripRepository.revokeAccountSession('sid-phone'),
+    ).thenThrow(Exception('offline'));
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
+    final revokeFinder = find.byKey(
+      const Key('account-session-revoke-sid-phone'),
+    );
+    expect(tester.getSize(revokeFinder).height, greaterThanOrEqualTo(44));
+
+    await tester.tap(revokeFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('account-session-details')),
+      findsOneWidget,
+    );
+    expect(find.text('登出裝置失敗，請稍後再試'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '重試'), findsOneWidget);
+    expect(tester.widget<FilledButton>(revokeFinder).onPressed, isNotNull);
+  });
+
+  testWidgets('登出其他裝置缺少 server-bound reauth 時安全阻擋且不呼叫 API', (tester) async {
     await pumpScreen(tester);
 
     await tester.tap(find.byKey(const Key('account-sessions-revoke-others')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('登出其他裝置'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, '登出'));
-    await tester.pumpAndSettle();
-
-    verify(() => mockTripRepository.revokeOtherAccountSessions()).called(1);
-    expect(find.text('已登出其他裝置'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('revoke-other-sessions-blocked-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('需要重新驗證才能登出其他裝置'), findsOneWidget);
+    expect(find.textContaining('缺少可綁定伺服器操作'), findsOneWidget);
+    expect(find.textContaining('逐一登出'), findsOneWidget);
+    verifyNever(() => mockTripRepository.revokeOtherAccountSessions());
   });
 
   testWidgets('顯示帳號 email、OAuth 提醒與頁尾深淺模式/登出', (tester) async {

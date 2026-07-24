@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
@@ -16,6 +15,7 @@ import '../../models/user.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'account_display.dart';
+import 'connected_apps_screen.dart';
 import 'settings/theme_mode_controller.dart';
 
 /// 登入裝置清單 provider（GET /account/sessions）。
@@ -34,7 +34,6 @@ class AccountSessionsScreen extends ConsumerStatefulWidget {
 
 class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   String? _busySessionSid;
-  bool _isRevokingOthers = false;
   String? _mutationError;
 
   @override
@@ -54,15 +53,10 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           TpToolbarGlassButton(
             key: const Key('account-sessions-revoke-others'),
             tooltip: '登出其他裝置',
-            onPressed: canRevokeOthers && !_isRevokingOthers
-                ? () => unawaited(_confirmRevokeOtherSessions())
+            onPressed: canRevokeOthers
+                ? () => unawaited(_showRevokeOtherSessionsBlocked())
                 : null,
-            child: _isRevokingOthers
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                  )
-                : const Icon(CupertinoIcons.square_arrow_right),
+            child: const Icon(CupertinoIcons.square_arrow_right),
           ),
         ],
       ),
@@ -83,7 +77,13 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
           onThemeModeChanged: (mode) =>
               ref.read(themeModeProvider.notifier).setMode(mode),
           onOpenConnectedApps: () {
-            GoRouter.maybeOf(context)?.push('/settings/connected-apps');
+            unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ConnectedAppsScreen(),
+                ),
+              ),
+            );
           },
           onLogout: () => _confirmLogout(context, ref),
         ),
@@ -91,54 +91,46 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
     );
   }
 
-  Future<void> _confirmRevokeOtherSessions() async {
-    final shouldRevoke = await showAppConfirm(
-      context,
-      title: '登出其他裝置',
-      message: '這會保留目前裝置，並登出其他所有登入裝置。',
-      confirmLabel: '登出',
-      isDestructive: true,
+  Future<void> _showRevokeOtherSessionsBlocked() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('revoke-other-sessions-blocked-dialog'),
+        title: const Text('需要重新驗證才能登出其他裝置'),
+        content: const Text(
+          '目前缺少可綁定伺服器操作的重新驗證機制，因此不會送出批次登出要求。'
+          '你仍可返回裝置清單，逐一登出不再使用的裝置。',
+        ),
+        actions: [
+          TextButton(
+            autofocus: true,
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
+          ),
+        ],
+      ),
     );
-    if (!shouldRevoke || !mounted) return;
-
-    setState(() {
-      _isRevokingOthers = true;
-      _mutationError = null;
-    });
-    try {
-      await ref.read(tripRepositoryProvider).revokeOtherAccountSessions();
-      if (!mounted) return;
-      ref.invalidate(accountSessionsProvider);
-      showAppNotice(context, '已登出其他裝置');
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _mutationError = _errorMessage(error);
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRevokingOthers = false;
-        });
-      }
-    }
   }
 
-  Future<void> _revokeSession(String sid) async {
+  Future<String?> _revokeSession(String sid) async {
     setState(() {
       _busySessionSid = sid;
       _mutationError = null;
     });
     try {
       await ref.read(tripRepositoryProvider).revokeAccountSession(sid);
-      if (!mounted) return;
+      if (!mounted) return '登出裝置失敗，請稍後再試';
       ref.invalidate(accountSessionsProvider);
       showAppNotice(context, '已登出該裝置');
+      return null;
     } catch (error) {
-      if (!mounted) return;
+      final message = _errorMessage(error);
+      if (!mounted) return message;
       setState(() {
-        _mutationError = _errorMessage(error);
+        _mutationError = message;
       });
+      return message;
     } finally {
       if (mounted) {
         setState(() {
@@ -212,7 +204,7 @@ class _SessionsList extends StatelessWidget {
   final String? busySessionSid;
   final String? mutationError;
   final VoidCallback onRetry;
-  final Future<void> Function(String sid) onRevoke;
+  final Future<String?> Function(String sid) onRevoke;
   final ValueChanged<ThemeMode> onThemeModeChanged;
   final VoidCallback onOpenConnectedApps;
   final VoidCallback onLogout;
@@ -244,7 +236,7 @@ class _SessionsList extends StatelessWidget {
                     _SessionTile(
                       session: sessions[index],
                       isBusy: busySessionSid == sessions[index].sid,
-                      onRevoke: () => unawaited(onRevoke(sessions[index].sid)),
+                      onRevoke: () => onRevoke(sessions[index].sid),
                     ),
                     if (index != sessions.length - 1)
                       Divider(
@@ -444,7 +436,7 @@ class _SessionTile extends StatelessWidget {
 
   final AccountSession session;
   final bool isBusy;
-  final VoidCallback onRevoke;
+  final Future<String?> Function() onRevoke;
 
   @override
   Widget build(BuildContext context) {
@@ -470,15 +462,15 @@ class _SessionTile extends StatelessWidget {
     );
   }
 
-  Future<void> _showDetails(BuildContext context) async {
-    await showAppContentSheet<void>(
-      context,
-      title: '登入裝置',
-      builder: (_) => _SessionDetails(
-        session: session,
-        subtitle: _subtitle,
-        isBusy: isBusy,
-        onRevoke: onRevoke,
+  Future<void> _showDetails(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _SessionDetails(
+          session: session,
+          subtitle: _subtitle,
+          initiallyBusy: isBusy,
+          onRevoke: onRevoke,
+        ),
       ),
     );
   }
@@ -494,64 +486,108 @@ class _SessionTile extends StatelessWidget {
   }
 }
 
-class _SessionDetails extends StatelessWidget {
+class _SessionDetails extends StatefulWidget {
   const _SessionDetails({
     required this.session,
     required this.subtitle,
-    required this.isBusy,
+    required this.initiallyBusy,
     required this.onRevoke,
   });
 
   final AccountSession session;
   final String subtitle;
-  final bool isBusy;
-  final VoidCallback onRevoke;
+  final bool initiallyBusy;
+  final Future<String?> Function() onRevoke;
+
+  @override
+  State<_SessionDetails> createState() => _SessionDetailsState();
+}
+
+class _SessionDetailsState extends State<_SessionDetails> {
+  late bool _isBusy = widget.initiallyBusy;
+  String? _errorText;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        TpSpacing.s5,
-        TpSpacing.s2,
-        TpSpacing.s5,
-        TpSpacing.s5,
-      ),
-      children: [
-        Text(
-          session.uaSummary ?? '未知裝置',
-          style: Theme.of(context).textTheme.titleLarge,
+    final session = widget.session;
+    return Scaffold(
+      key: const ValueKey('account-session-details'),
+      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('裝置詳情')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          TpSpacing.s5,
+          TpSpacing.s2,
+          TpSpacing.s5,
+          TpSpacing.s5,
         ),
-        const SizedBox(height: TpSpacing.s3),
-        Text(subtitle),
-        if (session.ipHashPrefix != null) ...[
-          const SizedBox(height: TpSpacing.s2),
+        children: [
           Text(
-            '安全識別碼：${session.ipHashPrefix}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            session.uaSummary ?? '未知裝置',
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-        ],
-        if (!session.isCurrent) ...[
-          const SizedBox(height: TpSpacing.s5),
-          FilledButton.icon(
-            key: Key('account-session-revoke-${session.sid}'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+          const SizedBox(height: TpSpacing.s3),
+          Text(widget.subtitle),
+          if (session.ipHashPrefix != null) ...[
+            const SizedBox(height: TpSpacing.s2),
+            Text(
+              '安全識別碼：${session.ipHashPrefix}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
-            onPressed: isBusy
-                ? null
-                : () {
-                    TpLargeSheetNavigationScope.maybeOf(context)?.onClose();
-                    onRevoke();
-                  },
-            icon: const Icon(CupertinoIcons.square_arrow_right),
-            label: const Text('登出此裝置'),
-          ),
+          ],
+          if (!session.isCurrent) ...[
+            if (_errorText != null) ...[
+              const SizedBox(height: TpSpacing.s4),
+              _InlineErrorPanel(
+                message: _errorText!,
+                onRetry: () => unawaited(_confirmRevoke()),
+              ),
+            ],
+            const SizedBox(height: TpSpacing.s5),
+            FilledButton.icon(
+              key: Key('account-session-revoke-${session.sid}'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(TpSpacing.tapMin),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: _isBusy ? null : _confirmRevoke,
+              icon: _isBusy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                    )
+                  : const Icon(CupertinoIcons.square_arrow_right),
+              label: const Text('登出此裝置'),
+            ),
+          ],
         ],
-      ],
+      ),
     );
+  }
+
+  Future<void> _confirmRevoke() async {
+    final sessionName = widget.session.uaSummary ?? '此裝置';
+    final confirmed = await showAppConfirm(
+      context,
+      title: '登出 $sessionName？',
+      message: '這會立即移除此裝置的登入狀態，之後必須重新登入。這項操作無法復原。',
+      confirmLabel: '登出',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() {
+      _isBusy = true;
+      _errorText = null;
+    });
+    final error = await widget.onRevoke();
+    if (!mounted) return;
+    setState(() {
+      _isBusy = false;
+      _errorText = error;
+    });
+    if (error == null) await Navigator.of(context).maybePop();
   }
 }
 
@@ -603,30 +639,33 @@ class _InlineErrorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      color: colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              CupertinoIcons.exclamationmark_circle,
-              color: colorScheme.onErrorContainer,
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colorScheme.onErrorContainer),
+    return Semantics(
+      liveRegion: true,
+      child: Card(
+        color: colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_circle,
+                color: colorScheme.onErrorContainer,
               ),
-            ),
-            TextButton(
-              key: const Key('account-sessions-retry'),
-              onPressed: onRetry,
-              child: const Text('重試'),
-            ),
-          ],
+              const SizedBox(width: TpSpacing.s3),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(color: colorScheme.onErrorContainer),
+                ),
+              ),
+              TextButton(
+                key: const Key('account-sessions-retry'),
+                onPressed: onRetry,
+                child: const Text('重試'),
+              ),
+            ],
+          ),
         ),
       ),
     );

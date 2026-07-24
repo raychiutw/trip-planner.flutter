@@ -107,5 +107,22 @@ void main() {
         containsAll(<String>['GET /poi-favorites', 'GET /trips/t/days']),
       );
     });
+    test('帳號 session mutation → sessions 清單', () {
+      expect(
+        evictionPrefixesFor('DELETE', '/account/sessions/session-1'),
+        const ['GET /account/sessions'],
+      );
+    });
+    test('connected app mutation → connected apps 清單', () {
+      expect(
+        evictionPrefixesFor('DELETE', '/account/connected-apps/tp_alpha'),
+        const ['GET /account/connected-apps'],
+      );
+    });
+    test('developer app mutation → apps 清單與 detail prefix', () {
+      expect(evictionPrefixesFor('PATCH', '/dev/apps/tp_dev'), const [
+        'GET /dev/apps',
+      ]);
+    });
   });
 }

@@ -888,6 +888,78 @@ void main() {
     }
   });
 
+  testWidgets('帳號安全與開發者 deep link 依序返回 Account 再關閉至原 branch', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/favorites');
+    await tester.pumpAndSettle();
+
+    for (final target in <(String, Type)>[
+      ('/account/sessions', AccountSessionsScreen),
+      ('/account/connected-apps', ConnectedAppsScreen),
+      ('/settings/developer-apps', DeveloperAppsScreen),
+    ]) {
+      router.go(target.$1);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(target.$2), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AccountScreen), findsOneWidget);
+      expect(find.byType(target.$2), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+      await tester.pumpAndSettle();
+
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/favorites');
+    }
+  });
+
+  testWidgets('新增開發者應用 deep link 的 Back 先回應用清單再回 Account', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/favorites');
+    await tester.pumpAndSettle();
+    router.go('/settings/developer-apps/new');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DeveloperAppNewScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(DeveloperAppsScreen), findsOneWidget);
+    expect(find.byType(AccountScreen), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-back')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(AccountScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/favorites');
+  });
+
   testWidgets('帳號 deep link 在四個 root tabs 上開啟並返回原 branch', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);

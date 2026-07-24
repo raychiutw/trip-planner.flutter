@@ -22,6 +22,15 @@ List<String> evictionPrefixesFor(String method, String path, [Object? body]) {
   if (path == '/invitations/accept') {
     return const ['GET /my-trips', 'GET /trips', 'GET /invitations'];
   }
+  if (path.startsWith('/account/sessions')) {
+    return const ['GET /account/sessions'];
+  }
+  if (path.startsWith('/account/connected-apps')) {
+    return const ['GET /account/connected-apps'];
+  }
+  if (path.startsWith('/dev/apps')) {
+    return const ['GET /dev/apps'];
+  }
 
   // add-to-trip:目標 tripId 在 body,需失效該 trip 的 days(tripId encode 對齊快取 key)。
   if (path.startsWith('/poi-favorites') && path.endsWith('/add-to-trip')) {
