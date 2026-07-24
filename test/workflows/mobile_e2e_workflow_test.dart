@@ -709,7 +709,14 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('onMapStyleApplied'));
         expect(nativeMapSmoke, contains('grantPermissionWhenInUse'));
         expect(nativeMapSmoke, contains('.swipe('));
+        expect(nativeMapSmoke, contains('.platform.mobile.doubleTap('));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
+        expect(
+          nativeMapSmoke,
+          contains(
+            'https://github.com/raychiutw/trip-planner.flutter/issues/104',
+          ),
+        );
         expect(nativeMapSmoke, contains('_poiTapOffsets'));
         expect(nativeMapSmoke, contains('#toggleMapLifecycle'));
         expect(nativeMapSmoke, contains('#nativeMapRemounted'));
