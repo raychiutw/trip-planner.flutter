@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -728,8 +729,21 @@ Future<void> runAppOwnedReleaseFlow(
   );
   expect(find.text('暖暮拉麵'), findsOneWidget);
 
-  await typeText(find.byKey(const ValueKey('favorites-search-input')), '');
-  await tester.pump();
+  await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill));
+  await tester.pumpAndSettle();
+  expect(
+    tester
+        .widget<EditableText>(
+          find.descendant(
+            of: favoritesSearch,
+            matching: find.byType(EditableText),
+          ),
+        )
+        .controller
+        .text,
+    isEmpty,
+  );
+  expect(find.text('美麗海水族館'), findsOneWidget);
   await tester.tap(find.byKey(const ValueKey('favorites-sort-action')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('favorites-sort-oldest')));

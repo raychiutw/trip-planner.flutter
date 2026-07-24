@@ -51,7 +51,6 @@ void main() {
       (key: const ValueKey('login-password-field'), text: 'secret'),
       (key: const ValueKey('chat-input'), text: 'device smoke draft'),
       (key: const ValueKey('favorites-search-input'), text: '牧志'),
-      (key: const ValueKey('favorites-search-input'), text: ''),
     ]);
     expect(
       captures,
