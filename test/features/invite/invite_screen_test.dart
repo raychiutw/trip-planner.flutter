@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -55,7 +58,13 @@ void main() {
     WidgetTester tester, {
     UserInfo? user,
     String token = 'raw-token',
+    Locale locale = const Locale('zh', 'TW'),
+    Size size = const Size(390, 844),
+    double textScale = 1,
+    bool settle = true,
   }) async {
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final router = GoRouter(
       initialLocation: '/invite?token=$token',
       routes: [
@@ -92,12 +101,25 @@ void main() {
           authStateProvider.overrideWith(() => _FakeAuthNotifier(user)),
         ],
         child: MaterialApp.router(
+          locale: locale,
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const [Locale('zh', 'TW'), Locale('en', 'US')],
           theme: AppTheme.light(),
           routerConfig: router,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(size: size, textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
   }
 
   setUp(() {
@@ -122,12 +144,40 @@ void main() {
     expect(find.text('登入 traveler@example.com 後即可加入'), findsOneWidget);
     expect(find.byKey(const ValueKey('invite-signup')), findsOneWidget);
     expect(find.byKey(const ValueKey('invite-login')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(
+      tester
+          .widget<ListView>(find.byKey(const ValueKey('invite-page')))
+          .keyboardDismissBehavior,
+      ScrollViewKeyboardDismissBehavior.onDrag,
+    );
 
     await tester.tap(find.byKey(const ValueKey('invite-signup')));
     await tester.pumpAndSettle();
 
     expect(find.text('signup raw-token'), findsOneWidget);
     verifyNever(() => repo.acceptInvitation(any()));
+  });
+
+  testWidgets('邀請載入狀態會向 screen reader 宣告', (tester) async {
+    final pending = Completer<InvitationDetails>();
+    when(() => repo.fetchInvitation(any())).thenAnswer((_) => pending.future);
+
+    await pumpInvite(tester, settle: false);
+
+    final loading = find.byKey(const ValueKey('invite-loading'));
+    expect(loading, findsOneWidget);
+    expect(
+      tester
+          .getSemantics(loading)
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+
+    pending.complete(_invitation);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('未登入點登入會帶回 invite redirect', (tester) async {
@@ -138,6 +188,24 @@ void main() {
 
     expect(find.text('login /invite?token=raw-token'), findsOneWidget);
     verifyNever(() => repo.acceptInvitation(any()));
+  });
+
+  testWidgets('邀請期限依目前 locale 顯示', (tester) async {
+    await pumpInvite(tester, locale: const Locale('en', 'US'));
+
+    expect(find.text('有效至 7/16/2026'), findsOneWidget);
+  });
+
+  testWidgets('邀請頁在 compact Accessibility Size 可捲動完成流程', (tester) async {
+    await pumpInvite(tester, size: const Size(320, 568), textScale: 3.2);
+
+    final login = find.byKey(const ValueKey('invite-login'));
+    await tester.ensureVisible(login);
+    await tester.pumpAndSettle();
+
+    expect(login, findsOneWidget);
+    expect(tester.getSize(login).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('登入帳號符合時可接受邀請並前往行程', (tester) async {
@@ -199,5 +267,13 @@ void main() {
     expect(find.byKey(const ValueKey('invite-error')), findsOneWidget);
     expect(find.text('邀請已過期，請聯絡邀請者重寄。'), findsOneWidget);
     expect(find.text('請聯絡邀請者重寄一份新的邀請連結。'), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('invite-error')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
   });
 }

@@ -11,6 +11,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/external_links.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
 
 /// Email/password signup page, including optional invitation token handoff.
 class SignupScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     setState(() {
@@ -129,6 +131,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       subtitle: widget.invitationToken == null
           ? '用 Email 加入 Tripline'
           : '建立帳號後加入這趟行程',
+      primaryActionLabel: _submitting ? '建立中…' : '建立',
+      primaryActionKey: const ValueKey('signup-submit-button'),
+      onPrimaryAction: _submit,
+      primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
         child: Column(
@@ -246,14 +252,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: TpSpacing.s4),
-            FilledButton(
-              key: const ValueKey('signup-submit-button'),
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const _ButtonProgressLabel('建立帳號')
-                  : const Text('建立帳號'),
-            ),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
               onPressed: _submitting ? null : () => context.go('/login'),
@@ -288,7 +286,7 @@ class _EmailVerifyPendingScreenState
   String? _message;
 
   Future<void> _resend() async {
-    if (widget.email.trim().isEmpty) return;
+    if (_sending || widget.email.trim().isEmpty) return;
     setState(() {
       _sending = true;
       _message = null;
@@ -316,6 +314,10 @@ class _EmailVerifyPendingScreenState
     return _AuthScaffold(
       title: '查看你的信箱',
       subtitle: widget.email.isEmpty ? '註冊已送出，請回信箱確認驗證信' : widget.email,
+      primaryActionLabel: _sending ? '寄送中…' : '重寄',
+      primaryActionKey: const ValueKey('verify-pending-resend-button'),
+      onPrimaryAction: _resend,
+      primaryActionEnabled: !_sending && widget.email.trim().isNotEmpty,
       child: Column(
         key: const ValueKey('verify-pending-page'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -330,17 +332,14 @@ class _EmailVerifyPendingScreenState
             '點開信中的連結即可完成驗證。若沒有收到，可重新寄送驗證信。',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: TpSpacing.s6),
-          OutlinedButton(
-            key: const ValueKey('verify-pending-resend-button'),
-            onPressed: _sending || widget.email.trim().isEmpty ? null : _resend,
-            child: _sending
-                ? const _ButtonProgressLabel('重寄驗證信')
-                : const Text('重寄驗證信'),
-          ),
           if (_message != null) ...[
             const SizedBox(height: TpSpacing.s3),
-            Text(_message!, key: const ValueKey('verify-pending-message')),
+            Semantics(
+              key: const ValueKey('verify-pending-message'),
+              container: true,
+              liveRegion: true,
+              child: Text(_message!),
+            ),
           ],
           const SizedBox(height: TpSpacing.s3),
           TextButton(
@@ -376,6 +375,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     setState(() {
@@ -422,6 +422,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     return _AuthScaffold(
       title: '重設密碼',
       subtitle: '輸入帳號 Email，我們會寄出重設連結',
+      primaryActionLabel: _submitting ? '寄送中…' : '寄送',
+      primaryActionKey: const ValueKey('forgot-password-submit-button'),
+      onPrimaryAction: _submit,
+      primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
         child: Column(
@@ -444,14 +448,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) =>
                   value == null || value.trim().isEmpty ? '請輸入 Email' : null,
-            ),
-            const SizedBox(height: TpSpacing.s6),
-            FilledButton(
-              key: const ValueKey('forgot-password-submit-button'),
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const _ButtonProgressLabel('寄出重設連結')
-                  : const Text('寄出重設連結'),
             ),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
@@ -484,6 +480,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _success = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  String? _passwordServerError;
   String? _error;
 
   @override
@@ -494,10 +491,12 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) return;
     setState(() {
       _submitting = true;
+      _passwordServerError = null;
       _error = null;
     });
     try {
@@ -510,11 +509,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       if (mounted) setState(() => _success = true);
     } on Exception catch (error) {
       if (mounted) {
+        if (error is ApiError && error.code == 'RESET_INVALID_PASSWORD') {
+          setState(() => _passwordServerError = '密碼至少 8 字元');
+          return;
+        }
         setState(
           () => _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
             'RESET_TOKEN_MISSING': '重設連結缺少 token',
-            'RESET_INVALID_PASSWORD': '密碼至少 8 字元',
           }, '暫時無法處理，請稍後再試'),
         );
       }
@@ -549,6 +551,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     return _AuthScaffold(
       title: '設定新密碼',
       subtitle: '請輸入至少 8 字元的新密碼',
+      primaryActionLabel: _submitting ? '更新中…' : '更新',
+      primaryActionKey: const ValueKey('reset-password-submit-button'),
+      onPrimaryAction: _submit,
+      primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
         child: Column(
@@ -567,6 +573,12 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               obscureText: _obscurePassword,
               textInputAction: TextInputAction.next,
               enabled: !_submitting,
+              forceErrorText: _passwordServerError,
+              onChanged: (_) {
+                if (_passwordServerError != null) {
+                  setState(() => _passwordServerError = null);
+                }
+              },
               decoration: InputDecoration(
                 labelText: '新密碼',
                 helperText: '至少 8 個字元',
@@ -611,14 +623,6 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               validator: (value) =>
                   value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
             ),
-            const SizedBox(height: TpSpacing.s6),
-            FilledButton(
-              key: const ValueKey('reset-password-submit-button'),
-              onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const _ButtonProgressLabel('更新密碼')
-                  : const Text('更新密碼'),
-            ),
           ],
         ),
       ),
@@ -642,6 +646,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   String? _error;
 
   Future<void> _verify() async {
+    if (_verifying) return;
     if (widget.token.trim().isEmpty) {
       setState(() => _error = '驗證連結缺少 token');
       return;
@@ -679,6 +684,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     return _AuthScaffold(
       title: _success ? '信箱已驗證' : '確認信箱驗證',
       subtitle: _success ? '可以回到登入頁繼續使用 Tripline' : '點擊下方按鈕完成驗證',
+      primaryActionLabel: _success ? null : (_verifying ? '驗證中…' : '驗證'),
+      primaryActionKey: _success
+          ? null
+          : const ValueKey('verify-email-confirm-button'),
+      onPrimaryAction: _success ? null : _verify,
+      primaryActionEnabled: !_verifying,
       child: Column(
         key: const ValueKey('verify-email-page'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -695,14 +706,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
               key: const ValueKey('verify-email-success'),
               onPressed: () => context.go('/login?verified=1'),
               child: const Text('前往登入'),
-            )
-          else
-            FilledButton(
-              key: const ValueKey('verify-email-confirm-button'),
-              onPressed: _verifying ? null : _verify,
-              child: _verifying
-                  ? const _ButtonProgressLabel('完成驗證')
-                  : const Text('完成驗證'),
             ),
         ],
       ),
@@ -715,20 +718,38 @@ class _AuthScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.child,
+    this.primaryActionLabel,
+    this.primaryActionKey,
+    this.onPrimaryAction,
+    this.primaryActionEnabled = true,
   });
 
   final String title;
   final String subtitle;
   final Widget child;
+  final String? primaryActionLabel;
+  final Key? primaryActionKey;
+  final VoidCallback? onPrimaryAction;
+  final bool primaryActionEnabled;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: TpAppBar(
+        role: TpAppBarRole.publicDetail,
+        title: Text(title),
+        onBack: () => context.go('/login'),
+        primaryActionLabel: primaryActionLabel,
+        primaryActionKey: primaryActionKey,
+        onPrimaryAction: onPrimaryAction,
+        primaryActionEnabled: primaryActionEnabled,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.symmetric(
               horizontal: TpSpacing.s6,
               vertical: TpSpacing.s10,
@@ -750,8 +771,6 @@ class _AuthScaffold extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: TpSpacing.s6),
-                  Text(title, style: textTheme.headlineSmall),
-                  const SizedBox(height: TpSpacing.s2),
                   Text(
                     subtitle,
                     style: textTheme.bodyLarge?.copyWith(
@@ -778,42 +797,27 @@ class _InlineAuthMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: TpSpacing.s4,
-        vertical: TpSpacing.s3,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(TpRadius.md),
-      ),
-      child: Text(
-        message,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
-      ),
-    );
-  }
-}
-
-class _ButtonProgressLabel extends StatelessWidget {
-  const _ButtonProgressLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox.square(
-          dimension: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '錯誤：$message',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TpSpacing.s4,
+          vertical: TpSpacing.s3,
         ),
-        const SizedBox(width: TpSpacing.s2),
-        Text(label),
-      ],
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(TpRadius.md),
+        ),
+        child: Text(
+          message,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+        ),
+      ),
     );
   }
 }
