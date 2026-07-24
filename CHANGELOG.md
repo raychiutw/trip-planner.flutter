@@ -9,6 +9,7 @@
 - 行程清單搜尋支援鍵盤 Search、清除與跨 root tab／詳情往返狀態保留；時間軸 Day selector 補齊左右方向鍵、完整 VoiceOver 語意、窄螢幕置中與僅點選換日。行程與行程日刪除統一為不可復原流程，伺服器成功前鎖定並保留內容，失敗時提供持續重試；缺少日期改以「新增」而非「加回」表達。
 - 收藏刪除改為不可復原：卡片、左滑、選單與批次入口都先顯示具名確認，伺服器成功後才移除；失敗時保留資料與選取並提供重試。Flutter restore API、Undo、feature flag 與 staging release verifier 已移除。
 - 註冊、信箱驗證、密碼重設與 OAuth 改用 inline Header 與防重複提交；邀請與公開分享補齊在地日期／時間、Dynamic Type、鍵盤操作與 screen reader 狀態，並維持既有登入方式、不加入 Apple ID 登入。
+- 聊天輸入列新增附件／行程項目入口、1–4 行文字輸入、空白時麥克風與有文字時送出切換，並支援 Command–Return 送出；首次語音輸入會先說明用途，權限不可用時提供前往系統設定的恢復動線。
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。
 - Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。

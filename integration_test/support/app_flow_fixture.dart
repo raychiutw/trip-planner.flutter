@@ -14,6 +14,7 @@ import 'package:tripline/app/router.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/auth/login_screen.dart';
 import 'package:tripline/features/auth/welcome_screen.dart';
+import 'package:tripline/features/chat/speech_service.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -38,6 +39,8 @@ class MockRequestsRepository extends Mock implements RequestsRepository {}
 class MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
 class MockMapRepository extends Mock implements MapRepository {}
+
+class MockSpeechService extends Mock implements SpeechService {}
 
 const releaseSmokeTrip = Trip(id: 'okinawa', name: 'okinawa', title: '沖繩家族之旅');
 const releaseSmokeTokyoTrip = Trip(id: 'tokyo', name: 'tokyo', title: '東京週末旅行');
@@ -160,6 +163,7 @@ class AppFlowFixture {
     required this.favorites,
     required this.map,
     required this.apiClient,
+    required this.speech,
   });
 
   factory AppFlowFixture.loggedOut() {
@@ -169,6 +173,7 @@ class AppFlowFixture {
     final favorites = MockFavoritesRepository();
     final map = MockMapRepository();
     final apiClient = MockApiClient();
+    final speech = MockSpeechService();
 
     when(
       () => apiClient.queueFlushRequests,
@@ -237,6 +242,32 @@ class AppFlowFixture {
       ),
     ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
     when(
+      () => requests.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer(
+      (invocation) async => TripRequest(
+        id: 901,
+        tripId: invocation.namedArguments[#tripId]! as String,
+        message: invocation.namedArguments[#message]! as String,
+        status: RequestStatus.processing,
+      ),
+    );
+    when(() => requests.fetchRequest(901)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 901,
+        tripId: 'okinawa',
+        message: 'device smoke draft',
+        reply: '收到',
+        status: RequestStatus.completed,
+      ),
+    );
+    when(() => speech.isAvailable).thenReturn(false);
+    when(speech.init).thenAnswer((_) async => false);
+    when(() => speech.listen(any())).thenAnswer((_) async {});
+    when(speech.openSettings).thenAnswer((_) async => true);
+    when(
       favorites.watchFavorites,
     ).thenAnswer((_) => Stream.value(releaseSmokeFavorites));
 
@@ -247,6 +278,7 @@ class AppFlowFixture {
       favorites: favorites,
       map: map,
       apiClient: apiClient,
+      speech: speech,
     );
   }
 
@@ -256,6 +288,7 @@ class AppFlowFixture {
   final MockFavoritesRepository favorites;
   final MockMapRepository map;
   final MockApiClient apiClient;
+  final MockSpeechService speech;
 
   Widget get app => ProviderScope(
     overrides: [
@@ -265,6 +298,7 @@ class AppFlowFixture {
       requestsRepositoryProvider.overrideWithValue(requests),
       favoritesRepositoryProvider.overrideWithValue(favorites),
       mapRepositoryProvider.overrideWithValue(map),
+      speechServiceProvider.overrideWithValue(speech),
       settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
       appNetworkAvailabilityProvider.overrideWithValue(const Stream.empty()),
@@ -323,12 +357,14 @@ Finder _rootTab(String label) {
 typedef AppFlowCapture = Future<void> Function(String name);
 typedef AppFlowAppWrapper = Widget Function(Widget child);
 typedef AppFlowEnterText = Future<void> Function(Finder finder, String text);
+typedef AppFlowKeyboardVisibility = Future<void> Function(bool visible);
 
 Future<void> runAppOwnedReleaseFlow(
   WidgetTester tester, {
   AppFlowCapture? capture,
   AppFlowAppWrapper? appWrapper,
   AppFlowEnterText? enterText,
+  AppFlowKeyboardVisibility? setKeyboardVisible,
 }) async {
   Future<void> captureState(String name) async {
     if (capture != null) await capture(name);
@@ -489,6 +525,7 @@ Future<void> runAppOwnedReleaseFlow(
     find.byKey(const ValueKey('chat-input')),
     'device smoke draft',
   );
+  await tester.pump();
   final chatInput = tester.widget<EditableText>(
     find.descendant(
       of: find.byKey(const ValueKey('chat-input')),
@@ -497,6 +534,32 @@ Future<void> runAppOwnedReleaseFlow(
   );
   expect(find.text('device smoke draft'), findsOneWidget);
   expect(chatInput.focusNode.hasFocus, isTrue);
+  expect(find.byKey(const ValueKey('chat-send')), findsOneWidget);
+  expect(find.byKey(const ValueKey('chat-mic-button')), findsNothing);
+  if (setKeyboardVisible != null) {
+    await setKeyboardVisible(true);
+    expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsNothing);
+    expect(
+      tester
+          .getBottomLeft(find.byKey(const ValueKey('chat-composer-glass')))
+          .dy,
+      lessThanOrEqualTo(
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+            tester.view.viewInsets.bottom +
+            1,
+      ),
+    );
+    await setKeyboardVisible(false);
+    expect(find.byKey(const ValueKey('apple-root-tab-bar')), findsOneWidget);
+  }
+
+  await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+  await tester.pumpAndSettle();
+  expect(find.text('device smoke draft'), findsOneWidget);
+
   await tester.tap(find.text('從一個指令開始'));
   await tester.pump();
   expect(chatInput.focusNode.hasFocus, isFalse);
@@ -505,6 +568,23 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
   await tester.pumpAndSettle();
   expect(find.text('東京週末旅行'), findsOneWidget);
+  expect(find.byKey(const ValueKey('chat-mic-button')), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+  await tester.pumpAndSettle();
+  expect(find.text('使用語音輸入？'), findsOneWidget);
+  await tester.tap(find.text('繼續'));
+  await tester.pumpAndSettle();
+  expect(find.text('無法使用語音輸入'), findsOneWidget);
+  await tester.tap(find.text('稍後再說'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('chat-mic-button')));
+  await tester.pumpAndSettle();
+  expect(find.text('使用語音輸入？'), findsNothing);
+  expect(find.text('無法使用語音輸入'), findsOneWidget);
+  await tester.tap(find.text('稍後再說'));
+  await tester.pumpAndSettle();
+  verify(fixture.speech.init).called(1);
+  verifyNever(() => fixture.speech.listen(any()));
   await captureState('chat');
 
   await tester.tap(_rootTab('行程'));
@@ -531,6 +611,21 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.text('沖繩家族之旅'), findsOneWidget);
   expect(find.text('device smoke draft'), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey('chat-send')));
+  await tester.pumpAndSettle();
+  verify(
+    () => fixture.requests.sendRequest(
+      tripId: 'okinawa',
+      message: 'device smoke draft',
+    ),
+  ).called(1);
+  expect(
+    tester
+        .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+        .controller!
+        .text,
+    isEmpty,
+  );
 
   await tester.tap(_rootTab('地圖'));
   await tester.pumpAndSettle();

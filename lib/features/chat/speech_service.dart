@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -16,6 +17,9 @@ abstract class SpeechService {
 
   /// 停止聆聽。
   Future<void> stop();
+
+  /// 開啟 App 的系統設定頁，讓使用者自行調整已拒絕的權限。
+  Future<bool> openSettings();
 
   /// 是否可用(init 成功後為 true)。
   bool get isAvailable;
@@ -45,6 +49,9 @@ class SpeechToTextService implements SpeechService {
 
   @override
   Future<void> stop() => _speech.stop();
+
+  @override
+  Future<bool> openSettings() => openAppSettings();
 }
 
 /// 預設真實作;測試 override 成 mock。

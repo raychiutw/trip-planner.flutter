@@ -12,11 +12,18 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
     await runAppOwnedReleaseFlow(
       tester,
       enterText: (finder, text) async {
         textEntries.add((key: finder.evaluate().single.widget.key, text: text));
         await tester.enterText(finder, text);
+      },
+      setKeyboardVisible: (visible) async {
+        tester.view.viewInsets = visible
+            ? const FakeViewPadding(bottom: 300)
+            : FakeViewPadding.zero;
+        await tester.pumpAndSettle();
       },
     );
     expect(textEntries, [
