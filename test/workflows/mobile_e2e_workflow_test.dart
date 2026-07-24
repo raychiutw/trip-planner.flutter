@@ -715,13 +715,29 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('onMapStyleApplied'));
         expect(nativeMapSmoke, contains('grantPermissionWhenInUse'));
         expect(nativeMapSmoke, contains('.swipe('));
-        expect(nativeMapSmoke, contains('.platform.mobile.doubleTap('));
+        expect(nativeMapSmoke, isNot(contains('.platform.mobile.doubleTap(')));
         expect(nativeMapSmoke, isNot(contains('.startGesture(')));
+        expect(nativeMapSmoke, contains('ensureSemantics'));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
-        expect(nativeMapSmoke, contains('Tripline native map pinch request'));
-        expect(nativeMapSmoke, contains('Tripline native map rotate request'));
+        for (final requestLabel in [
+          'Tripline native map pinch request',
+          'Tripline native map rotate request',
+          'Tripline native map double tap request',
+        ]) {
+          expect(nativeMapSmoke, contains(requestLabel));
+          expect(nativeGestureBridge, contains(requestLabel));
+          expect(androidNativeGestureBridge, contains(requestLabel));
+        }
+        for (final source in [
+          nativeMapSmoke,
+          nativeGestureBridge,
+          androidNativeGestureBridge,
+        ]) {
+          expect(source, contains('native Google Map renders'));
+        }
         expect(nativeGestureBridge, contains('pinchWithScale:'));
         expect(nativeGestureBridge, contains('rotate:'));
+        expect(nativeGestureBridge, contains('[target doubleTap]'));
         expect(androidNativeGestureBridge, contains('.pinchOut('));
         expect(
           androidNativeGestureBridge,
@@ -734,6 +750,15 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(
           androidNativeGestureBridge,
           contains('dartTestName.contains(NATIVE_MAP_TEST_NAME)'),
+        );
+        expect(androidNativeGestureBridge, contains('gestureBridge.join('));
+        expect(
+          androidNativeGestureBridge,
+          contains('device.click(centerX, centerY)'),
+        );
+        expect(
+          androidNativeGestureBridge,
+          contains('SystemClock.sleep(DOUBLE_TAP_INTERVAL_MS)'),
         );
         expect(
           nativeGestureBridge,

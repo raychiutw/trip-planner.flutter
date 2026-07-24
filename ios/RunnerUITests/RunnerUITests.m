@@ -15,14 +15,15 @@
 
 PATROL_INTEGRATION_TEST_IOS_RUNNER(RunnerUITests)
 
-// Patrol 4.6.1 尚未提供 iOS pinch／rotate。Flutter 按鈕進入等待狀態後，
-// 以 accessibility label 請求一次 XCUI 手勢，再由 Dart 驗證地圖鏡頭 callback。
-static NSString *const TriplineMapLabel =
-    @"Tripline native map evidence canvas";
+// Patrol 4.6.1 尚未提供 iOS pinch／rotate，release PlatformView selector 也不穩定。
+// Flutter 按鈕進入等待狀態後，以 accessibility label 請求一次 XCUI 手勢，
+// 再由 Dart 驗證地圖鏡頭 callback。
 static NSString *const TriplinePinchRequestLabel =
     @"Tripline native map pinch request";
 static NSString *const TriplineRotateRequestLabel =
     @"Tripline native map rotate request";
+static NSString *const TriplineDoubleTapRequestLabel =
+    @"Tripline native map double tap request";
 
 @interface TriplineNativeMapGestureBridge : NSObject
 @property(nonatomic, strong) XCUIApplication *app;
@@ -70,21 +71,28 @@ static NSString *const TriplineRotateRequestLabel =
 
   XCUIElement *pinchRequest = [self elementWithLabel:TriplinePinchRequestLabel];
   XCUIElement *rotateRequest = [self elementWithLabel:TriplineRotateRequestLabel];
+  XCUIElement *doubleTapRequest =
+      [self elementWithLabel:TriplineDoubleTapRequestLabel];
   NSString *requestLabel = pinchRequest.exists
                                ? TriplinePinchRequestLabel
-                               : (rotateRequest.exists ? TriplineRotateRequestLabel : nil);
+                               : (rotateRequest.exists
+                                      ? TriplineRotateRequestLabel
+                                      : (doubleTapRequest.exists
+                                             ? TriplineDoubleTapRequestLabel
+                                             : nil));
   if (requestLabel == nil) return;
 
-  XCUIElement *map = [self elementWithLabel:TriplineMapLabel];
-  if (!map.exists) return;
-
+  XCUIElement *target = self.app;
   self.activeRequestLabel = requestLabel;
   if ([requestLabel isEqualToString:TriplinePinchRequestLabel]) {
     NSLog(@"Tripline native map bridge: pinch");
-    [map pinchWithScale:2.0 velocity:1.0];
-  } else {
+    [target pinchWithScale:2.0 velocity:1.0];
+  } else if ([requestLabel isEqualToString:TriplineRotateRequestLabel]) {
     NSLog(@"Tripline native map bridge: rotate");
-    [map rotate:M_PI_2 withVelocity:1.0];
+    [target rotate:M_PI_2 withVelocity:1.0];
+  } else {
+    NSLog(@"Tripline native map bridge: double tap");
+    [target doubleTap];
   }
 }
 

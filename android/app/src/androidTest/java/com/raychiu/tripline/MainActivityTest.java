@@ -14,12 +14,16 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import pl.leancode.patrol.PatrolJUnitRunner;
 
+import static org.junit.Assert.assertFalse;
+
 @RunWith(Parameterized.class)
 public class MainActivityTest {
     private static final String MAP_LABEL = "Tripline native map evidence canvas";
     private static final String PINCH_REQUEST_LABEL = "Tripline native map pinch request";
     private static final String ROTATE_REQUEST_LABEL = "Tripline native map rotate request";
+    private static final String DOUBLE_TAP_REQUEST_LABEL = "Tripline native map double tap request";
     private static final String NATIVE_MAP_TEST_NAME = "native Google Map renders";
+    private static final long DOUBLE_TAP_INTERVAL_MS = 100;
 
     @Parameters(name = "{0}")
     public static Object[] testCases() {
@@ -48,6 +52,12 @@ public class MainActivityTest {
         } finally {
             if (gestureBridge != null) {
                 gestureBridge.interrupt();
+                try {
+                    gestureBridge.join(5000);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                assertFalse("Native map gesture bridge did not stop", gestureBridge.isAlive());
             }
         }
     }
@@ -63,10 +73,12 @@ public class MainActivityTest {
                         ? PINCH_REQUEST_LABEL
                         : (device.findObject(new UiSelector().description(ROTATE_REQUEST_LABEL)).exists()
                                 ? ROTATE_REQUEST_LABEL
-                                : null);
+                                : (device.findObject(new UiSelector().description(DOUBLE_TAP_REQUEST_LABEL)).exists()
+                                        ? DOUBLE_TAP_REQUEST_LABEL
+                                        : null));
                 if (request == null) {
                     activeRequest = null;
-                } else if (!request.equals(activeRequest) && injectGesture(map, request)) {
+                } else if (!request.equals(activeRequest) && injectGesture(device, map, request)) {
                     activeRequest = request;
                 }
                 SystemClock.sleep(250);
@@ -76,7 +88,7 @@ public class MainActivityTest {
         return bridge;
     }
 
-    private static boolean injectGesture(UiObject map, String request) {
+    private static boolean injectGesture(UiDevice device, UiObject map, String request) {
         try {
             if (PINCH_REQUEST_LABEL.equals(request)) {
                 return map.pinchOut(60, 30);
@@ -85,6 +97,14 @@ public class MainActivityTest {
             Rect bounds = map.getBounds();
             int centerX = bounds.centerX();
             int centerY = bounds.centerY();
+            if (DOUBLE_TAP_REQUEST_LABEL.equals(request)) {
+                if (!device.click(centerX, centerY)) {
+                    return false;
+                }
+                SystemClock.sleep(DOUBLE_TAP_INTERVAL_MS);
+                return device.click(centerX, centerY);
+            }
+
             int radius = Math.min(bounds.width(), bounds.height()) / 5;
             return map.performTwoPointerGesture(
                     new Point(centerX - radius, centerY),

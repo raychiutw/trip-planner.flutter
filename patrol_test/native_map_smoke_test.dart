@@ -16,11 +16,7 @@ const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
 const _nativeMapEvidenceLabel = 'Tripline native map evidence canvas';
 const _nativePinchRequestLabel = 'Tripline native map pinch request';
 const _nativeRotateRequestLabel = 'Tripline native map rotate request';
-
-final _nativeMapSelector = MobileSelector(
-  android: AndroidSelector(contentDescription: _nativeMapEvidenceLabel),
-  ios: IOSSelector(label: _nativeMapEvidenceLabel),
-);
+const _nativeDoubleTapRequestLabel = 'Tripline native map double tap request';
 
 enum _NativeGesture { pan, pinch, rotate, doubleTap }
 
@@ -86,23 +82,23 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
-    await $(#armPinchCheck).tap();
-    await $(
-      #nativeMapPinchObserved,
-    ).waitUntilExists(timeout: const Duration(seconds: 15));
-    expect($(#nativeMapPinchObserved), findsOneWidget);
-
-    await $(#armRotateCheck).tap();
-    await $(
-      #nativeMapRotateObserved,
-    ).waitUntilExists(timeout: const Duration(seconds: 15));
-    expect($(#nativeMapRotateObserved), findsOneWidget);
-
-    await $(#armDoubleTapCheck).tap();
     final semantics = $.tester.ensureSemantics();
     try {
       await $.tester.pump();
-      await $.platform.mobile.doubleTap(_nativeMapSelector);
+
+      await $(#armPinchCheck).tap();
+      await $(
+        #nativeMapPinchObserved,
+      ).waitUntilExists(timeout: const Duration(seconds: 15));
+      expect($(#nativeMapPinchObserved), findsOneWidget);
+
+      await $(#armRotateCheck).tap();
+      await $(
+        #nativeMapRotateObserved,
+      ).waitUntilExists(timeout: const Duration(seconds: 15));
+      expect($(#nativeMapRotateObserved), findsOneWidget);
+
+      await $(#armDoubleTapCheck).tap();
       await $(
         #nativeMapDoubleTapObserved,
       ).waitUntilExists(timeout: const Duration(seconds: 15));
@@ -382,6 +378,11 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                             _nativePinchRequestLabel,
                           (_NativeGesture.rotate, _NativeGesture.rotate) =>
                             _nativeRotateRequestLabel,
+                          (
+                            _NativeGesture.doubleTap,
+                            _NativeGesture.doubleTap,
+                          ) =>
+                            _nativeDoubleTapRequestLabel,
                           _ => label,
                         }),
                       ),
