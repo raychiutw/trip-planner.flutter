@@ -754,6 +754,11 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(androidNativeGestureBridge, contains('gestureBridge.join('));
         expect(
           androidNativeGestureBridge,
+          contains('setUncaughtExceptionHandler'),
+        );
+        expect(androidNativeGestureBridge, contains('addSuppressed'));
+        expect(
+          androidNativeGestureBridge,
           contains('device.click(centerX, centerY)'),
         );
         expect(

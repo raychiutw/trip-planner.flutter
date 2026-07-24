@@ -3,6 +3,7 @@ package com.raychiu.tripline;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.SystemClock;
+import java.util.concurrent.atomic.AtomicReference;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject;
@@ -13,8 +14,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import pl.leancode.patrol.PatrolJUnitRunner;
-
-import static org.junit.Assert.assertFalse;
 
 @RunWith(Parameterized.class)
 public class MainActivityTest {
@@ -44,11 +43,16 @@ public class MainActivityTest {
     public void runDartTest() {
         PatrolJUnitRunner instrumentation =
                 (PatrolJUnitRunner) InstrumentationRegistry.getInstrumentation();
+        AtomicReference<Throwable> gestureBridgeFailure = new AtomicReference<>();
         Thread gestureBridge = dartTestName.contains(NATIVE_MAP_TEST_NAME)
-                ? startNativeMapGestureBridge(instrumentation)
+                ? startNativeMapGestureBridge(instrumentation, gestureBridgeFailure)
                 : null;
+        Throwable testFailure = null;
         try {
             instrumentation.runDartTest(dartTestName);
+        } catch (RuntimeException | Error failure) {
+            testFailure = failure;
+            throw failure;
         } finally {
             if (gestureBridge != null) {
                 gestureBridge.interrupt();
@@ -57,12 +61,28 @@ public class MainActivityTest {
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 }
-                assertFalse("Native map gesture bridge did not stop", gestureBridge.isAlive());
+                AssertionError bridgeError = null;
+                if (gestureBridge.isAlive()) {
+                    bridgeError = new AssertionError("Native map gesture bridge did not stop");
+                } else if (gestureBridgeFailure.get() != null) {
+                    bridgeError = new AssertionError(
+                            "Native map gesture bridge failed",
+                            gestureBridgeFailure.get());
+                }
+                if (bridgeError != null) {
+                    if (testFailure != null) {
+                        testFailure.addSuppressed(bridgeError);
+                    } else {
+                        throw bridgeError;
+                    }
+                }
             }
         }
     }
 
-    private static Thread startNativeMapGestureBridge(PatrolJUnitRunner instrumentation) {
+    private static Thread startNativeMapGestureBridge(
+            PatrolJUnitRunner instrumentation,
+            AtomicReference<Throwable> bridgeFailure) {
         Thread bridge = new Thread(() -> {
             UiDevice device = UiDevice.getInstance(instrumentation);
             UiObject map = device.findObject(new UiSelector().description(MAP_LABEL));
@@ -84,6 +104,7 @@ public class MainActivityTest {
                 SystemClock.sleep(250);
             }
         }, "tripline-native-map-gestures");
+        bridge.setUncaughtExceptionHandler((thread, failure) -> bridgeFailure.set(failure));
         bridge.start();
         return bridge;
     }
