@@ -6,6 +6,7 @@ void showAppError(
   String message, {
   VoidCallback? onRetry,
   bool allowDismiss = true,
+  String retryLabel = '重試',
 }) {
   assert(
     allowDismiss || onRetry != null,
@@ -41,7 +42,7 @@ void showAppError(
                 dismiss();
                 onRetry();
               },
-              child: const Text('重試'),
+              child: Text(retryLabel),
             ),
           if (allowDismiss)
             TextButton(onPressed: dismiss, child: const Text('關閉')),

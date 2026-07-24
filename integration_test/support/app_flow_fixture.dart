@@ -450,7 +450,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
-  expect(find.text('總覽'), findsOneWidget);
+  expect(find.text('全部'), findsOneWidget);
   expect(tester.widget<PageView>(find.byType(PageView)).pageSnapping, isFalse);
   await captureState('map-tripline-poi');
   await tester.tap(find.byKey(const ValueKey('fake-google-poi-trigger')));

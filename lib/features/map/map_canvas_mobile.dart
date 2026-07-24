@@ -208,6 +208,7 @@ class _TripMapMobileCanvasState extends State<_TripMapMobileCanvas> {
       TripMapCameraPosition(
         target: _fromNative(position.target),
         zoom: position.zoom,
+        bearing: position.bearing,
       ),
     );
     if (widget.config.clusterMarkers && _zoom.floor() != previousBucket) {

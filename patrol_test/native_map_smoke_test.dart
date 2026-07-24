@@ -12,6 +12,9 @@ const _taipei101 = TripMapPoint(25.033968, 121.564468);
 // coalesce the camera update and skip its idle callback.
 const _zoomCheckPoint = TripMapPoint(25.1676, 121.4450);
 const _expectGooglePoi = bool.fromEnvironment('E2E_EXPECT_GOOGLE_POI');
+
+enum _NativeGesture { pan, pinch, rotate, doubleTap }
+
 const _poiTapOffsets = <Offset>[
   Offset(0.5, 0.5),
   Offset(0.47, 0.5),
@@ -63,16 +66,65 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#darkMapTheme), findsOneWidget);
 
-    await $(#armGestureCheck).tap();
+    await $(#armPanCheck).tap();
     await $.platform.mobile.swipe(
       from: const Offset(0.5, 0.68),
       to: const Offset(0.5, 0.42),
       steps: 24,
     );
     await $(
-      #nativeMapGestureObserved,
+      #nativeMapPanObserved,
     ).waitUntilExists(timeout: const Duration(seconds: 15));
-    expect($(#nativeMapGestureObserved), findsOneWidget);
+    expect($(#nativeMapPanObserved), findsOneWidget);
+
+    final mapRect = $.tester.getRect(
+      find.byKey(const ValueKey('google-trip-map-canvas')),
+    );
+    final mapCenter = mapRect.center;
+
+    await $(#armPinchCheck).tap();
+    final pinchLeft = await $.tester.startGesture(
+      mapCenter - const Offset(36, 0),
+      pointer: 1,
+    );
+    final pinchRight = await $.tester.startGesture(
+      mapCenter + const Offset(36, 0),
+      pointer: 2,
+    );
+    await pinchLeft.moveTo(mapCenter - const Offset(96, 0));
+    await pinchRight.moveTo(mapCenter + const Offset(96, 0));
+    await pinchLeft.up();
+    await pinchRight.up();
+    await $(
+      #nativeMapPinchObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapPinchObserved), findsOneWidget);
+
+    await $(#armRotateCheck).tap();
+    final rotateLeft = await $.tester.startGesture(
+      mapCenter - const Offset(56, 0),
+      pointer: 3,
+    );
+    final rotateRight = await $.tester.startGesture(
+      mapCenter + const Offset(56, 0),
+      pointer: 4,
+    );
+    await rotateLeft.moveTo(mapCenter - const Offset(0, 56));
+    await rotateRight.moveTo(mapCenter + const Offset(0, 56));
+    await rotateLeft.up();
+    await rotateRight.up();
+    await $(
+      #nativeMapRotateObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapRotateObserved), findsOneWidget);
+
+    await $(#armDoubleTapCheck).tap();
+    await $.tester.tapAt(mapCenter);
+    await $.tester.tapAt(mapCenter);
+    await $(
+      #nativeMapDoubleTapObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapDoubleTapObserved), findsOneWidget);
 
     await $(#requestLocationPermission).tap();
     await $.platform.mobile.grantPermissionWhenInUse();
@@ -137,8 +189,8 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
   bool _ready = false;
   bool _expectingZoom13 = false;
   bool _observedZoom13 = false;
-  bool _expectingGesture = false;
-  bool _gestureObserved = false;
+  _NativeGesture? _expectedGesture;
+  final _observedGestures = <_NativeGesture>{};
   bool _darkStyleApplied = false;
   bool _locationPermissionGranted = false;
   bool _poiZoomReady = false;
@@ -163,17 +215,35 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
       });
       return;
     }
-    if (_expectingGesture) {
+    final expectedGesture = _expectedGesture;
+    if (expectedGesture != null) {
       final start = _gestureStartPosition;
-      if (start == null ||
-          _near(start.target, position.target, tolerance: 1e-5)) {
-        return;
-      }
+      if (start == null) return;
+      final observed = switch (expectedGesture) {
+        _NativeGesture.pan => !_near(
+          start.target,
+          position.target,
+          tolerance: 1e-5,
+        ),
+        _NativeGesture.pinch ||
+        _NativeGesture.doubleTap => (start.zoom - position.zoom).abs() >= 0.25,
+        _NativeGesture.rotate =>
+          _bearingDelta(start.bearing, position.bearing) >= 5,
+      };
+      if (!observed) return;
       setState(() {
-        _expectingGesture = false;
-        _gestureObserved = true;
+        _expectedGesture = null;
+        _observedGestures.add(expectedGesture);
       });
     }
+  }
+
+  void _armGesture(_NativeGesture gesture) {
+    setState(() {
+      _expectedGesture = gesture;
+      _observedGestures.remove(gesture);
+      _gestureStartPosition = _lastCameraPosition;
+    });
   }
 
   Future<void> _requestLocationPermission() async {
@@ -271,15 +341,21 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                       }),
                       child: const Text('Theme'),
                     ),
-                    FilledButton(
-                      key: const ValueKey('armGestureCheck'),
-                      onPressed: () => setState(() {
-                        _expectingGesture = true;
-                        _gestureObserved = false;
-                        _gestureStartPosition = _lastCameraPosition;
-                      }),
-                      child: const Text('Gesture'),
-                    ),
+                    for (final (gesture, key, label) in const [
+                      (_NativeGesture.pan, 'armPanCheck', 'Pan'),
+                      (_NativeGesture.pinch, 'armPinchCheck', 'Pinch'),
+                      (_NativeGesture.rotate, 'armRotateCheck', 'Rotate'),
+                      (
+                        _NativeGesture.doubleTap,
+                        'armDoubleTapCheck',
+                        'Double tap',
+                      ),
+                    ])
+                      FilledButton(
+                        key: ValueKey(key),
+                        onPressed: () => _armGesture(gesture),
+                        child: Text(label),
+                      ),
                     FilledButton(
                       key: const ValueKey('requestLocationPermission'),
                       onPressed: _requestLocationPermission,
@@ -301,9 +377,21 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
               const IgnorePointer(
                 child: SizedBox(key: ValueKey('darkMapTheme')),
               ),
-            if (_gestureObserved)
+            if (_observedGestures.contains(_NativeGesture.pan))
               const IgnorePointer(
-                child: SizedBox(key: ValueKey('nativeMapGestureObserved')),
+                child: SizedBox(key: ValueKey('nativeMapPanObserved')),
+              ),
+            if (_observedGestures.contains(_NativeGesture.pinch))
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapPinchObserved')),
+              ),
+            if (_observedGestures.contains(_NativeGesture.rotate))
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapRotateObserved')),
+              ),
+            if (_observedGestures.contains(_NativeGesture.doubleTap))
+              const IgnorePointer(
+                child: SizedBox(key: ValueKey('nativeMapDoubleTapObserved')),
               ),
             if (_locationPermissionGranted)
               const IgnorePointer(
@@ -327,3 +415,8 @@ bool _near(
 }) =>
     (first.latitude - second.latitude).abs() < tolerance &&
     (first.longitude - second.longitude).abs() < tolerance;
+
+double _bearingDelta(double first, double second) {
+  final delta = (first - second).abs() % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
