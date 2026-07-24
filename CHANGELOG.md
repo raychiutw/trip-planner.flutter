@@ -6,6 +6,7 @@
 
 ### 變更
 
+- Account 採用有 section header 與 inset separator 的系統設定列；compact width 維持近滿版 Navigation Stack sheet，一般寬度改用置中 form sheet。外觀預設跟隨系統，個人資料支援正確焦點與 Dynamic Type；通知只在使用者啟用項目時說明用途並請求系統權限，並在回到 App 時同步系統狀態，拒絕後不重複提示。刪除帳號會列出影響、要求重新驗證，且僅在伺服器成功後清除本機帳號資料；純 OAuth 帳號在尚無 fresh-auth 契約時會安全阻擋 App 內刪除並導向身分核對說明。
 - 收藏刪除改為不可復原：卡片、左滑、選單與批次入口都先顯示具名確認，伺服器成功後才移除；失敗時保留資料與選取並提供重試。Flutter restore API、Undo、feature flag 與 staging release verifier 已移除。
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。

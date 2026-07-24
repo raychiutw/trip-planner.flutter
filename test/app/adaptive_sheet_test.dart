@@ -206,6 +206,58 @@ void main() {
     expect(find.byKey(const ValueKey('app-sheet-close')), findsOneWidget);
   });
 
+  testWidgets('regular content sheet Close 不會繞過子頁未儲存保護', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = AppUnsavedChangesController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (sheetContext) => FilledButton(
+                onPressed: () => Navigator.of(sheetContext).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AppUnsavedChangesGuard(
+                      controller: controller,
+                      hasChanges: true,
+                      child: const Scaffold(
+                        appBar: TpAppBar(
+                          role: TpAppBarRole.detail,
+                          title: Text('編輯個人資料'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('編輯'),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('編輯'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('編輯個人資料'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('app-regular-content-sheet')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('dirty form asks before Cancel and stays open when kept', (
     tester,
   ) async {

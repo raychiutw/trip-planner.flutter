@@ -28,11 +28,14 @@ class AppearanceScreen extends ConsumerWidget {
       body: ListView(
         children: [
           TpSettingsGroup(
+            title: 'App 外觀',
             children: [
               for (final (m, label) in _options)
-                ListTile(
+                TpSettingsRow(
                   key: ValueKey('theme-${themeModeToString(m)}'),
-                  title: Text(label),
+                  title: label,
+                  selected: mode == m,
+                  inMutuallyExclusiveGroup: true,
                   trailing: mode == m
                       ? const Icon(CupertinoIcons.checkmark)
                       : null,

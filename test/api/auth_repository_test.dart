@@ -363,6 +363,28 @@ void main() {
       expect(await sessionStore.read(), isNull);
     });
 
+    test('DELETE /account 失敗時保留 session，讓使用者可重新驗證再試', () async {
+      await sessionStore.write('session-token');
+      dioAdapter.onDelete(
+        '/account',
+        (server) => server.reply(401, {
+          'code': 'ACCOUNT_DELETE_PASSWORD_INVALID',
+          'message': 'invalid password',
+        }),
+        data: {'password': 'wrong-password'},
+      );
+
+      await expectLater(
+        authRepository.deleteAccount(
+          hasPassword: true,
+          confirmation: 'wrong-password',
+        ),
+        throwsA(isA<ApiError>()),
+      );
+
+      expect(await sessionStore.read(), 'session-token');
+    });
+
     test('純 OAuth 帳號 DELETE /account 送 confirm DELETE', () async {
       dioAdapter.onDelete(
         '/account',

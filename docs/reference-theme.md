@@ -1,6 +1,6 @@
 # Tripline Theme 與共用 UI 參考
 
-> 更新：2026-07-21。視覺驗收以 [`discovery/design.md`](discovery/design.md) 與 [`2026-07-21-trip-entry-card-menu-keyboard-glass.md`](superpowers/plans/2026-07-21-trip-entry-card-menu-keyboard-glass.md) 為準。
+> 更新：2026-07-24。視覺與互動驗收以 repository root 的 `/design.md` 為唯一 Source of Truth；本文件只說明目前共用元件。
 
 ## 取色
 
@@ -36,8 +36,8 @@
 
 ## 導覽
 
-- Root tab 固定五項：聊天、行程、地圖、收藏、帳號。
-- Account 是第 5 branch；其他 root Header 不再重複 avatar，`/account` deep link 保留。
+- Root tab 固定四項：聊天、行程、地圖、收藏。
+- Account 不建立 root branch；每個內容頁 Header 的 `person.crop.circle` 開啟獨立 Navigation Stack sheet，`/account` deep link 保留。
 - 浮動 tab 使用 `AppleRootTabBar`，左右 margin `16`、可見高度 `64`、安全區上方留白由 `TpRootTabGeometry` 統一計算。
 - `AppShell` 開啟 `extendBody`。根頁底部淨空一律使用 `TpRootScrollScaffold` 或 `TpRootTabGeometry.clearance(context)`，不得另寫 magic number。
 - 最小 tap target `44×44`；selection 使用 haptic；reduced motion 由 `TpMotion.resolve` 處理。
@@ -57,6 +57,8 @@
 - 內容層使用實色 grouped surface；玻璃只用於 tab、浮動 toolbar 與 sheet。
 - 設定頁使用 `TpSettingsGroup`：無外框、無陰影、圓角 grouped surface、內縮 separator。
 - 帳號列、通知 switch、外觀 checkmark 均使用原生熟悉的 HIG 動線。
+- Account 使用有 section header 的 grouped list；compact width 使用近滿版 sheet，一般寬度使用置中 form sheet。
+- 外觀預設跟隨系統，Account 不重複提供 Dynamic Type、accessibility、鍵盤或捲動等系統已有的偏好。
 - 卡片不靠彩色分類表達資訊；階層以字重、留白與 separator 建立。
 - Navigation regular glass 使用 Light/Dark alpha `.40/.48`，PlatformView 使用 `.56/.62`，High Contrast 使用 `.96` opaque fallback；內容卡不套 glass。
 
@@ -71,6 +73,10 @@
 - `SwipeToDelete`：左滑只揭露紅色刪除，點擊後才進確認。
 - `AppKeyboardDismissRegion`：全 App 點外部／拖曳收鍵盤並保留草稿。
 - `AppSearchField` / `showAppActionSheet` / `showAppConfirm` / `showAppTimePicker`：平台自適應互動。
+
+## 系統權限
+
+`NotificationPermissionService` 是通知設定唯一的 app-owned platform boundary，只提供 `getStatus`、`request` 與 `openSettings`。通知頁初次顯示及從系統設定回到 App 時會同步 OS 狀態，但不會因此要求權限；只有使用者啟用通知時，才先說明具體用途並顯示系統 prompt。拒絕後改顯示持續可見的系統設定入口，不重複要求；狀態讀取失敗可明確重試，未知的原生回傳值採 fail-closed。
 
 ## 例外
 
