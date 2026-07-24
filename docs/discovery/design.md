@@ -167,8 +167,8 @@ AI 聊天每一則非系統訊息都顯示發話者名稱。自己的訊息優�
 - `plus` 開啟既有 Google POI 探索／收藏流程；新增不是搜尋，因此不得使用放大鏡代表新增。
 - 收藏 row 使用 grouped list 與 inset separator，不以三色卡片區分類型。
 - 篩選使用 sheet＋checkmark；POI action 使用 action sheet。
-- POI action 至少包含：加入行程、地圖查看、編輯收藏與筆記、分享、取消收藏。
-- 單筆取消收藏與復原改用後端 `POST /api/poi-favorites/:id/restore`；完整後端交付契約見 `docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`。
+- POI action 至少包含：加入行程與 destructive「刪除」；所有刪除入口使用同一具名確認。
+- 收藏刪除不可復原，伺服器成功後才從畫面移除；失敗時保留資料與選取並提供重試。Flutter 不呼叫或依賴 restore endpoint。
 - 空狀態提供清除篩選或前往 Google Maps POI 搜尋。
 
 ## 9. 新增景點

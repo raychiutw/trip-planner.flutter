@@ -44,10 +44,46 @@ void main() {
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    final actions = tester
+        .widgetList<CupertinoDialogAction>(find.byType(CupertinoDialogAction))
+        .toList();
+    expect(actions.first.isDefaultAction, isTrue);
+    expect(actions.last.isDestructiveAction, isTrue);
+    expect(actions.last.isDefaultAction, isFalse);
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
     expect(await future, isTrue);
+  });
+
+  testWidgets('Android 破壞性確認由安全選項取得預設焦點', (tester) async {
+    await tester.pumpWidget(
+      host(TargetPlatform.android, (context) {
+        unawaited(
+          showAppConfirm(
+            context,
+            title: '刪除收藏',
+            confirmLabel: '刪除',
+            isDestructive: true,
+          ),
+        );
+      }),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, '取消'))
+          .autofocus,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '刪除'))
+          .autofocus,
+      isFalse,
+    );
   });
 
   testWidgets('Android → Material AlertDialog;取消回傳 false', (tester) async {
@@ -272,6 +308,16 @@ void main() {
 
     expect(find.text('已登出該裝置'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
+    expect(
+      tester
+          .widgetList<Semantics>(find.byType(Semantics))
+          .any(
+            (widget) =>
+                widget.properties.liveRegion == true &&
+                widget.properties.label == '已登出該裝置',
+          ),
+      isTrue,
+    );
     // 不推進到 2.5s;測試結束時 tree 拆除須取消 timer,否則框架報 pending timer。
   });
 
@@ -315,30 +361,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CupertinoAlertDialog), findsOneWidget);
-  });
-
-  testWidgets('Undo notice renders one six-second action and dispatches it', (
-    tester,
-  ) async {
-    var undoCount = 0;
-    await tester.pumpWidget(
-      host(TargetPlatform.iOS, (context) {
-        showAppUndoNotice(context, message: '已移除收藏', onUndo: () => undoCount++);
-      }),
-    );
-
-    await tester.tap(find.text('open'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.duration, const Duration(seconds: 6));
-    expect(find.text('已移除收藏'), findsOneWidget);
-    expect(find.text('復原'), findsOneWidget);
-
-    await tester.tap(find.text('復原'));
-    await tester.pump();
-    expect(undoCount, 1);
   });
 
   Widget searchHost(TargetPlatform platform, TextEditingController controller) {

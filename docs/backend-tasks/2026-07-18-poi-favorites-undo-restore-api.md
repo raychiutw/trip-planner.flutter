@@ -2,7 +2,7 @@
 
 日期：2026-07-18
 
-狀態：待後端實作
+狀態：歷史後端交付文件；Flutter #88 已停止呼叫 restore endpoint，後端 endpoint 是否退休不在本次範圍
 
 後端 repository：`/Users/ray/Projects/trip-planner`
 

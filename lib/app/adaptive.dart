@@ -138,6 +138,7 @@ Future<bool> showAppConfirm(
         content: message == null ? null : Text(message),
         actions: [
           CupertinoDialogAction(
+            isDefaultAction: isDestructive,
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(cancelLabel),
           ),
@@ -161,10 +162,12 @@ Future<bool> showAppConfirm(
       content: message == null ? null : Text(message),
       actions: [
         TextButton(
+          autofocus: isDestructive,
           onPressed: () => Navigator.of(dialogContext).pop(false),
           child: Text(cancelLabel),
         ),
         FilledButton(
+          autofocus: !isDestructive,
           style: isDestructive
               ? FilledButton.styleFrom(
                   backgroundColor: scheme.error,
@@ -984,34 +987,6 @@ void showAppNotice(BuildContext context, String message) {
   overlay.insert(entry);
 }
 
-/// 顯示可復原的單一動作通知。
-///
-/// Undo 必須在使用者仍可看到原畫面時立即操作，因此所有平台都使用固定在
-/// Root tab 上方的浮動 SnackBar，而不使用無 action 的 iOS 頂部橫幅。
-void showAppUndoNotice(
-  BuildContext context, {
-  required String message,
-  required VoidCallback onUndo,
-}) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..clearSnackBars()
-    ..showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(
-          TpSpacing.s4,
-          0,
-          TpSpacing.s4,
-          TpRootTabGeometry.clearance(context) + TpSpacing.s2,
-        ),
-        duration: const Duration(seconds: 6),
-        content: Text(message),
-        action: SnackBarAction(label: '復原', onPressed: onUndo),
-      ),
-    );
-}
-
 /// iOS 頂部通知橫幅:下一幀滑入、停留約 2.5 秒後滑出,結束時呼叫 [onDismissed]。
 class _TopNoticeBanner extends StatefulWidget {
   const _TopNoticeBanner({required this.message, required this.onDismissed});
@@ -1070,22 +1045,28 @@ class _TopNoticeBannerState extends State<_TopNoticeBanner> {
             child: AnimatedOpacity(
               duration: fadeDuration,
               opacity: _visible ? 1 : 0,
-              child: Material(
-                color: theme.colorScheme.inverseSurface,
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(TpRadius.lg),
-                ),
-                elevation: 6,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TpSpacing.s4,
-                    vertical: TpSpacing.s3,
+              child: Semantics(
+                container: true,
+                liveRegion: true,
+                label: widget.message,
+                excludeSemantics: true,
+                child: Material(
+                  color: theme.colorScheme.inverseSurface,
+                  borderRadius: const BorderRadius.all(
+                    Radius.circular(TpRadius.lg),
                   ),
-                  child: Text(
-                    widget.message,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onInverseSurface,
+                  elevation: 6,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpSpacing.s4,
+                      vertical: TpSpacing.s3,
+                    ),
+                    child: Text(
+                      widget.message,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onInverseSurface,
+                      ),
                     ),
                   ),
                 ),

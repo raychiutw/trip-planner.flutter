@@ -25,7 +25,7 @@ on:
           - macos-26
           - tripline-release
       run_optional_evidence:
-        description: Also run staging contract and Firebase device evidence
+        description: Also run Firebase device evidence
         required: true
         default: false
         type: boolean
@@ -86,31 +86,6 @@ jobs:
           set -euo pipefail
           : "${GOOGLE_MAPS_ANDROID_API_KEY:?Missing GOOGLE_MAPS_ANDROID_API_KEY secret}"
           flutter build apk --debug
-
-  favorite_restore_contract:
-    name: Verify staging favorite restore
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.run_optional_evidence }}
-    runs-on: ubuntu-24.04
-    environment: mobile-release
-    timeout-minutes: 10
-    concurrency:
-      group: favorite-restore-contract-${{ github.repository }}
-      cancel-in-progress: false
-    env:
-      STAGING_API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
-      STAGING_ORIGIN: ${{ secrets.STAGING_ORIGIN }}
-      STAGING_SESSION_COOKIE: ${{ secrets.STAGING_SESSION_COOKIE }}
-      STAGING_CSRF_TOKEN: ${{ secrets.STAGING_CSRF_TOKEN }}
-      STAGING_OTHER_SESSION_COOKIE: ${{ secrets.STAGING_OTHER_SESSION_COOKIE }}
-      STAGING_OTHER_CSRF_TOKEN: ${{ secrets.STAGING_OTHER_CSRF_TOKEN }}
-      STAGING_FAVORITE_POI_ID: ${{ secrets.STAGING_FAVORITE_POI_ID }}
-      STAGING_CONTRACT_GUARD: ${{ secrets.STAGING_CONTRACT_GUARD }}
-    steps:
-      - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Verify staging favorite restore
-        run: tool/verify_favorite_restore_contract.sh
 
   external_device_gate:
     name: External device evidence
@@ -199,7 +174,6 @@ jobs:
           flutter build ipa \
             --release \
             --build-number="$build_number" \
-            --dart-define=FAVORITE_RESTORE_ENABLED=true \
             --export-options-plist=ios/ExportOptions.plist
 
       - name: Resolve IPA path
@@ -291,8 +265,7 @@ jobs:
           fi
           flutter build appbundle \
             --release \
-            --build-number="$version_code" \
-            --dart-define=FAVORITE_RESTORE_ENABLED=true
+            --build-number="$version_code"
           test -f build/app/outputs/bundle/release/app-release.aab
 
       - name: Preserve signed Android App Bundle
