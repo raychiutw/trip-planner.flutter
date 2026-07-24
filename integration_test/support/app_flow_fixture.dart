@@ -648,14 +648,19 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('day-pill-2')));
   await tester.pumpAndSettle();
-  expect(
-    tester
-        .getSemantics(find.byKey(const ValueKey('day-pill-2')))
-        .getSemanticsData()
-        .flagsCollection
-        .isSelected,
-    Tristate.isTrue,
-  );
+  final semantics = tester.ensureSemantics();
+  try {
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('day-pill-2')))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+  } finally {
+    semantics.dispose();
+  }
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
@@ -714,6 +719,8 @@ Future<void> runAppOwnedReleaseFlow(
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
+  await tester.tap(find.text('從一個指令開始'));
+  await tester.pump();
   await tester.tap(_rootTab('收藏'));
   await tester.pumpAndSettle();
   final favoritesSearch = find.byKey(const ValueKey('favorites-search-input'));
