@@ -709,6 +709,8 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pump();
   expect(find.text('暖暮拉麵'), findsOneWidget);
   expect(find.text('美麗海水族館'), findsNothing);
+  await tester.testTextInput.receiveAction(TextInputAction.search);
+  await tester.pumpAndSettle();
 
   await tester.tap(_rootTab('聊天'));
   await tester.pumpAndSettle();
