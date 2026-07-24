@@ -103,6 +103,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       _activeDayNum = widget.initialDayNum;
     }
     if (oldWidget.tripId != widget.tripId) {
+      _editingTripId = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           unawaited(
@@ -149,21 +150,31 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       AsyncData(:final value) => value,
       _ => const <TripSummary>[],
     };
-    final selectedAsync = ref.watch(currentTripIdProvider);
-    final currentTrip = resolveCurrentTrip(trips, selectedAsync.value);
-    final tripId = currentTrip?.tripId ?? widget.tripId;
-    final isEditing = _editingTripId == tripId;
-    if (!selectedAsync.isLoading &&
-        currentTrip != null &&
-        selectedAsync.value != tripId) {
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    final selectedAsync = isActiveBranch
+        ? ref.watch(currentTripIdProvider)
+        : ref.read(currentTripIdProvider);
+    final sharedTrip = trips
+        .where((trip) => trip.tripId == selectedAsync.value)
+        .firstOrNull;
+    if (isActiveBranch &&
+        !selectedAsync.isLoading &&
+        sharedTrip != null &&
+        sharedTrip.tripId != widget.tripId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(
-            ref.read(currentTripIdProvider.notifier).select(currentTrip.tripId),
-          );
-        }
+        if (!mounted) return;
+        final dayNum = _activeDayNum;
+        GoRouter.maybeOf(context)?.go(
+          '/trips/${Uri.encodeComponent(sharedTrip.tripId)}'
+          '${dayNum == null ? '' : '?day=$dayNum'}',
+        );
       });
     }
+    final tripId = widget.tripId;
+    final currentTrip = trips
+        .where((trip) => trip.tripId == tripId)
+        .firstOrNull;
+    final isEditing = _editingTripId == tripId;
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final trip = tripAsync.value;

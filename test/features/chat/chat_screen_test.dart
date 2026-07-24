@@ -874,6 +874,27 @@ void main() {
           .text,
       '新的深連結指令',
     );
+
+    harnessKey.currentState!.showTrip('kyoto', prefill: '新的深連結指令');
+    await tester.pumpAndSettle();
+    expect(find.text('京都'), findsWidgets);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '新的深連結指令',
+    );
+
+    harnessKey.currentState!.showTrip('okinawa');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+          .controller!
+          .text,
+      '新的深連結指令',
+    );
   });
 
   testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {

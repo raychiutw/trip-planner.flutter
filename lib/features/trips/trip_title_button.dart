@@ -35,6 +35,7 @@ class TripTitleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasTrips = trips.isNotEmpty;
     final canSelect = trips.length > 1;
     return Semantics(
       key: const ValueKey('trip-title-button'),
@@ -43,7 +44,12 @@ class TripTitleButton extends StatelessWidget {
       enabled: canSelect,
       label: '目前行程',
       value: currentTitle,
-      hint: canSelect ? '點兩下切換行程' : '只有一個行程',
+      hint: canSelect
+          ? '點兩下切換行程'
+          : hasTrips
+          ? '只有一個行程'
+          : null,
+      onTap: canSelect ? () => _openPicker(context) : null,
       excludeSemantics: true,
       child: TextButton(
         onPressed: canSelect ? () => _openPicker(context) : null,
@@ -175,6 +181,7 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
                     ].join(' · ');
                     return ListTile(
                       key: ValueKey('trip-picker-item-${trip.tripId}'),
+                      selected: selected,
                       minTileHeight: 56,
                       leading: Icon(
                         CupertinoIcons.map,

@@ -38,43 +38,53 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   int? _activeDayNum;
+  String? _pendingRouteTripId;
+  String? _renderedTripId;
 
   @override
   void initState() {
     super.initState();
     _activeDayNum = widget.initialDayNum;
     final tripId = widget.initialTripId;
-    if (tripId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
-        }
-      });
-    }
+    _pendingRouteTripId = tripId;
+    if (tripId != null) _selectRouteTripAfterBuild(tripId);
   }
 
   @override
   void didUpdateWidget(covariant GlobalMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     final explicitTripId = widget.initialTripId;
-    if (explicitTripId != null && explicitTripId != oldWidget.initialTripId) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(
-            ref.read(currentTripIdProvider.notifier).select(explicitTripId),
-          );
-        }
-      });
+    if (explicitTripId != oldWidget.initialTripId) {
+      _pendingRouteTripId = explicitTripId;
+      if (explicitTripId != null) {
+        _selectRouteTripAfterBuild(explicitTripId);
+      }
     }
     if (widget.initialDayNum != oldWidget.initialDayNum) {
       _activeDayNum = widget.initialDayNum;
     }
   }
 
+  void _selectRouteTripAfterBuild(String tripId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingRouteTripId != tripId) return;
+      unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
+      setState(() => _pendingRouteTripId = null);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
-    final selectedAsync = ref.watch(currentTripIdProvider);
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    final selectedAsync = isActiveBranch
+        ? ref.watch(currentTripIdProvider)
+        : ref.read(currentTripIdProvider);
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        !selectedAsync.isLoading) {
+      _renderedTripId = selectedAsync.value;
+    }
     return tripsAsync.when(
       loading: () => _rootState(
         context,
@@ -104,17 +114,34 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
             title: '尚無行程',
           );
         }
-        final selected = resolveCurrentTrip(trips, selectedAsync.value)!;
-        if (!selectedAsync.isLoading &&
-            selectedAsync.value != selected.tripId) {
+        if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
+            (_pendingRouteTripId != null &&
+                !trips.any((trip) => trip.tripId == _pendingRouteTripId))) {
+          return _rootState(
+            context,
+            const Center(child: CircularProgressIndicator.adaptive()),
+          );
+        }
+        final selected = resolveCurrentTrip(
+          trips,
+          _pendingRouteTripId ??
+              (isActiveBranch ? selectedAsync.value : _renderedTripId),
+        )!;
+        final sharedTrip = trips
+            .where((trip) => trip.tripId == selectedAsync.value)
+            .firstOrNull;
+        if (isActiveBranch &&
+            _pendingRouteTripId == null &&
+            widget.initialTripId != null &&
+            sharedTrip != null &&
+            widget.initialTripId != sharedTrip.tripId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              unawaited(
-                ref
-                    .read(currentTripIdProvider.notifier)
-                    .select(selected.tripId),
-              );
-            }
+            if (!mounted) return;
+            final day = _activeDayNum;
+            GoRouter.maybeOf(context)?.go(
+              '/map?tripId=${Uri.encodeQueryComponent(sharedTrip.tripId)}'
+              '${day == null ? '' : '&day=$day'}',
+            );
           });
         }
         return TripMapScreen(

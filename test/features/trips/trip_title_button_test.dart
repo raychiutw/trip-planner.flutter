@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +8,7 @@ import 'package:tripline/models/trip.dart';
 
 void main() {
   testWidgets('trip picker is a selection sheet', (tester) async {
+    final semantics = tester.ensureSemantics();
     String? selected;
     await tester.pumpWidget(
       MaterialApp(
@@ -23,15 +26,35 @@ void main() {
       ),
     );
 
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('trip-title-button'))),
+      matchesSemantics(
+        label: '目前行程',
+        value: '東京五日行',
+        hint: '點兩下切換行程',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
     await tester.tap(find.text('東京五日行'));
     await tester.pumpAndSettle();
     expect(find.text('取消'), findsOneWidget);
     expect(find.text('完成'), findsNothing);
     expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('trip-picker-item-trip-1')))
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
 
     await tester.tap(find.text('沖繩五日行'));
     await tester.pumpAndSettle();
     expect(selected, 'trip-2');
+    semantics.dispose();
   });
 
   testWidgets('只有一個行程時停用 selector 並提供完整語意', (tester) async {

@@ -53,6 +53,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _pendingPrefill;
+  String? _pendingRouteTripId;
+  String? _renderedTripId;
   final _drafts = <String, String>{};
 
   @override
@@ -60,33 +62,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _pendingPrefill = widget.initialPrefill;
     final tripId = widget.initialTripId;
-    if (tripId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
-        }
-      });
-    }
+    _pendingRouteTripId = tripId;
+    if (tripId != null) _selectRouteTripAfterBuild(tripId);
   }
 
   @override
   void didUpdateWidget(covariant ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialTripId != null &&
-        widget.initialTripId != oldWidget.initialTripId) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(
-            ref
-                .read(currentTripIdProvider.notifier)
-                .select(widget.initialTripId!),
-          );
-        }
-      });
+    if (widget.initialTripId != oldWidget.initialTripId) {
+      _pendingRouteTripId = widget.initialTripId;
+      if (widget.initialTripId != null) {
+        _selectRouteTripAfterBuild(widget.initialTripId!);
+      }
     }
-    if (widget.initialPrefill != oldWidget.initialPrefill) {
+    if (widget.initialPrefill != oldWidget.initialPrefill ||
+        (widget.initialTripId != oldWidget.initialTripId &&
+            widget.initialPrefill != null)) {
       _pendingPrefill = widget.initialPrefill;
     }
+  }
+
+  void _selectRouteTripAfterBuild(String tripId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _pendingRouteTripId != tripId) return;
+      unawaited(ref.read(currentTripIdProvider.notifier).select(tripId));
+      setState(() => _pendingRouteTripId = null);
+    });
   }
 
   void _consumePrefill() {
@@ -103,16 +104,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final tripsAsync = ref.watch(myTripsProvider);
     final trips = tripsAsync.value ?? const <TripSummary>[];
-    final selectedAsync = ref.watch(currentTripIdProvider);
-    final currentTrip = resolveCurrentTrip(trips, selectedAsync.value);
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    final selectedAsync = isActiveBranch
+        ? ref.watch(currentTripIdProvider)
+        : ref.read(currentTripIdProvider);
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        !selectedAsync.isLoading) {
+      _renderedTripId = selectedAsync.value;
+    }
+    final selectedTripId =
+        _pendingRouteTripId ??
+        (isActiveBranch ? selectedAsync.value : _renderedTripId);
+    final currentTrip = resolveCurrentTrip(trips, selectedTripId);
     final tripId = currentTrip?.tripId;
-    if (!selectedAsync.isLoading &&
-        currentTrip != null &&
-        selectedAsync.value != tripId) {
+    final selectedTrip = trips
+        .where((trip) => trip.tripId == selectedAsync.value)
+        .firstOrNull;
+    if (isActiveBranch &&
+        _pendingRouteTripId == null &&
+        widget.initialTripId != null &&
+        selectedTrip != null &&
+        widget.initialTripId != selectedTrip.tripId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          unawaited(
-            ref.read(currentTripIdProvider.notifier).select(currentTrip.tripId),
+          GoRouter.maybeOf(context)?.go(
+            '/chat?tripId=${Uri.encodeQueryComponent(selectedTrip.tripId)}',
           );
         }
       });
@@ -121,7 +138,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return TpRootScaffold(
       header: TpRootHeaderConfig(
         title: currentTrip == null
-            ? Text(tripsAsync.isLoading ? '行程' : '尚無行程')
+            ? Text(tripsAsync.isLoading || tripsAsync.hasError ? '行程' : '尚無行程')
             : TripTitleButton(
                 key: const ValueKey('chat-trip-dropdown'),
                 currentTripId: currentTrip.tripId,
@@ -153,10 +170,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             );
           }
+          if ((selectedAsync.isLoading && _pendingRouteTripId == null) ||
+              (_pendingRouteTripId != null && tripId != _pendingRouteTripId)) {
+            return initiallyBelowHeader(
+              const Center(child: CircularProgressIndicator.adaptive()),
+            );
+          }
+          final pendingPrefill =
+              _pendingPrefill != null &&
+                  (widget.initialTripId == null ||
+                      widget.initialTripId == tripId)
+              ? _pendingPrefill
+              : null;
           return _ChatBody(
             key: ValueKey(tripId),
             tripId: tripId!,
-            initialPrefill: _pendingPrefill ?? _drafts[tripId],
+            initialPrefill: pendingPrefill ?? _drafts[tripId],
             onInitialPrefillConsumed: _consumePrefill,
             onDraftChanged: (draft) => _drafts[tripId] = draft,
           );

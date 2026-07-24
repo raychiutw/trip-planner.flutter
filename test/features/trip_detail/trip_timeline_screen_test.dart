@@ -526,6 +526,14 @@ void main() {
           .value,
       2,
     );
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-edit-mode')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('tp-root-header-primary-action')),
+      findsOneWidget,
+    );
 
     activeTripId.value = otherTripId;
     await tester.pumpAndSettle();
@@ -538,6 +546,11 @@ void main() {
           .value,
       1,
     );
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
+
+    activeTripId.value = _tripId;
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('trip-actions-menu')), findsOneWidget);
   });
 
   testWidgets('排序請求中切換 Trip，交通重算仍只作用於原行程', (tester) async {
