@@ -55,6 +55,8 @@ void main() {
       contains('UIAccessibility.reduceTransparencyStatusDidChangeNotification'),
     );
     expect(appDelegate, contains('NotificationCenter.default.addObserver'));
+    expect(appDelegate, contains('guard\n      let registrar ='));
+    expect(appDelegate, contains('else { return }'));
     expect(appDelegate, contains('ReduceTransparencyPlugin.register'));
   });
 
