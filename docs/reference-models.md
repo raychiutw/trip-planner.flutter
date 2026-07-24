@@ -147,10 +147,6 @@ enum NoteGenerationType { tips, lodgingTips, emergency }
 | `emailVerified` | `bool` | 0/1 bool,預設 `false` |
 | `displayName`、`avatarUrl`、`createdAt` | `String?` | |
 
-### AccountStats — `GET /account/stats` 回應(帳號頁 hero 3 統計)
-
-`tripCount: int`、`totalDays: int`、`collaboratorCount: int` — 全部缺漏預設 `0`。
-
 ### AccountNotificationPreferences — `GET/PATCH /account/notifications`
 
 | 欄位 | 型別 | 備註 |

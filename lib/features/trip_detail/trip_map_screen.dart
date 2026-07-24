@@ -817,9 +817,10 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   TripMapMarker _buildMarker(_MapStop pin, {required int number}) {
-    // 白底圓形 chip + 日別色外圈／數字；聚焦點改 accent 填底並放大（對齊 web）。
+    // 白底圓形 chip + 日別色外圈／數字；聚焦點改 adaptive app tint 填底並放大。
     final style = tripMapMarkerStyle(
       dayColor: pin.color,
+      focusColor: Theme.of(context).colorScheme.primary,
       isFocused: pin.entry.id == _activeEntryId,
     );
     return TripMapMarker(

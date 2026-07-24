@@ -26,9 +26,6 @@ const List<Color> kDayPinPalette = [
   Color(0xFF10B981), // emerald-500 day 10
 ];
 
-/// 品牌 accent（design.md soft brown）：聚焦 marker 的填色。
-const Color kTripMapFocusColor = Color(0xFFA97A4A);
-
 /// 取第 N 天（1-based）的色；超過 10 天輪回 day 1，無效值回 day 1。
 ///
 /// 以 `dayNum` 而非陣列 index 取色 —— 對齊 web `dayColor(dayNum)`，天數有
@@ -85,17 +82,18 @@ class TripMapMarkerStyle {
       Object.hash(fill, stroke, text, diameter, borderWidth, fontSize, zIndex);
 }
 
-/// 白底圓形 chip + 日別色外圈與數字；聚焦點改用品牌 accent 填底 + 白字並放大。
+/// 白底圓形 chip + 日別色外圈與數字；聚焦點改用 adaptive app tint 填底 + 白字並放大。
 ///
 /// 日別色只做外圈／數字，不做填色 —— 這是 web 的視覺語言，也讓地圖上不會出現
 /// 一整片彩虹色塊。
 TripMapMarkerStyle tripMapMarkerStyle({
   required Color dayColor,
+  required Color focusColor,
   required bool isFocused,
 }) {
   if (isFocused) {
-    return const TripMapMarkerStyle(
-      fill: kTripMapFocusColor,
+    return TripMapMarkerStyle(
+      fill: focusColor,
       stroke: Colors.white,
       text: Colors.white,
       diameter: 36,

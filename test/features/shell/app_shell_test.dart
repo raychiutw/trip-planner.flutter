@@ -605,9 +605,9 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         glass.indicatorColor,
-        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsDark.tint.withValues(alpha: 0.68),
       );
-      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
+      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
     });
 
     testWidgets('root branches keep content visible through Liquid Glass', (
@@ -655,7 +655,10 @@ void main() {
         map.indicatorSettings?.refractiveIndex,
         map.settings?.refractiveIndex,
       );
-      expect(TpColorsLight.rootTabSelection, TpColorsLight.dayThumb);
+      expect(
+        map.indicatorColor,
+        TpSystemColorsLight.tint.withValues(alpha: 0.68),
+      );
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
@@ -915,7 +918,7 @@ void main() {
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         glass.indicatorColor,
-        TpColorsLight.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsLight.tint.withValues(alpha: 0.68),
       );
       expect(glass.settings?.chromaticAberration, 0);
       expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
@@ -938,9 +941,9 @@ void main() {
       );
       expect(
         glass.indicatorColor,
-        TpColorsDark.rootTabSelection.withValues(alpha: 0.68),
+        TpSystemColorsDark.tint.withValues(alpha: 0.68),
       );
-      expect(glass.selectedIconColor, TpColorsDark.accentDeep);
+      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
       expect(glass.settings?.chromaticAberration, 0);
     });
 

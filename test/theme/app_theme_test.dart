@@ -4,117 +4,65 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 
 void main() {
-  group('AppTheme.light', () {
-    test('可建構且使用 Material 3', () {
-      final lightTheme = AppTheme.light();
-      expect(lightTheme.useMaterial3, isTrue);
+  group('HIG 系統主題', () {
+    test('淺色使用 system surfaces、labels 與單一 tint', () {
+      final theme = AppTheme.light();
+
+      expect(theme.useMaterial3, isTrue);
+      expect(theme.colorScheme.primary, TpSystemColorsLight.tint);
+      expect(theme.colorScheme.surface, TpSystemColorsLight.background);
+      expect(
+        theme.colorScheme.surfaceContainerLow,
+        TpSystemColorsLight.secondary,
+      );
+      expect(
+        theme.colorScheme.surfaceContainerHigh,
+        TpSystemColorsLight.tertiary,
+      );
+      expect(theme.colorScheme.onSurface, TpSystemColorsLight.label);
+      expect(
+        theme.colorScheme.onSurfaceVariant,
+        TpSystemColorsLight.secondaryLabel,
+      );
+      expect(theme.colorScheme.error, TpSystemColorsLight.destructive);
+      expect(theme.scaffoldBackgroundColor, TpSystemColorsLight.background);
+      expect(theme.extensions, isEmpty);
     });
 
-    test('尚未遷移畫面保留既有暖褐 palette', () {
-      final lightTheme = AppTheme.light();
-      expect(lightTheme.colorScheme.primary, const Color(0xFFA97A4A));
-      expect(lightTheme.colorScheme.surface, const Color(0xFFFFFBF5));
-      expect(lightTheme.scaffoldBackgroundColor, const Color(0xFFFFFBF5));
+    test('深色使用 system surfaces、labels 與單一 tint', () {
+      final theme = AppTheme.dark();
+
+      expect(theme.useMaterial3, isTrue);
+      expect(theme.colorScheme.brightness, Brightness.dark);
+      expect(theme.colorScheme.primary, TpSystemColorsDark.tint);
+      expect(theme.colorScheme.surface, TpSystemColorsDark.background);
+      expect(
+        theme.colorScheme.surfaceContainerLow,
+        TpSystemColorsDark.secondary,
+      );
+      expect(
+        theme.colorScheme.surfaceContainerHigh,
+        TpSystemColorsDark.tertiary,
+      );
+      expect(theme.colorScheme.onSurface, TpSystemColorsDark.label);
+      expect(
+        theme.colorScheme.onSurfaceVariant,
+        TpSystemColorsDark.secondaryLabel,
+      );
+      expect(theme.colorScheme.error, TpSystemColorsDark.destructive);
+      expect(theme.scaffoldBackgroundColor, TpSystemColorsDark.background);
+      expect(theme.extensions, isEmpty);
     });
 
-    test('CardTheme elevation 為 0（hairline 原則）', () {
-      final lightTheme = AppTheme.light();
-      expect(lightTheme.cardTheme.elevation, 0);
-    });
-
-    test('TpTones extension 可從 ThemeData 取得且色值正確', () {
-      final lightTheme = AppTheme.light();
-      final tones = lightTheme.extension<TpTones>();
-      expect(tones, isNotNull);
-      expect(tones!.accent, TpColorsLight.accent);
-      expect(tones.sageDeep, TpColorsLight.sageDeep);
-      expect(tones.pinkBg, TpColorsLight.pinkBg);
-      expect(tones.success, TpColorsLight.success);
-      expect(tones.warning, TpColorsLight.warning);
-      expect(tones.sageSubtle, TpColorsLight.tertiary);
-      expect(tones.pinkSubtle, TpColorsLight.tertiary);
-    });
-  });
-
-  group('AppTheme.dark', () {
-    test('可建構且使用 Material 3', () {
-      final darkTheme = AppTheme.dark();
-      expect(darkTheme.useMaterial3, isTrue);
-      expect(darkTheme.colorScheme.brightness, Brightness.dark);
-    });
-
-    test('尚未遷移畫面保留既有深色 palette', () {
-      final darkTheme = AppTheme.dark();
-      expect(darkTheme.colorScheme.primary, const Color(0xFFCBA06E));
-      expect(darkTheme.scaffoldBackgroundColor, const Color(0xFF1C1C1E));
-      expect(darkTheme.colorScheme.surface, const Color(0xFF1C1C1E));
-    });
-
-    test('CardTheme elevation 為 0', () {
-      final darkTheme = AppTheme.dark();
-      expect(darkTheme.cardTheme.elevation, 0);
-    });
-
-    test('TpTones extension 可從 ThemeData 取得且為 dark 色值', () {
-      final darkTheme = AppTheme.dark();
-      final tones = darkTheme.extension<TpTones>();
-      expect(tones, isNotNull);
-      expect(tones!.accent, TpColorsDark.accent);
-      expect(tones.sage, TpColorsDark.sage);
-      expect(tones.pinkSubtle, TpColorsDark.pinkSubtle);
-      expect(tones.sageSubtle, TpColorsDark.tertiary);
-      expect(tones.pinkSubtle, TpColorsDark.tertiary);
-    });
-
-    test('既有 chip 配色未被 reference flow 遷移影響', () {
-      final darkTheme = AppTheme.dark();
-      expect(darkTheme.chipTheme.backgroundColor, TpColorsDark.accentSubtle);
-      expect(darkTheme.chipTheme.selectedColor, TpColorsDark.accent);
-    });
-  });
-
-  group('HIG system foundation', () {
-    test('Light 使用 system surfaces、labels 與 semantic colors', () {
-      final theme = AppTheme.higLight();
-      final tones = theme.extension<TpTones>()!;
-
-      expect(theme.colorScheme.primary, const Color(0xFF8A6038));
-      expect(theme.colorScheme.surface, const Color(0xFFFFFFFF));
-      expect(theme.colorScheme.surfaceContainerLow, const Color(0xFFF2F2F7));
-      expect(theme.colorScheme.surfaceContainerHigh, const Color(0xFFE5E5EA));
-      expect(theme.colorScheme.onSurface, const Color(0xFF000000));
-      expect(theme.colorScheme.onSurfaceVariant, const Color(0x993C3C43));
-      expect(theme.colorScheme.error, const Color(0xFFFF3B30));
-      expect(tones.success, const Color(0xFF34C759));
-      expect(tones.warning, const Color(0xFFFF9500));
-    });
-
-    test('Dark 使用 system surfaces、labels 與 semantic colors', () {
-      final theme = AppTheme.higDark();
-      final tones = theme.extension<TpTones>()!;
-
-      expect(theme.colorScheme.primary, const Color(0xFFD0A576));
-      expect(theme.colorScheme.surface, const Color(0xFF000000));
-      expect(theme.colorScheme.surfaceContainerLow, const Color(0xFF1C1C1E));
-      expect(theme.colorScheme.surfaceContainerHigh, const Color(0xFF2C2C2E));
-      expect(theme.colorScheme.onSurface, const Color(0xFFFFFFFF));
-      expect(theme.colorScheme.onSurfaceVariant, const Color(0x99EBEBF5));
-      expect(theme.colorScheme.error, const Color(0xFFFF453A));
-      expect(tones.success, const Color(0xFF30D158));
-      expect(tones.warning, const Color(0xFFFF9F0A));
-    });
-
-    test('未選取 chip 使用中性 surface，暖褐只留給 active 狀態', () {
-      final theme = AppTheme.higDark();
+    test('未選取 chip 使用中性 surface，選取才使用 tint', () {
+      final theme = AppTheme.dark();
       expect(theme.chipTheme.backgroundColor, TpSystemColorsDark.tertiary);
-      expect(theme.chipTheme.selectedColor, TpSystemColorsDark.tintSubtle);
+      expect(theme.chipTheme.selectedColor, TpSystemColorsDark.tintBackground);
     });
-  });
 
-  group('HIG Increased Contrast', () {
-    test('light 提升 secondary label、separator 與 disabled 對比', () {
-      final normal = AppTheme.higLight();
-      final highContrast = AppTheme.higLight(highContrast: true);
+    test('淺色提高對比時提升 secondary label、separator 與 disabled', () {
+      final normal = AppTheme.light();
+      final highContrast = AppTheme.light(highContrast: true);
 
       expect(
         highContrast.colorScheme.onSurfaceVariant,
@@ -128,9 +76,9 @@ void main() {
       );
     });
 
-    test('dark 提升 secondary label、separator 與 disabled 對比', () {
-      final normal = AppTheme.higDark();
-      final highContrast = AppTheme.higDark(highContrast: true);
+    test('深色提高對比時提升 secondary label、separator 與 disabled', () {
+      final normal = AppTheme.dark();
+      final highContrast = AppTheme.dark(highContrast: true);
 
       expect(
         highContrast.colorScheme.onSurfaceVariant,
@@ -145,122 +93,92 @@ void main() {
     });
   });
 
-  group('TpTones', () {
-    test('copyWith 可覆寫單一欄位', () {
-      final lightTones = AppTheme.light().extension<TpTones>()!;
-      final overridden = lightTones.copyWith(accent: const Color(0xFF000000));
-      expect(overridden.accent, const Color(0xFF000000));
-      expect(overridden.sage, lightTones.sage);
-    });
-
-    test('lerp t=0 / t=1 回到端點', () {
-      final lightTones = AppTheme.light().extension<TpTones>()!;
-      final darkTones = AppTheme.dark().extension<TpTones>()!;
-      expect(lightTones.lerp(darkTones, 0).accent, lightTones.accent);
-      expect(lightTones.lerp(darkTones, 1).accent, darkTones.accent);
-    });
-  });
-
   group('元件 theme 規格', () {
-    test('AppBar：標題維持中性，互動控制使用低比例 accent', () {
+    test('Card 與 AppBar 使用 hairline，互動控制使用 tint', () {
       for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        expect(theme.cardTheme.elevation, 0);
         expect(theme.appBarTheme.foregroundColor, theme.colorScheme.primary);
         expect(
           theme.appBarTheme.titleTextStyle?.color,
           theme.colorScheme.onSurface,
         );
+        expect(
+          theme.navigationBarTheme.indicatorColor,
+          theme.colorScheme.primaryContainer,
+        );
       }
     });
 
-    test('NavigationBar：active=accent、indicator=accentSubtle、label 11', () {
-      final lightTheme = AppTheme.light();
-      final navigationBarTheme = lightTheme.navigationBarTheme;
-      expect(navigationBarTheme.indicatorColor, TpColorsLight.accentSubtle);
-      final selectedLabelStyle = navigationBarTheme.labelTextStyle!.resolve({
+    test('NavigationBar selected label 與 icon 使用 tint，label 為 11', () {
+      final theme = AppTheme.light();
+      final selectedLabelStyle = theme.navigationBarTheme.labelTextStyle!
+          .resolve({WidgetState.selected});
+      final selectedIconTheme = theme.navigationBarTheme.iconTheme!.resolve({
         WidgetState.selected,
       });
+
       expect(selectedLabelStyle!.fontSize, 11);
-      expect(selectedLabelStyle.color, TpColorsLight.accent);
-      final selectedIconTheme = navigationBarTheme.iconTheme!.resolve({
-        WidgetState.selected,
-      });
-      expect(selectedIconTheme!.color, TpColorsLight.accent);
+      expect(selectedLabelStyle.color, theme.colorScheme.primary);
+      expect(selectedIconTheme!.color, theme.colorScheme.primary);
     });
 
-    test('FilledButton：minHeight 44、radius 8', () {
-      final lightTheme = AppTheme.light();
-      final filledButtonStyle = lightTheme.filledButtonTheme.style!;
-      expect(filledButtonStyle.minimumSize!.resolve({})!.height, 44);
-      expect(filledButtonStyle.textStyle!.resolve({})!.fontSize, 15);
-      final buttonShape =
-          filledButtonStyle.shape!.resolve({}) as RoundedRectangleBorder;
-      expect(buttonShape.borderRadius, BorderRadius.circular(TpRadius.md));
-    });
+    test('所有按鈕至少 44pt，主要按鈕 radius 8', () {
+      final theme = AppTheme.light();
+      final filledStyle = theme.filledButtonTheme.style!;
 
-    test('Text、Outlined 與 icon-only controls 都至少 44×44', () {
-      final lightTheme = AppTheme.light();
-
+      expect(filledStyle.minimumSize!.resolve({})!.height, TpSpacing.tapMin);
+      expect(filledStyle.textStyle!.resolve({})!.fontSize, 15);
+      final shape = filledStyle.shape!.resolve({}) as RoundedRectangleBorder;
+      expect(shape.borderRadius, BorderRadius.circular(TpRadius.md));
       expect(
-        lightTheme.textButtonTheme.style!.minimumSize!.resolve({})!.height,
+        theme.textButtonTheme.style!.minimumSize!.resolve({})!.height,
         TpSpacing.tapMin,
       );
       expect(
-        lightTheme.outlinedButtonTheme.style!.minimumSize!.resolve({})!.height,
+        theme.outlinedButtonTheme.style!.minimumSize!.resolve({})!.height,
         TpSpacing.tapMin,
       );
       expect(
-        lightTheme.iconButtonTheme.style!.minimumSize!.resolve({}),
+        theme.iconButtonTheme.style!.minimumSize!.resolve({}),
         const Size.square(TpSpacing.tapMin),
       );
     });
 
-    test('Chip 為 StadiumBorder', () {
-      final lightTheme = AppTheme.light();
-      expect(lightTheme.chipTheme.shape, isA<StadiumBorder>());
-      expect(lightTheme.chipTheme.labelStyle?.fontSize, 11);
-    });
-
-    test('Input：filled、radius 12', () {
-      final lightTheme = AppTheme.light();
-      final inputTheme = lightTheme.inputDecorationTheme;
-      expect(inputTheme.filled, isTrue);
-      final enabledBorder = inputTheme.enabledBorder as OutlineInputBorder;
+    test('Chip 為 StadiumBorder，輸入框 filled 且 radius 12', () {
+      final theme = AppTheme.light();
+      expect(theme.chipTheme.shape, isA<StadiumBorder>());
+      expect(theme.chipTheme.labelStyle?.fontSize, 11);
+      expect(theme.inputDecorationTheme.filled, isTrue);
+      final enabledBorder =
+          theme.inputDecorationTheme.enabledBorder as OutlineInputBorder;
       expect(enabledBorder.borderRadius, BorderRadius.circular(TpRadius.lg));
     });
 
-    test('AppBar：高 56、無 elevation', () {
-      final lightTheme = AppTheme.light();
-      expect(lightTheme.appBarTheme.toolbarHeight, 56);
-      expect(lightTheme.appBarTheme.elevation, 0);
+    test('AppBar 高 56 且無 elevation', () {
+      final theme = AppTheme.light();
+      expect(theme.appBarTheme.toolbarHeight, 56);
+      expect(theme.appBarTheme.elevation, 0);
     });
 
-    test('TextTheme：HIG type scale 完整映射且中文 letterSpacing 0', () {
-      final lightTheme = AppTheme.light();
-      final bodyStyle = lightTheme.textTheme.bodyLarge!;
-      expect(lightTheme.textTheme.displaySmall?.fontSize, 28);
-      expect(lightTheme.textTheme.headlineMedium?.fontSize, 22);
-      expect(lightTheme.textTheme.headlineSmall?.fontSize, 20);
-      expect(lightTheme.textTheme.titleLarge?.fontSize, 17);
-      expect(lightTheme.textTheme.titleMedium?.fontSize, 15);
-      expect(lightTheme.textTheme.titleSmall?.fontSize, 13);
-      expect(bodyStyle.fontSize, 15);
-      expect(lightTheme.textTheme.bodyMedium?.fontSize, 13);
-      expect(lightTheme.textTheme.bodySmall?.fontSize, 12);
-      expect(lightTheme.textTheme.labelLarge?.fontSize, 15);
-      expect(lightTheme.textTheme.labelMedium?.fontSize, 12);
-      expect(lightTheme.textTheme.labelSmall?.fontSize, 11);
-      expect(bodyStyle.letterSpacing, 0);
-      // 改用系統字:iOS→SF Pro、Android→Roboto,CJK 由系統 fallback;不再打包 Inter。
-      expect(bodyStyle.fontFamily, isNot(contains('Inter')));
+    test('HIG type scale 完整映射且中文 letterSpacing 為 0', () {
+      final textTheme = AppTheme.light().textTheme;
+      expect(textTheme.displaySmall?.fontSize, 28);
+      expect(textTheme.headlineMedium?.fontSize, 22);
+      expect(textTheme.headlineSmall?.fontSize, 20);
+      expect(textTheme.titleLarge?.fontSize, 17);
+      expect(textTheme.titleMedium?.fontSize, 15);
+      expect(textTheme.titleSmall?.fontSize, 13);
+      expect(textTheme.bodyLarge?.fontSize, 15);
+      expect(textTheme.bodyMedium?.fontSize, 13);
+      expect(textTheme.bodySmall?.fontSize, 12);
+      expect(textTheme.labelLarge?.fontSize, 15);
+      expect(textTheme.labelMedium?.fontSize, 12);
+      expect(textTheme.labelSmall?.fontSize, 11);
+      expect(textTheme.bodyLarge?.letterSpacing, 0);
+      expect(textTheme.bodyLarge?.fontFamily, isNot(contains('Inter')));
     });
 
-    // design.md：中文 letterSpacing 一律 0。未在 _textTheme() 定義的角色會 fallback
-    // 到 Material 預設(帶非零字距與 Material 字級),等於畫面偷偷跑掉設計系統。
-    //
-    // 必須用 widget test：字級幾何(englishLike2021)是 MaterialApp 依語系套上去的,
-    // 不是烘在 ThemeData.textTheme 裡 —— 在 widget tree 外量到的是 null,量不到
-    // 畫面實際拿到的值。
-    testWidgets('TextTheme：app 用到的字階全部有定義且 letterSpacing 為 0', (tester) async {
+    testWidgets('app 用到的字階全部有定義且 letterSpacing 為 0', (tester) async {
       late TextTheme textTheme;
       await tester.pumpWidget(
         MaterialApp(
@@ -295,7 +213,7 @@ void main() {
   });
 
   group('tokens', () {
-    test('radius / spacing / motion 常數', () {
+    test('radius、spacing 與 motion 常數', () {
       expect(TpRadius.md, 8.0);
       expect(TpRadius.lg, 12.0);
       expect(TpSpacing.s4, 16.0);

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,11 +104,11 @@ void main() {
     await tester.tap(find.byKey(const Key('connected-app-revoke-tp_alpha')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.text('撤銷 Alpha App？'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
     await tester.pumpAndSettle();
 
     verify(() => mockTripRepository.revokeConnectedApp('tp_alpha')).called(1);
@@ -120,7 +121,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('connected-app-revoke-tp_alpha')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
@@ -149,7 +150,7 @@ void main() {
 
     await tester.tap(revokeFinder);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
     await tester.pump();
 
     expect(tester.widget<TextButton>(revokeFinder).onPressed, isNull);

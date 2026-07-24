@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -184,7 +185,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '允許通知'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '允許通知'));
     await tester.pumpAndSettle();
 
     expect(permissionService.requestCalls, 1);
@@ -204,7 +205,7 @@ void main() {
     final switchFinder = find.byKey(const ValueKey('notif-switch-invitations'));
     await tester.tap(switchFinder);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '允許通知'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '允許通知'));
     await tester.pumpAndSettle();
 
     expect(permissionService.requestCalls, 1);

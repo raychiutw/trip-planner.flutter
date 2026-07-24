@@ -97,7 +97,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                       if (nextDate == null) return;
                       final ok = await ctrl.shiftStartDate(nextDate);
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '出發日期已變更');
+                        showAppNotice(context, '出發日期已變更');
                       }
                     },
                   ),
@@ -109,19 +109,19 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onAddStart: () async {
                       final ok = await ctrl.addDay('start');
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已在最前加入一天');
+                        showAppNotice(context, '已在最前加入一天');
                       }
                     },
                     onAddEnd: () async {
                       final ok = await ctrl.addDay('end');
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已在最後加入一天');
+                        showAppNotice(context, '已在最後加入一天');
                       }
                     },
                     onCreateMissingDay: (date) async {
                       final ok = await ctrl.addMissingDay(date);
                       if (context.mounted && ok) {
-                        _showSnackBar(context, '已新增 $date');
+                        showAppNotice(context, '已新增 $date');
                       }
                     },
                     onDelete: (day) => _deleteDay(ctrl, day),
@@ -224,7 +224,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     final label = 'DAY ${day.dayNum}・${day.displayTitle}';
     switch (result.resolution) {
       case DayDeletionResolution.committed:
-        _showSnackBar(
+        showAppNotice(
           context,
           _dayDeletedMessage(day, result.removedEntryCount),
         );
@@ -289,7 +289,7 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
 
     final latestDay = controller.dayById(targetId);
     if (latestDay == null) {
-      _showSnackBar(context, '此行程日已不存在');
+      showAppNotice(context, '此行程日已不存在');
       return;
     }
     await _deleteDay(controller, latestDay);
@@ -614,11 +614,4 @@ String _formatIsoDate(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '$year-$month-$day';
-}
-
-void _showSnackBar(BuildContext context, String message) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..removeCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
 }

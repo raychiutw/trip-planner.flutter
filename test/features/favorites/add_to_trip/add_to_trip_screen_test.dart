@@ -292,13 +292,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
     await tester.pumpAndSettle();
 
-    // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
-    expect(
-      find.byWidgetPredicate(
-        (w) => w is AlertDialog || w is CupertinoAlertDialog,
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
   });
 

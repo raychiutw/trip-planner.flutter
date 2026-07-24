@@ -621,67 +621,57 @@ class _DeveloperAppFormScreenState
   }
 
   Future<void> _showCreatedDialog(CreatedDeveloperApp app) async {
-    await showAdaptiveDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog.adaptive(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-        ),
-        title: const Text('應用建立成功'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              app.clientSecret == null
-                  ? 'Client ID 已產生'
-                  : '請立即複製 client_secret',
-            ),
+    await showAppContentSheet<void>(
+      context,
+      title: '應用建立成功',
+      builder: (sheetContext) => ListView(
+        padding: const EdgeInsets.all(TpSpacing.s4),
+        children: [
+          Text(
+            app.clientSecret == null ? 'Client ID 已產生' : '請立即複製 client_secret',
+          ),
+          const SizedBox(height: TpSpacing.s3),
+          const Text('Client ID'),
+          const SizedBox(height: TpSpacing.s1),
+          _SecretValueRow(
+            value: app.clientId,
+            copyKey: const Key('developer-app-copy-client-id'),
+            onCopy: () => unawaited(_copyToClipboard(app.clientId)),
+          ),
+          if (app.clientSecret != null) ...[
             const SizedBox(height: TpSpacing.s3),
-            const Text('Client ID'),
+            const Text('Client Secret'),
             const SizedBox(height: TpSpacing.s1),
             _SecretValueRow(
-              value: app.clientId,
-              copyKey: const Key('developer-app-copy-client-id'),
-              onCopy: () => unawaited(_copyToClipboard(app.clientId)),
+              value: app.clientSecret!,
+              copyKey: const Key('developer-app-copy-client-secret'),
+              onCopy: () => unawaited(_copyToClipboard(app.clientSecret!)),
             ),
-            if (app.clientSecret != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              const Text('Client Secret'),
-              const SizedBox(height: TpSpacing.s1),
-              _SecretValueRow(
-                value: app.clientSecret!,
-                copyKey: const Key('developer-app-copy-client-secret'),
-                onCopy: () => unawaited(_copyToClipboard(app.clientSecret!)),
+            const SizedBox(height: TpSpacing.s2),
+            Text(
+              '此 secret 不會再顯示，請存到密碼管理器或環境變數。',
+              style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                color: Theme.of(sheetContext).colorScheme.error,
               ),
-              const SizedBox(height: TpSpacing.s2),
-              Text(
-                '此 secret 不會再顯示，請存到密碼管理器或環境變數。',
-                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(dialogContext).colorScheme.error,
-                ),
-              ),
-            ],
-            const SizedBox(height: TpSpacing.s3),
-            Text(app.statusLabel),
+            ),
           ],
-        ),
-        actions: [
+          const SizedBox(height: TpSpacing.s3),
+          Text(app.statusLabel),
+          const SizedBox(height: TpSpacing.s5),
           FilledButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              if (TpLargeSheetNavigationScope.maybeOf(context) != null) {
-                unawaited(Navigator.of(context).maybePop());
-              } else {
-                GoRouter.maybeOf(context)?.go('/settings/developer-apps');
-              }
-            },
             key: const Key('developer-app-secret-acknowledge'),
+            onPressed: () => unawaited(closeAppRouteOrSheet(sheetContext)),
             child: const Text('我已複製，繼續'),
           ),
         ],
       ),
     );
+    if (!mounted) return;
+    if (TpLargeSheetNavigationScope.maybeOf(context) != null) {
+      await Navigator.of(context).maybePop();
+    } else {
+      GoRouter.maybeOf(context)?.go('/settings/developer-apps');
+    }
   }
 
   Future<void> _copyToClipboard(String value) async {

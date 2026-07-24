@@ -113,8 +113,8 @@ void main() {
         find.byKey(const ValueKey('favorite-leading-9')),
       );
       final decoration = leading.decoration! as BoxDecoration;
-      final tones = AppTheme.light().extension<TpTones>()!;
-      expect(decoration.color, tones.accentBg);
+      final colors = AppTheme.light().colorScheme;
+      expect(decoration.color, colors.primaryContainer);
       expect(
         tester
             .widget<Icon>(
@@ -124,7 +124,7 @@ void main() {
               ),
             )
             .color,
-        tones.accentDeep,
+        colors.onPrimaryContainer,
       );
       expect(
         tester
@@ -135,7 +135,7 @@ void main() {
               ),
             )
             .color,
-        tones.accentDeep,
+        colors.onPrimaryContainer,
       );
     });
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -398,7 +399,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 

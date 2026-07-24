@@ -1,7 +1,7 @@
 # 模組契約（跨 agent 實作介面，嚴格遵守）
 
 > **狀態：P0 已實作完成，本檔為歷史契約。** 個別欄位以 `lib/` 程式碼與 [reference-models.md](reference-models.md)／[reference-api.md](reference-api.md) 為準。
-> 已知與實作的偏差：`UserInfo` 多 `createdAt` 欄位、`AccountStats` 實際為 `tripCount`/`totalDays`/`collaboratorCount`、`sortOrder`/`version` 缺漏時預設 `0`。
+> 已知與實作的偏差：`UserInfo` 多 `createdAt` 欄位；`sortOrder`/`version` 缺漏時預設 `0`。舊 `AccountStats`、`TpTones` 與 `TpColorsLight/Dark` 已移除。
 
 > 所有平行實作的 agent 必須照此檔的檔案路徑、class 名、方法簽章實作。
 > 若實作中發現契約有誤（如 API 欄位不符），以 `docs/discovery/*.md` 與 web repo 原始碼為準，並在最終回報中註明偏差。
@@ -17,18 +17,16 @@
 ## lib/theme/
 
 ```dart
-// tokens.dart — design token 常數（值來自 docs/discovery/design.md 的 tokens 表）
-abstract final class TpColorsLight { static const background = Color(0xFFFFFBF5); /* group, tertiary, selected, accent, foreground, muted, separator, semantic status colors …；legacy sage/pink 名稱僅可 alias 到中性 surface */ }
-abstract final class TpColorsDark { /* 同名 dark 值 */ }
+// tokens.dart — 系統語意 token 只供 AppTheme 工廠；Widget 走 colorScheme
+abstract final class TpSystemColorsLight { /* iOS Light 語意色 + 單一 tint */ }
+abstract final class TpSystemColorsDark { /* iOS Dark 語意色 + 單一 tint */ }
 abstract final class TpRadius { static const xs = 4.0; sm = 6.0; md = 8.0; lg = 12.0; xl = 16.0; }
 abstract final class TpSpacing { /* 4px grid: s1=4 … s10=40; tapMin=44.0; navHeight=88.0 */ }
 abstract final class TpMotion { static const fast = Duration(milliseconds: 150); normal = 250ms; slow = 350ms; static const appleEase = Cubic(0.2, 0.8, 0.2, 1); }
 
-// app_theme.dart
-class TpTones extends ThemeExtension<TpTones> { /* accent + neutral surface aliases + semantic success/warning；不得以 sage/pink 區分內容類型 */ }
 abstract final class AppTheme {
-  static ThemeData light();
-  static ThemeData dark();
+  static ThemeData light({bool highContrast = false});
+  static ThemeData dark({bool highContrast = false});
 }
 ```
 
@@ -77,7 +75,6 @@ class TripNotes { final List<TripFlight> flights; final List<TripLodging> lodgin
 
 // user.dart
 class UserInfo { final String id; final String email; final bool emailVerified; final String? displayName; final String? avatarUrl; }
-class AccountStats { /* 欄位以 web repo functions/api/account/stats.ts 實際輸出（camelCase 化）為準，實作前先讀該檔 */ }
 ```
 
 ## lib/api/
@@ -130,7 +127,6 @@ class TripRepository {
   Future<List<TripDay>> fetchDays(String id);        // GET /trips/:id/days?all=1
   Future<TripNotes> fetchNotes(String id);           // GET /trips/:id/notes
   Future<void> deleteTrip(String id);
-  Future<AccountStats> fetchStats();                 // GET /account/stats
   Future<UserInfo> updateProfile({String? displayName}); // PATCH /account/profile
 }
 

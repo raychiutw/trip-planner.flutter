@@ -52,18 +52,6 @@ void main() {
     });
   });
 
-  group('TripAuditRollbackResult.fromJson', () {
-    test('解析 rollback result snake_case', () {
-      final result = TripAuditRollbackResult.fromJson({
-        'ok': true,
-        'rolled_back': 'update->revert',
-      });
-
-      expect(result.ok, isTrue);
-      expect(result.rolledBack, 'update->revert');
-    });
-  });
-
   group('parseTripAuditAction', () {
     test('支援 known actions 與 fallback', () {
       expect(parseTripAuditAction('insert'), TripAuditAction.insert);

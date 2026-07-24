@@ -2,248 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
-/// 共用色階 ThemeExtension。sage/pink 僅保留舊 API 相容性，實際映射中性色。
-class TpTones extends ThemeExtension<TpTones> {
-  const TpTones({
-    required this.accent,
-    required this.accentDeep,
-    required this.accentSubtle,
-    required this.accentBg,
-    required this.sage,
-    required this.sageDeep,
-    required this.sageSubtle,
-    required this.sageBg,
-    required this.pink,
-    required this.pinkDeep,
-    required this.pinkSubtle,
-    required this.pinkBg,
-    required this.success,
-    required this.warning,
-  });
-
-  final Color accent;
-  final Color accentDeep;
-  final Color accentSubtle;
-  final Color accentBg;
-  final Color sage;
-  final Color sageDeep;
-  final Color sageSubtle;
-  final Color sageBg;
-  final Color pink;
-  final Color pinkDeep;
-  final Color pinkSubtle;
-  final Color pinkBg;
-  final Color success;
-  final Color warning;
-
-  static const light = TpTones(
-    accent: TpColorsLight.accent,
-    accentDeep: TpColorsLight.accentDeep,
-    accentSubtle: TpColorsLight.accentSubtle,
-    accentBg: TpColorsLight.accentBg,
-    sage: TpColorsLight.sage,
-    sageDeep: TpColorsLight.sageDeep,
-    sageSubtle: TpColorsLight.sageSubtle,
-    sageBg: TpColorsLight.sageBg,
-    pink: TpColorsLight.pink,
-    pinkDeep: TpColorsLight.pinkDeep,
-    pinkSubtle: TpColorsLight.pinkSubtle,
-    pinkBg: TpColorsLight.pinkBg,
-    success: TpColorsLight.success,
-    warning: TpColorsLight.warning,
-  );
-
-  static const dark = TpTones(
-    accent: TpColorsDark.accent,
-    accentDeep: TpColorsDark.accentDeep,
-    accentSubtle: TpColorsDark.accentSubtle,
-    accentBg: TpColorsDark.accentBg,
-    sage: TpColorsDark.sage,
-    sageDeep: TpColorsDark.sageDeep,
-    sageSubtle: TpColorsDark.sageSubtle,
-    sageBg: TpColorsDark.sageBg,
-    pink: TpColorsDark.pink,
-    pinkDeep: TpColorsDark.pinkDeep,
-    pinkSubtle: TpColorsDark.pinkSubtle,
-    pinkBg: TpColorsDark.pinkBg,
-    success: TpColorsDark.success,
-    warning: TpColorsDark.warning,
-  );
-
-  static const systemLight = TpTones(
-    accent: TpSystemColorsLight.tint,
-    accentDeep: TpSystemColorsLight.tintDeep,
-    accentSubtle: TpSystemColorsLight.tintSubtle,
-    accentBg: TpSystemColorsLight.tintBackground,
-    sage: TpSystemColorsLight.secondaryLabel,
-    sageDeep: TpSystemColorsLight.label,
-    sageSubtle: TpSystemColorsLight.tertiary,
-    sageBg: TpSystemColorsLight.tertiary,
-    pink: TpSystemColorsLight.secondaryLabel,
-    pinkDeep: TpSystemColorsLight.label,
-    pinkSubtle: TpSystemColorsLight.tertiary,
-    pinkBg: TpSystemColorsLight.tertiary,
-    success: TpSystemColorsLight.success,
-    warning: TpSystemColorsLight.warning,
-  );
-
-  static const systemDark = TpTones(
-    accent: TpSystemColorsDark.tint,
-    accentDeep: TpSystemColorsDark.tintDeep,
-    accentSubtle: TpSystemColorsDark.tintSubtle,
-    accentBg: TpSystemColorsDark.tintBackground,
-    sage: TpSystemColorsDark.secondaryLabel,
-    sageDeep: TpSystemColorsDark.label,
-    sageSubtle: TpSystemColorsDark.tertiary,
-    sageBg: TpSystemColorsDark.tertiary,
-    pink: TpSystemColorsDark.secondaryLabel,
-    pinkDeep: TpSystemColorsDark.label,
-    pinkSubtle: TpSystemColorsDark.tertiary,
-    pinkBg: TpSystemColorsDark.tertiary,
-    success: TpSystemColorsDark.success,
-    warning: TpSystemColorsDark.warning,
-  );
-
-  @override
-  TpTones copyWith({
-    Color? accent,
-    Color? accentDeep,
-    Color? accentSubtle,
-    Color? accentBg,
-    Color? sage,
-    Color? sageDeep,
-    Color? sageSubtle,
-    Color? sageBg,
-    Color? pink,
-    Color? pinkDeep,
-    Color? pinkSubtle,
-    Color? pinkBg,
-    Color? success,
-    Color? warning,
-  }) {
-    return TpTones(
-      accent: accent ?? this.accent,
-      accentDeep: accentDeep ?? this.accentDeep,
-      accentSubtle: accentSubtle ?? this.accentSubtle,
-      accentBg: accentBg ?? this.accentBg,
-      sage: sage ?? this.sage,
-      sageDeep: sageDeep ?? this.sageDeep,
-      sageSubtle: sageSubtle ?? this.sageSubtle,
-      sageBg: sageBg ?? this.sageBg,
-      pink: pink ?? this.pink,
-      pinkDeep: pinkDeep ?? this.pinkDeep,
-      pinkSubtle: pinkSubtle ?? this.pinkSubtle,
-      pinkBg: pinkBg ?? this.pinkBg,
-      success: success ?? this.success,
-      warning: warning ?? this.warning,
-    );
-  }
-
-  @override
-  TpTones lerp(ThemeExtension<TpTones>? other, double t) {
-    if (other is! TpTones) return this;
-    return TpTones(
-      accent: Color.lerp(accent, other.accent, t)!,
-      accentDeep: Color.lerp(accentDeep, other.accentDeep, t)!,
-      accentSubtle: Color.lerp(accentSubtle, other.accentSubtle, t)!,
-      accentBg: Color.lerp(accentBg, other.accentBg, t)!,
-      sage: Color.lerp(sage, other.sage, t)!,
-      sageDeep: Color.lerp(sageDeep, other.sageDeep, t)!,
-      sageSubtle: Color.lerp(sageSubtle, other.sageSubtle, t)!,
-      sageBg: Color.lerp(sageBg, other.sageBg, t)!,
-      pink: Color.lerp(pink, other.pink, t)!,
-      pinkDeep: Color.lerp(pinkDeep, other.pinkDeep, t)!,
-      pinkSubtle: Color.lerp(pinkSubtle, other.pinkSubtle, t)!,
-      pinkBg: Color.lerp(pinkBg, other.pinkBg, t)!,
-      success: Color.lerp(success, other.success, t)!,
-      warning: Color.lerp(warning, other.warning, t)!,
-    );
-  }
-}
-
 /// Tripline ThemeData 工廠。
 ///
 /// 字型不指定 fontFamily → 走各平台系統字(iOS: SF Pro、Android: Roboto,
 /// CJK 由系統 PingFang/Noto 自動 fallback),最貼 HIG 且拿到真 Dynamic Type。
 abstract final class AppTheme {
-  /// 尚未遷移畫面使用的既有淺色主題。
-  static ThemeData light() {
-    const colorScheme = ColorScheme(
-      brightness: Brightness.light,
-      primary: TpColorsLight.accent,
-      onPrimary: TpColorsLight.accentForeground,
-      primaryContainer: TpColorsLight.accentBg,
-      onPrimaryContainer: TpColorsLight.accentDeep,
-      secondary: TpColorsLight.sage,
-      onSecondary: TpColorsLight.foreground,
-      secondaryContainer: TpColorsLight.sageBg,
-      onSecondaryContainer: TpColorsLight.sageDeep,
-      tertiary: TpColorsLight.pink,
-      onTertiary: TpColorsLight.foreground,
-      tertiaryContainer: TpColorsLight.pinkBg,
-      onTertiaryContainer: TpColorsLight.pinkDeep,
-      surface: TpColorsLight.background,
-      surfaceContainerLow: TpColorsLight.secondary,
-      surfaceContainerHigh: TpColorsLight.tertiary,
-      onSurface: TpColorsLight.foreground,
-      onSurfaceVariant: TpColorsLight.muted,
-      outline: TpColorsLight.lineStrong,
-      outlineVariant: TpColorsLight.border,
-      error: TpColorsLight.destructive,
-      onError: Color(0xFFFFFFFF),
-      errorContainer: TpColorsLight.destructiveBg,
-      onErrorContainer: TpColorsLight.destructive,
-      scrim: TpColorsLight.overlay,
-    );
-    return _buildTheme(
-      colorScheme: colorScheme,
-      tones: TpTones.light,
-      hover: TpColorsLight.hover,
-      disabled: TpColorsLight.disabled,
-      scaffoldBackground: TpColorsLight.background,
-    );
-  }
-
-  /// 尚未遷移畫面使用的既有深色主題。
-  static ThemeData dark() {
-    const colorScheme = ColorScheme(
-      brightness: Brightness.dark,
-      primary: TpColorsDark.accent,
-      onPrimary: TpColorsDark.accentForeground,
-      primaryContainer: TpColorsDark.accentBg,
-      onPrimaryContainer: TpColorsDark.accentDeep,
-      secondary: TpColorsDark.sage,
-      onSecondary: TpColorsDark.background,
-      secondaryContainer: TpColorsDark.sageBg,
-      onSecondaryContainer: TpColorsDark.sageDeep,
-      tertiary: TpColorsDark.pink,
-      onTertiary: TpColorsDark.background,
-      tertiaryContainer: TpColorsDark.pinkBg,
-      onTertiaryContainer: TpColorsDark.pinkDeep,
-      surface: TpColorsDark.background,
-      surfaceContainerLow: TpColorsDark.secondary,
-      surfaceContainerHigh: TpColorsDark.tertiary,
-      onSurface: TpColorsDark.foreground,
-      onSurfaceVariant: TpColorsDark.muted,
-      outline: TpColorsDark.lineStrong,
-      outlineVariant: TpColorsDark.border,
-      error: TpColorsDark.destructive,
-      onError: TpColorsDark.background,
-      errorContainer: TpColorsDark.destructiveBg,
-      onErrorContainer: TpColorsDark.destructive,
-      scrim: TpColorsDark.overlay,
-    );
-    return _buildTheme(
-      colorScheme: colorScheme,
-      tones: TpTones.dark,
-      hover: TpColorsDark.hover,
-      disabled: TpColorsDark.disabled,
-      scaffoldBackground: TpColorsDark.background,
-    );
-  }
-
-  /// Welcome／Login 參考流程使用的 HIG 淺色主題。
-  static ThemeData higLight({bool highContrast = false}) {
+  /// HIG 淺色主題；暖褐 tint 只用於選取、連結與主要動作。
+  static ThemeData light({bool highContrast = false}) {
     final colorScheme = ColorScheme(
       brightness: Brightness.light,
       primary: TpSystemColorsLight.tint,
@@ -279,18 +44,16 @@ abstract final class AppTheme {
     );
     return _buildTheme(
       colorScheme: colorScheme,
-      tones: TpTones.systemLight,
       hover: TpSystemColorsLight.hover,
       disabled: highContrast
           ? const Color(0xB33C3C43)
           : TpSystemColorsLight.disabled,
       scaffoldBackground: TpSystemColorsLight.background,
-      systemFoundation: true,
     );
   }
 
-  /// Welcome／Login 參考流程使用的 HIG 深色主題。
-  static ThemeData higDark({bool highContrast = false}) {
+  /// HIG 深色主題；使用與淺色相同的系統語意層級。
+  static ThemeData dark({bool highContrast = false}) {
     final colorScheme = ColorScheme(
       brightness: Brightness.dark,
       primary: TpSystemColorsDark.tint,
@@ -326,23 +89,19 @@ abstract final class AppTheme {
     );
     return _buildTheme(
       colorScheme: colorScheme,
-      tones: TpTones.systemDark,
       hover: TpSystemColorsDark.hover,
       disabled: highContrast
           ? const Color(0xB3EBEBF5)
           : TpSystemColorsDark.disabled,
       scaffoldBackground: TpSystemColorsDark.background,
-      systemFoundation: true,
     );
   }
 
   static ThemeData _buildTheme({
     required ColorScheme colorScheme,
-    required TpTones tones,
     required Color hover,
     required Color disabled,
     required Color scaffoldBackground,
-    bool systemFoundation = false,
   }) {
     const buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(TpRadius.md)),
@@ -365,7 +124,6 @@ abstract final class AppTheme {
       hoverColor: hover,
       disabledColor: disabled,
       textTheme: textTheme,
-      extensions: [tones],
       cardTheme: CardThemeData(
         elevation: 0,
         color: colorScheme.surfaceContainerLow,
@@ -412,10 +170,8 @@ abstract final class AppTheme {
         shape: const StadiumBorder(),
         side: BorderSide.none,
         elevation: 0,
-        backgroundColor: systemFoundation
-            ? colorScheme.surfaceContainerHigh
-            : tones.accentSubtle,
-        selectedColor: systemFoundation ? tones.accentSubtle : tones.accent,
+        backgroundColor: colorScheme.surfaceContainerHigh,
+        selectedColor: colorScheme.primaryContainer,
         labelStyle: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -447,7 +203,7 @@ abstract final class AppTheme {
         height: TpSpacing.navHeight,
         elevation: 0,
         backgroundColor: colorScheme.surface,
-        indicatorColor: tones.accentSubtle,
+        indicatorColor: colorScheme.primaryContainer,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return IconThemeData(

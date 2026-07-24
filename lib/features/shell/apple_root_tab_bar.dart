@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_glass_surface.dart';
 
@@ -51,7 +50,6 @@ class AppleRootTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final isDark = theme.brightness == Brightness.dark;
     final glassSettings = tpNavigationGlassSettings(
       context,
@@ -59,9 +57,9 @@ class AppleRootTabBar extends StatelessWidget {
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
-    final selectionTint = isDark
-        ? TpColorsDark.navigationSelection
-        : TpColorsLight.navigationSelection;
+    final selectionTint = theme.colorScheme.primary.withValues(
+      alpha: isDark ? 0.24 : 0.18,
+    );
     final tabs = [
       for (final destination in _destinations)
         GlassTab(
@@ -72,7 +70,7 @@ class AppleRootTabBar extends StatelessWidget {
           activeIcon: Icon(destination.selectedIcon),
           label: destination.label,
           semanticLabel: destination.label,
-          glowColor: tones.accentDeep,
+          glowColor: theme.colorScheme.onPrimaryContainer,
         ),
     ];
     final selectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
@@ -96,8 +94,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: tones.accentDeep,
-            selectedLabelColor: tones.accentDeep,
+            selectedIconColor: theme.colorScheme.onPrimaryContainer,
+            selectedLabelColor: theme.colorScheme.onPrimaryContainer,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,
@@ -117,8 +115,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: tones.accentDeep,
-            selectedLabelColor: tones.accentDeep,
+            selectedIconColor: theme.colorScheme.onPrimaryContainer,
+            selectedLabelColor: theme.colorScheme.onPrimaryContainer,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,

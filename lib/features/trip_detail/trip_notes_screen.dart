@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
+import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
 import '../../app/irreversible_action.dart';
@@ -256,9 +257,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     if (event.status == RequestStatus.completed && event.error == null) {
       setState(() => _aiJob = null);
       ref.invalidate(tripNotesProvider(widget.tripId));
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('AI 生成完成（${type.pendingLabel}）')));
+      showAppNotice(context, 'AI 生成完成（${type.pendingLabel}）');
       return;
     }
 

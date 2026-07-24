@@ -283,39 +283,15 @@ class EntryPoiScreen extends ConsumerWidget {
     List<TimelineEntry> sameDayEntries,
   ) async {
     final warning = _crossRegionWarning(alternate, sameDayEntries, entry.id);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('設為正選？'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'),
-            if (warning != null) ...[
-              const SizedBox(height: TpSpacing.s3),
-              Text(
-                warning,
-                style: TextStyle(
-                  color: Theme.of(dialogContext).colorScheme.error,
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('設為正選'),
-          ),
-        ],
-      ),
+    final ok = await showAppConfirm(
+      context,
+      title: '設為正選？',
+      message:
+          '要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'
+          '${warning == null ? '' : '\n\n$warning'}',
+      confirmLabel: '設為正選',
     );
-    if (ok != true || !context.mounted) return;
+    if (!ok || !context.mounted) return;
     await _run(
       context,
       ref,

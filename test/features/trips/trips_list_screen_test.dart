@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -387,7 +387,14 @@ void main() {
 
       final searchField = find.byKey(const ValueKey('trips-search-field'));
       expect(
-        tester.widget<TextField>(searchField).textInputAction,
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: searchField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .textInputAction,
         TextInputAction.search,
       );
 
@@ -410,14 +417,36 @@ void main() {
             .hasFocus,
         isFalse,
       );
-      expect(tester.widget<TextField>(searchField).controller!.text, '沖繩');
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: searchField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .controller
+            .text,
+        '沖繩',
+      );
       expect(find.text('沖繩家族之旅'), findsOneWidget);
       expect(find.byType(TripCard), findsOneWidget);
 
-      await tester.tap(find.byIcon(CupertinoIcons.clear));
+      await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill));
       await tester.pump();
 
-      expect(tester.widget<TextField>(searchField).controller!.text, isEmpty);
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: searchField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .controller
+            .text,
+        isEmpty,
+      );
       expect(find.byType(TripCard), findsNWidgets(3));
     });
 
@@ -823,10 +852,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -868,7 +897,7 @@ void main() {
         // 點「刪除行程」→ AlertDialog 確認
         await tester.tap(find.text('刪除行程'));
         await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.byType(CupertinoAlertDialog), findsOneWidget);
 
         // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
         await tester.tap(find.text('刪除'));
@@ -1000,7 +1029,7 @@ void main() {
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
       verifyNever(() => mockTripRepository.deleteTrip(any()));
     });
   });

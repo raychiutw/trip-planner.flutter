@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -199,7 +200,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '設為正選'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '設為正選'));
     await tester.pumpAndSettle();
 
     verify(
@@ -250,7 +251,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(
@@ -268,7 +269,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
     await tester.pumpAndSettle();
 
     verifyNever(
@@ -295,7 +296,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
 
     expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
@@ -335,7 +336,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     expect(find.text('玉陵'), findsOneWidget);
@@ -374,7 +375,7 @@ void main() {
     await _pump(tester, repo);
 
     await _openAlternateDelete(tester, 502);
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
 
     // 回應抵達前離開頁面。
@@ -833,7 +834,10 @@ void main() {
     expect(find.text('離開後，本次修改不會保留。'), findsOneWidget);
 
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('取消')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('取消'),
+      ),
     );
     await tester.pumpAndSettle();
     expect(find.text('選擇地點'), findsOneWidget);

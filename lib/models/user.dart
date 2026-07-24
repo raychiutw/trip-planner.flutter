@@ -1,4 +1,4 @@
-/// 使用者 models（`GET /oauth/userinfo`、`GET /account/stats`、account settings）。
+/// 使用者 models（`GET /oauth/userinfo`、account settings）。
 library;
 
 /// `GET /oauth/userinfo` 回應。
@@ -29,27 +29,6 @@ class UserInfo {
       displayName: json['displayName'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       createdAt: json['createdAt'] as String?,
-    );
-  }
-}
-
-/// `GET /account/stats` 回應（Account hub hero 3 stats）。
-class AccountStats {
-  const AccountStats({
-    this.tripCount = 0,
-    this.totalDays = 0,
-    this.collaboratorCount = 0,
-  });
-
-  final int tripCount;
-  final int totalDays;
-  final int collaboratorCount;
-
-  factory AccountStats.fromJson(Map<String, dynamic> json) {
-    return AccountStats(
-      tripCount: (json['tripCount'] as num?)?.toInt() ?? 0,
-      totalDays: (json['totalDays'] as num?)?.toInt() ?? 0,
-      collaboratorCount: (json['collaboratorCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

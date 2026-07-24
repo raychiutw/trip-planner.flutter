@@ -21,7 +21,6 @@ import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
-import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
@@ -1311,10 +1310,11 @@ void main() {
           .currentConfiguration
           .uri
           .toString(),
-      '/trips?account=appearance',
+      '/trips?account=root',
     );
     expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
-    expect(find.byType(AppearanceScreen), findsOneWidget);
+    expect(find.byType(AccountScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings-appearance')), findsNothing);
     expect(find.byType(LoginScreen), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));

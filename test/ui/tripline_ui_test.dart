@@ -502,7 +502,7 @@ void main() {
     final thumb = tester.widget<GlassButton>(find.byType(GlassButton));
     expect(
       thumb.settings?.glassColor,
-      TpColorsDark.dayThumb.withValues(alpha: 0.72),
+      TpSystemColorsDark.tint.withValues(alpha: 0.24),
     );
     final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
     expect(track.settings?.chromaticAberration, 0);

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
@@ -139,17 +138,15 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     );
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final tones = theme.extension<TpTones>()!;
     final trackSettings = tpNavigationGlassSettings(
       context,
       recipe: widget.platformViewBackdrop
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
-    final selectedColor = isDark
-        ? TpColorsDark.navigationSelection
-        : TpColorsLight.navigationSelection;
-    final selectedTint = selectedColor.withValues(alpha: isDark ? 0.72 : 0.64);
+    final selectedTint = theme.colorScheme.primary.withValues(
+      alpha: isDark ? 0.24 : 0.18,
+    );
     final selectedSettings = trackSettings.copyWith(
       glassColor: selectedTint,
       platformViewFallbackColor: selectedTint,
@@ -184,7 +181,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
                     width: _optionWidth(option),
                     height: height,
                     selectedSettings: selectedSettings,
-                    accentColor: tones.accentDeep,
+                    accentColor: theme.colorScheme.onPrimaryContainer,
                     onTap: () {
                       _focusNode.requestFocus();
                       widget.onSelected(option.value);

@@ -360,7 +360,7 @@ void main() {
     expect(find.textContaining('無法復原'), findsOneWidget);
     verifyNever(() => mockTripRepository.suspendDeveloperApp(any()));
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -410,7 +410,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('developer-app-delete')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('developer-app-row-tp_dev')));
     await tester.pumpAndSettle();
@@ -430,7 +430,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('developer-app-delete')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     expect(find.text('刪除應用程式失敗，請稍後再試'), findsOneWidget);
@@ -601,11 +601,8 @@ void main() {
         homepageUrl: null,
       ),
     ).called(1);
-    // 自適應對話框:iOS/macOS 為 CupertinoAlertDialog、其餘為 AlertDialog。
     expect(
-      find.byWidgetPredicate(
-        (w) => w is AlertDialog || w is CupertinoAlertDialog,
-      ),
+      find.byKey(const ValueKey('app-regular-content-sheet')),
       findsOneWidget,
     );
     expect(find.text('tp_new'), findsOneWidget);

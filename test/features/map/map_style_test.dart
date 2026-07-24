@@ -37,6 +37,7 @@ void main() {
     test('未聚焦：白底 + 日別色外圈與數字（日別色不當填色）', () {
       final style = tripMapMarkerStyle(
         dayColor: const Color(0xFF0EA5E9),
+        focusColor: const Color(0xFF7A5230),
         isFocused: false,
       );
 
@@ -48,13 +49,14 @@ void main() {
       expect(style.zIndex, 0);
     });
 
-    test('聚焦：品牌 accent 填底 + 白字，放大並提高層級', () {
+    test('聚焦：使用注入的 adaptive app tint + 白字，放大並提高層級', () {
       final style = tripMapMarkerStyle(
         dayColor: const Color(0xFF0EA5E9),
+        focusColor: const Color(0xFF7A5230),
         isFocused: true,
       );
 
-      expect(style.fill, kTripMapFocusColor);
+      expect(style.fill, const Color(0xFF7A5230));
       expect(style.stroke, const Color(0xFFFFFFFF));
       expect(style.text, const Color(0xFFFFFFFF));
       expect(style.diameter, 36);

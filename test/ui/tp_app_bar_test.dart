@@ -299,7 +299,7 @@ void main() {
       final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
       expect(
         item.style?.foregroundColor?.resolve(<WidgetState>{}),
-        TpColorsLight.foreground,
+        TpSystemColorsLight.label,
       );
       expect(
         find.descendant(
@@ -344,7 +344,7 @@ void main() {
     final item = tester.widget<MenuItemButton>(find.byType(MenuItemButton));
     expect(
       item.style?.foregroundColor?.resolve(<WidgetState>{}),
-      TpColorsDark.accent,
+      TpSystemColorsDark.tint,
     );
   });
 

@@ -16,7 +16,6 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'account_display.dart';
 import 'connected_apps_screen.dart';
-import 'settings/theme_mode_controller.dart';
 
 /// 登入裝置清單 provider（GET /account/sessions）。
 final accountSessionsProvider = FutureProvider<AccountSessionsPage>((ref) {
@@ -40,7 +39,6 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(accountSessionsProvider);
     final currentUser = ref.watch(authStateProvider).value;
-    final themeMode = ref.watch(themeModeProvider);
     final sessionsPage = sessionsAsync.value;
     final canRevokeOthers =
         sessionsPage?.sessions.any((session) => !session.isCurrent) ?? false;
@@ -69,13 +67,10 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
         data: (page) => _SessionsList(
           sessions: page.sessions,
           currentUserEmail: currentUser?.email,
-          themeMode: themeMode,
           busySessionSid: _busySessionSid,
           mutationError: _mutationError,
           onRetry: () => ref.invalidate(accountSessionsProvider),
           onRevoke: _revokeSession,
-          onThemeModeChanged: (mode) =>
-              ref.read(themeModeProvider.notifier).setMode(mode),
           onOpenConnectedApps: () {
             unawaited(
               Navigator.of(context).push<void>(
@@ -92,24 +87,13 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _showRevokeOtherSessionsBlocked() async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        key: const ValueKey('revoke-other-sessions-blocked-dialog'),
-        title: const Text('需要重新驗證才能登出其他裝置'),
-        content: const Text(
+    await showAppAlert(
+      context,
+      key: const ValueKey('revoke-other-sessions-blocked-dialog'),
+      title: '需要重新驗證才能登出其他裝置',
+      message:
           '目前缺少可綁定伺服器操作的重新驗證機制，因此不會送出批次登出要求。'
           '你仍可返回裝置清單，逐一登出不再使用的裝置。',
-        ),
-        actions: [
-          TextButton(
-            autofocus: true,
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('好'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -141,39 +125,14 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(TpRadius.xl)),
-          ),
-          title: const Text('登出帳號'),
-          content: const Text('確定要登出嗎？'),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                shape: const StadiumBorder(),
-                foregroundColor: colorScheme.onSurface,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('登出'),
-            ),
-          ],
-        );
-      },
+    final shouldLogout = await showAppConfirm(
+      context,
+      title: '登出帳號',
+      message: '確定要登出嗎？',
+      confirmLabel: '登出',
+      isDestructive: true,
     );
-    if (shouldLogout == true && mounted) {
+    if (shouldLogout && mounted) {
       await ref.read(authStateProvider.notifier).logout();
     }
   }
@@ -188,24 +147,20 @@ class _SessionsList extends StatelessWidget {
   const _SessionsList({
     required this.sessions,
     required this.currentUserEmail,
-    required this.themeMode,
     required this.busySessionSid,
     required this.mutationError,
     required this.onRetry,
     required this.onRevoke,
-    required this.onThemeModeChanged,
     required this.onOpenConnectedApps,
     required this.onLogout,
   });
 
   final List<AccountSession> sessions;
   final String? currentUserEmail;
-  final ThemeMode themeMode;
   final String? busySessionSid;
   final String? mutationError;
   final VoidCallback onRetry;
   final Future<String?> Function(String sid) onRevoke;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
   final VoidCallback onOpenConnectedApps;
   final VoidCallback onLogout;
 
@@ -251,11 +206,7 @@ class _SessionsList extends StatelessWidget {
           const SizedBox(height: TpSpacing.s4),
           _SessionsInfoPanel(onOpenConnectedApps: onOpenConnectedApps),
           const SizedBox(height: TpSpacing.s4),
-          _SessionsFooter(
-            themeMode: themeMode,
-            onThemeModeChanged: onThemeModeChanged,
-            onLogout: onLogout,
-          ),
+          _SessionsFooter(onLogout: onLogout),
         ],
       ),
     );
@@ -353,14 +304,8 @@ class _SessionsInfoPanel extends StatelessWidget {
 }
 
 class _SessionsFooter extends StatelessWidget {
-  const _SessionsFooter({
-    required this.themeMode,
-    required this.onThemeModeChanged,
-    required this.onLogout,
-  });
+  const _SessionsFooter({required this.onLogout});
 
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
   final VoidCallback onLogout;
 
   @override
@@ -369,61 +314,19 @@ class _SessionsFooter extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          ListTile(
-            key: const Key('account-sessions-theme-footer'),
-            leading: const Icon(Icons.brightness_6_outlined),
-            title: const Text('深淺模式'),
-            subtitle: Text(_themeModeLabel(themeMode)),
-            trailing: PopupMenuButton<ThemeMode>(
-              key: const Key('account-sessions-theme-menu'),
-              tooltip: '變更深淺模式',
-              initialValue: themeMode,
-              onSelected: onThemeModeChanged,
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  key: Key('account-sessions-theme-system'),
-                  value: ThemeMode.system,
-                  child: Text('跟隨系統'),
-                ),
-                PopupMenuItem(
-                  key: Key('account-sessions-theme-light'),
-                  value: ThemeMode.light,
-                  child: Text('淺色'),
-                ),
-                PopupMenuItem(
-                  key: Key('account-sessions-theme-dark'),
-                  value: ThemeMode.dark,
-                  child: Text('深色'),
-                ),
-              ],
-            ),
+      child: ListTile(
+        key: const Key('account-sessions-logout'),
+        leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
+        title: Text(
+          '登出此帳號',
+          style: TextStyle(
+            color: colorScheme.error,
+            fontWeight: FontWeight.w600,
           ),
-          Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
-          ListTile(
-            key: const Key('account-sessions-logout'),
-            leading: Icon(Icons.logout, size: 20, color: colorScheme.error),
-            title: Text(
-              '登出此帳號',
-              style: TextStyle(
-                color: colorScheme.error,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: onLogout,
-          ),
-        ],
+        ),
+        onTap: onLogout,
       ),
     );
-  }
-
-  String _themeModeLabel(ThemeMode mode) {
-    return switch (mode) {
-      ThemeMode.system => '跟隨系統',
-      ThemeMode.light => '淺色',
-      ThemeMode.dark => '深色',
-    };
   }
 }
 

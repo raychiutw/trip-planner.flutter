@@ -133,7 +133,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/account/appearance',
-        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
+        redirect: (context, state) => accountSheetAlias(state, 'root'),
       ),
       GoRoute(
         path: '/account/sessions',
@@ -150,7 +150,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/settings/appearance',
-        redirect: (context, state) => accountSheetAlias(state, 'appearance'),
+        redirect: (context, state) => accountSheetAlias(state, 'root'),
       ),
       GoRoute(
         path: '/settings/profile',

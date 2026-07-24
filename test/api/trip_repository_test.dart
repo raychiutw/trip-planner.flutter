@@ -787,42 +787,10 @@ void main() {
     expect(rows.single.diff?['title'], {'old': 'A', 'new': 'B'});
   });
 
-  test('rollbackAudit：POST /trips/:id/audit/:aid/rollback 回 result', () async {
-    dioAdapter.onPost(
-      '/trips/okinawa/audit/99/rollback',
-      (server) =>
-          server.reply(200, {'ok': true, 'rolled_back': 'update->revert'}),
-    );
-
-    final result = await tripRepository.rollbackAudit(
-      tripId: 'okinawa',
-      auditId: 99,
-    );
-
-    expect(result.ok, isTrue);
-    expect(result.rolledBack, 'update->revert');
-  });
-
   test('deleteTrip：DELETE /trips/:id（204 視為成功）', () async {
     dioAdapter.onDelete('/trips/old-trip', (server) => server.reply(204, null));
 
     await expectLater(tripRepository.deleteTrip('old-trip'), completes);
-  });
-
-  test('fetchStats：GET /account/stats', () async {
-    dioAdapter.onGet(
-      '/account/stats',
-      (server) => server.reply(200, {
-        'tripCount': 2,
-        'totalDays': 10,
-        'collaboratorCount': 1,
-      }),
-    );
-
-    final accountStats = await tripRepository.fetchStats();
-
-    expect(accountStats.tripCount, 2);
-    expect(accountStats.totalDays, 10);
   });
 
   test('updateProfile：PATCH /account/profile 回 UserInfo', () async {

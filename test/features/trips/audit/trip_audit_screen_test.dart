@@ -83,61 +83,35 @@ void main() {
     expect(find.textContaining('首里城 → 首里城公園'), findsOneWidget);
   });
 
-  testWidgets('回滾 audit row 需確認並呼叫 rollbackAudit', (tester) async {
+  testWidgets('audit log 是唯讀紀錄，更新與刪除 row 都不提供回滾入口', (tester) async {
     when(
-      () => repository.rollbackAudit(
-        tripId: any(named: 'tripId'),
-        auditId: any(named: 'auditId'),
+      () => repository.fetchAuditLog(
+        'trip-1',
+        limit: any(named: 'limit'),
+        requestId: any(named: 'requestId'),
       ),
     ).thenAnswer(
-      (_) async =>
-          const TripAuditRollbackResult(ok: true, rolledBack: 'update->revert'),
+      (_) async => [
+        ...rows,
+        const TripAuditRow(
+          id: 9,
+          tripId: 'trip-1',
+          tableName: 'trip_entries',
+          recordId: 102,
+          action: TripAuditAction.delete,
+          changedBy: 'ray@example.com',
+          createdAt: '2026-07-09T11:00:00Z',
+        ),
+      ],
     );
     await pumpScreen(tester);
 
-    await tester.tap(find.byKey(const ValueKey('trip-audit-rollback-8')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '回滾'));
-    await tester.pumpAndSettle();
-
-    verify(
-      () => repository.rollbackAudit(tripId: 'trip-1', auditId: 8),
-    ).called(1);
-    expect(find.text('已回滾異動'), findsOneWidget);
-  });
-
-  testWidgets('回滾失敗保留專屬 wording 並可重試', (tester) async {
-    var attempts = 0;
-    when(
-      () => repository.rollbackAudit(
-        tripId: any(named: 'tripId'),
-        auditId: any(named: 'auditId'),
-      ),
-    ).thenAnswer((_) async {
-      attempts++;
-      if (attempts == 1) throw Exception('offline');
-      return const TripAuditRollbackResult(
-        ok: true,
-        rolledBack: 'update->revert',
-      );
-    });
-    await pumpScreen(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-audit-rollback-8')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '回滾'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('回滾異動失敗，請稍後再試'), findsOneWidget);
-    expect(find.textContaining('刪除失敗'), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('trip-audit-error-retry')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '回滾'));
-    await tester.pumpAndSettle();
-
-    expect(attempts, 2);
-    expect(find.text('已回滾異動'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-audit-row-8')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-audit-row-9')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-audit-rollback-8')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-audit-rollback-9')), findsNothing);
+    expect(find.text('回滾'), findsNothing);
+    expect(find.text('可回滾'), findsNothing);
   });
 
   testWidgets('無 audit log 時顯示空狀態', (tester) async {
@@ -201,7 +175,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('trip-audit-refresh-button')), findsOne);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOne);
-    expect(find.text('回滾'), findsOneWidget);
+    expect(find.text('回滾'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

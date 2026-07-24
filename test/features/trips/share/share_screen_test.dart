@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -364,7 +365,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-custom-expiry-date')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
+    await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-create')));
     await tester.pumpAndSettle();
@@ -395,7 +397,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-revoke-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '撤銷')); // 對話框確認
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷')); // 對話框確認
     await tester.pump();
 
     expect(
@@ -417,7 +419,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-delete-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteShare('t', 1)).called(1);

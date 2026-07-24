@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-import '../theme/tokens.dart';
-
 enum TpNavigationGlassRecipe { regular, platformView }
 
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final baseColor = isDark ? TpColorsDark.secondary : TpColorsLight.background;
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final baseColor = isDark
+      ? theme.colorScheme.surfaceContainerLow
+      : theme.colorScheme.surface;
   final platformView = recipe == TpNavigationGlassRecipe.platformView;
   final tint = baseColor.withValues(
     alpha: platformView ? (isDark ? 0.62 : 0.56) : (isDark ? 0.48 : 0.40),
@@ -29,10 +30,7 @@ LiquidGlassSettings tpNavigationGlassSettings(
     platformViewFallbackColor: tint,
   );
   if (!MediaQuery.highContrastOf(context)) return settings;
-  final opaqueColor =
-      (isDark ? TpColorsDark.background : TpColorsLight.background).withValues(
-        alpha: 0.96,
-      );
+  final opaqueColor = theme.colorScheme.surface.withValues(alpha: 0.96);
   return settings.copyWith(
     glassColor: opaqueColor,
     backerColor: opaqueColor,
@@ -76,8 +74,10 @@ class TpGlassSurface extends StatelessWidget {
     final highContrast = MediaQuery.highContrastOf(context);
     final isDark = theme.brightness == Brightness.dark;
     final defaultTint = isDark
-        ? TpColorsDark.secondary.withValues(alpha: highContrast ? 0.96 : 0.68)
-        : TpColorsLight.background.withValues(
+        ? theme.colorScheme.surfaceContainerLow.withValues(
+            alpha: highContrast ? 0.96 : 0.68,
+          )
+        : theme.colorScheme.surface.withValues(
             alpha: highContrast ? 0.96 : 0.58,
           );
     final tint = tintColor == null

@@ -204,18 +204,11 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
 
   Future<void> _showConflict(TripEntryConflict conflict) {
     final timeLabel = conflict.time == null ? '' : '（${conflict.time}）';
-    return showAdaptiveDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog.adaptive(
-        title: const Text('時段衝突'),
-        content: Text('該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。'),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('知道了'),
-          ),
-        ],
-      ),
+    return showAppAlert(
+      context,
+      title: '時段衝突',
+      message: '該時段已有「${conflict.title}」$timeLabel。請改選其他時間後再試。',
+      actionLabel: '知道了',
     );
   }
 

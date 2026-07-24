@@ -9,8 +9,8 @@ Tripline Flutter 是 [trip-planner React SPA](https://github.com/raychiutw/trip-
 │ features/   畫面與 widget(auth/trips/      │
 │             trip_detail/account/shell)     │
 ├─────────────────────────────────────────────┤
-│ app/        go_router(5-tab shell +        │
-│             auth redirect)                  │
+│ app/        go_router(4-tab shell、        │
+│             Account sheet + auth redirect)  │
 ├─────────────────────────────────────────────┤
 │ api/        ApiClient(dio)+ repositories  │
 │             + riverpod providers            │
@@ -18,8 +18,7 @@ Tripline Flutter 是 [trip-planner React SPA](https://github.com/raychiutw/trip-
 │ models/     純 Dart immutable class +       │
 │             手寫 fromJson                   │
 ├─────────────────────────────────────────────┤
-│ theme/      design tokens + ThemeData +     │
-│             TpTones ThemeExtension          │
+│ theme/      系統語意 tokens + ThemeData     │
 └─────────────────────────────────────────────┘
 ```
 

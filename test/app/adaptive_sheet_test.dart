@@ -97,7 +97,10 @@ void main() {
     expect(sheet.showDragIndicator, isFalse);
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('東京五日行'))).colorScheme.surface,
+    );
 
     await tester.tap(find.text('東京五日行'));
     await tester.pumpAndSettle();
@@ -134,7 +137,10 @@ void main() {
     expect(sheet.showDragIndicator, isFalse);
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFFFFFBF5));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
+    );
   });
 
   testWidgets('fixed content sheet uses a neutral opaque dark canvas', (
@@ -164,7 +170,10 @@ void main() {
     );
     expect(sheet.fillThreshold, 0.85);
     expect(sheet.fullSettings, isNull);
-    expect(sheet.expandedColor, const Color(0xFF1C1C1E));
+    expect(
+      sheet.expandedColor,
+      Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
+    );
   });
 
   testWidgets('system Back returns from a nested content-sheet page first', (

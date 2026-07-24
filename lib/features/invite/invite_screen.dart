@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../models/trip_member.dart';
 import '../../models/user.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 import 'invite_controller.dart';
@@ -173,15 +172,14 @@ class _InviteHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final inviter = invitation.inviterDisplayName?.trim().isNotEmpty == true
         ? invitation.inviterDisplayName!.trim()
         : invitation.inviterEmail;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: tones.accentSubtle,
-        border: Border.all(color: tones.accentBg),
+        color: theme.colorScheme.primaryContainer,
+        border: Border.all(color: theme.colorScheme.primaryContainer),
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.lg)),
       ),
       child: Padding(
@@ -192,7 +190,7 @@ class _InviteHero extends StatelessWidget {
             Text(
               '共編邀請',
               style: theme.textTheme.labelLarge?.copyWith(
-                color: tones.accentDeep,
+                color: theme.colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -637,10 +635,12 @@ enum _SummaryTone { success, pending, error, muted }
 
 Color _toneColor(BuildContext context, _SummaryTone tone) {
   final theme = Theme.of(context);
-  final tones = theme.extension<TpTones>()!;
+  final successColor = theme.brightness == Brightness.dark
+      ? TpSystemColorsDark.success
+      : TpSystemColorsLight.success;
   return switch (tone) {
-    _SummaryTone.success => tones.success,
-    _SummaryTone.pending => tones.accent,
+    _SummaryTone.success => successColor,
+    _SummaryTone.pending => theme.colorScheme.primary,
     _SummaryTone.error => theme.colorScheme.error,
     _SummaryTone.muted => theme.colorScheme.onSurfaceVariant,
   };

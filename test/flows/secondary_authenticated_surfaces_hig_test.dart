@@ -25,9 +25,7 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   'lib/features/account/developer_apps_screen.dart': {
     'DeveloperAppsScreen': _HeaderContract.accountException,
     'DeveloperAppNewScreen': _HeaderContract.modalForm,
-  },
-  'lib/features/account/settings/appearance_screen.dart': {
-    'AppearanceScreen': _HeaderContract.accountException,
+    'DeveloperAppEditScreen': _HeaderContract.modalForm,
   },
   'lib/features/account/settings/notifications_screen.dart': {
     'NotificationsScreen': _HeaderContract.accountException,

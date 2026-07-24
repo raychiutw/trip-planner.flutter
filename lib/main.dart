@@ -17,9 +17,9 @@ import 'api/providers.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
 import 'features/account/account_sheet.dart';
-import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
 import 'theme/app_theme.dart';
+import 'theme/tokens.dart';
 import 'ui/tp_app_bar.dart';
 
 /// 現階段所有產品文案均為繁體中文；新增語系前須先完成整套字串在地化。
@@ -36,7 +36,7 @@ final appNetworkAvailabilityProvider = Provider<Stream<bool>>(
 const _triplineGlassTheme = GlassThemeData(
   light: GlassThemeVariant(
     settings: GlassThemeSettings(
-      glassColor: Color(0x9EFFFBF5),
+      glassColor: Color(0x9EFFFFFF),
       thickness: 24,
       blur: 22,
       chromaticAberration: 0.006,
@@ -46,11 +46,14 @@ const _triplineGlassTheme = GlassThemeData(
       saturation: 1.10,
     ),
     quality: GlassQuality.standard,
-    glowColors: GlassGlowColors(primary: Color(0xFFA97A4A), glowOpacity: 0.30),
+    glowColors: GlassGlowColors(
+      primary: TpSystemColorsLight.tint,
+      glowOpacity: 0.30,
+    ),
   ),
   dark: GlassThemeVariant(
     settings: GlassThemeSettings(
-      glassColor: Color(0x61121214),
+      glassColor: Color(0x611C1C1E),
       thickness: 28,
       blur: 22,
       chromaticAberration: 0.004,
@@ -60,7 +63,10 @@ const _triplineGlassTheme = GlassThemeData(
       saturation: 1.08,
     ),
     quality: GlassQuality.standard,
-    glowColors: GlassGlowColors(primary: Color(0xFFCBA06E), glowOpacity: 0.24),
+    glowColors: GlassGlowColors(
+      primary: TpSystemColorsDark.tint,
+      glowOpacity: 0.24,
+    ),
   ),
 );
 
@@ -142,8 +148,10 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       title: 'Tripline',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      highContrastTheme: AppTheme.light(highContrast: true),
       darkTheme: AppTheme.dark(),
-      themeMode: ref.watch(themeModeProvider),
+      highContrastDarkTheme: AppTheme.dark(highContrast: true),
+      themeMode: ThemeMode.system,
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),

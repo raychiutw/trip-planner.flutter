@@ -73,8 +73,8 @@ void main() {
         child: MaterialApp.router(
           theme:
               (brightness == Brightness.light
-                      ? AppTheme.light()
-                      : AppTheme.dark())
+                      ? AppTheme.light(highContrast: highContrast)
+                      : AppTheme.dark(highContrast: highContrast))
                   .copyWith(platform: platform),
           themeMode: ThemeMode.light,
           routerConfig: fakeRouter,
@@ -405,7 +405,7 @@ void main() {
     );
     expect(
       richTagline.text.style?.fontWeight?.value,
-      greaterThan(AppTheme.higLight().textTheme.bodyLarge!.fontWeight!.value),
+      greaterThan(AppTheme.light().textTheme.bodyLarge!.fontWeight!.value),
     );
     final context = tester.element(find.byKey(const ValueKey('auth-card')));
     expect(TpMotion.resolve(context, TpMotion.normal), Duration.zero);

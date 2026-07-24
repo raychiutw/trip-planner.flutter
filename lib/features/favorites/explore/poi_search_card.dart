@@ -3,12 +3,10 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 
 import '../../../models/poi_search_result.dart';
 import '../../../models/poi_type.dart';
-import '../../../theme/app_theme.dart';
-import '../../../theme/poi_tone.dart';
 import '../../../theme/tokens.dart';
 import '../poi_rating_label.dart';
 
-/// 探索 POI 卡片：cover tone 漸層 + 類型 label + name/address/rating + heart toggle。
+/// 探索 POI 卡片：系統 surface + 類型 label + name/address/rating + heart toggle。
 class PoiSearchCard extends StatelessWidget {
   const PoiSearchCard({
     super.key,
@@ -28,11 +26,9 @@ class PoiSearchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final poiType = mapGooglePrimaryTypeToPoiType(poi.category);
     final categoryLabel =
         poiCategoryLabel(poi.category) ?? kPoiTypeLabels[poiType] ?? 'POI';
-    final tone = resolvePoiTone(tones, poiType);
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
     return Container(
@@ -48,7 +44,10 @@ class PoiSearchCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              Container(height: 64, color: tone.subtle),
+              Container(
+                height: 64,
+                color: theme.colorScheme.surfaceContainerHigh,
+              ),
               Positioned(
                 top: 0,
                 right: 0,
@@ -58,7 +57,7 @@ class PoiSearchCard extends StatelessWidget {
                   onPressed: isSaving ? null : onToggleFavorite,
                   icon: Icon(
                     isSaved ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                    color: tones.accent,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               ),
@@ -75,43 +74,36 @@ class PoiSearchCard extends StatelessWidget {
                 ),
             ],
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s3),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    categoryLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: tone.deep,
-                    ),
+          Padding(
+            padding: const EdgeInsets.all(TpSpacing.s3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  categoryLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    poi.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  if (poi.address != null && poi.address!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        poi.address!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: mutedColor,
-                        ),
+                ),
+                const SizedBox(height: 2),
+                Text(poi.name, style: theme.textTheme.titleMedium),
+                if (poi.address != null && poi.address!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      poi.address!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: mutedColor,
                       ),
                     ),
-                  const Spacer(),
-                  if (poi.rating != null) PoiRatingLabel(rating: poi.rating!),
+                  ),
+                if (poi.rating != null) ...[
+                  const SizedBox(height: TpSpacing.s2),
+                  PoiRatingLabel(rating: poi.rating!),
                 ],
-              ),
+              ],
             ),
           ),
         ],

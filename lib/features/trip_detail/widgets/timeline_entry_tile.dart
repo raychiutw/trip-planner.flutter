@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
-import '../../../theme/app_theme.dart';
 import '../../../theme/tokens.dart';
 import 'entry_duration.dart';
 
@@ -40,7 +39,6 @@ class TimelineEntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final categoryLabel =
         poiCategoryLabel(entry.master?.category) ??
         kPoiTypeLabels[entry.master?.type];
@@ -89,7 +87,7 @@ class TimelineEntryTile extends StatelessWidget {
                   entryId: entry.id,
                   number: number,
                   isFirst: isFirst,
-                  color: tones.accentDeep,
+                  color: theme.colorScheme.onPrimaryContainer,
                   lineColor: theme.colorScheme.outlineVariant,
                 ),
                 const SizedBox(width: 10),
@@ -252,7 +250,6 @@ class _EntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final master = entry.master;
     final muted = theme.colorScheme.onSurfaceVariant;
     final duration = formatEntryDuration(
@@ -371,7 +368,7 @@ class _EntryCard extends StatelessWidget {
                             Icon(
                               CupertinoIcons.star_fill,
                               size: 14,
-                              color: tones.accent,
+                              color: theme.colorScheme.primary,
                             ),
                             const SizedBox(width: 2),
                             Text(

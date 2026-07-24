@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -239,7 +239,14 @@ void main() {
 
       final searchInput = find.byKey(const ValueKey('favorites-search-input'));
       expect(
-        tester.widget<TextField>(searchInput).textInputAction,
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: searchInput,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .textInputAction,
         TextInputAction.search,
       );
       await tester.enterText(searchInput, '暖暮');
@@ -247,7 +254,7 @@ void main() {
       await tester.pump();
       expect(find.text('暖暮拉麵'), findsOneWidget);
 
-      await tester.tap(find.byIcon(CupertinoIcons.clear));
+      await tester.tap(find.byIcon(CupertinoIcons.xmark_circle_fill));
       await tester.pump();
 
       expect(find.text('已篩選：餐廳'), findsOneWidget);
@@ -377,7 +384,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('favorite-remove-7')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
       await tester.tap(find.text('保留'));
@@ -405,7 +412,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -474,7 +481,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       await tester.tap(find.text('保留'));
       await tester.pumpAndSettle();
@@ -512,7 +519,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -554,7 +561,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -588,7 +595,7 @@ void main() {
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -644,7 +651,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -680,7 +687,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -700,7 +707,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -775,13 +782,13 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('favorites-delete-selected')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除 2 個收藏？'), findsOneWidget);
       expect(find.text('將刪除「美麗海水族館」、「暖暮拉麵」。刪除後無法復原。'), findsOneWidget);
 
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -856,7 +863,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -865,7 +872,7 @@ void main() {
 
       verify(() => mockRepo.deleteFavorite(7)).called(1);
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
 
       await tester.tap(
         find.byKey(const ValueKey('favorite-remove-7')),
@@ -873,7 +880,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
       verifyNever(() => mockRepo.deleteFavorite(7));
 
       deletion.complete();
@@ -909,7 +916,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );
@@ -933,7 +940,7 @@ void main() {
       expect(find.text('將刪除「暖暮拉麵」。刪除後無法復原。'), findsOneWidget);
       await tester.tap(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(CupertinoAlertDialog),
           matching: find.text('刪除'),
         ),
       );

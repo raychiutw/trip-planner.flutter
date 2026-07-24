@@ -19,7 +19,9 @@ void main() {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final theme =
-        (brightness == Brightness.light ? AppTheme.light() : AppTheme.dark())
+        (brightness == Brightness.light
+                ? AppTheme.light(highContrast: highContrast)
+                : AppTheme.dark(highContrast: highContrast))
             .copyWith(platform: platform);
     await tester.pumpWidget(
       MaterialApp(
@@ -170,7 +172,7 @@ void main() {
     );
     expect(
       headline.style?.fontSize,
-      AppTheme.higLight().textTheme.displaySmall?.fontSize,
+      AppTheme.light().textTheme.displaySmall?.fontSize,
     );
     expect(headline.style?.letterSpacing, 0);
     final description = find.text(
@@ -181,7 +183,7 @@ void main() {
     );
     expect(
       richDescription.text.style?.fontWeight?.value,
-      greaterThan(AppTheme.higLight().textTheme.bodyLarge!.fontWeight!.value),
+      greaterThan(AppTheme.light().textTheme.bodyLarge!.fontWeight!.value),
     );
     final context = tester.element(
       find.byKey(const ValueKey('welcome-screen')),
@@ -209,7 +211,7 @@ void main() {
     await pumpWelcome(tester, onLogin: () {});
 
     final appBar = tester.widget<SliverAppBar>(find.byType(SliverAppBar));
-    expect(appBar.backgroundColor, AppTheme.higLight().colorScheme.surface);
+    expect(appBar.backgroundColor, AppTheme.light().colorScheme.surface);
     expect(appBar.backgroundColor?.a, 1);
   });
 

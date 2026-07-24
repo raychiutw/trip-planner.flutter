@@ -15,7 +15,6 @@ import 'package:go_router/go_router.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../models/trip.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_glass_surface.dart';
@@ -542,7 +541,6 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final tones = theme.extension<TpTones>()!;
 
     final isAssistant = message.role == ChatRole.assistant;
     final normalizedMyEmail = myEmail?.trim().toLowerCase();
@@ -562,7 +560,7 @@ class _MessageBubble extends StatelessWidget {
     } else if (isAssistant) {
       bg = scheme.surfaceContainerHigh;
     } else if (isSelf) {
-      bg = tones.accentSubtle;
+      bg = scheme.primaryContainer;
     } else {
       bg = Color.alphaBlend(
         collaboratorAccent.withValues(
@@ -585,7 +583,7 @@ class _MessageBubble extends StatelessWidget {
       label = displayName?.isNotEmpty == true
           ? displayName!
           : _emailLocalPart(myEmail) ?? '你';
-      labelColor = tones.accentDeep;
+      labelColor = scheme.onPrimaryContainer;
     } else {
       final senderName = message.senderName?.trim();
       label = senderName?.isNotEmpty == true

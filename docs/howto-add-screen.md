@@ -1,6 +1,6 @@
 # How to 新增畫面
 
-把一個新畫面掛進 5-tab shell：建立 screen widget、掛路由、寫 widget test。五個 root branch 是聊天、行程、地圖、收藏與帳號，各自保留 navigation stack。以下以「把收藏 tab 從 placeholder 換成真畫面」為例。
+把一個新畫面掛進 4-tab shell：建立 screen widget、掛路由、寫 widget test。四個 root branch 是聊天、行程、地圖與收藏，各自保留 navigation stack；Account 由內容頁 Header 的 `person.crop.circle` 開啟獨立 sheet，不建立第五個 branch。以下以「把收藏 tab 從 placeholder 換成真畫面」為例。
 
 ## 前置條件
 
@@ -30,7 +30,7 @@
 
    - `ConsumerWidget`(無本地 state)或 `ConsumerStatefulWidget`(有表單/控制器)
    - async 資料用 `ref.watch(xxxProvider).when(data:..., error:..., loading:...)` 三態都要處理(參考 `trips_list_screen.dart` 的 `_ErrorState` + retry 模式)
-   - 取色守則見 [Theme 參考](reference-theme.md#取色守則):語意色走 `colorScheme`、tone 走 `TpTones`、間距用 `TpSpacing`
+   - 取色守則見 [Theme 參考](reference-theme.md#取色)：Widget 走 `Theme.of(context).colorScheme`，間距用 `TpSpacing`
    - 依內容角色用 `AppAdaptiveContent` 限寬：表單 `720`、對話/搜尋 `860`、feed `920`；手機自然維持全寬
    - 確認、action sheet、搜尋與短暫通知優先重用 `lib/app/adaptive.dart`，不要在 feature 內重寫平台判斷
    - 頁級載入用 `AppListLoadingSkeleton` 或 `AppMapLoadingSkeleton` 保留版型；不要只留空白或在中央放單一 spinner
@@ -67,7 +67,7 @@ flutter run    # 實機/模擬器確認視覺(注意:連 prod API,用測試帳�
 | 錯誤一閃就消失 | 用了 `showAppNotice` 或 SnackBar — 真錯誤改用 `showAppError`，並提供 retry |
 | 畫面一進來就被踢去 `/login` | widget test 沒 override `authStateProvider`,啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗 → 視同未登入 |
 | `No ProviderScope found` | 測試的 `pumpWidget` 最外層忘了包 `ProviderScope` |
-| tone 色在 dark mode 不對 | 直接引用了 `TpColorsLight` 常數 — 改走 `Theme.of(context).extension<TpTones>()!` |
+| 顏色在 dark mode 不對 | feature 直接引用了 Light／Dark 常數 — 改走 `Theme.of(context).colorScheme` |
 
 ## 相關文件
 

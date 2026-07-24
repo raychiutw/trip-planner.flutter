@@ -40,8 +40,6 @@ Color dotColor(WidgetTester tester, int entryId) {
 }
 
 void main() {
-  const tones = TpTones.light;
-
   group('TimelineEntryTile', () {
     testWidgets('顯示時間、標題、master meta（名稱/分類/評分)', (tester) async {
       await pumpTile(
@@ -159,7 +157,7 @@ void main() {
           master: EntryPoiInfo(poiId: 1, type: 'restaurant'),
         ),
       );
-      expect(dotColor(tester, 2), tones.accentDeep);
+      expect(dotColor(tester, 2), TpSystemColorsLight.tintDeep);
     });
 
     testWidgets('POI 類型不改變中性卡片 surface 與邊框', (tester) async {
@@ -199,7 +197,7 @@ void main() {
           title: '自由活動',
         ),
       );
-      expect(dotColor(tester, 3), tones.accentDeep);
+      expect(dotColor(tester, 3), TpSystemColorsLight.tintDeep);
       expect(find.text('14：00'), findsOneWidget);
     });
 

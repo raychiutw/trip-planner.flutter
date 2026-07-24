@@ -468,17 +468,6 @@ class TripRepository {
     TripAuditRow.fromJson,
   );
 
-  /// POST /trips/:id/audit/:aid/rollback（回滾指定 audit row）。
-  Future<TripAuditRollbackResult> rollbackAudit({
-    required String tripId,
-    required int auditId,
-  }) async {
-    final body = await _client.post(
-      '/trips/${Uri.encodeComponent(tripId)}/audit/$auditId/rollback',
-    );
-    return TripAuditRollbackResult.fromJson(body as Map<String, dynamic>);
-  }
-
   /// DELETE /trips/:id（限 owner/admin）。
   Future<void> deleteTrip(String id) =>
       _client.delete('/trips/${Uri.encodeComponent(id)}');
@@ -905,12 +894,6 @@ class TripRepository {
       '/trips/${Uri.encodeComponent(tripId)}/entries/$entryId/pois/$poiId',
       body: {'note': ?note, 'poi_type': ?poiType, 'reservation': ?reservation},
     );
-  }
-
-  /// GET /account/stats。
-  Future<AccountStats> fetchStats() async {
-    final responseBody = await _client.get('/account/stats');
-    return AccountStats.fromJson(responseBody as Map<String, dynamic>);
   }
 
   /// PATCH /account/profile（displayName 傳 null 表示清除）。

@@ -1,3 +1,23 @@
+# Handoff — 2026-07-24 HIG #96 全 App 契約收斂
+
+## 本輪交付
+
+- 外觀只跟隨系統；`MaterialApp` 提供 Light／Dark／High Contrast 主題，不再保留 Account 外觀頁、session 外觀選單或 `themeModeProvider`。
+- Root 固定聊天、行程、地圖、收藏四個 branches；Account 只由 Header 的 `person.crop.circle` 開啟 sheet。舊 `/account/appearance` 與 `/settings/appearance` 保留為回到 Account 根頁的 alias。
+- 移除舊 `TpTones`、`TpColorsLight/Dark`、Account 統計 hero／API、無 production consumer 元件，以及 audit／收藏的復原入口；Apple ID 登入仍不實作。
+- 一般提示、確認、單一提示與表單統一走 `app/adaptive.dart` 的 HIG 元件；永久刪除只可左滑揭露後點擊，不允許 full swipe 直接執行。
+- 探索 POI 改為自然高度列表，名稱與地址在 Accessibility Size 下不受固定 grid 比例裁切。
+- `test/flows/release_wide_consistency_test.dart` 守住系統主題、iOS launch surface、calendar date picker、四 branches、無 Large Title、非搜尋頁無搜尋控制、系統 12／24 小時偏好與無 favorite restore 等 release-wide 契約。
+
+## 驗證
+
+- `dart format --output=none --set-exit-if-changed .`：342 個檔案，0 變更。
+- `flutter analyze`：0 issue。
+- `flutter test --no-pub -r failures-only`：1,566 個測試全數通過（150.5 秒）。
+- `git diff --check`：通過。
+
+---
+
 # Handoff — 2026-07-23 HIG #84 四個根層分頁與帳號 Sheet
 
 ## 本輪交付
@@ -36,7 +56,7 @@ flutter test --no-pub -r failures-only
 ## v0.9.6 發布結案
 
 - 最終 source SHA `4ac7776d95135cbcf1baded91511a11d28d171c9` 已經 PR [#80](https://github.com/raychiutw/trip-planner.flutter/pull/80) 合併至 `master`；PR CI [29963049945](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963049945) 與 master CI [29963722375](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963722375) 均通過 analyzer、完整測試、UI evidence 與 Android debug build。
-- 本機 `flutter analyze` 0 issue、1,402 tests 全數通過；iOS simulator Patrol app-owned flow 1/1 通過登入、聊天、五個 root tabs 與收藏搜尋。
+- 本機 `flutter analyze` 0 issue、1,402 tests 全數通過；iOS simulator Patrol app-owned flow 1/1 通過登入、聊天、當時的五個 root tabs 與收藏搜尋（該導覽已由 #84 取代）。
 - iOS Firebase Test Lab [29963749443](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963749443) 在 iPhone 14 Pro／iOS 16.6 對 final master 回報 `3 test cases passed`，涵蓋 XCTest example、app-owned release flow 與 native Google map smoke。
 - iOS release flow 已改用 Patrol 實機文字輸入 driver，root tab 導覽改用 app 自有唯一 `ValueKey`；不再依賴 release build 不提供的 debug semantics 或 Liquid Glass 套件內部手勢元件。
 - Release workflow [29964801571](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29964801571) 已將共同 build `12701` 發布至 TestFlight（processing `VALID`）與 Google Play internal（status `completed`，Play edit `14630000200256184012`）。
@@ -64,7 +84,7 @@ flutter test --no-pub -r failures-only
 - 不同 Trip 切換後回 `DAY 1`；同一 Trip 的行程／地圖互切保留 Day。
 - 起訖時間改成兩個 compact chips；iOS／macOS 使用 Cupertino wheel，其他平台使用 Material picker；本輪不支援跨午夜。
 - 全 App 由 root 共用 tap-outside／user-scroll keyboard dismissal，收合不清除草稿、不 submit。
-- Account 成為第 5 個 root tab；聊天／行程／地圖／收藏 Header 的 account avatar 已移除。
+- 當時曾將 Account 設為第 5 個 root tab；此決策已由 #84 的四分頁＋Header Account sheet 取代。
 - Root Header、Day selector、Root tab 改用 regular／PlatformView glass recipes，並保留 High Contrast／Reduce Transparency 實色 fallback。
 - swipe delete 只揭露紅色「刪除」按鈕，點擊後才確認；沒有 full swipe、Undo 或 Restore，且與 menu delete 共用 handler。
 
@@ -84,9 +104,9 @@ flutter build apk --debug --no-pub
 ## 後續非阻塞平台驗收
 
 1. 在 macOS 執行 `flutter build ios --simulator`，再跑 iOS simulator widget／integration flows。
-2. iPhone 320pt／390pt／430pt，100%／200% Dynamic Type：檢查 5-tab labels、時間 chips、導航 pills、menu 與刪除 label。
+2. iPhone 320pt／390pt／430pt，100%／200% Dynamic Type：檢查四個 root tab labels、Header Account、時間 chips、導航 pills、menu 與刪除 label。
 3. Light／Dark、Reduce Transparency／High Contrast：以內容從 Header／Day selector／Root tab 下方滑過的錄影確認 glass 透出與可讀性。
-4. VoiceOver：確認卡片 expanded/collapsed、時間、地圖、`…`、設為正選、移動到其他天、刪除與 Account tab 的 focus／閱讀順序。
+4. VoiceOver：確認卡片 expanded/collapsed、時間、地圖、`…`、設為正選、移動到其他天、刪除與 Header Account 的 focus／閱讀順序。
 5. 實機拖曳長行程：驗證畫面邊緣自動捲動、跨 Day drop、request lock、API 失敗兩日回滾及交通重算。
 6. Google Map PlatformView：確認 map gestures 不被 glass navigation 攔截、玻璃不閃爍或凍結。
 

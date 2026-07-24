@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -881,13 +881,13 @@ void main() {
   testWidgets('entry tile 不因 master.type 恢復三色圓點', (tester) async {
     await _pumpTimeline(tester);
 
-    expect(_entryDotColor(tester, 11), TpColorsLight.accentDeep);
-    expect(_entryDotColor(tester, 12), TpColorsLight.accentDeep);
+    expect(_entryDotColor(tester, 11), TpSystemColorsLight.tintDeep);
+    expect(_entryDotColor(tester, 12), TpSystemColorsLight.tintDeep);
 
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    expect(_entryDotColor(tester, 21), TpColorsLight.accentDeep);
+    expect(_entryDotColor(tester, 21), TpSystemColorsLight.tintDeep);
   });
 
   testWidgets('travel pill 使用出發 entry 的 travel 顯示各相鄰路段', (tester) async {
@@ -1447,7 +1447,7 @@ void main() {
     );
     expect(
       selected.settings?.glassColor,
-      TpColorsLight.dayThumb.withValues(alpha: 0.64),
+      TpSystemColorsLight.tint.withValues(alpha: 0.18),
     );
   });
 
@@ -1975,7 +1975,10 @@ void main() {
     expect(find.textContaining('無法復原'), findsOneWidget);
 
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pump();
     expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
@@ -2009,7 +2012,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -2043,7 +2049,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -2090,7 +2099,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(
-      find.descendant(of: find.byType(AlertDialog), matching: find.text('刪除')),
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
     );
     await tester.pumpAndSettle();
 

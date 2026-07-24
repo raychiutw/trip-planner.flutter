@@ -5,12 +5,12 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: a release dispatch can opt into the matching Test Lab matrix with `run_optional_evidence=true`, or Firebase can run separately as independent evidence. Store uploads do not wait for Firebase; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. In the current #96 workflow schema, a release dispatch can opt into the matching Test Lab matrix with `run_optional_evidence=true`, or Firebase can run separately as independent evidence; #96 does not change that release gate schema. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
 The Patrol bundle contains two independent evidence suites:
 
-- `app_owned_flow_test.dart` runs login, itinerary/day switching, notes, map/itinerary switching, trip selection, account/appearance, chat, and favorites search/sort against deterministic repository fixtures. It never calls production services.
-- `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 13, overlays, and theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
+- `app_owned_flow_test.dart` runs login, itinerary/day switching, notes, map/itinerary switching, trip selection, the Account sheet, chat, and favorites search/sort against deterministic repository fixtures. Appearance follows the system and has no in-app settings page. The flow never calls production services.
+- `native_map_smoke_test.dart` checks the real native map lifecycle, zoom 13, overlays, and system-theme switching. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI also fails unless a Google native POI produces the platform callback.
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
@@ -28,7 +28,7 @@ attaches the text-input connection required by release-mode tests on physical
 iOS devices; the host-runner integration test keeps the standard Flutter test
 driver through the same shared flow.
 
-The regular PR/push CI also runs the same app-owned flow on the host runner. It writes named geometry-review PNGs for chat, itinerary, Tripline POI, native-Google-POI callback state, favorites, trip picker, account, form, and destructive confirmation to `build/test-artifacts/app-owned/`. Every state is captured in Light/Dark, 100%/200% text, and Reduce Motion/Reduce Transparency coverage, then uploaded as the seven-day `tripline-ui-evidence-*` artifact even when a later CI step fails. Flutter host tests use the deterministic Ahem font, so these PNGs validate layout and state coverage; use Test Lab's device screenshots/video for readable platform typography and native map tiles. Screenshots are evidence, not pixel-perfect pass/fail goldens.
+The regular PR/push CI also runs the same app-owned flow on the host runner. It writes 10 named product-state PNGs—welcome, chat, itinerary, two map states, favorites, trip picker, Account sheet, form, and destructive confirmation—to `build/test-artifacts/app-owned/`. Each state is captured in six system configurations: Light/Dark at 100%, Light/Dark at 200%, and Light/Dark with Reduce Motion plus Reduce Transparency. The resulting 60 PNGs are uploaded as the seven-day `tripline-ui-evidence-*` artifact even when a later CI step fails. Flutter host tests use the deterministic Ahem font, so these PNGs validate layout and state coverage; use Test Lab's device screenshots/video for readable platform typography and native map tiles. Screenshots are evidence, not pixel-perfect pass/fail goldens.
 
 ## One-time Google Cloud setup
 
@@ -124,6 +124,11 @@ Manual **Mobile CI / Releases** dispatches are accepted only from `master` and r
 contract，也不再向 release build 注入 restore feature flag。已部署的後端
 restore endpoint 是否退休不屬於 Flutter release pipeline 的責任範圍。
 
+以下依日期排列的 release records 是當時版本的歷史證據。凡其中提到
+Account 外觀頁、第五個 root tab、favorite restore App wiring、restore staging
+contract 或 restore feature flag，均已由 #96 與現行 `design.md` 取代，不代表
+目前 App 或 release workflow 的契約。
+
 Test Lab exit codes are not swallowed:
 
 - `0`: all tests passed;
@@ -192,6 +197,8 @@ Official references:
 - [Firebase Android command line testing](https://firebase.google.com/docs/test-lab/android/command-line)
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
+
+## 歷史 release records
 
 ## 2026-07-23 v0.9.6 store release record
 

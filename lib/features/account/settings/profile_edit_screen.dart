@@ -48,9 +48,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           _draft = savedName;
           _saving = false;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('已更新個人資料')));
+        showAppNotice(context, '已更新個人資料');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && context.canPop()) context.pop();
         });

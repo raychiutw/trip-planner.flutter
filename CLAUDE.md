@@ -55,7 +55,7 @@ wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.t
 
 ### Theme 取色守則
 
-語意色走 `colorScheme`；柔褐 accent 是唯一品牌強調色，內容 surface 使用暖白／中性深色。`TpTones` 的 sage／pink 僅是舊 API 相容別名，不得恢復內容三色分類。Widget 不要直接引用 `TpColorsLight/Dark` 常數（會壞 dark mode）；地圖逐日 pin／route palette 是唯一 rainbow 色例外。設計禁忌：無 gradient 裝飾、無 emoji icon。
+Widget 取色一律走 `Theme.of(context).colorScheme`；柔褐 tint 是唯一品牌強調色，內容 surface 跟隨 iOS 系統語意層級。`TpSystemColorsLight/Dark` 只供 `AppTheme` 工廠建立 Light／Dark／High Contrast 主題，feature 不得直接引用；地圖逐日 pin／route palette 是唯一 rainbow 色例外。設計禁忌：無 gradient 裝飾、無 emoji icon。
 
 ### OCC
 

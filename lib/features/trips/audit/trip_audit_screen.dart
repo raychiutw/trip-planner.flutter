@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
-import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/trip.dart';
@@ -14,7 +13,7 @@ import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
 
-/// Shows the latest audit rows for a trip and allows safe rollback.
+/// Shows the latest audit rows for a trip as a read-only history.
 class TripAuditScreen extends ConsumerStatefulWidget {
   const TripAuditScreen({super.key, required this.tripId});
 
@@ -29,8 +28,6 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
   String? _error;
   Trip? _trip;
   List<TripAuditRow> _rows = const [];
-  int? _rollingBackId;
-  TripAuditRow? _retryRollback;
   var _generation = 0;
 
   @override
@@ -45,8 +42,6 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
     if (oldWidget.tripId != widget.tripId) {
       _trip = null;
       _rows = const [];
-      _rollingBackId = null;
-      _retryRollback = null;
       _load();
     }
   }
@@ -58,7 +53,6 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
     setState(() {
       _loading = true;
       _error = null;
-      _retryRollback = null;
     });
 
     try {
@@ -82,44 +76,6 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
     }
   }
 
-  Future<void> _rollback(TripAuditRow row) async {
-    if (_rollingBackId != null) return;
-    final confirmed = await showAppConfirm(
-      context,
-      title: '回滾異動',
-      message: '確定要回滾 #${row.id} 這筆異動嗎？此操作會寫入新的 audit 記錄。',
-      confirmLabel: '回滾',
-    );
-    if (!confirmed || !mounted) return;
-
-    final generation = _generation;
-    final tripId = widget.tripId;
-    setState(() {
-      _rollingBackId = row.id;
-      _error = null;
-      _retryRollback = null;
-    });
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .rollbackAudit(tripId: tripId, auditId: row.id);
-      if (!_isCurrent(generation, tripId)) return;
-      if (!mounted) return;
-      showAppNotice(context, '已回滾異動');
-      await _load();
-    } on Exception catch (error) {
-      if (!_isCurrent(generation, tripId)) return;
-      setState(() {
-        _error = _auditRollbackErrorMessage(error);
-        _retryRollback = row;
-      });
-    } finally {
-      if (mounted && widget.tripId == tripId) {
-        setState(() => _rollingBackId = null);
-      }
-    }
-  }
-
   bool _isCurrent(int generation, String tripId) =>
       mounted && generation == _generation && widget.tripId == tripId;
 
@@ -134,7 +90,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
           TpToolbarIconButton(
             key: const ValueKey('trip-audit-refresh-button'),
             tooltip: '重新整理',
-            onPressed: _loading || _rollingBackId != null ? null : _load,
+            onPressed: _loading ? null : _load,
             icon: Icons.refresh,
           ),
         ],
@@ -152,7 +108,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
                 ),
               )
             : RefreshIndicator(
-                onRefresh: _rollingBackId == null ? _load : () async {},
+                onRefresh: _load,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(
@@ -180,27 +136,14 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
                           _Header(title: tripTitle, count: _rows.length),
                           const SizedBox(height: TpSpacing.s4),
                           if (_error != null) ...[
-                            _InlineError(
-                              message: _error!,
-                              onRetry: _retryRollback == null
-                                  ? _load
-                                  : () => _rollback(_retryRollback!),
-                            ),
+                            _InlineError(message: _error!, onRetry: _load),
                             const SizedBox(height: TpSpacing.s4),
                           ],
                           if (_rows.isEmpty && _error == null)
                             const _EmptyAudit()
                           else
                             for (final row in _rows) ...[
-                              _AuditCard(
-                                row: row,
-                                rollingBack: _rollingBackId == row.id,
-                                onRollback:
-                                    row.action == TripAuditAction.error ||
-                                        _rollingBackId != null
-                                    ? null
-                                    : () => _rollback(row),
-                              ),
+                              _AuditCard(row: row),
                               const SizedBox(height: TpSpacing.s3),
                             ],
                         ],
@@ -237,11 +180,6 @@ class _Header extends StatelessWidget {
               avatar: const Icon(Icons.history_outlined, size: 16),
               label: Text('$count 筆'),
             ),
-            const Chip(
-              visualDensity: VisualDensity.compact,
-              avatar: Icon(Icons.restore, size: 16),
-              label: Text('可回滾'),
-            ),
           ],
         ),
       ],
@@ -250,15 +188,9 @@ class _Header extends StatelessWidget {
 }
 
 class _AuditCard extends StatelessWidget {
-  const _AuditCard({
-    required this.row,
-    required this.rollingBack,
-    required this.onRollback,
-  });
+  const _AuditCard({required this.row});
 
   final TripAuditRow row;
-  final bool rollingBack;
-  final VoidCallback? onRollback;
 
   @override
   Widget build(BuildContext context) {
@@ -324,25 +256,6 @@ class _AuditCard extends StatelessWidget {
                   child: Text(line),
                 ),
             ],
-            const SizedBox(height: TpSpacing.s3),
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                key: ValueKey('trip-audit-rollback-${row.id}'),
-                onPressed: rollingBack ? null : onRollback,
-                icon: rollingBack
-                    ? Semantics(
-                        liveRegion: true,
-                        label: '正在回滾異動',
-                        child: const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : const Icon(Icons.restore),
-                label: const Text('回滾'),
-              ),
-            ),
           ],
         ),
       ),
@@ -501,11 +414,6 @@ String _formatTimestamp(String value) {
 String _auditErrorMessage(Object error) {
   if (error is ApiError && _hasCjk(error.message)) return error.message;
   return '載入異動紀錄失敗，請稍後再試';
-}
-
-String _auditRollbackErrorMessage(Object error) {
-  if (error is ApiError && _hasCjk(error.message)) return error.message;
-  return '回滾異動失敗，請稍後再試';
 }
 
 bool _hasCjk(String value) => RegExp(r'[一-鿿]').hasMatch(value);

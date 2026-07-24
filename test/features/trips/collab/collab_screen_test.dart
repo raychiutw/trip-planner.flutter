@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -229,7 +230,7 @@ void main() {
 
     expect(find.text('移除「v@x.com」？'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, '移除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '移除'));
     await tester.pump();
     expect(
       find.byKey(const ValueKey('irreversible-action-progress')),
@@ -260,7 +261,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('撤銷「guest@x.com」的邀請？'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, '撤銷'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
     await tester.pumpAndSettle();
 
     verify(

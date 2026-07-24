@@ -19,7 +19,7 @@
 | `/trips/:tripId/notes` | `TripNotesScreen` | tab 2 孫路由 |
 | `/trips/:tripId/print` | `TripPrintScreen` | tab 2 孫路由 |
 | `/trips/:tripId/health` | `TripHealthScreen` | tab 2 孫路由 |
-| `/trips/:tripId/audit` | `TripAuditScreen` | tab 2 孫路由(查看 audit log 摘要、diff 欄位與確認式 rollback) |
+| `/trips/:tripId/audit` | `TripAuditScreen` | tab 2 孫路由（唯讀查看 audit log 摘要與 diff 欄位） |
 | `/edit-trip/:tripId` | `EditTripScreen` | shell 外編輯頁(目的地、標題、描述、語言、發布狀態,並可整體平移出發日期、新增/刪除天數與補回缺漏日期) |
 | `/trips/:tripId/entries/new?day=N&mode=search|favorites|custom&region=沖繩` | `EntryAddRouteScreen` | tab 2 孫路由(搜尋 POI / 收藏景點 / 自訂停留點；搜尋模式可帶 region,加入前 resolve Place Details 產生營業/消費/地址備註,選取後可覆寫單筆 POI 分類；自訂模式可設定分類與座標；搜尋/收藏可分類篩選與多選批次加入) |
 | `/trips/:tripId/entries/:eid/edit` | `EntryEditRouteScreen` | tab 2 孫路由 |
@@ -32,7 +32,7 @@
 | `/favorites/add-to-trip` | `AddToTripScreen` | tab 4 子路由(加入行程,extra `AddToTripArgs`) |
 | `/account` | `AccountScreen` | Account sheet 根頁（保留 deep link） |
 | `/settings/profile` | `ProfileEditScreen` | Account sheet 設定子頁 |
-| `/settings/appearance` | `AppearanceScreen` | Account sheet 設定子頁 |
+| `/settings/appearance` | `AccountScreen` | 舊版相容 alias；回到 Account sheet 根頁，外觀固定跟隨系統 |
 | `/settings/notifications` | `NotificationsScreen` | Account sheet 設定子頁 |
 | `/account/notifications` | `NotificationsScreen` | Account sheet 的 Web 相容 alias |
 | `/settings/sessions` | `AccountSessionsScreen` | Account sheet 設定子頁 |

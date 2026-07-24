@@ -1,14 +1,13 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
-import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -69,7 +68,6 @@ void main() {
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
         ),
-        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       ],
     );
     addTearDown(container.dispose);
@@ -157,7 +155,6 @@ void main() {
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
         ),
-        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       ],
     );
     addTearDown(container.dispose);
@@ -215,11 +212,11 @@ void main() {
     await tester.tap(find.byKey(const Key('account-session-revoke-sid-phone')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
     verifyNever(() => mockTripRepository.revokeAccountSession(any()));
 
-    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
     await tester.pumpAndSettle();
 
     verify(
@@ -244,7 +241,7 @@ void main() {
 
     await tester.tap(revokeFinder);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
     await tester.pumpAndSettle();
 
     expect(
@@ -272,7 +269,7 @@ void main() {
     verifyNever(() => mockTripRepository.revokeOtherAccountSessions());
   });
 
-  testWidgets('顯示帳號 email、OAuth 提醒與頁尾深淺模式/登出', (tester) async {
+  testWidgets('顯示帳號 email、OAuth 提醒與頁尾登出', (tester) async {
     await pumpScreen(tester);
 
     expect(
@@ -287,27 +284,19 @@ void main() {
     expect(find.textContaining('OAuth 已連結應用不受影響'), findsOneWidget);
     expect(
       find.byKey(const Key('account-sessions-theme-footer')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byKey(const Key('account-sessions-logout')), findsOneWidget);
   });
 
-  testWidgets('頁尾可切換深色模式並登出帳號', (tester) async {
-    final container = await pumpScreen(tester);
-
-    await tester.tap(find.byKey(const Key('account-sessions-theme-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('account-sessions-theme-dark')));
-    await tester.pumpAndSettle();
-
-    expect(container.read(themeModeProvider), ThemeMode.dark);
-
+  testWidgets('頁尾可登出帳號', (tester) async {
+    await pumpScreen(tester);
     await tester.tap(find.byKey(const Key('account-sessions-logout')));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
     expect(find.text('登出帳號'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, '登出'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
     await tester.pumpAndSettle();
 
     expect(logoutCalls, hasLength(1));

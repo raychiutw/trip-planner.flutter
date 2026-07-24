@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -252,11 +252,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('edit-shift-days')));
     await tester.pumpAndSettle();
-    expect(find.byType(DatePickerDialog), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.chevron_right));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('1').last);
-    await tester.tap(find.text('OK'));
+    final picker = tester.widget<CalendarDatePicker>(
+      find.byType(CalendarDatePicker),
+    );
+    picker.onDateChanged(DateTime(2026, 5));
+    await tester.pump();
+    await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
 
     verify(
@@ -335,7 +336,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -467,7 +468,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
 
     expect(
@@ -558,7 +559,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -583,7 +584,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(() => tripRepo.deleteDay(tripId: 'okinawa', dayNum: 3)).called(1);
@@ -651,7 +652,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     expect(deletedDayNums, [3]);
@@ -672,7 +673,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     expect(deletedDayNums, [3, 4]);
@@ -719,7 +720,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
 
@@ -775,7 +776,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(() => tripRepo.deleteDay(tripId: 'okinawa', dayNum: 3)).called(1);
@@ -822,7 +823,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -881,7 +882,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit-delete-day-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

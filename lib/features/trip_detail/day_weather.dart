@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/day.dart';
-import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 
 typedef DayWeatherFetcher =
@@ -325,7 +324,6 @@ class DayWeatherPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final sample = _sample;
     return Container(
       key: ValueKey('day-weather-preview-$dayNum'),
@@ -340,7 +338,11 @@ class DayWeatherPreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(sample.icon, size: 22, color: tones.accentDeep),
+          Icon(
+            sample.icon,
+            size: 22,
+            color: theme.colorScheme.onPrimaryContainer,
+          ),
           const SizedBox(width: TpSpacing.s3),
           Expanded(
             child: Column(
@@ -349,7 +351,7 @@ class DayWeatherPreview extends StatelessWidget {
                 Text(
                   '天氣示意',
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: tones.accentDeep,
+                    color: theme.colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -488,7 +490,6 @@ class _WeatherForecastPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
 
     return Container(
       width: double.infinity,
@@ -513,7 +514,7 @@ class _WeatherForecastPanel extends StatelessWidget {
                 children: [
                   Icon(
                     _weatherIcon(summary.code),
-                    color: tones.accent,
+                    color: theme.colorScheme.primary,
                     size: 20,
                   ),
                   const SizedBox(width: TpSpacing.s2),
@@ -532,7 +533,7 @@ class _WeatherForecastPanel extends StatelessWidget {
                   Icon(
                     Icons.water_drop_outlined,
                     size: 16,
-                    color: tones.accent,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: TpSpacing.s1),
                   Text(
@@ -610,7 +611,6 @@ class _HourlyWeatherTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tones = theme.extension<TpTones>()!;
     final rainy = rain >= 50;
 
     return Container(
@@ -621,12 +621,12 @@ class _HourlyWeatherTile extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: rainy
-            ? tones.accent.withValues(alpha: 0.10)
+            ? theme.colorScheme.primary.withValues(alpha: 0.10)
             : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(TpRadius.sm),
         border: Border.all(
           color: rainy
-              ? tones.accent.withValues(alpha: 0.30)
+              ? theme.colorScheme.primary.withValues(alpha: 0.30)
               : theme.colorScheme.outlineVariant,
         ),
       ),
@@ -641,7 +641,7 @@ class _HourlyWeatherTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: TpSpacing.s1),
-          Icon(_weatherIcon(code), size: 18, color: tones.accent),
+          Icon(_weatherIcon(code), size: 18, color: theme.colorScheme.primary),
           const SizedBox(height: TpSpacing.s1),
           Text(
             '$temp°',
@@ -652,7 +652,9 @@ class _HourlyWeatherTile extends StatelessWidget {
           Text(
             '$rain%',
             style: theme.textTheme.labelSmall?.copyWith(
-              color: rainy ? theme.colorScheme.onSurface : tones.accent,
+              color: rainy
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.primary,
               fontWeight: rainy ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
