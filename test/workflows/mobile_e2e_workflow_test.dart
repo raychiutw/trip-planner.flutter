@@ -557,6 +557,7 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
             '\${{ github.workspace }}/ios/Flutter/TestLabSigning.xcconfig',
           ),
           contains('patrol build ios'),
+          contains('--verbose'),
         ),
       );
       expect(
