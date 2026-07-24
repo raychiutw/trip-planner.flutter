@@ -6,6 +6,7 @@
 
 ### 變更
 
+- 收藏刪除改為不可復原：卡片、左滑、選單與批次入口都先顯示具名確認，伺服器成功後才移除；失敗時保留資料與選取並提供重試。Flutter restore API、Undo、feature flag 與 staging release verifier 已移除。
 - 聊天、行程與地圖共用目前行程選擇器與 Day 狀態；跨分頁切換會保留可用 Day、分行程聊天草稿，並清除舊地圖選取。
 - Root navigation 改為聊天、行程、地圖、收藏四個 tabs；Account 由每個內容頁右上角的 `person.crop.circle` 開啟獨立 navigation sheet，舊 Account／Settings deep links 仍可直達對應 sheet 子頁。
 - Welcome／Login 採用跨 iOS、Android 共用的 system colors、暖褐 app tint、HIG controls 與 accessibility fallback；認證與 redirect contract 維持不變。

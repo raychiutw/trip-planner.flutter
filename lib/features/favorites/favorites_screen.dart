@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/adaptive.dart';
-import '../../api/api_error.dart';
+import '../../app/app_feedback.dart';
 import '../../models/add_to_trip.dart';
 import '../../models/poi_favorite.dart';
 import '../../models/poi_type.dart';
@@ -56,6 +56,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   String _regionFilter = 'all';
   Set<int> _selectedIds = {};
   final Set<int> _hiddenFavoriteIds = {};
+  final Set<int> _pendingFavoriteIds = {};
+  final Set<int> _deletingFavoriteIds = {};
+  bool _confirmingSelected = false;
   bool _deletingSelected = false;
   int _page = 1;
   _FavoriteSort _sort = _FavoriteSort.newest;
@@ -308,20 +311,44 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   for (final favorite in visibleFavorites)
                     SwipeToDelete(
                       dismissKey: ValueKey('favorite-dismiss-${favorite.id}'),
-                      actionLabel: '移除收藏',
+                      actionLabel: '刪除',
                       onDelete: () => _removeFavorite(context, ref, favorite),
-                      child: PoiFavoriteCard(
-                        favorite: favorite,
-                        grouped: true,
-                        matchQuery: _searchQuery,
-                        selected: _selectedIds.contains(favorite.id),
-                        selectionMode: _selectedIds.isNotEmpty,
-                        onSelectedChanged: _deletingSelected
-                            ? null
-                            : (_) => _toggleFavoriteSelection(favorite.id),
-                        onRemove: () => _removeFavorite(context, ref, favorite),
-                        onLongPress: () =>
-                            _showFavoriteActions(context, ref, favorite),
+                      child: Stack(
+                        children: [
+                          PoiFavoriteCard(
+                            favorite: favorite,
+                            grouped: true,
+                            matchQuery: _searchQuery,
+                            selected: _selectedIds.contains(favorite.id),
+                            selectionMode: _selectedIds.isNotEmpty,
+                            onSelectedChanged: _deletingSelected
+                                ? null
+                                : (_) => _toggleFavoriteSelection(favorite.id),
+                            onRemove: () =>
+                                _removeFavorite(context, ref, favorite),
+                            onLongPress: () =>
+                                _showFavoriteActions(context, ref, favorite),
+                          ),
+                          if (_deletingFavoriteIds.contains(favorite.id))
+                            Positioned.fill(
+                              child: Semantics(
+                                key: ValueKey(
+                                  'favorite-delete-progress-${favorite.id}',
+                                ),
+                                container: true,
+                                liveRegion: true,
+                                label: '正在刪除「${favorite.displayName}」',
+                                child: ColoredBox(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surface.withValues(alpha: 0.72),
+                                  child: const Center(
+                                    child: CircularProgressIndicator.adaptive(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                 ],
@@ -415,7 +442,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           icon: CupertinoIcons.check_mark_circled,
         ),
         TpActionItem(
-          label: '取消收藏',
+          label: '刪除',
           value: _FavoriteContextAction.remove,
           icon: CupertinoIcons.heart_slash,
           dividerBefore: true,
@@ -479,46 +506,80 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   }
 
   Future<void> _confirmDeleteSelected() async {
+    if (_confirmingSelected || _deletingSelected) return;
     final ids = _selectedIds.toList();
     if (ids.isEmpty) return;
+    if (ids.any(_pendingFavoriteIds.contains)) return;
+    final names = [
+      for (final favorite
+          in ref.read(favoritesProvider).value ?? const <PoiFavorite>[])
+        if (ids.contains(favorite.id)) '「${favorite.displayName}」',
+    ];
 
-    final confirmed = await showAppConfirm(
-      context,
-      title: '確定刪除收藏？',
-      message: '即將刪除 ${ids.length} 個收藏景點，此操作無法復原。',
-      confirmLabel: '刪除',
-      cancelLabel: '保留',
-      isDestructive: true,
-    );
-    if (!confirmed || !mounted) return;
+    _confirmingSelected = true;
+    _pendingFavoriteIds.addAll(ids);
+    try {
+      final confirmed = await showAppConfirm(
+        context,
+        title: '刪除 ${ids.length} 個收藏？',
+        message: '將刪除${names.join('、')}。刪除後無法復原。',
+        confirmLabel: '刪除',
+        cancelLabel: '保留',
+        isDestructive: true,
+      );
+      if (!confirmed || !mounted) return;
 
-    setState(() => _deletingSelected = true);
-    final repository = ref.read(favoritesRepositoryProvider);
-    final results = await Future.wait(
-      ids.map(
-        (id) => repository
-            .deleteFavorite(id)
-            .then((_) => true)
-            .catchError((_) => false),
-      ),
-    );
-    final failed = results.where((ok) => !ok).length;
+      setState(() {
+        _deletingSelected = true;
+        _deletingFavoriteIds.addAll(ids);
+      });
+      final repository = ref.read(favoritesRepositoryProvider);
+      final results = await Future.wait(
+        ids.map((id) async {
+          try {
+            await repository.deleteFavorite(id);
+            return (id: id, succeeded: true);
+          } on Exception {
+            return (id: id, succeeded: false);
+          }
+        }),
+      );
+      final succeededIds = {
+        for (final result in results)
+          if (result.succeeded) result.id,
+      };
+      final failedIds = {
+        for (final result in results)
+          if (!result.succeeded) result.id,
+      };
 
-    ref.invalidate(favoritesProvider);
-    if (!mounted) return;
-    setState(() {
-      _selectedIds = {};
-      _deletingSelected = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _hiddenFavoriteIds.addAll(succeededIds);
+        _selectedIds = failedIds;
+      });
+      if (succeededIds.isNotEmpty) ref.invalidate(favoritesProvider);
+      if (failedIds.isNotEmpty) {
+        showAppError(
+          context,
+          '${failedIds.length} 個收藏刪除失敗，資料仍保留。',
+          onRetry: () => unawaited(_confirmDeleteSelected()),
+        );
+        return;
+      }
 
-    final message = failed == 0
-        ? '已刪除 ${ids.length} 個收藏'
-        : failed < ids.length
-        ? '已刪除 ${ids.length - failed} 個，$failed 個失敗'
-        : '刪除失敗，請稍後再試';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      HapticFeedback.mediumImpact();
+      showAppNotice(context, '已刪除 ${succeededIds.length} 個收藏');
+    } finally {
+      _confirmingSelected = false;
+      _pendingFavoriteIds.removeAll(ids);
+      if (mounted) {
+        setState(() {
+          _deletingSelected = false;
+          _deletingFavoriteIds.removeAll(ids);
+        });
+      }
+    }
   }
 
   Future<void> _removeFavorite(
@@ -526,41 +587,41 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     WidgetRef ref,
     PoiFavorite favorite,
   ) async {
-    setState(() => _hiddenFavoriteIds.add(favorite.id));
+    if (!_pendingFavoriteIds.add(favorite.id)) return;
     try {
-      await ref.read(favoritesRepositoryProvider).deleteFavorite(favorite.id);
-      ref.invalidate(favoritesProvider);
-      HapticFeedback.selectionClick();
-      if (!context.mounted) return;
-      if (!ref.read(favoriteRestoreEnabledProvider)) {
-        showAppNotice(context, '已移除收藏');
-        return;
-      }
-      showAppUndoNotice(
+      final confirmed = await showAppConfirm(
         context,
-        message: '已移除收藏',
-        onUndo: () => unawaited(_restoreFavorite(favorite.id)),
+        title: '刪除「${favorite.displayName}」？',
+        message: '將從收藏移除「${favorite.displayName}」。刪除後無法復原。',
+        confirmLabel: '刪除',
+        cancelLabel: '保留',
+        isDestructive: true,
       );
+      if (!confirmed || !context.mounted) return;
+
+      setState(() => _deletingFavoriteIds.add(favorite.id));
+      await ref.read(favoritesRepositoryProvider).deleteFavorite(favorite.id);
+      if (!mounted) return;
+      setState(() {
+        _hiddenFavoriteIds.add(favorite.id);
+        _selectedIds = Set<int>.from(_selectedIds)..remove(favorite.id);
+      });
+      ref.invalidate(favoritesProvider);
+      HapticFeedback.mediumImpact();
+      if (!context.mounted) return;
+      showAppNotice(context, '已刪除「${favorite.displayName}」');
     } on Exception {
       if (!context.mounted) return;
-      setState(() => _hiddenFavoriteIds.remove(favorite.id));
-      showAppNotice(context, '取消收藏失敗，請稍後再試');
-    }
-  }
-
-  Future<void> _restoreFavorite(int favoriteId) async {
-    try {
-      await ref.read(favoritesRepositoryProvider).restoreFavorite(favoriteId);
-      if (!mounted) return;
-      setState(() => _hiddenFavoriteIds.remove(favoriteId));
-      ref.invalidate(favoritesProvider);
-      HapticFeedback.selectionClick();
-    } on Exception catch (error) {
-      if (!mounted) return;
-      final expired = error is ApiError && error.status == 410;
-      if (!expired) setState(() => _hiddenFavoriteIds.remove(favoriteId));
-      showAppNotice(context, expired ? '復原期限已過' : '無法復原收藏，請稍後再試');
-      ref.invalidate(favoritesProvider);
+      showAppError(
+        context,
+        '無法刪除「${favorite.displayName}」，收藏仍保留。',
+        onRetry: () => unawaited(_removeFavorite(context, ref, favorite)),
+      );
+    } finally {
+      _pendingFavoriteIds.remove(favorite.id);
+      if (mounted) {
+        setState(() => _deletingFavoriteIds.remove(favorite.id));
+      }
     }
   }
 }

@@ -5,7 +5,7 @@ Tripline uses two complementary test layers:
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
 - Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
 
-The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: a release dispatch can opt into the matching Test Lab matrix with `run_optional_evidence=true`, or Firebase can run separately as independent evidence. Store uploads no longer wait for Firebase or the staging favorite-restore contract; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
+The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. The same workflow is reusable: a release dispatch can opt into the matching Test Lab matrix with `run_optional_evidence=true`, or Firebase can run separately as independent evidence. Store uploads do not wait for Firebase; failures remain visible for the next corrective release without preventing an otherwise valid signed build from reaching testers. Both Test Lab jobs are master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
 The Patrol bundle contains two independent evidence suites:
 
@@ -118,35 +118,11 @@ same change as the protected GitHub secrets.
 
 In GitHub Actions, select **Mobile E2E / Firebase Test Lab** and choose `android`, `ios`, or `all`. Test Lab keeps device video, screenshots, logs, JUnit results, and submitted test binaries in the private result bucket. Before GitHub uploads the seven-day artifact, `tool/sanitize_test_lab_evidence.sh` applies an evidence-only allowlist and removes signed APK/XCTest archives plus unknown binary formats. GitHub therefore retains the matrix log, JUnit/XML results, logcat, video, screenshots, and text metadata without republishing installable test inputs.
 
-Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Select `release_target=both` for the normal release path: the TestFlight and Google Play jobs then share one `GITHUB_RUN_NUMBER`／`GITHUB_RUN_ATTEMPT` pair and therefore receive the same build number. Use a platform-specific target only to recover or republish one store. Store upload is independent of staging and Firebase evidence so a Test Lab configuration, quota, or infrastructure failure cannot block TestFlight／Play internal delivery. Keep `run_optional_evidence` disabled for the publish-first path; enable it only when the same dispatch should also collect staging and device evidence. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
+Manual **Mobile CI / Releases** dispatches are accepted only from `master` and require approval through the `mobile-release` GitHub Environment. Select `release_target=both` for the normal release path: the TestFlight and Google Play jobs then share one `GITHUB_RUN_NUMBER`／`GITHUB_RUN_ATTEMPT` pair and therefore receive the same build number. Use a platform-specific target only to recover or republish one store. Store upload is independent of Firebase evidence so a Test Lab configuration, quota, or infrastructure failure cannot block TestFlight／Play internal delivery. Keep `run_optional_evidence` disabled for the publish-first path; enable it only when the same dispatch should also collect device evidence. Google Workload Identity Federation remains restricted to this repository's `mobile-e2e.yml` on `master`.
 
-When `run_optional_evidence` is enabled, the release workflow runs `tool/verify_favorite_restore_contract.sh` against a disposable staging account and POI before collecting Test Lab evidence. Configure these protected `mobile-release` Environment secrets after the backend migration is deployed:
-
-- `STAGING_API_BASE_URL` (HTTPS only), `STAGING_ORIGIN`
-- `STAGING_SESSION_COOKIE`, optional `STAGING_CSRF_TOKEN`
-- `STAGING_OTHER_SESSION_COOKIE`, optional `STAGING_OTHER_CSRF_TOKEN`
-- `STAGING_FAVORITE_POI_ID`
-- `STAGING_CONTRACT_GUARD=tripline-staging-favorite-restore-v1`
-
-Before adding those secrets, add the deployed API's exact HTTPS origin and its
-stable backend `environmentId` to the reviewed
-`tool/staging-release-environments.txt` file. The environment cannot override
-that file. The checked-in `.test` pair is reserved for the isolated script test
-and cannot resolve on the public Internet. The backend must implement the
-read-only `GET /api/environment-identity` contract documented in
-`docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md`.
-
-Before its first mutation, the smoke verifies that the exact origin is committed,
-the backend identity matches, and the backend advertises the
-`expected-environment-id-v1` mutation guard. Every request carries the committed
-ID in `X-Expected-Environment-ID`, which the backend must verify again inside
-each write path. It then verifies create → delete → active-list
-exclusion → second-user containment → restore → one active row → cleanup.
-Missing secrets, an uncommitted origin, an explicit port or path, an identity
-mismatch, the committed production host `trip-planner-dby.pages.dev`, an absent
-migration, or any contract mismatch fails closed. Only after this gate succeeds
-do release builds receive `FAVORITE_RESTORE_ENABLED=true`; the independent
-Patrol suites do not toggle a feature they do not exercise.
+收藏已採不可復原刪除，release workflow 不再執行收藏 restore staging
+contract，也不再向 release build 注入 restore feature flag。已部署的後端
+restore endpoint 是否退休不屬於 Flutter release pipeline 的責任範圍。
 
 Test Lab exit codes are not swallowed:
 

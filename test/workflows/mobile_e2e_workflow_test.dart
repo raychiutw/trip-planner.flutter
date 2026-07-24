@@ -24,9 +24,6 @@ void main() {
     'patrol_test/support/ios_system_alerts.dart',
   ).readAsStringSync();
   final setupGuide = File('docs/mobile-e2e.md').readAsStringSync();
-  final restoreContract = File(
-    'tool/verify_favorite_restore_contract.sh',
-  ).readAsStringSync();
   final evidenceSanitizer = File(
     'tool/sanitize_test_lab_evidence.sh',
   ).readAsStringSync();
@@ -102,7 +99,7 @@ void main() {
           RegExp(
             r'inputs\.run_optional_evidence',
           ).allMatches(releaseWorkflow).length,
-          greaterThanOrEqualTo(2),
+          1,
         );
       },
     );
@@ -247,48 +244,34 @@ void main() {
       );
     });
 
-    test(
-      'release keeps the real staging favorite restore contract as evidence',
-      () {
-        expect(releaseWorkflow, contains('Verify staging favorite restore'));
-        expect(releaseWorkflow, contains('STAGING_API_BASE_URL'));
-        expect(releaseWorkflow, isNot(contains('STAGING_ALLOWED_HOST')));
-        expect(releaseWorkflow, contains('STAGING_SESSION_COOKIE'));
-        expect(releaseWorkflow, contains('STAGING_OTHER_SESSION_COOKIE'));
-        expect(
-          releaseWorkflow,
-          contains('--dart-define=FAVORITE_RESTORE_ENABLED=true'),
-        );
-        expect(e2eWorkflow, isNot(contains('favorite_restore_enabled')));
-        expect(restoreContract, contains('/api/poi-favorites/'));
-        expect(restoreContract, contains('/restore'));
-        expect(restoreContract, contains('STAGING_CONTRACT_GUARD'));
-        expect(restoreContract, contains('staging-release-environments.txt'));
-        expect(restoreContract, contains('/api/environment-identity'));
-        expect(restoreContract, contains('X-Expected-Environment-ID'));
-        expect(restoreContract, contains('expected-environment-id-v1'));
-        expect(restoreContract, contains('--connect-timeout'));
-        expect(restoreContract, contains('--max-time'));
-        expect(releaseWorkflow, contains('favorite-restore-contract-'));
-        expect(
-          releaseWorkflow,
-          contains(
-            'external_device_gate:\n'
-            '    name: External device evidence\n'
-            '    if:',
+    test('release 不再包含收藏 restore contract 與 feature flag', () {
+      expect(
+        releaseWorkflow,
+        isNot(
+          anyOf(
+            contains('Verify staging favorite restore'),
+            contains('FAVORITE_RESTORE_ENABLED'),
+            contains('STAGING_FAVORITE_POI_ID'),
+            contains('favorite_restore_contract'),
+            contains('favorite-restore-contract-'),
           ),
-        );
-        expect(
-          releaseWorkflow,
-          isNot(contains('needs: favorite_restore_contract')),
-        );
-        expect(releaseWorkflow, isNot(contains('needs: external_device_gate')));
-        expect(
-          releaseWorkflow,
-          isNot(contains("needs.external_device_gate.result == 'success'")),
-        );
-      },
-    );
+        ),
+      );
+      expect(
+        File('tool/verify_favorite_restore_contract.sh').existsSync(),
+        isFalse,
+      );
+      expect(
+        File(
+          'test/workflows/favorite_restore_contract_script_test.dart',
+        ).existsSync(),
+        isFalse,
+      );
+      expect(
+        File('tool/staging-release-environments.txt').existsSync(),
+        isFalse,
+      );
+    });
 
     test('public GitHub artifacts exclude signed device test binaries', () {
       expect(

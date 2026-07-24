@@ -6,7 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import 'poi_rating_label.dart';
 
-/// 收藏 POI 卡片：共用 Tripline accent + rating/note/usages + 取消收藏 heart。
+/// 收藏 POI 卡片：共用 Tripline accent + rating/note/usages + 刪除入口。
 class PoiFavoriteCard extends StatelessWidget {
   const PoiFavoriteCard({
     super.key,
@@ -134,7 +134,7 @@ class PoiFavoriteCard extends StatelessWidget {
             ),
             IconButton(
               key: ValueKey('favorite-remove-${favorite.id}'),
-              tooltip: '取消收藏',
+              tooltip: '刪除',
               icon: Icon(CupertinoIcons.heart_fill, color: tones.accentDeep),
               onPressed: onRemove,
             ),
