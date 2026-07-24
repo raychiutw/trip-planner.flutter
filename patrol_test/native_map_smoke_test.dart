@@ -91,7 +91,10 @@ void main() {
     );
 
     await $(#armDoubleTapCheck).tap();
-    await $.platform.mobile.doubleTap(_nativeMapSelector);
+    await $.platform.mobile.doubleTap(
+      _nativeMapSelector,
+      delayBetweenTaps: const Duration(milliseconds: 50),
+    );
     await $(
       #nativeMapDoubleTapObserved,
     ).waitUntilExists(timeout: const Duration(seconds: 15));
