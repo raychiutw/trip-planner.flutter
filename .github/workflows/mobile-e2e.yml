@@ -200,7 +200,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p test-lab-results/android
+          mkdir -p \
+            test-lab-results/android/integration \
+            test-lab-results/android/patrol
           touch test-lab-results/android/.tripline-test-lab-evidence-root
           gcloud storage cp --recursive \
             "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${INTEGRATION_TEST_RESULTS_DIR}" \

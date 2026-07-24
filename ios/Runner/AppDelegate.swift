@@ -22,13 +22,15 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(
-      forPlugin: "TriplineNotificationPermission"
-    )
+    guard
+      let registrar = engineBridge.pluginRegistry.registrar(
+        forPlugin: "TriplineNotificationPermission"
+      ),
+      let accessibilityRegistrar = engineBridge.pluginRegistry.registrar(
+        forPlugin: "TriplineAccessibility"
+      )
+    else { return }
     NotificationPermissionPlugin.register(with: registrar)
-    let accessibilityRegistrar = engineBridge.pluginRegistry.registrar(
-      forPlugin: "TriplineAccessibility"
-    )
     ReduceTransparencyPlugin.register(with: accessibilityRegistrar)
   }
 }

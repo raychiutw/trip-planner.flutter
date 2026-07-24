@@ -100,6 +100,11 @@ void main() {
       expect(e2eWorkflow, contains('--results-bucket'));
       expect(e2eWorkflow, contains('gcloud storage cp --recursive'));
       expect(e2eWorkflow, contains('test-lab-results/android'));
+      expect(
+        e2eWorkflow,
+        contains('test-lab-results/android/integration \\\n'),
+      );
+      expect(e2eWorkflow, contains('test-lab-results/android/patrol'));
       expect(e2eWorkflow, contains('test-lab-results/ios'));
       expect(setupGuide, contains('FIREBASE_TEST_RESULTS_BUCKET'));
       expect(setupGuide, contains('.github/test-lab-results-lifecycle.json'));
