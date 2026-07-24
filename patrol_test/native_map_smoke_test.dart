@@ -18,7 +18,7 @@ const _multitouchEvidenceIssue =
 
 final _nativeMapSelector = MobileSelector(
   android: AndroidSelector(contentDescription: _nativeMapEvidenceLabel),
-  ios: IOSSelector(label: _nativeMapEvidenceLabel),
+  ios: IOSSelector(elementType: IOSElementType.application),
 );
 
 enum _NativeGesture { pan, doubleTap }
@@ -91,17 +91,11 @@ void main() {
     );
 
     await $(#armDoubleTapCheck).tap();
-    final semantics = $.tester.ensureSemantics();
-    try {
-      await $.tester.pump();
-      await $.platform.mobile.doubleTap(_nativeMapSelector);
-      await $(
-        #nativeMapDoubleTapObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapDoubleTapObserved), findsOneWidget);
-    } finally {
-      semantics.dispose();
-    }
+    await $.platform.mobile.doubleTap(_nativeMapSelector);
+    await $(
+      #nativeMapDoubleTapObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapDoubleTapObserved), findsOneWidget);
 
     await $(#requestLocationPermission).tap();
     await $.platform.mobile.grantPermissionWhenInUse();
