@@ -709,7 +709,7 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('onMapStyleApplied'));
         expect(nativeMapSmoke, contains('grantPermissionWhenInUse'));
         expect(nativeMapSmoke, contains('.swipe('));
-        expect(nativeMapSmoke, contains('.platform.mobile.doubleTap('));
+        expect(nativeMapSmoke, contains('.platform.android.doubleTap('));
         expect(nativeMapSmoke, isNot(contains('.startGesture(')));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
         expect(
