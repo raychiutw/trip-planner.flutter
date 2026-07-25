@@ -17,21 +17,24 @@ status: accepted
 ## Consequences
 
 - **把關從 workflow 層移到 GitHub 設定層。** 剩下的前置條件只有兩個:`environment: mobile-release` 的環境審核,以及 `github.ref == 'refs/heads/master'` 加 `workflow_dispatch` 的觸發限制。這兩層是現在唯一擋在上傳前面的東西。
-- **⚠️ 已查證:那兩層設定目前都不存在,所以發版現在沒有任何前置把關。**
-  2026-07-25 以 GitHub API 查得:
+- **那兩層設定原本都不存在,2026-07-25 已補上(issue #133)。** 查證時發現
+  `mobile-release` 只有 `branch_policy`、`rulesets` 數量為 0、`master` 回
+  404 Branch not protected —— 也就是手動 dispatch 一次就直接上傳,而且
+  「master 上的 code 已經過 CI」這個前提並不成立。現況:
 
   ```
-  environments/mobile-release  protection_rules = [branch_policy]   # 沒有 required_reviewers
-  deployment-branch-policies   = [master]                            # 只限制來源分支
-  rulesets                     = []                                  # 數量 0
-  branches/master/protection   → 404 Branch not protected
+  environments/mobile-release  protection_rules = [branch_policy, required_reviewers]
+  rulesets                     = ["master: require CI"]（required_status_checks: Analyze and test）
   ```
 
-  也就是說:手動 dispatch 一次就會直接上傳,沒有人工審核;而且 `master`
-  沒有 required status check,「master 上的 code 已經過 CI」這個前提也不成立
-  (實務上 PR 都跑了 CI,但沒有任何東西強制它)。
+  **這是 repo 設定,不在程式碼裡,測試驗不到** —— 它可以被任何有 admin
+  權限的人靜靜關掉,而本 ADR 的整個安全論證都靠它。定期複查:
 
-  這是 repo 設定,不在程式碼裡,**測試驗不到** —— 是本決定最主要的殘留風險。
-  追蹤於 issue #133,需要 repo admin 在 GitHub UI 設定。
+  ```bash
+  gh api repos/raychiutw/trip-planner.flutter/environments/mobile-release \
+    --jq '[.protection_rules[].type]'
+  gh api repos/raychiutw/trip-planner.flutter/rules/branches/master \
+    --jq '.[] | select(.type=="required_status_checks")'
+  ```
 - **Test Lab 失敗不再等於發版失敗,但也不再有人被迫看它。** 排程跑出來的紅燈需要有人主動追,否則外部裝置證據會靜靜地爛掉。
 - 契約由 `test/platform/google_maps_configuration_test.dart` 與 `test/features/map/map_platform_config_test.dart` 守住:前者驗 store job 沒有 `needs:`、但保有 environment 與 master-only;後者驗 `mobile-e2e.yml` 保有自己的觸發來源,不會因為沒人呼叫而變成孤兒 workflow。
