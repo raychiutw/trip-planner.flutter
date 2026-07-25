@@ -500,8 +500,11 @@ double _bearingDelta(double first, double second) {
 Future<void> _ensureNativeSemantics() async {
   const channel = MethodChannel('tripline/e2e/semantics');
   try {
-    await channel.invokeMethod<bool>('ensureEnabled');
+    final enabled = await channel.invokeMethod<bool>('ensureEnabled');
+    // 診斷用：失敗時要能區分「native 說做了但沒效」與「channel 沒被呼叫到」
+    // —— 兩者的測試失敗長得一模一樣（見 #104）。
+    debugPrint('Tripline e2e semantics: native returned $enabled');
   } on MissingPluginException {
-    // Android 或未註冊的建置：不需要這一步。
+    debugPrint('Tripline e2e semantics: channel not registered (Android?)');
   }
 }
