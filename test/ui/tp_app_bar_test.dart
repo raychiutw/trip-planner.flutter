@@ -68,14 +68,23 @@ void main() {
     });
 
     testWidgets('Esc 可關閉，方向鍵可走動', (tester) async {
-      await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
+      String? selected;
+      await tester.pumpWidget(
+        _menuHost(items: items, onSelected: (value) => selected = value),
+      );
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
       await tester.pumpAndSettle();
 
+      // 方向鍵把焦點移進面板，Enter 啟動落點的那一項 —— 只驗「不丟例外」
+      // 是恆真的，拿掉 shortcuts 也不會丟例外。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull, reason: '方向鍵要能在面板內走動而不是丟例外');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selected, 'a', reason: '方向鍵要走到第一項，Enter 要能啟動它');
 
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(find.byKey(_menuPanel), findsNothing);

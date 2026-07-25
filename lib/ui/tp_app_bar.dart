@@ -865,7 +865,9 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
         },
         child: Shortcuts(
           shortcuts: _kTpMenuTraversalShortcuts,
+          // 面板開啟時就把焦點收進來，方向鍵才有東西可以走。
           child: FocusScope(
+            autofocus: true,
             child: Stack(
               children: [
                 Positioned(
