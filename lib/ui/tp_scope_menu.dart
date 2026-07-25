@@ -51,17 +51,14 @@ class TpScopeMenu<T> extends StatelessWidget {
             value: option.value,
             child: Row(
               children: [
-                SizedBox(
-                  width: 24,
-                  child: Icon(
-                    option.value == value
-                        ? CupertinoIcons.check_mark
-                        : option.icon,
-                    size: 18,
-                  ),
-                ),
+                SizedBox(width: 24, child: Icon(option.icon, size: 18)),
                 const SizedBox(width: TpSpacing.s2),
                 Text(option.label),
+                // 選取態保留項目原本的字符，勾選另外顯示在尾端。
+                if (option.value == value) ...[
+                  const SizedBox(width: TpSpacing.s2),
+                  const Icon(CupertinoIcons.check_mark, size: 18),
+                ],
               ],
             ),
           ),

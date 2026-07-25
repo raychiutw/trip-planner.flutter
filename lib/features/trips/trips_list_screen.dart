@@ -389,9 +389,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   }) {
     return TpActionItem(
       value: action,
-      icon: _sortOrder == order
-          ? CupertinoIcons.check_mark
-          : CupertinoIcons.arrow_up_arrow_down,
+      icon: CupertinoIcons.arrow_up_arrow_down,
+      selected: _sortOrder == order,
       label: label,
       dividerBefore: dividerBefore,
     );

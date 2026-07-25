@@ -7,6 +7,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
@@ -120,6 +121,54 @@ void main() {
         expectsOpaqueGlass ? 1 : 1.06,
       );
 
+      // 品牌柔褐只出現在前景：選取態的無障礙不透明 fallback 必須是中性語意層。
+      final scheme = (state.brightness == Brightness.dark
+              ? AppTheme.dark()
+              : AppTheme.light())
+          .colorScheme;
+      if (expectsOpaqueGlass) {
+        final selectedDay = tester.widget<GlassButton>(
+          find.descendant(
+            of: find.byKey(const ValueKey('day-2-option')),
+            matching: find.byType(GlassButton),
+          ),
+        );
+        expect(
+          selectedDay.settings!.glassColor,
+          scheme.surfaceContainerHigh.withValues(alpha: 1),
+          reason: '日期選擇器的選取膠囊 fallback 應為中性語意層',
+        );
+
+        final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+        expect(
+          tabBar.indicatorColor,
+          scheme.surfaceContainerHigh.withValues(alpha: 1),
+          reason: 'root tab bar 的選取膠囊 fallback 應為中性語意層',
+        );
+      }
+
+      // 選取態保留項目原本的字符，勾選另外顯示。
+      await tester.tap(find.byKey(const ValueKey('matrix-more-menu')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('matrix-menu-selected')),
+          matching: find.byIcon(CupertinoIcons.sort_down),
+        ),
+        findsOneWidget,
+        reason: '已選取的項目仍應顯示它原本的字符',
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('matrix-menu-selected')),
+          matching: find.byIcon(CupertinoIcons.check_mark),
+        ),
+        findsOneWidget,
+        reason: '勾選要另外顯示，而不是取代原字符',
+      );
+      await tester.tapAt(const Offset(20, 700));
+      await tester.pumpAndSettle();
+
       await tester.fling(
         find.byType(CustomScrollView),
         const Offset(0, -1200),
@@ -191,6 +240,25 @@ class _MatrixSceneState extends State<_MatrixScene> {
               tooltip: '筆記',
               onPressed: () {},
               child: const Icon(CupertinoIcons.doc_text, size: 20),
+            ),
+            TpMoreMenuButton<int>(
+              key: const ValueKey('matrix-more-menu'),
+              onSelected: (_) {},
+              items: const <TpActionItem<int>>[
+                TpActionItem<int>(
+                  key: ValueKey('matrix-menu-selected'),
+                  value: 1,
+                  icon: CupertinoIcons.sort_down,
+                  label: '最新',
+                  selected: true,
+                ),
+                TpActionItem<int>(
+                  key: ValueKey('matrix-menu-plain'),
+                  value: 2,
+                  icon: CupertinoIcons.sort_up,
+                  label: '最舊',
+                ),
+              ],
             ),
           ],
         ),

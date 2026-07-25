@@ -85,7 +85,7 @@ class AppleRootTabBar extends StatelessWidget {
         glassColor: selectionTint.withValues(alpha: 0.68),
         platformViewFallbackColor: selectionTint.withValues(alpha: 0.68),
       ),
-      opaqueColor: theme.colorScheme.primaryContainer,
+      opaqueColor: theme.colorScheme.surfaceContainerHigh,
     );
     final indicatorColor = indicatorSettings.glassColor;
     final tabBar = inline
