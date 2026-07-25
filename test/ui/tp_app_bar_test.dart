@@ -66,7 +66,7 @@ void main() {
     expect(find.text('取消'), findsNothing);
   });
 
-  testWidgets('detail app bar pops one route 且不再自動附加帳號入口', (tester) async {
+  testWidgets('detail 固定 bar 只退一層路由且不再自動附加帳號入口', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) =>
@@ -111,7 +111,7 @@ void main() {
           appBar: TpAppBar(
             role: TpAppBarRole.detail,
             title: Text('共編設定'),
-            actions: [TpAccountAvatarButton()],
+            accountEntry: TpAccountAvatarButton(),
           ),
         ),
       ),
@@ -125,6 +125,82 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
     expect(accountOpened, isTrue);
+  });
+
+  testWidgets('內容 header 的帳號入口不佔用一般動作額度', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            TpAccountActionScope(onOpen: (_) {}, child: child!),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: const Text('共編設定'),
+            actions: [
+              TpToolbarIconButton(
+                icon: CupertinoIcons.arrow_clockwise,
+                tooltip: '重新整理',
+                onPressed: () {},
+              ),
+            ],
+            accountEntry: const TpAccountAvatarButton(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.byTooltip('重新整理'), findsOneWidget);
+    // 帳號入口自成一組，固定排在最右側。
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('account-avatar-button'))).dx,
+      greaterThan(tester.getCenter(find.byTooltip('重新整理')).dx),
+    );
+  });
+
+  testWidgets('內容 header 兩個一般動作沒有更多選單時仍拒收', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: const Text('共編設定'),
+            actions: [
+              TpToolbarIconButton(
+                icon: CupertinoIcons.arrow_clockwise,
+                tooltip: '重新整理',
+                onPressed: () {},
+              ),
+              TpToolbarIconButton(
+                icon: CupertinoIcons.share,
+                tooltip: '分享',
+                onPressed: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isAssertionError);
+  });
+
+  testWidgets('帳號入口誤放進 actions 會被擋下', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: Text('共編設定'),
+            actions: [TpAccountAvatarButton()],
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isAssertionError);
   });
 
   testWidgets('modal form exposes Cancel and the explicit submit verb', (

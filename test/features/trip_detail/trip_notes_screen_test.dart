@@ -212,7 +212,7 @@ void main() {
     expect(content.center.dx, 600);
   });
 
-  testWidgets('compact dark 與最大 Dynamic Type 保留內容及 44pt Account', (
+  testWidgets('compact dark 與最大 Dynamic Type 保留內容及 44pt 返回鈕，且無帳號入口', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 568);
@@ -232,6 +232,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('notes-section-flights')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('tp-app-bar-back'))),
+      const Size(44, 44),
+    );
   });
 
   testWidgets('載入失敗持續顯示且可重試', (tester) async {

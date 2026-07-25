@@ -148,7 +148,8 @@ class TpAccountActionScope extends InheritedWidget {
       onOpen != oldWidget.onOpen;
 }
 
-/// App 內容頁 Header 使用的 44pt 系統帳號動作。
+/// 帳號入口的 44pt 玻璃按鈕：浮動 header 固定提供，
+/// shell 外沒有 root tab bar 的路由改以 `TpAppBar.accountEntry` 明文提供。
 class TpAccountAvatarButton extends StatelessWidget {
   const TpAccountAvatarButton({super.key, this.onPressed});
 
@@ -319,6 +320,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     required this.role,
     this.actions = const [],
+    this.accountEntry,
     this.onBack,
     this.onCancel,
     this.primaryActionLabel,
@@ -340,6 +342,10 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
   final TpAppBarRole role;
   final List<Widget> actions;
+
+  /// 帳號入口自成一組，不屬於本頁動作，因此不佔內容 Header 的動作額度。
+  /// 只有 shell 外、沒有 root tab bar 的路由需要明文提供。
+  final Widget? accountEntry;
   final VoidCallback? onBack;
   final VoidCallback? onCancel;
   final String? primaryActionLabel;
@@ -354,10 +360,13 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final largeSheetScope = TpLargeSheetNavigationScope.maybeOf(context);
     final leadingAction = _semanticLeading(context, largeSheetScope);
-    // 帳號入口屬 root 層級（浮動 header）；固定 bar 不自動附加，
-    // shell 外沒有 root tab bar 的路由自行把 TpAccountAvatarButton 放進 actions。
+    // 內容 Header（固定 bar 的 detail 角色）只給一個直接動作，其餘進更多選單。
     final isContentHeader =
         largeSheetScope == null && role == TpAppBarRole.detail;
+    assert(
+      !actions.any((action) => action is TpAccountAvatarButton),
+      'Account entry belongs in accountEntry, not actions.',
+    );
     final pageActions = <Widget>[
       ...actions,
       if (primaryActionLabel != null)
@@ -374,6 +383,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                   pageActions.any((action) => action is TpMoreMenuButton))),
       'Content headers support one direct action; extra actions use More.',
     );
+    // 帳號入口在額度計算之後才併入，位置固定在最右側。
+    final headerActions = <Widget>[...pageActions, ?accountEntry];
     final leadingWidth = leadingAction == null
         ? 0.0
         : role == TpAppBarRole.modalForm
@@ -382,7 +393,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
             leadingAction as TpToolbarTextButton,
           )
         : TpSpacing.tapMin;
-    final actionsWidth = TpToolbarSlots.actionsWidth(context, pageActions);
+    final actionsWidth = TpToolbarSlots.actionsWidth(context, headerActions);
     if (largeSheetScope != null) {
       final colors = Theme.of(context).colorScheme;
       final showsScopeClose = role != TpAppBarRole.modalForm;
@@ -396,6 +407,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
             context,
             pageActions.last as TpToolbarTextButton,
           ),
+        if (accountEntry != null) TpSpacing.tapMin,
         if (showsScopeClose) TpSpacing.tapMin,
       ];
       final sheetActionsWidth = sheetActionWidths.isEmpty
@@ -439,7 +451,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
               padding: const EdgeInsets.only(right: TpSpacing.s4),
               child: TpHeaderActionRow(
                 children: [
-                  ...pageActions,
+                  ...headerActions,
                   if (showsScopeClose)
                     KeyedSubtree(
                       key: const ValueKey('app-sheet-close'),
@@ -480,9 +492,9 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? TpToolbarSlots.actions(
               context: context,
               width: actionsWidth,
-              children: pageActions,
+              children: headerActions,
             )
-          : pageActions,
+          : headerActions,
     );
   }
 

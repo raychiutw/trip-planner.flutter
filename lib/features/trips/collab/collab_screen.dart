@@ -98,7 +98,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
       appBar: const TpAppBar(
         role: TpAppBarRole.detail,
         title: Text('共編設定'),
-        actions: [TpAccountAvatarButton()],
+        accountEntry: TpAccountAvatarButton(),
       ),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,

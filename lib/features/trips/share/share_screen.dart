@@ -247,7 +247,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       appBar: const TpAppBar(
         role: TpAppBarRole.detail,
         title: Text('分享連結'),
-        actions: [TpAccountAvatarButton()],
+        accountEntry: TpAccountAvatarButton(),
       ),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,

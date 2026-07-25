@@ -292,14 +292,15 @@ void main() {
     );
 
     // 共編設定與分享設定在 StatefulShellRoute 之外、沒有 root tab bar，
-    // 帳號入口是它們唯一的路徑，必須明文保留。
+    // 帳號入口是它們唯一的路徑，必須明文保留 —— 且走自成一組的 accountEntry，
+    // 不佔內容 Header 的動作額度。
     for (final path in const [
       'lib/features/trips/collab/collab_screen.dart',
       'lib/features/trips/share/share_screen.dart',
     ]) {
       expect(
         File(path).readAsStringSync(),
-        contains('TpAccountAvatarButton()'),
+        contains('accountEntry: TpAccountAvatarButton()'),
         reason: path,
       );
     }
