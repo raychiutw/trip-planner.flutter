@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
@@ -737,17 +736,6 @@ abstract final class _TpMenuMetrics {
   static const gap = TpSpacing.s2;
 }
 
-/// 方向鍵走動；`RawMenuAnchor` 不像 Material 的 `MenuAnchor` 會自帶這組。
-const Map<ShortcutActivator, Intent> _kTpMenuTraversalShortcuts =
-    <ShortcutActivator, Intent>{
-      SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
-        TraversalDirection.down,
-      ),
-      SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
-        TraversalDirection.up,
-      ),
-    };
-
 class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   final _menuController = MenuController();
 
@@ -863,49 +851,47 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
         actions: <Type, Action<Intent>>{
           DismissIntent: DismissMenuAction(controller: _menuController),
         },
-        child: Shortcuts(
-          shortcuts: _kTpMenuTraversalShortcuts,
-          // 面板開啟時就把焦點收進來，方向鍵才有東西可以走。
-          child: FocusScope(
-            autofocus: true,
-            child: Stack(
-              children: [
-                Positioned(
-                  right: math.max(
-                    0,
-                    info.overlaySize.width - info.anchorRect.right,
-                  ),
-                  top: flipUp ? null : info.anchorRect.bottom + gap,
-                  bottom: flipUp
-                      ? info.overlaySize.height - info.anchorRect.top + gap
-                      : null,
-                  width: width,
-                  child: _TpMenuPanel(
-                    flipUp: flipUp,
-                    settings: _panelSettings(context),
-                    children: [
-                      for (final item in widget.items) ...[
-                        if (item.dividerBefore)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Divider(
-                              height: TpSpacing.s4,
-                              // 選單內部的分組分隔線是選單語彙，HIG 明文允許 ——
-                              // 與工具列動作群組不同。
-                              color: scheme.onSurface.withValues(alpha: 0.18),
-                            ),
-                          ),
-                        _TpMenuItem<T>(
-                          key: item.key,
-                          item: item,
-                          onSelected: _select,
-                        ),
-                      ],
-                    ],
-                  ),
+        // 面板開啟時就把焦點收進來，方向鍵才有東西可以走 —— 方向鍵 traversal
+        // 本身由框架預設提供，不需要自己再掛一組 shortcuts。
+        child: FocusScope(
+          autofocus: true,
+          child: Stack(
+            children: [
+              Positioned(
+                right: math.max(
+                  0,
+                  info.overlaySize.width - info.anchorRect.right,
                 ),
-              ],
-            ),
+                top: flipUp ? null : info.anchorRect.bottom + gap,
+                bottom: flipUp
+                    ? info.overlaySize.height - info.anchorRect.top + gap
+                    : null,
+                width: width,
+                child: _TpMenuPanel(
+                  flipUp: flipUp,
+                  settings: _panelSettings(context),
+                  children: [
+                    for (final item in widget.items) ...[
+                      if (item.dividerBefore)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Divider(
+                            height: TpSpacing.s4,
+                            // 選單內部的分組分隔線是選單語彙，HIG 明文允許 ——
+                            // 與工具列動作群組不同。
+                            color: scheme.onSurface.withValues(alpha: 0.18),
+                          ),
+                        ),
+                      _TpMenuItem<T>(
+                        key: item.key,
+                        item: item,
+                        onSelected: _select,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
