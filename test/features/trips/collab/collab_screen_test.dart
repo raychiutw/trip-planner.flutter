@@ -11,6 +11,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/trips/collab/collab_screen.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockCollabRepo extends Mock implements CollabRepository {}
 
@@ -44,6 +45,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('owner@x.com'), findsOneWidget);
     expect(find.text('v@x.com'), findsOneWidget);
+  });
+
+  testWidgets('shell 外的共編設定保留可達的帳號入口', (tester) async {
+    var accountOpened = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (retryCount, error) => null,
+        overrides: [collabRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => TpAccountActionScope(
+            onOpen: (_) => accountOpened = true,
+            child: child!,
+          ),
+          home: const CollabScreen(tripId: 'okinawa'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final account = find.byKey(const ValueKey('account-avatar-button'));
+    expect(account, findsOneWidget);
+    await tester.tap(account);
+    expect(accountOpened, isTrue);
   });
 
   testWidgets('regular width 置中限制共編內容寬度', (tester) async {

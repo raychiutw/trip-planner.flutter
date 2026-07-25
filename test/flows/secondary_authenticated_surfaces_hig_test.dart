@@ -271,15 +271,39 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('共用 detail Header 固定提供 44pt Account 入口與單一直接動作規則', () {
-    final source = File('lib/ui/tp_app_bar.dart').readAsStringSync();
+  test('固定 bar 不自動附加 Account 入口，帳號入口只在浮動 header 與 shell 外路由明文提供', () {
+    final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
 
-    expect(source, contains('if (showsAccount) const TpAccountAvatarButton()'));
-    expect(source, contains('pageActions.length <= 2'));
-    expect(source, contains('action is TpMoreMenuButton'));
-    expect(source, contains("ValueKey('account-avatar-button')"));
-    expect(source, contains('CupertinoIcons.person_crop_circle'));
-    expect(source, contains('TpSpacing.tapMin'));
+    // 帳號入口是 root 層級的動作，固定 bar（detail / modal）不得自動附加。
+    expect(appBar, isNot(contains('showsAccount')));
+    expect(appBar, isNot(contains('const TpAccountAvatarButton()')));
+    // 44pt 玻璃入口本身仍由共用元件擁有，供明文呼叫端使用。
+    expect(appBar, contains("ValueKey('account-avatar-button')"));
+    expect(appBar, contains('CupertinoIcons.person_crop_circle'));
+    expect(appBar, contains('TpSpacing.tapMin'));
+    // 內容 Header 的單一直接動作規則不隨帳號入口一起消失。
+    expect(appBar, contains('pageActions.length <= 2'));
+    expect(appBar, contains('action is TpMoreMenuButton'));
+
+    // 6 個 root 畫面共用的浮動 header 仍固定提供帳號入口。
+    expect(
+      File('lib/ui/tp_root_scaffold.dart').readAsStringSync(),
+      contains('const TpAccountAvatarButton()'),
+    );
+
+    // 共編設定與分享設定在 StatefulShellRoute 之外、沒有 root tab bar，
+    // 帳號入口是它們唯一的路徑，必須明文保留 —— 且走自成一組的 accountEntry，
+    // 不佔內容 Header 的動作額度。
+    for (final path in const [
+      'lib/features/trips/collab/collab_screen.dart',
+      'lib/features/trips/share/share_screen.dart',
+    ]) {
+      expect(
+        File(path).readAsStringSync(),
+        contains('accountEntry: TpAccountAvatarButton()'),
+        reason: path,
+      );
+    }
   });
 
   test('次要畫面不回復 feature-owned wrapper、內容 Glass 或 40pt 動作', () {

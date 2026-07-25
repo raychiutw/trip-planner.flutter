@@ -50,6 +50,30 @@ void main() {
     expect(find.textContaining('已被檢視 2 次'), findsOneWidget);
   });
 
+  testWidgets('shell 外的分享設定保留可達的帳號入口', (tester) async {
+    var accountOpened = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (retryCount, error) => null,
+        overrides: [shareRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => TpAccountActionScope(
+            onOpen: (_) => accountOpened = true,
+            child: child!,
+          ),
+          home: const ShareScreen(tripId: 't'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final account = find.byKey(const ValueKey('account-avatar-button'));
+    expect(account, findsOneWidget);
+    await tester.tap(account);
+    expect(accountOpened, isTrue);
+  });
+
   testWidgets('regular width 置中限制分享內容寬度', (tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
