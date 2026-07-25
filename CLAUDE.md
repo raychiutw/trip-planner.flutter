@@ -19,6 +19,12 @@ flutter run                                           # 連 prod API — 一律�
 
 ## 開發流程(強制)
 
+- **一律走 mattpocock skill 工作流**,同類任務優先於 superpowers / gstack 的對應 skill:
+  - 主線:`/grill-with-docs`(訪談收斂,同時產出 `CONTEXT.md` 詞彙與 `docs/adr/`)→ `/to-spec`(合成 spec 並發成 GitHub Issue,貼 `ready-for-agent`)→ `/to-tickets`(拆成 tracer-bullet 票)→ `/implement`(內部驅動 `/tdd` 一次一個紅綠切片,收尾跑 `/code-review`)。
+  - 單一 session 做得完的小功能可跳過 `/to-tickets`,`/to-spec` 後直接 `/implement`。
+  - **步驟 1~3 要在同一個 context window 內完成**,不要中途 compact;接近上限就 `/handoff` 換新 session。每個 `/implement` 開新 context。
+  - 分流:bug 用 `/diagnosing-bugs`;外部進來的 issue 用 `/triage`(自己 `/to-tickets` 產的票不要 triage);設計問題需要跑起來才答得出來時用 `/prototype`;範圍大到一個 session 裝不下的用 `/wayfinder`。
+  - 忘記該用哪個 skill 就問 `/ask-matt`。
 - **TDD 紅綠重構**:任何 production code 變更先寫失敗測試。修 bug 先寫重現測試。
 - **完成定義**:`flutter analyze` 零 error/warning + `flutter test` 全綠。
 - **不直接 commit 到 `master`**:開 feature branch → `/ship` 開 PR。base branch 是 `master`(無 `main`)。
@@ -77,4 +83,4 @@ Issues 與 PRD 使用 GitHub Issues（`raychiutw/trip-planner.flutter`），透�
 
 ### Domain docs
 
-採 single-context 架構；根目錄 `CONTEXT.md` 與 `docs/adr/` 按需建立。詳見 `docs/agents/domain.md`。
+採 single-context 架構。根目錄 `CONTEXT.md` 是**詞彙表**(只定義語彙,不寫實作細節),由 `/grill-with-docs` 驅動的 `/domain-modeling` 隨討論即時更新;`docs/adr/` 按需建立,只有「難以逆轉 + 沒 context 會困惑 + 真實 trade-off」三者皆備才開。詳見 `docs/agents/domain.md`。
