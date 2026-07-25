@@ -81,12 +81,15 @@ private final class E2ESemanticsPlugin: NSObject, FlutterPlugin {
     guard
       let controller = appDelegate?.window?.rootViewController as? FlutterViewController
     else {
+      // 診斷用：失敗時要能和「channel 根本沒被呼叫」區分開來（見 #104）。
+      NSLog("Tripline e2e semantics: no FlutterViewController")
       result(false)
       return
     }
     // `FlutterViewController.engine` 在 header 沒有 `_Nullable`，橋接到 Swift
     // 是 non-optional，不能用 optional chaining。
     controller.engine.ensureSemanticsEnabled()
+    NSLog("Tripline e2e semantics: ensureSemanticsEnabled called")
     result(true)
   }
 }
