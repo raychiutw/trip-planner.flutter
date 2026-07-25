@@ -42,6 +42,9 @@ void main() {
   final nativeGestureBridge = File(
     'ios/RunnerUITests/RunnerUITests.m',
   ).readAsStringSync();
+  final iosGestureExtension = File(
+    'ios/RunnerUITests/TriplineGestureExtension.swift',
+  ).readAsStringSync();
   final androidNativeGestureBridge = File(
     'android/app/src/androidTest/java/com/raychiu/tripline/MainActivityTest.java',
   ).readAsStringSync();
@@ -665,27 +668,34 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(nativeMapSmoke, contains('.swipe('));
         expect(nativeMapSmoke, isNot(contains('.platform.mobile.doubleTap(')));
         expect(nativeMapSmoke, isNot(contains('.startGesture(')));
-        expect(nativeMapSmoke, contains('ensureSemantics'));
         expect(nativeMapSmoke, contains('.waitUntilExists('));
+
+        // iOS 不再靠 accessibility label 傳訊號 —— XCUI 的 a11y tree 裡沒有
+        // Flutter 的 Semantics 節點（#104，run 30175947137 的 dump 證實）。
+        // 改由 Dart 直接 RPC 呼叫跑在 XCTest runner 行程內的 server extension。
+        expect(nativeMapSmoke, contains('_requestNativeGesture'));
+        expect(nativeMapSmoke, contains('patrolNativeServerUri'));
+        expect(nativeMapSmoke, isNot(contains(r'$.tester.ensureSemantics(')));
+        expect(nativeGestureBridge, isNot(contains('NSTimer')));
+        expect(nativeGestureBridge, contains('registerExtensionClass'));
+
+        // Android 維持既有的 UiAutomator 多指注入（已通過 Test Lab，勿動）。
         for (final requestLabel in [
           'Tripline native map pinch request',
           'Tripline native map rotate request',
           'Tripline native map double tap request',
         ]) {
           expect(nativeMapSmoke, contains(requestLabel));
-          expect(nativeGestureBridge, contains(requestLabel));
           expect(androidNativeGestureBridge, contains(requestLabel));
         }
-        for (final source in [
-          nativeMapSmoke,
-          nativeGestureBridge,
-          androidNativeGestureBridge,
-        ]) {
+        // RunnerUITests.m 現在只負責註冊 extension，不再依測試名開關輪詢。
+        for (final source in [nativeMapSmoke, androidNativeGestureBridge]) {
           expect(source, contains('native Google Map renders'));
         }
-        expect(nativeGestureBridge, contains('pinchWithScale:'));
-        expect(nativeGestureBridge, contains('rotate:'));
-        expect(nativeGestureBridge, contains('[target doubleTap]'));
+        expect(iosGestureExtension, contains('PatrolServerExtension'));
+        expect(iosGestureExtension, contains('pinch(withScale:'));
+        expect(iosGestureExtension, contains('rotate('));
+        expect(iosGestureExtension, contains('doubleTap()'));
         expect(androidNativeGestureBridge, contains('.pinchOut('));
         expect(
           androidNativeGestureBridge,
@@ -712,10 +722,6 @@ exec bash tool/validate_manual_evidence.sh "$4" "$5"
         expect(
           androidNativeGestureBridge,
           contains('SystemClock.sleep(DOUBLE_TAP_INTERVAL_MS)'),
-        );
-        expect(
-          nativeGestureBridge,
-          contains('containsString:@"native Google Map renders"'),
         );
         expect(nativeMapSmoke, contains('_poiTapOffsets'));
         expect(nativeMapSmoke, contains('#toggleMapLifecycle'));
