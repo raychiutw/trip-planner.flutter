@@ -24,53 +24,44 @@ class AppleRootTabBar extends StatelessWidget {
   final bool inline;
   final List<FocusNode>? focusNodes;
 
+  /// 兩態都用實心字符，靠 tint 區分 —— outline↔filled 切換是 Material 作法，
+  /// iOS 系統 app 的 tab bar 不這樣做。
   static const _destinations = [
-    (
-      label: '聊天',
-      icon: CupertinoIcons.chat_bubble,
-      selectedIcon: CupertinoIcons.chat_bubble_fill,
-    ),
-    (
-      label: '行程',
-      icon: SFIcons.sf_suitcase,
-      selectedIcon: SFIcons.sf_suitcase_fill,
-    ),
-    (
-      label: '地圖',
-      icon: CupertinoIcons.map,
-      selectedIcon: CupertinoIcons.map_fill,
-    ),
-    (
-      label: '收藏',
-      icon: CupertinoIcons.heart,
-      selectedIcon: CupertinoIcons.heart_fill,
-    ),
+    (label: '聊天', icon: CupertinoIcons.chat_bubble_fill),
+    (label: '行程', icon: SFIcons.sf_suitcase_fill),
+    (label: '地圖', icon: CupertinoIcons.map_fill),
+    (label: '收藏', icon: CupertinoIcons.heart_fill),
   ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final glassSettings = tpNavigationGlassSettings(
       context,
       recipe: selectedIndex == 2
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
-    final selectionTint = theme.colorScheme.primary.withValues(
-      alpha: isDark ? 0.24 : 0.18,
+    // 選取膠囊走中性語意層；品牌色只出現在前景（字符、標籤與光暈）。
+    final selectionTint = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.68,
     );
     final tabs = [
       for (final destination in _destinations)
         GlassTab(
+          // 兩態同一個實心字符，由 tint 區分選取；選取層是另一份 widget，
+          // key 必須各自唯一，否則 finder 會抓到兩個。
           icon: Icon(
             destination.icon,
             key: ValueKey('root-tab-${destination.label}'),
           ),
-          activeIcon: Icon(destination.selectedIcon),
+          activeIcon: Icon(
+            destination.icon,
+            key: ValueKey('root-tab-active-${destination.label}'),
+          ),
           label: destination.label,
           semanticLabel: destination.label,
-          glowColor: theme.colorScheme.onPrimaryContainer,
+          glowColor: theme.colorScheme.primary,
         ),
     ];
     final selectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
@@ -82,8 +73,8 @@ class AppleRootTabBar extends StatelessWidget {
     final indicatorSettings = tpResolveGlassSettings(
       context,
       glassSettings.copyWith(
-        glassColor: selectionTint.withValues(alpha: 0.68),
-        platformViewFallbackColor: selectionTint.withValues(alpha: 0.68),
+        glassColor: selectionTint,
+        platformViewFallbackColor: selectionTint,
       ),
       opaqueColor: theme.colorScheme.surfaceContainerHigh,
     );
@@ -99,8 +90,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: theme.colorScheme.onPrimaryContainer,
-            selectedLabelColor: theme.colorScheme.onPrimaryContainer,
+            selectedIconColor: theme.colorScheme.primary,
+            selectedLabelColor: theme.colorScheme.primary,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,
@@ -120,8 +111,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: theme.colorScheme.onPrimaryContainer,
-            selectedLabelColor: theme.colorScheme.onPrimaryContainer,
+            selectedIconColor: theme.colorScheme.primary,
+            selectedLabelColor: theme.colorScheme.primary,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
             selectedLabelStyle: selectedLabelStyle,

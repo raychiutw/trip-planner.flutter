@@ -1,5 +1,6 @@
 import 'dart:ui' show PointerDeviceKind, Tristate;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sficon/flutter_sficon.dart';
@@ -606,9 +607,11 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         glass.indicatorColor,
-        TpSystemColorsDark.tint.withValues(alpha: 0.68),
+        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.68,
+        ),
       );
-      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
+      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
     });
 
     testWidgets('root branches keep content visible through Liquid Glass', (
@@ -658,7 +661,9 @@ void main() {
       );
       expect(
         map.indicatorColor,
-        TpSystemColorsLight.tint.withValues(alpha: 0.68),
+        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.68,
+        ),
       );
     });
 
@@ -875,9 +880,14 @@ void main() {
       }
       expect(find.bySemanticsLabel('帳號'), findsNothing);
       final bar = find.byKey(const ValueKey('apple-root-tab-bar'));
+      // 兩態同字符後，選取層與底層會各渲染一次；精確的字符契約由
+      //「root tab bar 選取態是中性膠囊加品牌 tint 前景」那支負責。
       expect(
-        find.descendant(of: bar, matching: find.byIcon(SFIcons.sf_suitcase)),
-        findsOneWidget,
+        find.descendant(
+          of: bar,
+          matching: find.byIcon(SFIcons.sf_suitcase_fill),
+        ),
+        findsWidgets,
       );
       final selected = tester.getSemantics(find.bySemanticsLabel('聊天'));
       expect(
@@ -944,13 +954,67 @@ void main() {
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         glass.indicatorColor,
-        TpSystemColorsLight.tint.withValues(alpha: 0.68),
+        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.68,
+        ),
       );
       expect(glass.settings?.chromaticAberration, 0);
       expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
     });
 
-    testWidgets('深色 root tab 使用中性黑玻璃與暖褐選取色', (tester) async {
+    testWidgets('root tab bar 選取態是中性膠囊加品牌 tint 前景，兩態同實心字符', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: buildShellRouter(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheme = AppTheme.light().colorScheme;
+      final glass = tester.widget<GlassTabBar>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(GlassTabBar),
+        ),
+      );
+      (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
+
+      // 膠囊本身保留（iOS 26 的系統視覺指示），只換底色為中性語意層。
+      expect(glass.indicatorColor, isNotNull);
+      expect(rgb(glass.indicatorColor!), rgb(scheme.surfaceContainerHighest));
+      expect(rgb(glass.indicatorColor!), isNot(rgb(scheme.primary)));
+
+      // 品牌色只出現在前景：字符、標籤與光暈。
+      expect(glass.selectedIconColor, scheme.primary);
+      expect(glass.selectedLabelColor, scheme.primary);
+      expect(glass.unselectedIconColor, scheme.onSurfaceVariant);
+      for (final tab in glass.tabs) {
+        expect(tab.glowColor, scheme.primary);
+      }
+
+      // 未選取態也是實心字符，靠 tint 區分而不是 outline↔filled 切換。
+      const filled = [
+        CupertinoIcons.chat_bubble_fill,
+        SFIcons.sf_suitcase_fill,
+        CupertinoIcons.map_fill,
+        CupertinoIcons.heart_fill,
+      ];
+      expect(glass.tabs.length, filled.length);
+      for (var i = 0; i < filled.length; i++) {
+        final tab = glass.tabs[i];
+        expect((tab.icon! as Icon).icon, filled[i], reason: '第 $i 個 tab 未選取態');
+        expect(
+          (tab.activeIcon! as Icon).icon,
+          filled[i],
+          reason: '第 $i 個 tab 選取態必須是同一個實心字符，不做 outline↔filled 切換',
+        );
+      }
+    });
+
+    testWidgets('深色 root tab 使用中性黑玻璃與中性選取膠囊', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -967,9 +1031,11 @@ void main() {
       );
       expect(
         glass.indicatorColor,
-        TpSystemColorsDark.tint.withValues(alpha: 0.68),
+        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.68,
+        ),
       );
-      expect(glass.selectedIconColor, TpSystemColorsDark.tintDeep);
+      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
       expect(glass.settings?.chromaticAberration, 0);
     });
 

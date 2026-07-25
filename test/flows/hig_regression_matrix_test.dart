@@ -157,6 +157,33 @@ void main() {
           isNot(rgb(scheme.primary)),
           reason: '品牌柔褐不得鋪成選取膠囊的背景',
         );
+
+        final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+        expect(
+          rgb(tabBar.indicatorColor!),
+          rgb(scheme.surfaceContainerHighest),
+          reason: 'root tab bar 的選取膠囊與日期選擇器應是同一套中性語意層',
+        );
+        expect(
+          rgb(tabBar.indicatorColor!),
+          isNot(rgb(scheme.primary)),
+          reason: '品牌柔褐不得鋪成 root tab bar 的選取膠囊',
+        );
+        expect(
+          tabBar.selectedIconColor,
+          scheme.primary,
+          reason: 'root tab bar 的選取字符是品牌 tint',
+        );
+      }
+
+      // 未選取態也是實心字符：兩態同字符、靠 tint 區分，不做 outline↔filled 切換。
+      final rootTabs = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+      for (final tab in rootTabs.tabs) {
+        expect(
+          (tab.activeIcon! as Icon).icon,
+          (tab.icon! as Icon).icon,
+          reason: 'root tab 的選取態與未選取態必須是同一個字符',
+        );
       }
 
       // 品牌色改走前景：選取態的標籤是 tint，未選取維持中性次要前景。
