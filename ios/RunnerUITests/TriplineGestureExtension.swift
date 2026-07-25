@@ -28,17 +28,24 @@ public class TriplineGestureExtension: NSObject, PatrolServerExtension {
   public func register(on registrar: PatrolRouteRegistrar) {
     registrar.post("tripline/gesture") { body in
       let kind = try Self.decodeKind(from: body)
-      let app = XCUIApplication()
 
-      switch kind {
-      case "pinch":
-        app.pinch(withScale: 2.0, velocity: 1.0)
-      case "rotate":
-        app.rotate(.pi / 2, withVelocity: 1.0)
-      case "doubleTap":
-        app.doubleTap()
-      default:
-        throw TriplineGestureError.unsupported(kind)
+      // XCUI 只能在主執行緒操作 —— Patrol 自己的 automation 也是把每個動作包在
+      // `DispatchQueue.main.sync` 裡（`IOSAutomator.runAction`）。直接在 HTTP
+      // handler 的執行緒上呼叫會讓 XCTest runner 崩潰：run 30178220082 的症狀是
+      // Dart 端收到 "Connection closed before full header was received"，
+      // JUnit 則多出一筆空名稱、0.0 秒的 FAIL。
+      try DispatchQueue.main.sync {
+        let app = XCUIApplication()
+        switch kind {
+        case "pinch":
+          app.pinch(withScale: 2.0, velocity: 1.0)
+        case "rotate":
+          app.rotate(.pi / 2, withVelocity: 1.0)
+        case "doubleTap":
+          app.doubleTap()
+        default:
+          throw TriplineGestureError.unsupported(kind)
+        }
       }
 
       NSLog("Tripline gesture extension: performed \(kind)")
