@@ -262,7 +262,7 @@ void main() {
       // 圓鈕的描邊是可覆寫的預設值。
       final button = tester.widget<GlassButton>(find.byType(GlassButton));
       expect(
-        (button.shape! as LiquidRoundedSuperellipse).side.color.a,
+        (button.shape as LiquidRoundedSuperellipse).side.color.a,
         matcher,
         reason: '$reason：工具列玻璃圓鈕',
       );
@@ -276,7 +276,7 @@ void main() {
           find.byKey(ValueKey(key)),
         );
         expect(
-          (container.shape! as LiquidRoundedSuperellipse).side.color.a,
+          (container.shape as LiquidRoundedSuperellipse).side.color.a,
           matcher,
           reason: '$reason：$key',
         );
