@@ -115,11 +115,39 @@ void main() {
             ? greaterThanOrEqualTo(0.95)
             : closeTo(state.brightness == Brightness.dark ? 0.48 : 0.40, 0.01),
       );
+      final isDark = state.brightness == Brightness.dark;
       expect(headerGlass.settings!.blur, expectsOpaqueGlass ? 0 : 16);
-      expect(headerGlass.settings!.thickness, expectsOpaqueGlass ? 0 : 16);
+      // 導覽配方與共用玻璃表面已收斂為同一組參數。
+      expect(
+        headerGlass.settings!.thickness,
+        expectsOpaqueGlass ? 0 : (isDark ? 28 : 24),
+      );
       expect(
         headerGlass.settings!.refractiveIndex,
-        expectsOpaqueGlass ? 1 : 1.06,
+        expectsOpaqueGlass ? 1 : 1.15,
+      );
+
+      // 邊緣交還材質：這三個參數若沒設定，shader 的邊緣光是關掉的，
+      // 就得再描一條實心線補回來 —— 那正是「貼紙感」的來源。
+      if (!expectsOpaqueGlass) {
+        expect(
+          headerGlass.settings!.ambientRim,
+          greaterThan(0),
+          reason: '環境邊緣光必須有值',
+        );
+        expect(
+          headerGlass.settings!.glowIntensity,
+          greaterThan(0),
+          reason: '光暈強度必須有值',
+        );
+      }
+
+      // 一般模式不描邊；只有提高對比才補一條可見實心邊。
+      final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;
+      expect(
+        headerShape.side.color.a,
+        state.increasedContrast ? greaterThan(0.5) : 0,
+        reason: '一般模式的邊緣應由材質產生，不是畫上去的',
       );
 
       // 品牌柔褐只出現在前景：選取膠囊在一般模式與無障礙 fallback 都是中性語意層。

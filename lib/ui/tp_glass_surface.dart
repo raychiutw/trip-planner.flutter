@@ -75,6 +75,54 @@ class TpBarForeground extends StatelessWidget {
   }
 }
 
+/// 一般模式的邊緣**交還玻璃材質**；只有「提高對比」才補一條可見實心邊。
+///
+/// 均勻描一圈固定顏色的實心線正是「貼紙感」的來源 —— iOS 26 的玻璃邊緣是
+/// 材質沿周長算出來、受光角影響的亮邊，由 [tpGlassRecipe] 的 `ambientRim`、
+/// `glowIntensity` 與 `specularSharpness` 產生。
+Color tpGlassEdgeColor(BuildContext context) {
+  if (!MediaQuery.highContrastOf(context)) return Colors.transparent;
+  return Theme.of(context).brightness == Brightness.dark
+      ? Colors.white
+      : Colors.black.withValues(alpha: 0.72);
+}
+
+/// 導覽 chrome 與共用玻璃表面的**單一參數來源**。
+///
+/// 原本兩處各有一組（共用表面用較高的折射率／色散／飽和度，導覽配方用較低的），
+/// 浮動 header 呼叫導覽配方時又把前者蓋掉。收斂為同一組，以較接近 iOS 26 的
+/// 那一組為準；媒體背景（platform view）維持低色散與低折射率。
+///
+/// `ambientRim`／`glowIntensity`／`specularSharpness` 三個參數原本**沒有設定**，
+/// 等於把 shader 的邊緣光關掉，才需要另外描一條實心線補回來。
+///
+/// ⚠️ 這三個參數目前是初值，**尚未真機定案**（見 #121）—— shader 折射與裝置
+/// 像素比及實際背景內容有關，模擬器不準。
+LiquidGlassSettings tpGlassRecipe(
+  BuildContext context, {
+  required Color tint,
+  required bool onMedia,
+  required double blur,
+}) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return LiquidGlassSettings(
+    glassColor: tint,
+    backerColor: null,
+    thickness: onMedia ? 16 : (isDark ? 28 : 24),
+    blur: blur,
+    chromaticAberration: onMedia ? 0 : (isDark ? 0.004 : 0.006),
+    lightIntensity: onMedia ? (isDark ? 0.56 : 0.62) : (isDark ? 0.72 : 0.82),
+    ambientStrength: onMedia ? (isDark ? 0.06 : 0.10) : (isDark ? 0.08 : 0.18),
+    ambientRim: onMedia ? 0.5 : 0.7,
+    glowIntensity: onMedia ? 0.5 : 0.75,
+    specularSharpness: GlassSpecularSharpness.medium,
+    refractiveIndex: onMedia ? 1.06 : 1.15,
+    saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),
+    standardOpacityMultiplier: 1,
+    platformViewFallbackColor: tint,
+  );
+}
+
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
@@ -89,20 +137,10 @@ LiquidGlassSettings tpNavigationGlassSettings(
   final tint = platformView
       ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
       : baseColor.withValues(alpha: isDark ? 0.48 : 0.40);
-  final settings = LiquidGlassSettings(
-    glassColor: tint,
-    backerColor: null,
-    thickness: 16,
-    blur: 16,
-    chromaticAberration: 0,
-    lightIntensity: isDark ? 0.56 : 0.62,
-    ambientStrength: isDark ? 0.06 : 0.10,
-    refractiveIndex: 1.06,
-    saturation: 1.02,
-    standardOpacityMultiplier: 1,
-    platformViewFallbackColor: tint,
+  return tpResolveGlassSettings(
+    context,
+    tpGlassRecipe(context, tint: tint, onMedia: platformView, blur: 16),
   );
-  return tpResolveGlassSettings(context, settings);
 }
 
 class TpGlassSurface extends StatelessWidget {
@@ -150,27 +188,16 @@ class TpGlassSurface extends StatelessWidget {
     final tint = tintColor == null
         ? defaultTint
         : tintColor!.withValues(alpha: useOpaqueFallback ? 1 : tintColor!.a);
-    final border = isDark
-        ? Colors.white.withValues(alpha: increasedContrast ? 0.64 : 0.18)
-        : Colors.white.withValues(alpha: increasedContrast ? 1 : 0.88);
+    final border = tpGlassEdgeColor(context);
     final radius = borderRadius.topLeft.x;
-    final defaultSettings = LiquidGlassSettings(
-      glassColor: tint,
-      thickness: platformViewBackdrop ? 16 : (isDark ? 28 : 24),
-      blur: blurSigma,
-      chromaticAberration: platformViewBackdrop ? 0 : (isDark ? 0.004 : 0.006),
-      lightIntensity: platformViewBackdrop
-          ? (isDark ? 0.56 : 0.62)
-          : (isDark ? 0.72 : 0.82),
-      ambientStrength: platformViewBackdrop
-          ? (isDark ? 0.06 : 0.10)
-          : (isDark ? 0.08 : 0.18),
-      refractiveIndex: platformViewBackdrop ? 1.06 : 1.15,
-      saturation: platformViewBackdrop ? 1.02 : (isDark ? 1.08 : 1.10),
-      standardOpacityMultiplier: 1,
-      platformViewFallbackColor: tint,
-    );
-    final baseSettings = glassSettings ?? defaultSettings;
+    final baseSettings =
+        glassSettings ??
+        tpGlassRecipe(
+          context,
+          tint: tint,
+          onMedia: platformViewBackdrop,
+          blur: blurSigma,
+        );
     final resolvedSettings = tpResolveGlassSettings(
       context,
       baseSettings,

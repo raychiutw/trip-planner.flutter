@@ -218,6 +218,72 @@ void main() {
     });
   });
 
+  testWidgets('工具列玻璃的邊緣由材質產生，只有提高對比才描一條實心邊', (tester) async {
+    for (final highContrast in [false, true]) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: MediaQuery(
+            data: MediaQueryData(highContrast: highContrast),
+            child: Scaffold(
+              body: Column(
+                children: [
+                  TpToolbarGlassButton(
+                    tooltip: '更多',
+                    onPressed: () {},
+                    child: const Icon(Icons.more_horiz),
+                  ),
+                  const TpToolbarActionSurface(icon: Icons.person),
+                  TpToolbarActionGroup(
+                    children: [
+                      TpToolbarIconButton(
+                        icon: CupertinoIcons.share,
+                        tooltip: '分享',
+                        onPressed: () {},
+                      ),
+                      TpToolbarIconButton(
+                        icon: CupertinoIcons.add,
+                        tooltip: '新增',
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final matcher = highContrast ? greaterThan(0.5) : 0;
+      final reason = 'highContrast=$highContrast';
+
+      // 圓鈕的描邊是可覆寫的預設值。
+      final button = tester.widget<GlassButton>(find.byType(GlassButton));
+      expect(
+        (button.shape as LiquidRoundedSuperellipse).side.color.a,
+        matcher,
+        reason: '$reason：工具列玻璃圓鈕',
+      );
+
+      // 動作表面與群組容器沒有覆寫參數，各自獨立改過。
+      for (final key in [
+        'tp-toolbar-action-surface',
+        'tp-toolbar-action-group',
+      ]) {
+        final container = tester.widget<GlassContainer>(
+          find.byKey(ValueKey(key)),
+        );
+        expect(
+          (container.shape as LiquidRoundedSuperellipse).side.color.a,
+          matcher,
+          reason: '$reason：$key',
+        );
+      }
+    }
+  });
+
   testWidgets('表單主要動作是 prominent，著色在底色而不是字符', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

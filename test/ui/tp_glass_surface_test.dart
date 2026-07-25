@@ -157,12 +157,13 @@ void main() {
     );
     expect(glass.settings?.blur, 22);
     expect(shape.borderRadius, 28);
-    expect(shape.side.color.a, closeTo(0.88, 0.01));
+    // 一般模式不描邊 —— 邊緣改由材質的環境邊緣光與高光產生。
+    expect(shape.side.color.a, 0);
+    expect(glass.settings!.ambientRim, greaterThan(0));
+    expect(glass.settings!.glowIntensity, greaterThan(0));
   });
 
-  testWidgets('dark glass uses elevated material with a subtle bright rim', (
-    tester,
-  ) async {
+  testWidgets('dark glass 的邊緣由材質產生，不再描一圈實心線', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
@@ -179,7 +180,10 @@ void main() {
       glass.settings?.glassColor,
       TpSystemColorsDark.secondary.withValues(alpha: 0.68),
     );
-    expect(shape.side.color.a, closeTo(0.18, 0.01));
+    // 一般模式不描邊；亮邊改由 ambientRim／glowIntensity 沿周長算出來。
+    expect(shape.side.color.a, 0);
+    expect(glass.settings!.ambientRim, greaterThan(0));
+    expect(glass.settings!.glowIntensity, greaterThan(0));
   });
 
   // 媒體背景不分明暗模式都套同一層暗化 —— 地圖圖磚恆為亮色，
