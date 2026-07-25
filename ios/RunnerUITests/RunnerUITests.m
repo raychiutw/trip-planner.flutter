@@ -29,6 +29,8 @@ static NSString *const TriplineDoubleTapRequestLabel =
 @property(nonatomic, strong) XCUIApplication *app;
 @property(nonatomic, strong) NSTimer *timer;
 @property(nonatomic, copy, nullable) NSString *activeRequestLabel;
+@property(nonatomic, assign) NSInteger pollCount;
+@property(nonatomic, assign) BOOL didDumpTree;
 @end
 
 @implementation TriplineNativeMapGestureBridge
@@ -80,7 +82,18 @@ static NSString *const TriplineDoubleTapRequestLabel =
                                       : (doubleTapRequest.exists
                                              ? TriplineDoubleTapRequestLabel
                                              : nil));
-  if (requestLabel == nil) return;
+  if (requestLabel == nil) {
+    // 診斷（#104）：Flutter 的 Semantics label 一直沒出現在 XCUI 的 a11y tree，
+    // 但無法從外部得知 XCUI 究竟看到了什麼。輪詢一段時間後 dump 一次樹，
+    // 用來區分「tree 是空的／只有原生殼層」與「tree 有內容但 label 形式不同」。
+    self.pollCount += 1;
+    if (self.pollCount == 40 && !self.didDumpTree) {
+      self.didDumpTree = YES;
+      NSLog(@"Tripline a11y dump BEGIN\n%@\nTripline a11y dump END",
+            self.app.debugDescription);
+    }
+    return;
+  }
 
   XCUIElement *target = self.app;
   self.activeRequestLabel = requestLabel;
