@@ -73,14 +73,46 @@ private final class E2ESemanticsPlugin: NSObject, FlutterPlugin {
     )
   }
 
+  /// 找出承載 Flutter 的 view controller。
+  ///
+  /// 不能只看 `appDelegate.window?.rootViewController` —— Patrol／XCTest 環境下
+  /// 實測取不到（run 30166845261 的 log 是 `no FlutterViewController`）。改成掃過
+  /// 所有 scene 的 window，並遞迴進容器與 presented controller。
+  private static func findFlutterViewController(
+    from appDelegate: AppDelegate?
+  ) -> FlutterViewController? {
+    var roots: [UIViewController] = []
+    if let root = appDelegate?.window?.rootViewController {
+      roots.append(root)
+    }
+    roots += UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+      .compactMap(\.rootViewController)
+
+    for root in roots {
+      if let found = search(root) { return found }
+    }
+    return nil
+  }
+
+  private static func search(_ controller: UIViewController) -> FlutterViewController? {
+    if let flutter = controller as? FlutterViewController { return flutter }
+    for child in controller.children {
+      if let found = search(child) { return found }
+    }
+    if let presented = controller.presentedViewController {
+      return search(presented)
+    }
+    return nil
+  }
+
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     guard call.method == "ensureEnabled" else {
       result(FlutterMethodNotImplemented)
       return
     }
-    guard
-      let controller = appDelegate?.window?.rootViewController as? FlutterViewController
-    else {
+    guard let controller = Self.findFlutterViewController(from: appDelegate) else {
       // 診斷用：失敗時要能和「channel 根本沒被呼叫」區分開來（見 #104）。
       NSLog("Tripline e2e semantics: no FlutterViewController")
       result(false)
