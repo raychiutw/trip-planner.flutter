@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:ui' as ui;
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:patrol/patrol.dart';
@@ -84,50 +84,34 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
-    // `ensureSemantics()` 只走到 `SemanticsBinding`，它再呼叫
-    // `platformDispatcher.setSemanticsTreeEnabled()`（framework
-    // `semantics/binding.dart:173`）—— 但測試環境拿到的是
-    // `TestPlatformDispatcher`，它**沒有轉發**這個方法，會被自己的
-    // `noSuchMethod` 靜默吞掉（`flutter_test/src/window.dart:988` 回傳 null）。
+    // iOS 的 XCUI accessibility tree 裡完全沒有 Flutter 的 Semantics 節點
+    // （run 30175947137 dump 證實），所以「Flutter 掛旗標、原生輪詢 a11y label」
+    // 那套橋接在 iOS 上不可行；`setSemanticsTreeEnabled()` 與
+    // `ensureSemanticsEnabled()` 都試過都無效（#104）。
     //
-    // engine 因此不會建 accessibility bridge。iOS 實機只在 VoiceOver／Switch
-    // Control／Speak Screen 開啟時才自動建（simulator 是無條件建，所以模擬器
-    // 過、Test Lab 不過），XCTest 的 accessibility tree 於是看不到 Flutter 的
-    // `Semantics(label:)`，原生 selector 找不到目標 —— 這就是 #104 裡 iOS
-    // pinch／rotate／double-tap 三個缺口的共同根因。
-    //
-    // 先試 Dart 側直接對 engine 的 `PlatformDispatcher` 打開，繞過 wrapper。
-    ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(true);
-    // 但實測（run 30163580717）證實這條在 iOS 實機上不夠 —— XCUI 查得到 root
-    // element snapshot，卻始終找不到 Flutter 的 `Semantics(label:)`，原生橋接
-    // 輪詢 6108 次一次都沒命中、從未執行過手勢。改由 native 側呼叫官方公開 API
-    // `FlutterEngine.ensureSemanticsEnabled`（header 明寫用途就是 UI testing）。
-    await _ensureNativeSemantics();
-    final semantics = $.tester.ensureSemantics();
-    try {
-      await $.tester.pump();
+    // 改走 Patrol 4.8.0 的 server extension：automation server 跑在 XCTest
+    // runner 行程內，這裡直接以 HTTP 請求手勢，完全繞開 a11y tree。
+    // Android 沒有這個問題，維持既有的 UiAutomator 多指注入。
+    await $(#armPinchCheck).tap();
+    await _requestNativeGesture('pinch');
+    await $(
+      #nativeMapPinchObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapPinchObserved), findsOneWidget);
 
-      await $(#armPinchCheck).tap();
-      await $(
-        #nativeMapPinchObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapPinchObserved), findsOneWidget);
+    await $(#armRotateCheck).tap();
+    await _requestNativeGesture('rotate');
+    await $(
+      #nativeMapRotateObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapRotateObserved), findsOneWidget);
 
-      await $(#armRotateCheck).tap();
-      await $(
-        #nativeMapRotateObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapRotateObserved), findsOneWidget);
-
-      await $(#armDoubleTapCheck).tap();
-      await $(
-        #nativeMapDoubleTapObserved,
-      ).waitUntilExists(timeout: const Duration(seconds: 15));
-      expect($(#nativeMapDoubleTapObserved), findsOneWidget);
-    } finally {
-      semantics.dispose();
-      ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(false);
-    }
+    await $(#armDoubleTapCheck).tap();
+    await _requestNativeGesture('doubleTap');
+    await $(
+      #nativeMapDoubleTapObserved,
+    ).waitUntilExists(timeout: const Duration(seconds: 15));
+    expect($(#nativeMapDoubleTapObserved), findsOneWidget);
 
     await $(#requestLocationPermission).tap();
     await $.platform.mobile.grantPermissionWhenInUse();
@@ -488,23 +472,24 @@ double _bearingDelta(double first, double second) {
   return delta > 180 ? 360 - delta : delta;
 }
 
-/// 請 native 側打開 accessibility bridge，讓 XCTest 的 accessibility tree 看得到
-/// Flutter 的 `Semantics(label:)`。
+/// 請 XCTest runner 行程執行一次原生手勢。
 ///
-/// iOS 實機只在 VoiceOver 等輔助功能開啟時才自動建 bridge；Dart 側的
-/// `PlatformDispatcher.setSemanticsTreeEnabled()` 在測試環境會被
-/// `TestPlatformDispatcher.noSuchMethod` 吞掉，繞不過去（issue #104）。
-///
-/// Android 沒有這個問題（bridge 一律監聽 `updateSemantics`），channel 不存在時
-/// 靜默略過。
-Future<void> _ensureNativeSemantics() async {
-  const channel = MethodChannel('tripline/e2e/semantics');
+/// iOS 走 Patrol server extension（`TriplineGestureExtension`）；Android 沒有
+/// 註冊這條 route，收到非 2xx 就略過，維持既有的 UiAutomator 多指注入。
+Future<void> _requestNativeGesture(String kind) async {
+  final uri = patrolNativeServerUri.replace(path: '/tripline/gesture');
+  final client = HttpClient();
   try {
-    final enabled = await channel.invokeMethod<bool>('ensureEnabled');
-    // 診斷用：失敗時要能區分「native 說做了但沒效」與「channel 沒被呼叫到」
-    // —— 兩者的測試失敗長得一模一樣（見 #104）。
-    debugPrint('Tripline e2e semantics: native returned $enabled');
-  } on MissingPluginException {
-    debugPrint('Tripline e2e semantics: channel not registered (Android?)');
+    final request = await client.postUrl(uri);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'kind': kind}));
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    debugPrint('Tripline gesture $kind -> ${response.statusCode} $body');
+  } on Object catch (error) {
+    // Android：route 不存在。診斷用，不讓它中斷測試。
+    debugPrint('Tripline gesture $kind unavailable: $error');
+  } finally {
+    client.close(force: true);
   }
 }

@@ -18,6 +18,7 @@
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		983964DC2978A956007EB76F /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = 983964DB2978A956007EB76F /* RunnerUITests.m */; };
+		AE9BE3EE4E336173FEBA86B2 /* TriplineGestureExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F8FB96F4DD9BB256D80606A /* TriplineGestureExtension.swift */; };
 		D096CEE4A9F9387A8167C958 /* Pods_Runner_RunnerUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F712DB5A42AD0F511535F35E /* Pods_Runner_RunnerUITests.framework */; };
 		F7A8874C7ACBD4A04EDBD0DB /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F7577CAB2335045C6C55D0 /* Pods_Runner.framework */; };
 /* End PBXBuildFile section */
@@ -81,10 +82,11 @@
 		983964D92978A956007EB76F /* RunnerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		983964DB2978A956007EB76F /* RunnerUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RunnerUITests.m; sourceTree = "<group>"; };
 		9EF8566E234B5B3FBF68B66F /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F8FB96F4DD9BB256D80606A /* TriplineGestureExtension.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TriplineGestureExtension.swift; sourceTree = "<group>"; };
 		A26DED0084471BFD6A917114 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
-		AAAABBBBCCCCDDDDEEEE0001 /* RunnerUITests-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Debug.xcconfig"; path = Flutter/RunnerUITests-Debug.xcconfig; sourceTree = "<group>"; };
-		AAAABBBBCCCCDDDDEEEE0002 /* RunnerUITests-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Release.xcconfig"; path = Flutter/RunnerUITests-Release.xcconfig; sourceTree = "<group>"; };
-		AAAABBBBCCCCDDDDEEEE0003 /* RunnerUITests-Profile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Profile.xcconfig"; path = Flutter/RunnerUITests-Profile.xcconfig; sourceTree = "<group>"; };
+		AAAABBBBCCCCDDDDEEEE0001 /* RunnerUITests-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Debug.xcconfig"; path = "Flutter/RunnerUITests-Debug.xcconfig"; sourceTree = "<group>"; };
+		AAAABBBBCCCCDDDDEEEE0002 /* RunnerUITests-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Release.xcconfig"; path = "Flutter/RunnerUITests-Release.xcconfig"; sourceTree = "<group>"; };
+		AAAABBBBCCCCDDDDEEEE0003 /* RunnerUITests-Profile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "RunnerUITests-Profile.xcconfig"; path = "Flutter/RunnerUITests-Profile.xcconfig"; sourceTree = "<group>"; };
 		B9AE06EF3B8A4B786606223B /* Pods-Runner-RunnerUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.release.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.release.xcconfig"; sourceTree = "<group>"; };
 		E1FB381F3FDC25C1AFD690A9 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		EEA886AD1F8957518C2E8065 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				983964DB2978A956007EB76F /* RunnerUITests.m */,
+				9F8FB96F4DD9BB256D80606A /* TriplineGestureExtension.swift */,
 			);
 			path = RunnerUITests;
 			sourceTree = "<group>";
@@ -559,6 +562,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				983964DC2978A956007EB76F /* RunnerUITests.m in Sources */,
+				AE9BE3EE4E336173FEBA86B2 /* TriplineGestureExtension.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -895,6 +899,8 @@
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.raychiu.tripline.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Runner;
 			};
@@ -914,6 +920,7 @@
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.raychiu.tripline.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Runner;
 			};
@@ -933,6 +940,7 @@
 				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.raychiu.tripline.RunnerUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = Runner;
 			};
