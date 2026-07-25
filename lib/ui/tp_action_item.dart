@@ -21,6 +21,8 @@ class TpActionItem<T> {
   final IconData icon;
   final Key? key;
   final String? semanticLabel;
+
+  /// 目前選取中。呈現規則:保留 [icon] 原本的字符,勾選另外顯示 —— 不以勾取代字符。
   final bool selected;
   final bool dividerBefore;
   final TpActionRole role;

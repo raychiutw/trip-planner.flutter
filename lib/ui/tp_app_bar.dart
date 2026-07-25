@@ -678,10 +678,11 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
                       ),
                     MenuItemButton(
                       key: item.key,
-                      leadingIcon: Icon(
-                        item.selected ? CupertinoIcons.check_mark : item.icon,
-                        size: 22,
-                      ),
+                      leadingIcon: Icon(item.icon, size: 22),
+                      // 選取態保留項目原本的字符，勾選另外顯示在尾端。
+                      trailingIcon: item.selected
+                          ? const Icon(CupertinoIcons.check_mark, size: 18)
+                          : null,
                       closeOnActivate: false,
                       style: ButtonStyle(
                         alignment: AlignmentDirectional.centerStart,

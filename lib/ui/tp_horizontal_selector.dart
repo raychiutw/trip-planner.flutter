@@ -153,7 +153,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
         glassColor: selectedTint,
         platformViewFallbackColor: selectedTint,
       ),
-      opaqueColor: theme.colorScheme.primaryContainer,
+      opaqueColor: theme.colorScheme.surfaceContainerHigh,
     );
     final height = TpHorizontalSelector.preferredHeight(context);
     return Focus(
