@@ -246,7 +246,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('trip-print-do')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-print-more')), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

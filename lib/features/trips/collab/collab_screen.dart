@@ -93,7 +93,13 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
     final state = ref.watch(collabControllerProvider(widget.tripId));
 
     return Scaffold(
-      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('共編設定')),
+      // 本頁在 StatefulShellRoute 之外、沒有 root tab bar，
+      // 帳號入口是這裡唯一的路徑，明文保留。
+      appBar: const TpAppBar(
+        role: TpAppBarRole.detail,
+        title: Text('共編設定'),
+        accountEntry: TpAccountAvatarButton(),
+      ),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,
         contentKey: const ValueKey('collab-content'),

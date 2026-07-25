@@ -299,7 +299,7 @@ void main() {
       lessThanOrEqualTo(720),
     );
     expect(find.byKey(const ValueKey('trip-health-refresh-button')), findsOne);
-    expect(find.byKey(const ValueKey('account-avatar-button')), findsOne);
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
