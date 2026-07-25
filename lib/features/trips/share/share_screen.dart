@@ -242,7 +242,13 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
     final revokedShares = state.shares.where((s) => s.isRevoked).toList();
 
     return Scaffold(
-      appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('分享連結')),
+      // 本頁在 StatefulShellRoute 之外、沒有 root tab bar，
+      // 帳號入口是這裡唯一的路徑，明文保留。
+      appBar: const TpAppBar(
+        role: TpAppBarRole.detail,
+        title: Text('分享連結'),
+        actions: [TpAccountAvatarButton()],
+      ),
       body: AppAdaptiveContent(
         maxWidth: AppContentWidth.form,
         contentKey: const ValueKey('share-content'),

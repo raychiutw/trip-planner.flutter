@@ -231,10 +231,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('notes-section-flights')), findsOneWidget);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
-      const Size(44, 44),
-    );
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
   });
 
   testWidgets('載入失敗持續顯示且可重試', (tester) async {

@@ -354,7 +354,10 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final largeSheetScope = TpLargeSheetNavigationScope.maybeOf(context);
     final leadingAction = _semanticLeading(context, largeSheetScope);
-    final showsAccount = largeSheetScope == null && role == TpAppBarRole.detail;
+    // 帳號入口屬 root 層級（浮動 header）；固定 bar 不自動附加，
+    // shell 外沒有 root tab bar 的路由自行把 TpAccountAvatarButton 放進 actions。
+    final isContentHeader =
+        largeSheetScope == null && role == TpAppBarRole.detail;
     final pageActions = <Widget>[
       ...actions,
       if (primaryActionLabel != null)
@@ -364,12 +367,8 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           onPressed: primaryActionEnabled ? onPrimaryAction : null,
         ),
     ];
-    final resolvedActions = <Widget>[
-      ...pageActions,
-      if (showsAccount) const TpAccountAvatarButton(),
-    ];
     assert(
-      !showsAccount ||
+      !isContentHeader ||
           (pageActions.length <= 2 &&
               (pageActions.length <= 1 ||
                   pageActions.any((action) => action is TpMoreMenuButton))),
@@ -383,7 +382,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
             leadingAction as TpToolbarTextButton,
           )
         : TpSpacing.tapMin;
-    final actionsWidth = TpToolbarSlots.actionsWidth(context, resolvedActions);
+    final actionsWidth = TpToolbarSlots.actionsWidth(context, pageActions);
     if (largeSheetScope != null) {
       final colors = Theme.of(context).colorScheme;
       final showsScopeClose = role != TpAppBarRole.modalForm;
@@ -395,7 +394,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
         if (primaryActionLabel != null)
           TpToolbarSlots.textActionWidth(
             context,
-            resolvedActions.last as TpToolbarTextButton,
+            pageActions.last as TpToolbarTextButton,
           ),
         if (showsScopeClose) TpSpacing.tapMin,
       ];
@@ -440,7 +439,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
               padding: const EdgeInsets.only(right: TpSpacing.s4),
               child: TpHeaderActionRow(
                 children: [
-                  ...resolvedActions,
+                  ...pageActions,
                   if (showsScopeClose)
                     KeyedSubtree(
                       key: const ValueKey('app-sheet-close'),
@@ -481,9 +480,9 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? TpToolbarSlots.actions(
               context: context,
               width: actionsWidth,
-              children: resolvedActions,
+              children: pageActions,
             )
-          : resolvedActions,
+          : pageActions,
     );
   }
 

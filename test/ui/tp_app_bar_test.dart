@@ -66,14 +66,11 @@ void main() {
     expect(find.text('取消'), findsNothing);
   });
 
-  testWidgets('detail app bar pops one route', (tester) async {
-    var accountOpened = false;
+  testWidgets('detail app bar pops one route 且不再自動附加帳號入口', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        builder: (context, child) => TpAccountActionScope(
-          onOpen: (_) => accountOpened = true,
-          child: child!,
-        ),
+        builder: (context, child) =>
+            TpAccountActionScope(onOpen: (_) {}, child: child!),
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () => Navigator.of(context).push(
@@ -94,6 +91,33 @@ void main() {
 
     await tester.tap(find.text('開啟'));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-avatar-button')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('開啟'), findsOneWidget);
+    expect(find.text('外觀'), findsNothing);
+  });
+
+  testWidgets('固定 bar 的帳號入口改由呼叫端明文提供', (tester) async {
+    var accountOpened = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => TpAccountActionScope(
+          onOpen: (_) => accountOpened = true,
+          child: child!,
+        ),
+        home: const Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: Text('共編設定'),
+            actions: [TpAccountAvatarButton()],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('account-avatar-button'))),
@@ -101,11 +125,6 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
     expect(accountOpened, isTrue);
-    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('開啟'), findsOneWidget);
-    expect(find.text('外觀'), findsNothing);
   });
 
   testWidgets('modal form exposes Cancel and the explicit submit verb', (
