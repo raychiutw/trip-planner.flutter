@@ -630,16 +630,20 @@ void main() {
       expect(map.platformViewBackdrop, isTrue);
       expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
       expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-      expect(map.settings?.thickness, standard.settings?.thickness);
+      // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
+      // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
       expect(map.settings?.blur, standard.settings?.blur);
-      expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
-      expect(map.settings?.ambientStrength, standard.settings?.ambientStrength);
-      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
-      expect(map.settings?.saturation, standard.settings?.saturation);
       expect(
         map.settings?.standardOpacityMultiplier,
         standard.settings?.standardOpacityMultiplier,
       );
+      expect(map.settings?.chromaticAberration, 0);
+      expect(map.settings?.refractiveIndex, 1.06);
+      expect(standard.settings!.chromaticAberration, greaterThan(0));
+      expect(standard.settings!.refractiveIndex, greaterThan(1.06));
+      // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+      expect(map.settings!.ambientRim, greaterThan(0));
+      expect(standard.settings!.ambientRim, greaterThan(0));
 
       final selected = tester.widget<GlassButton>(
         find.descendant(
@@ -777,7 +781,7 @@ void main() {
       )),
     );
     final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
-    expect(track.settings?.chromaticAberration, 0);
+    expect(track.settings?.chromaticAberration, closeTo(0.004, 0.001));
   });
 
   testWidgets('TpBottomAccessory 自行避讓 root tab 並維持固定高度', (tester) async {

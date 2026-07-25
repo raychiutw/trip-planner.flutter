@@ -646,15 +646,20 @@ void main() {
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
       expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-      expect(map.settings?.thickness, standard.settings?.thickness);
+      // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
+      // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
       expect(map.settings?.blur, standard.settings?.blur);
-      expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
-      expect(map.settings?.ambientStrength, standard.settings?.ambientStrength);
-      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
       expect(
         map.settings?.standardOpacityMultiplier,
         standard.settings?.standardOpacityMultiplier,
       );
+      expect(map.settings?.chromaticAberration, 0);
+      expect(map.settings?.refractiveIndex, 1.06);
+      expect(standard.settings!.chromaticAberration, greaterThan(0));
+      expect(standard.settings!.refractiveIndex, greaterThan(1.06));
+      // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+      expect(map.settings!.ambientRim, greaterThan(0));
+      expect(standard.settings!.ambientRim, greaterThan(0));
       expect(map.indicatorSettings?.blur, map.settings?.blur);
       expect(
         map.indicatorSettings?.refractiveIndex,
@@ -959,8 +964,9 @@ void main() {
           alpha: 0.68,
         ),
       );
-      expect(glass.settings?.chromaticAberration, 0);
-      expect(glass.settings?.refractiveIndex, lessThanOrEqualTo(1.08));
+      // 導覽配方已與共用玻璃表面收斂為同一組（較高的折射率與色散）。
+      expect(glass.settings?.chromaticAberration, closeTo(0.006, 0.001));
+      expect(glass.settings?.refractiveIndex, 1.15);
     });
 
     testWidgets('root tab bar 選取態是中性膠囊加品牌 tint 前景，兩態同實心字符', (tester) async {
@@ -1037,7 +1043,7 @@ void main() {
         ),
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
-      expect(glass.settings?.chromaticAberration, 0);
+      expect(glass.settings?.chromaticAberration, closeTo(0.004, 0.001));
     });
 
     test('iPhone safe area 與膠囊重疊後，底部至少保留 16pt', () {

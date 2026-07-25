@@ -113,7 +113,6 @@ class TpToolbarActionGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       width: widthFor(children.length),
       height: TpSpacing.tapMin,
@@ -124,9 +123,8 @@ class TpToolbarActionGroup extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         shape: LiquidRoundedSuperellipse(
           borderRadius: 22,
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
-          ),
+          // 邊緣交還材質；只有提高對比才補實心邊。
+          side: BorderSide(color: tpGlassEdgeColor(context)),
         ),
         settings: tpNavigationGlassSettings(context),
         child: _TpToolbarGroupScope(
@@ -178,7 +176,6 @@ class TpToolbarGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     // 群組容器已經提供整片玻璃，這裡再畫一片就會玻璃疊玻璃。
     if (_TpToolbarGroupScope.of(context)) {
       return SizedBox.square(
@@ -221,11 +218,8 @@ class TpToolbarGlassButton extends StatelessWidget {
           stretch: 0.12,
           shape: LiquidRoundedSuperellipse(
             borderRadius: 22,
-            side: BorderSide(
-              color:
-                  rimColor ??
-                  Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
-            ),
+            // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
+            side: BorderSide(color: rimColor ?? tpGlassEdgeColor(context)),
           ),
           settings: resolvedSettings,
           child: child,
@@ -663,7 +657,6 @@ class TpToolbarActionSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
       child: GlassContainer(
@@ -672,9 +665,7 @@ class TpToolbarActionSurface extends StatelessWidget {
         quality: GlassQuality.standard,
         shape: LiquidRoundedSuperellipse(
           borderRadius: 22,
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
-          ),
+          side: BorderSide(color: tpGlassEdgeColor(context)),
         ),
         settings: tpNavigationGlassSettings(context),
         child:
