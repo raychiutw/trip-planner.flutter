@@ -28,10 +28,64 @@ import UserNotifications
       ),
       let accessibilityRegistrar = engineBridge.pluginRegistry.registrar(
         forPlugin: "TriplineAccessibility"
+      ),
+      let e2eSemanticsRegistrar = engineBridge.pluginRegistry.registrar(
+        forPlugin: "TriplineE2ESemantics"
       )
     else { return }
     NotificationPermissionPlugin.register(with: registrar)
     ReduceTransparencyPlugin.register(with: accessibilityRegistrar)
+    E2ESemanticsPlugin.register(with: e2eSemanticsRegistrar, appDelegate: self)
+  }
+}
+
+/// e2e 專用:讓 XCTest 的 accessibility tree 看得到 Flutter 的 `Semantics`。
+///
+/// iOS 實機只在 VoiceOver／Switch Control／Speak Screen 開啟時才建 accessibility
+/// bridge(simulator 是無條件建,所以模擬器過、Test Lab 不過)。Dart 側本來可以用
+/// `PlatformDispatcher.setSemanticsTreeEnabled()` 打開,但測試環境拿到的是
+/// `TestPlatformDispatcher`,它沒有轉發該方法、被自己的 `noSuchMethod` 靜默吞掉
+/// —— 繞不過去。詳見 issue #104 與 `docs/discovery/native-map-gestures.md`。
+///
+/// **gating:** production 程式碼沒有任何呼叫點,只有 `patrol_test/` 會呼叫。
+/// handler 存在但永遠不會被觸發,不改變 app 的正常行為。
+private final class E2ESemanticsPlugin: NSObject, FlutterPlugin {
+  private static let channelName = "tripline/e2e/semantics"
+  private weak var appDelegate: AppDelegate?
+
+  init(appDelegate: AppDelegate?) {
+    self.appDelegate = appDelegate
+    super.init()
+  }
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    register(with: registrar, appDelegate: nil)
+  }
+
+  static func register(with registrar: FlutterPluginRegistrar, appDelegate: AppDelegate?) {
+    let channel = FlutterMethodChannel(
+      name: channelName,
+      binaryMessenger: registrar.messenger()
+    )
+    registrar.addMethodCallDelegate(
+      E2ESemanticsPlugin(appDelegate: appDelegate),
+      channel: channel
+    )
+  }
+
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard call.method == "ensureEnabled" else {
+      result(FlutterMethodNotImplemented)
+      return
+    }
+    guard
+      let controller = appDelegate?.window?.rootViewController as? FlutterViewController
+    else {
+      result(false)
+      return
+    }
+    controller.engine?.ensureSemanticsEnabled()
+    result(true)
   }
 }
 

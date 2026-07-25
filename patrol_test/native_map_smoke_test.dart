@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:patrol/patrol.dart';
@@ -95,8 +96,13 @@ void main() {
     // `Semantics(label:)`，原生 selector 找不到目標 —— 這就是 #104 裡 iOS
     // pinch／rotate／double-tap 三個缺口的共同根因。
     //
-    // 直接對 engine 的 `PlatformDispatcher` 打開，繞過 wrapper。
+    // 先試 Dart 側直接對 engine 的 `PlatformDispatcher` 打開，繞過 wrapper。
     ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(true);
+    // 但實測（run 30163580717）證實這條在 iOS 實機上不夠 —— XCUI 查得到 root
+    // element snapshot，卻始終找不到 Flutter 的 `Semantics(label:)`，原生橋接
+    // 輪詢 6108 次一次都沒命中、從未執行過手勢。改由 native 側呼叫官方公開 API
+    // `FlutterEngine.ensureSemanticsEnabled`（header 明寫用途就是 UI testing）。
+    await _ensureNativeSemantics();
     final semantics = $.tester.ensureSemantics();
     try {
       await $.tester.pump();
@@ -480,4 +486,22 @@ bool _near(
 double _bearingDelta(double first, double second) {
   final delta = (first - second).abs() % 360;
   return delta > 180 ? 360 - delta : delta;
+}
+
+/// 請 native 側打開 accessibility bridge，讓 XCTest 的 accessibility tree 看得到
+/// Flutter 的 `Semantics(label:)`。
+///
+/// iOS 實機只在 VoiceOver 等輔助功能開啟時才自動建 bridge；Dart 側的
+/// `PlatformDispatcher.setSemanticsTreeEnabled()` 在測試環境會被
+/// `TestPlatformDispatcher.noSuchMethod` 吞掉，繞不過去（issue #104）。
+///
+/// Android 沒有這個問題（bridge 一律監聽 `updateSemantics`），channel 不存在時
+/// 靜默略過。
+Future<void> _ensureNativeSemantics() async {
+  const channel = MethodChannel('tripline/e2e/semantics');
+  try {
+    await channel.invokeMethod<bool>('ensureEnabled');
+  } on MissingPluginException {
+    // Android 或未註冊的建置：不需要這一步。
+  }
 }
