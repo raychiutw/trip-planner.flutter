@@ -1858,7 +1858,14 @@ void main() {
 
     for (final action in ['move', 'copy']) {
       final finder = find.byKey(ValueKey('entry-$action-11'));
-      expect(tester.widget<MenuItemButton>(finder).onPressed, isNull);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.descendant(of: finder, matching: find.byType(TextButton)),
+            )
+            .onPressed,
+        isNull,
+      );
       final label = action == 'move' ? '移動到其他天' : '複製到其他天';
       expect(find.bySemanticsLabel('$label，目前行程只有一天，無法使用'), findsOneWidget);
     }

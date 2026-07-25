@@ -203,10 +203,10 @@ void main() {
       tester.getSize(find.byType(TpMoreMenuButton<int>)).height,
       greaterThanOrEqualTo(44),
     );
-    final menu = tester.widget<MenuAnchor>(
+    final menu = tester.widget<RawMenuAnchor>(
       find.descendant(
         of: find.byType(TpMoreMenuButton<int>),
-        matching: find.byType(MenuAnchor),
+        matching: find.byType(RawMenuAnchor),
       ),
     );
     expect(menu.useRootOverlay, isTrue);
