@@ -87,7 +87,7 @@ class TpRootGlassHeader extends StatelessWidget {
     assert(
       config.actions.length <= 2 &&
           (config.actions.length <= 1 ||
-              config.actions.any((action) => action is TpMoreMenuButton)),
+              tpActionsIncludeMoreMenu(config.actions)),
       'Root headers support one direct action; extra actions use More.',
     );
     return SizedBox(
@@ -136,9 +136,14 @@ class TpRootGlassHeader extends StatelessWidget {
                         child: config.actions[index],
                       )
                     else
-                      SizedBox.square(
+                      SizedBox(
                         key: ValueKey('tp-root-header-action-$index'),
-                        dimension: TpSpacing.tapMin,
+                        // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
+                        width: TpToolbarSlots.slotWidth(
+                          context,
+                          config.actions[index],
+                        ),
+                        height: TpSpacing.tapMin,
                         child: config.actions[index],
                       ),
                   const TpAccountAvatarButton(),

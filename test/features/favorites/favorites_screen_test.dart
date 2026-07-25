@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
@@ -12,6 +13,7 @@ import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/favorites/poi_favorite_card.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 class MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
@@ -74,6 +76,102 @@ Future<void> _openFavoritesFilter(WidgetTester tester) async {
 
 void main() {
   group('FavoritesScreen', () {
+    testWidgets('header 的排序與新增共用一片玻璃，中間只有間距、沒有分隔線', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      final group = find.byKey(const ValueKey('favorites-header-group'));
+      expect(group, findsOneWidget);
+
+      // 兩顆相關動作都在同一片容器裡。
+      for (final key in ['favorites-sort-action', 'favorites-add-action']) {
+        expect(
+          find.descendant(of: group, matching: find.byKey(ValueKey(key))),
+          findsOneWidget,
+          reason: key,
+        );
+      }
+
+      // 一片玻璃：群組提供容器，裡面的按鈕不再各自畫一顆玻璃。
+      expect(
+        find.descendant(of: group, matching: find.byType(GlassContainer)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: group,
+          matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+        ),
+        findsNothing,
+        reason: '群組內不該再有各自的玻璃按鈕，否則玻璃疊玻璃',
+      );
+
+      // 只以間距分隔 —— HIG Toolbars 不提分隔線。
+      expect(
+        find.descendant(of: group, matching: find.byType(VerticalDivider)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: group, matching: find.byType(Divider)),
+        findsNothing,
+      );
+
+      // 帳號鈕自成一組，不入群組。
+      expect(
+        find.descendant(
+          of: group,
+          matching: find.byType(TpAccountAvatarButton),
+        ),
+        findsNothing,
+      );
+      expect(find.byType(TpAccountAvatarButton), findsOneWidget);
+
+      // 兩顆按鈕都仍是完整 44pt 觸控目標。
+      for (final key in ['favorites-sort-action', 'favorites-add-action']) {
+        expect(
+          tester.getSize(find.byKey(ValueKey(key))).height,
+          greaterThanOrEqualTo(44),
+          reason: key,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('窄寬度加大字級時維持折疊，不套用群組', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(textScaler: const TextScaler.linear(1.6)),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('favorites-header-group')),
+        findsNothing,
+        reason: 'header 只剩一顆按鈕時不套用群組',
+      );
+      expect(find.byKey(const ValueKey('favorites-add-action')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('favorites-sort-action')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('渲染收藏清單 N 卡', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

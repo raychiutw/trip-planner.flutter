@@ -45,13 +45,19 @@ class TpToolbarTextButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
+    this.prominent = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
 
+  /// 主要動作（儲存、完成）分離並著色。HIG 要求著色在**底色**而不是字符，
+  /// 一列只能有一個，且置於尾端。
+  final bool prominent;
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ConstrainedBox(
       constraints: const BoxConstraints(
         minWidth: TpSpacing.tapMin,
@@ -61,6 +67,12 @@ class TpToolbarTextButton extends StatelessWidget {
         style: TextButton.styleFrom(
           minimumSize: const Size(TpSpacing.tapMin, TpSpacing.tapMin),
           padding: const EdgeInsets.symmetric(horizontal: 10),
+          backgroundColor: prominent ? scheme.primary : null,
+          foregroundColor: prominent ? scheme.onPrimary : null,
+          disabledBackgroundColor: prominent
+              ? scheme.onSurface.withValues(alpha: 0.12)
+              : null,
+          shape: prominent ? const StadiumBorder() : null,
         ),
         onPressed: onPressed,
         child: Text(label, maxLines: 1),
@@ -68,6 +80,81 @@ class TpToolbarTextButton extends StatelessWidget {
     );
   }
 }
+
+/// 標記「目前在群組容器裡」，讓子按鈕不要再各自畫一片玻璃。
+class _TpToolbarGroupScope extends InheritedWidget {
+  const _TpToolbarGroupScope({required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TpToolbarGroupScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_TpToolbarGroupScope oldWidget) => false;
+}
+
+/// 一列上相關的動作收在同一片玻璃裡，彼此只有間距。
+///
+/// **不畫分隔線** —— HIG Toolbars 只提間距（SwiftUI 也只有 `ToolbarSpacer`）；
+/// 分隔線是選單語彙，選單內部的分組分隔線是另一回事，仍然正確。
+/// 不相關的動作各自成一顆容器，一列最多約三組。
+class TpToolbarActionGroup extends StatelessWidget {
+  const TpToolbarActionGroup({super.key, required this.children})
+    : assert(children.length >= 2, '單一動作不需要群組容器');
+
+  final List<Widget> children;
+
+  /// 群組內按鈕之間的間距，比群組與群組之間更窄。
+  static const innerGap = TpSpacing.s1;
+
+  static double widthFor(int count) =>
+      count * TpSpacing.tapMin + (count - 1) * innerGap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      width: widthFor(children.length),
+      height: TpSpacing.tapMin,
+      child: GlassContainer(
+        key: const ValueKey('tp-toolbar-action-group'),
+        useOwnLayer: true,
+        quality: GlassQuality.standard,
+        clipBehavior: Clip.antiAlias,
+        shape: LiquidRoundedSuperellipse(
+          borderRadius: 22,
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.72),
+          ),
+        ),
+        settings: tpNavigationGlassSettings(context),
+        child: _TpToolbarGroupScope(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0) const SizedBox(width: innerGap),
+                SizedBox.square(
+                  dimension: TpSpacing.tapMin,
+                  child: children[index],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 群組容器把更多選單包起來後，`action is TpMoreMenuButton` 的直接型別判斷
+/// 就不成立了，改用這個會遞迴進群組的判斷。
+bool tpActionsIncludeMoreMenu(Iterable<Widget> actions) => actions.any(
+  (action) =>
+      action is TpMoreMenuButton ||
+      (action is TpToolbarActionGroup &&
+          tpActionsIncludeMoreMenu(action.children)),
+);
 
 /// Header 共用的 44pt 圓形套件 Liquid Glass 按鈕。
 class TpToolbarGlassButton extends StatelessWidget {
@@ -91,6 +178,26 @@ class TpToolbarGlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 群組容器已經提供整片玻璃，這裡再畫一片就會玻璃疊玻璃。
+    if (_TpToolbarGroupScope.of(context)) {
+      return SizedBox.square(
+        dimension: TpSpacing.tapMin,
+        child: Tooltip(
+          message: tooltip,
+          excludeFromSemantics: true,
+          child: Semantics(
+            button: true,
+            enabled: onPressed != null,
+            label: tooltip,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onPressed,
+              child: Center(child: child),
+            ),
+          ),
+        ),
+      );
+    }
     final resolvedSettings = glassSettings == null
         ? tpNavigationGlassSettings(context)
         : tpResolveGlassSettings(context, glassSettings!);
@@ -243,15 +350,21 @@ abstract final class TpToolbarSlots {
     );
   }
 
+  /// 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
+  static double slotWidth(BuildContext context, Widget child) =>
+      switch (child) {
+        TpToolbarTextButton() => textActionWidth(context, child),
+        TpToolbarActionGroup() => TpToolbarActionGroup.widthFor(
+          child.children.length,
+        ),
+        _ => TpSpacing.tapMin,
+      };
+
   static double actionsWidth(BuildContext context, List<Widget> children) {
     if (children.isEmpty) return 0;
     return children.fold<double>(
           0,
-          (width, child) =>
-              width +
-              (child is TpToolbarTextButton
-                  ? textActionWidth(context, child)
-                  : TpSpacing.tapMin),
+          (width, child) => width + slotWidth(context, child),
         ) +
         (children.length - 1) * TpSpacing.s2;
   }
@@ -270,6 +383,11 @@ abstract final class TpToolbarSlots {
             for (final child in children)
               if (child is TpToolbarTextButton)
                 SizedBox(width: textActionWidth(context, child), child: child)
+              else if (child is TpToolbarActionGroup)
+                SizedBox(
+                  width: TpToolbarActionGroup.widthFor(child.children.length),
+                  child: child,
+                )
               else
                 SizedBox.square(dimension: TpSpacing.tapMin, child: child),
           ],
@@ -374,13 +492,14 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           key: primaryActionKey ?? const ValueKey('tp-app-bar-primary-action'),
           label: primaryActionLabel!,
           onPressed: primaryActionEnabled ? onPrimaryAction : null,
+          prominent: true,
         ),
     ];
     assert(
       !isContentHeader ||
           (pageActions.length <= 2 &&
               (pageActions.length <= 1 ||
-                  pageActions.any((action) => action is TpMoreMenuButton))),
+                  tpActionsIncludeMoreMenu(pageActions))),
       'Content headers support one direct action; extra actions use More.',
     );
     // 帳號入口在額度計算之後才併入，位置固定在最右側。
