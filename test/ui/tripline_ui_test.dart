@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
@@ -354,6 +355,107 @@ void main() {
     },
   );
 
+  testWidgets('日期選擇器選取態是中性膠囊加品牌 tint 前景', (tester) async {
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('day-selector'),
+            value: 1,
+            options: const [
+              TpScopeOption(value: 0, label: '總覽'),
+              TpScopeOption(value: 1, label: 'DAY 1'),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    final scheme = AppTheme.light().colorScheme;
+    final pill = tester
+        .widget<GlassButton>(
+          find.descendant(
+            of: find.byKey(const ValueKey('day-selector')),
+            matching: find.byType(GlassButton),
+          ),
+        )
+        .settings!
+        .glassColor;
+
+    // 膠囊底走中性語意層，品牌柔褐不再當背景鋪滿。
+    (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
+    expect(rgb(pill), rgb(scheme.surfaceContainerHighest));
+    expect(rgb(pill), isNot(rgb(scheme.primary)));
+
+    // 品牌色只出現在前景；未選取維持中性次要前景。
+    expect(
+      tester.widget<Text>(find.text('DAY 1')).style?.color,
+      scheme.primary,
+    );
+    expect(
+      tester.widget<Text>(find.text('總覽')).style?.color,
+      scheme.onSurfaceVariant,
+    );
+  });
+
+  testWidgets('日期選擇器欄寬改量測，長標籤不截斷且 Dynamic Type 只計一次', (tester) async {
+    const short = '全';
+    const mid = 'DAY 1';
+    const long = '2026/07/25（六）';
+
+    Future<Map<String, double>> widthsAt(double scale) async {
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: TpHorizontalSelector<int>(
+              value: 0,
+              options: const [
+                TpScopeOption(value: 0, label: short, key: ValueKey('w-short')),
+                TpScopeOption(value: 1, label: mid, key: ValueKey('w-mid')),
+                TpScopeOption(value: 2, label: long, key: ValueKey('w-long')),
+              ],
+              onSelected: (_) {},
+            ),
+          ),
+          textScale: scale,
+        ),
+      );
+      await tester.pump();
+      return {
+        for (final key in ['w-short', 'w-mid', 'w-long'])
+          key: tester.getSize(find.byKey(ValueKey(key))).width,
+      };
+    }
+
+    final at1 = await widthsAt(1);
+
+    // 量測取代字元數階梯：標籤越長欄位越寬，不再是同一級距擠在一起。
+    expect(at1['w-long']!, greaterThan(at1['w-mid']!));
+    expect(at1['w-mid']!, greaterThan(at1['w-short']!));
+
+    // 量測後短標籤仍不得低於最小點擊尺寸。
+    expect(at1['w-short']!, greaterThanOrEqualTo(TpSpacing.tapMin));
+
+    // 長標籤要有足夠欄位，不被 ellipsis 截斷、不折行。
+    final paragraph = tester.renderObject<RenderParagraph>(find.text(long));
+    expect(paragraph.didExceedMaxLines, isFalse);
+
+    final at2 = await widthsAt(2);
+    for (final entry in at2.entries) {
+      expect(
+        entry.value,
+        greaterThanOrEqualTo(TpSpacing.tapMin),
+        reason: entry.key,
+      );
+    }
+
+    // Dynamic Type 只被計入一次：量測本身已含縮放，若再乘一次會逼近四倍。
+    final ratio = at2['w-long']! / at1['w-long']!;
+    expect(ratio, greaterThan(1.5));
+    expect(ratio, lessThan(3));
+  });
+
   testWidgets(
     'navigation selector keeps one optical recipe over a platform view',
     (tester) async {
@@ -505,9 +607,7 @@ void main() {
     expect(tester.takeException(), isAssertionError);
   });
 
-  testWidgets('深色日期 selector 使用 Liquid Glass 暖褐 thumb，不使用金色實心底', (
-    tester,
-  ) async {
+  testWidgets('深色日期 selector 的選取膠囊同樣是中性語意層，不鋪品牌柔褐', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
@@ -529,10 +629,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final scheme = AppTheme.dark().colorScheme;
     final thumb = tester.widget<GlassButton>(find.byType(GlassButton));
+    final pill = thumb.settings!.glassColor;
     expect(
-      thumb.settings?.glassColor,
-      TpSystemColorsDark.tint.withValues(alpha: 0.24),
+      (pill.r, pill.g, pill.b),
+      (
+        scheme.surfaceContainerHighest.r,
+        scheme.surfaceContainerHighest.g,
+        scheme.surfaceContainerHighest.b,
+      ),
+    );
+    expect(
+      (pill.r, pill.g, pill.b),
+      isNot((
+        TpSystemColorsDark.tint.r,
+        TpSystemColorsDark.tint.g,
+        TpSystemColorsDark.tint.b,
+      )),
     );
     final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
     expect(track.settings?.chromaticAberration, 0);
