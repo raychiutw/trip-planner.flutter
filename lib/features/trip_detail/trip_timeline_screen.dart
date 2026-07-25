@@ -34,6 +34,7 @@ import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
 import 'day_weather.dart';
 import 'reorder_helpers.dart';
+import 'selected_day_provider.dart';
 import 'trip_providers.dart';
 import 'trip_notes_screen.dart';
 import 'trip_print_screen.dart';
@@ -84,10 +85,15 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   int? _activeDayNum;
   String? _editingTripId;
 
+  /// 前景期間最後一次同步到的共用選取日。切回前景時比對，只有真的被別的
+  /// 畫面改過才接手 —— 否則會把使用者在本畫面的選擇蓋掉。
+  SelectedTripDay? _syncedSelection;
+  bool _wasActiveBranch = true;
+
   @override
   void initState() {
     super.initState();
-    _activeDayNum = widget.initialDayNum;
+    _resolveActiveDayNum();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(
@@ -102,7 +108,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId ||
         oldWidget.initialDayNum != widget.initialDayNum) {
-      _activeDayNum = widget.initialDayNum;
+      _resolveActiveDayNum();
     }
     if (oldWidget.tripId != widget.tripId) {
       _editingTripId = null;
@@ -114,6 +120,23 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         }
       });
     }
+  }
+
+  /// 路由查詢參數優先；缺席時才由共用選取日供值。
+  void _resolveActiveDayNum() {
+    _syncedSelection = ref.read(selectedDayProvider);
+    _activeDayNum =
+        widget.initialDayNum ?? _syncedSelection.dayNumFor(widget.tripId);
+  }
+
+  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
+  /// 背景分支仍會 rebuild，SWR 的兩段 emit 必然給出新 list 而觸發寫入。
+  void _publishSelectedDay(int dayNum) {
+    if (!TickerMode.valuesOf(context).enabled) return;
+    ref
+        .read(selectedDayProvider.notifier)
+        .select(tripId: widget.tripId, dayNum: dayNum);
+    _syncedSelection = ref.read(selectedDayProvider);
   }
 
   void _openActionSheet(Widget screen) {
@@ -152,7 +175,18 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       AsyncData(:final value) => value,
       _ => const <TripSummary>[],
     };
+    // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
+    // 重建，才接得住其他 tab 期間變動的共用選取日（保活的分支子樹本身不重建）。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    if (isActiveBranch && !_wasActiveBranch) {
+      final selection = ref.read(selectedDayProvider);
+      final sharedDayNum = selection.dayNumFor(widget.tripId);
+      if (sharedDayNum != null && selection != _syncedSelection) {
+        _activeDayNum = sharedDayNum;
+        _syncedSelection = selection;
+      }
+    }
+    _wasActiveBranch = isActiveBranch;
     final selectedAsync = isActiveBranch
         ? ref.watch(currentTripIdProvider)
         : ref.read(currentTripIdProvider);
@@ -225,19 +259,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 },
               ),
         actions: [
-          if (!isEditing)
-            TpToolbarIconButton(
-              key: const ValueKey('trip-timeline-map'),
-              icon: CupertinoIcons.map,
-              tooltip: '地圖',
-              onPressed: () {
-                final dayNum = _activeDayNum ?? fallbackDayNum;
-                context.go(
-                  '/map?tripId=${Uri.encodeQueryComponent(tripId)}'
-                  '${dayNum == null ? '' : '&day=$dayNum'}',
-                );
-              },
-            ),
+          // 與 root tab「地圖」重複的 bar button 已移除，切換交由 tab 承擔；
+          // 目前看的是第幾天改由共用選取日跨 tab 沿用。
           if (isEditing)
             TpToolbarTextButton(
               key: const ValueKey('tp-root-header-primary-action'),
@@ -314,7 +337,10 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 initialDayNum: _activeDayNum ?? widget.initialDayNum,
                 isEditing: isEditing,
                 onStartEditing: () => setState(() => _editingTripId = tripId),
-                onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
+                onActiveDayChanged: (dayNum) {
+                  _activeDayNum = dayNum;
+                  _publishSelectedDay(dayNum);
+                },
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
         error: (error, stackTrace) => initiallyBelowHeader(

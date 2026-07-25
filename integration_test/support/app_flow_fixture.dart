@@ -483,7 +483,8 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
   await tester.pumpAndSettle();
 
-  await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+  // 行程與地圖之間改由 root tab 進出（兩顆重複的 bar button 已移除）。
+  await tester.tap(_rootTab('地圖'));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
@@ -504,9 +505,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.byKey(const ValueKey('trip-map-itinerary')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const ValueKey('trip-map-itinerary')));
+  await tester.tap(_rootTab('行程'));
   await tester.pumpAndSettle();
   expect(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),

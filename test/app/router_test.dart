@@ -53,6 +53,7 @@ import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
+import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 import '../helpers/fake_trip_map.dart';
 
@@ -84,6 +85,7 @@ const _entry = TimelineEntry(id: 11, sortOrder: 0, title: '首里城', version: 
 ProviderContainer _buildContainer({
   required UserInfo? currentUser,
   List<TripSummary>? trips,
+  List<TripDay>? days,
 }) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
@@ -107,7 +109,7 @@ ProviderContainer _buildContainer({
     ),
   );
   when(() => mockTripRepository.watchDays(any())).thenAnswer(
-    (_) => Stream.value(const [TripDay(id: 1, dayNum: 1, version: 0)]),
+    (_) => Stream.value(days ?? const [TripDay(id: 1, dayNum: 1, version: 0)]),
   );
   when(
     () => mockTripRepository.watchEntry(
@@ -1181,7 +1183,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('day-pill-1')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
+    // 與 root tab「地圖」重複的 bar button 已移除。
+    expect(find.byKey(const ValueKey('trip-timeline-map')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('day-pill-1')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -1244,8 +1247,14 @@ void main() {
     );
   });
 
-  testWidgets('行程工具列切到地圖 root branch 並保留 DAY', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
+  testWidgets('root tab 切到地圖分支並沿用共用選取日，反向亦然', (tester) async {
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      days: const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(id: 2, dayNum: 2, version: 0),
+      ],
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -1256,9 +1265,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    container.read(appRouterProvider).go('/trips/trip-1?day=1');
+    container.read(appRouterProvider).go('/trips/trip-1');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('root-tab-地圖')));
     await tester.pumpAndSettle();
 
     expect(find.byType(GlobalMapScreen), findsOneWidget);
@@ -1266,7 +1278,112 @@ void main() {
       find.byType(AppleRootTabBar),
     );
     expect(rootTab.selectedIndex, 2);
-    expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-map-day-selector')),
+          )
+          .value,
+      2,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('root-tab-行程')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      1,
+    );
+  });
+
+  testWidgets('地圖選「全部」後切回時間軸不會被打回第 1 天', (tester) async {
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      days: const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(id: 2, dayNum: 2, version: 0),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('root-tab-地圖')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-map-day-selector')),
+        matching: find.text('全部'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('root-tab-行程')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+          )
+          .value,
+      2,
+    );
+  });
+
+  testWidgets('深連結指定的 day 優先於共用選取日', (tester) async {
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      days: const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(id: 2, dayNum: 2, version: 0),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final router = container.read(appRouterProvider);
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    router.go('/map?tripId=trip-1&day=1');
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-map-day-selector')),
+          )
+          .value,
+      1,
+    );
   });
 
   testWidgets('已登入可使用 web route aliases', (tester) async {
