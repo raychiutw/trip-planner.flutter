@@ -75,13 +75,15 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
       await tester.pumpAndSettle();
 
-      // 方向鍵把焦點移進面板，Enter 啟動落點的那一項 —— 只驗「不丟例外」
-      // 是恆真的，拿掉 shortcuts 也不會丟例外。
+      // 面板開啟時焦點落在 FocusScope 本身，第一次方向鍵才走到第一項。
+      // 要驗「走得到第二項」才守得住 —— 只驗「按了不丟例外」是恆真的。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(selected, 'a', reason: '方向鍵要走到第一項，Enter 要能啟動它');
+      expect(selected, 'b', reason: '方向鍵要能一路走到第二項並以 Enter 啟動');
 
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
       await tester.pumpAndSettle();
