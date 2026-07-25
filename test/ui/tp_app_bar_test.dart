@@ -13,6 +13,99 @@ import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  testWidgets('表單主要動作是 prominent，著色在底色而不是字符', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.modalForm,
+            title: const Text('編輯行程'),
+            onCancel: () {},
+            primaryActionLabel: '儲存',
+            onPrimaryAction: () {},
+          ),
+        ),
+      ),
+    );
+
+    final scheme = AppTheme.light().colorScheme;
+    final primary = tester.widget<TextButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('tp-app-bar-primary-action')),
+        matching: find.byType(TextButton),
+      ),
+    );
+    const resting = <WidgetState>{};
+    expect(
+      primary.style?.backgroundColor?.resolve(resting),
+      scheme.primary,
+      reason: '著色在底色',
+    );
+    expect(
+      primary.style?.foregroundColor?.resolve(resting),
+      scheme.onPrimary,
+      reason: '底色著色後，文字改用 onPrimary 才有對比',
+    );
+
+    // 一列只有一個 prominent，且置於尾端。
+    final prominentButtons = tester
+        .widgetList<TpToolbarTextButton>(find.byType(TpToolbarTextButton))
+        .where((button) => button.prominent)
+        .toList();
+    expect(prominentButtons.length, 1);
+    expect(prominentButtons.single.label, '儲存');
+
+    // 取消是次要動作，維持純文字。
+    final cancel = tester.widget<TextButton>(
+      find.ancestor(of: find.text('取消'), matching: find.byType(TextButton)),
+    );
+    expect(cancel.style?.backgroundColor?.resolve(resting), isNull);
+  });
+
+  testWidgets('群組容器包住更多選單時，header 的動作額度判斷仍成立', (tester) async {
+    // 改寫前這裡會 assert：`action is TpMoreMenuButton` 對群組容器不成立。
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: const Text('行程'),
+            actions: [
+              TpToolbarIconButton(
+                icon: CupertinoIcons.share,
+                tooltip: '分享',
+                onPressed: () {},
+              ),
+              TpToolbarActionGroup(
+                children: [
+                  TpMoreMenuButton<int>(
+                    items: const [
+                      TpActionItem(value: 1, label: '列印', icon: Icons.print),
+                    ],
+                    onSelected: (_) {},
+                  ),
+                  TpToolbarIconButton(
+                    icon: CupertinoIcons.add,
+                    tooltip: '新增',
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('tp-toolbar-action-group')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'TpToolbarGlassButton resolves custom settings for Reduce Transparency',
     (tester) async {

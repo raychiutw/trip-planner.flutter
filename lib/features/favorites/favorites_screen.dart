@@ -198,15 +198,21 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       onSelected: _handleHeaderAction,
     );
 
+    // 窄寬度加大字級時新增已折進選單，header 只剩一顆按鈕，不套用群組。
+    if (compactHeader) return [sort];
     return [
-      sort,
-      if (!compactHeader)
-        TpToolbarIconButton(
-          key: const ValueKey('favorites-add-action'),
-          tooltip: '新增收藏',
-          icon: CupertinoIcons.add,
-          onPressed: () => context.go('/favorites/explore'),
-        ),
+      TpToolbarActionGroup(
+        key: const ValueKey('favorites-header-group'),
+        children: [
+          sort,
+          TpToolbarIconButton(
+            key: const ValueKey('favorites-add-action'),
+            tooltip: '新增收藏',
+            icon: CupertinoIcons.add,
+            onPressed: () => context.go('/favorites/explore'),
+          ),
+        ],
+      ),
     ];
   }
 
