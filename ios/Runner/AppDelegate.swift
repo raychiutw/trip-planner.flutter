@@ -84,7 +84,9 @@ private final class E2ESemanticsPlugin: NSObject, FlutterPlugin {
       result(false)
       return
     }
-    controller.engine?.ensureSemanticsEnabled()
+    // `FlutterViewController.engine` 在 header 沒有 `_Nullable`，橋接到 Swift
+    // 是 non-optional，不能用 optional chaining。
+    controller.engine.ensureSemanticsEnabled()
     result(true)
   }
 }
