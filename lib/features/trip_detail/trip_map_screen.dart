@@ -26,6 +26,7 @@ import '../map/map_style.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'google_poi_accessory_card.dart';
+import 'selected_day_provider.dart';
 import 'trip_providers.dart';
 
 /// 行程地圖：Header 行程 action + 全部／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
@@ -70,12 +71,19 @@ class TripMapScreen extends ConsumerStatefulWidget {
 }
 
 class _TripMapScreenState extends ConsumerState<TripMapScreen> {
-  int? _activeDayNum;
+  /// 傳給地圖 view 的初始天數：路由查詢參數優先，缺席時才由共用選取日供值。
+  int? _initialDayNum;
+
+  /// 使用者在本畫面選了「全部」。「全部」不進共用狀態（空值在時間軸是另一個
+  /// 意思），所以切回前景時得靠這個旗標記得使用者的選擇 —— 不能拿共用值有沒有
+  /// 變動去反推，那推論會被任何一條也寫共用值的路徑弄髒。
+  bool _showingAllDays = false;
+  bool _wasActiveBranch = true;
 
   @override
   void initState() {
     super.initState();
-    _activeDayNum = widget.initialDayNum;
+    _resolveInitialDayNum();
   }
 
   @override
@@ -83,12 +91,45 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId ||
         oldWidget.initialDayNum != widget.initialDayNum) {
-      _activeDayNum = widget.initialDayNum;
+      _resolveInitialDayNum();
     }
+  }
+
+  /// 換行程或換深連結日期時重新解析，順帶清掉上一段路由留下的「全部」。
+  void _resolveInitialDayNum() {
+    _showingAllDays = false;
+    _initialDayNum =
+        widget.initialDayNum ??
+        ref.read(selectedDayProvider).dayNumFor(widget.tripId);
+  }
+
+  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
+  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
+  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
+  ///
+  /// 「全部」（空值）不進共用狀態：地圖的空值是「全部」，時間軸的空值是
+  /// 「未指定 → 第一天」，同一個空值兩種語意不可混用。
+  void _publishSelectedDay(int? dayNum) {
+    if (!TickerMode.valuesOf(context).enabled) return;
+    _showingAllDays = dayNum == null;
+    if (dayNum == null) return;
+    ref
+        .read(selectedDayProvider.notifier)
+        .select(tripId: widget.tripId, dayNum: dayNum);
   }
 
   @override
   Widget build(BuildContext context) {
+    // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
+    // 重建，才接得住其他 tab 期間變動的共用選取日。
+    final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    if (isActiveBranch && !_wasActiveBranch && !_showingAllDays) {
+      final sharedDayNum = ref
+          .read(selectedDayProvider)
+          .dayNumFor(widget.tripId);
+      if (sharedDayNum != null) _initialDayNum = sharedDayNum;
+    }
+    _wasActiveBranch = isActiveBranch;
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final trips = switch (ref.watch(myTripsProvider)) {
       AsyncData(:final value) => value,
@@ -117,19 +158,8 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             },
           ),
           actions: [
-            TpToolbarIconButton(
-              key: const ValueKey('trip-map-itinerary'),
-              tooltip: '行程',
-              onPressed: () {
-                final query = _activeDayNum == null
-                    ? ''
-                    : '?day=$_activeDayNum';
-                context.go(
-                  '/trips/${Uri.encodeComponent(widget.tripId)}$query',
-                );
-              },
-              icon: CupertinoIcons.calendar,
-            ),
+            // 與 root tab「行程」重複的 bar button 已移除，切換交由 tab 承擔；
+            // 目前看的是第幾天改由共用選取日跨 tab 沿用。
             TpMoreMenuButton<_TripMapHeaderAction>(
               key: const ValueKey('trip-map-more-button'),
               onSelected: (action) {
@@ -163,13 +193,13 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             tripId: widget.tripId,
             days: days,
             initialEntryId: widget.initialEntryId,
-            initialDayNum: widget.initialDayNum,
+            initialDayNum: _initialDayNum,
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             locationSettingsOpener: widget.locationSettingsOpener,
             externalLauncher: widget.externalLauncher,
             onActiveDayChanged: (dayNum) {
-              _activeDayNum = dayNum;
+              _publishSelectedDay(dayNum);
               widget.onActiveDayChanged?.call(dayNum);
             },
           ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import 'package:tripline/features/map/google_maps_external_launcher.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
@@ -24,8 +26,25 @@ import 'package:tripline/models/trip_route.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
+import 'package:tripline/ui/tp_horizontal_selector.dart';
 
+import '../../helpers/branch_keepalive.dart';
 import '../../helpers/fake_trip_map.dart';
+
+ProviderContainer _containerOf(WidgetTester tester) =>
+    ProviderScope.containerOf(
+      tester.element(find.byType(TripMapScreen).first),
+      listen: false,
+    );
+
+int? _sharedDayNum(WidgetTester tester, [String tripId = 'trip-1']) =>
+    _containerOf(tester).read(selectedDayProvider).dayNumFor(tripId);
+
+int _mapSelectorTabIndex(WidgetTester tester) => tester
+    .widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-map-day-selector')),
+    )
+    .value;
 
 class _FakeLocationService implements TripMapLocationService {
   int calls = 0;
@@ -210,6 +229,7 @@ const _googlePoi = GoogleMapPoiSelection(
 
 Widget _buildScreen(
   List<TripDay> days, {
+  Stream<List<TripDay>>? daysStream,
   int? initialEntryId,
   int? initialDayNum,
   TripMapLocationService? locationService,
@@ -226,22 +246,27 @@ Widget _buildScreen(
   GoogleMapsExternalLauncher externalLauncher =
       const GoogleMapsExternalLauncher(),
   bool renderSelectedTripMap = false,
+  SelectedTripDay? initialSelectedDay,
+  ValueListenable<bool>? branchActive,
 }) {
   final router = GoRouter(
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => TripMapScreen(
-          tripId: 'trip-1',
-          initialEntryId: initialEntryId,
-          initialDayNum: initialDayNum,
-          mapBuilder: (config) {
-            onMapConfig?.call(config);
-            return fakeTripMapBuilder(config);
-          },
-          locationService: locationService,
-          locationSettingsOpener: locationSettingsOpener,
-          externalLauncher: externalLauncher,
+        builder: (context, state) => MaybeBranch(
+          active: branchActive,
+          child: TripMapScreen(
+            tripId: 'trip-1',
+            initialEntryId: initialEntryId,
+            initialDayNum: initialDayNum,
+            mapBuilder: (config) {
+              onMapConfig?.call(config);
+              return fakeTripMapBuilder(config);
+            },
+            locationService: locationService,
+            locationSettingsOpener: locationSettingsOpener,
+            externalLauncher: externalLauncher,
+          ),
         ),
       ),
       GoRoute(
@@ -275,11 +300,17 @@ Widget _buildScreen(
   );
   return ProviderScope(
     overrides: [
-      tripDaysProvider.overrideWith((ref, tripId) => Stream.value(days)),
+      tripDaysProvider.overrideWith(
+        (ref, tripId) => daysStream ?? Stream.value(days),
+      ),
       myTripsProvider.overrideWith((ref) => Stream.value(trips)),
       mapRepositoryProvider.overrideWithValue(
         mapRepository ?? _StubMapRepository(),
       ),
+      if (initialSelectedDay != null)
+        selectedDayProvider.overrideWith(
+          () => SeededSelectedDayController(initialSelectedDay),
+        ),
     ],
     child: MaterialApp.router(
       theme: theme ?? AppTheme.light(),
@@ -463,23 +494,11 @@ void main() {
     final daySelector = find.byKey(const ValueKey('trip-map-day-selector'));
     expect(daySelector, findsOneWidget);
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
-    expect(find.byKey(const ValueKey('trip-map-itinerary')), findsOneWidget);
+    // 與 root tab「行程」重複的 bar button 已移除，改由 tab 承擔。
+    expect(find.byKey(const ValueKey('trip-map-itinerary')), findsNothing);
+    expect(find.byIcon(CupertinoIcons.calendar), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-more-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-notes-button')), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('tp-root-glass-header')),
-        matching: find.byKey(const ValueKey('trip-map-itinerary')),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: daySelector,
-        matching: find.byKey(const ValueKey('trip-map-itinerary')),
-      ),
-      findsNothing,
-    );
     expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
     expect(find.text('全部'), findsOneWidget);
     expect(find.text('總覽'), findsNothing);
@@ -692,16 +711,145 @@ void main() {
     expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
   });
 
-  testWidgets('地圖 Header 的行程按鈕切回同一天 timeline', (tester) async {
+  testWidgets('前景分支：選 DAY 寫入共用選取日', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 1);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('「全部」不寫入共用選取日', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-map-itinerary')));
+    await tester.tap(find.text('全部'));
     await tester.pumpAndSettle();
 
-    expect(find.text('trip-timeline-route-trip-1-2'), findsOneWidget);
+    expect(_mapSelectorTabIndex(tester), 0);
+    // 地圖的空值是「全部」，時間軸的空值是「未指定 → 第一天」，不可混用。
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
+    // riverpod 3 會在 TickerMode 關閉時 pause 訂閱，背景分支多半根本收不到 emit；
+    // 但「emit 落在切到背景的同一批」時，暫停前就已標記 dirty 的畫面仍會以背景身分
+    // 重建一次，並在其中處理新的 days —— 這一格才是共用狀態真正會被污染的縫。
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        daysStream: days.stream,
+        initialDayNum: 2,
+        branchActive: active,
+      ),
+    );
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    expect(_sharedDayNum(tester), 2);
+
+    // 使用者在前景改看 DAY 1
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
+    await tester.pumpAndSettle();
+    expect(_sharedDayNum(tester), 1);
+
+    // SWR 第二段 emit 給出新的 list，同一批切到背景：地圖內部會依 initialDayNum
+    // 退回 DAY 2，但背景分支不得把這個退回寫進共用狀態。
+    days.add([_dayOne, _dayTwo]);
+    active.value = false;
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 1);
+  });
+
+  testWidgets('查詢參數缺席時採用共用選取日', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialSelectedDay: const SelectedTripDay(tripId: 'trip-1', dayNum: 2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2);
+  });
+
+  testWidgets('深連結 day 優先於共用選取日', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialDayNum: 1,
+        initialSelectedDay: const SelectedTripDay(tripId: 'trip-1', dayNum: 2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester), 1);
+  });
+
+  testWidgets('切換行程後不殘留前一個行程的共用選取日', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], initialSelectedDay: const SelectedTripDay(tripId: 'tokyo', dayNum: 2)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 1);
+  });
+
+  testWidgets('切回前景時接住其他 tab 變更的共用選取日', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 1);
+
+    final container = _containerOf(tester);
+    active.value = false;
+    await tester.pumpAndSettle();
+    container
+        .read(selectedDayProvider.notifier)
+        .select(tripId: 'trip-1', dayNum: 2);
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 1);
+
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2);
+  });
+
+  testWidgets('前景時選「全部」，離開再回來仍維持「全部」', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    active.value = false;
+    await tester.pumpAndSettle();
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
   });
 
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {

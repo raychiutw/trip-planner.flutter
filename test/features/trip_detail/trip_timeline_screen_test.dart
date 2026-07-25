@@ -13,6 +13,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/day_weather.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_pill.dart';
@@ -26,9 +27,26 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
+import '../../helpers/branch_keepalive.dart';
+
 const _tripId = 'okinawa-2026';
 
 class _MockTripRepository extends Mock implements TripRepository {}
+
+ProviderContainer _containerOf(WidgetTester tester) =>
+    ProviderScope.containerOf(
+      tester.element(find.byType(TripTimelineScreen)),
+      listen: false,
+    );
+
+int? _sharedDayNum(WidgetTester tester, [String tripId = _tripId]) =>
+    _containerOf(tester).read(selectedDayProvider).dayNumFor(tripId);
+
+int _selectorDayNum(WidgetTester tester) => tester
+    .widget<TpHorizontalSelector<int>>(
+      find.byKey(const ValueKey('trip-timeline-view-day-selector')),
+    )
+    .value;
 
 class _TripSwitchHarness extends StatelessWidget {
   const _TripSwitchHarness(this.tripId);
@@ -200,16 +218,21 @@ Future<void> _pumpTimeline(
   bool disableAnimations = false,
   TextScaler? textScaler,
   List<TripSummary>? trips,
+  SelectedTripDay? initialSelectedDay,
+  ValueListenable<bool>? branchActive,
 }) async {
   final router = GoRouter(
     initialLocation: '/trips/$tripId',
     routes: [
       GoRoute(
         path: '/trips/:tripId',
-        builder: (context, state) => TripTimelineScreen(
-          tripId: state.pathParameters['tripId']!,
-          initialEntryId: initialEntryId,
-          initialDayNum: initialDayNum,
+        builder: (context, state) => MaybeBranch(
+          active: branchActive,
+          child: TripTimelineScreen(
+            tripId: state.pathParameters['tripId']!,
+            initialEntryId: initialEntryId,
+            initialDayNum: initialDayNum,
+          ),
         ),
         routes: [
           GoRoute(
@@ -295,6 +318,10 @@ Future<void> _pumpTimeline(
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
         if (dayWeatherFetcher != null)
           dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
+        if (initialSelectedDay != null)
+          selectedDayProvider.overrideWith(
+            () => SeededSelectedDayController(initialSelectedDay),
+          ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
@@ -444,21 +471,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
-    expect(find.byKey(const ValueKey('trip-timeline-map')), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('tp-root-glass-header')),
-        matching: find.byKey(const ValueKey('trip-timeline-map')),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('trip-timeline-view-day-selector')),
-        matching: find.byKey(const ValueKey('trip-timeline-map')),
-      ),
-      findsNothing,
-    );
+    // 與 root tab「地圖」重複的 bar button 已移除，改由 tab 承擔。
+    expect(find.byKey(const ValueKey('trip-timeline-map')), findsNothing);
+    expect(find.byIcon(CupertinoIcons.map), findsNothing);
     expect(
       find.byKey(const ValueKey('trip-timeline-day-overview')),
       findsNothing,
@@ -481,13 +496,98 @@ void main() {
     expect(find.byKey(const ValueKey('trip-action-notes')), findsOneWidget);
   });
 
-  testWidgets('Header 切換地圖並保留目前 DAY', (tester) async {
+  testWidgets('前景分支：目前 DAY 寫入共用選取日', (tester) async {
     await _pumpTimeline(tester);
-
-    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
     await tester.pumpAndSettle();
 
-    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+    expect(_sharedDayNum(tester), 1);
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
+    // riverpod 3 會在 TickerMode 關閉時 pause 訂閱，背景分支多半根本收不到 emit；
+    // 但「emit 落在切到背景的同一批」時，暫停前就已標記 dirty 的畫面仍會以背景身分
+    // 重建一次，並在其中處理新的 days —— 這一格才是共用狀態真正會被污染的縫。
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream, branchActive: active);
+    days.add(_fakeDays);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    expect(_sharedDayNum(tester), 2);
+
+    // SWR 第二段 emit 少掉 DAY 2，同一批切到背景：畫面內部會退回 DAY 1，
+    // 但背景分支不得把這個退回寫進共用狀態。
+    days.add([_fakeDays.first]);
+    active.value = false;
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('查詢參數缺席時採用共用選取日', (tester) async {
+    await _pumpTimeline(
+      tester,
+      initialSelectedDay: const SelectedTripDay(tripId: _tripId, dayNum: 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 2);
+  });
+
+  testWidgets('深連結 day 優先於共用選取日', (tester) async {
+    await _pumpTimeline(
+      tester,
+      initialDayNum: 1,
+      initialSelectedDay: const SelectedTripDay(tripId: _tripId, dayNum: 2),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 1);
+    expect(_sharedDayNum(tester), 1);
+  });
+
+  testWidgets('切換行程後不殘留前一個行程的共用選取日', (tester) async {
+    await _pumpTimeline(
+      tester,
+      initialSelectedDay: const SelectedTripDay(
+        tripId: 'tokyo-2026',
+        dayNum: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 1);
+  });
+
+  testWidgets('切回前景時接住其他 tab 變更的共用選取日', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await _pumpTimeline(tester, branchActive: active);
+    await tester.pumpAndSettle();
+    expect(_selectorDayNum(tester), 1);
+
+    final container = _containerOf(tester);
+    active.value = false;
+    await tester.pumpAndSettle();
+    container
+        .read(selectedDayProvider.notifier)
+        .select(tripId: _tripId, dayNum: 2);
+    await tester.pumpAndSettle();
+    expect(_selectorDayNum(tester), 1);
+
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 2);
   });
 
   testWidgets('切換 Trip 會重設 DAY 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
@@ -1501,22 +1601,12 @@ void main() {
     );
   });
 
-  testWidgets('無效 day deep link fallback 後地圖導覽使用實際 Day 1', (tester) async {
+  testWidgets('無效 day deep link fallback 後共用選取日為實際 Day 1', (tester) async {
     await _pumpTimeline(tester, initialDayNum: 99);
     await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<TpHorizontalSelector<int>>(
-            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
-          )
-          .value,
-      1,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
-    await tester.pumpAndSettle();
-    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+    expect(_selectorDayNum(tester), 1);
+    expect(_sharedDayNum(tester), 1);
   });
 
   testWidgets('指定 initialEntryId：初始聚焦該停留點卡片', (tester) async {
@@ -1533,22 +1623,12 @@ void main() {
     expect(border.top.width, 2);
   });
 
-  testWidgets('entry deep link 聚焦後地圖導覽使用 entry 所在 Day', (tester) async {
+  testWidgets('entry deep link 聚焦後共用選取日為 entry 所在 Day', (tester) async {
     await _pumpTimeline(tester, initialEntryId: 22);
     await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<TpHorizontalSelector<int>>(
-            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
-          )
-          .value,
-      2,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
-    await tester.pumpAndSettle();
-    expect(find.text('map-page-$_tripId-2'), findsOneWidget);
+    expect(_selectorDayNum(tester), 2);
+    expect(_sharedDayNum(tester), 2);
   });
 
   testWidgets('days refresh preserves current scroll offset', (tester) async {
@@ -1574,7 +1654,7 @@ void main() {
     expect(tester.getTopLeft(daySection).dy, before);
   });
 
-  testWidgets('days refresh 移除目前 Day 時同步 selector 與後續導覽 Day', (tester) async {
+  testWidgets('days refresh 移除目前 Day 時同步 selector 與共用選取日', (tester) async {
     final days = StreamController<List<TripDay>>();
     addTearDown(days.close);
     await _pumpTimeline(tester, daysStream: days.stream);
@@ -1587,18 +1667,8 @@ void main() {
     days.add([_fakeDays.first]);
     await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<TpHorizontalSelector<int>>(
-            find.byKey(const ValueKey('trip-timeline-view-day-selector')),
-          )
-          .value,
-      1,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('trip-timeline-map')));
-    await tester.pumpAndSettle();
-    expect(find.text('map-page-$_tripId-1'), findsOneWidget);
+    expect(_selectorDayNum(tester), 1);
+    expect(_sharedDayNum(tester), 1);
   });
 
   testWidgets('loading 顯示 skeleton 條列', (tester) async {
