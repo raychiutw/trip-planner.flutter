@@ -5,6 +5,9 @@ import '../../app/adaptive.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 
+/// 下拉箭頭相對標題的不透明度 —— 次要提示，比標題淡一階。
+const double _chevronOpacity = 0.6;
+
 /// AppBar 內的目前行程標題；點擊後以 HIG sheet 切換行程。
 class TripTitleButton extends StatelessWidget {
   const TripTitleButton({
@@ -37,6 +40,8 @@ class TripTitleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasTrips = trips.isNotEmpty;
     final canSelect = trips.length > 1;
+    // 跟著所在 bar 的前景色，媒體背景上才不會變成讀不到的暗色。
+    final foreground = IconTheme.of(context).color;
     return Semantics(
       key: const ValueKey('trip-title-button'),
       container: true,
@@ -54,7 +59,7 @@ class TripTitleButton extends StatelessWidget {
       child: TextButton(
         onPressed: canSelect ? () => _openPicker(context) : null,
         style: TextButton.styleFrom(
-          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          foregroundColor: foreground,
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
           alignment: Alignment.centerLeft,
@@ -79,7 +84,7 @@ class TripTitleButton extends StatelessWidget {
               Icon(
                 CupertinoIcons.chevron_down,
                 size: 14,
-                color: IconTheme.of(context).color?.withValues(alpha: 0.6),
+                color: foreground?.withValues(alpha: _chevronOpacity),
               ),
             ],
           ],

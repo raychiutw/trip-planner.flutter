@@ -7,6 +7,12 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  test('媒體背景的暗化層是 HIG 材質指引的約 35%', () {
+    // 其餘測試以 tpMediaScrimOpacity 表達意圖；這裡釘住實際數值，
+    // 否則改動常數時所有斷言會跟著一起改，變成恆真。
+    expect(tpMediaScrimOpacity, closeTo(0.35, 0.001));
+  });
+
   testWidgets('navigation glass separates text and visual backdrops', (
     tester,
   ) async {
