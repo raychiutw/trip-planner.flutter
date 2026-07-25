@@ -91,23 +91,20 @@ void main() {
 
     expect(workflow, contains('GOOGLE_MAPS_IOS_API_KEY'));
     expect(workflow, contains('secrets.GOOGLE_MAPS_ANDROID_API_KEY'));
-    expect(workflow, contains('flutter build apk --debug'));
     expect(workflow, isNot(contains('secrets.MAPS_API_KEY')));
     expect(workflow, contains('GOOGLE_MAPS_IOS_API_KEY=%s'));
     expect(workflow, contains("wait-for-processing: 'true'"));
     expect(workflow, isNot(contains('uses-non-exempt-encryption')));
-    expect(workflow, contains('runner:'));
-    expect(workflow, contains('tripline-release'));
-    expect(workflow, contains(r'runs-on: ${{ inputs.runner }}'));
+    // 發版路徑縮短後，ci 只服務 PR／push；手動 dispatch 直接進 store job，
+    // 不再把 ci 當成上傳前置閘門。
     expect(
       workflow,
-      isNot(contains(r"if: ${{ github.event_name != 'workflow_dispatch' }}")),
+      contains(r"if: ${{ github.event_name != 'workflow_dispatch' }}"),
     );
-    expect('flutter test'.allMatches(workflow).length, 1);
     expect(infoPlist, contains('ITSAppUsesNonExemptEncryption'));
   });
 
-  test('商店上傳必須等待外部裝置與人工輔助使用證據', () {
+  test('商店上傳與外部裝置、人工證據解耦，但保留 master-only 與環境審核', () {
     final workflow = read('.github/workflows/mobile.yml');
     final testflightJob = workflow.substring(
       workflow.indexOf('  testflight:'),
@@ -117,16 +114,24 @@ void main() {
       workflow.indexOf('  android_internal:'),
     );
 
-    expect(workflow, contains('  external_device_gate:'));
-    expect(workflow, contains('  manual_evidence_gate:'));
+    // 解耦：store 上傳不再等待任何前置 job，Test Lab 與人工證據各自獨立驗證。
+    // 決策與取捨見 docs/adr/0002-decouple-store-upload-from-evidence-gates.md。
+    expect(workflow, isNot(contains('external_device_gate')));
+    expect(workflow, isNot(contains('manual_evidence_gate')));
     expect(
-      testflightJob,
-      contains('needs: [ci, external_device_gate, manual_evidence_gate]'),
+      workflow,
+      isNot(contains('uses: ./.github/workflows/mobile-e2e.yml')),
     );
-    expect(
-      androidJob,
-      contains('needs: [ci, external_device_gate, manual_evidence_gate]'),
-    );
+    expect(testflightJob, isNot(contains('needs:')));
+    expect(androidJob, isNot(contains('needs:')));
+
+    // 解耦掉的是 workflow 層的 needs；把關改由 GitHub Environment 審核與
+    // master-only 條件承擔。這兩層若也消失，發版就真的沒有任何前置把關。
+    for (final job in [testflightJob, androidJob]) {
+      expect(job, contains('environment: mobile-release'));
+      expect(job, contains(r"github.ref == 'refs/heads/master'"));
+      expect(job, contains(r"github.event_name == 'workflow_dispatch'"));
+    }
   });
 
   test('workflow 手動發布 Android internal testing 且沒有 production 權限', () {
@@ -152,14 +157,8 @@ void main() {
         'e738b9dd8f2476ea806d921b64aacd24f34515a5',
       ),
     );
-    expect(
-      workflow,
-      contains(
-        'actions/upload-artifact@'
-        '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
-      ),
-    );
-    expect(workflow, contains('tripline-android-internal-'));
+    // 簽章後的 AAB 直接上傳 Google Play，不再保留公開的 GitHub artifact。
+    expect(workflow, isNot(contains('actions/upload-artifact')));
     expect(workflow, contains('tracks: internal'));
     expect(workflow, contains('status: completed'));
     expect(workflow, isNot(contains('track: production')));

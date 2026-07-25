@@ -127,26 +127,24 @@ void main() {
     expect(appOwnedTarget, lessThan(nativeMapTarget));
   });
 
-  test(
-    'mobile releases keep reusable Test Lab evidence without gating uploads',
-    () {
-      final e2eWorkflow = File(
-        '.github/workflows/mobile-e2e.yml',
-      ).readAsStringSync();
-      final releaseWorkflow = File(
-        '.github/workflows/mobile.yml',
-      ).readAsStringSync();
+  test('Test Lab workflow 自己可被觸發，不依賴發版 workflow 呼叫', () {
+    final e2eWorkflow = File(
+      '.github/workflows/mobile-e2e.yml',
+    ).readAsStringSync();
+    final releaseWorkflow = File(
+      '.github/workflows/mobile.yml',
+    ).readAsStringSync();
 
-      expect(e2eWorkflow, contains('workflow_call:'));
-      expect(
-        releaseWorkflow,
-        contains('uses: ./.github/workflows/mobile-e2e.yml'),
-      );
-      expect(releaseWorkflow, isNot(contains('needs: external_device_gate')));
-      expect(
-        releaseWorkflow,
-        isNot(contains("needs.external_device_gate.result == 'success'")),
-      );
-    },
-  );
+    // 發版路徑已與 Test Lab 解耦，mobile.yml 不再呼叫這支 workflow。
+    // 因此它必須保有自己的觸發來源，否則就成了永遠不會執行的孤兒。
+    expect(
+      releaseWorkflow,
+      isNot(contains('uses: ./.github/workflows/mobile-e2e.yml')),
+    );
+    expect(e2eWorkflow, contains('  schedule:'));
+    expect(e2eWorkflow, contains(RegExp(r"^    - cron: '", multiLine: true)));
+    expect(e2eWorkflow, contains('  workflow_dispatch:'));
+    // workflow_call 保留，讓需要時仍可由其他 workflow 重用。
+    expect(e2eWorkflow, contains('  workflow_call:'));
+  });
 }
