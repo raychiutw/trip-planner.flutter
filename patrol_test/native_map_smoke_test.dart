@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,6 +83,20 @@ void main() {
     ).waitUntilExists(timeout: const Duration(seconds: 15));
     expect($(#nativeMapPanObserved), findsOneWidget);
 
+    // `ensureSemantics()` 只走到 `SemanticsBinding`，它再呼叫
+    // `platformDispatcher.setSemanticsTreeEnabled()`（framework
+    // `semantics/binding.dart:173`）—— 但測試環境拿到的是
+    // `TestPlatformDispatcher`，它**沒有轉發**這個方法，會被自己的
+    // `noSuchMethod` 靜默吞掉（`flutter_test/src/window.dart:988` 回傳 null）。
+    //
+    // engine 因此不會建 accessibility bridge。iOS 實機只在 VoiceOver／Switch
+    // Control／Speak Screen 開啟時才自動建（simulator 是無條件建，所以模擬器
+    // 過、Test Lab 不過），XCTest 的 accessibility tree 於是看不到 Flutter 的
+    // `Semantics(label:)`，原生 selector 找不到目標 —— 這就是 #104 裡 iOS
+    // pinch／rotate／double-tap 三個缺口的共同根因。
+    //
+    // 直接對 engine 的 `PlatformDispatcher` 打開，繞過 wrapper。
+    ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(true);
     final semantics = $.tester.ensureSemantics();
     try {
       await $.tester.pump();
@@ -105,6 +120,7 @@ void main() {
       expect($(#nativeMapDoubleTapObserved), findsOneWidget);
     } finally {
       semantics.dispose();
+      ui.PlatformDispatcher.instance.setSemanticsTreeEnabled(false);
     }
 
     await $(#requestLocationPermission).tap();
