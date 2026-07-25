@@ -11,6 +11,8 @@
 - 帳號頭像退出內容頁：固定 bar 不再自動附加帳號入口，帳號入口只留在 6 個 root 畫面的浮動 header。共編設定與分享設定位於 root tab bar 之外，以 `TpAppBar.accountEntry` 明文保留各自的帳號入口 —— 帳號自成一組，不佔內容 Header 的動作額度。
 - 時間軸與行程地圖的浮動 header 不再各掛一顆跳到對方的 bar button（與 root tab bar 的「行程」「地圖」重複），切換一律交由 root tab bar 承擔。原本靠查詢參數帶過去的「第幾天」改由跨畫面共用的選取日承接：在時間軸看第 3 天、切到地圖 tab 仍是第 3 天，反向亦然；地圖選「全部」後切回時間軸不會被打回第 1 天；深連結指定的日期仍優先於共用狀態；切換行程後不殘留前一個行程的天數。
 
+- 日期選擇器的選取膠囊改為中性語意層，品牌柔褐退回前景（選取態文字與字符）；未選取維持中性次要前景。欄寬從字元數階梯改為量測實際文字寬度，長標籤不再被擠壓截斷，短標籤仍保留 44pt 最小點擊尺寸，且 Dynamic Type 只被計入一次。
+
 ### 修正
 
 - 發版 workflow 的契約測試改為驗證縮短後的路徑：商店上傳不等待外部裝置與人工證據，但必須保留 `mobile-release` 環境審核與 master-only 限制；`mobile-e2e.yml` 必須保有自己的 `schedule` 與 `workflow_dispatch`，不會變成沒人呼叫的孤兒 workflow。決策與殘留風險記於 `docs/adr/0002-decouple-store-upload-from-evidence-gates.md`。

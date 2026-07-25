@@ -121,17 +121,19 @@ void main() {
         expectsOpaqueGlass ? 1 : 1.06,
       );
 
-      // 品牌柔褐只出現在前景：選取態的無障礙不透明 fallback 必須是中性語意層。
+      // 品牌柔褐只出現在前景：選取膠囊在一般模式與無障礙 fallback 都是中性語意層。
+      final scheme = Theme.of(
+        tester.element(find.byType(AppleRootTabBar)),
+      ).colorScheme;
+      final selectedDay = tester.widget<GlassButton>(
+        find.descendant(
+          of: find.byKey(const ValueKey('day-2-option')),
+          matching: find.byType(GlassButton),
+        ),
+      );
+      (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
+
       if (expectsOpaqueGlass) {
-        final scheme = Theme.of(
-          tester.element(find.byType(AppleRootTabBar)),
-        ).colorScheme;
-        final selectedDay = tester.widget<GlassButton>(
-          find.descendant(
-            of: find.byKey(const ValueKey('day-2-option')),
-            matching: find.byType(GlassButton),
-          ),
-        );
         expect(
           selectedDay.settings!.glassColor,
           scheme.surfaceContainerHigh.withValues(alpha: 1),
@@ -144,6 +146,36 @@ void main() {
           scheme.surfaceContainerHigh.withValues(alpha: 1),
           reason: 'root tab bar 的選取膠囊 fallback 應為中性語意層',
         );
+      } else {
+        expect(
+          rgb(selectedDay.settings!.glassColor),
+          rgb(scheme.surfaceContainerHighest),
+          reason: '一般模式下真正生效的選取膠囊底色也應為中性語意層',
+        );
+        expect(
+          rgb(selectedDay.settings!.glassColor),
+          isNot(rgb(scheme.primary)),
+          reason: '品牌柔褐不得鋪成選取膠囊的背景',
+        );
+      }
+
+      // 品牌色改走前景：選取態的標籤是 tint，未選取維持中性次要前景。
+      expect(
+        tester.widget<Text>(find.text('DAY 2')).style?.color,
+        scheme.primary,
+        reason: '選取態的標籤應是品牌 tint',
+      );
+      expect(
+        tester.widget<Text>(find.text('DAY 1')).style?.color,
+        scheme.onSurfaceVariant,
+        reason: '未選取態維持中性次要前景',
+      );
+
+      // 欄寬改量測後，放大字級仍不得讓選項低於最小點擊尺寸。
+      for (final key in ['day-1-option', 'day-2-option']) {
+        final size = tester.getSize(find.byKey(ValueKey(key)));
+        expect(size.width, greaterThanOrEqualTo(44), reason: key);
+        expect(size.height, greaterThanOrEqualTo(44), reason: key);
       }
 
       // 選取態保留項目原本的字符，勾選另外顯示。

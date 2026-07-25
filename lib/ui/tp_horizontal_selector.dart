@@ -8,6 +8,11 @@ import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
 
+/// 高度與寬度共用同一份文字樣式，避免兩套基準各自漂移。
+TextStyle? _labelStyle(BuildContext context) => Theme.of(
+  context,
+).textTheme.labelMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w700);
+
 /// 行程／地圖頁共用的同層選擇器；跨頁動作應放在頁首工具列。
 class TpHorizontalSelector<T> extends StatefulWidget {
   const TpHorizontalSelector({
@@ -25,12 +30,8 @@ class TpHorizontalSelector<T> extends StatefulWidget {
 
   /// 選擇器依目前 Dynamic Type 實際行高增高，且永遠保留 44pt 觸控高度。
   static double preferredHeight(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-    );
     final painter = TextPainter(
-      text: TextSpan(text: 'DAY 00', style: style),
+      text: TextSpan(text: 'DAY 00', style: _labelStyle(context)),
       textScaler: MediaQuery.textScalerOf(context),
       textDirection: Directionality.of(context),
       maxLines: 1,
@@ -44,8 +45,9 @@ class TpHorizontalSelector<T> extends StatefulWidget {
 }
 
 class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
-  // 13pt HIG label + Dynamic Type breathing room (DAY 01 still fits).
-  static const _tabWidth = 76.0;
+  // 文字兩側的呼吸空間（含外層 3pt padding），讓膠囊不貼著字。
+  static const _optionInset = 28.0;
+  static const _iconSize = 14.0;
   final ScrollController _controller = ScrollController();
   final FocusNode _focusNode = FocusNode(debugLabel: 'TpHorizontalSelector');
 
@@ -144,8 +146,9 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
-    final selectedTint = theme.colorScheme.primary.withValues(
-      alpha: isDark ? 0.24 : 0.18,
+    // 選取膠囊走中性語意層，比 track 高一階讓它浮出來；品牌色只留給前景。
+    final selectedTint = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: isDark ? 0.52 : 0.44,
     );
     final selectedSettings = tpResolveGlassSettings(
       context,
@@ -185,7 +188,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
                     width: _optionWidth(option),
                     height: height,
                     selectedSettings: selectedSettings,
-                    accentColor: theme.colorScheme.onPrimaryContainer,
+                    accentColor: theme.colorScheme.primary,
                     onTap: () {
                       _focusNode.requestFocus();
                       widget.onSelected(option.value);
@@ -199,15 +202,21 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     );
   }
 
+  /// 量測實際文字寬度，字元數階梯會把長短標籤擠在同一級距。
+  ///
+  /// `TextPainter` 的 `textScaler` 已把 Dynamic Type 算進去，之後不可再乘一次；
+  /// 但量測值對短標籤可能低於最小點擊尺寸，所以保留 44pt 下限。
   double _optionWidth(TpScopeOption<T> option) {
-    final textScale = math.max(
-      1,
-      MediaQuery.textScalerOf(context).scale(13) / 13,
-    );
-    final baseWidth =
-        (_tabWidth + (option.label.characters.length - 5).clamp(0, 4) * 10)
-            .toDouble();
-    return baseWidth * textScale;
+    final painter = TextPainter(
+      text: TextSpan(text: option.label, style: _labelStyle(context)),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    var content = painter.width;
+    if (option.icon != null) content += _iconSize + TpSpacing.s1;
+    if (option.indicatorColor != null) content += TpSpacing.s2 * 2;
+    return math.max(TpSpacing.tapMin, content + _optionInset);
   }
 }
 
@@ -288,7 +297,11 @@ class _OptionContent<T> extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (option.icon != null) ...[
-          Icon(option.icon, size: 14, color: color),
+          Icon(
+            option.icon,
+            size: _TpHorizontalSelectorState._iconSize,
+            color: color,
+          ),
           const SizedBox(width: TpSpacing.s1),
         ],
         if (option.indicatorColor != null) ...[
@@ -306,11 +319,7 @@ class _OptionContent<T> extends StatelessWidget {
           option.label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            fontSize: 13,
-            color: color,
-            fontWeight: FontWeight.w700,
-          ),
+          style: _labelStyle(context)?.copyWith(color: color),
         ),
       ],
     );

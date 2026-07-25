@@ -1589,15 +1589,21 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
+    // 只有選取態才會長出 GlassButton 膠囊。
     final selected = tester.widget<GlassButton>(
       find.descendant(
         of: find.byKey(const ValueKey('day-pill-2')),
         matching: find.byType(GlassButton),
       ),
     );
+    final pill = selected.settings!.glassColor;
     expect(
-      selected.settings?.glassColor,
-      TpSystemColorsLight.tint.withValues(alpha: 0.18),
+      (pill.r, pill.g, pill.b),
+      isNot((
+        TpSystemColorsLight.tint.r,
+        TpSystemColorsLight.tint.g,
+        TpSystemColorsLight.tint.b,
+      )),
     );
   });
 
