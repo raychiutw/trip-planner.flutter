@@ -10,6 +10,7 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 import 'package:tripline/ui/tp_scope_menu.dart';
 
@@ -277,6 +278,73 @@ void main() {
         find.byKey(const ValueKey('apple-root-tab-bar')),
       );
       expect(lastContent.bottom, lessThanOrEqualTo(rootTab.top));
+      expect(tester.takeException(), isNull);
+
+      // 媒體背景情境（地圖等 platform view）：同一組無障礙狀態下，清透玻璃要有
+      // 暗化層、字符改亮色。地圖圖磚恆為亮色，不能靠 app 的明暗模式判斷。
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: state.reduceTransparency,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: state.brightness == Brightness.dark
+                ? AppTheme.dark()
+                : AppTheme.light(),
+            home: MediaQuery(
+              data: MediaQueryData(
+                size: const Size(390, 844),
+                padding: const EdgeInsets.only(top: 47),
+                textScaler: TextScaler.linear(state.textScale),
+                disableAnimations: state.reduceMotion,
+                highContrast: state.increasedContrast,
+              ),
+              child: TpRootScaffold(
+                header: TpRootHeaderConfig(
+                  title: const Text('地圖'),
+                  platformViewBackdrop: true,
+                  actions: [
+                    TpToolbarIconButton(
+                      icon: CupertinoIcons.share,
+                      tooltip: '分享',
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+                body: const TpRootScrollView(
+                  slivers: [SliverToBoxAdapter(child: Text('地圖內容'))],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final mediaGlass = tester.widget<GlassContainer>(
+        find.descendant(
+          of: find.byKey(const ValueKey('tp-root-glass-header')),
+          matching: find.byType(GlassContainer),
+        ),
+      );
+      if (expectsOpaqueGlass) {
+        expect(
+          mediaGlass.settings!.glassColor.a,
+          1,
+          reason: '媒體背景的無障礙 fallback 仍要收斂成不透明',
+        );
+      } else {
+        expect(
+          mediaGlass.settings!.glassColor,
+          Colors.black.withValues(alpha: tpMediaScrimOpacity),
+          reason: '媒體背景要用清透玻璃加暗化層',
+        );
+        expect(
+          IconTheme.of(tester.element(find.byIcon(CupertinoIcons.share))).color,
+          Colors.white,
+          reason: '暗化之後字符要用亮色，深淺兩種模式都可讀',
+        );
+      }
       expect(tester.takeException(), isNull);
     });
   }

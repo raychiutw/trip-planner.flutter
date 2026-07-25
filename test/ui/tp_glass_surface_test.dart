@@ -7,6 +7,12 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  test('媒體背景的暗化層是 HIG 材質指引的約 35%', () {
+    // 其餘測試以 tpMediaScrimOpacity 表達意圖；這裡釘住實際數值，
+    // 否則改動常數時所有斷言會跟著一起改，變成恆真。
+    expect(tpMediaScrimOpacity, closeTo(0.35, 0.001));
+  });
+
   testWidgets('navigation glass separates text and visual backdrops', (
     tester,
   ) async {
@@ -29,7 +35,13 @@ void main() {
 
     expect(textBackdrop!.glassColor.a, closeTo(0.40, 0.01));
     expect(textBackdrop!.backerColor, isNull);
-    expect(visualBackdrop!.glassColor.a, closeTo(0.56, 0.01));
+    // 媒體背景改清透玻璃加暗化層 —— 比一般背景更透，不再更不透明。
+    expect(visualBackdrop!.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
+    expect(
+      visualBackdrop!.glassColor.a,
+      lessThan(textBackdrop!.glassColor.a),
+      reason: '清透玻璃的不透明度必須低於一般背景的玻璃',
+    );
     expect(visualBackdrop!.backerColor, isNull);
   });
 
@@ -170,36 +182,35 @@ void main() {
     expect(shape.side.color.a, closeTo(0.18, 0.01));
   });
 
-  for (final (brightness, expectedTint) in [
-    (Brightness.light, TpSystemColorsLight.background.withValues(alpha: 0.58)),
-    (Brightness.dark, TpSystemColorsDark.secondary.withValues(alpha: 0.68)),
-  ]) {
-    testWidgets(
-      'PlatformView ${brightness.name} glass preserves the 28pt Liquid Glass recipe',
-      (tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: brightness == Brightness.dark
-                ? AppTheme.dark()
-                : AppTheme.light(),
-            home: const Scaffold(
-              body: TpGlassSurface(
-                platformViewBackdrop: true,
-                blurSigma: 28,
-                child: SizedBox(width: 120, height: 44),
-              ),
+  // 媒體背景不分明暗模式都套同一層暗化 —— 地圖圖磚恆為亮色，
+  // `tripMapColorScheme()` 丟棄了 brightness 參數。
+  for (final brightness in [Brightness.light, Brightness.dark]) {
+    final expectedTint = Colors.black.withValues(alpha: tpMediaScrimOpacity);
+    testWidgets('PlatformView ${brightness.name} glass 用清透玻璃加暗化層並保留 28pt 配方', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brightness == Brightness.dark
+              ? AppTheme.dark()
+              : AppTheme.light(),
+          home: const Scaffold(
+            body: TpGlassSurface(
+              platformViewBackdrop: true,
+              blurSigma: 28,
+              child: SizedBox(width: 120, height: 44),
             ),
           ),
-        );
+        ),
+      );
 
-        final settings = tester
-            .widget<GlassContainer>(find.byType(GlassContainer))
-            .settings!;
-        expect(settings.blur, 28);
-        expect(settings.glassColor, expectedTint);
-        expect(settings.standardOpacityMultiplier, 1);
-        expect(settings.platformViewFallbackColor, expectedTint);
-      },
-    );
+      final settings = tester
+          .widget<GlassContainer>(find.byType(GlassContainer))
+          .settings!;
+      expect(settings.blur, 28);
+      expect(settings.glassColor, expectedTint);
+      expect(settings.standardOpacityMultiplier, 1);
+      expect(settings.platformViewFallbackColor, expectedTint);
+    });
   }
 }
