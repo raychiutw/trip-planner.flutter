@@ -37,6 +37,44 @@ LiquidGlassSettings tpResolveGlassSettings(
   );
 }
 
+/// 媒體背景上的暗化層不透明度 —— HIG 材質指引：底下內容亮時約 35%。
+const double tpMediaScrimOpacity = 0.35;
+
+/// 玻璃上的字符與文字走單色標籤語意色，並依玻璃底下內容的亮度切換深淺。
+///
+/// **不能用 app 的明暗模式判斷。** `tripMapColorScheme()` 丟棄了 brightness
+/// 參數、永遠回傳 light，地圖在深色模式下仍是亮圖磚；媒體背景一律先加暗化層
+/// （見 [tpMediaScrimOpacity]），字符再用亮色，深淺兩種模式都可讀。
+Color tpBarForeground(BuildContext context, {required bool onMedia}) =>
+    onMedia ? Colors.white : Theme.of(context).colorScheme.onSurface;
+
+/// 把 [tpBarForeground] 套給整片 bar 的字符與文字。
+///
+/// 用框架既有的 [IconTheme] 與 [DefaultTextStyle] 傳遞，明確指定顏色的呼叫點
+/// （例如選單觸發鈕的品牌 tint）自然覆蓋掉它。
+class TpBarForeground extends StatelessWidget {
+  const TpBarForeground({
+    super.key,
+    required this.onMedia,
+    required this.child,
+  });
+
+  final bool onMedia;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = tpBarForeground(context, onMedia: onMedia);
+    return IconTheme.merge(
+      data: IconThemeData(color: color),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(color: color),
+        child: child,
+      ),
+    );
+  }
+}
+
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
@@ -47,9 +85,10 @@ LiquidGlassSettings tpNavigationGlassSettings(
       ? theme.colorScheme.surfaceContainerLow
       : theme.colorScheme.surface;
   final platformView = recipe == TpNavigationGlassRecipe.platformView;
-  final tint = baseColor.withValues(
-    alpha: platformView ? (isDark ? 0.62 : 0.56) : (isDark ? 0.48 : 0.40),
-  );
+  // 媒體背景走清透玻璃：不透明度比一般背景低，暗化交給 scrim 那層負責。
+  final tint = platformView
+      ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
+      : baseColor.withValues(alpha: isDark ? 0.48 : 0.40);
   final settings = LiquidGlassSettings(
     glassColor: tint,
     backerColor: null,
@@ -95,13 +134,19 @@ class TpGlassSurface extends StatelessWidget {
     );
     final useOpaqueFallback = increasedContrast || reduceTransparency;
     final isDark = theme.brightness == Brightness.dark;
-    final defaultTint = isDark
+    final neutralTint = isDark
         ? theme.colorScheme.surfaceContainerLow.withValues(
             alpha: useOpaqueFallback ? 1 : 0.68,
           )
         : theme.colorScheme.surface.withValues(
             alpha: useOpaqueFallback ? 1 : 0.58,
           );
+    // 浮在視覺豐富背景上才用清透玻璃，且底下內容亮時要加暗化層。
+    // 地圖圖磚恆為亮色（tripMapColorScheme 丟棄 brightness 參數），所以深淺
+    // 兩種模式都需要暗化，不能靠 app 的明暗模式判斷。
+    final defaultTint = platformViewBackdrop && !useOpaqueFallback
+        ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
+        : neutralTint;
     final tint = tintColor == null
         ? defaultTint
         : tintColor!.withValues(alpha: useOpaqueFallback ? 1 : tintColor!.a);

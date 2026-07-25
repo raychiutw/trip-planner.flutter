@@ -107,49 +107,53 @@ class TpRootGlassHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(
             horizontal: TpRootGeometry.headerContentInset,
           ),
-          child: Row(
-            children: [
-              if (config.leading != null) ...[
-                SizedBox.square(
-                  key: const ValueKey('tp-root-header-leading'),
-                  dimension: TpSpacing.tapMin,
-                  child: config.leading,
-                ),
-                const SizedBox(width: TpSpacing.s2),
-              ],
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TpHeaderTitle(
-                    key: const ValueKey('tp-root-header-title'),
-                    child: config.title,
+          // 玻璃上的字符與文字依底下內容亮度切換，而不是依 app 的明暗模式。
+          child: TpBarForeground(
+            onMedia: config.platformViewBackdrop,
+            child: Row(
+              children: [
+                if (config.leading != null) ...[
+                  SizedBox.square(
+                    key: const ValueKey('tp-root-header-leading'),
+                    dimension: TpSpacing.tapMin,
+                    child: config.leading,
+                  ),
+                  const SizedBox(width: TpSpacing.s2),
+                ],
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TpHeaderTitle(
+                      key: const ValueKey('tp-root-header-title'),
+                      child: config.title,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: TpSpacing.s2),
-              TpHeaderActionRow(
-                children: [
-                  for (var index = 0; index < config.actions.length; index++)
-                    if (config.actions[index] is TpToolbarTextButton)
-                      KeyedSubtree(
-                        key: ValueKey('tp-root-header-action-$index'),
-                        child: config.actions[index],
-                      )
-                    else
-                      SizedBox(
-                        key: ValueKey('tp-root-header-action-$index'),
-                        // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
-                        width: TpToolbarSlots.slotWidth(
-                          context,
-                          config.actions[index],
+                const SizedBox(width: TpSpacing.s2),
+                TpHeaderActionRow(
+                  children: [
+                    for (var index = 0; index < config.actions.length; index++)
+                      if (config.actions[index] is TpToolbarTextButton)
+                        KeyedSubtree(
+                          key: ValueKey('tp-root-header-action-$index'),
+                          child: config.actions[index],
+                        )
+                      else
+                        SizedBox(
+                          key: ValueKey('tp-root-header-action-$index'),
+                          // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
+                          width: TpToolbarSlots.slotWidth(
+                            context,
+                            config.actions[index],
+                          ),
+                          height: TpSpacing.tapMin,
+                          child: config.actions[index],
                         ),
-                        height: TpSpacing.tapMin,
-                        child: config.actions[index],
-                      ),
-                  const TpAccountAvatarButton(),
-                ],
-              ),
-            ],
+                    const TpAccountAvatarButton(),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -4,6 +4,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
+import 'package:tripline/models/trip.dart';
+import 'package:tripline/features/trips/trip_title_button.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
@@ -355,6 +357,132 @@ void main() {
     },
   );
 
+  testWidgets('bar 字符依底下內容亮度切換，媒體背景加暗化層', (tester) async {
+    for (final isDark in [false, true]) {
+      final theme = isDark ? AppTheme.dark() : AppTheme.light();
+      for (final onMedia in [false, true]) {
+        // 換主題要先清場，否則 element tree 被重用、拿到上一輪的玻璃設定。
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: TpRootScaffold(
+              header: TpRootHeaderConfig(
+                title: const Text('地圖'),
+                platformViewBackdrop: onMedia,
+                actions: [
+                  TpToolbarIconButton(
+                    icon: CupertinoIcons.share,
+                    tooltip: '分享',
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+              body: const TpRootScrollView(
+                slivers: [SliverToBoxAdapter(child: Text('內容'))],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final reason = 'isDark=$isDark onMedia=$onMedia';
+        final glass = tester.widget<GlassContainer>(
+          find.descendant(
+            of: find.byKey(const ValueKey('tp-root-glass-header')),
+            matching: find.byType(GlassContainer),
+          ),
+        );
+
+        if (onMedia) {
+          // 清透玻璃加約 35% 暗化層 —— 地圖圖磚恆為亮色，深淺模式都要暗化。
+          expect(
+            glass.settings!.glassColor,
+            Colors.black.withValues(alpha: tpMediaScrimOpacity),
+            reason: reason,
+          );
+        } else {
+          expect(
+            glass.settings!.glassColor.a,
+            closeTo(isDark ? 0.48 : 0.40, 0.01),
+            reason: reason,
+          );
+        }
+
+        // 字符走單色標籤語意色，媒體背景上改亮色 —— 不是依 app 的明暗模式。
+        final iconColor = IconTheme.of(
+          tester.element(find.byIcon(CupertinoIcons.share)),
+        ).color;
+        expect(
+          iconColor,
+          onMedia ? Colors.white : theme.colorScheme.onSurface,
+          reason: reason,
+        );
+      }
+    }
+  });
+
+  testWidgets('標題下拉箭頭是次要文字色，標題本身維持標籤色', (tester) async {
+    for (final onMedia in [false, true]) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: TpRootScaffold(
+            header: TpRootHeaderConfig(
+              platformViewBackdrop: onMedia,
+              title: TripTitleButton(
+                currentTripId: 'trip-1',
+                currentTitle: '沖繩四日',
+                trips: const [
+                  TripSummary(tripId: 'trip-1', name: '沖繩四日'),
+                  TripSummary(tripId: 'trip-2', name: '東京三日'),
+                ],
+                onSelected: (_) {},
+              ),
+            ),
+            body: const TpRootScrollView(
+              slivers: [SliverToBoxAdapter(child: Text('內容'))],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final reason = 'onMedia=$onMedia';
+      final expectedTitle = onMedia
+          ? Colors.white
+          : AppTheme.light().colorScheme.onSurface;
+
+      // 標題維持標籤色（媒體背景上是暗化後的亮色）。
+      final titleButton = tester.widget<TextButton>(
+        find.ancestor(of: find.text('沖繩四日'), matching: find.byType(TextButton)),
+      );
+      expect(
+        titleButton.style?.foregroundColor?.resolve(const <WidgetState>{}),
+        expectedTitle,
+        reason: reason,
+      );
+
+      // 箭頭是次要提示，必須比標題淡 —— 不能與標題同色。
+      final chevron = tester.widget<Icon>(
+        find.byIcon(CupertinoIcons.chevron_down),
+      );
+      expect(chevron.color, isNotNull, reason: reason);
+      expect(
+        chevron.color!.a,
+        lessThan(expectedTitle.a),
+        reason: '$reason：箭頭與標題同色就看不出主次',
+      );
+      expect(chevron.color!.a, closeTo(0.6, 0.01), reason: reason);
+      expect(
+        (chevron.color!.r, chevron.color!.g, chevron.color!.b),
+        (expectedTitle.r, expectedTitle.g, expectedTitle.b),
+        reason: '$reason：箭頭沿用 bar 前景色，只降不透明度',
+      );
+    }
+  });
+
   testWidgets('日期選擇器選取態是中性膠囊加品牌 tint 前景', (tester) async {
     await tester.pumpWidget(
       app(
@@ -501,7 +629,7 @@ void main() {
       expect(standard.platformViewBackdrop, isFalse);
       expect(map.platformViewBackdrop, isTrue);
       expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
-      expect(map.settings?.glassColor.a, closeTo(0.56, 0.01));
+      expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
