@@ -355,6 +355,90 @@ void main() {
     },
   );
 
+  testWidgets('bar 字符依底下內容亮度切換，媒體背景加暗化層', (tester) async {
+    for (final isDark in [false, true]) {
+      final theme = isDark ? AppTheme.dark() : AppTheme.light();
+      for (final onMedia in [false, true]) {
+        // 換主題要先清場，否則 element tree 被重用、拿到上一輪的玻璃設定。
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: TpRootScaffold(
+              header: TpRootHeaderConfig(
+                title: const Text('地圖'),
+                platformViewBackdrop: onMedia,
+                actions: [
+                  TpToolbarIconButton(
+                    icon: CupertinoIcons.share,
+                    tooltip: '分享',
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+              body: const TpRootScrollView(
+                slivers: [SliverToBoxAdapter(child: Text('內容'))],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final reason = 'isDark=$isDark onMedia=$onMedia';
+        final glass = tester.widget<GlassContainer>(
+          find.descendant(
+            of: find.byKey(const ValueKey('tp-root-glass-header')),
+            matching: find.byType(GlassContainer),
+          ),
+        );
+
+        if (onMedia) {
+          // 清透玻璃加約 35% 暗化層 —— 地圖圖磚恆為亮色，深淺模式都要暗化。
+          expect(
+            glass.settings!.glassColor,
+            Colors.black.withValues(alpha: tpMediaScrimOpacity),
+            reason: reason,
+          );
+        } else {
+          expect(
+            glass.settings!.glassColor.a,
+            closeTo(isDark ? 0.48 : 0.40, 0.01),
+            reason: reason,
+          );
+        }
+
+        // 字符走單色標籤語意色，媒體背景上改亮色 —— 不是依 app 的明暗模式。
+        final iconColor = IconTheme.of(
+          tester.element(find.byIcon(CupertinoIcons.share)),
+        ).color;
+        expect(
+          iconColor,
+          onMedia ? Colors.white : theme.colorScheme.onSurface,
+          reason: reason,
+        );
+      }
+    }
+  });
+
+  testWidgets('標題下拉箭頭是次要文字色，標題本身維持標籤色', (tester) async {
+    await tester.pumpWidget(
+      app(
+        const TpRootScaffold(
+          header: TpRootHeaderConfig(title: Text('沖繩四日')),
+          body: TpRootScrollView(
+            slivers: [SliverToBoxAdapter(child: Text('內容'))],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final titleColor = DefaultTextStyle.of(
+      tester.element(find.text('沖繩四日')),
+    ).style.color;
+    expect(titleColor, AppTheme.light().colorScheme.onSurface);
+  });
+
   testWidgets('日期選擇器選取態是中性膠囊加品牌 tint 前景', (tester) async {
     await tester.pumpWidget(
       app(
@@ -501,7 +585,7 @@ void main() {
       expect(standard.platformViewBackdrop, isFalse);
       expect(map.platformViewBackdrop, isTrue);
       expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
-      expect(map.settings?.glassColor.a, closeTo(0.56, 0.01));
+      expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);

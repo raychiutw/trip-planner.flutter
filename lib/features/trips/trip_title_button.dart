@@ -74,7 +74,13 @@ class TripTitleButton extends StatelessWidget {
             ),
             if (canSelect) ...[
               const SizedBox(width: TpSpacing.s1),
-              const Icon(CupertinoIcons.chevron_down, size: 14),
+              // 箭頭是次要提示，比標題淡一階，讓標題看得出可點；沿用 bar 的
+              // 前景色再降階，媒體背景與一般背景都成立。
+              Icon(
+                CupertinoIcons.chevron_down,
+                size: 14,
+                color: IconTheme.of(context).color?.withValues(alpha: 0.6),
+              ),
             ],
           ],
         ),

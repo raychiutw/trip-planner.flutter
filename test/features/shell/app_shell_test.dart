@@ -15,6 +15,7 @@ import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
 GoRouter buildShellRouter() {
@@ -644,7 +645,7 @@ void main() {
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
-      expect(map.settings?.glassColor.a, closeTo(0.56, 0.01));
+      expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
       expect(map.settings?.thickness, standard.settings?.thickness);
       expect(map.settings?.blur, standard.settings?.blur);
       expect(map.settings?.lightIntensity, standard.settings?.lightIntensity);
