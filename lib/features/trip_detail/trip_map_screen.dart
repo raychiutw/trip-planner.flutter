@@ -74,9 +74,10 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
   /// 傳給地圖 view 的初始天數：路由查詢參數優先，缺席時才由共用選取日供值。
   int? _initialDayNum;
 
-  /// 前景期間最後一次同步到的共用選取日。切回前景時比對，只有真的被別的
-  /// 畫面改過才接手 —— 否則會把使用者選的「全部」蓋掉。
-  SelectedTripDay? _syncedSelection;
+  /// 使用者在本畫面選了「全部」。「全部」不進共用狀態（空值在時間軸是另一個
+  /// 意思），所以切回前景時得靠這個旗標記得使用者的選擇 —— 不能拿共用值有沒有
+  /// 變動去反推，那推論會被任何一條也寫共用值的路徑弄髒。
+  bool _showingAllDays = false;
   bool _wasActiveBranch = true;
 
   @override
@@ -94,24 +95,27 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     }
   }
 
+  /// 換行程或換深連結日期時重新解析，順帶清掉上一段路由留下的「全部」。
   void _resolveInitialDayNum() {
-    _syncedSelection = ref.read(selectedDayProvider);
+    _showingAllDays = false;
     _initialDayNum =
-        widget.initialDayNum ?? _syncedSelection.dayNumFor(widget.tripId);
+        widget.initialDayNum ??
+        ref.read(selectedDayProvider).dayNumFor(widget.tripId);
   }
 
+  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
+  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
+  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
+  ///
   /// 「全部」（空值）不進共用狀態：地圖的空值是「全部」，時間軸的空值是
   /// 「未指定 → 第一天」，同一個空值兩種語意不可混用。
-  ///
-  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
-  /// 背景分支仍會 rebuild，SWR 的兩段 emit 必然給出新 list 而觸發寫入。
   void _publishSelectedDay(int? dayNum) {
-    if (dayNum == null) return;
     if (!TickerMode.valuesOf(context).enabled) return;
+    _showingAllDays = dayNum == null;
+    if (dayNum == null) return;
     ref
         .read(selectedDayProvider.notifier)
         .select(tripId: widget.tripId, dayNum: dayNum);
-    _syncedSelection = ref.read(selectedDayProvider);
   }
 
   @override
@@ -119,13 +123,11 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
     // 重建，才接得住其他 tab 期間變動的共用選取日。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
-    if (isActiveBranch && !_wasActiveBranch) {
-      final selection = ref.read(selectedDayProvider);
-      final sharedDayNum = selection.dayNumFor(widget.tripId);
-      if (sharedDayNum != null && selection != _syncedSelection) {
-        _initialDayNum = sharedDayNum;
-        _syncedSelection = selection;
-      }
+    if (isActiveBranch && !_wasActiveBranch && !_showingAllDays) {
+      final sharedDayNum = ref
+          .read(selectedDayProvider)
+          .dayNumFor(widget.tripId);
+      if (sharedDayNum != null) _initialDayNum = sharedDayNum;
     }
     _wasActiveBranch = isActiveBranch;
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));

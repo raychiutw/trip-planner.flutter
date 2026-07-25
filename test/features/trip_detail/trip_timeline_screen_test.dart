@@ -27,40 +27,11 @@ import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/swipe_to_delete.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
+import '../../helpers/branch_keepalive.dart';
+
 const _tripId = 'okinawa-2026';
 
 class _MockTripRepository extends Mock implements TripRepository {}
-
-/// 以指定初始值起跳的共用選取日，用來驗證「查詢參數缺席時才採用共用狀態」。
-class _SeededSelectedDayController extends SelectedDayController {
-  _SeededSelectedDayController(this.seed);
-
-  final SelectedTripDay? seed;
-
-  @override
-  SelectedTripDay? build() => seed;
-}
-
-/// 模擬 StatefulShellRoute 的分支保活：前景／背景以 TickerMode 切換，
-/// 且子樹 widget 實例不變（背景分支不會因切換而重建整棵樹）。
-class _MaybeBranch extends StatelessWidget {
-  const _MaybeBranch({required this.active, required this.child});
-
-  final ValueListenable<bool>? active;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final listenable = active;
-    if (listenable == null) return child;
-    return ValueListenableBuilder<bool>(
-      valueListenable: listenable,
-      builder: (context, enabled, child) =>
-          TickerMode(enabled: enabled, child: child!),
-      child: child,
-    );
-  }
-}
 
 ProviderContainer _containerOf(WidgetTester tester) =>
     ProviderScope.containerOf(
@@ -255,7 +226,7 @@ Future<void> _pumpTimeline(
     routes: [
       GoRoute(
         path: '/trips/:tripId',
-        builder: (context, state) => _MaybeBranch(
+        builder: (context, state) => MaybeBranch(
           active: branchActive,
           child: TripTimelineScreen(
             tripId: state.pathParameters['tripId']!,
@@ -349,7 +320,7 @@ Future<void> _pumpTimeline(
           dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
         if (initialSelectedDay != null)
           selectedDayProvider.overrideWith(
-            () => _SeededSelectedDayController(initialSelectedDay),
+            () => SeededSelectedDayController(initialSelectedDay),
           ),
       ],
       child: MaterialApp.router(
@@ -537,13 +508,29 @@ void main() {
     expect(_sharedDayNum(tester), 2);
   });
 
-  testWidgets('背景分支不寫入共用選取日', (tester) async {
-    final active = ValueNotifier(false);
+  testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
+    // riverpod 3 會在 TickerMode 關閉時 pause 訂閱，背景分支多半根本收不到 emit；
+    // 但「emit 落在切到背景的同一批」時，暫停前就已標記 dirty 的畫面仍會以背景身分
+    // 重建一次，並在其中處理新的 days —— 這一格才是共用狀態真正會被污染的縫。
+    final active = ValueNotifier(true);
     addTearDown(active.dispose);
-    await _pumpTimeline(tester, branchActive: active);
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await _pumpTimeline(tester, daysStream: days.stream, branchActive: active);
+    days.add(_fakeDays);
     await tester.pumpAndSettle();
 
-    expect(_containerOf(tester).read(selectedDayProvider), isNull);
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    expect(_sharedDayNum(tester), 2);
+
+    // SWR 第二段 emit 少掉 DAY 2，同一批切到背景：畫面內部會退回 DAY 1，
+    // 但背景分支不得把這個退回寫進共用狀態。
+    days.add([_fakeDays.first]);
+    active.value = false;
+    await tester.pumpAndSettle();
+
+    expect(_sharedDayNum(tester), 2);
   });
 
   testWidgets('查詢參數缺席時採用共用選取日', (tester) async {

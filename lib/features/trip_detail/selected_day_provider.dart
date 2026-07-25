@@ -7,6 +7,9 @@
 /// 2. **「全部」不進來**：地圖的空值意思是「全部」，時間軸的空值意思是
 ///    「未指定 → 第一天」；同一個空值兩種語意，因此 `select` 只收非空天數。
 /// 3. **只有前景分支可寫入**：由呼叫端以 `TickerMode` 守門，這裡不做假設。
+///    riverpod 3 會在 `TickerMode` 關閉時暫停該畫面的訂閱，但「emit 落在切到
+///    背景的同一批」時，畫面仍會以背景身分重建一次並處理到新資料，那一格就會
+///    寫進來。
 /// 4. **純記憶體不持久化**：時間軸每捲動換一天就寫一次，持久化等於每次捲動寫磁碟。
 library;
 
@@ -49,11 +52,12 @@ class SelectedDayController extends Notifier<SelectedTripDay?> {
   SelectedTripDay? build() => null;
 
   /// 記下某個行程目前看的是第幾天。`tripId` 為空字串時忽略。
+  ///
+  /// 不需要自己比對舊值：riverpod 的 Notifier 已用 `==` 去重，寫入相同的
+  /// `(tripId, dayNum)` 不會通知 listener。
   void select({required String tripId, required int dayNum}) {
     if (tripId.isEmpty) return;
-    final next = SelectedTripDay(tripId: tripId, dayNum: dayNum);
-    if (state == next) return;
-    state = next;
+    state = SelectedTripDay(tripId: tripId, dayNum: dayNum);
   }
 }
 

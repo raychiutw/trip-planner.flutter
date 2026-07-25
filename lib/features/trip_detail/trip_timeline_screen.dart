@@ -85,9 +85,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   int? _activeDayNum;
   String? _editingTripId;
 
-  /// 前景期間最後一次同步到的共用選取日。切回前景時比對，只有真的被別的
-  /// 畫面改過才接手 —— 否則會把使用者在本畫面的選擇蓋掉。
-  SelectedTripDay? _syncedSelection;
   bool _wasActiveBranch = true;
 
   @override
@@ -124,19 +121,19 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
 
   /// 路由查詢參數優先；缺席時才由共用選取日供值。
   void _resolveActiveDayNum() {
-    _syncedSelection = ref.read(selectedDayProvider);
     _activeDayNum =
-        widget.initialDayNum ?? _syncedSelection.dayNumFor(widget.tripId);
+        widget.initialDayNum ??
+        ref.read(selectedDayProvider).dayNumFor(widget.tripId);
   }
 
   /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
-  /// 背景分支仍會 rebuild，SWR 的兩段 emit 必然給出新 list 而觸發寫入。
+  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
+  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
   void _publishSelectedDay(int dayNum) {
     if (!TickerMode.valuesOf(context).enabled) return;
     ref
         .read(selectedDayProvider.notifier)
         .select(tripId: widget.tripId, dayNum: dayNum);
-    _syncedSelection = ref.read(selectedDayProvider);
   }
 
   void _openActionSheet(Widget screen) {
@@ -178,13 +175,13 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
     // 重建，才接得住其他 tab 期間變動的共用選取日（保活的分支子樹本身不重建）。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
+    // 時間軸沒有「全部」：前景看到的第幾天必定已寫進共用狀態，所以切回前景時
+    // 無條件接手即可，不必（也無從測出）再比對「共用值有沒有被別人改過」。
     if (isActiveBranch && !_wasActiveBranch) {
-      final selection = ref.read(selectedDayProvider);
-      final sharedDayNum = selection.dayNumFor(widget.tripId);
-      if (sharedDayNum != null && selection != _syncedSelection) {
-        _activeDayNum = sharedDayNum;
-        _syncedSelection = selection;
-      }
+      final sharedDayNum = ref
+          .read(selectedDayProvider)
+          .dayNumFor(widget.tripId);
+      if (sharedDayNum != null) _activeDayNum = sharedDayNum;
     }
     _wasActiveBranch = isActiveBranch;
     final selectedAsync = isActiveBranch
