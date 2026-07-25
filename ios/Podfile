@@ -35,6 +35,12 @@ target 'Runner' do
   end
   target 'RunnerUITests' do
     inherit! :complete
+    # patrol 在 SPM 啟用時會被 podhelper 移除（`pod install` 會印
+    # "Removing patrol"），而 FlutterGeneratedPluginSwiftPackage 只連結 Runner
+    # target —— RunnerUITests 的 Swift 因此找不到 patrol module（issue #104）。
+    # Objective-C 的 @import 靠 test host 的 header path 還能過，Swift 不行。
+    # 明文保留 pod 形式，讓這個 target 的 FRAMEWORK_SEARCH_PATHS 帶上 patrol。
+    pod 'patrol', :path => '.symlinks/plugins/patrol/darwin'
   end
 end
 
