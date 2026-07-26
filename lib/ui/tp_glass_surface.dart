@@ -75,13 +75,57 @@ class TpBarForeground extends StatelessWidget {
   }
 }
 
-/// 一般模式的邊緣**交還玻璃材質**；只有「提高對比」才補一條可見實心邊。
+/// 一般模式描一條**細邊**；「提高對比」才換成明顯的實心邊。
 ///
-/// 均勻描一圈固定顏色的實心線正是「貼紙感」的來源 —— iOS 26 的玻璃邊緣是
-/// 材質沿周長算出來、受光角影響的亮邊，由 [tpGlassRecipe] 的 `ambientRim`、
-/// `glowIntensity` 與 `specularSharpness` 產生。
+/// 曾經相信「移除描邊之後由材質接手」（`ambientRim`／`glowIntensity`／
+/// `specularSharpness` 會沿周長算出亮邊），據此把四處描邊全部移除。**模擬器
+/// 實測那個前提不成立**：用真正的 [TpGlassSurface] 量，不論背後是純黑或壓在
+/// 內容上，邊緣峰值與內部填色的差都是 **0**；把 `ambientRim` 從 0.70 到 0.07
+/// 試了五組值，在純黑背景上一律是 0。邊緣就這樣整個消失了。
+///
+/// iOS 26 的玻璃邊緣實測是**峰值高出內部填色約 +30**，且沿周長均勻
+/// （訊息 app 標題膠囊 x 360→810 全程 +28~+33；電話 app 編輯膠囊 +29）。
+/// 所以這裡把邊緣做回來，強度對齊 Apple，而不是舊描邊那種 +119 的貼紙感。
+///
+/// 顏色由 `onSurface` 導出而非寫死白色：深色模式得到偏亮的細邊，淺色模式得到
+/// 偏暗的細邊 —— 淺色的填色本來就接近白，再加白邊等於沒有。
+const double _tpGlassEdgeAlpha = 0.12;
+
+/// 把邊緣畫在玻璃**之上**。
+///
+/// 不能靠 shape 的 `side`：`AdaptiveGlass` 一般模式只拿 shape 去 clip
+/// （`ClipRRect`／`ClipPath`），**從不呼叫 `shape.paint`**，所以 `BorderSide`
+/// 在有 blur 時完全畫不出來 —— 只有無障礙 fallback 走 `ShapeDecoration` 才會
+/// 現形。這是先前「日期選擇器軌道 18% 細邊是死碼」那條的同一個機制。
+///
+/// `ShapeDecoration` 會畫 side，所以改用 `foregroundDecoration` 疊在玻璃上。
+class TpGlassEdge extends StatelessWidget {
+  const TpGlassEdge({
+    super.key,
+    required this.borderRadius,
+    required this.child,
+  });
+
+  final double borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    foregroundDecoration: ShapeDecoration(
+      shape: LiquidRoundedSuperellipse(
+        borderRadius: borderRadius,
+        side: BorderSide(color: tpGlassEdgeColor(context)),
+      ),
+    ),
+    child: child,
+  );
+}
+
 Color tpGlassEdgeColor(BuildContext context) {
-  if (!MediaQuery.highContrastOf(context)) return Colors.transparent;
+  final scheme = Theme.of(context).colorScheme;
+  if (!MediaQuery.highContrastOf(context)) {
+    return scheme.onSurface.withValues(alpha: _tpGlassEdgeAlpha);
+  }
   return Theme.of(context).brightness == Brightness.dark
       ? Colors.white
       : Colors.black.withValues(alpha: 0.72);
@@ -204,19 +248,22 @@ class TpGlassSurface extends StatelessWidget {
       opaqueColor: tint,
     );
 
-    return GlassContainer(
-      padding: padding,
-      useOwnLayer: true,
-      quality: GlassQuality.standard,
-      platformViewBackdrop: platformViewBackdrop,
-      allowElevation: true,
-      clipBehavior: Clip.antiAlias,
-      shape: LiquidRoundedSuperellipse(
-        borderRadius: radius,
-        side: BorderSide(color: border),
+    return TpGlassEdge(
+      borderRadius: radius,
+      child: GlassContainer(
+        padding: padding,
+        useOwnLayer: true,
+        quality: GlassQuality.standard,
+        platformViewBackdrop: platformViewBackdrop,
+        allowElevation: true,
+        clipBehavior: Clip.antiAlias,
+        shape: LiquidRoundedSuperellipse(
+          borderRadius: radius,
+          side: BorderSide(color: border),
+        ),
+        settings: resolvedSettings,
+        child: child,
       ),
-      settings: resolvedSettings,
-      child: child,
     );
   }
 }
