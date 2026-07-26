@@ -139,7 +139,6 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       'TpHorizontalSelector only accepts selection options.',
     );
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final trackSettings = tpNavigationGlassSettings(
       context,
       recipe: widget.platformViewBackdrop
@@ -147,17 +146,13 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
           : TpNavigationGlassRecipe.regular,
     );
     // 選取膠囊走中性語意層，比 track 高一階讓它浮出來；品牌色只留給前景。
-    final selectedTint = theme.colorScheme.surfaceContainerHighest.withValues(
-      alpha: isDark ? 0.52 : 0.44,
-    );
-    final selectedSettings = tpResolveGlassSettings(
-      context,
-      trackSettings.copyWith(
-        glassColor: selectedTint,
-        platformViewFallbackColor: selectedTint,
-      ),
-      opaqueColor: theme.colorScheme.surfaceContainerHigh,
-    );
+    //
+    // **是自己畫的實心填色，不是玻璃**：軌道用 `useOwnLayer: true` 建立
+    // LiquidGlassLayer，巢狀在裡面的子玻璃會被合併進母層，子層自己的
+    // `glassColor` 不生效。模擬器實測選取態與未選在淺色下都是 #FFFFFF、
+    // 深色是 #080808 vs #040404，改子層 alpha 逐位元零差異。Apple 的分段
+    // 控制項 thumb 本來就是實心材質，不是玻璃。
+    final selectedFill = theme.colorScheme.surfaceContainerHighest;
     final height = TpHorizontalSelector.preferredHeight(context);
     return Focus(
       focusNode: _focusNode,
@@ -185,7 +180,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
                     selected: option.value == widget.value,
                     width: _optionWidth(option),
                     height: height,
-                    selectedSettings: selectedSettings,
+                    selectedFill: selectedFill,
                     accentColor: theme.colorScheme.primary,
                     onTap: () {
                       _focusNode.requestFocus();
@@ -224,7 +219,7 @@ class _SelectorOption<T> extends StatelessWidget {
     required this.selected,
     required this.width,
     required this.height,
-    required this.selectedSettings,
+    required this.selectedFill,
     required this.accentColor,
     required this.onTap,
   });
@@ -233,7 +228,7 @@ class _SelectorOption<T> extends StatelessWidget {
   final bool selected;
   final double width;
   final double height;
-  final LiquidGlassSettings selectedSettings;
+  final Color selectedFill;
   final Color accentColor;
   final VoidCallback onTap;
 
@@ -256,19 +251,14 @@ class _SelectorOption<T> extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
             child: selected
-                ? IgnorePointer(
-                    child: GlassButton.custom(
-                      label: option.label,
-                      width: width - 6,
-                      height: height - 10,
+                ? DecoratedBox(
+                    decoration: ShapeDecoration(
+                      color: selectedFill,
                       shape: LiquidRoundedSuperellipse(
                         borderRadius: (height - 10) / 2,
                       ),
-                      settings: selectedSettings,
-                      quality: GlassQuality.standard,
-                      interactionScale: 1,
-                      stretch: 0,
-                      onTap: onTap,
+                    ),
+                    child: Center(
                       child: _OptionContent(option: option, color: color),
                     ),
                   )

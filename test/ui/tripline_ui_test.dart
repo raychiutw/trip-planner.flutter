@@ -312,7 +312,7 @@ void main() {
   });
 
   testWidgets(
-    'TpHorizontalSelector 使用單一 GlassContainer + active GlassButton 與 13pt DAY 字級',
+    'TpHorizontalSelector 使用單一 GlassContainer + 一塊選取填色與 13pt DAY 字級',
     (tester) async {
       var selected = 0;
       await tester.pumpWidget(
@@ -340,9 +340,12 @@ void main() {
       );
 
       final selector = find.byKey(const ValueKey('day-selector'));
+      // 選取態是自己畫的實心填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor`
+      // 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
+      expect(selectedPillFill(tester, selector).a, 1);
       expect(
         find.descendant(of: selector, matching: find.byType(GlassButton)),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: selector, matching: find.byType(GlassContainer)),
@@ -501,15 +504,10 @@ void main() {
     );
 
     final scheme = AppTheme.light().colorScheme;
-    final pill = tester
-        .widget<GlassButton>(
-          find.descendant(
-            of: find.byKey(const ValueKey('day-selector')),
-            matching: find.byType(GlassButton),
-          ),
-        )
-        .settings!
-        .glassColor;
+    final pill = selectedPillFill(
+      tester,
+      find.byKey(const ValueKey('day-selector')),
+    );
 
     // 膠囊底走中性語意層，品牌柔褐不再當背景鋪滿。
     (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
@@ -645,16 +643,13 @@ void main() {
       expect(map.settings!.ambientRim, greaterThan(0));
       expect(standard.settings!.ambientRim, greaterThan(0));
 
-      final selected = tester.widget<GlassButton>(
-        find.descendant(
-          of: find.byKey(const ValueKey('standard-navigation-selector')),
-          matching: find.byType(GlassButton),
-        ),
-      );
-      expect(selected.settings?.blur, standard.settings?.blur);
+      // 選取態不再是玻璃，所以不共用光學配方 —— 它是畫在軌道之上的實心填色。
       expect(
-        selected.settings?.refractiveIndex,
-        standard.settings?.refractiveIndex,
+        selectedPillFill(
+          tester,
+          find.byKey(const ValueKey('standard-navigation-selector')),
+        ).a,
+        1,
       );
     },
   );
@@ -667,7 +662,11 @@ void main() {
             value: 1,
             options: const [
               TpScopeOption(value: 0, label: '總覽'),
-              TpScopeOption(value: 1, label: 'DAY 1'),
+              TpScopeOption(
+                value: 1,
+                label: 'DAY 1',
+                key: ValueKey('reduce-transparency-day-1'),
+              ),
             ],
             onSelected: (_) {},
           ),
@@ -676,9 +675,23 @@ void main() {
       ),
     );
 
-    final selected = tester.widget<GlassButton>(find.byType(GlassButton));
-    expect(selected.settings?.blur, 0);
-    expect(selected.settings?.glassColor.a, 1);
+    // 選取底色本來就是自己畫的實心填色，Reduce Transparency 下同樣成立 ——
+    // 它不經過玻璃 shader，所以不會被衰減。
+    // 範圍收到選取項：Reduce Transparency 下軌道自己也會退成 ShapeDecoration。
+    final pill = selectedPillFill(
+      tester,
+      find.byKey(const ValueKey('reduce-transparency-day-1')),
+    );
+    expect(pill.a, 1);
+    expect(pill, AppTheme.light().colorScheme.surfaceContainerHighest);
+    expect(
+      find.descendant(
+        of: find.byType(TpHorizontalSelector<int>),
+        matching: find.byType(GlassButton),
+      ),
+      findsNothing,
+      reason: '巢狀玻璃的顏色會被軌道母層吃掉，選取態不得再用 GlassButton',
+    );
   });
 
   testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
@@ -739,6 +752,58 @@ void main() {
     expect(tester.takeException(), isAssertionError);
   });
 
+  testWidgets('選取膠囊是實際畫上去的填色，不倚賴會被母層吃掉的玻璃 tint', (tester) async {
+    // 軌道是 `GlassContainer(useOwnLayer: true)`，會建立 LiquidGlassLayer；
+    // 巢狀在裡面的子玻璃會被合併進母層，子層自己的 `glassColor` 不生效。
+    // 模擬器實測：選取態與未選在淺色下都是 #FFFFFF（差 0），深色是
+    // #080808 vs #040404（差 4/255），改子層 alpha 逐位元零差異。
+    // 所以選取指示器必須是真的畫上去的不透明填色。
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: TpHorizontalSelector<int>(
+            value: 1,
+            options: const [
+              TpScopeOption(value: 0, label: 'DAY 1'),
+              TpScopeOption(
+                value: 1,
+                label: 'DAY 2',
+                key: ValueKey('fill-day-2'),
+              ),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scheme = AppTheme.light().colorScheme;
+    final decorated = tester.widgetList<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const ValueKey('fill-day-2')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    final fills = decorated
+        .map((box) => box.decoration)
+        .whereType<ShapeDecoration>()
+        .where((deco) => deco.color != null)
+        .toList();
+    expect(
+      fills,
+      isNotEmpty,
+      reason: '選取態要有一層自己畫的 ShapeDecoration 填色',
+    );
+    expect(fills.single.color, scheme.surfaceContainerHighest);
+    expect(
+      fills.single.color!.a,
+      1,
+      reason: '半透明填色會被玻璃 shader 衰減到看不見',
+    );
+  });
+
   testWidgets('深色日期 selector 的選取膠囊同樣是中性語意層，不鋪品牌柔褐', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -762,8 +827,19 @@ void main() {
     await tester.pumpAndSettle();
 
     final scheme = AppTheme.dark().colorScheme;
-    final thumb = tester.widget<GlassButton>(find.byType(GlassButton));
-    final pill = thumb.settings!.glassColor;
+    final pill =
+        tester
+                .widgetList<DecoratedBox>(
+                  find.descendant(
+                    of: find.byKey(const ValueKey('dark-day-1')),
+                    matching: find.byType(DecoratedBox),
+                  ),
+                )
+                .map((box) => box.decoration)
+                .whereType<ShapeDecoration>()
+                .where((deco) => deco.color != null)
+                .single
+                .color!;
     expect(
       (pill.r, pill.g, pill.b),
       (
@@ -825,3 +901,17 @@ void main() {
     expect(find.byType(AnimatedContainer), findsNothing);
   });
 }
+
+/// 取選取膠囊自己畫的填色。
+///
+/// 選取態不是玻璃：軌道用 `useOwnLayer: true` 建立 LiquidGlassLayer，巢狀
+/// 在裡面的子玻璃會被合併進母層，子層自己的 `glassColor` 畫不出來。
+Color selectedPillFill(WidgetTester tester, Finder scope) => tester
+    .widgetList<DecoratedBox>(
+      find.descendant(of: scope, matching: find.byType(DecoratedBox)),
+    )
+    .map((box) => box.decoration)
+    .whereType<ShapeDecoration>()
+    .where((deco) => deco.color != null)
+    .single
+    .color!;
