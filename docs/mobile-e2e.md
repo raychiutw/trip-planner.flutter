@@ -286,6 +286,34 @@ Official references:
 - [Firebase iOS XCTest packaging and signing](https://firebase.google.com/docs/test-lab/ios/run-xctest)
 - [Google Navigation cross-platform setup](https://developers.google.com/maps/documentation/cross-platform/navigation)
 
+## 2026-07-26 原生地圖多指手勢真機驗證紀錄（issue #104）
+
+`nativeMapPinchObserved`／`nativeMapRotateObserved`／`nativeMapDoubleTapObserved`
+三個缺口已補齊，兩平台都取得綠燈證據。原本的 `BLOCKED` release waiver 依據
+（「缺少可用的原生自動化注入能力」）不再成立。
+
+| Platform | Result | Evidence |
+| --- | --- | --- |
+| Android Firebase Test Lab | PASS | [Run 30164616330](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30164616330) 與 [30165755093](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30165755093) 連續兩輪 `native_map_smoke_test` 通過 |
+| iOS Firebase Test Lab | PASS | [Run 30181732102](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30181732102)，iPhone 14 Pro／iOS 16.6，`native_map_smoke_test` 通過（34.3s），四個手勢旗標與 Google POI callback 都觀察到 |
+
+**Android 這一側用的是 `MediumPhone.arm`，那是虛擬機而非實體裝置。** 宣稱
+「真機證據」時只有 iOS 的 `iphone14pro` 算數，兩者不可混為一談。
+
+iOS 的注入方式：Patrol 4.8.0 的 server extension
+（`ios/RunnerUITests/TriplineGestureExtension.swift`）跑在 XCTest runner 行程內，
+Dart 端以 HTTP POST 請求手勢，由 `XCUIElement` 的公開多指介面執行。**不**依賴
+accessibility tree —— iOS 實機的 XCUI a11y tree 裡沒有任何 Flutter `Semantics`
+節點，`setSemanticsTreeEnabled()` 與 `ensureSemanticsEnabled()` 都無法改變這點
+（詳見 issue #104 與 `docs/discovery/native-map-gestures.md`）。
+
+⚠️ **Google POI 斷言依賴裝置的對外網路。**
+[Run 30178928266](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30178928266)
+曾因該台 iPhone 整台 DNS 失效（`SlowWiFiDnsFailure` 49 次、`-1001` 逾時 79 次）
+而完全載不到地圖圖磚，九次 tap 點在空白畫布上、POI 斷言失敗 —— 那是基礎設施
+故障，不是產品缺陷。現在測試會分流回報（觸控未抵達 vs 底圖不可用），CI 也會在
+DNS 全黑時發出 `::warning::`。
+
 ## 歷史 release records
 
 ## 2026-07-23 v0.9.6 store release record
