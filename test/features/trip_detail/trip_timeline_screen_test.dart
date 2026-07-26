@@ -1588,7 +1588,7 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
-    // 只有選取態才會長出膠囊；它是自己畫的實心填色，不是玻璃 —— 巢狀玻璃的
+    // 只有選取態才會長出膠囊；它是自己畫的半透明填色，不是玻璃 —— 巢狀玻璃的
     // `glassColor` 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
     final pill =
         tester
@@ -1611,7 +1611,9 @@ void main() {
         TpSystemColorsLight.tint.b,
       )),
     );
-    expect(pill.a, 1, reason: '半透明填色會被玻璃 shader 衰減到看不見');
+    // 半透明但可控：LiquidGlass shader 會把 tint 衰減到約 14%，改用自己畫的
+    // 填色 + `BackdropFilter` 才有確定的色值。
+    expect(pill.a, closeTo(0.92, 0.001));
   });
 
   testWidgets('無效 day deep link fallback 後共用選取日為實際 Day 1', (tester) async {

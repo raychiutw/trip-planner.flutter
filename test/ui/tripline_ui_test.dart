@@ -312,7 +312,7 @@ void main() {
   });
 
   testWidgets(
-    'TpHorizontalSelector 使用單一 GlassContainer + 一塊選取填色與 13pt DAY 字級',
+    'TpHorizontalSelector 使用單一半透明軌 + 一塊選取填色與 13pt DAY 字級',
     (tester) async {
       var selected = 0;
       await tester.pumpWidget(
@@ -340,16 +340,22 @@ void main() {
       );
 
       final selector = find.byKey(const ValueKey('day-selector'));
-      // 選取態是自己畫的實心填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor`
-      // 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
-      expect(selectedPillFill(tester, selector).a, 1);
+      // 軌與選取膠囊都是自己畫的半透明填色 + `BackdropFilter` —— LiquidGlass
+      // shader 會把 tint 衰減到約 14%，巢狀玻璃的顏色又會被母層吃掉，兩者
+      // 都讓顏色變得不可控。
+      expect(selectedPillFill(tester, selector).a, closeTo(0.92, 0.001));
+      expect(
+        find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+        findsOneWidget,
+        reason: '半透明軌要真的模糊背後內容',
+      );
       expect(
         find.descendant(of: selector, matching: find.byType(GlassButton)),
         findsNothing,
       );
       expect(
         find.descendant(of: selector, matching: find.byType(GlassContainer)),
-        findsOneWidget,
+        findsNothing,
       );
       expect(tester.getSize(selector).height, TpSpacing.tapMin);
       expect(find.text('DAY 01'), findsOneWidget);
@@ -511,7 +517,8 @@ void main() {
 
     // 膠囊底走中性語意層，品牌柔褐不再當背景鋪滿。
     (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
-    expect(rgb(pill), rgb(scheme.surfaceContainerHighest));
+    // Apple 分段控制項：選取膠囊比軌更亮（淺色是白），靠浮起表達選取。
+    expect(rgb(pill), rgb(scheme.surface));
     expect(rgb(pill), isNot(rgb(scheme.primary)));
 
     // 品牌色只出現在前景；未選取維持中性次要前景。
@@ -582,16 +589,53 @@ void main() {
     expect(ratio, lessThan(3));
   });
 
-  testWidgets(
-    'navigation selector keeps one optical recipe over a platform view',
-    (tester) async {
-      await tester.pumpWidget(
-        app(
-          Scaffold(
-            body: Column(
-              children: [
+  testWidgets('導覽玻璃的兩種配方同源，媒體背景只做平面化', (tester) async {
+    // 這組斷言原本掛在日期選擇器上，但選擇器已改成實心分段控制項、不再用
+    // 玻璃。配方本身仍由頁首與 root tab bar 使用，所以改成直接對配方斷言，
+    // 不透過任何 widget。
+    late LiquidGlassSettings standard;
+    late LiquidGlassSettings map;
+    await tester.pumpWidget(
+      app(
+        Builder(
+          builder: (context) {
+            standard = tpNavigationGlassSettings(context);
+            map = tpNavigationGlassSettings(
+              context,
+              recipe: TpNavigationGlassRecipe.platformView,
+            );
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(standard.glassColor.a, closeTo(0.40, 0.01));
+    expect(map.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
+    // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
+    // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
+    expect(map.blur, standard.blur);
+    expect(map.standardOpacityMultiplier, standard.standardOpacityMultiplier);
+    expect(map.chromaticAberration, 0);
+    expect(map.refractiveIndex, 1.06);
+    expect(standard.chromaticAberration, greaterThan(0));
+    expect(standard.refractiveIndex, greaterThan(1.06));
+    // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+    expect(map.ambientRim, greaterThan(0));
+    expect(standard.ambientRim, greaterThan(0));
+  });
+
+  testWidgets('選擇器不因所在背景而改變外觀：地圖上與一般頁面同一塊實心軌', (tester) async {
+    // 軌是實心的，所以沒有 platform view 疑慮 —— 先前那顆
+    // `platformViewBackdrop` 參數已隨玻璃一起移除。
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: Column(
+            children: [
+              for (final key in ['selector-a', 'selector-b'])
                 TpHorizontalSelector<int>(
-                  key: const ValueKey('standard-navigation-selector'),
+                  key: ValueKey(key),
                   value: 1,
                   options: const [
                     TpScopeOption(value: 0, label: '總覽'),
@@ -599,60 +643,18 @@ void main() {
                   ],
                   onSelected: (_) {},
                 ),
-                TpHorizontalSelector<int>(
-                  key: const ValueKey('map-navigation-selector'),
-                  platformViewBackdrop: true,
-                  value: 1,
-                  options: const [
-                    TpScopeOption(value: 0, label: '總覽'),
-                    TpScopeOption(value: 1, label: 'DAY 1'),
-                  ],
-                  onSelected: (_) {},
-                ),
-              ],
-            ),
+            ],
           ),
         ),
-      );
+      ),
+    );
 
-      GlassContainer trackFor(String key) => tester.widget<GlassContainer>(
-        find.descendant(
-          of: find.byKey(ValueKey(key)),
-          matching: find.byType(GlassContainer),
-        ),
-      );
-
-      final standard = trackFor('standard-navigation-selector');
-      final map = trackFor('map-navigation-selector');
-      expect(standard.platformViewBackdrop, isFalse);
-      expect(map.platformViewBackdrop, isTrue);
-      expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
-      expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-      // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
-      // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
-      expect(map.settings?.blur, standard.settings?.blur);
-      expect(
-        map.settings?.standardOpacityMultiplier,
-        standard.settings?.standardOpacityMultiplier,
-      );
-      expect(map.settings?.chromaticAberration, 0);
-      expect(map.settings?.refractiveIndex, 1.06);
-      expect(standard.settings!.chromaticAberration, greaterThan(0));
-      expect(standard.settings!.refractiveIndex, greaterThan(1.06));
-      // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
-      expect(map.settings!.ambientRim, greaterThan(0));
-      expect(standard.settings!.ambientRim, greaterThan(0));
-
-      // 選取態不再是玻璃，所以不共用光學配方 —— 它是畫在軌道之上的實心填色。
-      expect(
-        selectedPillFill(
-          tester,
-          find.byKey(const ValueKey('standard-navigation-selector')),
-        ).a,
-        1,
-      );
-    },
-  );
+    expect(find.byType(GlassContainer), findsNothing);
+    expect(
+      trackFill(tester, find.byKey(const ValueKey('selector-a'))),
+      trackFill(tester, find.byKey(const ValueKey('selector-b'))),
+    );
+  });
 
   testWidgets('Reduce Transparency 使用不透明且無模糊的 selector 選取底色', (tester) async {
     await tester.pumpWidget(
@@ -683,7 +685,7 @@ void main() {
       find.byKey(const ValueKey('reduce-transparency-day-1')),
     );
     expect(pill.a, 1);
-    expect(pill, AppTheme.light().colorScheme.surfaceContainerHighest);
+    expect(pill, AppTheme.light().colorScheme.surface);
     expect(
       find.descendant(
         of: find.byType(TpHorizontalSelector<int>),
@@ -752,6 +754,51 @@ void main() {
     expect(tester.takeException(), isAssertionError);
   });
 
+  testWidgets('選擇器是 Apple 分段控制項：Gray6 實心軌 + 比軌更亮的膠囊', (tester) async {
+    // 玻璃軌在純色頁面上等於無色（導覽配方的 tint 淺色是 `surface`＝白），
+    // 看不出「這是一組四選一」。改成 iOS `UISegmentedControl` 的實心軌。
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('segmented'),
+            value: 1,
+            options: const [
+              TpScopeOption(value: 0, label: 'DAY 1'),
+              TpScopeOption(
+                value: 1,
+                label: 'DAY 2',
+                key: ValueKey('segmented-day-2'),
+              ),
+            ],
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scheme = AppTheme.light().colorScheme;
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('segmented')),
+        matching: find.byType(GlassContainer),
+      ),
+      findsNothing,
+      reason: '不走 LiquidGlass shader —— 它會把 tint 衰減到顏色不可控',
+    );
+    expect(
+      trackFill(tester, find.byKey(const ValueKey('segmented'))),
+      scheme.surfaceContainerLow.withValues(alpha: 0.80),
+      reason: '軌是半透明的，內容要能透出來',
+    );
+    expect(
+      selectedPillFill(tester, find.byKey(const ValueKey('segmented-day-2'))),
+      scheme.surface.withValues(alpha: 0.92),
+      reason: '淺色的選取膠囊比軌更亮（Apple 是靠浮起表達選取）',
+    );
+  });
+
   testWidgets('選取膠囊是實際畫上去的填色，不倚賴會被母層吃掉的玻璃 tint', (tester) async {
     // 軌道是 `GlassContainer(useOwnLayer: true)`，會建立 LiquidGlassLayer；
     // 巢狀在裡面的子玻璃會被合併進母層，子層自己的 `glassColor` 不生效。
@@ -796,12 +843,7 @@ void main() {
       isNotEmpty,
       reason: '選取態要有一層自己畫的 ShapeDecoration 填色',
     );
-    expect(fills.single.color, scheme.surfaceContainerHighest);
-    expect(
-      fills.single.color!.a,
-      1,
-      reason: '半透明填色會被玻璃 shader 衰減到看不見',
-    );
+    expect(fills.single.color, scheme.surface.withValues(alpha: 0.92));
   });
 
   testWidgets('深色日期 selector 的選取膠囊同樣是中性語意層，不鋪品牌柔褐', (tester) async {
@@ -856,8 +898,12 @@ void main() {
         TpSystemColorsDark.tint.b,
       )),
     );
-    final track = tester.widget<GlassContainer>(find.byType(GlassContainer));
-    expect(track.settings?.chromaticAberration, closeTo(0.004, 0.001));
+    // 深色的軌是半透明的 systemGray6，內容要能透出來。
+    expect(
+      trackFill(tester, find.byType(TpHorizontalSelector<int>)),
+      scheme.surfaceContainerLow.withValues(alpha: 0.72),
+    );
+    expect(find.byType(GlassContainer), findsNothing);
   });
 
   testWidgets('TpBottomAccessory 自行避讓 root tab 並維持固定高度', (tester) async {
@@ -913,5 +959,16 @@ Color selectedPillFill(WidgetTester tester, Finder scope) => tester
     .map((box) => box.decoration)
     .whereType<ShapeDecoration>()
     .where((deco) => deco.color != null)
-    .single
+    .last
+    .color!;
+
+/// 取選擇器軌道自己畫的填色（最外層那一塊）。
+Color trackFill(WidgetTester tester, Finder scope) => tester
+    .widgetList<DecoratedBox>(
+      find.descendant(of: scope, matching: find.byType(DecoratedBox)),
+    )
+    .map((box) => box.decoration)
+    .whereType<ShapeDecoration>()
+    .where((deco) => deco.color != null)
+    .first
     .color!;

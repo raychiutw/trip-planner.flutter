@@ -150,22 +150,23 @@ void main() {
         reason: '一般模式的邊緣應由材質產生，不是畫上去的',
       );
 
-      // 日期選擇器的軌道走同一條規則 —— 它先前固定描 18% 細邊，而
-      // `AdaptiveGlass` 一般模式只拿 shape 去 clip（不呼叫 `shape.paint`），
-      // 那條邊在一般模式畫不出來，只在無障礙 fallback（走 `ShapeDecoration`）
-      // 現形，且比其他四處弱得多。
-      final trackShape =
+      // 日期選擇器的軌道走同一條規則。軌本身改成半透明填色 +
+      // `BackdropFilter`，不再是 LiquidGlass —— shader 會把 tint 衰減到約
+      // 14%，導覽配方的 tint 在淺色又是 `surface`（白），疊在白色頁面上等於
+      // 無色，實測軌與頁面同為 #FFFFFF。
+      final trackDecoration =
           tester
-                  .widget<GlassContainer>(
-                    find
-                        .descendant(
-                          of: find.byType(TpHorizontalSelector<int>),
-                          matching: find.byType(GlassContainer),
-                        )
-                        .first,
+                  .widgetList<DecoratedBox>(
+                    find.descendant(
+                      of: find.byType(TpHorizontalSelector<int>),
+                      matching: find.byType(DecoratedBox),
+                    ),
                   )
-                  .shape
-              as LiquidRoundedSuperellipse;
+                  .map((box) => box.decoration)
+                  .whereType<ShapeDecoration>()
+                  .first;
+      final trackShape = trackDecoration.shape as LiquidRoundedSuperellipse;
+      (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
       expect(
         trackShape.side.color.a,
         state.increasedContrast ? greaterThan(0.5) : 0,
@@ -176,9 +177,8 @@ void main() {
       final scheme = Theme.of(
         tester.element(find.byType(AppleRootTabBar)),
       ).colorScheme;
-      // 選取膠囊是自己畫的實心填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor`
-      // 會被軌道的 LiquidGlassLayer 吃掉，模擬器實測逐位元零差異。因此兩種
-      // 模式收斂到同一個中性語意層，不再分支。
+      // 選取膠囊是自己畫的填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor` 會被
+      // 軌道的 LiquidGlassLayer 吃掉，模擬器實測改 alpha 逐位元零差異。
       final selectedDayFill = tester
           .widgetList<DecoratedBox>(
             find.descendant(
@@ -191,14 +191,28 @@ void main() {
           .where((deco) => deco.color != null)
           .single
           .color!;
-      (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
 
+      // 對照 iOS 26 電話 app 通話記錄實測：深色膠囊 #363636。
+      final selectedBase = isDark
+          ? scheme.surfaceContainerHighest
+          : scheme.surface;
       expect(
-        selectedDayFill,
-        scheme.surfaceContainerHighest,
-        reason: '日期選擇器的選取膠囊在兩種模式都是同一個中性語意層',
+        rgb(selectedDayFill),
+        rgb(selectedBase),
+        reason: '日期選擇器的選取膠囊是中性語意層，比軌更亮',
       );
-      expect(selectedDayFill.a, 1, reason: '半透明填色會被玻璃 shader 吃掉');
+      expect(
+        selectedDayFill.a,
+        expectsOpaqueGlass ? 1 : closeTo(isDark ? 0.90 : 0.92, 0.001),
+        reason: '一般模式半透明讓內容透出；無障礙 fallback 收斂為不透明',
+      );
+      expect(
+        find.descendant(
+          of: find.byType(TpHorizontalSelector<int>),
+          matching: find.byType(BackdropFilter),
+        ),
+        expectsOpaqueGlass ? findsNothing : findsOneWidget,
+      );
 
       if (expectsOpaqueGlass) {
         final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
