@@ -173,7 +173,7 @@ void main() {
         expect(
           tabBar.indicatorColor,
           scheme.surfaceContainerHigh.withValues(alpha: 1),
-          reason: 'root tab bar 的選取膠囊 fallback 應為中性語意層',
+          reason: '無障礙 fallback 仍收斂為中性不透明，避免大面積品牌色',
         );
       } else {
         expect(
@@ -187,21 +187,23 @@ void main() {
           reason: '品牌柔褐不得鋪成選取膠囊的背景',
         );
 
+        // root tab 是主導覽，選取指示用品牌強調色當底、字符反白（對齊 iOS 26
+        // 的 tab bar）。日期選擇器是篩選內容，維持中性語意層 —— 兩處刻意不同。
         final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
           rgb(tabBar.indicatorColor!),
-          rgb(scheme.surfaceContainerHighest),
-          reason: 'root tab bar 的選取膠囊與日期選擇器應是同一套中性語意層',
+          rgb(scheme.primary),
+          reason: 'root tab bar 的選取膠囊是品牌柔褐',
         );
         expect(
-          rgb(tabBar.indicatorColor!),
-          isNot(rgb(scheme.primary)),
-          reason: '品牌柔褐不得鋪成 root tab bar 的選取膠囊',
+          rgb(selectedDay.settings!.glassColor),
+          isNot(rgb(tabBar.indicatorColor!)),
+          reason: '日期選擇器維持中性，與 root tab 刻意不同',
         );
         expect(
           tabBar.selectedIconColor,
-          scheme.primary,
-          reason: 'root tab bar 的選取字符是品牌 tint',
+          scheme.onPrimary,
+          reason: '字符坐在柔褐底上要反白',
         );
       }
 
