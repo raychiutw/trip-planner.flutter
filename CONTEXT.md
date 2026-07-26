@@ -45,10 +45,10 @@ _避免_: title button、trip picker
 **tint**:
 品牌柔褐,唯一的品牌強調色。用於前景 —— 文字、字符、選取指示。不畫成框線。
 
-**唯一鋪成底色的例外:root tab bar 的選取膠囊。** iOS 26 的 tab bar 拿強調色當選取背景、
-字符反白(見「電話」app 的通話記錄分頁);root tab 是全 app 唯一的主導覽,選取指示需要
-最強的視覺分量。日期選擇器是篩選內容而非切換功能,維持中性語意層 —— 兩處刻意不同。
-見 `docs/adr/0003-brand-tint-for-root-tab-selection.md`。
+**沒有例外 —— tint 一律在前景。** 包含 root tab bar 的選取膠囊:膠囊本身走中性語意層,
+tint 上在字符與標籤。這與 iOS 26 一致 —— 「電話」app 通話記錄分頁的選取膠囊實測是
+`#363636`(中性灰,比容器亮約 20 階),字符與標籤才是系統藍。
+見 `docs/adr/0004-neutral-selection-surface-with-tinted-foreground.md`。
 _避免_: 主色、primary、強調色
 
 **中性語意層**:

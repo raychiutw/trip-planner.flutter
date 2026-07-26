@@ -1,6 +1,11 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0004-neutral-selection-surface-with-tinted-foreground.md
 ---
+
+> **已被 ADR-0004 取代。** 本 ADR 的核心事實論據 ——「iOS 26 電話 app 的 tab bar 選取態是
+> 強調色實心底 + 反白字符」—— 經像素實測為**錯誤**:選取膠囊是 `#363636` 中性灰,
+> 系統藍在字符與標籤上。詳見 ADR-0004。以下保留原文供追溯。
 
 # root tab bar 的選取膠囊改用品牌柔褐,日期選擇器維持中性
 
