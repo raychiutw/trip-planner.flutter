@@ -50,20 +50,33 @@ void main() {
     expect(openedMode, LaunchMode.externalApplication);
   });
 
-  test('entry URI uses coordinates first and name as fallback', () {
+  test('entry URI uses name first so Google Maps shows the place, not coordinates', () {
+    // 與 buildSearchUri 同一條規則:有名稱就用名稱 —— 帶座標當 query 時
+    // Google Maps 只會落一根無名的座標針,使用者看到的是一串數字。
     expect(
       GoogleMapsExternalLauncher.buildEntryUri(
         name: '沖繩美麗海水族館',
         latitude: 26.6942,
         longitude: 127.8778,
       ).queryParameters['query'],
-      '26.6942,127.8778',
+      '沖繩美麗海水族館',
     );
     expect(
       GoogleMapsExternalLauncher.buildEntryUri(
         name: '沖繩美麗海水族館',
       ).queryParameters['query'],
       '沖繩美麗海水族館',
+    );
+  });
+
+  test('entry URI falls back to coordinates when the name is blank', () {
+    expect(
+      GoogleMapsExternalLauncher.buildEntryUri(
+        name: '   ',
+        latitude: 26.6942,
+        longitude: 127.8778,
+      ).queryParameters['query'],
+      '26.6942,127.8778',
     );
   });
 }
