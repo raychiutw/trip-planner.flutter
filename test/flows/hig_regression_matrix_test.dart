@@ -154,17 +154,16 @@ void main() {
       // `BackdropFilter`，不再是 LiquidGlass —— shader 會把 tint 衰減到約
       // 14%，導覽配方的 tint 在淺色又是 `surface`（白），疊在白色頁面上等於
       // 無色，實測軌與頁面同為 #FFFFFF。
-      final trackDecoration =
-          tester
-                  .widgetList<DecoratedBox>(
-                    find.descendant(
-                      of: find.byType(TpHorizontalSelector<int>),
-                      matching: find.byType(DecoratedBox),
-                    ),
-                  )
-                  .map((box) => box.decoration)
-                  .whereType<ShapeDecoration>()
-                  .first;
+      final trackDecoration = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(
+              of: find.byType(TpHorizontalSelector<int>),
+              matching: find.byType(DecoratedBox),
+            ),
+          )
+          .map((box) => box.decoration)
+          .whereType<ShapeDecoration>()
+          .first;
       final trackShape = trackDecoration.shape as LiquidRoundedSuperellipse;
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
       expect(
