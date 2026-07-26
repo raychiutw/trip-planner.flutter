@@ -54,8 +54,8 @@ jobs:
         # 排除 Patrol 產生的 bundle：它由 `patrol build` 重新產生，格式不受我們
         # 控制，留在檢查範圍內會讓每一支 PR 的 CI 都紅（與改動內容無關）。
         run: >-
-          dart format --output=none --set-exit-if-changed
-          $(git ls-files '*.dart' ':!:patrol_test/test_bundle.dart')
+          git ls-files -z '*.dart' ':!:patrol_test/test_bundle.dart'
+          | xargs -0 dart format --output=none --set-exit-if-changed
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
