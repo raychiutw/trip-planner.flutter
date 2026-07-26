@@ -10,6 +10,13 @@ abstract final class TpSystemColorsLight {
   static const background = Color(0xFFFFFFFF);
   static const secondary = Color(0xFFF2F2F7);
   static const tertiary = Color(0xFFE5E5EA);
+
+  /// iOS systemGray4 —— 比 [tertiary] 再高一階的填充層。
+  ///
+  /// 選取膠囊、骨架屏這類「要浮在容器之上」的填充需要它。缺這一階時
+  /// `ColorScheme.surfaceContainerHighest` 會回退成 `surface`（純白／純黑），
+  /// 膠囊因此比容器更暗或幾乎同色，等於隱形。
+  static const quaternary = Color(0xFFD1D1D6);
   static const hover = Color(0x0F000000);
 
   static const label = Color(0xFF000000);
@@ -36,6 +43,9 @@ abstract final class TpSystemColorsDark {
   static const background = Color(0xFF000000);
   static const secondary = Color(0xFF1C1C1E);
   static const tertiary = Color(0xFF2C2C2E);
+
+  /// iOS systemGray4 —— 比 [tertiary] 再高一階的填充層。見淺色版說明。
+  static const quaternary = Color(0xFF3A3A3C);
   static const hover = Color(0x1FFFFFFF);
 
   static const label = Color(0xFFFFFFFF);

@@ -26,6 +26,7 @@ abstract final class AppTheme {
       surface: TpSystemColorsLight.background,
       surfaceContainerLow: TpSystemColorsLight.secondary,
       surfaceContainerHigh: TpSystemColorsLight.tertiary,
+      surfaceContainerHighest: TpSystemColorsLight.quaternary,
       onSurface: TpSystemColorsLight.label,
       onSurfaceVariant: highContrast
           ? const Color(0xFF3C3C43)
@@ -71,6 +72,7 @@ abstract final class AppTheme {
       surface: TpSystemColorsDark.background,
       surfaceContainerLow: TpSystemColorsDark.secondary,
       surfaceContainerHigh: TpSystemColorsDark.tertiary,
+      surfaceContainerHighest: TpSystemColorsDark.quaternary,
       onSurface: TpSystemColorsDark.label,
       onSurfaceVariant: highContrast
           ? const Color(0xFFEBEBF5)
