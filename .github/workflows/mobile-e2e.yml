@@ -405,6 +405,29 @@ jobs:
             "gs://${FIREBASE_TEST_RESULTS_BUCKET}/${TEST_LAB_RESULTS_DIR}" \
             test-lab-results/ios
 
+      # 裝置整台連不到外網時，地圖沒有底圖，POI 斷言必然失敗 —— 但失敗訊息會
+      # 長得跟真正的功能故障一模一樣（#104，run 30178928266 就是這樣被誤讀）。
+      # 讓 log 自己說明這一點。
+      #
+      # 判別式刻意不用某個錯誤字串（成功時本來就 0 命中，等於恆真），而是問
+      # 「整場有沒有任何一筆對外連線成功」。
+      - name: Flag iOS network-level infrastructure failure
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          syslog=$(find test-lab-results/ios -name syslog.txt | head -1)
+          if [[ -z "$syslog" ]]; then
+            echo "No syslog captured; skipping network triage."
+            exit 0
+          fi
+          dns_failures=$(grep -c 'SlowWiFiDnsFailure' "$syslog" || true)
+          timeouts=$(grep -c -- '-1001' "$syslog" || true)
+          echo "iOS device network triage: SlowWiFiDnsFailure=${dns_failures} timeout(-1001)=${timeouts}"
+          if (( dns_failures > 20 && timeouts > 20 )); then
+            echo "::warning::iOS Test Lab device appears to have had no working outbound network (DNS failures=${dns_failures}, -1001 timeouts=${timeouts}). Map tiles cannot load, so any Google POI assertion failure in this run is an infrastructure failure, not a product defect. See issue #104."
+          fi
+
       - name: Sanitize iOS Test Lab evidence
         id: sanitize_ios_evidence
         if: ${{ always() }}
