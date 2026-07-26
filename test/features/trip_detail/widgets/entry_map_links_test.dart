@@ -49,7 +49,9 @@ void main() {
     await tester.tap(find.text('Google'));
     await tester.pump();
     expect(opened?.host, 'www.google.com');
-    expect(opened?.queryParameters['query'], '26.6942,127.8778');
+    // 名稱優先：座標當 query 時 Google Maps 只落一根無名的針，使用者看到的
+    // 是一串數字而不是景點。
+    expect(opened?.queryParameters['query'], '沖繩美麗海水族館');
   });
 
   testWidgets('iOS 顯示 Google 與 Apple，Apple app 失敗後改用網頁', (tester) async {
