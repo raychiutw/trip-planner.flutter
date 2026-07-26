@@ -164,9 +164,16 @@ void main() {
     });
 
     test('release CI enforces format, analyzer and the smoke suite', () {
+      // 格式檢查排除 Patrol 產生的 bundle —— 它由 `patrol build` 重新產生，
+      // 未通過 `dart format`，留在範圍內會讓每一支 PR 的 CI 都紅。這裡守住
+      // 「仍然有檢查、且只排除那一個檔」。
       expect(
         releaseWorkflow,
-        contains('dart format --output=none --set-exit-if-changed .'),
+        contains('dart format --output=none --set-exit-if-changed'),
+      );
+      expect(
+        releaseWorkflow,
+        contains("git ls-files -z '*.dart' ':!:patrol_test/test_bundle.dart'"),
       );
       expect(releaseWorkflow, contains('flutter analyze --no-fatal-infos'));
       expect(
