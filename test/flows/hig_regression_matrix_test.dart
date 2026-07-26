@@ -228,25 +228,30 @@ void main() {
           reason: '品牌柔褐不得鋪成選取膠囊的背景',
         );
 
-        // root tab 是主導覽，選取指示用品牌強調色當底、字符反白（對齊 iOS 26
-        // 的 tab bar）。日期選擇器是篩選內容，維持中性語意層 —— 兩處刻意不同。
+        // 選取指示一律「中性底 + tint 前景」。iOS 26 電話 app 實測:選取膠囊
+        // 是 #363636 中性灰(比容器亮約 20 階),系統藍在字符與標籤上 ——
+        // 強調色在前景,不在背景(ADR-0004 取代 ADR-0003)。
         final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
           rgb(tabBar.indicatorColor!),
-          rgb(scheme.primary),
-          reason: 'root tab bar 的選取膠囊是品牌柔褐',
-        );
-        expect(
-          rgb(selectedDayFill),
-          isNot(rgb(tabBar.indicatorColor!)),
-          reason: '日期選擇器維持中性，與 root tab 刻意不同',
+          isNot(rgb(scheme.primary)),
+          reason: '品牌柔褐不得鋪成 root tab 選取膠囊的背景',
         );
         expect(
           tabBar.selectedIconColor,
-          scheme.onPrimary,
-          reason: '字符坐在柔褐底上要反白',
+          scheme.primary,
+          reason: '選取字符走品牌 tint,不是坐在柔褐上的 onPrimary',
         );
       }
+
+      // 未選字符與標籤同色。實測我們先前 icon #919197(中灰)、label
+      // #F9F9FB(近白),同一顆 tab 內不一致;Apple 兩者都是近白。
+      final rootBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+      expect(
+        rootBar.unselectedIconColor,
+        rootBar.unselectedLabelColor,
+        reason: '未選的字符與標籤必須同色',
+      );
 
       // 未選取態也是實心字符：兩態同字符、靠 tint 區分，不做 outline↔filled 切換。
       final rootTabs = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
