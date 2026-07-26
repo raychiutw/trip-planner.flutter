@@ -218,7 +218,7 @@ void main() {
     });
   });
 
-  testWidgets('工具列玻璃的邊緣由材質產生，只有提高對比才描一條實心邊', (tester) async {
+  testWidgets('工具列玻璃一般模式描細邊，提高對比才換成明顯實心邊', (tester) async {
     for (final highContrast in [false, true]) {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(
@@ -256,7 +256,11 @@ void main() {
         ),
       );
 
-      final matcher = highContrast ? greaterThan(0.5) : 0;
+      // 一般模式是對齊 Apple 強度的細邊(+30),不是無邊 —— 實測材質
+      // 不會自己產生邊緣,詳見 `tpGlassEdgeColor` 的註解。
+      final matcher = highContrast
+          ? greaterThan(0.5)
+          : closeTo(0.12, 0.001);
       final reason = 'highContrast=$highContrast';
 
       // 圓鈕的描邊是可覆寫的預設值。

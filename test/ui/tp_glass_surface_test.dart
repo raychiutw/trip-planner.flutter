@@ -157,8 +157,10 @@ void main() {
     );
     expect(glass.settings?.blur, 22);
     expect(shape.borderRadius, 28);
-    // 一般模式不描邊 —— 邊緣改由材質的環境邊緣光與高光產生。
-    expect(shape.side.color.a, 0);
+    // 一般模式描一條**細邊**。原本相信「移除描邊後由材質接手」,模擬器實測
+    // 材質並沒有接手:不論背後純黑或壓在內容上,邊緣與填色的差都是 0,
+    // 調 ambientRim 從 0.70 到 0.07 五組值也全是 0。Apple 是 +30。
+    expect(shape.side.color.a, closeTo(0.12, 0.001));
     expect(glass.settings!.ambientRim, greaterThan(0));
     expect(glass.settings!.glowIntensity, greaterThan(0));
   });
@@ -180,8 +182,10 @@ void main() {
       glass.settings?.glassColor,
       TpSystemColorsDark.secondary.withValues(alpha: 0.68),
     );
-    // 一般模式不描邊；亮邊改由 ambientRim／glowIntensity 沿周長算出來。
-    expect(shape.side.color.a, 0);
+    // 一般模式描一條細邊(見上)。深色由 onSurface(白)導出偏亮的邊,
+    // 淺色由 onSurface(黑)導出偏暗的邊 —— 淺色填色本來就接近白,
+    // 再加白邊等於沒有。
+    expect(shape.side.color.a, closeTo(0.12, 0.001));
     expect(glass.settings!.ambientRim, greaterThan(0));
     expect(glass.settings!.glowIntensity, greaterThan(0));
   });

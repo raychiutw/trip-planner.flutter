@@ -142,12 +142,13 @@ void main() {
         );
       }
 
-      // 一般模式不描邊；只有提高對比才補一條可見實心邊。
+      // 一般模式描一條細邊；提高對比才換成明顯的實心邊。原本相信「移除描邊
+      // 後由材質接手」，模擬器實測材質並沒有接手（差值恆為 0），Apple 是 +30。
       final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;
       expect(
         headerShape.side.color.a,
-        state.increasedContrast ? greaterThan(0.5) : 0,
-        reason: '一般模式的邊緣應由材質產生，不是畫上去的',
+        state.increasedContrast ? greaterThan(0.5) : closeTo(0.12, 0.001),
+        reason: '一般模式要有一條對齊 Apple 強度的細邊',
       );
 
       // 日期選擇器的軌道走同一條規則。軌本身改成半透明填色 +
@@ -168,7 +169,7 @@ void main() {
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
       expect(
         trackShape.side.color.a,
-        state.increasedContrast ? greaterThan(0.5) : 0,
+        state.increasedContrast ? greaterThan(0.5) : closeTo(0.12, 0.001),
         reason: '選擇器軌道的描邊規則應與導覽 chrome 一致',
       );
 
