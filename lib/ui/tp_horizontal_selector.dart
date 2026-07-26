@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
 import 'tp_scope_menu.dart';
@@ -20,13 +22,11 @@ class TpHorizontalSelector<T> extends StatefulWidget {
     required this.value,
     required this.options,
     required this.onSelected,
-    this.platformViewBackdrop = false,
   });
 
   final T value;
   final List<TpScopeOption<T>> options;
   final ValueChanged<T> onSelected;
-  final bool platformViewBackdrop;
 
   /// 選擇器依目前 Dynamic Type 實際行高增高，且永遠保留 44pt 觸控高度。
   static double preferredHeight(BuildContext context) {
@@ -47,6 +47,8 @@ class TpHorizontalSelector<T> extends StatefulWidget {
 class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   // 文字兩側的呼吸空間（含外層 3pt padding），讓膠囊不貼著字。
   static const _optionInset = 28.0;
+  // 與導覽 chrome 同一個模糊半徑。
+  static const _trackBlur = 16.0;
   static const _iconSize = 14.0;
   final ScrollController _controller = ScrollController();
   final FocusNode _focusNode = FocusNode(debugLabel: 'TpHorizontalSelector');
@@ -139,57 +141,76 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       'TpHorizontalSelector only accepts selection options.',
     );
     final theme = Theme.of(context);
-    final trackSettings = tpNavigationGlassSettings(
-      context,
-      recipe: widget.platformViewBackdrop
-          ? TpNavigationGlassRecipe.platformView
-          : TpNavigationGlassRecipe.regular,
-    );
-    // 選取膠囊走中性語意層，比 track 高一階讓它浮出來；品牌色只留給前景。
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // iOS `UISegmentedControl`：半透明 systemGray6 軌 + 比軌更亮的膠囊，
+    // 靠「浮起」表達選取。對照 iOS 26 電話 app 的通話記錄實測：深色下軌是
+    // #141414（黑底上）、膠囊 #363636，背後有內容時膠囊會透出約 8 階。
     //
-    // **是自己畫的實心填色，不是玻璃**：軌道用 `useOwnLayer: true` 建立
-    // LiquidGlassLayer，巢狀在裡面的子玻璃會被合併進母層，子層自己的
-    // `glassColor` 不生效。模擬器實測選取態與未選在淺色下都是 #FFFFFF、
-    // 深色是 #080808 vs #040404，改子層 alpha 逐位元零差異。Apple 的分段
-    // 控制項 thumb 本來就是實心材質，不是玻璃。
-    final selectedFill = theme.colorScheme.surfaceContainerHighest;
+    // **不走 LiquidGlass shader**：shader 會把 tint 衰減到約 14%，顏色不可
+    // 預測 —— 導覽配方的 tint 在淺色是 `surface`（白），疊在白色頁面上等於
+    // 無色，實測軌與頁面同為 #FFFFFF。巢狀在玻璃層裡的子玻璃顏色又會被母層
+    // 吃掉，選取膠囊完全畫不出來。改用 `BackdropFilter` + 半透明填色：一樣
+    // 是真的模糊與內容透出，但色值完全可控。
+    final opaque =
+        MediaQuery.highContrastOf(context) ||
+        AppAccessibilityScope.reduceTransparencyOf(context);
+    final trackFill = opaque
+        ? scheme.surfaceContainerLow
+        : scheme.surfaceContainerLow.withValues(alpha: isDark ? 0.72 : 0.80);
+    final selectedBase = isDark
+        ? scheme.surfaceContainerHighest
+        : scheme.surface;
+    final selectedFill = opaque
+        ? selectedBase
+        : selectedBase.withValues(alpha: isDark ? 0.90 : 0.92);
     final height = TpHorizontalSelector.preferredHeight(context);
+    final trackShape = LiquidRoundedSuperellipse(
+      borderRadius: height / 2,
+      // 一般模式不描邊；只有「提高對比」才補一條可見實心邊。
+      side: BorderSide(color: tpGlassEdgeColor(context)),
+    );
+    Widget track = DecoratedBox(
+      decoration: ShapeDecoration(color: trackFill, shape: trackShape),
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final option in widget.options)
+              _SelectorOption<T>(
+                option: option,
+                selected: option.value == widget.value,
+                width: _optionWidth(option),
+                height: height,
+                selectedFill: selectedFill,
+                // 淺色的白膠囊需要一點陰影才浮得起來；深色靠亮度差即可。
+                selectedShadow: !isDark,
+                accentColor: scheme.primary,
+                onTap: () {
+                  _focusNode.requestFocus();
+                  widget.onSelected(option.value);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!opaque) {
+      track = BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: _trackBlur, sigmaY: _trackBlur),
+        child: track,
+      );
+    }
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
       child: SizedBox(
         height: height,
-        child: GlassContainer(
-          useOwnLayer: true,
-          quality: GlassQuality.standard,
-          platformViewBackdrop: widget.platformViewBackdrop,
-          clipBehavior: Clip.antiAlias,
-          shape: LiquidRoundedSuperellipse(
-            borderRadius: height / 2,
-            side: BorderSide(color: tpGlassEdgeColor(context)),
-          ),
-          settings: trackSettings,
-          child: SingleChildScrollView(
-            controller: _controller,
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final option in widget.options)
-                  _SelectorOption<T>(
-                    option: option,
-                    selected: option.value == widget.value,
-                    width: _optionWidth(option),
-                    height: height,
-                    selectedFill: selectedFill,
-                    accentColor: theme.colorScheme.primary,
-                    onTap: () {
-                      _focusNode.requestFocus();
-                      widget.onSelected(option.value);
-                    },
-                  ),
-              ],
-            ),
-          ),
+        child: ClipPath(
+          clipper: ShapeBorderClipper(shape: trackShape),
+          child: track,
         ),
       ),
     );
@@ -220,6 +241,7 @@ class _SelectorOption<T> extends StatelessWidget {
     required this.width,
     required this.height,
     required this.selectedFill,
+    required this.selectedShadow,
     required this.accentColor,
     required this.onTap,
   });
@@ -229,6 +251,7 @@ class _SelectorOption<T> extends StatelessWidget {
   final double width;
   final double height;
   final Color selectedFill;
+  final bool selectedShadow;
   final Color accentColor;
   final VoidCallback onTap;
 
@@ -257,6 +280,15 @@ class _SelectorOption<T> extends StatelessWidget {
                       shape: LiquidRoundedSuperellipse(
                         borderRadius: (height - 10) / 2,
                       ),
+                      shadows: selectedShadow
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x1A000000),
+                                blurRadius: 3,
+                                offset: Offset(0, 1),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Center(
                       child: _OptionContent(option: option, color: color),

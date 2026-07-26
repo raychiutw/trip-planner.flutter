@@ -98,7 +98,6 @@ void main() {
     final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
     const consumers = [
       'lib/features/shell/apple_root_tab_bar.dart',
-      'lib/ui/tp_horizontal_selector.dart',
       'lib/ui/tp_root_scaffold.dart',
     ];
 
@@ -109,6 +108,16 @@ void main() {
       expect(source, contains('tpNavigationGlassSettings('));
       expect(source, isNot(contains('LiquidGlassSettings(')));
     }
+
+    // 日期選擇器刻意**不是**導覽玻璃的消費者：LiquidGlass shader 會把 tint
+    // 衰減到約 14%，而導覽配方的 tint 在淺色是 `surface`（白），疊在白色頁面
+    // 上等於無色 —— 實測軌與頁面同為 #FFFFFF。它改用自己畫的半透明填色 +
+    // `BackdropFilter`，色值可控。仍然不得自行組裝 glass settings。
+    final selector = File(
+      'lib/ui/tp_horizontal_selector.dart',
+    ).readAsStringSync();
+    expect(selector, isNot(contains('tpNavigationGlassSettings(')));
+    expect(selector, isNot(contains('LiquidGlassSettings(')));
   });
 
   test('root and routed headers share title and action geometry owners', () {

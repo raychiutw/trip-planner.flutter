@@ -788,7 +788,6 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
           right: TpSpacing.s3,
           child: TpHorizontalSelector<int>(
             key: const ValueKey('trip-map-day-selector'),
-            platformViewBackdrop: true,
             value: _selectedTabIndex,
             options: [
               TpScopeOption(
