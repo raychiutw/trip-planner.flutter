@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
 Widget _app(Widget home, {MediaQueryData? mediaQueryData}) {
@@ -160,19 +161,42 @@ void main() {
     );
   });
 
-  testWidgets('root header has one glass surface, two actions and account', (
-    tester,
-  ) async {
+  testWidgets('root header 是各自獨立的膠囊，不是一整片玻璃板', (tester) async {
+    // iOS 26 的頂部只有按鈕群是玻璃，標題與背景之間沒有玻璃板
+    // （WWDC25 明講玻璃不取樣玻璃）。標題自己包一顆膠囊，動作與頭像
+    // 各包一顆，中間的空隙直接透出內容。依據見 ADR-0004。
     await tester.pumpWidget(_app(_root(actionCount: 2)));
 
     final header = find.byKey(const ValueKey('tp-root-glass-header'));
+    final titleCapsule = find.byKey(const ValueKey('tp-root-header-title'));
+    expect(find.descendant(of: header, matching: titleCapsule), findsOneWidget);
+    // 標題自己坐在一顆玻璃膠囊裡。
     expect(
-      find.descendant(
-        of: header,
-        matching: find.byKey(const ValueKey('tp-glass-surface')),
-      ),
+      find.ancestor(of: titleCapsule, matching: find.byType(TpGlassSurface)),
       findsOneWidget,
+      reason: '標題要有自己的膠囊',
     );
+    // **玻璃不疊玻璃**：頭像與動作本身就是玻璃圓鈕，不得再落在玻璃板裡。
+    expect(
+      find.ancestor(
+        of: find.byType(TpAccountAvatarButton),
+        matching: find.byType(TpGlassSurface),
+      ),
+      findsNothing,
+      reason: '頭像不得包在玻璃板裡（玻璃不取樣玻璃）',
+    );
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('tp-root-header-action-0')),
+        matching: find.byType(TpGlassSurface),
+      ),
+      findsNothing,
+      reason: '動作不得包在玻璃板裡',
+    );
+    // 標題膠囊與頭像之間要留出空隙 —— 那是內容透出來的地方。
+    final titleRight = tester.getRect(titleCapsule).right;
+    final avatarLeft = tester.getRect(find.byType(TpAccountAvatarButton)).left;
+    expect(avatarLeft, greaterThan(titleRight), reason: '膠囊之間要有空隙');
     expect(
       find.byKey(const ValueKey('tp-root-header-action-0')),
       findsOneWidget,
@@ -290,7 +314,10 @@ void main() {
     expect(account.size, const Size(44, 44));
     expect(second.left - first.right, 8);
     expect(account.left - second.right, 8);
-    expect(header.right - account.right, 16);
+    // 拆成獨立膠囊後，右側動作直接貼齊 header 的內容邊界 —— 原本那 16pt
+    // 是玻璃板自己的內距，板子沒了自然歸零。頁面邊距仍由 scaffold 的
+    // `horizontalInset` 提供。
+    expect(header.right - account.right, 0);
     expect(find.text('京都五日行'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

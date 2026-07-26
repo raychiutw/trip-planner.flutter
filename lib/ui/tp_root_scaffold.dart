@@ -90,71 +90,85 @@ class TpRootGlassHeader extends StatelessWidget {
               tpActionsIncludeMoreMenu(config.actions)),
       'Root headers support one direct action; extra actions use More.',
     );
+    // **每個控制項各自成膠囊，不是一整片玻璃板。**
+    //
+    // iOS 26 的頂部只有按鈕群是玻璃，標題與背景之間沒有玻璃板 —— WWDC25
+    // 明講玻璃不取樣玻璃。原本這裡是一整片 64pt 的玻璃板，裡面又塞了標題與
+    // 數顆玻璃圓鈕（動作與頭像本來就各自是 `TpToolbarGlassButton`），
+    // 玻璃疊玻璃。#111 把這一條列為「本 app 與 iOS 26 觀感差距最大的結構
+    // 決定」並暫時擱置，ADR-0004 決定處理。
+    //
+    // 拆開後標題自己包一顆膠囊（對照 iOS 26「訊息」app 的
+    // `roybee903@icl… ›`），動作與頭像維持各自的圓鈕，中間的空隙直接透出
+    // 底下的內容。
     return SizedBox(
       key: const ValueKey('tp-root-glass-header'),
       height: TpRootGeometry.headerHeight,
-      child: KeyedSubtree(
-        key: const ValueKey('tp-glass-surface'),
-        child: TpGlassSurface(
-          platformViewBackdrop: config.platformViewBackdrop,
-          glassSettings: tpNavigationGlassSettings(
-            context,
-            recipe: config.platformViewBackdrop
-                ? TpNavigationGlassRecipe.platformView
-                : TpNavigationGlassRecipe.regular,
-          ),
-          borderRadius: const BorderRadius.all(Radius.circular(32)),
-          padding: const EdgeInsets.symmetric(
-            horizontal: TpRootGeometry.headerContentInset,
-          ),
-          // 玻璃上的字符與文字依底下內容亮度切換，而不是依 app 的明暗模式。
-          child: TpBarForeground(
-            onMedia: config.platformViewBackdrop,
-            child: Row(
-              children: [
-                if (config.leading != null) ...[
-                  SizedBox.square(
-                    key: const ValueKey('tp-root-header-leading'),
-                    dimension: TpSpacing.tapMin,
-                    child: config.leading,
-                  ),
-                  const SizedBox(width: TpSpacing.s2),
-                ],
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
+      child: TpBarForeground(
+        onMedia: config.platformViewBackdrop,
+        child: Row(
+          children: [
+            if (config.leading != null) ...[
+              SizedBox.square(
+                key: const ValueKey('tp-root-header-leading'),
+                dimension: TpSpacing.tapMin,
+                child: config.leading,
+              ),
+              const SizedBox(width: TpSpacing.s2),
+            ],
+            // `Expanded` + `Align`：膠囊保持自然寬度靠左，剩下的空間交給
+            // 右側動作。不能用 `Flexible` 搭 `Spacer` —— 兩者都有 flex，會
+            // 平分剩餘空間，動作就靠不到右邊。
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: KeyedSubtree(
+                  key: const ValueKey('tp-glass-surface'),
+                  child: TpGlassSurface(
+                    platformViewBackdrop: config.platformViewBackdrop,
+                    glassSettings: tpNavigationGlassSettings(
+                      context,
+                      recipe: config.platformViewBackdrop
+                          ? TpNavigationGlassRecipe.platformView
+                          : TpNavigationGlassRecipe.regular,
+                    ),
+                    borderRadius: const BorderRadius.all(Radius.circular(32)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TpRootGeometry.headerContentInset,
+                      vertical: TpSpacing.s2,
+                    ),
                     child: TpHeaderTitle(
                       key: const ValueKey('tp-root-header-title'),
                       child: config.title,
                     ),
                   ),
                 ),
-                const SizedBox(width: TpSpacing.s2),
-                TpHeaderActionRow(
-                  children: [
-                    for (var index = 0; index < config.actions.length; index++)
-                      if (config.actions[index] is TpToolbarTextButton)
-                        KeyedSubtree(
-                          key: ValueKey('tp-root-header-action-$index'),
-                          child: config.actions[index],
-                        )
-                      else
-                        SizedBox(
-                          key: ValueKey('tp-root-header-action-$index'),
-                          // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
-                          width: TpToolbarSlots.slotWidth(
-                            context,
-                            config.actions[index],
-                          ),
-                          height: TpSpacing.tapMin,
-                          child: config.actions[index],
-                        ),
-                    const TpAccountAvatarButton(),
-                  ],
-                ),
+              ),
+            ),
+            const SizedBox(width: TpSpacing.s2),
+            TpHeaderActionRow(
+              children: [
+                for (var index = 0; index < config.actions.length; index++)
+                  if (config.actions[index] is TpToolbarTextButton)
+                    KeyedSubtree(
+                      key: ValueKey('tp-root-header-action-$index'),
+                      child: config.actions[index],
+                    )
+                  else
+                    SizedBox(
+                      key: ValueKey('tp-root-header-action-$index'),
+                      // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
+                      width: TpToolbarSlots.slotWidth(
+                        context,
+                        config.actions[index],
+                      ),
+                      height: TpSpacing.tapMin,
+                      child: config.actions[index],
+                    ),
+                const TpAccountAvatarButton(),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
