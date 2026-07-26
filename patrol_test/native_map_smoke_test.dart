@@ -39,6 +39,7 @@ void main() {
     $,
   ) async {
     await dismissStaleSpringBoardTutorial($);
+    var observedMapTaps = 0;
     final ready = Completer<void>();
     final selectedPoi = Completer<GoogleMapPoiSelection>();
     final controller = TripMapController();
@@ -51,6 +52,13 @@ void main() {
         },
         onGooglePoiSelected: (poi) {
           if (!selectedPoi.isCompleted) selectedPoi.complete(poi);
+        },
+        onMapTapped: (point) {
+          observedMapTaps += 1;
+          debugPrint(
+            'Tripline map tap #$observedMapTaps -> '
+            '${point.latitude},${point.longitude}',
+          );
         },
       ),
     );
@@ -156,10 +164,16 @@ void main() {
       }
       if (poi != null) break;
     }
+    // 分流診斷：這兩種失敗的處置完全不同，訊息必須分得開。
     expect(
       poi,
       isNotNull,
-      reason: 'No native Google POI callback was observed near map center.',
+      reason: observedMapTaps == 0
+          ? '原生觸控未抵達 GMSMapView：${_poiTapOffsets.length} 次 tap 沒有任何一次'
+                '回報 onMapClicked。這是觸控注入或 platform view 的問題。'
+          : '觸控有抵達地圖（onMapClicked $observedMapTaps 次）但沒有 POI '
+                'callback：底圖或 POI 資料不可用，裝置很可能連不到 Google map '
+                'tiles（檢查 syslog 的 DNS／-1001 逾時）。',
     );
     final selected = poi!;
     expect(selected.placeId, isNotEmpty);
@@ -173,11 +187,13 @@ class _NativeMapSmokeHarness extends StatefulWidget {
     required this.controller,
     required this.onReady,
     required this.onGooglePoiSelected,
+    required this.onMapTapped,
   });
 
   final TripMapController controller;
   final VoidCallback onReady;
   final ValueChanged<GoogleMapPoiSelection> onGooglePoiSelected;
+  final ValueChanged<TripMapPoint> onMapTapped;
 
   @override
   State<_NativeMapSmokeHarness> createState() => _NativeMapSmokeHarnessState();
@@ -339,6 +355,11 @@ class _NativeMapSmokeHarnessState extends State<_NativeMapSmokeHarness> {
                         }
                       },
                       onGooglePoiSelected: widget.onGooglePoiSelected,
+                      // `onMapClicked` 是幾何投影，不需要圖磚也會回報 —— 用它
+                      // 區分「原生觸控沒抵達 GMSMapView」與「觸控到了但沒有
+                      // POI 資料」。這兩者在只驗 poi != null 時長得一模一樣
+                      // （#104，run 30178928266 就是後者被誤讀成前者）。
+                      onTap: widget.onMapTapped,
                     ),
                   ),
                 ),
