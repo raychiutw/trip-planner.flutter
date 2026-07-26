@@ -311,60 +311,55 @@ void main() {
     expect(selected, 1);
   });
 
-  testWidgets(
-    'TpHorizontalSelector 使用單一半透明軌 + 一塊選取填色與 13pt DAY 字級',
-    (tester) async {
-      var selected = 0;
-      await tester.pumpWidget(
-        app(
-          Scaffold(
-            body: TpHorizontalSelector<int>(
-              key: const ValueKey('day-selector'),
-              value: selected,
-              options: const [
-                TpScopeOption(
-                  value: 0,
-                  label: '總覽',
-                  key: ValueKey('day-overview'),
-                ),
-                TpScopeOption(
-                  value: 1,
-                  label: 'DAY 01',
-                  key: ValueKey('day-1'),
-                ),
-              ],
-              onSelected: (value) => selected = value,
-            ),
+  testWidgets('TpHorizontalSelector 使用單一半透明軌 + 一塊選取填色與 13pt DAY 字級', (
+    tester,
+  ) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpHorizontalSelector<int>(
+            key: const ValueKey('day-selector'),
+            value: selected,
+            options: const [
+              TpScopeOption(
+                value: 0,
+                label: '總覽',
+                key: ValueKey('day-overview'),
+              ),
+              TpScopeOption(value: 1, label: 'DAY 01', key: ValueKey('day-1')),
+            ],
+            onSelected: (value) => selected = value,
           ),
         ),
-      );
+      ),
+    );
 
-      final selector = find.byKey(const ValueKey('day-selector'));
-      // 軌與選取膠囊都是自己畫的半透明填色 + `BackdropFilter` —— LiquidGlass
-      // shader 會把 tint 衰減到約 14%，巢狀玻璃的顏色又會被母層吃掉，兩者
-      // 都讓顏色變得不可控。
-      expect(selectedPillFill(tester, selector).a, closeTo(0.92, 0.001));
-      expect(
-        find.descendant(of: selector, matching: find.byType(BackdropFilter)),
-        findsOneWidget,
-        reason: '半透明軌要真的模糊背後內容',
-      );
-      expect(
-        find.descendant(of: selector, matching: find.byType(GlassButton)),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: selector, matching: find.byType(GlassContainer)),
-        findsNothing,
-      );
-      expect(tester.getSize(selector).height, TpSpacing.tapMin);
-      expect(find.text('DAY 01'), findsOneWidget);
-      expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
-      expect(find.byKey(const ValueKey('tp-selector-divider-0')), findsNothing);
-      await tester.tap(find.bySemanticsLabel('DAY 01'));
-      expect(selected, 1);
-    },
-  );
+    final selector = find.byKey(const ValueKey('day-selector'));
+    // 軌與選取膠囊都是自己畫的半透明填色 + `BackdropFilter` —— LiquidGlass
+    // shader 會把 tint 衰減到約 14%，巢狀玻璃的顏色又會被母層吃掉，兩者
+    // 都讓顏色變得不可控。
+    expect(selectedPillFill(tester, selector).a, closeTo(0.92, 0.001));
+    expect(
+      find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
+      reason: '半透明軌要真的模糊背後內容',
+    );
+    expect(
+      find.descendant(of: selector, matching: find.byType(GlassButton)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: selector, matching: find.byType(GlassContainer)),
+      findsNothing,
+    );
+    expect(tester.getSize(selector).height, TpSpacing.tapMin);
+    expect(find.text('DAY 01'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
+    expect(find.byKey(const ValueKey('tp-selector-divider-0')), findsNothing);
+    await tester.tap(find.bySemanticsLabel('DAY 01'));
+    expect(selected, 1);
+  });
 
   testWidgets('bar 字符依底下內容亮度切換，媒體背景加暗化層', (tester) async {
     for (final isDark in [false, true]) {
@@ -838,11 +833,7 @@ void main() {
         .whereType<ShapeDecoration>()
         .where((deco) => deco.color != null)
         .toList();
-    expect(
-      fills,
-      isNotEmpty,
-      reason: '選取態要有一層自己畫的 ShapeDecoration 填色',
-    );
+    expect(fills, isNotEmpty, reason: '選取態要有一層自己畫的 ShapeDecoration 填色');
     expect(fills.single.color, scheme.surface.withValues(alpha: 0.92));
   });
 
@@ -869,19 +860,18 @@ void main() {
     await tester.pumpAndSettle();
 
     final scheme = AppTheme.dark().colorScheme;
-    final pill =
-        tester
-                .widgetList<DecoratedBox>(
-                  find.descendant(
-                    of: find.byKey(const ValueKey('dark-day-1')),
-                    matching: find.byType(DecoratedBox),
-                  ),
-                )
-                .map((box) => box.decoration)
-                .whereType<ShapeDecoration>()
-                .where((deco) => deco.color != null)
-                .single
-                .color!;
+    final pill = tester
+        .widgetList<DecoratedBox>(
+          find.descendant(
+            of: find.byKey(const ValueKey('dark-day-1')),
+            matching: find.byType(DecoratedBox),
+          ),
+        )
+        .map((box) => box.decoration)
+        .whereType<ShapeDecoration>()
+        .where((deco) => deco.color != null)
+        .single
+        .color!;
     expect(
       (pill.r, pill.g, pill.b),
       (
