@@ -163,7 +163,7 @@ void main() {
       );
     });
 
-    test('release CI enforces format, analyzer and the smoke suite', () {
+    test('release CI enforces format, analyzer and the full test suite', () {
       // 格式檢查排除 Patrol 產生的 bundle —— 它由 `patrol build` 重新產生，
       // 未通過 `dart format`，留在範圍內會讓每一支 PR 的 CI 都紅。這裡守住
       // 「仍然有檢查、且只排除那一個檔」。
@@ -176,17 +176,17 @@ void main() {
         contains("git ls-files -z '*.dart' ':!:patrol_test/test_bundle.dart'"),
       );
       expect(releaseWorkflow, contains('flutter analyze --no-fatal-infos'));
+      // CI 要跑**整套**測試，不是挑幾個檔。先前只跑三個檔，1643 條裡絕大多數
+      // 從未在 CI 執行過 —— PR #151 因此帶著一支紅測試合進 master。
       expect(
         releaseWorkflow,
-        contains(
-          'flutter test \\\n'
-          '            test/app/app_smoke_test.dart \\\n'
-          '            test/workflows/mobile_e2e_workflow_test.dart',
-        ),
+        contains('run: flutter test\n'),
+        reason: 'CI 必須跑整個 test/ 目錄',
       );
       expect(
         releaseWorkflow,
-        contains('flutter test test/flows/app_owned_release_flow_test.dart'),
+        isNot(contains('test/app/app_smoke_test.dart')),
+        reason: '不得退回挑檔執行',
       );
       expect(
         releaseWorkflow,

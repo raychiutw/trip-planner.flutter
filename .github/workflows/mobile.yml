@@ -60,12 +60,13 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Run smoke test suite
-        run: |
-          flutter test \
-            test/app/app_smoke_test.dart \
-            test/workflows/mobile_e2e_workflow_test.dart
-          flutter test test/flows/app_owned_release_flow_test.dart
+      - name: Run test suite
+        # 跑整個 test/ 目錄。先前只挑三個檔，1643 條裡絕大多數從未在 CI 執行 ——
+        # PR #151 因此帶著一支紅測試合進 master（改了 `buildEntryUri` 的行為，
+        # 但另一支測試把舊行為鎖成契約）。整套約多花 3~4 分鐘，換掉一個假的
+        # 綠燈是划算的。`patrol_test/` 不在 `flutter test` 預設範圍，仍由
+        # mobile-e2e.yml 在 Firebase Test Lab 上跑。
+        run: flutter test
 
   testflight:
     name: Upload to TestFlight
