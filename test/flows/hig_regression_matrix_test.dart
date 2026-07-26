@@ -150,25 +150,57 @@ void main() {
         reason: '一般模式的邊緣應由材質產生，不是畫上去的',
       );
 
+      // 日期選擇器的軌道走同一條規則 —— 它先前固定描 18% 細邊，而
+      // `AdaptiveGlass` 一般模式只拿 shape 去 clip（不呼叫 `shape.paint`），
+      // 那條邊在一般模式畫不出來，只在無障礙 fallback（走 `ShapeDecoration`）
+      // 現形，且比其他四處弱得多。
+      final trackShape =
+          tester
+                  .widget<GlassContainer>(
+                    find
+                        .descendant(
+                          of: find.byType(TpHorizontalSelector<int>),
+                          matching: find.byType(GlassContainer),
+                        )
+                        .first,
+                  )
+                  .shape
+              as LiquidRoundedSuperellipse;
+      expect(
+        trackShape.side.color.a,
+        state.increasedContrast ? greaterThan(0.5) : 0,
+        reason: '選擇器軌道的描邊規則應與導覽 chrome 一致',
+      );
+
       // 品牌柔褐只出現在前景：選取膠囊在一般模式與無障礙 fallback 都是中性語意層。
       final scheme = Theme.of(
         tester.element(find.byType(AppleRootTabBar)),
       ).colorScheme;
-      final selectedDay = tester.widget<GlassButton>(
-        find.descendant(
-          of: find.byKey(const ValueKey('day-2-option')),
-          matching: find.byType(GlassButton),
-        ),
-      );
+      // 選取膠囊是自己畫的實心填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor`
+      // 會被軌道的 LiquidGlassLayer 吃掉，模擬器實測逐位元零差異。因此兩種
+      // 模式收斂到同一個中性語意層，不再分支。
+      final selectedDayFill = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(
+              of: find.byKey(const ValueKey('day-2-option')),
+              matching: find.byType(DecoratedBox),
+            ),
+          )
+          .map((box) => box.decoration)
+          .whereType<ShapeDecoration>()
+          .where((deco) => deco.color != null)
+          .single
+          .color!;
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
 
-      if (expectsOpaqueGlass) {
-        expect(
-          selectedDay.settings!.glassColor,
-          scheme.surfaceContainerHigh.withValues(alpha: 1),
-          reason: '日期選擇器的選取膠囊 fallback 應為中性語意層',
-        );
+      expect(
+        selectedDayFill,
+        scheme.surfaceContainerHighest,
+        reason: '日期選擇器的選取膠囊在兩種模式都是同一個中性語意層',
+      );
+      expect(selectedDayFill.a, 1, reason: '半透明填色會被玻璃 shader 吃掉');
 
+      if (expectsOpaqueGlass) {
         final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
           tabBar.indicatorColor,
@@ -177,12 +209,7 @@ void main() {
         );
       } else {
         expect(
-          rgb(selectedDay.settings!.glassColor),
-          rgb(scheme.surfaceContainerHighest),
-          reason: '一般模式下真正生效的選取膠囊底色也應為中性語意層',
-        );
-        expect(
-          rgb(selectedDay.settings!.glassColor),
+          rgb(selectedDayFill),
           isNot(rgb(scheme.primary)),
           reason: '品牌柔褐不得鋪成選取膠囊的背景',
         );
@@ -196,7 +223,7 @@ void main() {
           reason: 'root tab bar 的選取膠囊是品牌柔褐',
         );
         expect(
-          rgb(selectedDay.settings!.glassColor),
+          rgb(selectedDayFill),
           isNot(rgb(tabBar.indicatorColor!)),
           reason: '日期選擇器維持中性，與 root tab 刻意不同',
         );
