@@ -19,6 +19,18 @@ void main() {
         theme.colorScheme.surfaceContainerHigh,
         TpSystemColorsLight.tertiary,
       );
+      // `surfaceContainerHighest` 若不定義，Flutter 會靜靜回退成 `surface`
+      // （color_scheme.dart:1278），淺色變純白、深色變純黑 —— 兩處選取膠囊
+      // 因此比容器更暗／幾乎同色，等於隱形，骨架屏也變成白底白條。
+      expect(
+        theme.colorScheme.surfaceContainerHighest,
+        TpSystemColorsLight.quaternary,
+      );
+      expect(
+        theme.colorScheme.surfaceContainerHighest,
+        isNot(theme.colorScheme.surface),
+        reason: '未定義時會回退成 surface，那是這個 bug 的特徵',
+      );
       expect(theme.colorScheme.onSurface, TpSystemColorsLight.label);
       expect(
         theme.colorScheme.onSurfaceVariant,
@@ -43,6 +55,15 @@ void main() {
       expect(
         theme.colorScheme.surfaceContainerHigh,
         TpSystemColorsDark.tertiary,
+      );
+      expect(
+        theme.colorScheme.surfaceContainerHighest,
+        TpSystemColorsDark.quaternary,
+      );
+      expect(
+        theme.colorScheme.surfaceContainerHighest,
+        isNot(theme.colorScheme.surface),
+        reason: '未定義時會回退成 surface，那是這個 bug 的特徵',
       );
       expect(theme.colorScheme.onSurface, TpSystemColorsDark.label);
       expect(
