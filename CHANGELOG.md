@@ -2,6 +2,16 @@
 
 本專案的重要變更紀錄。格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/),版本依 [Semantic Versioning](https://semver.org/lang/zh-TW/)。
 
+## [Unreleased]
+
+### 修正
+
+- 補上未定義的 `surfaceContainerHighest` 色階（iOS systemGray4）。它先前會靜靜回退成 `surface`，導致 root tab 與日期選擇器的選取膠囊在深色下比容器更暗、淺色下只差 4%，等於隱形；骨架屏也因此是白底白條／黑底黑條。
+
+### 變更
+
+- Root tab bar 的選取膠囊改回品牌柔褐、字符反白，對齊 iOS 26 tab bar 拿強調色當選取背景的作法。日期選擇器維持中性語意層 —— 它是篩選內容而非切換功能，兩處刻意不同（見 `docs/adr/0003-brand-tint-for-root-tab-selection.md`）。
+
 ## [0.11.0] - 2026-07-26
 
 ### 變更

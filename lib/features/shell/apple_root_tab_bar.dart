@@ -42,10 +42,14 @@ class AppleRootTabBar extends StatelessWidget {
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
-    // 選取膠囊走中性語意層；品牌色只出現在前景（字符、標籤與光暈）。
-    final selectionTint = theme.colorScheme.surfaceContainerHighest.withValues(
-      alpha: 0.68,
-    );
+    // iOS 26 的 tab bar 拿**強調色**當選取背景、前景反白（參考「電話」app 的
+    // 通話記錄分頁：選取字符坐在實心強調色底上）。Tripline 用品牌柔褐取代
+    // 系統藍 —— app 的 tint 本來就該是品牌色，Apple 的藍是「它的」強調色。
+    //
+    // 這一處是 `CONTEXT.md`「品牌柔褐不鋪成底色」的**明文例外**：root tab 是
+    // 全 app 唯一的主導覽，選取指示需要最強的視覺分量。日期選擇器（篩選內容、
+    // 不是切換功能）維持中性語意層，兩處刻意不同。
+    final selectionTint = theme.colorScheme.primary.withValues(alpha: 0.68);
     final tabs = [
       for (final destination in _destinations)
         GlassTab(
@@ -90,7 +94,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: theme.colorScheme.primary,
+            // 字符坐在柔褐底上要反白；標籤在膠囊之外，維持品牌 tint。
+            selectedIconColor: theme.colorScheme.onPrimary,
             selectedLabelColor: theme.colorScheme.primary,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
@@ -111,7 +116,8 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            selectedIconColor: theme.colorScheme.primary,
+            // 字符坐在柔褐底上要反白；標籤在膠囊之外，維持品牌 tint。
+            selectedIconColor: theme.colorScheme.onPrimary,
             selectedLabelColor: theme.colorScheme.primary,
             unselectedIconColor: theme.colorScheme.onSurfaceVariant,
             unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
