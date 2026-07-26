@@ -791,17 +791,9 @@ void main() {
         .whereType<ShapeDecoration>()
         .where((deco) => deco.color != null)
         .toList();
-    expect(
-      fills,
-      isNotEmpty,
-      reason: '選取態要有一層自己畫的 ShapeDecoration 填色',
-    );
+    expect(fills, isNotEmpty, reason: '選取態要有一層自己畫的 ShapeDecoration 填色');
     expect(fills.single.color, scheme.surfaceContainerHighest);
-    expect(
-      fills.single.color!.a,
-      1,
-      reason: '半透明填色會被玻璃 shader 衰減到看不見',
-    );
+    expect(fills.single.color!.a, 1, reason: '半透明填色會被玻璃 shader 衰減到看不見');
   });
 
   testWidgets('深色日期 selector 的選取膠囊同樣是中性語意層，不鋪品牌柔褐', (tester) async {
@@ -827,19 +819,18 @@ void main() {
     await tester.pumpAndSettle();
 
     final scheme = AppTheme.dark().colorScheme;
-    final pill =
-        tester
-                .widgetList<DecoratedBox>(
-                  find.descendant(
-                    of: find.byKey(const ValueKey('dark-day-1')),
-                    matching: find.byType(DecoratedBox),
-                  ),
-                )
-                .map((box) => box.decoration)
-                .whereType<ShapeDecoration>()
-                .where((deco) => deco.color != null)
-                .single
-                .color!;
+    final pill = tester
+        .widgetList<DecoratedBox>(
+          find.descendant(
+            of: find.byKey(const ValueKey('dark-day-1')),
+            matching: find.byType(DecoratedBox),
+          ),
+        )
+        .map((box) => box.decoration)
+        .whereType<ShapeDecoration>()
+        .where((deco) => deco.color != null)
+        .single
+        .color!;
     expect(
       (pill.r, pill.g, pill.b),
       (

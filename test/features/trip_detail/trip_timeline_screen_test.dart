@@ -1590,19 +1590,18 @@ void main() {
 
     // 只有選取態才會長出膠囊；它是自己畫的實心填色，不是玻璃 —— 巢狀玻璃的
     // `glassColor` 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
-    final pill =
-        tester
-                .widgetList<DecoratedBox>(
-                  find.descendant(
-                    of: find.byKey(const ValueKey('day-pill-2')),
-                    matching: find.byType(DecoratedBox),
-                  ),
-                )
-                .map((box) => box.decoration)
-                .whereType<ShapeDecoration>()
-                .where((deco) => deco.color != null)
-                .single
-                .color!;
+    final pill = tester
+        .widgetList<DecoratedBox>(
+          find.descendant(
+            of: find.byKey(const ValueKey('day-pill-2')),
+            matching: find.byType(DecoratedBox),
+          ),
+        )
+        .map((box) => box.decoration)
+        .whereType<ShapeDecoration>()
+        .where((deco) => deco.color != null)
+        .single
+        .color!;
     expect(
       (pill.r, pill.g, pill.b),
       isNot((
