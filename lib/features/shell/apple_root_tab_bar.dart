@@ -10,6 +10,12 @@ import '../../ui/tp_glass_surface.dart';
 ///
 /// 刻意不做 iOS 26 的 tab bar minimize —— Apple 的 minimize 語意綁定「tab bar
 /// 底下是可捲動內容」，本 app 多數 root 畫面底下是固定版面，縮放只會讓導覽跳動。
+/// 選取膠囊相對於欄位的內縮量。
+///
+/// 套件預設是往外擴 12pt；我們往內收，讓膠囊緊貼字符與標籤、左右留出明顯
+/// 間隙（對齊 iOS 26 tab bar 約 70% 欄寬的比例）。
+const _indicatorExpansion = EdgeInsets.symmetric(horizontal: -14, vertical: -2);
+
 class AppleRootTabBar extends StatelessWidget {
   const AppleRootTabBar({
     super.key,
@@ -46,10 +52,13 @@ class AppleRootTabBar extends StatelessWidget {
     // 通話記錄分頁：選取字符坐在實心強調色底上）。Tripline 用品牌柔褐取代
     // 系統藍 —— app 的 tint 本來就該是品牌色，Apple 的藍是「它的」強調色。
     //
-    // 這一處是 `CONTEXT.md`「品牌柔褐不鋪成底色」的**明文例外**：root tab 是
-    // 全 app 唯一的主導覽，選取指示需要最強的視覺分量。日期選擇器（篩選內容、
-    // 不是切換功能）維持中性語意層，兩處刻意不同。
-    final selectionTint = theme.colorScheme.primary.withValues(alpha: 0.68);
+    // 選取指示是「中性底 + tint 前景」，沒有例外。iOS 26「電話」app 實測：
+    // 選取膠囊是 #363636 中性灰（比容器亮約 20 階），系統藍在字符與標籤上
+    // —— 強調色在前景，不在背景。ADR-0003 曾主張相反，其事實論據經像素
+    // 量測為錯誤，已由 ADR-0004 取代。
+    final selectionTint = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.72,
+    );
     final tabs = [
       for (final destination in _destinations)
         GlassTab(
@@ -94,15 +103,21 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            // 字符坐在柔褐底上要反白；標籤在膠囊之外，維持品牌 tint。
-            selectedIconColor: theme.colorScheme.onPrimary,
+            // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
+            // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
+            // 同一顆 tab 內不一致）。
+            selectedIconColor: theme.colorScheme.primary,
             selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: theme.colorScheme.onSurfaceVariant,
-            unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+            unselectedIconColor: theme.colorScheme.onSurface,
+            unselectedLabelColor: theme.colorScheme.onSurface,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
             indicatorColor: indicatorColor,
             indicatorSettings: indicatorSettings,
+            // 套件預設是 `horizontal: 12`，指示器往兩側各外擴 12pt，膠囊因此
+            // 比自己的欄位還寬（實測欄寬 275px、膠囊 341px = 124%），壓到
+            // 左右鄰居。Apple 約 70%，所以改成往內收。
+            indicatorExpansion: _indicatorExpansion,
             magnification: 1,
             blendAmount: 4,
             glowOpacity: 0.18,
@@ -116,15 +131,21 @@ class AppleRootTabBar extends StatelessWidget {
             horizontalPadding: 0,
             verticalPadding: 0,
             settings: glassSettings,
-            // 字符坐在柔褐底上要反白；標籤在膠囊之外，維持品牌 tint。
-            selectedIconColor: theme.colorScheme.onPrimary,
+            // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
+            // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
+            // 同一顆 tab 內不一致）。
+            selectedIconColor: theme.colorScheme.primary,
             selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: theme.colorScheme.onSurfaceVariant,
-            unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+            unselectedIconColor: theme.colorScheme.onSurface,
+            unselectedLabelColor: theme.colorScheme.onSurface,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
             indicatorColor: indicatorColor,
             indicatorSettings: indicatorSettings,
+            // 套件預設是 `horizontal: 12`，指示器往兩側各外擴 12pt，膠囊因此
+            // 比自己的欄位還寬（實測欄寬 275px、膠囊 341px = 124%），壓到
+            // 左右鄰居。Apple 約 70%，所以改成往內收。
+            indicatorExpansion: _indicatorExpansion,
             magnification: 1,
             blendAmount: 4,
             glowOpacity: 0.18,

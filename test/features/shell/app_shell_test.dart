@@ -608,9 +608,11 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         glass.indicatorColor,
-        AppTheme.dark().colorScheme.primary.withValues(alpha: 0.68),
+        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.72,
+        ),
       );
-      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.onPrimary);
+      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
     });
 
     testWidgets('root branches keep content visible through Liquid Glass', (
@@ -665,7 +667,9 @@ void main() {
       );
       expect(
         map.indicatorColor,
-        AppTheme.light().colorScheme.primary.withValues(alpha: 0.68),
+        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.72,
+        ),
       );
     });
 
@@ -956,14 +960,16 @@ void main() {
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         glass.indicatorColor,
-        AppTheme.light().colorScheme.primary.withValues(alpha: 0.68),
+        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.72,
+        ),
       );
       // 導覽配方已與共用玻璃表面收斂為同一組（較高的折射率與色散）。
       expect(glass.settings?.chromaticAberration, closeTo(0.006, 0.001));
       expect(glass.settings?.refractiveIndex, 1.15);
     });
 
-    testWidgets('root tab bar 選取態是品牌柔褐膠囊加反白字符，兩態同實心字符', (tester) async {
+    testWidgets('root tab bar 選取態是中性膠囊加品牌柔褐字符，兩態同實心字符', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -988,22 +994,33 @@ void main() {
       // 的通話記錄分頁）。#118 當初改成中性語意層，前提是「iOS 26 不用強調色
       // 當選取底」—— 那個前提不成立。
       //
-      // Tripline 用自己的品牌柔褐取代系統藍：app 的 tint 本來就該是品牌色，
-      // Apple 的藍是「它的」強調色，不是規範色。
+      // 選取指示是「中性底 + tint 前景」。iOS 26 電話 app 實測膠囊是
+      // #363636 中性灰、系統藍在字符上 —— 強調色在前景不在背景。
+      // Apple 的藍是「它的」強調色，不是規範色；我們用柔褐。
       expect(glass.indicatorColor, isNotNull);
-      expect(rgb(glass.indicatorColor!), rgb(scheme.primary));
+      expect(rgb(glass.indicatorColor!), isNot(rgb(scheme.primary)));
       expect(
         rgb(glass.indicatorColor!),
-        isNot(rgb(scheme.surfaceContainerHighest)),
-        reason: '選取底改回品牌強調色',
+        rgb(scheme.surfaceContainerHighest),
+        reason: '選取底是中性語意層',
       );
 
       // 品牌色只出現在前景：字符、標籤與光暈。
-      // 字符落在柔褐底之上要反白才有對比；標籤在膠囊之外，維持品牌 tint
-      // （截圖裡 Apple 也是 icon 反白、標籤強調色）。
-      expect(glass.selectedIconColor, scheme.onPrimary);
+      expect(glass.selectedIconColor, scheme.primary);
+
+      // 膠囊不得寬於自己的欄位。套件預設 `horizontal: 12` 是往外擴，實測
+      // 膠囊 341px 落在 275px 的欄位裡 = 124%，壓到左右鄰居；改成往內收，
+      // 模擬器實測約 75%（按參數計算 69%，差額是柔邊）。Apple 約 70%。
+      final expansion = glass.indicatorExpansion.resolve(TextDirection.ltr);
+      expect(expansion.left, lessThan(0), reason: '選取膠囊要往內收，不能沿用套件往外擴的預設');
+      expect(expansion.right, lessThan(0));
       expect(glass.selectedLabelColor, scheme.primary);
-      expect(glass.unselectedIconColor, scheme.onSurfaceVariant);
+      expect(glass.unselectedIconColor, scheme.onSurface);
+      expect(
+        glass.unselectedIconColor,
+        glass.unselectedLabelColor,
+        reason: '未選的字符與標籤必須同色',
+      );
       for (final tab in glass.tabs) {
         expect(tab.glowColor, scheme.primary);
       }
@@ -1027,7 +1044,7 @@ void main() {
       }
     });
 
-    testWidgets('深色 root tab 使用中性黑玻璃與品牌柔褐選取膠囊', (tester) async {
+    testWidgets('深色 root tab 使用中性黑玻璃與中性選取膠囊', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -1044,9 +1061,11 @@ void main() {
       );
       expect(
         glass.indicatorColor,
-        AppTheme.dark().colorScheme.primary.withValues(alpha: 0.68),
+        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.72,
+        ),
       );
-      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.onPrimary);
+      expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
       expect(glass.settings?.chromaticAberration, closeTo(0.004, 0.001));
     });
 
