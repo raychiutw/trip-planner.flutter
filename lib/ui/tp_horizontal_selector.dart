@@ -171,9 +171,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
           clipBehavior: Clip.antiAlias,
           shape: LiquidRoundedSuperellipse(
             borderRadius: height / 2,
-            side: BorderSide(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.18),
-            ),
+            side: BorderSide(color: tpGlassEdgeColor(context)),
           ),
           settings: trackSettings,
           child: SingleChildScrollView(

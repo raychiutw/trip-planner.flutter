@@ -150,6 +150,28 @@ void main() {
         reason: '一般模式的邊緣應由材質產生，不是畫上去的',
       );
 
+      // 日期選擇器的軌道走同一條規則 —— 它先前固定描 18% 細邊，而
+      // `AdaptiveGlass` 一般模式只拿 shape 去 clip（不呼叫 `shape.paint`），
+      // 那條邊在一般模式畫不出來，只在無障礙 fallback（走 `ShapeDecoration`）
+      // 現形，且比其他四處弱得多。
+      final trackShape =
+          tester
+                  .widget<GlassContainer>(
+                    find
+                        .descendant(
+                          of: find.byType(TpHorizontalSelector<int>),
+                          matching: find.byType(GlassContainer),
+                        )
+                        .first,
+                  )
+                  .shape
+              as LiquidRoundedSuperellipse;
+      expect(
+        trackShape.side.color.a,
+        state.increasedContrast ? greaterThan(0.5) : 0,
+        reason: '選擇器軌道的描邊規則應與導覽 chrome 一致',
+      );
+
       // 品牌柔褐只出現在前景：選取膠囊在一般模式與無障礙 fallback 都是中性語意層。
       final scheme = Theme.of(
         tester.element(find.byType(AppleRootTabBar)),
