@@ -179,4 +179,94 @@ void main() {
     expect(hourly.hasData, isTrue);
   });
 
+  test('連線失敗時丟出帶可行動文案的 DayWeatherFailure', () async {
+    final fetcher = OpenMeteoDayWeatherFetcher(
+      dio: Dio()
+        ..httpClientAdapter = _ThrowingAdapter(
+          DioException.connectionError(
+            requestOptions: RequestOptions(),
+            reason: 'network is unreachable',
+          ),
+        ),
+    );
+    addTearDown(fetcher.dispose);
+
+    await expectLater(
+      fetcher.fetch(_requestFor(_dateOnly(DateTime.now()))),
+      throwsA(
+        isA<DayWeatherFailure>()
+            .having((e) => e.kind, 'kind', DayWeatherFailureKind.offline)
+            .having((e) => e.message, 'message', contains('重試')),
+      ),
+    );
+  });
+
+  test('伺服器回非 2xx 時保留狀態碼,文案指向稍後再試', () async {
+    final today = _dateOnly(DateTime.now());
+    final fetcher = OpenMeteoDayWeatherFetcher(
+      dio: Dio()
+        ..httpClientAdapter = _ThrowingAdapter(
+          DioException.badResponse(
+            statusCode: 400,
+            requestOptions: RequestOptions(),
+            response: Response<Object?>(
+              requestOptions: RequestOptions(),
+              statusCode: 400,
+              data: {'error': true, 'reason': 'bad range'},
+            ),
+          ),
+        ),
+    );
+    addTearDown(fetcher.dispose);
+
+    await expectLater(
+      fetcher.fetch(_requestFor(today.add(const Duration(days: 1)))),
+      throwsA(
+        isA<DayWeatherFailure>()
+            .having((e) => e.kind, 'kind', DayWeatherFailureKind.rejected)
+            .having((e) => e.message, 'message', contains('400'))
+            .having((e) => e.message, 'message', contains('稍後')),
+      ),
+    );
+  });
+
+  test('逾時與未知錯誤各自對應到不同的可行動文案', () async {
+    final today = _dateOnly(DateTime.now());
+
+    final timeoutFetcher = OpenMeteoDayWeatherFetcher(
+      dio: Dio()
+        ..httpClientAdapter = _ThrowingAdapter(
+          DioException.receiveTimeout(
+            timeout: const Duration(seconds: 8),
+            requestOptions: RequestOptions(),
+          ),
+        ),
+    );
+    addTearDown(timeoutFetcher.dispose);
+
+    await expectLater(
+      timeoutFetcher.fetch(_requestFor(today.add(const Duration(days: 1)))),
+      throwsA(
+        isA<DayWeatherFailure>().having(
+          (e) => e.kind,
+          'kind',
+          DayWeatherFailureKind.timeout,
+        ),
+      ),
+    );
+
+    final brokenFetcher = OpenMeteoDayWeatherFetcher(
+      dio: Dio()..httpClientAdapter = _ThrowingAdapter(StateError('boom')),
+    );
+    addTearDown(brokenFetcher.dispose);
+
+    await expectLater(
+      brokenFetcher.fetch(_requestFor(today.add(const Duration(days: 1)))),
+      throwsA(
+        isA<DayWeatherFailure>()
+            .having((e) => e.kind, 'kind', DayWeatherFailureKind.unknown)
+            .having((e) => e.message, 'message', contains('重試')),
+      ),
+    );
+  });
 }
