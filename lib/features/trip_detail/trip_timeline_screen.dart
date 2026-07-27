@@ -227,7 +227,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
 
     return TpRootScaffold(
-      showSoftEdge: true,
       header: TpRootHeaderConfig(
         leading: TpToolbarIconButton(
           key: const ValueKey('trip-timeline-back'),

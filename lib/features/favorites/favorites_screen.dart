@@ -74,7 +74,6 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     final favoritesAsync = ref.watch(favoritesProvider);
 
     return TpRootScaffold(
-      showSoftEdge: true,
       header: TpRootHeaderConfig(
         title: const Text('收藏'),
         actions: _buildHeaderActions(context),
