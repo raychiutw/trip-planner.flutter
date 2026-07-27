@@ -229,7 +229,7 @@ void main() {
     final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
     final shape = glass.shape as LiquidRoundedSuperellipse;
 
-    expect(glass.quality, GlassQuality.standard);
+    expect(glass.quality, GlassQuality.premium);
     expect(glass.useOwnLayer, isTrue);
     expect(
       glass.settings?.glassColor,
@@ -298,40 +298,26 @@ void main() {
     });
   }
 
-  testWidgets('深色下 chrome 對玻璃層宣告 light，把 shader 的 rim 壓下來', (tester) async {
-    // `lightweight_glass.frag` 的 rim 由 `uBackdropLuma` 決定：
-    //   `rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92`
-    // 而 `uBackdropLuma` 不是從真實背景算的，是 `isDark ? 0.15 : 0.85`
-    // （`glass_effect.dart`）。深色 → rimFade 1.0（滿版 rim，真機實測 +125）；
-    // 宣告 light → rimFade 0.08，降 92%。
+  testWidgets('chrome 走 premium 並關掉 Fresnel 邊緣光', (tester) async {
+    // `GlassQuality.standard` 走 `lightweight_glass.frag`，那裡的 rim 寫死在
+    // `kRimAlphaBase = 0.65` / `kMinRimVisibility = 0.35`，**任何 settings 都
+    // 調不動** —— 真機連續兩版都量到 +125~+138（Apple 與 day tab 是 +30）。
     //
-    // 其餘吃 `uBackdropLuma` 的地方在我們的值域下沒有影響：PATH B 的
-    // `baseRgb = mix(frostRgb, glassColor, min(glassAlpha / (frost + 0.01), 1))`
-    // 中，frost ≈ 0.13~0.17 而我們的 glassColor alpha 是 0.35~0.68，
-    // 係數被 clamp 成 1.0 → 白霧完全混不進來；`pmA = max(alpha, frost)` 同理。
-    // **這個結論以 alpha 遠高於 frost 為前提**，若日後有玻璃的 alpha 低於
-    // 約 0.2，白霧就會冒出來。
-    late Brightness glassBrightness;
+    // `premium` 走 `liquid_glass_final_render.frag`，那裡有 `uFresnelStrength`：
+    //   0.0 = pure blur-overlay appearance with no physics-based rim highlight,
+    //         matching iOS 26 system UI glass (Messages, Notification banners)
+    // —— 我們拿來當基準的正是訊息 app。`uAmbientRim` 是**額外再加一圈**，
+    // 方向相反，維持 0。
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
-          body: TpGlassSurface(
-            child: Builder(
-              builder: (context) {
-                glassBrightness = GlassTheme.brightnessOf(context);
-                return const SizedBox(width: 120, height: 44);
-              },
-            ),
-          ),
+          body: TpGlassSurface(child: const SizedBox(width: 120, height: 44)),
         ),
       ),
     );
-
-    expect(
-      glassBrightness,
-      Brightness.light,
-      reason: 'shader 以 uBackdropLuma 決定 rim 強度，深色會給滿版 rim',
-    );
+    final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
+    expect(glass.quality, GlassQuality.premium);
+    expect(glass.settings!.fresnelStrength, 0);
   });
 }

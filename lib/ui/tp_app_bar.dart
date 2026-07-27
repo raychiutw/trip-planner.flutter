@@ -681,14 +681,34 @@ class TpToolbarIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.plain = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
 
+  /// 已經坐在別人的玻璃裡時設 true —— 例如 root header 把返回鍵與標題併成
+  /// 同一顆膠囊。玻璃疊玻璃正是 #162 消滅掉的東西(WWDC25:玻璃不取樣玻璃)。
+  final bool plain;
+
   @override
   Widget build(BuildContext context) {
+    if (plain) {
+      return Semantics(
+        button: true,
+        label: tooltip,
+        child: SizedBox.square(
+          dimension: TpSpacing.tapMin,
+          child: IconButton(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 20),
+            padding: EdgeInsets.zero,
+            tooltip: tooltip,
+          ),
+        ),
+      );
+    }
     return TpToolbarGlassButton(
       tooltip: tooltip,
       onPressed: onPressed,

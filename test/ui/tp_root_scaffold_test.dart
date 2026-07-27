@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
@@ -53,6 +54,7 @@ void main() {
           header: TpRootHeaderConfig(
             leading: TpToolbarIconButton(
               key: const ValueKey('root-leading'),
+              plain: true,
               icon: Icons.chevron_left,
               tooltip: '返回',
               onPressed: () {},
@@ -69,9 +71,38 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('root-leading'))),
       const Size(44, 44),
     );
+    // 返回鍵與行程名稱是**同一組**,包在同一顆膠囊裡 —— 對照 iOS 26
+    // 「訊息」app 的 `‹ 121`:返回與它所屬的內容是一組,不是兩顆各自浮著。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('tp-glass-surface')),
+        matching: find.byKey(const ValueKey('tp-root-header-leading')),
+      ),
+      findsOneWidget,
+      reason: '返回鍵要與標題同一顆膠囊',
+    );
+    // 群組內的返回鍵不得再自帶玻璃 —— 那就是 #162 消滅掉的玻璃疊玻璃。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('tp-root-header-leading')),
+        matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
+      ),
+      findsNothing,
+      reason: '群組內的返回鍵不該有自己的玻璃底',
+    );
+    // 返回鍵與標題之間要有間距,不能擠在一起。
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('tp-root-header-title'))).dx -
+          tester.getRect(find.byKey(const ValueKey('root-leading'))).right,
+      greaterThanOrEqualTo(TpSpacing.s1),
+      reason: '返回鍵與標題之間要留間距',
+    );
+    // 標題排在返回鍵右邊(同一顆膠囊內)。
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('tp-root-header-title'))).dx,
-      greaterThan(60),
+      greaterThanOrEqualTo(
+        tester.getRect(find.byKey(const ValueKey('root-leading'))).right,
+      ),
     );
   });
 
@@ -193,6 +224,19 @@ void main() {
       findsNothing,
       reason: '動作不得包在玻璃板裡',
     );
+    // 同一列的膠囊要等高。真機實測標題膠囊 63.7pt、三顆圓鈕都是 44pt ——
+    // 拆膠囊時標題只給了內距、讓 `headlineSmall` 自己撐高度。
+    final titleHeight = tester
+        .getRect(find.byKey(const ValueKey('tp-glass-surface')))
+        .height;
+    for (final key in ['tp-root-header-action-0', 'account-avatar-button']) {
+      expect(
+        tester.getRect(find.byKey(ValueKey(key))).height,
+        closeTo(titleHeight, 0.5),
+        reason: '$key 與標題膠囊不等高',
+      );
+    }
+
     // 標題膠囊與頭像之間要留出空隙 —— 那是內容透出來的地方。
     final titleRight = tester.getRect(titleCapsule).right;
     final avatarLeft = tester.getRect(find.byType(TpAccountAvatarButton)).left;

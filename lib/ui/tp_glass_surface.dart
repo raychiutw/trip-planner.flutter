@@ -148,52 +148,6 @@ Color tpGlassEdgeColor(BuildContext context) {
 /// 浮動 header 呼叫導覽配方時又把前者蓋掉。收斂為同一組，以較接近 iOS 26 的
 /// 那一組為準；媒體背景（platform view）維持低色散與低折射率。
 ///
-/// 讓底下的玻璃層以為背景是亮的，把 shader 的 rim 壓下來。
-///
-/// `lightweight_glass.frag` 的邊緣強度由 `uBackdropLuma` 決定：
-///
-/// ```glsl
-/// rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92;
-/// ```
-///
-/// 而 `uBackdropLuma` **不是從真實背景算的**，是 `glass_effect.dart` 裡的
-/// `isDark ? 0.15 : 0.85`，`isDark` 又來自 `GlassTheme.brightnessOf(context)`。
-/// 深色 → `rimFade` 1.00（滿版 rim，真機實測 **+125**）；宣告亮 → 0.08，**降 92%**。
-///
-/// 其餘吃 `uBackdropLuma` 的地方在我們的值域下沒有影響。PATH B（所有 standard
-/// widget 走的路）是：
-///
-/// ```glsl
-/// simulatedFrost = 0.08 + densityFactor * 0.05 + isLight * 0.04;   // ≈0.13~0.17
-/// baseRgb = mix(vec3(isLight), uGlassColor.rgb,
-///               min(glassAlpha / (simulatedFrost + 0.01), 1.0));
-/// pmA     = max(glassAlpha, simulatedFrost);
-/// ```
-///
-/// 我們的 `glassColor` alpha 是 **0.35~0.68**，除以 frost 遠大於 1 → mix 係數被
-/// clamp 成 1.0，白霧完全混不進來；`pmA` 也仍取 alpha。剩下唯一的副作用是
-/// fresnel 的 `adaptiveStrength` 從 1.2 降到 0.8，方向與我們一致。
-///
-/// ⚠️ **這個結論以「alpha 遠高於 frost」為前提。** 若日後有玻璃的 alpha 低於
-/// 約 0.2，深色下就會冒出白霧 —— 那時要改用別的作法，不能沿用這裡。
-///
-/// 無障礙的不透明 fallback 不套用：那條路 `blur = 0`、不經 shader，沒有 rim
-/// 可壓，而且宣告錯的明暗會影響套件自己挑的預設值。
-Widget tpGlassBrightnessOverride({
-  required BuildContext context,
-  required Widget child,
-}) {
-  final increasedContrast = MediaQuery.highContrastOf(context);
-  final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
-    context,
-  );
-  if (increasedContrast || reduceTransparency) return child;
-  return GlassTheme(
-    data: const GlassThemeData(brightness: Brightness.light),
-    child: child,
-  );
-}
-
 /// ## 材質自身的邊緣光（#169 / #178）
 ///
 /// 真機（v0.13.0）量到標題膠囊與頭像圓鈕的邊緣高出內部填色 **+125~+138**，
@@ -209,7 +163,7 @@ Widget tpGlassBrightnessOverride({
 ///   `uData4.w`（uGlowIntensity）取的是 widget 欄位而非 `settings.glowIntensity`。
 /// - 0.23.0 的 rim 常數與 0.22.1 一字未改。
 ///
-/// 真正的旋鈕是 [tpGlassBrightnessOverride] —— 見該處說明。
+/// 真正的旋鈕是 `fresnelStrength`，且只在 `GlassQuality.premium` 生效。
 LiquidGlassSettings tpGlassRecipe(
   BuildContext context, {
   required Color tint,
@@ -228,6 +182,11 @@ LiquidGlassSettings tpGlassRecipe(
     specularSharpness: GlassSpecularSharpness.medium,
     refractiveIndex: onMedia ? 1.06 : 1.15,
     saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),
+    // **關掉物理 Fresnel 邊緣光。** 套件註解:0.0 = pure blur-overlay
+    // appearance with no physics-based rim highlight, matching iOS 26 system
+    // UI glass (Messages, Notification banners) —— 我們拿來當基準的正是
+    // 訊息 app。`ambientRim` 是**額外再加一圈**,方向相反,維持不設定。
+    fresnelStrength: 0,
     standardOpacityMultiplier: 1,
     platformViewFallbackColor: tint,
   );
@@ -314,24 +273,21 @@ class TpGlassSurface extends StatelessWidget {
       opaqueColor: tint,
     );
 
-    return tpGlassBrightnessOverride(
-      context: context,
-      child: TpGlassEdge(
-        borderRadius: radius,
-        child: GlassContainer(
-          padding: padding,
-          useOwnLayer: true,
-          quality: GlassQuality.standard,
-          platformViewBackdrop: platformViewBackdrop,
-          allowElevation: true,
-          clipBehavior: Clip.antiAlias,
-          shape: LiquidRoundedSuperellipse(
-            borderRadius: radius,
-            side: BorderSide(color: border),
-          ),
-          settings: resolvedSettings,
-          child: child,
+    return TpGlassEdge(
+      borderRadius: radius,
+      child: GlassContainer(
+        padding: padding,
+        useOwnLayer: true,
+        quality: GlassQuality.premium,
+        platformViewBackdrop: platformViewBackdrop,
+        allowElevation: true,
+        clipBehavior: Clip.antiAlias,
+        shape: LiquidRoundedSuperellipse(
+          borderRadius: radius,
+          side: BorderSide(color: border),
         ),
+        settings: resolvedSettings,
+        child: child,
       ),
     );
   }
