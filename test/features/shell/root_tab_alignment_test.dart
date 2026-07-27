@@ -104,9 +104,13 @@ Rect _pillRect(WidgetTester tester) {
     matching: find.byWidgetPredicate((widget) {
       if (widget is! DecoratedBox) return false;
       final decoration = widget.decoration;
+      // 0.23.0 把靜止態 indicator 的形狀從 `LiquidRoundedSuperellipse` 換成
+      // `LiquidRoundedRectangle`(#178 升級時發現)。兩種都收 —— 這條測試量的
+      // 是膠囊的實際方框,不是它用哪個 shape 類別。
       return decoration is ShapeDecoration &&
           decoration.color != null &&
-          decoration.shape is LiquidRoundedSuperellipse;
+          (decoration.shape is LiquidRoundedSuperellipse ||
+              decoration.shape is LiquidRoundedRectangle);
     }),
   );
   return tester.getRect(finder);

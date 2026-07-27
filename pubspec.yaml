@@ -60,7 +60,7 @@ dependencies:
   geolocator: ^14.0.3
   google_navigation_flutter: ^0.10.0
   drift: ^2.34.2
-  liquid_glass_widgets: 0.22.1
+  liquid_glass_widgets: 0.23.0
 
 dev_dependencies:
   flutter_test:

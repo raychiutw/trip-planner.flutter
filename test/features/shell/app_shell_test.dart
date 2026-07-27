@@ -658,8 +658,6 @@ void main() {
       expect(standard.settings!.chromaticAberration, greaterThan(0));
       expect(standard.settings!.refractiveIndex, greaterThan(1.06));
       // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
-      expect(map.settings!.ambientRim, greaterThan(0));
-      expect(standard.settings!.ambientRim, greaterThan(0));
       expect(map.indicatorSettings?.blur, map.settings?.blur);
       expect(
         map.indicatorSettings?.refractiveIndex,

@@ -127,19 +127,10 @@ void main() {
         expectsOpaqueGlass ? 1 : 1.15,
       );
 
-      // 材質邊緣光依真機 +125 → +30 的比例調降（#169）。數值寫死，拿 lib 的
-      // 常數當期望值會變成恆真。無障礙 fallback 則一律歸零。
-      expect(
-        headerGlass.settings!.ambientRim,
-        expectsOpaqueGlass ? 0 : closeTo(0.17, 0.0001),
-        reason: '環境邊緣光要對齊真機定案值',
-      );
-      expect(
-        headerGlass.settings!.glowIntensity,
-        expectsOpaqueGlass ? 0 : closeTo(0.18, 0.0001),
-        reason: '光暈強度要對齊真機定案值',
-      );
-
+      // 材質邊緣光不再由 settings 控制:`GlassQuality.standard` 走的 lightweight
+      // shader 沒有 `ambientRim` uniform,那兩個參數是死的(#178)。真正壓 rim 的
+      // 是 `tpGlassBrightnessOverride` —— 讓玻璃層以為背景是亮的,
+      // `rimFade` 從 1.00 降到 0.08。
       // 一般模式描一條細邊；提高對比才換成明顯的實心邊。真機量到這條細邊
       // 是 +20~+31（DAY tab 軌只有這一層），恰好落在 Apple 的 +30。
       final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;

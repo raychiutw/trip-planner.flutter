@@ -48,38 +48,6 @@ Future<List<double>> _edgeDeltas(WidgetTester tester, Key boundaryKey) async {
 }
 
 void main() {
-  testWidgets('材質邊緣光依真機量測調降：+125 → +30 的比例', (tester) async {
-    // 真機（v0.13.0）量到標題膠囊／頭像圓鈕的邊緣高出內部填色 +125~+138，
-    // iOS 26 是 +29~+31。這組值是 30/125 ≈ 0.24 的等比調降。
-    //
-    // **期望值寫死。** 拿 lib 的常數當期望值會變成恆真測試。
-    late LiquidGlassSettings regular;
-    late LiquidGlassSettings media;
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark(),
-        home: Builder(
-          builder: (context) {
-            const tint = Color(0x661C1C1E);
-            regular = tpGlassRecipe(
-              context,
-              tint: tint,
-              onMedia: false,
-              blur: 16,
-            );
-            media = tpGlassRecipe(context, tint: tint, onMedia: true, blur: 16);
-            return const SizedBox();
-          },
-        ),
-      ),
-    );
-
-    expect(regular.ambientRim, closeTo(0.17, 0.0001));
-    expect(regular.glowIntensity, closeTo(0.18, 0.0001));
-    expect(media.ambientRim, closeTo(0.12, 0.0001));
-    expect(media.glowIntensity, closeTo(0.12, 0.0001));
-  });
-
   // 斷言**實際畫出來的像素**，不是 `BorderSide` 的 alpha —— 這個專案已經因為
   // 「參數一直是對的、畫面一直是錯的」吃過虧。取像素的作法與模擬器截圖同源：
   // 掃一條水平線，比邊緣峰值與內部填色。
@@ -273,8 +241,6 @@ void main() {
     // 材質並沒有接手:不論背後純黑或壓在內容上,邊緣與填色的差都是 0,
     // 調 ambientRim 從 0.70 到 0.07 五組值也全是 0。Apple 是 +30。
     expect(shape.side.color.a, closeTo(0.12, 0.001));
-    expect(glass.settings!.ambientRim, greaterThan(0));
-    expect(glass.settings!.glowIntensity, greaterThan(0));
   });
 
   testWidgets('dark glass 的邊緣由材質產生，不再描一圈實心線', (tester) async {
@@ -298,8 +264,6 @@ void main() {
     // 淺色由 onSurface(黑)導出偏暗的邊 —— 淺色填色本來就接近白,
     // 再加白邊等於沒有。
     expect(shape.side.color.a, closeTo(0.12, 0.001));
-    expect(glass.settings!.ambientRim, greaterThan(0));
-    expect(glass.settings!.glowIntensity, greaterThan(0));
   });
 
   // 媒體背景不分明暗模式都套同一層暗化 —— 地圖圖磚恆為亮色，
@@ -333,4 +297,41 @@ void main() {
       expect(settings.platformViewFallbackColor, expectedTint);
     });
   }
+
+  testWidgets('深色下 chrome 對玻璃層宣告 light，把 shader 的 rim 壓下來', (tester) async {
+    // `lightweight_glass.frag` 的 rim 由 `uBackdropLuma` 決定：
+    //   `rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92`
+    // 而 `uBackdropLuma` 不是從真實背景算的，是 `isDark ? 0.15 : 0.85`
+    // （`glass_effect.dart`）。深色 → rimFade 1.0（滿版 rim，真機實測 +125）；
+    // 宣告 light → rimFade 0.08，降 92%。
+    //
+    // 其餘吃 `uBackdropLuma` 的地方在我們的值域下沒有影響：PATH B 的
+    // `baseRgb = mix(frostRgb, glassColor, min(glassAlpha / (frost + 0.01), 1))`
+    // 中，frost ≈ 0.13~0.17 而我們的 glassColor alpha 是 0.35~0.68，
+    // 係數被 clamp 成 1.0 → 白霧完全混不進來；`pmA = max(alpha, frost)` 同理。
+    // **這個結論以 alpha 遠高於 frost 為前提**，若日後有玻璃的 alpha 低於
+    // 約 0.2，白霧就會冒出來。
+    late Brightness glassBrightness;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: TpGlassSurface(
+            child: Builder(
+              builder: (context) {
+                glassBrightness = GlassTheme.brightnessOf(context);
+                return const SizedBox(width: 120, height: 44);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      glassBrightness,
+      Brightness.light,
+      reason: 'shader 以 uBackdropLuma 決定 rim 強度，深色會給滿版 rim',
+    );
+  });
 }

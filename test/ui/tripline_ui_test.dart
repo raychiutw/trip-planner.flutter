@@ -655,8 +655,6 @@ void main() {
     expect(standard.chromaticAberration, greaterThan(0));
     expect(standard.refractiveIndex, greaterThan(1.06));
     // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
-    expect(map.ambientRim, greaterThan(0));
-    expect(standard.ambientRim, greaterThan(0));
   });
 
   testWidgets('選擇器不因所在背景而改變外觀：地圖上與一般頁面同一塊玻璃軌', (tester) async {
