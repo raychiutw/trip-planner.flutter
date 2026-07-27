@@ -76,6 +76,20 @@ class TpRootScaffold extends StatelessWidget {
               onMedia: header.platformViewBackdrop,
             ),
           ),
+          // 底部同一套。root tab bar 自己是玻璃，但玻璃只糊它蓋住的那一塊，
+          // 而且 shader 的模糊在模擬器上不渲染 —— 內容照樣清晰地穿過 tab bar
+          // 與「行程」「地圖」的文字疊在一起（#167 之後的真機與模擬器皆可見）。
+          // 帶狀遮蔽是內容側的處理，與 tab bar 自己的材質不互相取代。
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+            child: _TpRootTabBand(
+              key: const ValueKey('tp-root-tab-band'),
+              onMedia: header.platformViewBackdrop,
+            ),
+          ),
           Positioned(
             top: TpRootGeometry.headerTop(context),
             left: TpRootGeometry.horizontalInset,
@@ -301,6 +315,81 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
 /// 顏色漸層沒有模糊，所以 #162 把 header 拆成獨立膠囊之後，內容直接從膠囊之間
 /// 的縫隙穿上來 —— 日期被標題膠囊蓋掉一半、返回鍵旁漏出一個孤零零的「0」。
 /// 依據 iOS 26「電話」app：控制項上方與後方的內容是漸進模糊加淡出，不是硬切。
+/// 底部 root tab 帶的遮蔽，與 [_TpRootHeaderBand] 同一組參數，方向相反。
+///
+/// 為什麼底部也要一條:root tab bar 自己是玻璃，但玻璃只糊它**蓋住的那一塊**，
+/// 而且 shader 的模糊在模擬器上不渲染。實際看到的是內容清晰地穿過 tab bar、
+/// 與「行程」「地圖」的文字疊在一起。帶狀遮蔽是內容側的處理，兩者不互相取代。
+class _TpRootTabBand extends StatelessWidget {
+  const _TpRootTabBand({super.key, required this.onMedia});
+
+  final bool onMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final opaqueFallback =
+        MediaQuery.highContrastOf(context) ||
+        AppAccessibilityScope.reduceTransparencyOf(context);
+    final veil = onMedia && !opaqueFallback
+        ? Colors.black
+        : theme.scaffoldBackgroundColor;
+    final peak = opaqueFallback
+        ? 1.0
+        : (onMedia ? tpMediaScrimOpacity : _TpRootHeaderBand.veilPeakAlpha);
+    final edge = opaqueFallback ? 1.0 : peak * _TpRootHeaderBand.veilEdgeRatio;
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          if (!opaqueFallback)
+            for (var index = 0; index < _TpRootHeaderBand.blurLayers; index++)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                // 逐層縮短:最底層最厚，越往上越薄，疊出漸進的模糊。
+                height:
+                    (index + 1) /
+                    _TpRootHeaderBand.blurLayers *
+                    _bandHeight(context),
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: _TpRootHeaderBand.blurSigmaPerLayer,
+                      sigmaY: _TpRootHeaderBand.blurSigmaPerLayer,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+          Positioned.fill(
+            child: opaqueFallback
+                ? ColoredBox(color: veil)
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          veil.withValues(alpha: peak),
+                          veil.withValues(alpha: edge),
+                          veil.withValues(alpha: 0),
+                        ],
+                        stops: const [0, 0.55, 1],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static double _bandHeight(BuildContext context) =>
+      TpRootTabGeometry.clearance(context) + TpSpacing.s4;
+}
+
 class _TpRootHeaderBand extends StatelessWidget {
   const _TpRootHeaderBand({super.key, required this.onMedia});
 
@@ -316,14 +405,14 @@ class _TpRootHeaderBand extends StatelessWidget {
   ///
   /// 這些層彼此重疊，**不能**共用 `BackdropGroup`／`BackdropKey` —— 框架文件
   /// 明講重疊的 backdrop filter 共用 key 時，重疊區會變成只套到其中一層。
-  static const int _blurLayers = 6;
+  static const int blurLayers = 6;
 
   /// 單層 sigma。高斯疊加是平方和開根號，帶頂的等效 sigma ≈ 5 × √6 ≈ 12。
-  static const double _blurSigmaPerLayer = 5;
+  static const double blurSigmaPerLayer = 5;
 
   /// 帶頂的淡出強度；膠囊下緣收到 [_veilEdgeRatio] 倍，再到帶底歸零。
-  static const double _veilPeakAlpha = 0.62;
-  static const double _veilEdgeRatio = 0.78;
+  static const double veilPeakAlpha = 0.62;
+  static const double veilEdgeRatio = 0.78;
 
   @override
   Widget build(BuildContext context) {
@@ -340,28 +429,27 @@ class _TpRootHeaderBand extends StatelessWidget {
         : theme.scaffoldBackgroundColor;
     final peak = opaqueFallback
         ? 1.0
-        : (onMedia ? tpMediaScrimOpacity : _veilPeakAlpha);
-    final edge = opaqueFallback ? 1.0 : peak * _veilEdgeRatio;
+        : (onMedia ? tpMediaScrimOpacity : veilPeakAlpha);
+    final edge = opaqueFallback ? 1.0 : peak * veilEdgeRatio;
 
     return IgnorePointer(
       child: Stack(
         children: [
           if (!opaqueFallback)
-            for (var index = 0; index < _blurLayers; index++)
+            for (var index = 0; index < blurLayers; index++)
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 height:
-                    headerBottom +
-                    feather * (_blurLayers - index) / _blurLayers,
+                    headerBottom + feather * (blurLayers - index) / blurLayers,
                 child: ClipRect(
                   // tileMode 用預設的 clamp：畫面邊界外沿用邊緣像素，跟系統
                   // bar 的模糊一致。decal 會在畫面最頂端淡成透明，露出一條縫。
                   child: BackdropFilter(
                     filter: ui.ImageFilter.blur(
-                      sigmaX: _blurSigmaPerLayer,
-                      sigmaY: _blurSigmaPerLayer,
+                      sigmaX: blurSigmaPerLayer,
+                      sigmaY: blurSigmaPerLayer,
                     ),
                     child: const SizedBox.expand(),
                   ),

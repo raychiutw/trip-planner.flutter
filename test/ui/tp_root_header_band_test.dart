@@ -171,6 +171,46 @@ void main() {
     );
   });
 
+  testWidgets('底部 root tab 帶底下的內容同樣被糊掉，不會清晰地穿上來', (tester) async {
+    // 頂部有 `_TpRootHeaderBand`，底部原本什麼都沒有 —— 真機與模擬器都看得到
+    // 「停留點 16」清晰地穿過 tab bar、與「行程」「地圖」的文字疊在一起。
+    // tab bar 自己是玻璃，但玻璃只糊它自己蓋住的那一塊，且 shader 的模糊在
+    // 模擬器上不渲染；帶狀遮蔽是內容側的處理，兩者不能互相取代。
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = _boundarySize;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final boundaryKey = GlobalKey();
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _scene(boundaryKey: boundaryKey, controller: controller),
+    );
+    await _scrollUnderBand(tester, controller);
+
+    final band = tester.getRect(find.byKey(const ValueKey('tp-root-tab-band')));
+    final pixels = await _capture(tester, boundaryKey);
+    const x = 200;
+    final insideBand = pixels.verticalContrast(
+      x,
+      band.top.round() + 6,
+      band.bottom.round() - 6,
+    );
+    final aboveBand = pixels.verticalContrast(
+      x,
+      band.top.round() - 140,
+      band.top.round() - 80,
+    );
+
+    expect(aboveBand, greaterThan(400), reason: '對照組必須是清晰內容，否則這條測試恆真');
+    expect(
+      insideBand,
+      lessThan(aboveBand * 0.15),
+      reason: 'root tab 帶底下的內容必須糊掉，量到的是 $insideBand vs $aboveBand',
+    );
+  });
+
   testWidgets('遮蔽是漸進的：越接近膠囊帶越糊', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = _boundarySize;

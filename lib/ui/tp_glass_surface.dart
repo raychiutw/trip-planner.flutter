@@ -148,33 +148,68 @@ Color tpGlassEdgeColor(BuildContext context) {
 /// 浮動 header 呼叫導覽配方時又把前者蓋掉。收斂為同一組，以較接近 iOS 26 的
 /// 那一組為準；媒體背景（platform view）維持低色散與低折射率。
 ///
-/// ## 材質自身的邊緣光（#169）
+/// 讓底下的玻璃層以為背景是亮的，把 shader 的 rim 壓下來。
+///
+/// `lightweight_glass.frag` 的邊緣強度由 `uBackdropLuma` 決定：
+///
+/// ```glsl
+/// rimFade = 1.0 - smoothstep(0.3, 0.5, uBackdropLuma) * 0.92;
+/// ```
+///
+/// 而 `uBackdropLuma` **不是從真實背景算的**，是 `glass_effect.dart` 裡的
+/// `isDark ? 0.15 : 0.85`，`isDark` 又來自 `GlassTheme.brightnessOf(context)`。
+/// 深色 → `rimFade` 1.00（滿版 rim，真機實測 **+125**）；宣告亮 → 0.08，**降 92%**。
+///
+/// 其餘吃 `uBackdropLuma` 的地方在我們的值域下沒有影響。PATH B（所有 standard
+/// widget 走的路）是：
+///
+/// ```glsl
+/// simulatedFrost = 0.08 + densityFactor * 0.05 + isLight * 0.04;   // ≈0.13~0.17
+/// baseRgb = mix(vec3(isLight), uGlassColor.rgb,
+///               min(glassAlpha / (simulatedFrost + 0.01), 1.0));
+/// pmA     = max(glassAlpha, simulatedFrost);
+/// ```
+///
+/// 我們的 `glassColor` alpha 是 **0.35~0.68**，除以 frost 遠大於 1 → mix 係數被
+/// clamp 成 1.0，白霧完全混不進來；`pmA` 也仍取 alpha。剩下唯一的副作用是
+/// fresnel 的 `adaptiveStrength` 從 1.2 降到 0.8，方向與我們一致。
+///
+/// ⚠️ **這個結論以「alpha 遠高於 frost」為前提。** 若日後有玻璃的 alpha 低於
+/// 約 0.2，深色下就會冒出白霧 —— 那時要改用別的作法，不能沿用這裡。
+///
+/// 無障礙的不透明 fallback 不套用：那條路 `blur = 0`、不經 shader，沒有 rim
+/// 可壓，而且宣告錯的明暗會影響套件自己挑的預設值。
+Widget tpGlassBrightnessOverride({
+  required BuildContext context,
+  required Widget child,
+}) {
+  final increasedContrast = MediaQuery.highContrastOf(context);
+  final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
+    context,
+  );
+  if (increasedContrast || reduceTransparency) return child;
+  return GlassTheme(
+    data: const GlassThemeData(brightness: Brightness.light),
+    child: child,
+  );
+}
+
+/// ## 材質自身的邊緣光（#169 / #178）
 ///
 /// 真機（v0.13.0）量到標題膠囊與頭像圓鈕的邊緣高出內部填色 **+125~+138**，
-/// iOS 26 是 **+29~+31**。`ambientRim`／`glowIntensity` 依 30/125 ≈ 0.24 等比
-/// 調降（0.70→0.17、0.75→0.18；媒體背景 0.50→0.12）。
+/// day tab 是 **+20~+31**，iOS 26 是 **+29~+31**。
 ///
-/// ⚠️ **這個調整值未經真機確認。** 模擬器不渲染材質邊緣光，量不到這一半。
+/// **不要試圖用 `ambientRim`／`glowIntensity` 調它 —— 在我們的算圖路徑上那兩個
+/// 參數是死的。** 讀 0.22.1 與 0.23.0 原始碼皆確認:
 ///
-/// ⚠️ **而且在目前的 `GlassQuality.standard` 下，這兩個參數根本不會進 shader。**
-/// 讀 `liquid_glass_widgets` 0.22.1 原始碼確認：
+/// - `AdaptiveGlass` 只在 `quality == premium` 時走 renderer 原生路徑（那裡才
+///   `setFloat(settings.ambientRim)`）；我們固定傳 `standard`，走
+///   `LightweightLiquidGlass`。
+/// - `shaders/lightweight_glass.frag` **沒有 `ambientRim` uniform**；
+///   `uData4.w`（uGlowIntensity）取的是 widget 欄位而非 `settings.glowIntensity`。
+/// - 0.23.0 的 rim 常數與 0.22.1 一字未改。
 ///
-/// - `AdaptiveGlass` 只在 `quality == premium && Impeller` 時走 renderer 原生
-///   路徑（那裡才會 `setFloat(settings.ambientRim)`）；我們固定傳 standard，
-///   走的是 `LightweightLiquidGlass`。
-/// - `shaders/lightweight_glass.frag` **沒有 ambientRim 這個 uniform**；
-///   `uData4.w`（uGlowIntensity）取的是 `LightweightLiquidGlass` 的 **widget 欄位**
-///   `glowIntensity`，不是 `settings.glowIntensity` —— `GlassContainer` 的同名
-///   欄位預設 0，我們沒設過。
-/// - 該 shader 的邊緣來自硬寫死的常數（`kRimAlphaBase = 0.65`、
-///   `kMinRimVisibility = 0.35`）加上 `uLightIntensity`／`uRefractiveIndex`／
-///   `uThickness`／`uBackdropLuma`。`rimBrightness` 的地板 0.35 讓
-///   `lightIntensity` 在我們這組值域內完全不影響亮度。
-///
-/// 也就是說：**這次調降在目前的算圖路徑上預期是無效的**，真機的 +125 不會因此
-/// 改變。要真的把材質邊緣壓到 +30，得改算圖路徑（chrome 改走 premium，
-/// `ambientRim` 才是活的）或升級套件，兩者都超出本票範圍。保留這組數值是為了
-/// 記錄意圖、並在改走 premium 時就位。詳見 #169 的討論。
+/// 真正的旋鈕是 [tpGlassBrightnessOverride] —— 見該處說明。
 LiquidGlassSettings tpGlassRecipe(
   BuildContext context, {
   required Color tint,
@@ -190,8 +225,6 @@ LiquidGlassSettings tpGlassRecipe(
     chromaticAberration: onMedia ? 0 : (isDark ? 0.004 : 0.006),
     lightIntensity: onMedia ? (isDark ? 0.56 : 0.62) : (isDark ? 0.72 : 0.82),
     ambientStrength: onMedia ? (isDark ? 0.06 : 0.10) : (isDark ? 0.08 : 0.18),
-    ambientRim: onMedia ? 0.12 : 0.17,
-    glowIntensity: onMedia ? 0.12 : 0.18,
     specularSharpness: GlassSpecularSharpness.medium,
     refractiveIndex: onMedia ? 1.06 : 1.15,
     saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),
@@ -281,21 +314,24 @@ class TpGlassSurface extends StatelessWidget {
       opaqueColor: tint,
     );
 
-    return TpGlassEdge(
-      borderRadius: radius,
-      child: GlassContainer(
-        padding: padding,
-        useOwnLayer: true,
-        quality: GlassQuality.standard,
-        platformViewBackdrop: platformViewBackdrop,
-        allowElevation: true,
-        clipBehavior: Clip.antiAlias,
-        shape: LiquidRoundedSuperellipse(
-          borderRadius: radius,
-          side: BorderSide(color: border),
+    return tpGlassBrightnessOverride(
+      context: context,
+      child: TpGlassEdge(
+        borderRadius: radius,
+        child: GlassContainer(
+          padding: padding,
+          useOwnLayer: true,
+          quality: GlassQuality.standard,
+          platformViewBackdrop: platformViewBackdrop,
+          allowElevation: true,
+          clipBehavior: Clip.antiAlias,
+          shape: LiquidRoundedSuperellipse(
+            borderRadius: radius,
+            side: BorderSide(color: border),
+          ),
+          settings: resolvedSettings,
+          child: child,
         ),
-        settings: resolvedSettings,
-        child: child,
       ),
     );
   }

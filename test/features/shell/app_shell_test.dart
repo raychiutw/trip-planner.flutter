@@ -3,7 +3,6 @@ import 'dart:ui' show PointerDeviceKind, Tristate;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -658,8 +657,6 @@ void main() {
       expect(standard.settings!.chromaticAberration, greaterThan(0));
       expect(standard.settings!.refractiveIndex, greaterThan(1.06));
       // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
-      expect(map.settings!.ambientRim, greaterThan(0));
-      expect(standard.settings!.ambientRim, greaterThan(0));
       expect(map.indicatorSettings?.blur, map.settings?.blur);
       expect(
         map.indicatorSettings?.refractiveIndex,
@@ -891,7 +888,7 @@ void main() {
       expect(
         find.descendant(
           of: bar,
-          matching: find.byIcon(SFIcons.sf_suitcase_fill),
+          matching: find.byIcon(CupertinoIcons.briefcase_fill),
         ),
         findsWidgets,
       );
@@ -1028,7 +1025,7 @@ void main() {
       // 未選取態也是實心字符，靠 tint 區分而不是 outline↔filled 切換。
       const filled = [
         CupertinoIcons.chat_bubble_fill,
-        SFIcons.sf_suitcase_fill,
+        CupertinoIcons.briefcase_fill,
         CupertinoIcons.map_fill,
         CupertinoIcons.heart_fill,
       ];
