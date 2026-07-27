@@ -9,6 +9,70 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 
+/// Open-Meteo forecast endpoint 允許的預報天數上限(自今天起算的**額外**天數)。
+///
+/// 免費 forecast API 最多給 16 天,且**含今天**,亦即 `end_date` 最多到 today+15。
+/// 多帶一天整包會被打回 HTTP 400
+/// `Parameter 'end_date' is out of allowed range from ... to ...`,
+/// 於 2026-07-27 對 `api.open-meteo.com` 實測確認。
+const int kWeatherForecastHorizonDays = 15;
+
+/// 取不到預報的原因分類 —— 決定使用者看到的下一步。
+enum DayWeatherFailureKind { offline, timeout, rejected, unknown }
+
+/// 帶「使用者看得懂的下一步」的預報失敗。
+class DayWeatherFailure implements Exception {
+  const DayWeatherFailure(this.kind, {this.statusCode, this.detail});
+
+  final DayWeatherFailureKind kind;
+  final int? statusCode;
+  final String? detail;
+
+  /// 給使用者看的文案 —— 一律要講得出下一步。
+  String get message => switch (kind) {
+    DayWeatherFailureKind.offline => '無法連線,請確認網路後重試',
+    DayWeatherFailureKind.timeout => '連線逾時,請重試',
+    DayWeatherFailureKind.rejected =>
+      '預報服務回應異常(HTTP ${statusCode ?? '?'}),請稍後再試',
+    DayWeatherFailureKind.unknown => '無法取得預報,請重試',
+  };
+
+  /// 把任意錯誤收斂成分類明確的失敗。
+  factory DayWeatherFailure.from(Object error) {
+    if (error is DayWeatherFailure) return error;
+    if (error is! DioException) {
+      return DayWeatherFailure(
+        DayWeatherFailureKind.unknown,
+        detail: error.toString(),
+      );
+    }
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout => DayWeatherFailure(
+        DayWeatherFailureKind.timeout,
+        detail: error.message,
+      ),
+      DioExceptionType.connectionError => DayWeatherFailure(
+        DayWeatherFailureKind.offline,
+        detail: error.message,
+      ),
+      DioExceptionType.badResponse => DayWeatherFailure(
+        DayWeatherFailureKind.rejected,
+        statusCode: error.response?.statusCode,
+        detail: error.response?.data?.toString(),
+      ),
+      _ => DayWeatherFailure(
+        DayWeatherFailureKind.unknown,
+        detail: error.message,
+      ),
+    };
+  }
+
+  @override
+  String toString() => 'DayWeatherFailure($kind, $statusCode, $detail)';
+}
+
 typedef DayWeatherFetcher =
     Future<TripWeatherHourly> Function(TripWeatherRequest request);
 
@@ -18,13 +82,21 @@ final dayWeatherFetcherProvider = Provider<DayWeatherFetcher>((ref) {
   return fetcher.fetch;
 });
 
+/// 預報失敗一律立刻讓使用者看到原因與重試鍵,不走自動重試。
+///
+/// riverpod 3 的 `ProviderContainer.defaultRetry` 只跳過 `Error`,其餘一律指數
+/// 退避重試 10 次;實測失敗會被重打 11 次、橫跨約 38 秒,期間 `AsyncValue` 停在
+/// `AsyncLoading(retrying)`,畫面一直是「正在更新預報」。天氣是可有可無的輔助
+/// 資訊,寧可馬上說清楚失敗原因,把要不要再試交給使用者。
+Duration? _noAutoRetry(int retryCount, Object error) => null;
+
 final dayWeatherProvider =
     FutureProvider.family<TripWeatherHourly, TripWeatherRequest>((
       ref,
       request,
     ) {
       return ref.watch(dayWeatherFetcherProvider)(request);
-    });
+    }, retry: _noAutoRetry);
 
 class TripWeatherLocation {
   const TripWeatherLocation({
@@ -192,7 +264,9 @@ class OpenMeteoDayWeatherFetcher {
     if (targetDate == null) return TripWeatherHourly.empty();
 
     final today = _dateOnly(DateTime.now());
-    final forecastEnd = today.add(const Duration(days: 16));
+    final forecastEnd = today.add(
+      const Duration(days: kWeatherForecastHorizonDays),
+    );
     final tripStart = _parseDateOnly(request.tripStart);
     final tripEnd = _parseDateOnly(request.tripEnd);
     final fetchStart = tripStart != null && tripStart.isAfter(today)
@@ -211,7 +285,11 @@ class OpenMeteoDayWeatherFetcher {
         .where((location) => !_cache.containsKey(_locationKey(location)))
         .toList();
     if (missing.isNotEmpty) {
-      await _fetchAndCache(missing, fetchStart, fetchEnd, request.timezone);
+      try {
+        await _fetchAndCache(missing, fetchStart, fetchEnd, request.timezone);
+      } catch (error) {
+        throw DayWeatherFailure.from(error);
+      }
     }
 
     final temps = <double>[];
@@ -288,10 +366,18 @@ class DayWeatherCard extends ConsumerStatefulWidget {
 
 /// 真實預報尚未可用時顯示的明確示意狀態。
 class DayWeatherPreview extends StatelessWidget {
-  const DayWeatherPreview({super.key, required this.dayNum, this.statusText});
+  const DayWeatherPreview({
+    super.key,
+    required this.dayNum,
+    this.statusText,
+    this.onRetry,
+  });
 
   final int dayNum;
   final String? statusText;
+
+  /// 只有「重試有意義」的失敗狀態才給,載入中與尚未開放不給。
+  final VoidCallback? onRetry;
 
   ({String temperature, String condition, String rain, IconData icon})
   get _sample => switch ((dayNum - 1) % 4) {
@@ -379,6 +465,23 @@ class DayWeatherPreview extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                if (onRetry != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: ValueKey('day-weather-retry-$dayNum'),
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('重試'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TpSpacing.s2,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -408,8 +511,10 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
       );
     }
 
+    // 上限與 [kWeatherForecastHorizonDays] 一致 —— 否則會送出注定 400 的請求,
+    // 使用者看到的是錯誤而不是「尚未開放」。
     final diff = _daysUntil(dayDate);
-    if (diff != null && diff > 16) {
+    if (diff != null && diff > kWeatherForecastHorizonDays) {
       return DayWeatherPreview(
         dayNum: widget.day.dayNum,
         statusText: '天氣預報將於出發前 16 天開放',
@@ -434,7 +539,8 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
           ),
           error: (error, stackTrace) => DayWeatherPreview(
             dayNum: widget.day.dayNum,
-            statusText: '暫時無法取得預報',
+            statusText: DayWeatherFailure.from(error).message,
+            onRetry: () => ref.invalidate(dayWeatherProvider(request)),
           ),
           data: (hourly) {
             if (!hourly.hasData) {

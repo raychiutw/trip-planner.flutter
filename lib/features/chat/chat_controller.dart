@@ -87,6 +87,7 @@ class ChatController extends Notifier<ChatState> {
   int _tempId = -1;
   bool _disposed = false;
   bool _initStarted = false;
+  bool _refreshing = false;
   final Set<int> _polling = <int>{};
 
   @override
@@ -140,6 +141,52 @@ class ChatController extends Notifier<ChatState> {
     _initStarted = false;
     state = state.copyWith(initialLoading: true, error: null);
     return loadInitial();
+  }
+
+  /// 回到最新那一端時重抓最新一頁(離開又回來就是最新的)。
+  ///
+  /// 與 [reload] 的差別:不進 `initialLoading`、不清空畫面,已經捲上去載入的更舊
+  /// 訊息也留著 —— 只把最新一頁併回去(同 id 以新抓到的為準)。重入由 [_refreshing]
+  /// 擋掉;失敗靜默(既有內容續留,不打斷閱讀)。
+  Future<void> refreshLatest() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      final page = await _repo.fetchRequests(
+        tripId: tripId,
+        sort: 'desc',
+        limit: _pageSize,
+      );
+      if (_disposed) return;
+      final latest = page.items.reversed.toList(); // asc
+      final latestIds = {for (final r in latest) r.id};
+      // 樂觀 temp(負 id)還沒換成真 row,留在最後不被這次合併洗掉。
+      final pending = [
+        for (final r in state.requests)
+          if (r.id < 0) r,
+      ];
+      final kept = [
+        for (final r in state.requests)
+          if (r.id >= 0 && !latestIds.contains(r.id)) r,
+      ];
+      final merged = [...kept, ...latest];
+      state = state.copyWith(
+        requests: [...merged, ...pending],
+        // 只有先前沒有任何真實訊息時,cursor 與 hasMore 才由這頁決定。
+        hasMore: kept.isEmpty ? page.hasMore : state.hasMore,
+        oldest: merged.isEmpty
+            ? null
+            : (createdAt: merged.first.createdAt, id: merged.first.id),
+        error: null,
+      );
+      for (final r in latest) {
+        if (!r.status.isTerminal) _startPoll(r.id);
+      }
+    } on Exception {
+      // 重拉失敗不擋畫面:維持既有訊息,也不覆蓋既有錯誤狀態。
+    } finally {
+      _refreshing = false;
+    }
   }
 
   /// 往更舊翻頁(prepend);用最舊一筆當 cursor。
