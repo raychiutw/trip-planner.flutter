@@ -196,8 +196,154 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('天氣示意'), findsOneWidget);
-    expect(find.text('暫時無法取得預報'), findsOneWidget);
+    expect(find.text('無法取得預報,請重試'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('取不到預報時只打一次 API,不被 riverpod 靜默重試', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue((request) async {
+            calls++;
+            throw const DayWeatherFailure(DayWeatherFailureKind.offline);
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // riverpod 3 的 defaultRetry 會把「非 Error」的失敗自動重試 10 次,
+    // 期間 AsyncValue 停在 AsyncLoading(retrying),使用者只看得到載入態。
+    expect(find.text('正在更新預報'), findsNothing);
+    expect(find.text('無法連線,請確認網路後重試'), findsOneWidget);
+
+    // 把假時鐘往前推超過預設退避總長(約 38 秒),確認沒有被靜默重打。
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(calls, 1);
+  });
+
+  testWidgets('離線失敗時給出可行動文案與重試鍵', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue(
+            (request) => Future.error(
+              const DayWeatherFailure(DayWeatherFailureKind.offline),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法連線,請確認網路後重試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('day-weather-retry-1')), findsOneWidget);
+  });
+
+  testWidgets('按重試會重抓並顯示實際預報', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue((request) async {
+            calls++;
+            if (calls == 1) {
+              throw const DayWeatherFailure(DayWeatherFailureKind.timeout);
+            }
+            return TripWeatherHourly(
+              temps: [for (var h = 0; h < 24; h++) 24],
+              rains: [for (var h = 0; h < 24; h++) 20],
+              codes: [for (var h = 0; h < 24; h++) 1],
+            );
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('連線逾時,請重試'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('day-weather-retry-1')));
+    await tester.pumpAndSettle();
+
+    expect(calls, 2);
+    expect(find.byKey(const ValueKey('day-weather-live-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('day-weather-retry-1')), findsNothing);
+  });
+
+  testWidgets('尚未開放與載入中的示意卡不給重試鍵', (tester) async {
+    final completer = Completer<TripWeatherHourly>();
+    addTearDown(() => completer.complete(TripWeatherHourly.empty()));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue(
+            (request) => completer.future,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: DayWeatherCard(day: _okinawaDay)),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('正在更新預報'), findsOneWidget);
+    expect(find.byKey(const ValueKey('day-weather-retry-1')), findsNothing);
+  });
+
+  testWidgets('恰好 16 天後的行程日不打 API,維持既有的 16 天文案', (tester) async {
+    final date = DateTime.now().add(const Duration(days: 16));
+    final dateText =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final day = TripDay(
+      id: 98,
+      dayNum: 2,
+      date: dateText,
+      version: 1,
+      timeline: _okinawaDay.timeline,
+    );
+    var calls = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue((request) async {
+            calls++;
+            return TripWeatherHourly.empty();
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: DayWeatherCard(day: day)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, 0);
+    expect(find.text('天氣預報將於出發前 16 天開放'), findsOneWidget);
   });
 
   testWidgets('empty hourly data never renders a misleading live forecast', (
