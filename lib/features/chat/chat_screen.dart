@@ -248,6 +248,12 @@ class _ChatBody extends ConsumerStatefulWidget {
 }
 
 class _ChatBodyState extends ConsumerState<_ChatBody> {
+  /// 距最舊那一端多近就自動載入更舊(iMessage／LINE 的作法,不需手勢)。
+  static const _loadOlderTrigger = 240.0;
+
+  /// 視為「停在最新那一端」的容差。
+  static const _latestEdgeSlop = 24.0;
+
   final _scroll = ScrollController();
   final _composerKey = GlobalKey();
   late final TextEditingController _input;
@@ -257,6 +263,9 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   bool? _aiAuthorized;
   bool _sendInProgress = false;
   double _composerHeight = 0;
+
+  /// 目前是否停在最新那一端;同時決定箭頭要不要出現,以及重拉的邊緣觸發。
+  bool _atLatest = true;
 
   @override
   void initState() {
@@ -309,13 +318,36 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
 
   void _saveDraft() => widget.onDraftChanged(_input.text);
 
-  // reverse list:接近「頂端」= 接近 maxScrollExtent → 載入更舊。
+  // reverse list:視覺底部 = 最新 = offset 0,視覺頂部 = 最舊 = maxScrollExtent。
   void _onScroll() {
-    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 240) {
-      unawaited(
-        ref.read(chatControllerProvider(widget.tripId).notifier).loadOlder(),
-      );
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final controller = ref.read(chatControllerProvider(widget.tripId).notifier);
+    if (position.pixels >= position.maxScrollExtent - _loadOlderTrigger) {
+      unawaited(controller.loadOlder());
     }
+    final atLatest = position.pixels <= _latestEdgeSlop;
+    // 邊緣觸發:只有「從離開狀態回到最新那一端」的那一次才重拉。回程會連續經過
+    // 多個貼近底部的位置,停在底部也還會有零星通知,靠 _atLatest 閂鎖擋掉重複。
+    if (atLatest == _atLatest) return;
+    if (atLatest) unawaited(controller.refreshLatest());
+    setState(() => _atLatest = atLatest);
+  }
+
+  /// 回到最新訊息那一端(reverse list 底部 = offset 0);重拉由 [_onScroll] 接手。
+  void _jumpToLatest() {
+    if (!_scroll.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(0);
+      return;
+    }
+    unawaited(
+      _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      ),
+    );
   }
 
   void _scrollToTop() {
@@ -471,8 +503,13 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                             TpSpacing.s4,
                             messageBottomInset,
                           ),
-                          itemCount: msgs.length,
+                          // reverse list 的最後一項落在視覺頂端 → 載入指示畫在
+                          // 更舊訊息即將接上來的那一頭。
+                          itemCount: msgs.length + (state.loadingOlder ? 1 : 0),
                           itemBuilder: (context, i) {
+                            if (i >= msgs.length) {
+                              return const _LoadingOlderIndicator();
+                            }
                             final m = msgs[msgs.length - 1 - i];
                             return _MessageBubble(
                               message: m,
@@ -487,6 +524,13 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
             ),
           ),
         ),
+        // 捲離最新訊息才出現;疊在訊息之上、輸入區之上方(不遮住輸入區)。
+        if (!_atLatest && msgs.isNotEmpty)
+          Positioned(
+            right: TpSpacing.s4,
+            bottom: messageBottomInset + TpSpacing.s2,
+            child: _JumpToLatestButton(onPressed: _jumpToLatest),
+          ),
         Align(
           alignment: Alignment.bottomCenter,
           child: NotificationListener<SizeChangedLayoutNotification>(
@@ -514,6 +558,53 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
       ],
     );
   }
+}
+
+/// 自動載入更舊時的指示;讀螢幕使用者靠 [Semantics] 得知目前正在載入。
+class _LoadingOlderIndicator extends StatelessWidget {
+  const _LoadingOlderIndicator();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: TpSpacing.s3),
+    child: Center(
+      child: Semantics(
+        key: const ValueKey('chat-loading-older'),
+        liveRegion: true,
+        label: '正在載入更早的訊息',
+        child: const SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 捲離最新訊息時浮出的「回到最新」圓鈕(44pt 可點區域)。
+class _JumpToLatestButton extends StatelessWidget {
+  const _JumpToLatestButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TpGlassSurface(
+    borderRadius: const BorderRadius.all(Radius.circular(TpSpacing.tapMin / 2)),
+    child: SizedBox.square(
+      dimension: TpSpacing.tapMin,
+      child: IconButton(
+        key: const ValueKey('chat-jump-to-latest'),
+        tooltip: '回到最新訊息',
+        padding: EdgeInsets.zero,
+        onPressed: onPressed,
+        icon: const Icon(
+          CupertinoIcons.chevron_down,
+          size: 20,
+          semanticLabel: '回到最新訊息',
+        ),
+      ),
+    ),
+  );
 }
 
 String? _emailLocalPart(String? email) {
