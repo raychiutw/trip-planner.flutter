@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../../theme/tokens.dart';
@@ -55,7 +54,11 @@ class AppleRootTabBar extends StatelessWidget {
   /// iOS 系統 app 的 tab bar 不這樣做。
   static const _destinations = [
     (label: '聊天', icon: CupertinoIcons.chat_bubble_fill),
-    (label: '行程', icon: SFIcons.sf_suitcase_fill),
+    // 整排統一用 `CupertinoIcons`。`SFIcons` 的 glyph 墨跡沒有置中在字框裡
+    // ——模擬器實測 60pt 下 `sf_suitcase_fill` 偏右 +9.7pt、`sf_suitcase`
+    // +8.8pt,而三個 `CupertinoIcons` 都在 ±0.3pt 內;換算到 24pt 字符約偏
+    // 4.8pt,與真機截圖量到的 5pt 吻合。混用兩個字型家族就會有一個對不齊。
+    (label: '行程', icon: CupertinoIcons.briefcase_fill),
     (label: '地圖', icon: CupertinoIcons.map_fill),
     (label: '收藏', icon: CupertinoIcons.heart_fill),
   ];

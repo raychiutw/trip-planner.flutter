@@ -189,4 +189,32 @@ void main() {
       expect(pill.width, greaterThan(columnWidth * 0.6));
     });
   });
+
+  testWidgets('root tab 的字符全部來自同一個字型家族', (tester) async {
+    // `SFIcons` 的 glyph 墨跡沒有置中在字框裡：在 60pt 下模擬器實測
+    // `sf_suitcase_fill` 偏右 **+9.7pt**、`sf_suitcase` 偏右 +8.8pt，而三個
+    // `CupertinoIcons`（chat_bubble_fill／map_fill／heart_fill）都在 ±0.3pt
+    // 內。換算到 tab bar 的 24pt 字符約偏 4.8pt，與 chrome 截圖量到的 5pt 吻合。
+    //
+    // 這不是版面問題（#170 修的是欄位對齊），是字型本身。混用兩個字型家族
+    // 就會有一個字符對不齊，所以整排統一。
+    await _pumpShell(tester);
+
+    final icons = tester
+        .widgetList<Icon>(
+          find.descendant(of: _tabBar, matching: find.byType(Icon)),
+        )
+        .map((icon) => icon.icon)
+        .whereType<IconData>()
+        .toList();
+
+    expect(icons, isNotEmpty);
+    for (final icon in icons) {
+      expect(
+        icon.fontFamily,
+        'CupertinoIcons',
+        reason: 'root tab 混用字型家族會讓其中一個字符對不齊：$icon',
+      );
+    }
+  });
 }

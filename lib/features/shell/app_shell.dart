@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_sficon/flutter_sficon.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -262,7 +261,7 @@ class _TripRegularList extends ConsumerWidget {
                 child: ListTile(
                   selected: selected,
                   title: Text(displayTitle),
-                  leading: const Icon(SFIcons.sf_suitcase),
+                  leading: const Icon(CupertinoIcons.briefcase),
                   trailing: selected
                       ? Icon(
                           CupertinoIcons.check_mark,
