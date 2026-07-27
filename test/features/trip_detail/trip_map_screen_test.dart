@@ -511,15 +511,15 @@ void main() {
         .getSemanticsData();
     expect(selectedDay.label, '第 1 天，共 2 天');
     expect(selectedDay.flagsCollection.isSelected, Tristate.isTrue);
-    // 選擇器的軌改成半透明填色 + `BackdropFilter`，不再走 LiquidGlass shader
-    // —— shader 會把 tint 衰減到顏色不可控。
+    // 選擇器的軌是玻璃，與其餘 chrome 同一套材質（#169）——「玻璃在純色頁面
+    // 上等於無色」是模擬器的假象，真機上玻璃膠囊清楚可見。
     expect(
       find.descendant(of: daySelector, matching: find.byType(GlassContainer)),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.descendant(of: daySelector, matching: find.byType(BackdropFilter)),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.byType(PageView), findsOneWidget);
     final pageView = tester.widget<PageView>(find.byType(PageView));

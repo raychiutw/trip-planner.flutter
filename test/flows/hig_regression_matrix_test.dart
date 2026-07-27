@@ -127,23 +127,21 @@ void main() {
         expectsOpaqueGlass ? 1 : 1.15,
       );
 
-      // 邊緣交還材質：這三個參數若沒設定，shader 的邊緣光是關掉的，
-      // 就得再描一條實心線補回來 —— 那正是「貼紙感」的來源。
-      if (!expectsOpaqueGlass) {
-        expect(
-          headerGlass.settings!.ambientRim,
-          greaterThan(0),
-          reason: '環境邊緣光必須有值',
-        );
-        expect(
-          headerGlass.settings!.glowIntensity,
-          greaterThan(0),
-          reason: '光暈強度必須有值',
-        );
-      }
+      // 材質邊緣光依真機 +125 → +30 的比例調降（#169）。數值寫死，拿 lib 的
+      // 常數當期望值會變成恆真。無障礙 fallback 則一律歸零。
+      expect(
+        headerGlass.settings!.ambientRim,
+        expectsOpaqueGlass ? 0 : closeTo(0.17, 0.0001),
+        reason: '環境邊緣光要對齊真機定案值',
+      );
+      expect(
+        headerGlass.settings!.glowIntensity,
+        expectsOpaqueGlass ? 0 : closeTo(0.18, 0.0001),
+        reason: '光暈強度要對齊真機定案值',
+      );
 
-      // 一般模式描一條細邊；提高對比才換成明顯的實心邊。原本相信「移除描邊
-      // 後由材質接手」，模擬器實測材質並沒有接手（差值恆為 0），Apple 是 +30。
+      // 一般模式描一條細邊；提高對比才換成明顯的實心邊。真機量到這條細邊
+      // 是 +20~+31（DAY tab 軌只有這一層），恰好落在 Apple 的 +30。
       final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;
       expect(
         headerShape.side.color.a,
@@ -151,10 +149,9 @@ void main() {
         reason: '一般模式要有一條對齊 Apple 強度的細邊',
       );
 
-      // 日期選擇器的軌道走同一條規則。軌本身改成半透明填色 +
-      // `BackdropFilter`，不再是 LiquidGlass —— shader 會把 tint 衰減到約
-      // 14%，導覽配方的 tint 在淺色又是 `surface`（白），疊在白色頁面上等於
-      // 無色，實測軌與頁面同為 #FFFFFF。
+      // 日期選擇器的軌道走同一條規則，而且軌本身也是玻璃（#169 改回）——
+      // 先前改成 `BackdropFilter` 的理由「玻璃在純色頁面上等於無色」是
+      // 模擬器的假象，真機上玻璃膠囊清楚可見。
       final trackDecoration = tester
           .widgetList<DecoratedBox>(
             find.descendant(
@@ -209,9 +206,17 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(TpHorizontalSelector<int>),
+          matching: find.byType(GlassContainer),
+        ),
+        findsOneWidget,
+        reason: '軌是玻璃，模糊與內容透出交給材質，不再自己疊 BackdropFilter',
+      );
+      expect(
+        find.descendant(
+          of: find.byType(TpHorizontalSelector<int>),
           matching: find.byType(BackdropFilter),
         ),
-        expectsOpaqueGlass ? findsNothing : findsOneWidget,
+        findsNothing,
       );
 
       if (expectsOpaqueGlass) {
