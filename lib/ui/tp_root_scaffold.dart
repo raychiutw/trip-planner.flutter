@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
 import 'tp_app_bar.dart';
 import 'tp_glass_surface.dart';
@@ -34,21 +36,26 @@ abstract final class TpRootGeometry {
   static double headerBottom(BuildContext context) =>
       headerTop(context) + headerHeight;
 
+  /// 帶狀遮蔽在膠囊下緣之外多留的羽化長度。
+  ///
+  /// 刻意等於 header 下方既有的 8pt 排版溝槽：日期選擇軌這類 chrome 就坐在
+  /// `headerBottom + TpSpacing.s2`，帶剛好收在它的上緣 —— chrome 不會被遮蔽
+  /// 層糊掉，內容（起點在 `initialContentTop`）也還在帶外，靜止時是清晰的。
+  static const double bandFeather = TpSpacing.s2;
+
+  /// 帶狀遮蔽的下緣。從畫面最頂（含狀態列）一路蓋到這裡。
+  static double bandBottom(BuildContext context) =>
+      headerBottom(context) + bandFeather;
+
   static double initialContentTop(BuildContext context) =>
       headerBottom(context) + TpSpacing.s3;
 }
 
 class TpRootScaffold extends StatelessWidget {
-  const TpRootScaffold({
-    super.key,
-    required this.header,
-    required this.body,
-    this.showSoftEdge = false,
-  });
+  const TpRootScaffold({super.key, required this.header, required this.body});
 
   final TpRootHeaderConfig header;
   final Widget body;
-  final bool showSoftEdge;
 
   @override
   Widget build(BuildContext context) {
@@ -57,14 +64,18 @@ class TpRootScaffold extends StatelessWidget {
       body: Stack(
         children: [
           Positioned.fill(child: body),
-          if (showSoftEdge)
-            Positioned(
-              key: const ValueKey('tp-root-soft-edge'),
-              top: TpRootGeometry.headerBottom(context),
-              left: 0,
-              right: 0,
-              child: const _TpRootSoftEdge(),
+          // 遮蔽層夾在內容與膠囊之間：它只取樣底下的內容，膠囊畫在它之上，
+          // 所以膠囊自己不會被糊到。六個 root 畫面共用這一條，不是 opt-in。
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: TpRootGeometry.bandBottom(context),
+            child: _TpRootHeaderBand(
+              key: const ValueKey('tp-root-header-band'),
+              onMedia: header.platformViewBackdrop,
             ),
+          ),
           Positioned(
             top: TpRootGeometry.headerTop(context),
             left: TpRootGeometry.horizontalInset,
@@ -284,27 +295,119 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
   }
 }
 
-class _TpRootSoftEdge extends StatelessWidget {
-  const _TpRootSoftEdge();
+/// header 佔的那一整條帶，對**底下的內容**做漸進模糊加淡出。
+///
+/// 取代原本的 `_TpRootSoftEdge`：那條只有 16pt、掛在 header **下方**、而且只有
+/// 顏色漸層沒有模糊，所以 #162 把 header 拆成獨立膠囊之後，內容直接從膠囊之間
+/// 的縫隙穿上來 —— 日期被標題膠囊蓋掉一半、返回鍵旁漏出一個孤零零的「0」。
+/// 依據 iOS 26「電話」app：控制項上方與後方的內容是漸進模糊加淡出，不是硬切。
+class _TpRootHeaderBand extends StatelessWidget {
+  const _TpRootHeaderBand({super.key, required this.onMedia});
+
+  /// 底下是 platform view（地圖）時走清透 scrim，與玻璃膠囊同一套暗化語彙。
+  final bool onMedia;
+
+  /// 漸進模糊靠**疊層**做，因為 Flutter 沒有「可遮罩的 backdrop filter」。
+  ///
+  /// `BackdropFilter` 取樣的是它底下已經合成的畫面；用 `ShaderMask` 或
+  /// `Opacity` 包住它會另開 save layer，backdrop 變成空的，模糊就消失。所以
+  /// 這裡疊一組都從帶頂出發、往下逐層縮短的 filter：越靠近帶頂被越多層蓋到，
+  /// 模糊越重，到帶底只剩一層，形成連續的斜坡而不是硬邊。
+  ///
+  /// 這些層彼此重疊，**不能**共用 `BackdropGroup`／`BackdropKey` —— 框架文件
+  /// 明講重疊的 backdrop filter 共用 key 時，重疊區會變成只套到其中一層。
+  static const int _blurLayers = 6;
+
+  /// 單層 sigma。高斯疊加是平方和開根號，帶頂的等效 sigma ≈ 5 × √6 ≈ 12。
+  static const double _blurSigmaPerLayer = 5;
+
+  /// 帶頂的淡出強度；膠囊下緣收到 [_veilEdgeRatio] 倍，再到帶底歸零。
+  static const double _veilPeakAlpha = 0.62;
+  static const double _veilEdgeRatio = 0.78;
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).scaffoldBackgroundColor;
+    final theme = Theme.of(context);
+    // 與玻璃同一組無障礙開關：這兩個狀態下不做模糊，改成不透明帶，
+    // 內容一格都不透出來，對比與可讀性最高。
+    final opaqueFallback =
+        MediaQuery.highContrastOf(context) ||
+        AppAccessibilityScope.reduceTransparencyOf(context);
+    final headerBottom = TpRootGeometry.headerBottom(context);
+    final feather = TpRootGeometry.bandFeather;
+    final veil = onMedia && !opaqueFallback
+        ? Colors.black
+        : theme.scaffoldBackgroundColor;
+    final peak = opaqueFallback
+        ? 1.0
+        : (onMedia ? tpMediaScrimOpacity : _veilPeakAlpha);
+    final edge = opaqueFallback ? 1.0 : peak * _veilEdgeRatio;
+
     return IgnorePointer(
-      child: SizedBox(
-        height: TpSpacing.s4,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                color.withValues(alpha: 0.38),
-                color.withValues(alpha: 0),
-              ],
+      child: Stack(
+        children: [
+          if (!opaqueFallback)
+            for (var index = 0; index < _blurLayers; index++)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height:
+                    headerBottom +
+                    feather * (_blurLayers - index) / _blurLayers,
+                child: ClipRect(
+                  // tileMode 用預設的 clamp：畫面邊界外沿用邊緣像素，跟系統
+                  // bar 的模糊一致。decal 會在畫面最頂端淡成透明，露出一條縫。
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: _blurSigmaPerLayer,
+                      sigmaY: _blurSigmaPerLayer,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: headerBottom,
+            // 無障礙 fallback 用純色而不是同色漸層：漸層著色器會 dither，
+            // 帶內就量得到 ±1 的雜訊，「內容一格都不透出」便驗不乾淨。
+            child: opaqueFallback
+                ? ColoredBox(color: veil)
+                : DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          veil.withValues(alpha: peak),
+                          veil.withValues(alpha: edge),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+          Positioned(
+            top: headerBottom,
+            left: 0,
+            right: 0,
+            height: feather,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    veil.withValues(alpha: edge),
+                    veil.withValues(alpha: 0),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

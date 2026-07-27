@@ -473,7 +473,6 @@ class _MatrixSceneState extends State<_MatrixScene> {
     return Scaffold(
       extendBody: true,
       body: TpRootScaffold(
-        showSoftEdge: true,
         header: TpRootHeaderConfig(
           title: const Text('京都五日行'),
           actions: [
