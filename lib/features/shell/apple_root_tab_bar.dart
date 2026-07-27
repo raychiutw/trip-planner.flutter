@@ -16,6 +16,27 @@ import '../../ui/tp_glass_surface.dart';
 /// 間隙（對齊 iOS 26 tab bar 約 70% 欄寬的比例）。
 const _indicatorExpansion = EdgeInsets.symmetric(horizontal: -14, vertical: -2);
 
+/// 字符與標籤那一排的左右內縮量(#170)。
+///
+/// `GlassTabBar` 內部有**兩個互相衝突的水平基準**:
+///
+/// - 字符／標籤那排住在「玻璃列寬度扣掉 `tabPadding`」的帶狀區裡,四欄均分;
+/// - 選取膠囊住在「玻璃列寬度扣掉固定 4pt」的帶狀區裡 —— 那個 4pt 是
+///   `TabIndicator` 寫死傳給 `AnimatedGlassIndicator` 的 `padding`,外部參數
+///   碰不到(liquid_glass_widgets 0.22.1)。
+///
+/// 兩條帶子相差多少,第 i 欄的中心就差 `p × (1 − 2(i+0.5)/n)`,與螢幕寬度無關。
+/// 套件預設 `.bottom` 是 4、`.inline` 是 8:
+///
+/// - 4pt(舊值):字符與膠囊同心,但整排被往玻璃列中心擠 3／1／−1／−3pt ——
+///   真機量到的「字符被往 bar 中心拉」就是這個;
+/// - 0pt:整排回到欄位中心,但膠囊反過來偏 3pt(已用測試確認會紅);
+/// - 2pt:兩邊各分一半,任一項最大 1.5pt,都落在票上訂的 2pt 容差內。
+///
+/// 所以取 2。套件哪天讓 indicator padding 可設定(或升到 0.23.0 後確認可設),
+/// 這裡就能改成 0 並讓兩個基準真正合一。
+const _tabPadding = EdgeInsets.symmetric(horizontal: 2);
+
 class AppleRootTabBar extends StatelessWidget {
   const AppleRootTabBar({
     super.key,
@@ -102,6 +123,8 @@ class AppleRootTabBar extends StatelessWidget {
             iconSize: 24,
             horizontalPadding: 0,
             verticalPadding: 0,
+            // 見 `_tabPadding`：字符／標籤那排與選取膠囊分屬兩個基準。
+            tabPadding: _tabPadding,
             settings: glassSettings,
             // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
             // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
@@ -130,6 +153,8 @@ class AppleRootTabBar extends StatelessWidget {
             onTabSelected: onSelected,
             horizontalPadding: 0,
             verticalPadding: 0,
+            // 見 `_tabPadding`：字符／標籤那排與選取膠囊分屬兩個基準。
+            tabPadding: _tabPadding,
             settings: glassSettings,
             // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
             // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
