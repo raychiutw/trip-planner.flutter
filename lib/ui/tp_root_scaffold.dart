@@ -133,17 +133,13 @@ class TpRootGlassHeader extends StatelessWidget {
         onMedia: config.platformViewBackdrop,
         child: Row(
           children: [
-            if (config.leading != null) ...[
-              SizedBox.square(
-                key: const ValueKey('tp-root-header-leading'),
-                dimension: TpSpacing.tapMin,
-                child: config.leading,
-              ),
-              const SizedBox(width: TpSpacing.s2),
-            ],
-            // `Expanded` + `Align`：膠囊保持自然寬度靠左，剩下的空間交給
-            // 右側動作。不能用 `Flexible` 搭 `Spacer` —— 兩者都有 flex，會
-            // 平分剩餘空間，動作就靠不到右邊。
+            // 返回鍵與標題是**同一組**,包在同一顆膠囊裡 —— 對照 iOS 26
+            // 「訊息」app 的 `‹ 121`:返回與它所屬的內容是一組,不是兩顆
+            // 各自浮著。
+            //
+            // `Expanded` + `Align`:膠囊保持自然寬度靠左,剩下的空間交給
+            // 右側動作。不能用 `Flexible` 搭 `Spacer` —— 兩者都有 flex,會
+            // 平分剩餘空間,動作就靠不到右邊。
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -157,14 +153,39 @@ class TpRootGlassHeader extends StatelessWidget {
                           ? TpNavigationGlassRecipe.platformView
                           : TpNavigationGlassRecipe.regular,
                     ),
-                    borderRadius: const BorderRadius.all(Radius.circular(32)),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TpRootGeometry.headerContentInset,
-                      vertical: TpSpacing.s2,
+                    borderRadius: const BorderRadius.all(
+                      Radius.circular(TpSpacing.tapMin / 2),
                     ),
-                    child: TpHeaderTitle(
-                      key: const ValueKey('tp-root-header-title'),
-                      child: config.title,
+                    padding: EdgeInsets.only(
+                      // 有返回鍵時左側交給按鈕自己的觸控區,不再另外內縮。
+                      left: config.leading == null
+                          ? TpRootGeometry.headerContentInset
+                          : 0,
+                      right: TpRootGeometry.headerContentInset,
+                    ),
+                    // 整列等高:三顆圓鈕都是 44pt,標題先前只給內距、讓
+                    // `headlineSmall` 自己撐,實測撐到 63.7pt。
+                    child: SizedBox(
+                      height: TpSpacing.tapMin,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (config.leading != null) ...[
+                            SizedBox.square(
+                              key: const ValueKey('tp-root-header-leading'),
+                              dimension: TpSpacing.tapMin,
+                              child: config.leading,
+                            ),
+                            const SizedBox(width: TpSpacing.s1),
+                          ],
+                          Flexible(
+                            child: TpHeaderTitle(
+                              key: const ValueKey('tp-root-header-title'),
+                              child: config.title,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

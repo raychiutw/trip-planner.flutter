@@ -232,6 +232,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
           key: const ValueKey('trip-timeline-back'),
           icon: CupertinoIcons.back,
           tooltip: '返回行程列表',
+          // 返回鍵與行程名稱併成同一顆膠囊,所以它自己不再帶玻璃。
+          plain: true,
           onPressed: () => context.go('/trips'),
         ),
         title: isEditing
