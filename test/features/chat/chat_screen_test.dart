@@ -63,6 +63,8 @@ class _ChatQueryHarnessState extends State<_ChatQueryHarness> {
 
 const _trips = [TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩')];
 
+typedef _RequestPage = ({List<TripRequest> items, bool hasMore});
+
 TripRequest _req({
   required int id,
   String message = 'hi',
@@ -1146,6 +1148,190 @@ void main() {
         message: any(named: 'message'),
       ),
     ).called(1);
+  });
+
+  group('捲動與重整區隔', () {
+    /// reverse list：視覺底部 = 最新 = offset 0，視覺頂部 = 最舊 = maxScrollExtent。
+    ScrollPosition positionOf(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(const ValueKey('chat-list')),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+
+    List<TripRequest> descPage(int newestId, int count) => [
+      for (var id = newestId; id > newestId - count; id--)
+        _req(
+          id: id,
+          message: '第 $id 則訊息',
+          reply: '第 $id 則回覆，內容夠長才撐得起可捲動的清單。',
+          status: RequestStatus.completed,
+        ),
+    ];
+
+    testWidgets('自動載入更舊時在清單頂端顯示載入指示，載入結束後消失', (tester) async {
+      final older = Completer<_RequestPage>();
+      when(
+        () => reqRepo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((invocation) {
+        final beforeId = invocation.namedArguments[#beforeId] as int?;
+        if (beforeId != null) return older.future;
+        return Future.value((items: descPage(12, 10), hasMore: true));
+      });
+
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+
+      final indicator = find.byKey(const ValueKey('chat-loading-older'));
+      expect(indicator, findsNothing);
+
+      final position = positionOf(tester);
+      position.jumpTo(position.maxScrollExtent); // 捲到視覺頂端（最舊）
+      await tester.pump();
+      position.jumpTo(position.maxScrollExtent); // 指示器插入後再貼齊頂端
+      await tester.pump();
+
+      expect(indicator, findsOneWidget);
+      expect(find.bySemanticsLabel('正在載入更早的訊息'), findsOneWidget);
+      final indicatorRect = tester.getRect(indicator);
+      expect(indicatorRect.top, greaterThanOrEqualTo(0.0)); // 真的在畫面內
+      expect(
+        indicatorRect.bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('第 3 則訊息')).top),
+      ); // 畫在最舊訊息之上
+
+      older.complete((items: descPage(2, 1), hasMore: false));
+      await tester.pumpAndSettle();
+
+      expect(indicator, findsNothing);
+      expect(find.text('第 2 則訊息'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('捲離最新訊息出現回到最新箭頭，點擊回到最新且不遮住輸入區', (tester) async {
+      when(
+        () => reqRepo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((_) async => (items: descPage(30, 30), hasMore: false));
+
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+
+      final arrow = find.byKey(const ValueKey('chat-jump-to-latest'));
+      expect(arrow, findsNothing); // 已在最新那一端
+
+      final list = find.byKey(const ValueKey('chat-list'));
+      await tester.drag(list, const Offset(0, 360));
+      await tester.pumpAndSettle();
+      final position = positionOf(tester);
+      expect(position.pixels, greaterThan(0));
+
+      expect(arrow, findsOneWidget);
+      expect(find.bySemanticsLabel('回到最新訊息'), findsOneWidget);
+      final arrowRect = tester.getRect(arrow);
+      expect(arrowRect.width, greaterThanOrEqualTo(44.0));
+      expect(arrowRect.height, greaterThanOrEqualTo(44.0));
+      expect(
+        arrowRect.bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byKey(const ValueKey('chat-composer-glass'))).top,
+        ),
+      ); // 不遮住輸入區
+
+      await tester.tap(arrow);
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, 0);
+      expect(arrow, findsNothing);
+      semantics.dispose();
+    });
+
+    testWidgets('手動捲回最新那一端會重抓一次，停在底部不會反覆發送', (tester) async {
+      var latestFetches = 0;
+      when(
+        () => reqRepo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((invocation) {
+        if (invocation.namedArguments[#beforeId] == null) latestFetches++;
+        return Future.value((items: descPage(30, 30), hasMore: false));
+      });
+
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+      expect(latestFetches, 1); // 進頁載入
+
+      final list = find.byKey(const ValueKey('chat-list'));
+      await tester.drag(list, const Offset(0, 360));
+      await tester.pumpAndSettle();
+      expect(positionOf(tester).pixels, greaterThan(0));
+      expect(latestFetches, 1); // 只是往上看歷史，不是重整
+
+      await tester.drag(list, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(positionOf(tester).pixels, 0);
+      // 回程會連續經過多個貼近底部的位置，仍只重抓一次。
+      expect(latestFetches, 2);
+
+      // 再離開再回來 → 是邊緣觸發，不是一輩子只做一次。
+      await tester.drag(list, const Offset(0, 360));
+      await tester.pumpAndSettle();
+      expect(latestFetches, 2);
+      await tester.drag(list, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(latestFetches, 3);
+    });
+
+    testWidgets('按回到最新箭頭也會重抓最新訊息', (tester) async {
+      var latestFetches = 0;
+      when(
+        () => reqRepo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((invocation) {
+        if (invocation.namedArguments[#beforeId] == null) latestFetches++;
+        return Future.value((items: descPage(30, 30), hasMore: false));
+      });
+
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find.byKey(const ValueKey('chat-list')),
+        const Offset(0, 360),
+      );
+      await tester.pumpAndSettle();
+      expect(latestFetches, 1);
+
+      await tester.tap(find.byKey(const ValueKey('chat-jump-to-latest')));
+      await tester.pumpAndSettle();
+
+      expect(positionOf(tester).pixels, 0);
+      expect(latestFetches, 2);
+    });
   });
 
   group('語音輸入', () {
