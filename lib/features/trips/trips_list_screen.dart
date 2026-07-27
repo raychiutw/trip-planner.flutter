@@ -269,7 +269,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     final theme = Theme.of(context);
 
     return TpRootScaffold(
-      showSoftEdge: true,
       header: TpRootHeaderConfig(
         title: const Text('我的行程'),
         actions: [

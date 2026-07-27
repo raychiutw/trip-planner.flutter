@@ -253,7 +253,6 @@ void main() {
     await tester.pumpWidget(
       _app(
         TpRootScaffold(
-          showSoftEdge: true,
           header: const TpRootHeaderConfig(title: Text('我的行程')),
           body: TpRootScrollView(
             slivers: [
@@ -281,7 +280,13 @@ void main() {
     await tester.pump();
 
     expect(tester.getRect(header), headerBefore);
-    expect(find.byKey(const ValueKey('tp-root-soft-edge')), findsOneWidget);
+    // 遮蔽帶不是 opt-in：沒有旗標的 root scaffold 也要有，六個畫面才一致。
+    // 它做了什麼（糊掉、淡出、不吃觸控）由 tp_root_header_band_test 量像素驗。
+    final band = tester.getRect(
+      find.byKey(const ValueKey('tp-root-header-band')),
+    );
+    expect(band.top, 0);
+    expect(band.bottom, greaterThan(headerBefore.bottom));
   });
 
   testWidgets('200 percent text keeps HIG action targets and spacing', (
