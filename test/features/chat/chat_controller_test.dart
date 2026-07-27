@@ -369,6 +369,166 @@ void main() {
     sub.close();
   });
 
+  group('refreshLatest（回到最新那一端重抓）', () {
+    test('併入新到的訊息、就地更新既有 row，且不進入 initialLoading', () async {
+      final repo = _MockRepo();
+      var latestFetches = 0;
+      when(
+        () => repo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((_) async {
+        latestFetches++;
+        // desc：第一次只有 1；第二次 2 是新到的，1 的 reply 也補上了。
+        return latestFetches == 1
+            ? (
+                items: [_req(id: 1, status: RequestStatus.completed)],
+                hasMore: false,
+              )
+            : (
+                items: [
+                  _req(
+                    id: 2,
+                    message: '協作者訊息',
+                    status: RequestStatus.completed,
+                  ),
+                  _req(id: 1, status: RequestStatus.completed, reply: '改好了'),
+                ],
+                hasMore: false,
+              );
+      });
+
+      final c = makeContainer(repo);
+      final ctrl = ctrlOf(c);
+      await ctrl.loadInitial();
+      expect(c.read(chatControllerProvider('t')).requests.single.reply, isNull);
+
+      await ctrl.refreshLatest();
+
+      final s = c.read(chatControllerProvider('t'));
+      expect(latestFetches, 2);
+      expect(s.requests.map((r) => r.id).toList(), [1, 2]); // asc，不重複
+      expect(s.requests.first.reply, '改好了'); // 就地更新
+      expect(s.initialLoading, isFalse); // 不清空畫面
+    });
+
+    test('保留先前捲上去載入的更舊訊息', () async {
+      final repo = _MockRepo();
+      var latestFetches = 0;
+      when(
+        () => repo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((invocation) async {
+        final beforeId = invocation.namedArguments[#beforeId] as int?;
+        if (beforeId != null) {
+          return (
+            items: [_req(id: 1, status: RequestStatus.completed)],
+            hasMore: false,
+          );
+        }
+        latestFetches++;
+        return (
+          items: [
+            // 第二次拉最新頁時，4 是離開期間新到的。
+            if (latestFetches > 1) _req(id: 4, status: RequestStatus.completed),
+            _req(id: 3, status: RequestStatus.completed),
+            _req(id: 2, status: RequestStatus.completed),
+          ],
+          hasMore: true,
+        );
+      });
+
+      final c = makeContainer(repo);
+      final ctrl = ctrlOf(c);
+      await ctrl.loadInitial(); // asc [2,3]
+      await ctrl.loadOlder(); // asc [1,2,3]
+
+      await ctrl.refreshLatest();
+
+      final s = c.read(chatControllerProvider('t'));
+      expect(s.requests.map((r) => r.id).toList(), [1, 2, 3, 4]);
+    });
+
+    test('進行中重入只發一次請求', () async {
+      final repo = _MockRepo();
+      final pending = Completer<({List<TripRequest> items, bool hasMore})>();
+      var latestFetches = 0;
+      when(
+        () => repo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((_) {
+        latestFetches++;
+        return latestFetches == 1
+            ? Future.value((items: <TripRequest>[], hasMore: false))
+            : pending.future;
+      });
+
+      final c = makeContainer(repo);
+      final ctrl = ctrlOf(c);
+      await ctrl.loadInitial();
+
+      final first = ctrl.refreshLatest();
+      final second = ctrl.refreshLatest();
+      expect(latestFetches, 2); // 初次載入 + 一次重拉
+
+      pending.complete((
+        items: [_req(id: 1, status: RequestStatus.completed)],
+        hasMore: false,
+      ));
+      await first;
+      await second;
+      expect(latestFetches, 2);
+      expect(c.read(chatControllerProvider('t')).requests, hasLength(1));
+    });
+
+    test('重拉失敗時保留既有訊息，不擋住畫面', () async {
+      final repo = _MockRepo();
+      var latestFetches = 0;
+      when(
+        () => repo.fetchRequests(
+          tripId: any(named: 'tripId'),
+          limit: any(named: 'limit'),
+          sort: any(named: 'sort'),
+          before: any(named: 'before'),
+          beforeId: any(named: 'beforeId'),
+        ),
+      ).thenAnswer((_) async {
+        latestFetches++;
+        if (latestFetches > 1) throw Exception('offline');
+        return (
+          items: [_req(id: 1, status: RequestStatus.completed, reply: 'a')],
+          hasMore: false,
+        );
+      });
+
+      final c = makeContainer(repo);
+      final ctrl = ctrlOf(c);
+      await ctrl.loadInitial();
+
+      await expectLater(ctrl.refreshLatest(), completes);
+
+      final s = c.read(chatControllerProvider('t'));
+      expect(latestFetches, 2); // 真的去打了才算重拉
+      expect(s.requests, hasLength(1));
+      expect(s.initialLoading, isFalse);
+      expect(s.error, isNull);
+    });
+  });
+
   test('reload：失敗後可重試成功', () async {
     final repo = _MockRepo();
     var calls = 0;
