@@ -9,6 +9,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 
+/// Open-Meteo forecast endpoint 允許的預報天數上限(自今天起算的**額外**天數)。
+///
+/// 免費 forecast API 最多給 16 天,且**含今天**,亦即 `end_date` 最多到 today+15。
+/// 多帶一天整包會被打回 HTTP 400
+/// `Parameter 'end_date' is out of allowed range from ... to ...`,
+/// 於 2026-07-27 對 `api.open-meteo.com` 實測確認。
+const int kWeatherForecastHorizonDays = 15;
+
 typedef DayWeatherFetcher =
     Future<TripWeatherHourly> Function(TripWeatherRequest request);
 
@@ -192,7 +200,9 @@ class OpenMeteoDayWeatherFetcher {
     if (targetDate == null) return TripWeatherHourly.empty();
 
     final today = _dateOnly(DateTime.now());
-    final forecastEnd = today.add(const Duration(days: 16));
+    final forecastEnd = today.add(
+      const Duration(days: kWeatherForecastHorizonDays),
+    );
     final tripStart = _parseDateOnly(request.tripStart);
     final tripEnd = _parseDateOnly(request.tripEnd);
     final fetchStart = tripStart != null && tripStart.isAfter(today)
@@ -408,8 +418,10 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
       );
     }
 
+    // 上限與 [kWeatherForecastHorizonDays] 一致 —— 否則會送出注定 400 的請求,
+    // 使用者看到的是錯誤而不是「尚未開放」。
     final diff = _daysUntil(dayDate);
-    if (diff != null && diff > 16) {
+    if (diff != null && diff > kWeatherForecastHorizonDays) {
       return DayWeatherPreview(
         dayNum: widget.day.dayNum,
         statusText: '天氣預報將於出發前 16 天開放',

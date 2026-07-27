@@ -200,6 +200,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('恰好 16 天後的行程日不打 API,維持既有的 16 天文案', (tester) async {
+    final date = DateTime.now().add(const Duration(days: 16));
+    final dateText =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final day = TripDay(
+      id: 98,
+      dayNum: 2,
+      date: dateText,
+      version: 1,
+      timeline: _okinawaDay.timeline,
+    );
+    var calls = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue((request) async {
+            calls++;
+            return TripWeatherHourly.empty();
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: DayWeatherCard(day: day)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, 0);
+    expect(find.text('天氣預報將於出發前 16 天開放'), findsOneWidget);
+  });
+
   testWidgets('empty hourly data never renders a misleading live forecast', (
     tester,
   ) async {
