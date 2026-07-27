@@ -319,5 +319,13 @@ void main() {
     final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
     expect(glass.quality, GlassQuality.premium);
     expect(glass.settings!.fresnelStrength, 0);
+    // `fresnelStrength` 只關掉 Fresnel 那一條。premium shader 的邊緣還有
+    // 第二個來源 —— specular 高光,`uLightIntensity` 在那裡被乘 3.0:
+    //   directional = totalInfluence^1.5 * uLightIntensity * 3.0
+    //   brightness  = (directional + ambient) * edgeFactor * thicknessScale
+    // 真機 v0.15.0 實測標題膠囊仍有 +100(目標 +30),所以連 lightIntensity
+    // 與 ambientStrength 一起壓。
+    expect(glass.settings!.lightIntensity, lessThanOrEqualTo(0.25));
+    expect(glass.settings!.ambientStrength, lessThanOrEqualTo(0.04));
   });
 }

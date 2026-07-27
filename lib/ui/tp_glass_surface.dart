@@ -177,8 +177,16 @@ LiquidGlassSettings tpGlassRecipe(
     thickness: onMedia ? 16 : (isDark ? 28 : 24),
     blur: blur,
     chromaticAberration: onMedia ? 0 : (isDark ? 0.004 : 0.006),
-    lightIntensity: onMedia ? (isDark ? 0.56 : 0.62) : (isDark ? 0.72 : 0.82),
-    ambientStrength: onMedia ? (isDark ? 0.06 : 0.10) : (isDark ? 0.08 : 0.18),
+    // **邊緣有兩條來源,`fresnelStrength` 只關掉其中一條。** premium shader
+    // 的 specular 高光是另一條,`uLightIntensity` 在那裡被乘 3.0:
+    //
+    //   directional = totalInfluence^1.5 * uLightIntensity * 3.0
+    //   brightness  = (directional + ambient) * edgeFactor * thicknessScale
+    //
+    // 真機 v0.15.0(已關 Fresnel)實測標題膠囊仍有 +100、日期選擇器 +105,
+    // 目標是 +30 —— 剩下的就是這一條。原本 0.72／0.08 壓到 0.20／0.03。
+    lightIntensity: onMedia ? 0.16 : 0.20,
+    ambientStrength: onMedia ? 0.02 : 0.03,
     specularSharpness: GlassSpecularSharpness.medium,
     refractiveIndex: onMedia ? 1.06 : 1.15,
     saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),
