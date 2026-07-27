@@ -53,3 +53,4 @@ ios/Flutter/Secrets.xcconfig
 android/maps.properties
 android/key.properties
 android/upload-keystore.jks
+.claude/worktrees/
