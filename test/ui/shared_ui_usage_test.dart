@@ -109,14 +109,12 @@ void main() {
       expect(source, isNot(contains('LiquidGlassSettings(')));
     }
 
-    // 日期選擇器刻意**不是**導覽玻璃的消費者：LiquidGlass shader 會把 tint
-    // 衰減到約 14%，而導覽配方的 tint 在淺色是 `surface`（白），疊在白色頁面
-    // 上等於無色 —— 實測軌與頁面同為 #FFFFFF。它改用自己畫的半透明填色 +
-    // `BackdropFilter`，色值可控。仍然不得自行組裝 glass settings。
+    // 日期選擇器的軌也是導覽玻璃的消費者（#169 改回玻璃）。先前排除它的理由
+    // 「玻璃在純色頁面上等於無色」是模擬器的假象。一樣不得自行組裝 settings。
     final selector = File(
       'lib/ui/tp_horizontal_selector.dart',
     ).readAsStringSync();
-    expect(selector, isNot(contains('tpNavigationGlassSettings(')));
+    expect(selector, contains('tpNavigationGlassSettings('));
     expect(selector, isNot(contains('LiquidGlassSettings(')));
   });
 

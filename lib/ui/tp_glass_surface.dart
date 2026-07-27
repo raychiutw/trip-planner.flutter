@@ -29,6 +29,9 @@ LiquidGlassSettings tpResolveGlassSettings(
     chromaticAberration: 0,
     lightIntensity: 0,
     ambientStrength: 0,
+    // `ambientRim` 先前漏在這串之外，fallback 仍帶著材質的邊緣光參數 ——
+    // 與「收斂為不透明、無 blur」的意圖不一致，一併歸零。
+    ambientRim: 0,
     refractiveIndex: 1,
     saturation: 1,
     glowIntensity: 0,
@@ -77,15 +80,23 @@ class TpBarForeground extends StatelessWidget {
 
 /// 一般模式描一條**細邊**；「提高對比」才換成明顯的實心邊。
 ///
-/// 曾經相信「移除描邊之後由材質接手」（`ambientRim`／`glowIntensity`／
-/// `specularSharpness` 會沿周長算出亮邊），據此把四處描邊全部移除。**模擬器
-/// 實測那個前提不成立**：用真正的 [TpGlassSurface] 量，不論背後是純黑或壓在
-/// 內容上，邊緣峰值與內部填色的差都是 **0**；把 `ambientRim` 從 0.70 到 0.07
-/// 試了五組值，在純黑背景上一律是 0。邊緣就這樣整個消失了。
-///
 /// iOS 26 的玻璃邊緣實測是**峰值高出內部填色約 +30**，且沿周長均勻
 /// （訊息 app 標題膠囊 x 360→810 全程 +28~+33；電話 app 編輯膠囊 +29）。
-/// 所以這裡把邊緣做回來，強度對齊 Apple，而不是舊描邊那種 +119 的貼紙感。
+/// 這條細邊就是對齊那個量級，而不是舊描邊那種 +119 的貼紙感。
+///
+/// **量測（#169，iPhone 17 Pro 模擬器 / iOS 26.5 / @3x）**：這條邊實體上是
+/// 3px 的實色，沿邊緣完全一致，左右對稱。
+///
+/// | | 內部填色 | 邊緣 | 差 |
+/// |---|---|---|---|
+/// | 深色 標題膠囊 / 選擇器軌 | 4 | 34 | **+30** |
+/// | 淺色 標題膠囊 / 選擇器軌 | 255 | 224 | **−31** |
+/// | 提高對比（深色） | 28 | 255 | +227 |
+/// | 提高對比（淺色） | 243 | 19 | −224 |
+///
+/// 同一批截圖裡玻璃材質自身**沒有**產生任何邊緣（內部填色與背景只差 4）——
+/// 模擬器不渲染材質邊緣光，真機上那一層是 +125，見 [tpGlassRecipe]。
+/// 換句話說**上表只驗到「我們自己畫的那條邊」**，材質那一半未經真機確認。
 ///
 /// 顏色由 `onSurface` 導出而非寫死白色：深色模式得到偏亮的細邊，淺色模式得到
 /// 偏暗的細邊 —— 淺色的填色本來就接近白，再加白邊等於沒有。
@@ -137,11 +148,33 @@ Color tpGlassEdgeColor(BuildContext context) {
 /// 浮動 header 呼叫導覽配方時又把前者蓋掉。收斂為同一組，以較接近 iOS 26 的
 /// 那一組為準；媒體背景（platform view）維持低色散與低折射率。
 ///
-/// `ambientRim`／`glowIntensity`／`specularSharpness` 三個參數原本**沒有設定**，
-/// 等於把 shader 的邊緣光關掉，才需要另外描一條實心線補回來。
+/// ## 材質自身的邊緣光（#169）
 ///
-/// ⚠️ 這三個參數目前是初值，**尚未真機定案**（見 #121）—— shader 折射與裝置
-/// 像素比及實際背景內容有關，模擬器不準。
+/// 真機（v0.13.0）量到標題膠囊與頭像圓鈕的邊緣高出內部填色 **+125~+138**，
+/// iOS 26 是 **+29~+31**。`ambientRim`／`glowIntensity` 依 30/125 ≈ 0.24 等比
+/// 調降（0.70→0.17、0.75→0.18；媒體背景 0.50→0.12）。
+///
+/// ⚠️ **這個調整值未經真機確認。** 模擬器不渲染材質邊緣光，量不到這一半。
+///
+/// ⚠️ **而且在目前的 `GlassQuality.standard` 下，這兩個參數根本不會進 shader。**
+/// 讀 `liquid_glass_widgets` 0.22.1 原始碼確認：
+///
+/// - `AdaptiveGlass` 只在 `quality == premium && Impeller` 時走 renderer 原生
+///   路徑（那裡才會 `setFloat(settings.ambientRim)`）；我們固定傳 standard，
+///   走的是 `LightweightLiquidGlass`。
+/// - `shaders/lightweight_glass.frag` **沒有 ambientRim 這個 uniform**；
+///   `uData4.w`（uGlowIntensity）取的是 `LightweightLiquidGlass` 的 **widget 欄位**
+///   `glowIntensity`，不是 `settings.glowIntensity` —— `GlassContainer` 的同名
+///   欄位預設 0，我們沒設過。
+/// - 該 shader 的邊緣來自硬寫死的常數（`kRimAlphaBase = 0.65`、
+///   `kMinRimVisibility = 0.35`）加上 `uLightIntensity`／`uRefractiveIndex`／
+///   `uThickness`／`uBackdropLuma`。`rimBrightness` 的地板 0.35 讓
+///   `lightIntensity` 在我們這組值域內完全不影響亮度。
+///
+/// 也就是說：**這次調降在目前的算圖路徑上預期是無效的**，真機的 +125 不會因此
+/// 改變。要真的把材質邊緣壓到 +30，得改算圖路徑（chrome 改走 premium，
+/// `ambientRim` 才是活的）或升級套件，兩者都超出本票範圍。保留這組數值是為了
+/// 記錄意圖、並在改走 premium 時就位。詳見 #169 的討論。
 LiquidGlassSettings tpGlassRecipe(
   BuildContext context, {
   required Color tint,
@@ -157,8 +190,8 @@ LiquidGlassSettings tpGlassRecipe(
     chromaticAberration: onMedia ? 0 : (isDark ? 0.004 : 0.006),
     lightIntensity: onMedia ? (isDark ? 0.56 : 0.62) : (isDark ? 0.72 : 0.82),
     ambientStrength: onMedia ? (isDark ? 0.06 : 0.10) : (isDark ? 0.08 : 0.18),
-    ambientRim: onMedia ? 0.5 : 0.7,
-    glowIntensity: onMedia ? 0.5 : 0.75,
+    ambientRim: onMedia ? 0.12 : 0.17,
+    glowIntensity: onMedia ? 0.12 : 0.18,
     specularSharpness: GlassSpecularSharpness.medium,
     refractiveIndex: onMedia ? 1.06 : 1.15,
     saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),

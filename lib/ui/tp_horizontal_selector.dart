@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,8 +46,6 @@ class TpHorizontalSelector<T> extends StatefulWidget {
 class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
   // 文字兩側的呼吸空間（含外層 3pt padding），讓膠囊不貼著字。
   static const _optionInset = 28.0;
-  // 與導覽 chrome 同一個模糊半徑。
-  static const _trackBlur = 16.0;
   static const _iconSize = 14.0;
   final ScrollController _controller = ScrollController();
   final FocusNode _focusNode = FocusNode(debugLabel: 'TpHorizontalSelector');
@@ -144,21 +141,22 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    // iOS `UISegmentedControl`：半透明 systemGray6 軌 + 比軌更亮的膠囊，
-    // 靠「浮起」表達選取。對照 iOS 26 電話 app 的通話記錄實測：深色下軌是
-    // #141414（黑底上）、膠囊 #363636，背後有內容時膠囊會透出約 8 階。
+    // iOS `UISegmentedControl`：玻璃軌 + 比軌更亮的膠囊，靠「浮起」表達選取。
+    // 對照 iOS 26 電話 app 的通話記錄實測：深色下軌是 #141414（黑底上）、
+    // 膠囊 #363636，背後有內容時膠囊會透出約 8 階。
     //
-    // **不走 LiquidGlass shader**：shader 會把 tint 衰減到約 14%，顏色不可
-    // 預測 —— 導覽配方的 tint 在淺色是 `surface`（白），疊在白色頁面上等於
-    // 無色，實測軌與頁面同為 #FFFFFF。巢狀在玻璃層裡的子玻璃顏色又會被母層
-    // 吃掉，選取膠囊完全畫不出來。改用 `BackdropFilter` + 半透明填色：一樣
-    // 是真的模糊與內容透出，但色值完全可控。
+    // **軌走與其餘 chrome 同一組玻璃材質**（#169）。v0.12.0 曾改成
+    // `BackdropFilter` + 自畫填色，理由是「玻璃在純色頁面上等於無色 —— 實測
+    // 軌與頁面同為 #FFFFFF」。那是**模擬器**的假象：模擬器不渲染 LiquidGlass
+    // 的材質邊緣光，真機上玻璃膠囊清楚可見（同一個假象也讓 PR #163 誤判材質
+    // 完全不產生邊緣）。頂部膠囊與底部 tab 都是玻璃，軌沒有理由自成一格。
+    //
+    // **選取膠囊維持自畫填色，不跟著回玻璃**：軌用 `useOwnLayer: true` 建立
+    // LiquidGlassLayer，巢狀在裡面的子玻璃會被合併進母層、`glassColor` 畫不
+    // 出來（實測改子層 alpha 逐位元零差異）。真機確認後再另案評估。
     final opaque =
         MediaQuery.highContrastOf(context) ||
         AppAccessibilityScope.reduceTransparencyOf(context);
-    final trackFill = opaque
-        ? scheme.surfaceContainerLow
-        : scheme.surfaceContainerLow.withValues(alpha: isDark ? 0.72 : 0.80);
     final selectedBase = isDark
         ? scheme.surfaceContainerHighest
         : scheme.surface;
@@ -166,51 +164,40 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
         ? selectedBase
         : selectedBase.withValues(alpha: isDark ? 0.90 : 0.92);
     final height = TpHorizontalSelector.preferredHeight(context);
-    final trackShape = LiquidRoundedSuperellipse(
-      borderRadius: height / 2,
-      // 一般模式不描邊；只有「提高對比」才補一條可見實心邊。
-      side: BorderSide(color: tpGlassEdgeColor(context)),
-    );
-    Widget track = DecoratedBox(
-      decoration: ShapeDecoration(color: trackFill, shape: trackShape),
-      child: SingleChildScrollView(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final option in widget.options)
-              _SelectorOption<T>(
-                option: option,
-                selected: option.value == widget.value,
-                width: _optionWidth(option),
-                height: height,
-                selectedFill: selectedFill,
-                // 淺色的白膠囊需要一點陰影才浮得起來；深色靠亮度差即可。
-                selectedShadow: !isDark,
-                accentColor: scheme.primary,
-                onTap: () {
-                  _focusNode.requestFocus();
-                  widget.onSelected(option.value);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-    if (!opaque) {
-      track = BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: _trackBlur, sigmaY: _trackBlur),
-        child: track,
-      );
-    }
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
       child: SizedBox(
         height: height,
-        child: ClipPath(
-          clipper: ShapeBorderClipper(shape: trackShape),
-          child: track,
+        child: TpGlassSurface(
+          // 無障礙 fallback 的不透明色。不能讓它退成 `surface` —— 選取膠囊
+          // 在淺色下就是 `surface`，軌與膠囊同色等於選取態隱形。
+          tintColor: scheme.surfaceContainerLow,
+          glassSettings: tpNavigationGlassSettings(context),
+          borderRadius: BorderRadius.all(Radius.circular(height / 2)),
+          child: SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final option in widget.options)
+                  _SelectorOption<T>(
+                    option: option,
+                    selected: option.value == widget.value,
+                    width: _optionWidth(option),
+                    height: height,
+                    selectedFill: selectedFill,
+                    // 淺色的白膠囊需要一點陰影才浮得起來；深色靠亮度差即可。
+                    selectedShadow: !isDark,
+                    accentColor: scheme.primary,
+                    onTap: () {
+                      _focusNode.requestFocus();
+                      widget.onSelected(option.value);
+                    },
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
