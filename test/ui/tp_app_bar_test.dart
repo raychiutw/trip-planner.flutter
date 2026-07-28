@@ -55,6 +55,44 @@ void main() {
       TpActionItem(value: 'b', label: '列印', icon: Icons.print),
     ];
 
+    testWidgets('開場淡入只包內容，玻璃面板本身不被 opacity 包住', (tester) async {
+      await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      // 動畫進行到一半 —— 這正是問題發生的時段。
+      await tester.pump();
+      await tester.pump(TpMotion.normal ~/ 2);
+
+      // 玻璃被 opacity 包住時，引擎會為它開一層 saveLayer，面板的 backdrop
+      // filter 因此失去直接翻用 onscreen target 的資格 —— 整段開場玻璃讀到的
+      // 是空背景，到最後一幀才突然變成毛玻璃（材質 pop）。淡入要包在玻璃
+      // 「裡面」，只淡內容；套件作者自己的 GlassPopover 也是這個寫法。
+      //
+      // 只看自家子樹：從玻璃往上走到面板最外層的 ScaleTransition 為止。
+      // 用 find.ancestor 會連框架的 route 轉場一起抓進來，那不是我們的事。
+      final between = <String>[];
+      tester.element(find.byKey(_menuPanel)).visitAncestorElements((element) {
+        if (element.widget is ScaleTransition) return false;
+        between.add(element.widget.runtimeType.toString());
+        return true;
+      });
+      expect(
+        between.where((t) => t == 'FadeTransition' || t == 'Opacity'),
+        isEmpty,
+        reason: '玻璃與 ScaleTransition 之間不得有 opacity 層，實際夾了：$between',
+      );
+      // 對照組：淡入本身沒有被拿掉，只是換了位置。
+      expect(
+        find.descendant(
+          of: find.byKey(_menuPanel),
+          matching: find.byType(FadeTransition),
+        ),
+        findsOneWidget,
+        reason: '淡入改由面板內部承擔，開場仍是淡入不是硬切',
+      );
+
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('點選單外面任何地方都可關閉', (tester) async {
       await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
