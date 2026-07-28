@@ -164,6 +164,17 @@ GoRouter buildSplitShellRouter() {
   );
 }
 
+/// 靜止態選取膠囊**實際畫出來**的填色。
+///
+/// #179:不要改回讀 `GlassTabBar.indicatorColor` —— 那個參數現在恆為透明,
+/// 靜止態的膠囊是本 app 自畫的(套件靜止時只會畫滿整格欄位,任何參數都收不動)。
+Color _selectedPillColor(WidgetTester tester, String label) {
+  final box = tester.widget<DecoratedBox>(
+    find.byKey(ValueKey('root-tab-pill-$label')),
+  );
+  return (box.decoration as ShapeDecoration).color!;
+}
+
 void main() {
   group('AppShell 4-tab 導航', () {
     testWidgets('iOS／Android 尺寸矩陣依可用寬度選擇導覽', (tester) async {
@@ -606,7 +617,7 @@ void main() {
       );
       expect(glass.platformViewBackdrop, isTrue);
       expect(
-        glass.indicatorColor,
+        _selectedPillColor(tester, '地圖'),
         AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.72,
         ),
@@ -663,7 +674,7 @@ void main() {
         map.settings?.refractiveIndex,
       );
       expect(
-        map.indicatorColor,
+        _selectedPillColor(tester, '地圖'),
         AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.72,
         ),
@@ -692,7 +703,7 @@ void main() {
       );
       expect(glass.indicatorSettings?.blur, 0);
       expect(glass.indicatorSettings?.glassColor.a, 1);
-      expect(glass.indicatorColor?.a, 1);
+      expect(_selectedPillColor(tester, '聊天').a, 1);
     });
 
     testWidgets('root tab 是浮動 Liquid Glass 功能層', (tester) async {
@@ -956,7 +967,7 @@ void main() {
       expect(glass.iconLabelSpacing, 4);
       expect(glass.platformViewBackdrop, isFalse);
       expect(
-        glass.indicatorColor,
+        _selectedPillColor(tester, '聊天'),
         AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.72,
         ),
@@ -994,10 +1005,10 @@ void main() {
       // 選取指示是「中性底 + tint 前景」。iOS 26 電話 app 實測膠囊是
       // #363636 中性灰、系統藍在字符上 —— 強調色在前景不在背景。
       // Apple 的藍是「它的」強調色，不是規範色；我們用柔褐。
-      expect(glass.indicatorColor, isNotNull);
-      expect(rgb(glass.indicatorColor!), isNot(rgb(scheme.primary)));
+      final pillColor = _selectedPillColor(tester, '聊天');
+      expect(rgb(pillColor), isNot(rgb(scheme.primary)));
       expect(
-        rgb(glass.indicatorColor!),
+        rgb(pillColor),
         rgb(scheme.surfaceContainerHighest),
         reason: '選取底是中性語意層',
       );
@@ -1009,12 +1020,10 @@ void main() {
       // 任何 settings 都調不動 —— 真機連續多版量到 +125~+138(目標 +30)。
       expect(glass.quality, GlassQuality.premium);
 
-      // 膠囊不得寬於自己的欄位。套件預設 `horizontal: 12` 是往外擴，實測
-      // 膠囊 341px 落在 275px 的欄位裡 = 124%，壓到左右鄰居；改成往內收，
-      // 模擬器實測約 75%（按參數計算 69%，差額是柔邊）。Apple 約 70%。
-      final expansion = glass.indicatorExpansion.resolve(TextDirection.ltr);
-      expect(expansion.left, lessThan(0), reason: '選取膠囊要往內收，不能沿用套件往外擴的預設');
-      expect(expansion.right, lessThan(0));
+      // #179:膠囊的寬度守門在 root_tab_alignment_test.dart —— 那裡量的是
+      // **畫出來的方框**。這裡原本斷言 `indicatorExpansion` 是負值,但那個參數
+      // 只在拖曳中生效(`RelativeRect.lerp` 在 thickness == 0 時回
+      // `RelativeRect.fill`),參數對、靜止態的畫面照樣滿版。
       expect(glass.selectedLabelColor, scheme.primary);
       expect(glass.unselectedIconColor, scheme.onSurface);
       expect(
@@ -1034,11 +1043,22 @@ void main() {
         CupertinoIcons.heart_fill,
       ];
       expect(glass.tabs.length, filled.length);
+      const labels = ['聊天', '行程', '地圖', '收藏'];
       for (var i = 0; i < filled.length; i++) {
-        final tab = glass.tabs[i];
-        expect((tab.icon! as Icon).icon, filled[i], reason: '第 $i 個 tab 未選取態');
+        // 兩態都量**畫出來的字符**：選取態的字符包在自畫膠囊外層裡（#179），
+        // 型別轉型看不到它。
         expect(
-          (tab.activeIcon! as Icon).icon,
+          tester
+              .widget<Icon>(find.byKey(ValueKey('root-tab-${labels[i]}')))
+              .icon,
+          filled[i],
+          reason: '第 $i 個 tab 未選取態',
+        );
+        final active = find.byKey(ValueKey('root-tab-active-${labels[i]}'));
+        // 選取層只畫選取態附近的 tab，畫出來的才驗。
+        if (active.evaluate().isEmpty) continue;
+        expect(
+          tester.widget<Icon>(active).icon,
           filled[i],
           reason: '第 $i 個 tab 選取態必須是同一個實心字符，不做 outline↔filled 切換',
         );
@@ -1061,7 +1081,7 @@ void main() {
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
       expect(
-        glass.indicatorColor,
+        _selectedPillColor(tester, '聊天'),
         AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.72,
         ),

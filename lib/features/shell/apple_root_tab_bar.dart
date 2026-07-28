@@ -9,11 +9,44 @@ import '../../ui/tp_glass_surface.dart';
 ///
 /// 刻意不做 iOS 26 的 tab bar minimize —— Apple 的 minimize 語意綁定「tab bar
 /// 底下是可捲動內容」，本 app 多數 root 畫面底下是固定版面，縮放只會讓導覽跳動。
-/// 選取膠囊相對於欄位的內縮量。
+/// 拖曳中的指示器相對於欄位的擴張量。
 ///
-/// 套件預設是往外擴 12pt；我們往內收，讓膠囊緊貼字符與標籤、左右留出明顯
-/// 間隙（對齊 iOS 26 tab bar 約 70% 欄寬的比例）。
+/// **只在拖曳中生效**(#179):`AnimatedGlassIndicator` 的幾何是
+/// `RelativeRect.lerp(RelativeRect.fill, expansion, thickness)`,靜止時
+/// `thickness == 0` → `RelativeRect.fill`,整格欄位。靜止態的膠囊寬度由
+/// `_restIndicatorWidthRatio` 自畫控制,與這個常數無關。
+///
+/// 套件預設是往外擴 12pt;這裡往內收,讓拖曳中的玻璃透鏡(欄寬 −28pt)貼近
+/// 靜止態膠囊(欄寬 70%),兩態切換時不會突然放大。
 const _indicatorExpansion = EdgeInsets.symmetric(horizontal: -14, vertical: -2);
+
+/// 靜止態選取膠囊佔欄寬的比例(#179)。
+///
+/// 對照 iOS 26「電話」app 約 70%。套件靜止態畫的是整格欄位(實測 390pt 螢幕
+/// 下膠囊 87.5pt / 欄寬 89.5pt = 98%),且沒有任何參數調得動 —— 0.23.0／0.24.3
+/// 的 `AnimatedGlassIndicator` 仍是同一段 `RelativeRect.lerp`,`padding` 寫死
+/// `EdgeInsets.all(4)`。所以膠囊改由本檔自畫,疊在選取態字符的底下。
+const _restIndicatorWidthRatio = 0.70;
+
+/// 靜止態膠囊上下各留的間隙。
+///
+/// 套件的選取層被 `JellyClipper` 裁成「欄位內縮 4pt」的膠囊,自畫膠囊必須完整
+/// 落在裡面才不會被切角,所以取 5(> 4)。
+const _restIndicatorVerticalInset = 5.0;
+
+/// 套件 `GlassTabBar` 的標籤基準樣式(`labelFontSize` 預設 11)。
+///
+/// `selectedLabelStyle` 是**疊在**這份樣式上的(`BottomBarTabItem` 內部
+/// `baseLabelStyle.merge(stateLabelStyle)`),量標籤高度時要用同一套合成順序,
+/// 否則膠囊的垂直中心會算偏。算偏了有測試會紅(膠囊必須與玻璃列同心)。
+const _packageLabelBaseStyle = TextStyle(
+  fontSize: 11,
+  fontWeight: FontWeight.w600,
+);
+
+/// 字符與標籤之間的間距，與傳給 `GlassTabBar` 的 `iconLabelSpacing` 同源
+/// （兩個 constructor 都用套件預設 4）。
+const _iconLabelSpacing = 4.0;
 
 /// 字符與標籤那一排的左右內縮量(#170)。
 ///
@@ -65,6 +98,24 @@ class AppleRootTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: const ValueKey('apple-root-tab-bar'),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          TpRootTabGeometry.horizontalMargin,
+          0,
+          TpRootTabGeometry.horizontalMargin,
+          inline ? TpSpacing.s2 : TpRootTabGeometry.bottomOffset(context),
+        ),
+        // 膠囊寬度是欄寬的比例，欄寬只有量到玻璃列本身才知道。
+        child: LayoutBuilder(
+          builder: (context, constraints) => _buildBar(context, constraints),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBar(BuildContext context, BoxConstraints constraints) {
     final theme = Theme.of(context);
     final glassSettings = tpNavigationGlassSettings(
       context,
@@ -83,24 +134,6 @@ class AppleRootTabBar extends StatelessWidget {
     final selectionTint = theme.colorScheme.surfaceContainerHighest.withValues(
       alpha: 0.72,
     );
-    final tabs = [
-      for (final destination in _destinations)
-        GlassTab(
-          // 兩態同一個實心字符，由 tint 區分選取；選取層是另一份 widget，
-          // key 必須各自唯一，否則 finder 會抓到兩個。
-          icon: Icon(
-            destination.icon,
-            key: ValueKey('root-tab-${destination.label}'),
-          ),
-          activeIcon: Icon(
-            destination.icon,
-            key: ValueKey('root-tab-active-${destination.label}'),
-          ),
-          label: destination.label,
-          semanticLabel: destination.label,
-          glowColor: theme.colorScheme.primary,
-        ),
-    ];
     final selectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
       fontWeight: FontWeight.w700,
     );
@@ -116,6 +149,45 @@ class AppleRootTabBar extends StatelessWidget {
       opaqueColor: theme.colorScheme.surfaceContainerHigh,
     );
     final indicatorColor = indicatorSettings.glassColor;
+    // 靜止態膠囊自畫（#179）：欄寬取自玻璃列本身，比例與垂直間隙見常數註解。
+    final columnWidth = constraints.maxWidth / _destinations.length;
+    final restIndicator = _RestIndicatorGeometry(
+      width: columnWidth * _restIndicatorWidthRatio,
+      height:
+          TpRootTabGeometry.expandedBarHeight - _restIndicatorVerticalInset * 2,
+      // 字符是 `Column` 的第一個孩子、標籤在下面；膠囊要與整組同心，就得從
+      // 字符中心再往下挪半個「間距 + 標籤高」。
+      dropBelowIcon:
+          (_iconLabelSpacing +
+              _measureLabelHeight(context, selectedLabelStyle)) /
+          2,
+      color: indicatorColor,
+    );
+    final tabs = [
+      for (final destination in _destinations)
+        GlassTab(
+          // 兩態同一個實心字符，由 tint 區分選取；選取層是另一份 widget，
+          // key 必須各自唯一，否則 finder 會抓到兩個。
+          icon: Icon(
+            destination.icon,
+            key: ValueKey('root-tab-${destination.label}'),
+          ),
+          // 選取層的字符連膠囊一起畫。膠囊只能長在這裡 —— 套件把選取態內容
+          // 疊在自己的指示器**之上**，外部塞不進中間那一層；長在字符底下才
+          // 會被標籤與字符蓋住，而不是反過來蓋掉它們。
+          activeIcon: _SelectedTabIcon(
+            geometry: restIndicator,
+            pillKey: ValueKey('root-tab-pill-${destination.label}'),
+            icon: Icon(
+              destination.icon,
+              key: ValueKey('root-tab-active-${destination.label}'),
+            ),
+          ),
+          label: destination.label,
+          semanticLabel: destination.label,
+          glowColor: theme.colorScheme.primary,
+        ),
+    ];
     final tabBar = inline
         ? GlassTabBar.inline(
             tabs: tabs,
@@ -138,11 +210,12 @@ class AppleRootTabBar extends StatelessWidget {
             unselectedLabelColor: theme.colorScheme.onSurface,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: indicatorColor,
+            // 套件靜止態的指示器是**整格欄位**，任何參數都收不動它（#179），
+            // 所以讓它不上色、由 `_SelectedTabIcon` 自畫。這裡設透明不會關掉
+            // 拖曳中的玻璃透鏡 —— 透鏡吃的是 `indicatorSettings`。
+            indicatorColor: Colors.transparent,
             indicatorSettings: indicatorSettings,
-            // 套件預設是 `horizontal: 12`，指示器往兩側各外擴 12pt，膠囊因此
-            // 比自己的欄位還寬（實測欄寬 275px、膠囊 341px = 124%），壓到
-            // 左右鄰居。Apple 約 70%，所以改成往內收。
+            // 見 `_indicatorExpansion`：這條**只管拖曳中**的透鏡幾何。
             indicatorExpansion: _indicatorExpansion,
             magnification: 1,
             blendAmount: 4,
@@ -168,11 +241,12 @@ class AppleRootTabBar extends StatelessWidget {
             unselectedLabelColor: theme.colorScheme.onSurface,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            indicatorColor: indicatorColor,
+            // 套件靜止態的指示器是**整格欄位**，任何參數都收不動它（#179），
+            // 所以讓它不上色、由 `_SelectedTabIcon` 自畫。這裡設透明不會關掉
+            // 拖曳中的玻璃透鏡 —— 透鏡吃的是 `indicatorSettings`。
+            indicatorColor: Colors.transparent,
             indicatorSettings: indicatorSettings,
-            // 套件預設是 `horizontal: 12`，指示器往兩側各外擴 12pt，膠囊因此
-            // 比自己的欄位還寬（實測欄寬 275px、膠囊 341px = 124%），壓到
-            // 左右鄰居。Apple 約 70%，所以改成往內收。
+            // 見 `_indicatorExpansion`：這條**只管拖曳中**的透鏡幾何。
             indicatorExpansion: _indicatorExpansion,
             magnification: 1,
             blendAmount: 4,
@@ -180,57 +254,130 @@ class AppleRootTabBar extends StatelessWidget {
             quality: GlassQuality.premium,
             platformViewBackdrop: selectedIndex == 2,
           );
-    return KeyedSubtree(
-      key: const ValueKey('apple-root-tab-bar'),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          TpRootTabGeometry.horizontalMargin,
-          0,
-          TpRootTabGeometry.horizontalMargin,
-          inline ? TpSpacing.s2 : TpRootTabGeometry.bottomOffset(context),
-        ),
-        child: inline
-            ? Stack(
-                children: [
-                  ExcludeSemantics(child: tabBar),
-                  Positioned.fill(
-                    child: Row(
-                      children: [
-                        for (
-                          var index = 0;
-                          index < _destinations.length;
-                          index++
-                        )
-                          Expanded(
-                            child: Semantics(
-                              label: _destinations[index].label,
-                              selected: index == selectedIndex,
-                              button: true,
-                              onTap: () => onSelected(index),
-                              child: ExcludeSemantics(
-                                child: TextButton(
-                                  key: ValueKey(
-                                    'regular-root-tab-${_destinations[index].label}',
-                                  ),
-                                  style: TextButton.styleFrom(
-                                    minimumSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    shape: const StadiumBorder(),
-                                  ),
-                                  focusNode: focusNodes?[index],
-                                  onPressed: () => onSelected(index),
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+    if (!inline) return tabBar;
+    return Stack(
+      children: [
+        ExcludeSemantics(child: tabBar),
+        Positioned.fill(
+          child: Row(
+            children: [
+              for (var index = 0; index < _destinations.length; index++)
+                Expanded(
+                  child: Semantics(
+                    label: _destinations[index].label,
+                    selected: index == selectedIndex,
+                    button: true,
+                    onTap: () => onSelected(index),
+                    child: ExcludeSemantics(
+                      child: TextButton(
+                        key: ValueKey(
+                          'regular-root-tab-${_destinations[index].label}',
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: EdgeInsets.zero,
+                          shape: const StadiumBorder(),
+                        ),
+                        focusNode: focusNodes?[index],
+                        onPressed: () => onSelected(index),
+                        child: const SizedBox.expand(),
+                      ),
                     ),
                   ),
-                ],
-              )
-            : tabBar,
-      ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
+}
+
+/// 靜止態選取膠囊的幾何與填色。
+class _RestIndicatorGeometry {
+  const _RestIndicatorGeometry({
+    required this.width,
+    required this.height,
+    required this.dropBelowIcon,
+    required this.color,
+  });
+
+  final double width;
+  final double height;
+
+  /// 膠囊中心相對於字符中心要往下挪多少，才會與「字符 + 標籤」整組同心。
+  final double dropBelowIcon;
+  final Color color;
+}
+
+/// 選取態的字符，底下疊一顆自畫的膠囊。
+///
+/// 膠囊超出字符的方框往外畫 —— 沿路的 `Stack`（本層與
+/// `BottomBarTabItem` 的字符層）都是 `Clip.none`，`FittedBox` 預設也不裁，
+/// 所以溢出的部分照樣畫得出來；能真正裁到它的只有套件選取層的
+/// `JellyClipper`，而膠囊比那個範圍小（見 `_restIndicatorVerticalInset`）。
+class _SelectedTabIcon extends StatelessWidget {
+  const _SelectedTabIcon({
+    required this.geometry,
+    required this.pillKey,
+    required this.icon,
+  });
+
+  final _RestIndicatorGeometry geometry;
+  final Key pillKey;
+  final Widget icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 先畫膠囊、再畫字符，標籤由套件在更外層的 `Column` 之後畫 ——
+        // 三者的疊放順序就是「膠囊在最底下」。
+        Positioned.fill(
+          child: Center(
+            child: Transform.translate(
+              offset: Offset(0, geometry.dropBelowIcon),
+              child: OverflowBox(
+                minWidth: geometry.width,
+                maxWidth: geometry.width,
+                minHeight: geometry.height,
+                maxHeight: geometry.height,
+                child: DecoratedBox(
+                  key: pillKey,
+                  decoration: ShapeDecoration(
+                    color: geometry.color,
+                    // 純圓弧膠囊，不是 squircle —— Apple 的 pill 兩端是正圓，
+                    // 套件 0.23.0 也已經把指示器改成 `LiquidRoundedRectangle`。
+                    shape: LiquidRoundedRectangle(
+                      borderRadius: geometry.height / 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        icon,
+      ],
+    );
+  }
+}
+
+/// 量套件實際會畫出來的標籤高度。
+double _measureLabelHeight(
+  BuildContext context,
+  TextStyle? selectedLabelStyle,
+) {
+  final painter = TextPainter(
+    // 單行高度與字串內容無關，取任一個標籤即可。
+    text: TextSpan(
+      text: '行程',
+      style: _packageLabelBaseStyle.merge(selectedLabelStyle),
+    ),
+    textScaler: MediaQuery.textScalerOf(context),
+    textDirection: Directionality.of(context),
+    maxLines: 1,
+  )..layout();
+  return painter.height;
 }
