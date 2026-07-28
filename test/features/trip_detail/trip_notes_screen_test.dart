@@ -1121,6 +1121,51 @@ void main() {
     );
   });
 
+  testWidgets('app 回到前景會重讀一次 AI 狀態並接上進行中的 job', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    // 第一次進頁面時什麼都沒在跑;使用者切走、在別的裝置按了生成,再切回來。
+    var call = 0;
+    when(() => mocks.repo.fetchNotesAiState('trip-1')).thenAnswer((_) async {
+      call++;
+      return call == 1
+          ? const TripNoteAiState()
+          : const TripNoteAiState(
+              jobs: [
+                TripNoteAiJob(
+                  jobId: 7,
+                  requestId: 99,
+                  docType: NoteGenerationType.tips,
+                  status: TripNoteAiJobStatus.processing,
+                ),
+              ],
+            );
+    });
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+        stubAiState: false,
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
+
+    // 回到前景 —— 沿用本專案既有的 WidgetsBindingObserver 手法。
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+
+    expect(call, 2, reason: 'resume 要重讀一次,不是只讀進頁面那一次');
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-tips')),
+      findsOneWidget,
+      reason: '重讀後要接上進行中的 job',
+    );
+    verify(() => mocks.requestsRepo.watchRequestEvents(99)).called(1);
+  });
+
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
