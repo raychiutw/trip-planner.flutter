@@ -3,6 +3,8 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 
 void main() {
+  _exclusionTests();
+
   _noteMaintenanceTests();
 
   _aiStateContractTests();
@@ -505,4 +507,41 @@ void _noteMaintenanceTests() {
       expect(edited.showsAiBadge, isFalse, reason: '改過就不再標成 AI 維護');
     });
   });
+}
+
+void _exclusionTests() {
+  group(
+    'TripNoteExclusion.fromJson（後端 GET .../exclusions 回 {items:[...]}）',
+    () {
+      test('解析完整欄位', () {
+        final list = TripNoteExclusion.listFromJson(const {
+          'items': [
+            {
+              'id': 3,
+              'docType': 'tips',
+              'semanticKey': 'power-socket',
+              'label': '插座與電壓',
+              'deletedAt': '2026-07-28T09:00:00Z',
+            },
+          ],
+        });
+        expect(list, hasLength(1));
+        final e = list.single;
+        expect(e.id, 3);
+        expect(e.docType, NoteGenerationType.tips);
+        expect(e.semanticKey, 'power-socket');
+        expect(e.label, '插座與電壓');
+        // 時間存字串不轉 DateTime(全專案慣例)。
+        expect(e.deletedAt, '2026-07-28T09:00:00Z');
+      });
+
+      test('items 缺漏回空 list,欄位缺漏有容錯', () {
+        expect(TripNoteExclusion.listFromJson(const {}), isEmpty);
+        final e = TripNoteExclusion.fromJson(const {'id': 1});
+        expect(e.label, isEmpty);
+        expect(e.deletedAt, isNull);
+        expect(e.docType, isNull);
+      });
+    },
+  );
 }

@@ -57,6 +57,10 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
   /// 逾時的那一種(逾時與一般失敗要分開呈現)。
   NoteGenerationType? _aiTimedOut;
 
+  /// 每種 docType 目前被排除幾則。契約把它放在每筆 job 上,頂層沒有
+  /// exclusionCounts 物件。
+  final _aiExclusionCounts = <NoteGenerationType, int>{};
+
   /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
   /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
   final _aiSubscriptions =
@@ -94,6 +98,11 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
       if (!mounted) return;
       setState(() {
         _aiStateError = null;
+        for (final job in state.jobs) {
+          if (job.docType != null) {
+            _aiExclusionCounts[job.docType!] = job.exclusionCount;
+          }
+        }
         for (final job in state.activeJobs) {
           _aiPending.add(job.docType!);
           _aiStage[job.docType!] = job.status == TripNoteAiJobStatus.processing
@@ -289,6 +298,8 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
           ],
           aiBusyTypes: aiBusyTypes,
           onGenerateNotes: _startAiGeneration,
+          exclusionDocType: NoteGenerationType.tips,
+          exclusionCount: _aiExclusionCounts[NoteGenerationType.tips] ?? 0,
           rows: [
             for (final p in notes.pretripNotes)
               _NoteRowData(
@@ -310,6 +321,8 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
           ],
           aiBusyTypes: aiBusyTypes,
           onGenerateNotes: _startAiGeneration,
+          exclusionDocType: NoteGenerationType.emergency,
+          exclusionCount: _aiExclusionCounts[NoteGenerationType.emergency] ?? 0,
           rows: [
             for (final c in notes.emergencyContacts)
               _NoteRowData(
@@ -781,6 +794,122 @@ String _notesAiErrorMessage(Object error) {
   return _notesAiErrorMessages[code] ?? _notesAiFallbackMessage;
 }
 
+/// 排除清單:被刪掉的 AI 項目,可逐項恢復。
+///
+/// 恢復改的是「下次會不會生成」,不是當下的內容 —— 那一則要等下一次生成
+/// 才會再出現在筆記裡。
+Future<void> showNoteExclusionsSheet(
+  BuildContext context, {
+  required String tripId,
+  required NoteGenerationType docType,
+}) => showAppContentSheet<void>(
+  context,
+  title: '已排除的項目',
+  builder: (sheetContext) =>
+      _NoteExclusionsList(tripId: tripId, docType: docType),
+);
+
+class _NoteExclusionsList extends ConsumerStatefulWidget {
+  const _NoteExclusionsList({required this.tripId, required this.docType});
+
+  final String tripId;
+  final NoteGenerationType docType;
+
+  @override
+  ConsumerState<_NoteExclusionsList> createState() =>
+      _NoteExclusionsListState();
+}
+
+class _NoteExclusionsListState extends ConsumerState<_NoteExclusionsList> {
+  late Future<List<TripNoteExclusion>> _future = _load();
+
+  Future<List<TripNoteExclusion>> _load() => ref
+      .read(tripRepositoryProvider)
+      .fetchNoteExclusions(widget.docType, tripId: widget.tripId);
+
+  Future<void> _restore(TripNoteExclusion exclusion) async {
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .restoreNoteExclusion(
+            widget.docType,
+            tripId: widget.tripId,
+            exclusionId: exclusion.id,
+          );
+      if (!mounted) return;
+      setState(() {
+        _future = _load();
+      });
+      ref.invalidate(tripNotesProvider(widget.tripId));
+    } on ApiError catch (error) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        hasCjk(error.message) ? error.message : '目前無法恢復這一則。',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FutureBuilder<List<TripNoteExclusion>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(TpSpacing.s6),
+            child: Center(child: CircularProgressIndicator.adaptive()),
+          );
+        }
+        final items = snapshot.data ?? const <TripNoteExclusion>[];
+        if (items.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(TpSpacing.s6),
+            child: Text('沒有被排除的項目。', style: theme.textTheme.bodyMedium),
+          );
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: TpSpacing.s3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.label, style: theme.textTheme.bodyLarge),
+                          if (item.deletedAt case final at?)
+                            Text(
+                              '刪除於 $at',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: TpSpacing.s2),
+                    TextButton(
+                      key: ValueKey('notes-exclusion-restore-${item.id}'),
+                      onPressed: () => _restore(item),
+                      child: const Text('恢復'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
 class _NotesSection extends ConsumerWidget {
@@ -794,12 +923,20 @@ class _NotesSection extends ConsumerWidget {
     this.aiActions = const [],
     this.aiBusyTypes = const {},
     this.onGenerateNotes,
+    this.exclusionCount = 0,
+    this.exclusionDocType,
   });
 
   final String tripId;
   final NoteSection section;
   final IconData icon;
   final String title;
+
+  /// 這一區有幾則被排除。**0 就不顯示入口**,版面一如現狀。
+  final int exclusionCount;
+
+  /// 排除清單走的 docType(與維護權的 section 不是同一組字)。
+  final NoteGenerationType? exclusionDocType;
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
   final List<_NoteAiAction> aiActions;
@@ -885,6 +1022,18 @@ class _NotesSection extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (exclusionCount > 0 && exclusionDocType != null) ...[
+                const Spacer(),
+                TextButton(
+                  key: ValueKey('notes-exclusions-${section.name}'),
+                  onPressed: () => showNoteExclusionsSheet(
+                    context,
+                    tripId: tripId,
+                    docType: exclusionDocType!,
+                  ),
+                  child: Text('已排除 $exclusionCount 項'),
+                ),
+              ],
             ],
           ),
           childrenPadding: const EdgeInsets.fromLTRB(
