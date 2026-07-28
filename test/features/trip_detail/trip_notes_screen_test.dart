@@ -143,6 +143,10 @@ Future<void> _expandAiSections(WidgetTester tester) async {
 _parallelAiMocks() {
   final repo = _MockTripRepository();
   final requestsRepo = _MockRequestsRepository();
+  // ai-state 預設成功回空 —— 只有專門測隔離的那條會覆寫成 throw。
+  when(
+    () => repo.fetchNotesAiState(any()),
+  ).thenAnswer((_) async => const TripNoteAiState());
   final tipsEvents = StreamController<TripRequestEvent>(sync: true);
   final emergencyEvents = StreamController<TripRequestEvent>(sync: true);
   // 刻意不 await:沒有 listener 的 controller,`close()` 的 future 永遠不會完成
@@ -212,13 +216,15 @@ Future<void> _pumpAiScreen(
     StreamController<TripRequestEvent> tipsEvents,
     StreamController<TripRequestEvent> emergencyEvents,
   })
-  mocks,
-) async {
+  mocks, {
+  bool stubAiState = true,
+}) async {
   await tester.pumpWidget(
     _buildScreen(
       _sampleNotes(),
       repo: mocks.repo,
       requestsRepo: mocks.requestsRepo,
+      stubAiState: stubAiState,
     ),
   );
   await tester.pumpAndSettle();
@@ -244,7 +250,15 @@ Widget _buildScreen(
   Stream<TripNotes> Function(Ref ref, String tripId)? notesBuilder,
   ThemeData? theme,
   TextScaler? textScaler,
+  bool stubAiState = true,
 }) {
+  // ai-state 對絕大多數測試是背景雜訊:預設成功回空,只有專門測隔離的那條
+  // 傳 `stubAiState: false` 自己 stub 成 throw。放這裡而不是每條測試各補一次。
+  if (repo != null && stubAiState) {
+    when(
+      () => repo.fetchNotesAiState(any()),
+    ).thenAnswer((_) async => const TripNoteAiState());
+  }
   return ProviderScope(
     retry: (retryCount, error) => null,
     overrides: [
@@ -1057,6 +1071,38 @@ void main() {
     expect(find.textContaining('目前無法完成 AI 生成'), findsOneWidget);
     expect(find.textContaining('NOTES_AI_SOMETHING_NEW'), findsNothing);
     expect(find.textContaining('ApiError'), findsNothing);
+  });
+
+  testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    // 後端 ai-state 還沒上線 / 暫時掛掉。
+    when(
+      () => mocks.repo.fetchNotesAiState('trip-1'),
+    ).thenThrow(ApiError(status: 404, code: 'NOT_FOUND', message: 'not found'));
+    await _pumpAiScreen(tester, mocks, stubAiState: false);
+
+    // AI 區塊內看得到失敗與重試。
+    expect(find.byKey(const ValueKey('notes-ai-state-error')), findsOneWidget);
+
+    // 而筆記本體完全不受影響 —— 這裡要斷言**實際操作**,不能只斷言沒 crash。
+    expect(
+      find.byKey(const ValueKey('notes-section-flights')),
+      findsOneWidget,
+      reason: '五區照常載入',
+    );
+    expect(
+      find.byKey(const ValueKey('note-drag-flights-1')),
+      findsOneWidget,
+      reason: '拖曳把手仍在,排序照常',
+    );
+    await tester.tap(find.byKey(const ValueKey('note-add-flights')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('新增航班'),
+      findsNWidgets(2),
+      reason: '照常開新增表單(按鈕 + sheet 標題)',
+    );
   });
 
   testWidgets('進度事件會換掉文案:送出→讀行程→整理內容,不是從頭到尾一句話', (tester) async {
