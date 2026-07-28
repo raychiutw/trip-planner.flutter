@@ -1073,6 +1073,54 @@ void main() {
     expect(find.textContaining('ApiError'), findsNothing);
   });
 
+  testWidgets('進頁面時若後端有進行中的 job,直接接上進度通道顯示生成中', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    // 使用者上次按了生成就離開;server 上那個 job 還在跑。
+    when(() => mocks.repo.fetchNotesAiState('trip-1')).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            jobId: 7,
+            requestId: 99,
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.processing,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+        stubAiState: false,
+      ),
+    );
+    // 進行中面板有一顆永遠在轉的 spinner,pumpAndSettle 會 timeout。
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-tips')),
+      findsOneWidget,
+      reason: '進頁面就看得到它還在跑,不是「什麼都沒發生」',
+    );
+    // 接的是既有的進度通道,不是新開輪詢。
+    expect(mocks.tipsEvents.hasListener, isTrue);
+    // 只訂閱一次 —— 恢復不得重複接上同一個 job。
+    verify(() => mocks.requestsRepo.watchRequestEvents(99)).called(1);
+    // 沒有進行中的那兩種不該被訂閱。
+    verifyNever(() => mocks.requestsRepo.watchRequestEvents(100));
+    // 恢復不是重新送一次生成。
+    verifyNever(
+      () => mocks.repo.generateNotes(
+        NoteGenerationType.tips,
+        tripId: any(named: 'tripId'),
+      ),
+    );
+  });
+
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
