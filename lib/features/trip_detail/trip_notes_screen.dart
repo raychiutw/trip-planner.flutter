@@ -1216,6 +1216,42 @@ class _ReservationRow extends StatelessWidget {
   }
 }
 
+/// 「AI 產生」標記。走中性語意層 —— 不另外調色、無 gradient、無 emoji。
+///
+/// **定位一律用 key,不要用 `find.text('AI')`** —— 緊急聯絡那顆生成按鈕的
+/// label 本身就是「AI」,同畫面會有兩個。
+class _NoteAiBadge extends StatelessWidget {
+  const _NoteAiBadge({required this.rowKey});
+
+  final String rowKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Semantics(
+      label: 'AI 產生',
+      container: true,
+      excludeSemantics: true,
+      child: Padding(
+        key: ValueKey('note-ai-badge-$rowKey'),
+        padding: const EdgeInsets.only(top: TpSpacing.s1),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.sparkles, size: 13, color: muted),
+            const SizedBox(width: 4),
+            Text(
+              'AI',
+              style: theme.textTheme.labelSmall?.copyWith(color: muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PretripNoteRow extends StatelessWidget {
   const _PretripNoteRow(this.pretripNote);
 
@@ -1226,6 +1262,8 @@ class _PretripNoteRow extends StatelessWidget {
     final theme = Theme.of(context);
     return _NoteRowCard(
       children: [
+        if (pretripNote.showsAiBadge)
+          _NoteAiBadge(rowKey: 'pretrip-${pretripNote.id}'),
         if (pretripNote.section.isNotEmpty)
           Text(
             pretripNote.section,
@@ -1267,6 +1305,8 @@ class _EmergencyContactRow extends StatelessWidget {
     final colors = theme.colorScheme;
     return _NoteRowCard(
       children: [
+        if (contact.showsAiBadge)
+          _NoteAiBadge(rowKey: 'emergency-${contact.id}'),
         Row(
           children: [
             Expanded(

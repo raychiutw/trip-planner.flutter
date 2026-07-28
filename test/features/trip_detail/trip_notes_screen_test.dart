@@ -1276,6 +1276,58 @@ void main() {
     );
   });
 
+  testWidgets('目前由 AI 維護的列顯示標記,改過的不顯示', (tester) async {
+    _useTallViewport(tester);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _buildScreen(
+        const TripNotes(
+          pretripNotes: [
+            TripPretripNote(
+              id: 11,
+              sortOrder: 0,
+              version: 1,
+              section: '一般',
+              title: 'AI 寫的',
+              content: 'x',
+              origin: NoteMaintainer.ai,
+              managedBy: NoteMaintainer.ai,
+            ),
+            TripPretripNote(
+              id: 12,
+              sortOrder: 1,
+              version: 1,
+              section: '一般',
+              title: '我改過的',
+              content: 'y',
+              origin: NoteMaintainer.ai,
+              managedBy: NoteMaintainer.human,
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    // 定位一律用 key —— 緊急聯絡那顆生成按鈕的 label 就是「AI」,
+    // find.text('AI') 會撞名。
+    expect(
+      find.byKey(const ValueKey('note-ai-badge-pretrip-11')),
+      findsOneWidget,
+      reason: '目前由 AI 維護 → 有標記',
+    );
+    expect(
+      find.byKey(const ValueKey('note-ai-badge-pretrip-12')),
+      findsNothing,
+      reason: '改過就不再標成 AI 維護',
+    );
+
+    expect(find.bySemanticsLabel('AI 產生'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
