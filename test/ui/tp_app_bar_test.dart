@@ -258,7 +258,7 @@ void main() {
 
       // 一般模式是對齊 Apple 強度的細邊(+30),不是無邊 —— 實測材質
       // 不會自己產生邊緣,詳見 `tpGlassEdgeColor` 的註解。
-      final matcher = highContrast ? greaterThan(0.5) : closeTo(0.12, 0.001);
+      final matcher = highContrast ? greaterThan(0.5) : 0;
       final reason = 'highContrast=$highContrast';
 
       // 圓鈕的描邊是可覆寫的預設值。

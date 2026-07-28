@@ -46,7 +46,7 @@ const _triplineGlassTheme = GlassThemeData(
       refractiveIndex: 1.15,
       saturation: 1.10,
     ),
-    quality: GlassQuality.standard,
+    quality: GlassQuality.premium,
     glowColors: GlassGlowColors(
       primary: TpSystemColorsLight.tint,
       glowOpacity: 0.30,
@@ -63,7 +63,7 @@ const _triplineGlassTheme = GlassThemeData(
       refractiveIndex: 1.15,
       saturation: 1.08,
     ),
-    quality: GlassQuality.standard,
+    quality: GlassQuality.premium,
     glowColors: GlassGlowColors(
       primary: TpSystemColorsDark.tint,
       glowOpacity: 0.24,

@@ -147,7 +147,7 @@ class AppleRootTabBar extends StatelessWidget {
             magnification: 1,
             blendAmount: 4,
             glowOpacity: 0.18,
-            quality: GlassQuality.standard,
+            quality: GlassQuality.premium,
             platformViewBackdrop: selectedIndex == 2,
           )
         : GlassTabBar.bottom(
@@ -177,7 +177,7 @@ class AppleRootTabBar extends StatelessWidget {
             magnification: 1,
             blendAmount: 4,
             glowOpacity: 0.18,
-            quality: GlassQuality.standard,
+            quality: GlassQuality.premium,
             platformViewBackdrop: selectedIndex == 2,
           );
     return KeyedSubtree(

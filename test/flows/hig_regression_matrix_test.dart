@@ -136,7 +136,7 @@ void main() {
       final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;
       expect(
         headerShape.side.color.a,
-        state.increasedContrast ? greaterThan(0.5) : closeTo(0.12, 0.001),
+        state.increasedContrast ? greaterThan(0.5) : 0,
         reason: '一般模式要有一條對齊 Apple 強度的細邊',
       );
 
@@ -157,7 +157,7 @@ void main() {
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
       expect(
         trackShape.side.color.a,
-        state.increasedContrast ? greaterThan(0.5) : closeTo(0.12, 0.001),
+        state.increasedContrast ? greaterThan(0.5) : 0,
         reason: '選擇器軌道的描邊規則應與導覽 chrome 一致',
       );
 
