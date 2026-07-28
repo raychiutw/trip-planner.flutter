@@ -1,12 +1,16 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderBox, RenderParagraph;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/timeline_entry_tile.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_action_item.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 Future<void> pumpTile(
   WidgetTester tester,
@@ -30,6 +34,67 @@ Future<void> pumpTile(
       ),
     ),
   );
+}
+
+/// 依時間軸畫面的接法組裝停留點卡片：`⋯` 與長按共用同一顆 [MenuController]，
+/// 點卡片則切換展開區塊。
+class _MenuTileHost extends StatefulWidget {
+  const _MenuTileHost({this.longPressEnabled = true});
+
+  /// 排序編輯模式下畫面不會給長按入口，以 false 模擬。
+  final bool longPressEnabled;
+
+  @override
+  State<_MenuTileHost> createState() => _MenuTileHostState();
+}
+
+class _MenuTileHostState extends State<_MenuTileHost> {
+  final MenuController _menuController = MenuController();
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TimelineEntryTile(
+      entry: const TimelineEntry(
+        id: 60,
+        sortOrder: 0,
+        version: 1,
+        title: '首里城',
+      ),
+      number: 1,
+      expanded: _expanded,
+      onTap: () => setState(() => _expanded = !_expanded),
+      onLongPress: widget.longPressEnabled ? _menuController.open : null,
+      expandedChild: _expanded ? const Text('展開區塊') : null,
+      trailing: TpMoreMenuButton<int>(
+        key: const ValueKey('entry-more-60'),
+        controller: _menuController,
+        tooltip: '景點操作',
+        items: const [
+          TpActionItem(value: 0, label: '編輯景點', icon: CupertinoIcons.pencil),
+          TpActionItem(value: 1, label: '刪除景點', icon: CupertinoIcons.delete),
+        ],
+        onSelected: (_) {},
+      ),
+    );
+  }
+}
+
+Future<void> pumpMenuTile(
+  WidgetTester tester, {
+  bool longPressEnabled = true,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: _MenuTileHost(longPressEnabled: longPressEnabled)),
+    ),
+  );
+}
+
+Future<void> dismissMenu(WidgetTester tester) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+  await tester.pumpAndSettle();
 }
 
 Color dotColor(WidgetTester tester, int entryId) {
@@ -610,6 +675,101 @@ void main() {
         lessThan(chipWidth),
         reason: '定版要求不折行；實際繪製後的完整時間必須落在 chip 內',
       );
+    });
+
+    testWidgets('長按內容卡叫出動作選單', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('編輯景點'), findsOneWidget);
+      expect(find.text('刪除景點'), findsOneWidget);
+    });
+
+    testWidgets('長按與 ⋯ 叫出同一份選單：同樣的項目、同樣的位置', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.tap(find.byKey(const ValueKey('entry-more-60')));
+      await tester.pumpAndSettle();
+      final byMoreButton = tester.getRect(
+        find.byKey(const ValueKey('tp-menu-panel')),
+      );
+      final labelsByMoreButton = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('tp-menu-panel')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data)
+          .toList();
+      await dismissMenu(tester);
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+      final byLongPress = tester.getRect(
+        find.byKey(const ValueKey('tp-menu-panel')),
+      );
+      final labelsByLongPress = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('tp-menu-panel')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data)
+          .toList();
+
+      expect(labelsByLongPress, labelsByMoreButton);
+      expect(byLongPress, byMoreButton, reason: '同一份選單面板，位置也該一致');
+    });
+
+    testWidgets('長按不觸發卡片展開，收起選單後點卡片仍會展開', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+      expect(find.text('展開區塊'), findsNothing);
+
+      await dismissMenu(tester);
+      await tester.tap(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('展開區塊'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    });
+
+    testWidgets('沒有長按入口時（排序編輯模式）長按不叫選單', (tester) async {
+      await pumpMenuTile(tester, longPressEnabled: false);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+      expect(find.text('刪除景點'), findsNothing);
+    });
+
+    testWidgets('讀螢幕使用者可用長按語意動作叫出同一份選單', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpMenuTile(tester);
+
+      final node = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-60')),
+      );
+      expect(
+        node.getSemanticsData().hasAction(SemanticsAction.longPress),
+        isTrue,
+      );
+
+      node.owner!.performAction(node.id, SemanticsAction.longPress);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('刪除景點'), findsOneWidget);
+      semantics.dispose();
     });
   });
 }

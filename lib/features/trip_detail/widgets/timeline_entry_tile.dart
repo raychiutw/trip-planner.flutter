@@ -18,6 +18,7 @@ class TimelineEntryTile extends StatelessWidget {
     this.compact = false,
     this.expanded = false,
     this.onTap,
+    this.onLongPress,
     this.onEditTime,
     this.trailing,
     this.mapLinks,
@@ -31,6 +32,9 @@ class TimelineEntryTile extends StatelessWidget {
   final bool compact;
   final bool expanded;
   final VoidCallback? onTap;
+
+  /// 長按卡片的入口；畫面接的是 `⋯` 那顆選單的 [MenuController]。
+  final VoidCallback? onLongPress;
   final VoidCallback? onEditTime;
   final Widget? trailing;
   final Widget? mapLinks;
@@ -58,9 +62,11 @@ class TimelineEntryTile extends StatelessWidget {
       button: onTap != null,
       expanded: onTap == null ? null : expanded,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: InkWell(
         excludeFromSemantics: true,
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(18),
         child: _EntryCard(
           entry: entry,
