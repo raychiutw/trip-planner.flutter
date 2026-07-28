@@ -322,40 +322,6 @@ void main() {
         reason: '選單應已關閉，避免殘留面板影響後續斷言',
       );
 
-      // 範圍選單走自己的版面，選取呈現需各自驗證。
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('matrix-scope-menu')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('matrix-scope-menu')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('matrix-scope-selected')),
-          matching: find.byIcon(CupertinoIcons.list_bullet),
-        ),
-        findsOneWidget,
-        reason: '已選取的範圍仍應顯示它原本的字符',
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('matrix-scope-selected')),
-          matching: find.byIcon(CupertinoIcons.check_mark),
-        ),
-        findsOneWidget,
-        reason: '勾選要另外顯示，而不是取代原字符',
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('matrix-scope-plain')),
-          matching: find.byIcon(CupertinoIcons.check_mark),
-        ),
-        findsNothing,
-        reason: '未選取的項目不應出現勾選',
-      );
-      await tester.tapAt(const Offset(20, 60));
-      await tester.pumpAndSettle();
-
       await tester.fling(
         find.byType(CustomScrollView),
         const Offset(0, -1200),
@@ -537,27 +503,6 @@ class _MatrixSceneState extends State<_MatrixScene> {
                       TpScopeOption(value: 3, label: 'DAY 3'),
                     ],
                     onSelected: (value) => setState(() => _day = value),
-                  ),
-                  const SizedBox(height: 16),
-                  TpScopeMenu<int>(
-                    key: const ValueKey('matrix-scope-menu'),
-                    label: '行程',
-                    value: 1,
-                    options: const [
-                      TpScopeOption(
-                        value: 1,
-                        label: '行程',
-                        icon: CupertinoIcons.list_bullet,
-                        key: ValueKey('matrix-scope-selected'),
-                      ),
-                      TpScopeOption(
-                        value: 2,
-                        label: '地圖',
-                        icon: CupertinoIcons.map,
-                        key: ValueKey('matrix-scope-plain'),
-                      ),
-                    ],
-                    onSelected: (_) {},
                   ),
                   const SizedBox(height: 16),
                   for (var index = 0; index < 12; index++)

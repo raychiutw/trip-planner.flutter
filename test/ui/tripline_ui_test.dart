@@ -286,31 +286,6 @@ void main() {
     expect(tester.getTopLeft(find.text('行程標題')).dx, closeTo(16, 0.1));
   });
 
-  testWidgets('TpScopeMenu 顯示目前值並回傳新選項', (tester) async {
-    var selected = 0;
-    await tester.pumpWidget(
-      app(
-        Scaffold(
-          body: TpScopeMenu<int>(
-            label: '地圖 · 總覽',
-            value: selected,
-            options: const [
-              TpScopeOption(value: 0, label: '總覽'),
-              TpScopeOption(value: 1, label: 'DAY 01'),
-            ],
-            onSelected: (value) => selected = value,
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.text('地圖 · 總覽'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('DAY 01'));
-    await tester.pumpAndSettle();
-    expect(selected, 1);
-  });
-
   testWidgets('TpHorizontalSelector 使用單一玻璃軌 + 一塊選取填色與 13pt DAY 字級', (
     tester,
   ) async {

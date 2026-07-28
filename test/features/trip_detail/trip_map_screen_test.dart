@@ -27,6 +27,7 @@ import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_bottom_accessory.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 import '../../helpers/branch_keepalive.dart';
 import '../../helpers/fake_trip_map.dart';
@@ -497,8 +498,6 @@ void main() {
     // 與 root tab「行程」重複的 bar button 已移除，改由 tab 承擔。
     expect(find.byKey(const ValueKey('trip-map-itinerary')), findsNothing);
     expect(find.byIcon(CupertinoIcons.calendar), findsNothing);
-    expect(find.byKey(const ValueKey('trip-map-more-button')), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-map-notes-button')), findsNothing);
     expect(find.byKey(const ValueKey('trip-map-day-overview')), findsNothing);
     expect(find.text('全部'), findsOneWidget);
     expect(find.text('總覽'), findsNothing);
@@ -580,6 +579,24 @@ void main() {
           .singleWhere((marker) => marker.id == 'map-pin-12')
           .glyph,
       '2',
+    );
+  });
+
+  testWidgets('地圖 header 沒有任何 action 按鈕', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('tp-root-glass-header')), findsOneWidget);
+    // 「筆記」與時間軸 ⋯ 的 trip-action-notes 完全同功能，整顆 ⋯ 移除；
+    // header 只留標題與行程切換鈕。
+    expect(find.byKey(const ValueKey('trip-map-more-button')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-map-notes-button')), findsNothing);
+    expect(
+      tester
+          .widget<TpRootGlassHeader>(find.byType(TpRootGlassHeader))
+          .config
+          .actions,
+      isEmpty,
     );
   });
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,8 +12,6 @@ import '../../models/entry.dart';
 import '../../models/poi_type.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_action_item.dart';
-import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_bottom_accessory.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_root_scaffold.dart';
@@ -157,28 +154,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
               context.go('/trips/${Uri.encodeComponent(selectedTripId)}/map');
             },
           ),
-          actions: [
-            // 與 root tab「行程」重複的 bar button 已移除，切換交由 tab 承擔；
-            // 目前看的是第幾天改由共用選取日跨 tab 沿用。
-            TpMoreMenuButton<_TripMapHeaderAction>(
-              key: const ValueKey('trip-map-more-button'),
-              onSelected: (action) {
-                if (action == _TripMapHeaderAction.notes) {
-                  context.push(
-                    '/trips/${Uri.encodeComponent(widget.tripId)}/notes',
-                  );
-                }
-              },
-              items: const [
-                TpActionItem(
-                  key: ValueKey('trip-map-notes-button'),
-                  value: _TripMapHeaderAction.notes,
-                  icon: CupertinoIcons.doc_text,
-                  label: '筆記',
-                ),
-              ],
-            ),
-          ],
         ),
         body: daysAsync.when(
           loading: () =>
@@ -208,8 +183,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     );
   }
 }
-
-enum _TripMapHeaderAction { notes }
 
 String _tripTitle(TripSummary trip) {
   final title = trip.title?.trim();
