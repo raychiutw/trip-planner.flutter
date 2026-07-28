@@ -9,9 +9,9 @@ enum NoteGenerationType { tips, lodgingTips, emergency }
 
 /// 把後端回的 `docType` 解成 [NoteGenerationType];未知或缺漏回 `null`。
 ///
-/// 契約未凍結:後端範例只給過 `"tips"`,而 `tips` 的 URL 形(`lodging-tips`)與
-/// enum 形(`lodgingTips`)在這個值上同字,推導不出住宿型會回哪一種,因此兩形都接受。
-/// 契約凍結後再收斂成單一形。
+/// 契約已凍結:後端 `NOTE_AI_DOC_TYPES = ['lodging-tips', 'tips', 'emergency']`
+/// **一律 URL 形**,不會回 `lodgingTips`。enum 形保留純粹當防禦(多接一個值域外的
+/// 字串不會讓解析變差),不是契約要求。
 NoteGenerationType? parseNoteGenerationType(String? raw) => switch (raw) {
   'tips' => NoteGenerationType.tips,
   'lodging-tips' || 'lodgingTips' => NoteGenerationType.lodgingTips,

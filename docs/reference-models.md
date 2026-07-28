@@ -146,12 +146,13 @@ class TripNoteAiJob {
   final String tripId;      // 缺漏 → ''
   final NoteGenerationType? docType; // 未知/缺漏 → null
   final int generation;     // 缺漏 → 0
-  final String? createdAt;  // ISO8601 字串，不轉 DateTime
-  final String? timeoutAt;
+  final String? timeoutAt;  // ISO8601 字串，不轉 DateTime
 }
 ```
 
-`TripNoteAiJob` 承接 `POST /trips/:id/notes/:type/generate` 的回應，全欄位皆有預設值：非預期 body 走預設值而不丟 `TypeError`。`docType` 由 `parseNoteGenerationType()` 解析，同時接受 URL 形（`lodging-tips`）與 enum 形（`lodgingTips`）—— 後端契約尚未凍結，凍結後再收斂成單一形。
+`TripNoteAiJob` 承接 `POST /trips/:id/notes/:type/generate` 的回應，全欄位皆有預設值：非預期 body 走預設值而不丟 `TypeError`。
+
+契約已凍結（後端 `raychiutw/trip-planner#1216` 已上線）：回應是 `jobId`、`requestId`、`status`、`generation`、`timeoutAt`、`tripId`、`docType`，**沒有 `createdAt`**（上游 issue 的範例有，三個實際回傳點都沒帶）。`docType` 的值域是 `NOTE_AI_DOC_TYPES = ['lodging-tips', 'tips', 'emergency']`，一律 URL 形；`parseNoteGenerationType()` 另外容忍 enum 形（`lodgingTips`）純屬防禦，不是契約要求。
 
 ## user.dart
 

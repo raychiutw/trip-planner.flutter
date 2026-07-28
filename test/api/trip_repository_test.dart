@@ -740,7 +740,6 @@ void main() {
             'tripId': 'okinawa',
             'docType': c.path,
             'generation': 2,
-            'createdAt': '2026-07-25T10:00:00Z',
             'timeoutAt': '2026-07-25T10:07:00Z',
           }),
         );
@@ -756,7 +755,6 @@ void main() {
         expect(job.tripId, 'okinawa');
         expect(job.docType, c.type);
         expect(job.generation, 2);
-        expect(job.createdAt, '2026-07-25T10:00:00Z');
         expect(job.timeoutAt, '2026-07-25T10:07:00Z');
       },
     );

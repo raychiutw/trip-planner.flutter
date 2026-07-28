@@ -9,6 +9,7 @@ import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
+import '../../app/error_message.dart';
 import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
@@ -228,6 +229,10 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       if (!mounted) return;
       setState(() {
         _aiSubmitting = false;
+        // `_watchAiJob` 在 `_aiJob` 設值之後才跑,而它也在 try 內。它丟例外時若
+        // 不一併清掉,進行中面板與錯誤面板會同時在、三顆按鈕仍卡死,連重試都被
+        // `_startAiGeneration` 開頭的守衛擋回去。
+        _aiJob = null;
         _aiFailure = (message: _notesAiErrorMessage(error), type: type);
       });
     }
@@ -266,10 +271,15 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       return;
     }
 
+    final rawError = event.error;
     setState(() {
       _aiJob = null;
       _aiFailure = (
-        message: event.error ?? _notesAiFallbackMessage,
+        // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
+        // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
+        message: rawError == null
+            ? _notesAiFallbackMessage
+            : _notesAiErrorMessage(rawError),
         type: type,
       );
     });
@@ -438,12 +448,22 @@ const _notesAiErrorMessages = <String, String>{
 
 const _notesAiFallbackMessage = '目前無法完成 AI 生成';
 
-/// 任何失敗都翻成使用者看得懂的中文；原始 error code 與型別文字不外流到畫面。
+/// 三條失敗路徑（POST 例外／stream onError／SSE 終止事件）共用這一條翻譯管線，
+/// 走全 app 一致的三層 fallback：**server 回繁中就直接用 → 否則查 code 對照表 →
+/// 再不然通用訊息**。原始 error code 與型別文字一律不外流到畫面。
+///
+/// 終止事件的 `TripRequestEvent.error` 是後端原字串，可能是 code（`NOTES_AI_*`）
+/// 也可能是繁中訊息，兩種都由這裡收斂；少了第一層，429 `SYS_RATE_LIMIT`、403 權限
+/// 這些後端已經給了人話的失敗會全部退化成一句通用訊息。
 String _notesAiErrorMessage(Object error) {
-  if (error is ApiError) {
-    return _notesAiErrorMessages[error.code] ?? _notesAiFallbackMessage;
-  }
-  return _notesAiFallbackMessage;
+  final (String? code, String? message) = switch (error) {
+    ApiError() => (error.code, error.message),
+    String() => (error, error),
+    _ => (null, null),
+  };
+  if (message != null && hasCjk(message)) return message;
+  if (code == null) return _notesAiFallbackMessage;
+  return _notesAiErrorMessages[code] ?? _notesAiFallbackMessage;
 }
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。

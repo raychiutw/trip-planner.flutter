@@ -337,7 +337,11 @@ extension TripNoteAiJobStatusX on TripNoteAiJobStatus {
 
 /// `POST /trips/:id/notes/:type/generate` 的回應（啟動一個 AI 生成 job）。
 ///
-/// 全部欄位都給預設值:後端多回或少回欄位時解析不丟例外,契約變動的爆炸半徑
+/// 契約已凍結（後端 `raychiutw/trip-planner#1216` 已上線）:回應是
+/// `jobId`、`requestId`、`status`、`generation`、`timeoutAt`、`tripId`、`docType`
+/// —— **沒有 `createdAt`**（上游 issue 的範例有,三個實際回傳點都沒帶）。
+///
+/// 全部欄位仍給預設值:後端多回或少回欄位時解析不丟例外,契約變動的爆炸半徑
 /// 關在這一層,畫面層不碰 json key 也不做型別 cast。
 class TripNoteAiJob {
   const TripNoteAiJob({
@@ -347,7 +351,6 @@ class TripNoteAiJob {
     this.tripId = '',
     this.docType,
     this.generation = 0,
-    this.createdAt,
     this.timeoutAt,
   });
 
@@ -358,16 +361,13 @@ class TripNoteAiJob {
   final TripNoteAiJobStatus status;
   final String tripId;
 
-  /// 後端回的 doc type;值域未凍結,未知形解成 `null`（見 [parseNoteGenerationType]）。
+  /// 後端回的 doc type;未知形解成 `null`（見 [parseNoteGenerationType]）。
   final NoteGenerationType? docType;
 
   /// job 的世代序號;同一份文件被重新生成時遞增。
   final int generation;
 
-  /// ISO8601 字串;全專案慣例不轉 DateTime。
-  final String? createdAt;
-
-  /// job 的逾時時刻（ISO8601 字串）。
+  /// job 的逾時時刻（ISO8601 字串;全專案慣例不轉 DateTime）。
   final String? timeoutAt;
 
   factory TripNoteAiJob.fromJson(Map<String, dynamic> json) => TripNoteAiJob(
@@ -377,7 +377,6 @@ class TripNoteAiJob {
     tripId: json['tripId'] as String? ?? '',
     docType: parseNoteGenerationType(json['docType'] as String?),
     generation: (json['generation'] as num?)?.toInt() ?? 0,
-    createdAt: json['createdAt'] as String?,
     timeoutAt: json['timeoutAt'] as String?,
   );
 }

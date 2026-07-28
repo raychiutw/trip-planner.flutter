@@ -272,7 +272,9 @@ void main() {
   // record + 非 null cast,契約一變動就在畫面層炸開;改成具名 model 後,wire 解析
   // 收在 models 這一層。
   group('TripNoteAiJob.fromJson', () {
-    test('解析完整欄位（含 generation / createdAt / timeoutAt）', () {
+    // 契約已凍結（後端 #1216 已上線）:回傳 jobId / requestId / status /
+    // generation / timeoutAt / tripId / docType,沒有 createdAt。
+    test('解析完整欄位（含 generation / timeoutAt）', () {
       final job = TripNoteAiJob.fromJson({
         'jobId': 12,
         'requestId': 34,
@@ -280,7 +282,6 @@ void main() {
         'tripId': 'okinawa',
         'docType': 'tips',
         'generation': 3,
-        'createdAt': '2026-07-25T10:00:00Z',
         'timeoutAt': '2026-07-25T10:07:00Z',
       });
 
@@ -292,8 +293,6 @@ void main() {
       expect(job.docType, NoteGenerationType.tips);
       expect(job.generation, 3);
       // 日期時間存字串不轉 DateTime（全專案慣例）
-      expect(job.createdAt, isA<String>());
-      expect(job.createdAt, '2026-07-25T10:00:00Z');
       expect(job.timeoutAt, isA<String>());
       expect(job.timeoutAt, '2026-07-25T10:07:00Z');
     });
@@ -306,7 +305,6 @@ void main() {
       expect(job.generation, 0);
       expect(job.tripId, '');
       expect(job.docType, isNull);
-      expect(job.createdAt, isNull);
       expect(job.timeoutAt, isNull);
       expect(job.status.isTerminal, isFalse);
     });
@@ -328,12 +326,12 @@ void main() {
       expect(jobWithStatus('failed').status.isTerminal, isTrue);
     });
 
-    test('docType 同時接受 lodging-tips 與 lodgingTips 兩形', () {
+    test('docType 吃契約的 URL 形,enum 形當防禦一併接受', () {
       NoteGenerationType? docTypeOf(String raw) =>
           TripNoteAiJob.fromJson({'docType': raw}).docType;
 
-      // 契約未凍結:#1214 的範例只給 "tips",URL 形與 enum 形同字,
-      // 推導不出 lodging-tips 會回哪一種,兩形都吃。
+      // 契約已凍結為 URL 形（NOTE_AI_DOC_TYPES),`lodgingTips` 不會出現;
+      // 多接一形純粹是防禦,不是契約要求。
       expect(docTypeOf('lodging-tips'), NoteGenerationType.lodgingTips);
       expect(docTypeOf('lodgingTips'), NoteGenerationType.lodgingTips);
       expect(docTypeOf('tips'), NoteGenerationType.tips);
