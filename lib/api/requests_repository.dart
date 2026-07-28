@@ -55,6 +55,18 @@ class RequestsRepository {
     return TripRequest.fromJson(body as Map<String, dynamic>);
   }
 
+  /// PATCH /requests/:id —— 停止等待(後端 ADR-0007)。
+  ///
+  /// **這不會中止 AI。** 只把 request 標成終結、讓使用者脫身;mac mini 上的
+  /// worker 照跑,完成後的回報還是會寫進 `reply`,行程也可能已被更動。UI 文案
+  /// 必須誠實反映這件事,不能講成「已中止」。
+  Future<void> stopWaiting(int id) async {
+    await _client.patch(
+      '/requests/$id',
+      body: {'status': 'failed', 'terminalReason': 'cancelled'},
+    );
+  }
+
   /// GET /requests/:id/events（SSE）→ status/progress events.
   Stream<TripRequestEvent> watchRequestEvents(int id) =>
       parseTripRequestEventStream(

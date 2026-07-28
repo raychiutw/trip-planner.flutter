@@ -12,6 +12,21 @@ RequestStatus parseRequestStatus(String? s) => switch (s) {
   _ => RequestStatus.processing, // unknown 續 poll,不誤判終止
 };
 
+/// 為什麼結束 —— 後端 ADR-0007 把「結束了沒」與「為什麼結束」拆成兩個欄位。
+///
+/// `status` 維持既有四值(後端刻意不改它的 CHECK constraint,那條路曾造成
+/// prod 資料全失),這個是獨立的新欄位。**讀取端必須同時看兩個欄位。**
+enum TerminalReason { cancelled, timedOut, error, needsConsent }
+
+/// 未知值一律 null —— 不誤判成任何已知原因,寧可退回通用文案。
+TerminalReason? parseTerminalReason(String? raw) => switch (raw) {
+  'cancelled' => TerminalReason.cancelled,
+  'timed_out' => TerminalReason.timedOut,
+  'error' => TerminalReason.error,
+  'needs_consent' => TerminalReason.needsConsent,
+  _ => null,
+};
+
 extension RequestStatusX on RequestStatus {
   bool get isTerminal =>
       this == RequestStatus.completed || this == RequestStatus.failed;
@@ -29,6 +44,7 @@ class TripRequest {
     this.processedBy,
     this.createdAt,
     this.updatedAt,
+    this.terminalReason,
   });
 
   final int id;
@@ -38,6 +54,9 @@ class TripRequest {
   /// AI 回覆（markdown）;未完成為 null。
   final String? reply;
   final RequestStatus status;
+
+  /// 為什麼結束;未結束或後端沒帶就是 null。與 [status] 一起讀。
+  final TerminalReason? terminalReason;
 
   /// 送出者 email。
   final String? submittedBy;
@@ -57,6 +76,7 @@ class TripRequest {
     processedBy: json['processedBy'] as String?,
     createdAt: json['createdAt'] as String?,
     updatedAt: json['updatedAt'] as String?,
+    terminalReason: parseTerminalReason(json['terminalReason'] as String?),
   );
 }
 

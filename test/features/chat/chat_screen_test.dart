@@ -145,6 +145,83 @@ void main() {
     );
   }
 
+  TripRequest pendingRow() =>
+      _req(id: 42, message: '幫我看行程', status: RequestStatus.processing);
+
+  void stubPending() {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: [pendingRow()], hasMore: false));
+    when(() => reqRepo.fetchRequest(42)).thenAnswer((_) async => pendingRow());
+  }
+
+  testWidgets('等待中的泡泡有「停止等待」,按下去送出取消', (tester) async {
+    stubPending();
+    when(() => reqRepo.stopWaiting(any())).thenAnswer((_) async {});
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    // 進行中泡泡有一顆永遠在轉的 spinner,pumpAndSettle 會 timeout。
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('chat-stop-waiting-42')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(() => reqRepo.stopWaiting(42)).called(1);
+
+    // 取消之後後端那筆會變終結 —— 讓輪詢自然收掉,否則 timer 留到 teardown。
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.cancelled,
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+  });
+
+  testWidgets('請求結束後「停止等待」消失,不留成裝飾', (tester) async {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          const TripRequest(
+            id: 42,
+            tripId: 'okinawa',
+            message: '幫我看行程',
+            status: RequestStatus.failed,
+            terminalReason: TerminalReason.cancelled,
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
+    expect(find.textContaining('已停止等待'), findsOneWidget);
+  });
+
   testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet', (tester) async {
     when(tripRepo.watchMyTrips).thenAnswer(
       (_) => Stream.value(const [
