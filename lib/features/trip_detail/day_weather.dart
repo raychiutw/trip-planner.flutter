@@ -172,7 +172,6 @@ class TripWeatherRequest {
     required this.weatherDay,
     this.tripStart,
     this.tripEnd,
-    this.timezone = 'Asia/Tokyo',
   });
 
   final int dayId;
@@ -180,7 +179,6 @@ class TripWeatherRequest {
   final TripWeatherDay weatherDay;
   final String? tripStart;
   final String? tripEnd;
-  final String timezone;
 
   @override
   bool operator ==(Object other) {
@@ -189,20 +187,12 @@ class TripWeatherRequest {
         other.dayDate == dayDate &&
         other.weatherDay == weatherDay &&
         other.tripStart == tripStart &&
-        other.tripEnd == tripEnd &&
-        other.timezone == timezone;
+        other.tripEnd == tripEnd;
   }
 
   @override
   int get hashCode {
-    return Object.hash(
-      dayId,
-      dayDate,
-      weatherDay,
-      tripStart,
-      tripEnd,
-      timezone,
-    );
+    return Object.hash(dayId, dayDate, weatherDay, tripStart, tripEnd);
   }
 }
 
@@ -286,12 +276,17 @@ class OpenMeteoDayWeatherFetcher {
         .toList();
     if (missing.isNotEmpty) {
       try {
-        await _fetchAndCache(missing, fetchStart, fetchEnd, request.timezone);
+        await _fetchAndCache(missing, fetchStart, fetchEnd);
       } catch (error) {
         throw DayWeatherFailure.from(error);
       }
     }
 
+    // 每格取「該時段所在地點」的當地時間預報 —— 因為 `timezone=auto` 是逐座標解析
+    // (見 [_fetchAndCache])。單一時區的一天(目前所有行程)整排就是當地時間;
+    // 跨時區的一天則是各段落各自對齊自己的當地時間,與使用者手機到當地會自動換時
+    // 區、行程表上的時間本來就是當地時間一致。代價是時區交界那格的絕對時間會小幅
+    // 重疊或跳過,但比整排硬套單一時區、讓其中一段整個錯開來得可讀。
     final temps = <double>[];
     final rains = <int>[];
     final codes = <int>[];
@@ -312,11 +307,24 @@ class OpenMeteoDayWeatherFetcher {
     _dio.close(force: true);
   }
 
+  /// 逐時預報一律以**當地時間**回傳,時區交給 Open-Meteo 從座標解析。
+  ///
+  /// `timezone=auto` 在多組座標下是**每組各自解析**,不是取第一組 ——
+  /// 2026-07-28 對 `api.open-meteo.com` 實測:
+  ///
+  /// ```
+  /// curl -s "https://api.open-meteo.com/v1/forecast?latitude=26.21,25.01\
+  /// &longitude=127.68,121.46&hourly=temperature_2m&timezone=auto&forecast_days=1"
+  /// [{"latitude":26.18629,...,"utc_offset_seconds":32400,"timezone":"Asia/Tokyo",...},
+  ///  {"latitude":24.99121,...,"utc_offset_seconds":28800,"timezone":"Asia/Taipei",...}]
+  /// ```
+  ///
+  /// 所以每組座標的 `hourly.time` 標籤就是該地當地時間,新增目的地不必維護任何
+  /// 時區對照表。快取以座標為鍵([_locationKey]),與時區一對一,不會互相污染。
   Future<void> _fetchAndCache(
     List<TripWeatherLocation> locations,
     DateTime start,
     DateTime end,
-    String timezone,
   ) async {
     final response = await _dio.get<Object?>(
       'https://api.open-meteo.com/v1/forecast',
@@ -326,7 +334,7 @@ class OpenMeteoDayWeatherFetcher {
         'hourly': 'temperature_2m,precipitation_probability,weather_code',
         'start_date': _toDateStr(start),
         'end_date': _toDateStr(end),
-        'timezone': timezone,
+        'timezone': 'auto',
       },
     );
 
@@ -352,13 +360,11 @@ class DayWeatherCard extends ConsumerStatefulWidget {
     required this.day,
     this.tripStart,
     this.tripEnd,
-    this.timezone = 'Asia/Tokyo',
   });
 
   final TripDay day;
   final String? tripStart;
   final String? tripEnd;
-  final String timezone;
 
   @override
   ConsumerState<DayWeatherCard> createState() => _DayWeatherCardState();
@@ -527,7 +533,6 @@ class _DayWeatherCardState extends ConsumerState<DayWeatherCard> {
       weatherDay: weatherDay,
       tripStart: widget.tripStart,
       tripEnd: widget.tripEnd,
-      timezone: widget.timezone,
     );
 
     final content = ref
