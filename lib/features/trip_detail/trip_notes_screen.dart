@@ -16,6 +16,7 @@ import '../../models/note_section.dart';
 import '../../models/notes.dart';
 import '../../models/trip_request.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
@@ -295,6 +296,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
                 version: p.version,
                 editFields: p.toEditFields(),
                 display: _PretripNoteRow(p),
+                canReassignToAi: p.canReassignToAi,
               ),
           ],
         ),
@@ -315,6 +317,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
                 version: c.version,
                 editFields: c.toEditFields(),
                 display: _EmergencyContactRow(c),
+                canReassignToAi: c.canReassignToAi,
               ),
           ],
         ),
@@ -495,12 +498,16 @@ class _NoteRowData {
     required this.version,
     required this.editFields,
     required this.display,
+    this.canReassignToAi = false,
   });
 
   final int id;
   final int version;
   final Map<String, dynamic> editFields;
   final Widget display;
+
+  /// 原本 AI 產生、目前人工維護 —— 只有這種才給「交還 AI 維護」。
+  final bool canReassignToAi;
 }
 
 /// AI 生成按鈕資料；只在可生成的 section 展開後顯示。
@@ -1008,8 +1015,63 @@ class _NoteRowTile extends StatelessWidget {
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
 
+  /// 交還 AI 維護。**兩個入口並存** —— 這是長按的捷徑,編輯 sheet 內另有一列
+  /// 主介面入口。Apple HIG「Context menus」明文:context menu 的動作在主介面
+  /// 也必須拿得到。
+  /// 長按的捷徑選單。用 action sheet 而不是自刻選單 —— 這一列右側已經有拖曳
+  /// 把手,塞不下 `⋯`;action sheet 出現在與列不同的位置、需要刻意關閉。
+  Future<void> _showReassignSheet(BuildContext context, WidgetRef ref) async {
+    final picked = await showAppActionSheet<int>(
+      context,
+      actions: const [TpActionItem(value: 0, label: '交還 AI 維護')],
+    );
+    if (picked == null || !context.mounted) return;
+    await _reassign(context, ref);
+  }
+
+  Future<void> _reassign(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(tripRepositoryProvider)
+          .setNoteMaintainer(
+            section,
+            tripId: tripId,
+            rowId: row.id,
+            managedBy: NoteMaintainer.ai,
+            expectedVersion: row.version,
+          );
+      if (!context.mounted) return;
+      ref.invalidate(tripNotesProvider(tripId));
+      showAppNotice(context, '已交還 AI 維護，下次生成才會更新內容');
+    } on ApiError catch (error) {
+      if (!context.mounted) return;
+      showAppError(context, _maintenanceErrorMessage(error));
+    }
+  }
+
+  static String _maintenanceErrorMessage(ApiError error) =>
+      switch (error.code) {
+        'NOTES_AI_NOT_REASSIGNABLE' => '這一則不是 AI 產生的，不能交還 AI 維護。',
+        'NOTES_AI_JOB_STALE' => '這一則已經被更新過，請重新整理後再試。',
+        _ => hasCjk(error.message) ? error.message : '目前無法變更維護方式。',
+      };
+
   @override
   Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) => GestureDetector(
+        // 長按必須掛在 SwipeToDelete **外面** —— flutter_slidable 會先攔下
+        // 手勢,掛在內層的 InkWell.onLongPress 永遠不會觸發。
+        onLongPress: row.canReassignToAi
+            ? () => _showReassignSheet(context, ref)
+            : null,
+        child: child,
+      ),
+      child: _buildRow(context),
+    );
+  }
+
+  Widget _buildRow(BuildContext context) {
     return SwipeToDelete(
       dismissKey: ValueKey('note-dismiss-${section.name}-${row.id}'),
       onDelete: onDelete,
@@ -1017,19 +1079,23 @@ class _NoteRowTile extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: InkWell(
-              onTap: () => showNoteEditSheet(
-                context,
-                tripId: tripId,
-                section: section,
-                initialFields: row.editFields,
-                rowId: row.id,
-                version: row.version,
+            child: Consumer(
+              builder: (context, ref, _) => InkWell(
+                onTap: () => showNoteEditSheet(
+                  context,
+                  tripId: tripId,
+                  section: section,
+                  initialFields: row.editFields,
+                  rowId: row.id,
+                  version: row.version,
+                ),
+                // 長按掛在這裡沒用 —— 外層 SwipeToDelete(flutter_slidable)
+                // 會先攔下手勢。改掛在 SwipeToDelete 之外(見 build 開頭)。
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(TpRadius.md),
+                ),
+                child: row.display,
               ),
-              borderRadius: const BorderRadius.all(
-                Radius.circular(TpRadius.md),
-              ),
-              child: row.display,
             ),
           ),
           ReorderDragHandle(
