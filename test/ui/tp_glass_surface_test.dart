@@ -1,8 +1,4 @@
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
@@ -14,39 +10,6 @@ import 'package:tripline/ui/tp_glass_surface.dart';
 ///
 /// 與模擬器截圖的量法一致：`pixelRatio: 3` 對齊 iPhone 的 @3x，1pt 的細邊在
 /// 實體像素上是 3px，取最左側 8px 內偏離內部填色最遠的那一點。
-Future<List<double>> _edgeDeltas(WidgetTester tester, Key boundaryKey) async {
-  final boundary = tester.renderObject<RenderRepaintBoundary>(
-    find.byKey(boundaryKey),
-  );
-  late ui.Image image;
-  late ByteData pixels;
-  await tester.runAsync(() async {
-    image = await boundary.toImage(pixelRatio: 3);
-    pixels = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-  });
-  final width = image.width;
-  double lumaAt(int x, int y) {
-    final offset = (y * width + x) * 4;
-    return 0.299 * pixels.getUint8(offset) +
-        0.587 * pixels.getUint8(offset + 1) +
-        0.114 * pixels.getUint8(offset + 2);
-  }
-
-  final deltas = <double>[];
-  for (final fraction in [0.35, 0.5, 0.65]) {
-    final y = (image.height * fraction).round();
-    final interior = lumaAt(width ~/ 2, y);
-    var peak = interior;
-    for (var x = 0; x < 8; x++) {
-      final value = lumaAt(x, y);
-      if ((value - interior).abs() > (peak - interior).abs()) peak = value;
-    }
-    deltas.add((peak - interior).abs());
-  }
-  image.dispose();
-  return deltas;
-}
-
 void main() {
   testWidgets('navigation glass separates text and visual backdrops', (
     tester,
