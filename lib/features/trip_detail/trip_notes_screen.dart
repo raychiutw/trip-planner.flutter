@@ -48,6 +48,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
   /// 每種生成目前走到哪一階段 —— 進度提示的文案由它決定。
   final _aiStage = <NoteGenerationType, _NotesAiStage>{};
 
+  /// 每種生成對應的 request id —— 停止等待要打的就是它。
+  final _aiRequestIds = <NoteGenerationType, int>{};
+
   /// 從後端讀回來的持久狀態。讀失敗只影響 AI 區塊,筆記本體照常。
   String? _aiStateError;
 
@@ -230,6 +233,8 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
                         key: ValueKey('notes-ai-pending-${type.pathSegment}'),
                         label: type.pendingLabel,
                         stage: _aiStage[type] ?? _NotesAiStage.queued,
+                        stopKey: ValueKey('notes-ai-stop-${type.pathSegment}'),
+                        onStopWaiting: () => _stopWaitingFor(type),
                       ),
                 ],
               ),
@@ -385,6 +390,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
   }
 
   void _watchAiJob(int requestId, NoteGenerationType type) {
+    _aiRequestIds[type] = requestId;
     // 只收掉**同一種**的舊通道（重試同一種時)。這裡若動到別的 docType,
     // 啟動第二個生成就會殺掉第一個的進度通道:畫面上兩個進行中都在,
     // 但第一個 job 的完成事件永遠不會到達,進行中狀態從此清不掉。
@@ -444,6 +450,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
     setState(() {
       _aiPending.remove(type);
       _aiStage.remove(type);
+      _aiRequestIds.remove(type);
       _aiFailure = (
         // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
         // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
@@ -456,6 +463,29 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
     // 逾時與一般失敗在進度通道上長得一樣(後端 #1217 把逾時的 job 對應的
     // request 也標成 failed),要靠重讀狀態才分得出來。client 不自己倒數。
     unawaited(_refreshAiOutcome(type));
+  }
+
+  /// 停止等待 —— **不中止 AI**(後端 ADR-0007)。只停這一種,不連坐別的。
+  ///
+  /// 標不掉也照樣把這一種換成終結態(與聊天、與 web 一致),但文案不假裝成功。
+  Future<void> _stopWaitingFor(NoteGenerationType type) async {
+    final requestId = _aiRequestIds[type];
+    if (requestId == null) return;
+    var confirmed = true;
+    try {
+      await ref.read(requestsRepositoryProvider).stopWaiting(requestId);
+    } on Object {
+      confirmed = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _aiSubscriptions.remove(type)?.cancel();
+      _aiPending.remove(type);
+      _aiStage.remove(type);
+      _aiRequestIds.remove(type);
+    });
+    if (confirmed) return;
+    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
   }
 
   /// 終態後重讀一次狀態,拿完成摘要或確認是不是逾時。**一次性,不是輪詢。**
@@ -567,10 +597,16 @@ class _NotesAiPendingPanel extends StatelessWidget {
     super.key,
     required this.label,
     required this.stage,
+    required this.stopKey,
+    required this.onStopWaiting,
   });
 
   final String label;
   final _NotesAiStage stage;
+  final Key stopKey;
+
+  /// 停止等待 —— 次要文字鈕,不換掉生成按鈕、不進工具列。
+  final VoidCallback onStopWaiting;
 
   @override
   Widget build(BuildContext context) {
@@ -604,6 +640,22 @@ class _NotesAiPendingPanel extends StatelessWidget {
                 color: colors.onSecondaryContainer,
                 fontWeight: FontWeight.w600,
               ),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: '停止等待',
+            hint: '停止等待這次生成。AI 若仍在處理，完成後的結果還是會寫進筆記。',
+            excludeSemantics: true,
+            child: TextButton(
+              key: stopKey,
+              onPressed: onStopWaiting,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, TpSpacing.tapMin),
+                padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('停止等待'),
             ),
           ),
         ],

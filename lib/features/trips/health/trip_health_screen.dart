@@ -12,7 +12,9 @@ import '../../../api/providers.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../app/error_message.dart';
+import '../../../app/app_feedback.dart';
 import '../../../models/day.dart';
+import '../../../models/trip_request.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
@@ -46,6 +48,45 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       _days.fold<int>(0, (count, day) => count + day.timeline.length);
 
   bool get _isPending => _report?.status == TripHealthStatus.pending;
+
+  /// 對應的 request 已終結,但報告表還停在 pending。後端的牆鐘直接 UPDATE
+  /// 不經 PATCH,完成 hook 不跑 —— 這個狀態要同時看兩邊才判斷得出來。
+  bool _requestTerminated = false;
+
+  /// 停止等待 —— **不中止 AI**(後端 ADR-0007)。
+  ///
+  /// 標不掉也照樣把畫面換成終結態,但文案不假裝成功。
+  Future<void> _stopWaiting() async {
+    final requestId = _report?.requestId;
+    if (requestId == null) return;
+    var confirmed = true;
+    try {
+      await ref.read(requestsRepositoryProvider).stopWaiting(requestId);
+    } on Object {
+      confirmed = false;
+    }
+    if (!mounted) return;
+    _pollTimer?.cancel();
+    setState(() => _requestTerminated = true);
+    if (confirmed) return;
+    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
+  }
+
+  /// 報告還是 pending 時順手看一下對應的 request 有沒有已經被收掉。
+  Future<void> _syncRequestTermination() async {
+    final requestId = _report?.requestId;
+    if (requestId == null || !_isPending || _requestTerminated) return;
+    try {
+      final row = await ref
+          .read(requestsRepositoryProvider)
+          .fetchRequest(requestId);
+      if (!mounted || !row.status.isTerminal) return;
+      _pollTimer?.cancel();
+      setState(() => _requestTerminated = true);
+    } on Object {
+      // 查不到就當它還在跑,下一輪再看。
+    }
+  }
 
   @override
   void initState() {
@@ -100,6 +141,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
         _poiHealth = results[3] as TripPoiHealthReport;
       });
       _schedulePoll(report, generation, tripId);
+      unawaited(_syncRequestTermination());
     } on Exception catch (error) {
       if (!_isCurrent(generation, tripId)) return;
       setState(() => _error = _healthErrorMessage(error, '載入健檢資料失敗，請稍後重試'));
@@ -244,6 +286,10 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
                           _ReportSection(
                             report: _report,
                             tripId: widget.tripId,
+                            requestTerminated: _requestTerminated,
+                            onStopWaiting: _report?.requestId == null
+                                ? null
+                                : _stopWaiting,
                           ),
                         ],
                       ),
@@ -412,10 +458,25 @@ class _PoiHealthCard extends StatelessWidget {
 }
 
 class _ReportSection extends StatelessWidget {
-  const _ReportSection({required this.report, required this.tripId});
+  const _ReportSection({
+    required this.report,
+    required this.tripId,
+    this.requestTerminated = false,
+    this.onStopWaiting,
+  });
 
   final TripHealthReport? report;
   final String tripId;
+
+  /// 對應的 request 已經終結,但報告表還停在 pending。
+  ///
+  /// 後端的牆鐘直接 UPDATE 不經 PATCH,所以完成 hook 不跑、報告不會被更新
+  /// (後端 ADR-0007 自己標成已知缺口)。**這裡只讓畫面說得出這個狀況,
+  /// 不在 app 側修根因。** 這個狀態要同時看請求與報告兩邊才判斷得出來。
+  final bool requestTerminated;
+
+  /// 停止等待 —— 不中止 AI。
+  final VoidCallback? onStopWaiting;
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +485,8 @@ class _ReportSection extends StatelessWidget {
       return const _EmptyReport();
     }
     return switch (report.status) {
-      TripHealthStatus.pending => const _PendingReport(),
+      TripHealthStatus.pending when requestTerminated => const _StalledReport(),
+      TripHealthStatus.pending => _PendingReport(onStopWaiting: onStopWaiting),
       TripHealthStatus.failed => _FailedReport(message: report.errorMessage),
       TripHealthStatus.completed =>
         report.findings.isEmpty
@@ -449,15 +511,50 @@ class _EmptyReport extends StatelessWidget {
 }
 
 class _PendingReport extends StatelessWidget {
-  const _PendingReport();
+  const _PendingReport({this.onStopWaiting});
+
+  final VoidCallback? onStopWaiting;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatePanel(
+      key: const ValueKey('trip-health-pending'),
+      icon: Icons.hourglass_top,
+      title: 'AI 健檢進行中',
+      message: '通常 3-7 分鐘完成。你可以先離開，稍後回來查看結果。',
+      liveRegion: true,
+      // 次要文字鈕 —— 不換掉「開始健檢」、不進工具列。
+      action: onStopWaiting == null
+          ? null
+          : Semantics(
+              button: true,
+              label: '停止等待',
+              hint: '停止等待這次健檢。AI 若仍在處理，結果之後仍可能出現。',
+              excludeSemantics: true,
+              child: TextButton(
+                key: const ValueKey('trip-health-stop'),
+                onPressed: onStopWaiting,
+                child: const Text('停止等待'),
+              ),
+            ),
+    );
+  }
+}
+
+/// 請求已終結、報告卻停在 pending。
+///
+/// 後端的牆鐘不經完成 hook,所以報告表不會被更新。使用者重整幾次都一樣 ——
+/// 畫面要說得出來,並給一個重新健檢的出口。
+class _StalledReport extends StatelessWidget {
+  const _StalledReport();
 
   @override
   Widget build(BuildContext context) {
     return const _StatePanel(
-      key: ValueKey('trip-health-pending'),
-      icon: Icons.hourglass_top,
-      title: 'AI 健檢進行中',
-      message: '通常 3-7 分鐘完成。你可以先離開，稍後回來查看結果。',
+      key: ValueKey('trip-health-stalled'),
+      icon: Icons.hourglass_disabled,
+      title: '這次健檢已經停止',
+      message: '報告不會再更新了。可以重新健檢一次。',
       liveRegion: true,
     );
   }
@@ -641,12 +738,16 @@ class _StatePanel extends StatelessWidget {
     required this.title,
     required this.message,
     this.liveRegion = false,
+    this.action,
   });
 
   final IconData icon;
   final String title;
   final String message;
   final bool liveRegion;
+
+  /// 次要動作,靠左貼在說明下面 —— 不與主要動作搶位置。
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +768,10 @@ class _StatePanel extends StatelessWidget {
               Text(title, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: TpSpacing.s2),
               Text(message),
+              if (action case final action?) ...[
+                const SizedBox(height: TpSpacing.s2),
+                Align(alignment: Alignment.centerLeft, child: action),
+              ],
             ],
           ),
         ),
