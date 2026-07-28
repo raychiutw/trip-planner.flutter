@@ -2,7 +2,7 @@ import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderBox, RenderParagraph;
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
