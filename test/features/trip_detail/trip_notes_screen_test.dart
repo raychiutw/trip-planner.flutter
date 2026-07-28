@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
@@ -16,7 +15,6 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/theme/tokens.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -106,14 +104,6 @@ Widget _buildScreen(
   ThemeData? theme,
   TextScaler? textScaler,
 }) {
-  final router = GoRouter(
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const TripNotesScreen(tripId: 'trip-1'),
-      ),
-    ],
-  );
   return ProviderScope(
     retry: (retryCount, error) => null,
     overrides: [
@@ -124,7 +114,7 @@ Widget _buildScreen(
       if (requestsRepo != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepo),
     ],
-    child: MaterialApp.router(
+    child: MaterialApp(
       theme: theme ?? AppTheme.light(),
       builder: textScaler == null
           ? null
@@ -132,7 +122,7 @@ Widget _buildScreen(
               data: MediaQuery.of(context).copyWith(textScaler: textScaler),
               child: child!,
             ),
-      routerConfig: router,
+      home: const TripNotesScreen(tripId: 'trip-1'),
     ),
   );
 }
@@ -271,7 +261,7 @@ void main() {
     final flightsTop = tester
         .getRect(find.byKey(const ValueKey('notes-section-flights')))
         .top;
-    expect(flightsTop - listTop, closeTo(TpSpacing.s4, 0.01));
+    expect(flightsTop - listTop, closeTo(16, 0.01));
 
     // 下拉整組消失：觸發鈕與三個選項都不在樹上。切換交由 root tab 承擔，
     // 退出筆記頁走返回鍵。

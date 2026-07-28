@@ -15,7 +15,6 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_bottom_accessory.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_root_scaffold.dart';
-import '../../ui/tp_scope_menu.dart';
 import '../map/map_adapter.dart';
 import '../map/google_maps_external_launcher.dart';
 import '../map/map_location.dart';

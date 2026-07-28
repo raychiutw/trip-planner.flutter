@@ -15,7 +15,6 @@ import 'package:tripline/ui/tp_content_surface.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
-import 'package:tripline/ui/tp_scope_menu.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 import 'package:tripline/ui/tp_state_view.dart';
 
