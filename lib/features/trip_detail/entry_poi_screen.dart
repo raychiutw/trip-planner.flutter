@@ -258,6 +258,8 @@ class EntryPoiScreen extends ConsumerWidget {
   ) {
     return confirmAndDelete(
       context,
+      // 備選景點只有左滑移除這條路徑，不是選單來源，alert 仍合規。
+      source: TpDestructiveConfirmSource.direct,
       title: '移除備選景點？',
       message: '移除「${alternate.name ?? '未命名地點'}」後無法復原。',
       delete: () => ref

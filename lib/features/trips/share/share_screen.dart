@@ -186,6 +186,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       case _ShareRowAction.revoke:
         await confirmAndRunIrreversibleAction(
           context,
+          source: TpDestructiveConfirmSource.menu,
           title: '撤銷「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
           message: '這個分享連結將立即失效，且無法復原。',
           actionLabel: '撤銷',
@@ -197,6 +198,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       case _ShareRowAction.delete:
         await confirmAndRunIrreversibleAction(
           context,
+          source: TpDestructiveConfirmSource.menu,
           title: '刪除「${share.label.isEmpty ? '無標籤連結' : share.label}」？',
           message: '這個分享連結與瀏覽統計會永久刪除，且無法復原。',
           actionLabel: '刪除',

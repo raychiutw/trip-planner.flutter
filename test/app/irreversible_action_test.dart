@@ -1,10 +1,56 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/app/irreversible_action.dart';
 
 void main() {
+  testWidgets('選單來源的不可復原動作以 action sheet 確認，確認後才動手', (tester) async {
+    var ran = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => unawaited(
+                confirmAndRunIrreversibleAction(
+                  context,
+                  source: TpDestructiveConfirmSource.menu,
+                  title: '移除「v@x.com」？',
+                  message: '這位成員將失去此行程的存取權，且無法復原。',
+                  actionLabel: '移除',
+                  progressLabel: '正在移除…',
+                  successMessage: '已移除共編成員',
+                  failureMessage: '移除失敗，原權限已保留',
+                  action: () async {
+                    ran = true;
+                    return true;
+                  },
+                ),
+              ),
+              child: const Text('開始'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開始'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsNothing);
+    expect(ran, isFalse);
+
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '移除'));
+    await tester.pumpAndSettle();
+    expect(ran, isTrue);
+    expect(find.text('已移除共編成員'), findsOneWidget);
+  });
+
   testWidgets('不可復原動作等伺服器成功後才關閉進度並通知', (tester) async {
     final completed = Completer<bool>();
     var succeeded = false;
@@ -17,6 +63,7 @@ void main() {
               onPressed: () => unawaited(
                 confirmAndRunIrreversibleAction(
                   context,
+                  source: TpDestructiveConfirmSource.direct,
                   title: '撤銷分享連結',
                   message: '「家人連結」將立即失效，且無法復原。',
                   actionLabel: '撤銷',
@@ -71,6 +118,7 @@ void main() {
               onPressed: () => unawaited(
                 confirmAndRunIrreversibleAction(
                   context,
+                  source: TpDestructiveConfirmSource.direct,
                   title: '刪除分享連結',
                   message: '連結與統計會永久刪除，且無法復原。',
                   actionLabel: '刪除',

@@ -988,8 +988,15 @@ class _TpMenuPanelState extends State<_TpMenuPanel>
   }
 }
 
-/// 選單項目。字符在前、標題在後 —— iOS 26 起系統選單就是這個方位
-/// （iOS 18 以前才相反），不要改成靠右。
+/// 選單項目。字符在前、標題在後。
+///
+/// 這個方位是**對照真實 iOS 26 系統選單的觀察結果**，不是 HIG 的規定 —— HIG
+/// `menus` 整頁沒有任何圖示方位的敘述（唯一出現 `leading` 的地方是一張插圖的
+/// alt text，講的還是勾號）；`pull-down-buttons` 唯一提到方位的句子是「you can
+/// display an interface icon or image **after its label**」，方向與這裡相反，
+/// 但那頁的 change log 停在 2022 年，文本已落後於系統。
+///
+/// 要翻版面前請先取得真機系統選單的截圖當證據，不要拿 HIG 文本當依據。
 class _TpMenuItem<T> extends StatelessWidget {
   const _TpMenuItem({super.key, required this.item, required this.onSelected});
 

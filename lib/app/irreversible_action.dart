@@ -8,8 +8,12 @@ import 'adaptive.dart';
 import 'app_feedback.dart';
 
 /// 統一不可復原動作的確認、執行中鎖定、成功與可重試失敗狀態。
+///
+/// [source] 由呼叫端指定 —— 同一個動作可能同時掛在選單與右滑上(時間軸的刪除
+/// 景點就是),確認界面依觸發來源決定,不可綁在這裡。
 Future<void> confirmAndRunIrreversibleAction(
   BuildContext context, {
+  required TpDestructiveConfirmSource source,
   required String title,
   required String message,
   required String actionLabel,
@@ -20,12 +24,12 @@ Future<void> confirmAndRunIrreversibleAction(
   VoidCallback? onSuccess,
   Key progressKey = const ValueKey('irreversible-action-progress'),
 }) async {
-  final confirmed = await showAppConfirm(
+  final confirmed = await showAppDestructiveConfirm(
     context,
+    source: source,
     title: title,
     message: message,
     confirmLabel: actionLabel,
-    isDestructive: true,
   );
   if (!confirmed) return;
 
@@ -82,6 +86,7 @@ Future<void> confirmAndRunIrreversibleAction(
 /// 行程項目與筆記沿用的永久刪除包裝。
 Future<void> confirmAndDelete(
   BuildContext context, {
+  required TpDestructiveConfirmSource source,
   required String title,
   required String message,
   required Future<void> Function() delete,
@@ -89,6 +94,7 @@ Future<void> confirmAndDelete(
 }) {
   return confirmAndRunIrreversibleAction(
     context,
+    source: source,
     title: title,
     message: message,
     actionLabel: '刪除',

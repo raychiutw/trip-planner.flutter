@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/adaptive.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../app/irreversible_action.dart';
@@ -64,6 +65,7 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
       case _MemberAction.remove:
         await confirmAndRunIrreversibleAction(
           context,
+          source: TpDestructiveConfirmSource.menu,
           title: '移除「${member.email}」？',
           message: '這位成員將失去此行程的存取權，且無法復原。',
           actionLabel: '移除',
@@ -78,6 +80,8 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
   Future<void> _revokeInvite(TripInvite invite) {
     return confirmAndRunIrreversibleAction(
       context,
+      // 邀請列上的撤銷是直接按鈕、不經選單，alert 仍合規。
+      source: TpDestructiveConfirmSource.direct,
       title: '撤銷「${invite.invitedEmail}」的邀請？',
       message: '這封邀請將立即失效，且無法復原。',
       actionLabel: '撤銷',

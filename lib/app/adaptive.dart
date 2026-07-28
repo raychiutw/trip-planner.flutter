@@ -203,6 +203,65 @@ Future<bool> showAppConfirm(
   return result ?? false;
 }
 
+/// 破壞性動作的確認來源 —— 決定確認要出 action sheet 還是 alert。
+///
+/// HIG `pull-down-buttons`:「When people choose a destructive action, the
+/// system displays an action sheet (iOS) or popover (iPadOS)... Because an
+/// action sheet appears in a different location from the menu and requires
+/// deliberate dismissal, it can help people avoid losing data by mistake.」
+///
+/// 這條只約束**從選單選中**的破壞性動作。`action-sheets` 頁明文承認 alert
+/// 一樣可以確認破壞性動作(「Although an alert can also help people confirm
+/// or cancel an action that has destructive consequences...」),所以右滑刪除
+/// 這類非選單來源維持 alert 仍然合規。
+enum TpDestructiveConfirmSource {
+  /// 從 [TpMoreMenuButton] 選單選中 —— 確認走 action sheet。
+  menu,
+
+  /// 直接觸發(右滑刪除、列上的按鈕)—— 確認走 alert。
+  direct,
+}
+
+/// 破壞性動作的確認,依 [source] 選擇 HIG 規定的確認界面。
+///
+/// action sheet 只放一個破壞性動作加取消 —— 內容保持一屏,避免 `action-sheets`
+/// 頁禁止的捲動。
+Future<bool> showAppDestructiveConfirm(
+  BuildContext context, {
+  required TpDestructiveConfirmSource source,
+  required String title,
+  String? message,
+  required String confirmLabel,
+  String cancelLabel = '取消',
+}) async {
+  if (source == TpDestructiveConfirmSource.direct) {
+    return showAppConfirm(
+      context,
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      isDestructive: true,
+    );
+  }
+  final confirmed = await showAppActionSheet<bool>(
+    context,
+    title: title,
+    message: message,
+    actions: [
+      TpActionItem(
+        value: true,
+        label: confirmLabel,
+        // action sheet 不畫字符,這裡只是 [TpActionItem] 的必填欄位。
+        icon: CupertinoIcons.exclamationmark_triangle,
+        role: TpActionRole.destructive,
+      ),
+    ],
+    cancelLabel: cancelLabel,
+  );
+  return confirmed ?? false;
+}
+
 /// 顯示只有單一確認動作的 HIG 提示對話框。
 Future<void> showAppAlert(
   BuildContext context, {

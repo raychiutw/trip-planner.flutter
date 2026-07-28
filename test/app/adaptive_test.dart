@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_action_item.dart';
 
 void main() {
@@ -248,6 +249,191 @@ void main() {
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
     await tester.pumpAndSettle();
     expect(await future, isFalse);
+  });
+
+  group('選單來源的破壞性確認', () {
+    Widget destructiveHost({
+      required TpDestructiveConfirmSource source,
+      TextScaler textScaler = TextScaler.noScaling,
+      FocusNode? triggerFocus,
+      void Function(Future<bool>)? capture,
+    }) {
+      return MaterialApp(
+        theme: AppTheme.light(),
+        // Dynamic Type 要掛在 Navigator 之上，modal popup 才吃得到 —— 掛在
+        // `home` 裡面的話 overlay 讀不到，量到的會是未縮放的假結果。
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+          child: child!,
+        ),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                focusNode: triggerFocus,
+                onPressed: () {
+                  final future = showAppDestructiveConfirm(
+                    context,
+                    source: source,
+                    title: '刪除停留點',
+                    message: '刪除「首里城」後，相關交通時間將重新計算。此動作無法復原。',
+                    confirmLabel: '刪除',
+                  );
+                  if (capture == null) {
+                    unawaited(future);
+                  } else {
+                    capture(future);
+                  }
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('選單來源出 action sheet 而不是 alert，確認回傳 true', (tester) async {
+      late Future<bool> future;
+      await tester.pumpWidget(
+        destructiveHost(
+          source: TpDestructiveConfirmSource.menu,
+          capture: (value) => future = value,
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
+      expect(find.text('刪除停留點'), findsOneWidget);
+      expect(find.textContaining('相關交通時間將重新計算'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
+      await tester.pumpAndSettle();
+      expect(await future, isTrue);
+    });
+
+    testWidgets('取消可辨識且回傳 false', (tester) async {
+      late Future<bool> future;
+      await tester.pumpWidget(
+        destructiveHost(
+          source: TpDestructiveConfirmSource.menu,
+          capture: (value) => future = value,
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final cancel = find.widgetWithText(CupertinoActionSheetAction, '取消');
+      expect(cancel, findsOneWidget);
+      expect(
+        tester.widget<CupertinoActionSheetAction>(cancel).isDestructiveAction,
+        isFalse,
+      );
+
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(await future, isFalse);
+    });
+
+    testWidgets('破壞性項目走 error 語意色', (tester) async {
+      await tester.pumpWidget(
+        destructiveHost(source: TpDestructiveConfirmSource.menu),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final confirm = find.widgetWithText(CupertinoActionSheetAction, '刪除');
+      expect(
+        tester.widget<CupertinoActionSheetAction>(confirm).isDestructiveAction,
+        isTrue,
+      );
+      final resolved = CupertinoDynamicColor.resolve(
+        CupertinoColors.destructiveRed,
+        tester.element(confirm),
+      );
+      expect(resolved, isSameColorAs(AppTheme.light().colorScheme.error));
+    });
+
+    testWidgets('最大 Dynamic Type 下 action sheet 不捲動', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        destructiveHost(
+          source: TpDestructiveConfirmSource.menu,
+          // iOS 無障礙級別的最大 Dynamic Type。
+          textScaler: const TextScaler.linear(3.2),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      // 先確認放大真的傳到了 sheet —— 否則下面的「不捲動」是恆真的假綠燈。
+      final sheet = find.byType(CupertinoActionSheet);
+      expect(tester.getSize(sheet).height, greaterThan(300));
+
+      final scrollables = find.descendant(
+        of: sheet,
+        matching: find.byType(Scrollable),
+      );
+      expect(scrollables, findsWidgets);
+      for (final element in scrollables.evaluate()) {
+        final state = (element as StatefulElement).state as ScrollableState;
+        expect(
+          state.position.maxScrollExtent,
+          0,
+          reason:
+              'action sheet 不得捲動（HIG action-sheets：Avoid letting an '
+              'action sheet scroll）',
+        );
+      }
+    });
+
+    testWidgets('action sheet 接管焦點，關閉後焦點回到原處', (tester) async {
+      final triggerFocus = FocusNode(debugLabel: 'trigger');
+      addTearDown(triggerFocus.dispose);
+
+      await tester.pumpWidget(
+        destructiveHost(
+          source: TpDestructiveConfirmSource.menu,
+          triggerFocus: triggerFocus,
+        ),
+      );
+      triggerFocus.requestFocus();
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, triggerFocus);
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus, isNot(triggerFocus));
+
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '取消'));
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus, triggerFocus);
+    });
+
+    testWidgets('非選單來源維持 alert', (tester) async {
+      late Future<bool> future;
+      await tester.pumpWidget(
+        destructiveHost(
+          source: TpDestructiveConfirmSource.direct,
+          capture: (value) => future = value,
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoActionSheet), findsNothing);
+
+      await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+      await tester.pumpAndSettle();
+      expect(await future, isTrue);
+    });
   });
 
   testWidgets('iOS → CupertinoActionSheet;選破壞性動作回傳其值', (tester) async {

@@ -1080,13 +1080,16 @@ class _DaySection extends ConsumerWidget {
   )
   onSetMaster;
 
+  /// 同一個刪除同時掛在選單與右滑上，確認界面依 [source] 分流。
   Future<void> _confirmDelete(
     BuildContext context,
     WidgetRef ref,
-    TimelineEntry entry,
-  ) {
+    TimelineEntry entry, {
+    required TpDestructiveConfirmSource source,
+  }) {
     return confirmAndDelete(
       context,
+      source: source,
       title: '刪除停留點',
       message: '刪除「${entry.title}」後，相關交通時間將重新計算。此動作無法復原。',
       delete: () async {
@@ -1300,7 +1303,12 @@ class _DaySection extends ConsumerWidget {
         : SwipeToDelete(
             dismissKey: ValueKey('entry-dismiss-${entry.id}'),
             actionLabel: '刪除景點',
-            onDelete: () => _confirmDelete(context, ref, entry),
+            onDelete: () => _confirmDelete(
+              context,
+              ref,
+              entry,
+              source: TpDestructiveConfirmSource.direct,
+            ),
             backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s3),
             child: tile,
           );
@@ -1429,7 +1437,14 @@ class _DaySection extends ConsumerWidget {
       case _EntryMoreAction.copy:
         unawaited(onCopyToDay(entry, day.id));
       case _EntryMoreAction.delete:
-        unawaited(_confirmDelete(context, ref, entry));
+        unawaited(
+          _confirmDelete(
+            context,
+            ref,
+            entry,
+            source: TpDestructiveConfirmSource.menu,
+          ),
+        );
     }
   }
 

@@ -255,7 +255,7 @@ void main() {
 
     expect(find.text('移除「v@x.com」？'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '移除'));
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '移除'));
     await tester.pump();
     expect(
       find.byKey(const ValueKey('irreversible-action-progress')),
@@ -265,6 +265,43 @@ void main() {
     completed.complete();
     await tester.pumpAndSettle();
     verify(() => repo.removeMember(2)).called(1);
+  });
+
+  testWidgets('從選單移除成員以 action sheet 確認，非選單的撤銷邀請仍是 alert', (tester) async {
+    when(() => repo.fetchInvites(any())).thenAnswer(
+      (_) async => const [
+        TripInvite(id: 'invite-1', invitedEmail: 'guest@x.com'),
+      ],
+    );
+    when(() => repo.removeMember(2)).thenAnswer((_) async {});
+    when(
+      () => repo.revokeInvite(
+        tripId: any(named: 'tripId'),
+        email: any(named: 'email'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    // 選單來源：破壞性動作要出 action sheet。
+    await tester.tap(find.byKey(const ValueKey('member-actions-2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('member-remove-2')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsNothing);
+    await tester.tap(
+      find.widgetWithText(CupertinoActionSheetAction, '取消').last,
+    );
+    await tester.pumpAndSettle();
+    verifyNever(() => repo.removeMember(2));
+
+    // 非選單來源(列上的撤銷按鈕)：alert 仍合規，不順手改。
+    await tester.tap(find.widgetWithText(TextButton, '撤銷'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+    expect(find.byType(CupertinoActionSheet), findsNothing);
   });
 
   testWidgets('撤銷邀請沿用不可復原流程且保留原 API 參數', (tester) async {
