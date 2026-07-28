@@ -285,6 +285,7 @@ Widget _buildScreen(
 void main() {
   setUpAll(() {
     registerFallbackValue(NoteSection.flights);
+    registerFallbackValue(NoteMaintainer.human);
     registerFallbackValue(NoteGenerationType.tips);
     registerFallbackValue(<String, dynamic>{});
   });
@@ -1277,6 +1278,74 @@ void main() {
     );
   });
 
+  Widget reassignScreen(_MockTripRepository repo) => _buildScreen(
+    const TripNotes(
+      pretripNotes: [
+        TripPretripNote(
+          id: 11,
+          sortOrder: 0,
+          version: 4,
+          section: '一般',
+          title: '我改過的 AI 項目',
+          content: 'x',
+          origin: NoteMaintainer.ai,
+          managedBy: NoteMaintainer.human,
+        ),
+        TripPretripNote(
+          id: 12,
+          sortOrder: 1,
+          version: 1,
+          section: '一般',
+          title: '我自己建的',
+          content: 'y',
+        ),
+      ],
+    ),
+    repo: repo,
+  );
+
+  _MockTripRepository reassignRepo() {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.fetchNotesAiState(any()),
+    ).thenAnswer((_) async => const TripNoteAiState());
+    when(
+      () => repo.setNoteMaintainer(
+        any(),
+        tripId: any(named: 'tripId'),
+        rowId: any(named: 'rowId'),
+        managedBy: any(named: 'managedBy'),
+        expectedVersion: any(named: 'expectedVersion'),
+      ),
+    ).thenAnswer((_) async {});
+    return repo;
+  }
+
+  testWidgets('原本 AI 產生、已轉人工的列可長按交還維護', (tester) async {
+    _useTallViewport(tester);
+    final repo = reassignRepo();
+    await tester.pumpWidget(reassignScreen(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('我改過的 AI 項目'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    await tester.tap(find.text('交還 AI 維護'));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+  });
+
   testWidgets('已排除 N 項:N=0 不出現;點開可逐項恢復', (tester) async {
     _useTallViewport(tester);
     final repo = _MockTripRepository();
@@ -1349,6 +1418,20 @@ void main() {
         exclusionId: 3,
       ),
     ).called(1);
+  });
+
+  testWidgets('純人工建立的列長按不叫任何選單（不是出現但 disabled）', (tester) async {
+    _useTallViewport(tester);
+    final repo = reassignRepo();
+    await tester.pumpWidget(reassignScreen(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('我自己建的'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoActionSheet), findsNothing);
+    expect(find.text('交還 AI 維護'), findsNothing);
   });
 
   testWidgets('目前由 AI 維護的列顯示標記,改過的不顯示', (tester) async {

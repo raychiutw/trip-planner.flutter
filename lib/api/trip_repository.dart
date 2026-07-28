@@ -450,6 +450,30 @@ class TripRepository {
     );
   }
 
+  /// PATCH /trips/:id/notes/:section/:rowId/maintenance（切換維護者）。
+  ///
+  /// **段名走 [NoteSection]** —— 它的 `name` 本來就是 `pretrip`／`emergency`，
+  /// 與排除清單用的 [NoteGenerationType.pathSegment]（`tips`／`lodging-tips`）
+  /// 不是同一組字。
+  ///
+  /// 對 `origin != 'ai'` 的列要求 `managedBy: 'ai'` 時後端回
+  /// `NOTES_AI_NOT_REASSIGNABLE`；純人工建立的列不該讓使用者看到這個動作。
+  Future<void> setNoteMaintainer(
+    NoteSection section, {
+    required String tripId,
+    required int rowId,
+    required NoteMaintainer managedBy,
+    required int expectedVersion,
+  }) async {
+    await _client.patch(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId/maintenance',
+      body: {
+        'managedBy': managedBy == NoteMaintainer.ai ? 'ai' : 'human',
+        'expectedVersion': expectedVersion,
+      },
+    );
+  }
+
   /// GET /trips/:id/notes/:docType/exclusions（被排除的 AI 項目)。
   ///
   /// **段名走 [NoteGenerationTypeX.pathSegment]**(`tips`／`lodging-tips`／
