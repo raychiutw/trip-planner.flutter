@@ -182,6 +182,9 @@ class TripPretripNote {
     this.title = '',
     this.content = '',
     this.aiGenerated = false,
+    this.origin = NoteMaintainer.human,
+    this.managedBy = NoteMaintainer.human,
+    this.semanticKey,
   });
 
   final int id;
@@ -194,6 +197,23 @@ class TripPretripNote {
   final String content;
   final bool aiGenerated;
 
+  /// 這一列**當初**由誰產生。
+  final NoteMaintainer origin;
+
+  /// 這一列**現在**由誰維護。使用者編輯內容後由後端翻成 [NoteMaintainer.human]。
+  final NoteMaintainer managedBy;
+
+  /// 後端用來判斷「同一則」的語意鍵;去重與排除靠它。
+  final String? semanticKey;
+
+  /// 要不要在列上顯示「AI」標記 —— 看的是**現在誰維護**,不是當初誰產生。
+  bool get showsAiBadge => managedBy == NoteMaintainer.ai;
+
+  /// 能不能交還給 AI 維護。只有「原本 AI 產生、目前人工維護」這種可以;
+  /// 純人工建立的永遠不行(後端會回 `NOTES_AI_NOT_REASSIGNABLE`)。
+  bool get canReassignToAi =>
+      origin == NoteMaintainer.ai && managedBy == NoteMaintainer.human;
+
   factory TripPretripNote.fromJson(Map<String, dynamic> json) {
     return TripPretripNote(
       id: (json['id'] as num).toInt(),
@@ -203,6 +223,9 @@ class TripPretripNote {
       title: json['title'] as String? ?? '',
       content: json['content'] as String? ?? '',
       aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
+      origin: parseNoteMaintainer(json['origin']),
+      managedBy: parseNoteMaintainer(json['managedBy']),
+      semanticKey: json['semanticKey'] as String?,
     );
   }
 
@@ -225,6 +248,9 @@ class TripEmergencyContact {
     this.email = '',
     this.kind = 'other',
     this.aiGenerated = false,
+    this.origin = NoteMaintainer.human,
+    this.managedBy = NoteMaintainer.human,
+    this.semanticKey,
   });
 
   final int id;
@@ -239,6 +265,23 @@ class TripEmergencyContact {
   final String kind;
   final bool aiGenerated;
 
+  /// 這一列**當初**由誰產生。
+  final NoteMaintainer origin;
+
+  /// 這一列**現在**由誰維護。使用者編輯內容後由後端翻成 [NoteMaintainer.human]。
+  final NoteMaintainer managedBy;
+
+  /// 後端用來判斷「同一則」的語意鍵;去重與排除靠它。
+  final String? semanticKey;
+
+  /// 要不要在列上顯示「AI」標記 —— 看的是**現在誰維護**,不是當初誰產生。
+  bool get showsAiBadge => managedBy == NoteMaintainer.ai;
+
+  /// 能不能交還給 AI 維護。只有「原本 AI 產生、目前人工維護」這種可以;
+  /// 純人工建立的永遠不行(後端會回 `NOTES_AI_NOT_REASSIGNABLE`)。
+  bool get canReassignToAi =>
+      origin == NoteMaintainer.ai && managedBy == NoteMaintainer.human;
+
   factory TripEmergencyContact.fromJson(Map<String, dynamic> json) {
     return TripEmergencyContact(
       id: (json['id'] as num).toInt(),
@@ -250,6 +293,9 @@ class TripEmergencyContact {
       email: json['email'] as String? ?? '',
       kind: json['kind'] as String? ?? 'other',
       aiGenerated: json['aiGenerated'] == 1 || json['aiGenerated'] == true,
+      origin: parseNoteMaintainer(json['origin']),
+      managedBy: parseNoteMaintainer(json['managedBy']),
+      semanticKey: json['semanticKey'] as String?,
     );
   }
 
@@ -318,6 +364,18 @@ class TripNotes {
 }
 
 /// AI 生成 job 的狀態。
+/// 一列筆記的來源與目前維護者。
+///
+/// 後端 migration 0091 對 `trip_pretrip_notes` 與 `trip_emergency_contacts`
+/// 各加了 `origin` 與 `managed_by`(皆 NOT NULL DEFAULT `'human'`)。
+///
+/// **缺漏一律預設 [human]** —— 這是安全側:離線樂觀寫入建立的列不帶這兩個
+/// 欄位,誤判成 AI 會讓使用者手寫的內容在下次生成被覆蓋。
+enum NoteMaintainer { human, ai }
+
+NoteMaintainer parseNoteMaintainer(Object? raw) =>
+    raw == 'ai' ? NoteMaintainer.ai : NoteMaintainer.human;
+
 /// job 狀態。契約以後端 `#1216`/`#1217` 原始碼為準:除了 issue 描述的五種,
 /// 實際還會回 `idle`(這種 docType 從沒生成過);`timed_out` 由 server 轉成
 /// `timedOut` 才送出。

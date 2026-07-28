@@ -3,6 +3,8 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 
 void main() {
+  _noteMaintenanceTests();
+
   _aiStateContractTests();
 
   group('TripFlight.fromJson', () {
@@ -442,6 +444,65 @@ void _aiStateContractTests() {
     test('idle 與 timedOut 的終止判定', () {
       expect(TripNoteAiJobStatus.idle.isTerminal, isFalse);
       expect(TripNoteAiJobStatus.timedOut.isTerminal, isTrue);
+    });
+  });
+}
+
+void _noteMaintenanceTests() {
+  group('筆記列的 origin / managedBy / semanticKey（後端 migration 0091）', () {
+    test('TripPretripNote 解析三個新欄位', () {
+      final note = TripPretripNote.fromJson(const {
+        'id': 1,
+        'sortOrder': 0,
+        'version': 2,
+        'section': 'general',
+        'title': '插座',
+        'content': 'A 型',
+        'origin': 'ai',
+        'managedBy': 'human',
+        'semanticKey': 'power-socket',
+      });
+      expect(note.origin, NoteMaintainer.ai);
+      expect(note.managedBy, NoteMaintainer.human);
+      expect(note.semanticKey, 'power-socket');
+      expect(note.canReassignToAi, isTrue, reason: '原本 AI 產生、現在人工維護 —— 這種才能交還');
+    });
+
+    test('缺漏一律預設 human（安全側）', () {
+      // 離線樂觀寫入建立的列沒有這三個欄位。
+      final note = TripPretripNote.fromJson(const {'id': 1, 'title': 'x'});
+      expect(note.origin, NoteMaintainer.human);
+      expect(note.managedBy, NoteMaintainer.human);
+      expect(note.semanticKey, isNull);
+      expect(note.canReassignToAi, isFalse, reason: '純人工永遠不可交還');
+      expect(note.showsAiBadge, isFalse);
+    });
+
+    test('未知值不當成 ai', () {
+      final note = TripPretripNote.fromJson(const {
+        'id': 1,
+        'origin': 'robot',
+        'managedBy': 'robot',
+      });
+      expect(note.origin, NoteMaintainer.human);
+      expect(note.managedBy, NoteMaintainer.human);
+    });
+
+    test('目前由 AI 維護才顯示標記', () {
+      final aiManaged = TripEmergencyContact.fromJson(const {
+        'id': 1,
+        'origin': 'ai',
+        'managedBy': 'ai',
+      });
+      expect(aiManaged.showsAiBadge, isTrue);
+      expect(aiManaged.canReassignToAi, isFalse, reason: '已經是 AI 維護,不用交還');
+
+      final edited = TripEmergencyContact.fromJson(const {
+        'id': 2,
+        'origin': 'ai',
+        'managedBy': 'human',
+      });
+      expect(edited.showsAiBadge, isFalse, reason: '改過就不再標成 AI 維護');
     });
   });
 }
