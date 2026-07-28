@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -95,6 +96,41 @@ const _sortableFlightNotes = TripNotes(
     ),
   ],
 );
+
+/// 讓 mock 丟出一個**真的** `TypeError`,而不是憑空 throw 一個假錯誤。
+///
+/// `TripNoteAiJob.fromJson` 現在全欄位都有預設值,repository 已經不會因為 body 缺
+/// `jobId` 而丟 `TypeError` 了。但畫面層的守門不是「repository 保證不丟 Error」,
+/// 而是「任何 `Error` 逃出來畫面都得撐住」—— `Error` 不是 `Exception`,`on Exception`
+/// 攔不到,而 catch 漏接的後果是三顆 AI 按鈕永久 disabled 且畫面上什麼都不顯示。
+/// 這個 helper 跑一段跟舊解析同形的非 null cast,產生跟當初一模一樣的 `TypeError`,
+/// 把那條守門釘在原地,不隨 repository 的解析寫法而失效。
+Never _decodeGenerateBodyMissingJobId() {
+  const body = <String, dynamic>{
+    'requestId': 99,
+    'status': 'pending',
+    'tripId': 'trip-1',
+    'docType': 'tips',
+  };
+  (body['jobId'] as num).toInt();
+  throw StateError('缺 jobId 的 body 應該在上一行就丟出 TypeError');
+}
+
+/// 三顆 AI 按鈕分散在兩個預設收合的 section,量按鈕狀態前要先讓它們都在樹上。
+/// 拉高 viewport 讓兩區展開後仍不需捲動,避免斷言被捲動時序干擾。
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(600, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _expandAiSections(WidgetTester tester) async {
+  await tester.tap(find.text('行前須知'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('緊急聯絡'));
+  await tester.pumpAndSettle();
+}
 
 Widget _buildScreen(
   TripNotes notes, {
@@ -492,12 +528,11 @@ void main() {
     when(
       () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
     ).thenAnswer(
-      (_) async => (
+      (_) async => const TripNoteAiJob(
         jobId: 7,
         requestId: 99,
-        status: 'pending',
         tripId: 'trip-1',
-        docType: 'tips',
+        docType: NoteGenerationType.tips,
       ),
     );
     when(
@@ -553,12 +588,11 @@ void main() {
     when(
       () => repo.generateNotes(NoteGenerationType.emergency, tripId: 'trip-1'),
     ).thenAnswer(
-      (_) async => (
+      (_) async => const TripNoteAiJob(
         jobId: 8,
         requestId: 100,
-        status: 'pending',
         tripId: 'trip-1',
-        docType: 'emergency',
+        docType: NoteGenerationType.emergency,
       ),
     );
     when(
@@ -602,5 +636,320 @@ void main() {
     ).called(1);
     expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
     expect(loadCount, greaterThan(1));
+  });
+
+  testWidgets('生成回應缺 jobId 時顯示錯誤面板與重試入口,三顆 AI 按鈕恢復可按', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenAnswer((_) async => _decodeGenerateBodyMissingJobId());
+    when(
+      () => requestsRepo.watchRequestEvents(any()),
+    ).thenAnswer((_) => const Stream<TripRequestEvent>.empty());
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, requestsRepo: requestsRepo),
+    );
+    await tester.pumpAndSettle();
+    await _expandAiSections(tester);
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    // 使用者看得到出事了:錯誤面板在,而不是一個永遠轉不完的 pending。
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+
+    // 三顆按鈕都不再卡死;lodging-tips 在 _sampleNotes() 有住宿所以本來就該可按。
+    for (final buttonKey in const [
+      'note-ai-tips',
+      'note-ai-lodging-tips',
+      'note-ai-emergency',
+    ]) {
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(ValueKey(buttonKey)))
+            .onPressed,
+        isNotNull,
+        reason: '$buttonKey 應恢復可按',
+      );
+    }
+
+    // 重試入口要真的能再送一次,不是一顆裝飾用的按鈕。
+    final retry = find.byKey(const ValueKey('notes-ai-retry'));
+    expect(retry, findsOneWidget);
+    await tester.tap(retry);
+    await tester.pump();
+    await tester.pump();
+
+    verify(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).called(2);
+  });
+
+  // 生成期的四個 error code。維護權的 NOTES_AI_NOT_REASSIGNABLE /
+  // NOTES_AI_JOB_STALE 不在這裡 —— 它們要到維護權 PATCH（#209）才有呼叫端。
+  for (final c in const [
+    (code: 'NOTES_AI_INVALID_OUTPUT', message: 'AI 這次產生的內容格式不正確'),
+    (code: 'NOTES_AI_NO_VALID_ITEMS', message: 'AI 這次沒有產生可用的項目'),
+    (code: 'NOTES_AI_JOB_ACTIVE', message: '這個行程已有一個生成中的工作'),
+    (code: 'NOTES_AI_APPLY_FAILED', message: 'AI 內容寫回筆記時失敗'),
+  ]) {
+    testWidgets('生成失敗 ${c.code} 顯示對應中文訊息且不露出原始 code', (tester) async {
+      _useTallViewport(tester);
+      final repo = _MockTripRepository();
+      when(
+        () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+      ).thenThrow(
+        ApiError(
+          status: 422,
+          code: c.code,
+          message: 'ai generation rejected by upstream',
+        ),
+      );
+
+      await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('行前須知'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+      expect(find.textContaining(c.message), findsOneWidget);
+      expect(find.textContaining(c.code), findsNothing);
+    });
+  }
+
+  testWidgets('server 已經回繁中訊息時直接用它,不降級成 code 對照表或通用句', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenThrow(
+      const ApiError(
+        status: 429,
+        code: 'SYS_RATE_LIMIT',
+        message: '請求過於頻繁，請於 60 秒後再試',
+      ),
+    );
+
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    // 三層 fallback 的第一層:code 對照表沒有 SYS_RATE_LIMIT,但後端已經給了
+    // 比對照表更精準的繁中說明(帶秒數),吞掉它等於讓使用者拿到比修復前更少的資訊。
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    expect(find.textContaining('請求過於頻繁，請於 60 秒後再試'), findsOneWidget);
+    expect(find.textContaining('目前無法完成 AI 生成'), findsNothing);
+  });
+
+  testWidgets('SSE 終止事件帶的 error code 一樣翻成中文,不把 code 貼上面板', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    final controller = StreamController<TripRequestEvent>(sync: true);
+    addTearDown(controller.close);
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenAnswer(
+      (_) async => const TripNoteAiJob(
+        jobId: 7,
+        requestId: 99,
+        tripId: 'trip-1',
+        docType: NoteGenerationType.tips,
+      ),
+    );
+    when(
+      () => requestsRepo.watchRequestEvents(99),
+    ).thenAnswer((_) => controller.stream);
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, requestsRepo: requestsRepo),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
+
+    // AI job 非同步失敗才是這張票的主場景:失敗從 SSE 的終止事件回來,
+    // 而 `TripRequestEvent.error` 就是後端原字串,沒有任何保證是繁中或不是 code。
+    controller.add(
+      const TripRequestEvent(
+        status: RequestStatus.failed,
+        error: 'NOTES_AI_INVALID_OUTPUT',
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    expect(find.textContaining('AI 這次產生的內容格式不正確'), findsOneWidget);
+    expect(find.textContaining('NOTES_AI_INVALID_OUTPUT'), findsNothing);
+  });
+
+  testWidgets('SSE 終止事件帶的繁中訊息直接顯示', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    final controller = StreamController<TripRequestEvent>(sync: true);
+    addTearDown(controller.close);
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenAnswer((_) async => const TripNoteAiJob(jobId: 7, requestId: 99));
+    when(
+      () => requestsRepo.watchRequestEvents(99),
+    ).thenAnswer((_) => controller.stream);
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, requestsRepo: requestsRepo),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    controller.add(
+      const TripRequestEvent(
+        status: RequestStatus.failed,
+        error: '模型逾時，請稍後再試一次',
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('模型逾時，請稍後再試一次'), findsOneWidget);
+  });
+
+  testWidgets('訂閱 SSE 就丟例外時錯誤面板單獨出現,重試真的會再送一次', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    final requestsRepo = _MockRequestsRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenAnswer((_) async => const TripNoteAiJob(jobId: 7, requestId: 99));
+    // 失敗發生在 `_aiJob` 已經設值之後。若 catch 只設錯誤不清 `_aiJob`,
+    // 進行中面板與錯誤面板會同時在、三顆按鈕仍卡死,連重試都被開頭的守衛擋掉。
+    when(() => requestsRepo.watchRequestEvents(99)).thenThrow(
+      const ApiError(status: 500, code: 'SSE_OPEN_FAILED', message: 'boom'),
+    );
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, requestsRepo: requestsRepo),
+    );
+    await tester.pumpAndSettle();
+    await _expandAiSections(tester);
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
+    for (final buttonKey in const [
+      'note-ai-tips',
+      'note-ai-lodging-tips',
+      'note-ai-emergency',
+    ]) {
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(ValueKey(buttonKey)))
+            .onPressed,
+        isNotNull,
+        reason: '$buttonKey 應恢復可按',
+      );
+    }
+
+    await tester.tap(find.byKey(const ValueKey('notes-ai-retry')));
+    await tester.pump();
+    await tester.pump();
+
+    verify(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).called(2);
+  });
+
+  testWidgets('AI 錯誤面板出現時,展開中的筆記區不被收合', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenThrow(
+      const ApiError(
+        status: 422,
+        code: 'NOTES_AI_INVALID_OUTPUT',
+        message: 'ai generation rejected by upstream',
+      ),
+    );
+
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    // 展開後 section 的 children 才在樹上（ExpansionTile 收合時整組 offstage）。
+    expect(find.byKey(const ValueKey('note-add-pretrip')), findsOneWidget);
+    expect(find.text('尚無資料'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    // 狀態面板若是 ListView 的條件式 children,它一出現後面每個 slot 都會換位重建,
+    // ExpansionTile 拿到全新的 State、退回 initiallyExpanded=false —— 使用者剛剛
+    // 親手展開的區在他眼前收起來。面板必須固定佔一個 slot。
+    expect(
+      find.byKey(const ValueKey('note-add-pretrip')),
+      findsOneWidget,
+      reason: '錯誤面板出現後「行前須知」應維持展開',
+    );
+    expect(find.text('尚無資料'), findsOneWidget);
+  });
+
+  testWidgets('未知 error code 走 fallback 訊息,不把原始 code 丟給使用者看', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenThrow(
+      const ApiError(
+        status: 500,
+        code: 'NOTES_AI_SOMETHING_NEW',
+        message: 'unmapped upstream failure',
+      ),
+    );
+
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
+    expect(find.textContaining('目前無法完成 AI 生成'), findsOneWidget);
+    expect(find.textContaining('NOTES_AI_SOMETHING_NEW'), findsNothing);
+    expect(find.textContaining('ApiError'), findsNothing);
   });
 }

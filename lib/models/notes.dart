@@ -3,6 +3,8 @@
 /// `NOT NULL DEFAULT ''`，缺漏時預設空字串。
 library;
 
+import 'note_section.dart';
+
 /// 航班（trip_flights）。
 class TripFlight {
   const TripFlight({
@@ -313,4 +315,68 @@ class TripNotes {
           .toList(),
     );
   }
+}
+
+/// AI 生成 job 的狀態。
+enum TripNoteAiJobStatus { pending, processing, completed, failed }
+
+/// 解析 job status;未知字串當成還在跑,不誤判成終止態(比照 `parseRequestStatus`)。
+TripNoteAiJobStatus parseTripNoteAiJobStatus(String? raw) => switch (raw) {
+  'completed' => TripNoteAiJobStatus.completed,
+  'failed' => TripNoteAiJobStatus.failed,
+  'processing' => TripNoteAiJobStatus.processing,
+  _ => TripNoteAiJobStatus.pending,
+};
+
+extension TripNoteAiJobStatusX on TripNoteAiJobStatus {
+  /// 只有 completed / failed 是終止態。
+  bool get isTerminal =>
+      this == TripNoteAiJobStatus.completed ||
+      this == TripNoteAiJobStatus.failed;
+}
+
+/// `POST /trips/:id/notes/:type/generate` 的回應（啟動一個 AI 生成 job）。
+///
+/// 契約已凍結（後端 `raychiutw/trip-planner#1216` 已上線）:回應是
+/// `jobId`、`requestId`、`status`、`generation`、`timeoutAt`、`tripId`、`docType`
+/// —— **沒有 `createdAt`**（上游 issue 的範例有,三個實際回傳點都沒帶）。
+///
+/// 全部欄位仍給預設值:後端多回或少回欄位時解析不丟例外,契約變動的爆炸半徑
+/// 關在這一層,畫面層不碰 json key 也不做型別 cast。
+class TripNoteAiJob {
+  const TripNoteAiJob({
+    this.jobId = 0,
+    this.requestId = 0,
+    this.status = TripNoteAiJobStatus.pending,
+    this.tripId = '',
+    this.docType,
+    this.generation = 0,
+    this.timeoutAt,
+  });
+
+  final int jobId;
+
+  /// 對應 `trip_requests.id`;SSE 進度靠它訂閱。
+  final int requestId;
+  final TripNoteAiJobStatus status;
+  final String tripId;
+
+  /// 後端回的 doc type;未知形解成 `null`（見 [parseNoteGenerationType]）。
+  final NoteGenerationType? docType;
+
+  /// job 的世代序號;同一份文件被重新生成時遞增。
+  final int generation;
+
+  /// job 的逾時時刻（ISO8601 字串;全專案慣例不轉 DateTime）。
+  final String? timeoutAt;
+
+  factory TripNoteAiJob.fromJson(Map<String, dynamic> json) => TripNoteAiJob(
+    jobId: (json['jobId'] as num?)?.toInt() ?? 0,
+    requestId: (json['requestId'] as num?)?.toInt() ?? 0,
+    status: parseTripNoteAiJobStatus(json['status'] as String?),
+    tripId: json['tripId'] as String? ?? '',
+    docType: parseNoteGenerationType(json['docType'] as String?),
+    generation: (json['generation'] as num?)?.toInt() ?? 0,
+    timeoutAt: json['timeoutAt'] as String?,
+  );
 }

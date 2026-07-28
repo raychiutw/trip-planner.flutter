@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 
 void main() {
@@ -264,6 +265,78 @@ void main() {
       expect(fields['title'], '潛水');
       expect(fields['party_size'], 4);
       expect(fields['reservation_no'], 'R-1');
+    });
+  });
+
+  // POST /trips/:id/notes/:type/generate 的回應。原本是 repository 內的 inline
+  // record + 非 null cast,契約一變動就在畫面層炸開;改成具名 model 後,wire 解析
+  // 收在 models 這一層。
+  group('TripNoteAiJob.fromJson', () {
+    // 契約已凍結（後端 #1216 已上線）:回傳 jobId / requestId / status /
+    // generation / timeoutAt / tripId / docType,沒有 createdAt。
+    test('解析完整欄位（含 generation / timeoutAt）', () {
+      final job = TripNoteAiJob.fromJson({
+        'jobId': 12,
+        'requestId': 34,
+        'status': 'pending',
+        'tripId': 'okinawa',
+        'docType': 'tips',
+        'generation': 3,
+        'timeoutAt': '2026-07-25T10:07:00Z',
+      });
+
+      expect(job.jobId, 12);
+      expect(job.requestId, 34);
+      expect(job.status, TripNoteAiJobStatus.pending);
+      expect(job.status.isTerminal, isFalse);
+      expect(job.tripId, 'okinawa');
+      expect(job.docType, NoteGenerationType.tips);
+      expect(job.generation, 3);
+      // 日期時間存字串不轉 DateTime（全專案慣例）
+      expect(job.timeoutAt, isA<String>());
+      expect(job.timeoutAt, '2026-07-25T10:07:00Z');
+    });
+
+    test('全欄位缺漏走預設值,不丟 TypeError', () {
+      final job = TripNoteAiJob.fromJson(const <String, dynamic>{});
+
+      expect(job.jobId, 0);
+      expect(job.requestId, 0);
+      expect(job.generation, 0);
+      expect(job.tripId, '');
+      expect(job.docType, isNull);
+      expect(job.timeoutAt, isNull);
+      expect(job.status.isTerminal, isFalse);
+    });
+
+    test('未知 status 字串不判為終止態,completed/failed 才是', () {
+      TripNoteAiJob jobWithStatus(String? status) => TripNoteAiJob.fromJson({
+        'jobId': 1,
+        'requestId': 2,
+        'status': status,
+      });
+
+      expect(jobWithStatus('rehydrating').status.isTerminal, isFalse);
+      expect(jobWithStatus('').status.isTerminal, isFalse);
+      expect(jobWithStatus(null).status.isTerminal, isFalse);
+
+      expect(jobWithStatus('completed').status, TripNoteAiJobStatus.completed);
+      expect(jobWithStatus('completed').status.isTerminal, isTrue);
+      expect(jobWithStatus('failed').status, TripNoteAiJobStatus.failed);
+      expect(jobWithStatus('failed').status.isTerminal, isTrue);
+    });
+
+    test('docType 吃契約的 URL 形,enum 形當防禦一併接受', () {
+      NoteGenerationType? docTypeOf(String raw) =>
+          TripNoteAiJob.fromJson({'docType': raw}).docType;
+
+      // 契約已凍結為 URL 形（NOTE_AI_DOC_TYPES),`lodgingTips` 不會出現;
+      // 多接一形純粹是防禦,不是契約要求。
+      expect(docTypeOf('lodging-tips'), NoteGenerationType.lodgingTips);
+      expect(docTypeOf('lodgingTips'), NoteGenerationType.lodgingTips);
+      expect(docTypeOf('tips'), NoteGenerationType.tips);
+      expect(docTypeOf('emergency'), NoteGenerationType.emergency);
+      expect(docTypeOf('weather'), isNull);
     });
   });
 }

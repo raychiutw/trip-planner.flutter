@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
 import '../../app/app_feedback.dart';
+import '../../app/error_message.dart';
 import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
@@ -35,7 +37,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   ({int requestId, int jobId, NoteGenerationType type})? _aiJob;
   StreamSubscription<TripRequestEvent>? _aiSubscription;
   bool _aiSubmitting = false;
-  String? _aiError;
+
+  /// 生成失敗時的顯示訊息與可重試的類型；null 代表目前沒有錯誤。
+  ({String message, NoteGenerationType type})? _aiFailure;
 
   @override
   void dispose() {
@@ -87,13 +91,22 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        if (_aiError != null)
-          _NotesAiErrorPanel(
-            message: _aiError!,
-            onDismiss: () => setState(() => _aiError = null),
-          ),
-        if (_aiJob != null)
-          _NotesAiPendingPanel(label: _aiJob!.type.pendingLabel),
+        // 固定佔一個 slot:ListView 的 children 一旦增減,後面每個 slot 的 widget
+        // 都會換位而重建,展開中的 section 會被收合。狀態面板永遠在這個 Column 裡進出。
+        Column(
+          key: const ValueKey('notes-ai-status'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_aiFailure case final failure?)
+              _NotesAiErrorPanel(
+                message: failure.message,
+                onRetry: () => _startAiGeneration(failure.type),
+                onDismiss: () => setState(() => _aiFailure = null),
+              ),
+            if (_aiJob case final job?)
+              _NotesAiPendingPanel(label: job.type.pendingLabel),
+          ],
+        ),
         _NotesSection(
           tripId: widget.tripId,
           section: NoteSection.flights,
@@ -197,7 +210,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     if (_aiSubmitting || _aiJob != null) return;
     setState(() {
       _aiSubmitting = true;
-      _aiError = null;
+      _aiFailure = null;
     });
 
     try {
@@ -210,11 +223,17 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         _aiJob = (requestId: job.requestId, jobId: job.jobId, type: type);
       });
       _watchAiJob(job.requestId, type);
-    } on Exception catch (error) {
+    } catch (error) {
+      // 攔 Error 與 Exception 兩類:解析非預期回應丟的是 TypeError,只攔
+      // Exception 會讓它逃逸,送出旗標永遠留在真、三顆按鈕從此按不下去。
       if (!mounted) return;
       setState(() {
         _aiSubmitting = false;
-        _aiError = _notesAiErrorMessage(error);
+        // `_watchAiJob` 在 `_aiJob` 設值之後才跑,而它也在 try 內。它丟例外時若
+        // 不一併清掉,進行中面板與錯誤面板會同時在、三顆按鈕仍卡死,連重試都被
+        // `_startAiGeneration` 開頭的守衛擋回去。
+        _aiJob = null;
+        _aiFailure = (message: _notesAiErrorMessage(error), type: type);
       });
     }
   }
@@ -233,7 +252,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
             if (!mounted) return;
             setState(() {
               _aiJob = null;
-              _aiError = _notesAiErrorMessage(error);
+              _aiFailure = (message: _notesAiErrorMessage(error), type: type);
             });
           },
         );
@@ -252,9 +271,17 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       return;
     }
 
+    final rawError = event.error;
     setState(() {
       _aiJob = null;
-      _aiError = event.error ?? 'AI 生成失敗';
+      _aiFailure = (
+        // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
+        // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
+        message: rawError == null
+            ? _notesAiFallbackMessage
+            : _notesAiErrorMessage(rawError),
+        type: type,
+      );
     });
   }
 }
@@ -334,9 +361,14 @@ class _NotesAiPendingPanel extends StatelessWidget {
 }
 
 class _NotesAiErrorPanel extends StatelessWidget {
-  const _NotesAiErrorPanel({required this.message, required this.onDismiss});
+  const _NotesAiErrorPanel({
+    required this.message,
+    required this.onRetry,
+    required this.onDismiss,
+  });
 
   final String message;
+  final VoidCallback onRetry;
   final VoidCallback onDismiss;
 
   @override
@@ -352,46 +384,86 @@ class _NotesAiErrorPanel extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
         border: Border.all(color: colors.error),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline, color: colors.onErrorContainer),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: Column(
+      child: Semantics(
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'AI 生成失敗',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colors.onErrorContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: TpSpacing.s1),
-                Text(
-                  '$message。可重試或手動填寫。',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onErrorContainer,
+                Icon(Icons.error_outline, color: colors.onErrorContainer),
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI 生成失敗',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colors.onErrorContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: TpSpacing.s1),
+                      Text(
+                        '$message。可重試或手動填寫。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onErrorContainer,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          TextButton(onPressed: onDismiss, child: const Text('關閉')),
-        ],
+            const SizedBox(height: TpSpacing.s1),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: onDismiss, child: const Text('關閉')),
+                const SizedBox(width: TpSpacing.s2),
+                FilledButton(
+                  key: const ValueKey('notes-ai-retry'),
+                  onPressed: onRetry,
+                  child: const Text('重試'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
+/// 生成期的 error code → 人話。維護權相關的 code（`NOTES_AI_NOT_REASSIGNABLE`／
+/// `NOTES_AI_JOB_STALE`）只會在維護權 PATCH 出現，這裡不列，避免留下沒有呼叫端的死碼。
+const _notesAiErrorMessages = <String, String>{
+  'NOTES_AI_INVALID_OUTPUT': 'AI 這次產生的內容格式不正確',
+  'NOTES_AI_NO_VALID_ITEMS': 'AI 這次沒有產生可用的項目',
+  'NOTES_AI_JOB_ACTIVE': '這個行程已有一個生成中的工作',
+  'NOTES_AI_APPLY_FAILED': 'AI 內容寫回筆記時失敗',
+};
+
+const _notesAiFallbackMessage = '目前無法完成 AI 生成';
+
+/// 三條失敗路徑（POST 例外／stream onError／SSE 終止事件）共用這一條翻譯管線，
+/// 走全 app 一致的三層 fallback：**server 回繁中就直接用 → 否則查 code 對照表 →
+/// 再不然通用訊息**。原始 error code 與型別文字一律不外流到畫面。
+///
+/// 終止事件的 `TripRequestEvent.error` 是後端原字串，可能是 code（`NOTES_AI_*`）
+/// 也可能是繁中訊息，兩種都由這裡收斂；少了第一層，429 `SYS_RATE_LIMIT`、403 權限
+/// 這些後端已經給了人話的失敗會全部退化成一句通用訊息。
 String _notesAiErrorMessage(Object error) {
-  final text = error.toString();
-  const exceptionPrefix = 'Exception: ';
-  if (text.startsWith(exceptionPrefix)) {
-    return text.substring(exceptionPrefix.length);
-  }
-  return text;
+  final (String? code, String? message) = switch (error) {
+    ApiError() => (error.code, error.message),
+    String() => (error, error),
+    _ => (null, null),
+  };
+  if (message != null && hasCjk(message)) return message;
+  if (code == null) return _notesAiFallbackMessage;
+  return _notesAiErrorMessages[code] ?? _notesAiFallbackMessage;
 }
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。

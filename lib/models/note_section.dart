@@ -7,6 +7,18 @@ enum NoteSection { flights, lodgings, reservations, pretrip, emergency }
 /// AI 筆記生成類型;對應 web/backend `/notes/:type/generate` 支援的三種 doc type。
 enum NoteGenerationType { tips, lodgingTips, emergency }
 
+/// 把後端回的 `docType` 解成 [NoteGenerationType];未知或缺漏回 `null`。
+///
+/// 契約已凍結:後端 `NOTE_AI_DOC_TYPES = ['lodging-tips', 'tips', 'emergency']`
+/// **一律 URL 形**,不會回 `lodgingTips`。enum 形保留純粹當防禦(多接一個值域外的
+/// 字串不會讓解析變差),不是契約要求。
+NoteGenerationType? parseNoteGenerationType(String? raw) => switch (raw) {
+  'tips' => NoteGenerationType.tips,
+  'lodging-tips' || 'lodgingTips' => NoteGenerationType.lodgingTips,
+  'emergency' => NoteGenerationType.emergency,
+  _ => null,
+};
+
 /// AI 筆記生成類型的 API path 與顯示文字。
 extension NoteGenerationTypeX on NoteGenerationType {
   /// API URL path segment.
