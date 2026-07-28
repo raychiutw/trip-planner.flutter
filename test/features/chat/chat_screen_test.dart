@@ -192,6 +192,64 @@ void main() {
     }
   });
 
+  testWidgets('取消送不出去時仍換成終結態,但誠實說伺服器沒確認', (tester) async {
+    stubPending();
+    when(
+      () => reqRepo.stopWaiting(any()),
+    ).thenThrow(ApiError(status: 500, code: 'SYS', message: 'boom'));
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    // 送不出去之後,後端那筆其實沒變 —— 但畫面仍要換成終結態(與 web 一致)。
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer(
+      (_) async => (
+        items: [
+          const TripRequest(
+            id: 42,
+            tripId: 'okinawa',
+            message: '幫我看行程',
+            status: RequestStatus.failed,
+            terminalReason: TerminalReason.cancelled,
+          ),
+        ],
+        hasMore: false,
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-stop-waiting-42')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('伺服器沒有確認'),
+      findsOneWidget,
+      reason: '標不掉就是標不掉,不能假裝成功',
+    );
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
+
+    // 讓那筆的輪詢自然收掉,否則 timer 留到 teardown。
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.cancelled,
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+  });
+
   testWidgets('請求結束後「停止等待」消失,不留成裝飾', (tester) async {
     when(
       () => reqRepo.fetchRequests(
