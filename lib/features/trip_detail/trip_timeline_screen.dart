@@ -1204,11 +1204,6 @@ class _DaySection extends ConsumerWidget {
       compact: isEditing,
       expanded: expanded,
       onTap: isEditing ? null : () => onToggleExpanded(entry.id),
-      onEditTime: isEditing
-          ? null
-          : () => context.push(
-              '/trips/${Uri.encodeComponent(tripId)}/entries/${entry.id}/edit',
-            ),
       mapLinks: isEditing || entry.master == null
           ? null
           : EntryMapLinks(

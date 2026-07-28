@@ -1,7 +1,8 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderBox, RenderParagraph;
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/timeline_entry_tile.dart';
@@ -269,7 +270,6 @@ void main() {
 
     testWidgets('時間與地圖控制不會誤觸卡片展開', (tester) async {
       var cardTaps = 0;
-      var timeTaps = 0;
       var mapTaps = 0;
       await tester.pumpWidget(
         MaterialApp(
@@ -285,7 +285,6 @@ void main() {
               ),
               number: 1,
               onTap: () => cardTaps++,
-              onEditTime: () => timeTaps++,
               mapLinks: TextButton(
                 key: const ValueKey('test-map-link'),
                 onPressed: () => mapTaps++,
@@ -298,7 +297,6 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('entry-time-13')));
       await tester.tap(find.byKey(const ValueKey('test-map-link')));
-      expect(timeTaps, 1);
       expect(mapTaps, 1);
       expect(cardTaps, 0);
     });
@@ -583,12 +581,9 @@ void main() {
       final timeText = tester.widget<Text>(timeFinder);
       expect(timeText.maxLines, 1);
       expect(timeText.softWrap, isFalse);
-      final timeChip = tester.widget<ActionChip>(
-        find.byKey(const ValueKey('entry-time-48')),
-      );
       expect(
-        timeChip.avatar,
-        isNull,
+        find.byIcon(CupertinoIcons.clock),
+        findsNothing,
         reason: '大字級時移除裝飾性圖示，把寬度留給完整時間與 Dynamic Type',
       );
 
@@ -597,19 +592,141 @@ void main() {
       expect(
         paragraph.size.width,
         greaterThanOrEqualTo(naturalSize.width - 0.1),
-        reason: '完整起訖時間不得被 ActionChip 的 fade overflow 裁掉',
+        reason: '完整起訖時間不得被截斷或改成刪節號',
       );
-      final timeBox = tester.renderObject<RenderBox>(timeFinder);
-      final paintedStart = timeBox.localToGlobal(Offset.zero);
-      final paintedEnd = timeBox.localToGlobal(Offset(timeBox.size.width, 0));
-      final chipWidth = tester
-          .getSize(find.byKey(const ValueKey('entry-time-48')))
-          .width;
+      final cardRect = tester.getRect(
+        find.byKey(const ValueKey('entry-card-48')),
+      );
+      final paintedTime = tester.getRect(timeFinder);
       expect(
-        paintedEnd.dx - paintedStart.dx,
-        lessThan(chipWidth),
-        reason: '定版要求不折行；實際繪製後的完整時間必須落在 chip 內',
+        paintedTime.left,
+        greaterThanOrEqualTo(cardRect.left),
+        reason: '定版要求不折行；實際繪製後的完整時間必須落在卡片內',
+      );
+      expect(
+        paintedTime.right,
+        lessThanOrEqualTo(cardRect.right),
+        reason: '定版要求不折行；實際繪製後的完整時間必須落在卡片內',
+      );
+    });
+
+    testWidgets('時間在語意上不是按鈕，也沒有點擊動作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 60,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '純顯示時間',
+        ),
+      );
+
+      final node = tester.getSemantics(find.text('09：30 - 11：00'));
+      final data = node.getSemanticsData();
+      expect(
+        data.flagsCollection.isButton,
+        isFalse,
+        reason: '時間是純顯示，讀螢幕不該把它念成按鈕',
+      );
+      expect(
+        data.hasAction(SemanticsAction.tap),
+        isFalse,
+        reason: '時間不該提供「點兩下以啟動」的動作',
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('時間貼合文字高度，不再撐出 chip 的最小點擊區', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 61,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '純顯示時間',
+        ),
+      );
+
+      expect(
+        find.byType(ActionChip),
+        findsNothing,
+        reason: '時間不得再做成 ActionChip',
+      );
+      final timeBox = tester.getRect(
+        find.byKey(const ValueKey('entry-time-61')),
+      );
+      final timeText = tester.getRect(find.text('09：30 - 11：00'));
+      expect(
+        timeBox.height,
+        closeTo(timeText.height, 1),
+        reason: '純顯示的時間只佔文字高度，不再帶按鈕的內距與最小點擊區',
+      );
+    });
+
+    testWidgets('點時間沒有反應，點卡片本體才展開', (tester) async {
+      await tester.pumpWidget(
+        const _ExpandableTileHost(
+          entry: TimelineEntry(
+            id: 62,
+            sortOrder: 0,
+            version: 1,
+            startTime: '09:30',
+            endTime: '11:00',
+            title: '互動測試',
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('09：30 - 11：00'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('展開後的細節'),
+        findsNothing,
+        reason: '時間是純顯示，點它不該發生任何事（含誤觸展開）',
+      );
+
+      await tester.tap(find.text('互動測試'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('展開後的細節'),
+        findsOneWidget,
+        reason: '對照組：點卡片本體仍會展開，證明上面的斷言不是恆真',
       );
     });
   });
+}
+
+/// 讓 `expanded` 真的隨點擊變動的宿主，測「點下去畫面有沒有變」而非 callback。
+class _ExpandableTileHost extends StatefulWidget {
+  const _ExpandableTileHost({required this.entry});
+
+  final TimelineEntry entry;
+
+  @override
+  State<_ExpandableTileHost> createState() => _ExpandableTileHostState();
+}
+
+class _ExpandableTileHostState extends State<_ExpandableTileHost> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: TimelineEntryTile(
+          entry: widget.entry,
+          number: 1,
+          expanded: _expanded,
+          onTap: () => setState(() => _expanded = !_expanded),
+          expandedChild: _expanded ? const Text('展開後的細節') : null,
+        ),
+      ),
+    );
+  }
 }
