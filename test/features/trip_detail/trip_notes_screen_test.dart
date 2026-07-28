@@ -132,6 +132,73 @@ Future<void> _expandAiSections(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// 兩種生成各自的 mock:tips → requestId 99、emergency → requestId 100,
+/// 每種各有一條**獨立可控**的進度通道,用來驗證兩個 job 互不干擾。
+({
+  _MockTripRepository repo,
+  _MockRequestsRepository requestsRepo,
+  StreamController<TripRequestEvent> tipsEvents,
+  StreamController<TripRequestEvent> emergencyEvents,
+})
+_parallelAiMocks() {
+  final repo = _MockTripRepository();
+  final requestsRepo = _MockRequestsRepository();
+  final tipsEvents = StreamController<TripRequestEvent>(sync: true);
+  final emergencyEvents = StreamController<TripRequestEvent>(sync: true);
+  // 刻意不 await:沒有 listener 的 controller,`close()` 的 future 永遠不會完成
+  //（done event 沒有人收），teardown 一 await 就整條測試卡到 10 分鐘 timeout。
+  addTearDown(() {
+    tipsEvents.close();
+    emergencyEvents.close();
+  });
+  when(
+    () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+  ).thenAnswer(
+    (_) async => const TripNoteAiJob(
+      jobId: 7,
+      requestId: 99,
+      tripId: 'trip-1',
+      docType: NoteGenerationType.tips,
+    ),
+  );
+  when(
+    () => repo.generateNotes(NoteGenerationType.emergency, tripId: 'trip-1'),
+  ).thenAnswer(
+    (_) async => const TripNoteAiJob(
+      jobId: 8,
+      requestId: 100,
+      tripId: 'trip-1',
+      docType: NoteGenerationType.emergency,
+    ),
+  );
+  when(
+    () => requestsRepo.watchRequestEvents(99),
+  ).thenAnswer((_) => tipsEvents.stream);
+  when(
+    () => requestsRepo.watchRequestEvents(100),
+  ).thenAnswer((_) => emergencyEvents.stream);
+  return (
+    repo: repo,
+    requestsRepo: requestsRepo,
+    tipsEvents: tipsEvents,
+    emergencyEvents: emergencyEvents,
+  );
+}
+
+/// 先按「一般」(行前須知)再按「AI」(緊急聯絡),兩個生成同時進行中。
+Future<void> _startTipsThenEmergency(WidgetTester tester) async {
+  await _expandAiSections(tester);
+  await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+  await tester.pump();
+  await tester.pump();
+  await tester.tap(find.byKey(const ValueKey('note-ai-emergency')));
+  await tester.pump();
+  await tester.pump();
+}
+
+VoidCallback? _aiButtonAction(WidgetTester tester, String key) =>
+    tester.widget<OutlinedButton>(find.byKey(ValueKey(key))).onPressed;
+
 Widget _buildScreen(
   TripNotes notes, {
   _MockTripRepository? repo,
@@ -690,12 +757,13 @@ void main() {
     ).called(2);
   });
 
-  // 生成期的四個 error code。維護權的 NOTES_AI_NOT_REASSIGNABLE /
-  // NOTES_AI_JOB_STALE 不在這裡 —— 它們要到維護權 PATCH（#209）才有呼叫端。
+  // 生成期真正算「失敗」的 error code。維護權的 NOTES_AI_NOT_REASSIGNABLE /
+  // NOTES_AI_JOB_STALE 不在這裡 —— 它們要到維護權 PATCH（#209）才有呼叫端;
+  // NOTES_AI_JOB_ACTIVE 也不在這裡 —— 它代表「同一份文件已經有 job 在跑」,
+  // 現在走「接上既有 job」而不是錯誤面板（見本檔最後一條測試）。
   for (final c in const [
     (code: 'NOTES_AI_INVALID_OUTPUT', message: 'AI 這次產生的內容格式不正確'),
     (code: 'NOTES_AI_NO_VALID_ITEMS', message: 'AI 這次沒有產生可用的項目'),
-    (code: 'NOTES_AI_JOB_ACTIVE', message: '這個行程已有一個生成中的工作'),
     (code: 'NOTES_AI_APPLY_FAILED', message: 'AI 內容寫回筆記時失敗'),
   ]) {
     testWidgets('生成失敗 ${c.code} 顯示對應中文訊息且不露出原始 code', (tester) async {
@@ -951,5 +1019,213 @@ void main() {
     expect(find.textContaining('目前無法完成 AI 生成'), findsOneWidget);
     expect(find.textContaining('NOTES_AI_SOMETHING_NEW'), findsNothing);
     expect(find.textContaining('ApiError'), findsNothing);
+  });
+
+  testWidgets('行前須知生成中時緊急聯絡仍可按,而且第二個生成真的送出;兩個 job 各走各的通道', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _expandAiSections(tester);
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    // 進行中的是「行前須知(一般)」,毫不相干的緊急聯絡不該被連坐 disable。
+    expect(
+      _aiButtonAction(tester, 'note-ai-emergency'),
+      isNotNull,
+      reason: 'tips 生成中時 emergency 按鈕仍應可按',
+    );
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-emergency')));
+    await tester.pump();
+    await tester.pump();
+
+    // 按得下去不等於送得出去:啟動流程開頭的守衛若還是全域的,這裡會 called(0)。
+    verify(
+      () => mocks.repo.generateNotes(
+        NoteGenerationType.emergency,
+        tripId: 'trip-1',
+      ),
+    ).called(1);
+
+    // 兩個進行中同時顯示,而且看得出是哪一種。
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('AI 正在生成行前須知（一般）'), findsOneWidget);
+    expect(find.textContaining('AI 正在生成緊急聯絡'), findsOneWidget);
+
+    // 第三道陷阱:啟動第二個生成不得把第一個的進度通道殺掉。訂閱若共用單一
+    // subscription,畫面上兩個進行中都在(前面的斷言全綠),但 tips 的完成事件
+    // 永遠不會到達 —— 進行中狀態從此清不掉。
+    expect(
+      mocks.tipsEvents.hasListener,
+      isTrue,
+      reason: '第一個生成的進度通道不該被第二個生成取消',
+    );
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.completed),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-tips')),
+      findsNothing,
+      reason: '第一個 job 的終態抵達後要清掉它自己的進行中狀態',
+    );
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsOneWidget,
+      reason: 'emergency 還在跑,不該被 tips 的完成一起清掉',
+    );
+    expect(_aiButtonAction(tester, 'note-ai-tips'), isNotNull);
+    expect(_aiButtonAction(tester, 'note-ai-emergency'), isNull);
+  });
+
+  testWidgets('畫面銷毀時兩條進度通道一併取消,且不再 setState', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _startTipsThenEmergency(tester);
+
+    expect(mocks.tipsEvents.hasListener, isTrue);
+    expect(mocks.emergencyEvents.hasListener, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(
+      mocks.tipsEvents.hasListener,
+      isFalse,
+      reason: 'tips 訂閱應在 dispose 取消',
+    );
+    expect(
+      mocks.emergencyEvents.hasListener,
+      isFalse,
+      reason: 'emergency 訂閱應在 dispose 一併取消',
+    );
+
+    // 通道都斷了,遲到的終止事件不會再打到已 dispose 的 State。
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.completed),
+    );
+    mocks.emergencyEvents.add(
+      const TripRequestEvent(status: RequestStatus.failed, error: 'boom'),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('兩個 job 幾乎同時完成:只出一則完成提示,而且兩種都提到', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _startTipsThenEmergency(tester);
+
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.completed),
+    );
+    mocks.emergencyEvents.add(
+      const TripRequestEvent(status: RequestStatus.completed),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // 提示是浮在 overlay 的橫幅,兩則會疊在同一個位置互相蓋掉;
+    // `tester.widget` 找到兩個以上就直接失敗 —— 這一行同時守住「不連發兩則」。
+    final notice = tester.widget<Text>(find.textContaining('AI 生成完成'));
+    expect(notice.data, contains('行前須知（一般）'));
+    expect(notice.data, contains('緊急聯絡'));
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('同一顆生成按鈕連按兩下只送出一次', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _expandAiSections(tester);
+
+    final button = find.byKey(const ValueKey('note-ai-tips'));
+    await tester.tap(button);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump();
+
+    verify(
+      () => mocks.repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).called(1);
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
+  });
+
+  testWidgets('server 回 NOTES_AI_JOB_ACTIVE 時視為接上既有 job,不呈現為錯誤', (
+    tester,
+  ) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
+    ).thenThrow(
+      const ApiError(
+        status: 409,
+        code: 'NOTES_AI_JOB_ACTIVE',
+        message: 'a generation job is already running',
+      ),
+    );
+
+    await tester.pumpWidget(_buildScreen(_sampleNotes(), repo: repo));
+    await tester.pumpAndSettle();
+    await _expandAiSections(tester);
+
+    await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    // 後端說「同一份文件已經有一個 job 在跑」——那正是使用者要的結果,
+    // 呈現成紅色錯誤面板等於把成功講成失敗。
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsNothing);
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
+    expect(_aiButtonAction(tester, 'note-ai-tips'), isNull);
+    expect(_aiButtonAction(tester, 'note-ai-emergency'), isNotNull);
   });
 }

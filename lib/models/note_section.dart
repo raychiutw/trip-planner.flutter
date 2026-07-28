@@ -35,9 +35,13 @@ extension NoteGenerationTypeX on NoteGenerationType {
     NoteGenerationType.emergency => 'AI',
   };
 
-  /// User-facing section label used while a job is pending.
+  /// 進行中面板與完成提示用的顯示名稱。
+  ///
+  /// 三種各自可辨識:行前須知底下有「一般」與「住宿」兩種生成,兩個同時在跑時
+  /// 使用者要看得出哪一條是哪一種,所以不能兩者都只寫「行前須知」。
   String get pendingLabel => switch (this) {
+    NoteGenerationType.tips => '行前須知（一般）',
+    NoteGenerationType.lodgingTips => '行前須知（住宿）',
     NoteGenerationType.emergency => '緊急聯絡',
-    _ => '行前須知',
   };
 }
