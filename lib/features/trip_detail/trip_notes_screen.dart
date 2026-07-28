@@ -34,16 +34,34 @@ class TripNotesScreen extends ConsumerStatefulWidget {
 }
 
 class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
-  ({int requestId, int jobId, NoteGenerationType type})? _aiJob;
-  StreamSubscription<TripRequestEvent>? _aiSubscription;
-  bool _aiSubmitting = false;
+  // 三種生成是三條獨立的線:送出中、進行中、進度通道全部 per-docType。
+  // 任何一格退回單一欄位,生成行前須知時緊急聯絡就會被連坐。
+
+  /// POST 已送出、還沒拿到 job 的 docType（同型連點的守衛）。
+  final _aiSubmitting = <NoteGenerationType>{};
+
+  /// job 已啟動、還在等終態的 docType。
+  final _aiPending = <NoteGenerationType>{};
+
+  /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
+  /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
+  final _aiSubscriptions =
+      <NoteGenerationType, StreamSubscription<TripRequestEvent>>{};
 
   /// 生成失敗時的顯示訊息與可重試的類型；null 代表目前沒有錯誤。
   ({String message, NoteGenerationType type})? _aiFailure;
 
+  /// 這一幀內完成的 docType;統一在 frame 結束後合成一則提示。
+  /// 兩個 job 幾乎同時完成時各發一則,兩張浮層會疊在同一個位置互相蓋掉。
+  final _aiJustCompleted = <NoteGenerationType>{};
+  bool _aiNoticeScheduled = false;
+
   @override
   void dispose() {
-    _aiSubscription?.cancel();
+    for (final subscription in _aiSubscriptions.values) {
+      subscription.cancel();
+    }
+    _aiSubscriptions.clear();
     super.dispose();
   }
 
@@ -86,7 +104,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   }
 
   Widget _buildSections(BuildContext context, TripNotes notes) {
-    final aiBusy = _aiSubmitting || _aiJob != null;
+    final aiBusyTypes = {..._aiSubmitting, ..._aiPending};
     return ListView(
       key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -103,8 +121,21 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                 onRetry: () => _startAiGeneration(failure.type),
                 onDismiss: () => setState(() => _aiFailure = null),
               ),
-            if (_aiJob case final job?)
-              _NotesAiPendingPanel(label: job.type.pendingLabel),
+            // 進行中的每一種各佔一列,並固定用 enum 的宣告順序,避免先後啟動
+            // 造成面板上下跳動。
+            if (_aiPending.isNotEmpty)
+              Column(
+                key: const ValueKey('notes-ai-pending'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final type in NoteGenerationType.values)
+                    if (_aiPending.contains(type))
+                      _NotesAiPendingPanel(
+                        key: ValueKey('notes-ai-pending-${type.pathSegment}'),
+                        label: type.pendingLabel,
+                      ),
+                ],
+              ),
           ],
         ),
         _NotesSection(
@@ -168,8 +199,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
               disabledText: '需先新增住宿',
             ),
           ],
-          aiBusy: aiBusy,
-          activeAiType: _aiJob?.type,
+          aiBusyTypes: aiBusyTypes,
           onGenerateNotes: _startAiGeneration,
           rows: [
             for (final p in notes.pretripNotes)
@@ -189,8 +219,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           aiActions: const [
             _NoteAiAction(type: NoteGenerationType.emergency, label: 'AI'),
           ],
-          aiBusy: aiBusy,
-          activeAiType: _aiJob?.type,
+          aiBusyTypes: aiBusyTypes,
           onGenerateNotes: _startAiGeneration,
           rows: [
             for (final c in notes.emergencyContacts)
@@ -207,9 +236,11 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   }
 
   Future<void> _startAiGeneration(NoteGenerationType type) async {
-    if (_aiSubmitting || _aiJob != null) return;
+    // 守衛只看**這一種**:全域守衛會讓「按鈕按得下去但什麼都沒送出」——
+    // 比按鈕直接 disabled 更糟,使用者按了以為在跑,其實什麼都沒發生。
+    if (_aiSubmitting.contains(type) || _aiPending.contains(type)) return;
     setState(() {
-      _aiSubmitting = true;
+      _aiSubmitting.add(type);
       _aiFailure = null;
     });
 
@@ -219,28 +250,42 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           .generateNotes(type, tripId: widget.tripId);
       if (!mounted) return;
       setState(() {
-        _aiSubmitting = false;
-        _aiJob = (requestId: job.requestId, jobId: job.jobId, type: type);
+        _aiSubmitting.remove(type);
+        _aiPending.add(type);
       });
       _watchAiJob(job.requestId, type);
     } catch (error) {
       // 攔 Error 與 Exception 兩類:解析非預期回應丟的是 TypeError,只攔
-      // Exception 會讓它逃逸,送出旗標永遠留在真、三顆按鈕從此按不下去。
+      // Exception 會讓它逃逸,送出旗標永遠留在真、按鈕從此按不下去。
       if (!mounted) return;
+      if (_isAlreadyRunning(error)) {
+        // 後端說同一份文件已經有 job 在跑（同 trip + docType）。那正是使用者
+        // 要的結果,呈現成紅色錯誤面板等於把成功講成失敗。這次回應沒帶
+        // requestId,所以只接上進行中狀態、沒有自己的進度通道 —— 重新接回
+        // 通道是「離開再回來還看得到它在跑」那張票的事。
+        setState(() {
+          _aiSubmitting.remove(type);
+          _aiPending.add(type);
+        });
+        return;
+      }
       setState(() {
-        _aiSubmitting = false;
-        // `_watchAiJob` 在 `_aiJob` 設值之後才跑,而它也在 try 內。它丟例外時若
-        // 不一併清掉,進行中面板與錯誤面板會同時在、三顆按鈕仍卡死,連重試都被
+        _aiSubmitting.remove(type);
+        // `_watchAiJob` 在進行中狀態設值之後才跑,而它也在 try 內。它丟例外時若
+        // 不一併清掉,進行中面板與錯誤面板會同時在、按鈕仍卡死,連重試都被
         // `_startAiGeneration` 開頭的守衛擋回去。
-        _aiJob = null;
+        _aiPending.remove(type);
         _aiFailure = (message: _notesAiErrorMessage(error), type: type);
       });
     }
   }
 
   void _watchAiJob(int requestId, NoteGenerationType type) {
-    _aiSubscription?.cancel();
-    _aiSubscription = ref
+    // 只收掉**同一種**的舊通道（重試同一種時)。這裡若動到別的 docType,
+    // 啟動第二個生成就會殺掉第一個的進度通道:畫面上兩個進行中都在,
+    // 但第一個 job 的完成事件永遠不會到達,進行中狀態從此清不掉。
+    _aiSubscriptions.remove(type)?.cancel();
+    _aiSubscriptions[type] = ref
         .read(requestsRepositoryProvider)
         .watchRequestEvents(requestId)
         .listen(
@@ -249,9 +294,10 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
             _handleAiTerminal(event, type);
           },
           onError: (Object error) {
+            _aiSubscriptions.remove(type)?.cancel();
             if (!mounted) return;
             setState(() {
-              _aiJob = null;
+              _aiPending.remove(type);
               _aiFailure = (message: _notesAiErrorMessage(error), type: type);
             });
           },
@@ -259,21 +305,19 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   }
 
   void _handleAiTerminal(TripRequestEvent event, NoteGenerationType type) {
-    final subscription = _aiSubscription;
-    _aiSubscription = null;
-    subscription?.cancel();
+    _aiSubscriptions.remove(type)?.cancel();
     if (!mounted) return;
 
     if (event.status == RequestStatus.completed && event.error == null) {
-      setState(() => _aiJob = null);
+      setState(() => _aiPending.remove(type));
       ref.invalidate(tripNotesProvider(widget.tripId));
-      showAppNotice(context, 'AI 生成完成（${type.pendingLabel}）');
+      _scheduleAiCompletionNotice(type);
       return;
     }
 
     final rawError = event.error;
     setState(() {
-      _aiJob = null;
+      _aiPending.remove(type);
       _aiFailure = (
         // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
         // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
@@ -284,6 +328,27 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       );
     });
   }
+
+  /// 完成提示延到 frame 結束才發:同一幀內完成的合成一則,兩張浮層才不會疊在
+  /// 同一個位置互相蓋掉,也不會連發兩則。
+  void _scheduleAiCompletionNotice(NoteGenerationType type) {
+    _aiJustCompleted.add(type);
+    if (_aiNoticeScheduled) return;
+    _aiNoticeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _aiNoticeScheduled = false;
+      final completed = _aiJustCompleted.toList()
+        ..sort((a, b) => a.index.compareTo(b.index));
+      _aiJustCompleted.clear();
+      if (!mounted || completed.isEmpty) return;
+      final labels = completed.map((t) => t.pendingLabel).join('、');
+      showAppNotice(context, 'AI 生成完成：$labels');
+    });
+  }
+
+  /// 後端說「同一份文件已經有一個生成中的 job」——不是失敗,是接上既有 job。
+  bool _isAlreadyRunning(Object error) =>
+      error is ApiError && error.code == _notesAiJobActiveCode;
 }
 
 /// 單一筆記 row 的資料：id/version（OCC）、editFields（編輯預填）、display（唯讀卡片）。
@@ -317,7 +382,7 @@ class _NoteAiAction {
 }
 
 class _NotesAiPendingPanel extends StatelessWidget {
-  const _NotesAiPendingPanel({required this.label});
+  const _NotesAiPendingPanel({super.key, required this.label});
 
   final String label;
 
@@ -326,7 +391,6 @@ class _NotesAiPendingPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     return Container(
-      key: const ValueKey('notes-ai-pending'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
       padding: const EdgeInsets.all(TpSpacing.s3),
       decoration: BoxDecoration(
@@ -437,12 +501,16 @@ class _NotesAiErrorPanel extends StatelessWidget {
   }
 }
 
+/// 「同一份文件已經有 job 在跑」。這個 code 不走錯誤翻譯,由
+/// [_TripNotesScreenState._isAlreadyRunning] 攔下來當成接上既有 job。
+const _notesAiJobActiveCode = 'NOTES_AI_JOB_ACTIVE';
+
 /// 生成期的 error code → 人話。維護權相關的 code（`NOTES_AI_NOT_REASSIGNABLE`／
-/// `NOTES_AI_JOB_STALE`）只會在維護權 PATCH 出現，這裡不列，避免留下沒有呼叫端的死碼。
+/// `NOTES_AI_JOB_STALE`）只會在維護權 PATCH 出現，這裡不列，避免留下沒有呼叫端的死碼;
+/// [_notesAiJobActiveCode] 同理 —— 它不是失敗,沒有任何路徑會把它翻成錯誤訊息。
 const _notesAiErrorMessages = <String, String>{
   'NOTES_AI_INVALID_OUTPUT': 'AI 這次產生的內容格式不正確',
   'NOTES_AI_NO_VALID_ITEMS': 'AI 這次沒有產生可用的項目',
-  'NOTES_AI_JOB_ACTIVE': '這個行程已有一個生成中的工作',
   'NOTES_AI_APPLY_FAILED': 'AI 內容寫回筆記時失敗',
 };
 
@@ -477,8 +545,7 @@ class _NotesSection extends ConsumerWidget {
     required this.rows,
     this.initiallyExpanded = false,
     this.aiActions = const [],
-    this.aiBusy = false,
-    this.activeAiType,
+    this.aiBusyTypes = const {},
     this.onGenerateNotes,
   });
 
@@ -489,8 +556,9 @@ class _NotesSection extends ConsumerWidget {
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
   final List<_NoteAiAction> aiActions;
-  final bool aiBusy;
-  final NoteGenerationType? activeAiType;
+
+  /// 正在送出或進行中的生成類型;每顆按鈕只看自己那一種。
+  final Set<NoteGenerationType> aiBusyTypes;
   final void Function(NoteGenerationType type)? onGenerateNotes;
 
   Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
@@ -590,17 +658,20 @@ class _NotesSection extends ConsumerWidget {
                     runSpacing: TpSpacing.s2,
                     children: [
                       for (final action in aiActions) ...[
+                        // 只看自己這一種在不在跑:別種在生成不該把這顆一起鎖住。
+                        // `action.enabled` 是按鈕自身的前置條件（例如沒有住宿就
+                        // 不能生成住宿建議），與 AI 忙不忙無關,兩者各自成立。
                         OutlinedButton.icon(
                           key: ValueKey('note-ai-${action.type.pathSegment}'),
                           onPressed:
-                              aiBusy ||
+                              aiBusyTypes.contains(action.type) ||
                                   !action.enabled ||
                                   onGenerateNotes == null
                               ? null
                               : () => onGenerateNotes!(action.type),
                           icon: const Icon(Icons.auto_awesome_outlined),
                           label: Text(
-                            activeAiType == action.type
+                            aiBusyTypes.contains(action.type)
                                 ? '生成中...'
                                 : action.label,
                           ),
