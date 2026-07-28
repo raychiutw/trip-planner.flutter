@@ -309,6 +309,31 @@ void main() {
       File('lib/app/adaptive.dart').readAsStringSync(),
       contains('MediaQuery.alwaysUse24HourFormatOf(context)'),
     );
+    // compact 就地展開的輪盤是現在的主要時間入口，同一條規則要跟著它走。
+    expect(
+      File('lib/ui/tp_compact_time_field.dart').readAsStringSync(),
+      contains('MediaQuery.alwaysUse24HourFormatOf(context)'),
+    );
+  });
+
+  test('停留點與加入行程的時間欄位走 compact 就地展開，不再開時間 modal', () {
+    const compactCallers = [
+      'lib/features/trip_detail/widgets/entry_edit_sheet.dart',
+      'lib/features/favorites/add_to_trip/add_to_trip_screen.dart',
+    ];
+    for (final path in compactCallers) {
+      final source = File(path).readAsStringSync();
+      expect(
+        source,
+        contains('TpCompactTimeField('),
+        reason: '$path 應使用就地展開的時間欄位',
+      );
+      expect(
+        source,
+        isNot(contains('showAppTimePicker(')),
+        reason: '$path 不得回頭改用從底部升起的時間面板',
+      );
+    }
   });
 
   test('收藏永久刪除不保留 restore runtime、release workflow 或工具', () {

@@ -15,6 +15,7 @@ import 'package:tripline/models/day.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_compact_time_field.dart';
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
@@ -166,12 +167,17 @@ void main() {
     expect(startTop, lessThan(descTop));
     expect(endTop, lessThan(descTop));
     expect(
+      find.byType(TpCompactTimeField),
+      findsNWidgets(2),
+      reason: '起訖時間都走 HIG compact 就地展開欄位',
+    );
+    expect(
       tester.widget(find.byKey(const ValueKey('entry-edit-start'))),
-      isA<InputChip>(),
+      isA<TextButton>(),
     );
     expect(
       tester.widget(find.byKey(const ValueKey('entry-edit-end'))),
-      isA<InputChip>(),
+      isA<TextButton>(),
     );
   });
 
@@ -184,12 +190,13 @@ void main() {
       alwaysUse24HourFormat: false,
     );
 
-    expect(find.text('開始 9:00 AM'), findsOneWidget);
+    expect(find.text('開始'), findsOneWidget);
     expect(
-      tester
-          .widget<InputChip>(find.byKey(const ValueKey('entry-edit-start')))
-          .tooltip,
-      '開始時間 9:00 AM',
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-start')),
+        matching: find.text('9:00 AM'),
+      ),
+      findsOneWidget,
     );
   });
 
@@ -202,12 +209,12 @@ void main() {
       alwaysUse24HourFormat: true,
     );
 
-    expect(find.text('開始 09:00'), findsOneWidget);
     expect(
-      tester
-          .widget<InputChip>(find.byKey(const ValueKey('entry-edit-start')))
-          .tooltip,
-      '開始時間 09:00',
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-start')),
+        matching: find.text('09:00'),
+      ),
+      findsOneWidget,
     );
   });
 
@@ -278,7 +285,7 @@ void main() {
     expect(field.controller!.text, isNot(contains('地點資料備註')));
   });
 
-  testWidgets('iOS compact time chip 開啟 Cupertino time picker', (tester) async {
+  testWidgets('iOS compact 時間膠囊就地展開輪盤，不開 modal', (tester) async {
     final repo = _MockTripRepository();
     await _open(
       tester,
@@ -290,14 +297,93 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-start-group')),
+        matching: find.byType(CupertinoDatePicker),
+      ),
+      findsOneWidget,
+    );
     final picker = tester.widget<CupertinoDatePicker>(
       find.byType(CupertinoDatePicker),
     );
     expect(picker.minuteInterval, 5);
     expect(picker.use24hFormat, isFalse);
-    expect(find.text('取消'), findsWidgets);
-    expect(find.text('完成'), findsOneWidget);
+    expect(find.text('完成'), findsNothing);
+  });
+
+  testWidgets('起訖兩顆時間不會同時展開', (tester) async {
+    final repo = _MockTripRepository();
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      platform: TargetPlatform.iOS,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-end')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-end-group')),
+        matching: find.byType(CupertinoDatePicker),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('展開再收合不得把 09:07 靜默量化成 09:05', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        expectedVersion: any(named: 'expectedVersion'),
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
+
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(
+        TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          startTime: '09:07',
+          endTime: '10:00',
+          title: '首里城',
+          description: '世界遺產',
+          version: 2,
+        ),
+      ),
+      platform: TargetPlatform.iOS,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateEntry(
+        tripId: 't1',
+        entryId: 11,
+        expectedVersion: 2,
+        description: '世界遺產',
+        startTime: '09:07',
+        endTime: '10:00',
+      ),
+    ).called(1);
   });
 
   testWidgets('時間錯誤顯示在結束欄位下方，並保留使用者輸入', (tester) async {
@@ -314,11 +400,15 @@ void main() {
     tester
         .widget<CupertinoDatePicker>(find.byType(CupertinoDatePicker))
         .onDateTimeChanged(DateTime(2026, 1, 1, 11));
-    await tester.pump();
-    await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
 
-    expect(find.text('開始 11:00 AM'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('entry-edit-start')),
+        matching: find.text('11:00 AM'),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('entry-edit-end-group')),
@@ -1083,8 +1173,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('entry-edit-start-clear')));
     await tester.tap(find.byKey(const ValueKey('entry-edit-end-clear')));
     await tester.pumpAndSettle();
-    expect(find.text('開始 未設定'), findsOneWidget);
-    expect(find.text('結束 未設定'), findsOneWidget);
+    expect(find.text('未設定'), findsNWidgets(2));
 
     entries.add(
       const TimelineEntry(
@@ -1105,8 +1194,7 @@ void main() {
     await tester.tap(find.text('繼續編輯'));
     await tester.pumpAndSettle();
 
-    expect(find.text('開始 未設定'), findsOneWidget);
-    expect(find.text('結束 未設定'), findsOneWidget);
+    expect(find.text('未設定'), findsNWidgets(2));
     verifyNever(
       () => repo.updateEntry(
         tripId: any(named: 'tripId'),

@@ -108,6 +108,14 @@ String formatAppDateTime(BuildContext context, DateTime dateTime) =>
     '${TimeOfDay.fromDateTime(dateTime).format(context)}';
 
 /// 全平台使用符合 iOS HIG 的底部 time wheel，固定五分鐘間隔。
+///
+/// 只剩「筆記日期時間」這種先選日期再選時間的串接流程還用它；表單裡的單一時間
+/// 欄位一律走 `TpCompactTimeField` 就地展開。
+///
+/// **輪盤位置 round 到五分鐘，但不得靜默竄改既有值。** `minuteInterval` 會
+/// assert 初始分鐘是倍數，所以輪盤一定要停在倍數上；但那是「輪盤停在哪」，不是
+/// 使用者的選擇。`selected` 因此以**原值**起頭，只有輪盤真的回報變更才覆蓋 ——
+/// 沒滾動就按完成，`10:07` 仍是 `10:07`。
 Future<TimeOfDay?> showAppTimePicker(
   BuildContext context, {
   required TimeOfDay initialTime,
@@ -116,7 +124,7 @@ Future<TimeOfDay?> showAppTimePicker(
     hour: initialTime.hour,
     minute: initialTime.minute - initialTime.minute % 5,
   );
-  var selected = pickerInitialTime;
+  var selected = initialTime;
   return showCupertinoModalPopup<TimeOfDay>(
     context: context,
     builder: (sheetContext) => Material(
