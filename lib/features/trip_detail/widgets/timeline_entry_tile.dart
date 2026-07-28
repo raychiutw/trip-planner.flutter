@@ -18,7 +18,6 @@ class TimelineEntryTile extends StatelessWidget {
     this.compact = false,
     this.expanded = false,
     this.onTap,
-    this.onEditTime,
     this.trailing,
     this.mapLinks,
     this.expandedChild,
@@ -31,7 +30,6 @@ class TimelineEntryTile extends StatelessWidget {
   final bool compact;
   final bool expanded;
   final VoidCallback? onTap;
-  final VoidCallback? onEditTime;
   final Widget? trailing;
   final Widget? mapLinks;
   final Widget? expandedChild;
@@ -68,7 +66,6 @@ class TimelineEntryTile extends StatelessWidget {
           categoryLabel: categoryLabel,
           compact: compact,
           timeLabel: timeLabel,
-          onEditTime: onEditTime,
           trailing: trailing,
           mapLinks: mapLinks,
         ),
@@ -233,7 +230,6 @@ class _EntryCard extends StatelessWidget {
     required this.categoryLabel,
     required this.compact,
     required this.timeLabel,
-    this.onEditTime,
     this.trailing,
     this.mapLinks,
   });
@@ -243,7 +239,6 @@ class _EntryCard extends StatelessWidget {
   final String? categoryLabel;
   final bool compact;
   final String timeLabel;
-  final VoidCallback? onEditTime;
   final Widget? trailing;
   final Widget? mapLinks;
 
@@ -312,27 +307,38 @@ class _EntryCard extends StatelessWidget {
                   runSpacing: TpSpacing.s1,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    ActionChip(
+                    // 時間是純顯示:不是 chip、不是按鈕。點它與點卡片其他地方
+                    // 一樣會展開 —— 整張卡片行為一致,不留死區(使用者拍板)。
+                    KeyedSubtree(
                       key: ValueKey('entry-time-${entry.id}'),
-                      avatar: accessibilityText
-                          ? null
-                          : const Icon(CupertinoIcons.clock, size: 14),
-                      // The approved D1 layout keeps the full range on one line.
-                      // Remove the decorative icon first; scale only when the
-                      // accessibility glyphs physically exceed the card width.
-                      label: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          timeLabel,
-                          maxLines: 1,
-                          softWrap: false,
-                          style: const TextStyle(
-                            fontFeatures: [FontFeature.tabularFigures()],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!accessibilityText) ...[
+                            Icon(CupertinoIcons.clock, size: 14, color: muted),
+                            const SizedBox(width: 4),
+                          ],
+                          // 定版版面要求完整起訖時間維持一行。先拿掉裝飾性圖示,
+                          // 只有無障礙字級真的撐破卡片寬度時才等比縮小。
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                timeLabel,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      onPressed: onEditTime,
                     ),
                     if (duration != null)
                       Text(
