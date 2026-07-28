@@ -68,6 +68,8 @@ class _MenuTileHostState extends State<_MenuTileHost> {
         sortOrder: 0,
         version: 1,
         title: '首里城',
+        // 有備選景點才有展開入口（#191）。
+        alternates: [EntryPoiInfo(poiId: 600, name: '備選景點')],
       ),
       number: 1,
       expanded: _expanded,
@@ -981,6 +983,8 @@ void main() {
             startTime: '09:30',
             endTime: '11:00',
             title: '互動測試',
+            // 有備選景點才有展開入口（#191）。
+            alternates: [EntryPoiInfo(poiId: 620, name: '備選景點')],
           ),
         ),
       );
