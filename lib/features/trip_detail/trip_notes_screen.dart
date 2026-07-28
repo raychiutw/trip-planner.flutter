@@ -72,9 +72,23 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   /// 整頁 —— 筆記的增刪改與拖曳排序與這支 API 無關,不該被它拖垮。
   Future<void> _loadAiState() async {
     try {
-      await ref.read(tripRepositoryProvider).fetchNotesAiState(widget.tripId);
+      final state = await ref
+          .read(tripRepositoryProvider)
+          .fetchNotesAiState(widget.tripId);
       if (!mounted) return;
-      setState(() => _aiStateError = null);
+      setState(() {
+        _aiStateError = null;
+        for (final job in state.activeJobs) {
+          _aiPending.add(job.docType!);
+          _aiStage[job.docType!] = job.status == TripNoteAiJobStatus.processing
+              ? _NotesAiStage.processing
+              : _NotesAiStage.queued;
+        }
+      });
+      // 接上既有的進度通道 —— **不新增輪詢**,狀態只讀這一次。
+      for (final job in state.activeJobs) {
+        _watchAiJob(job.requestId, job.docType!);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _aiStateError = _notesAiErrorMessage(error));
