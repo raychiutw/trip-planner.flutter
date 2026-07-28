@@ -202,31 +202,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    // 送不出去之後,後端那筆其實沒變 —— 但畫面仍要換成終結態(與 web 一致)。
-    when(
-      () => reqRepo.fetchRequests(
-        tripId: any(named: 'tripId'),
-        limit: any(named: 'limit'),
-        sort: any(named: 'sort'),
-        before: any(named: 'before'),
-        beforeId: any(named: 'beforeId'),
-      ),
-    ).thenAnswer(
-      (_) async => (
-        items: [
-          const TripRequest(
-            id: 42,
-            tripId: 'okinawa',
-            message: '幫我看行程',
-            status: RequestStatus.failed,
-            terminalReason: TerminalReason.cancelled,
-          ),
-        ],
-        hasMore: false,
-      ),
-    );
+    // PATCH 失敗 → 後端那筆**沒有變**。stub 保持 pending 才是寫實的。
     await tester.tap(find.byKey(const ValueKey('chat-stop-waiting-42')));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     expect(
       find.textContaining('伺服器沒有確認'),
@@ -250,34 +230,35 @@ void main() {
     }
   });
 
-  testWidgets('請求結束後「停止等待」消失,不留成裝飾', (tester) async {
-    when(
-      () => reqRepo.fetchRequests(
-        tripId: any(named: 'tripId'),
-        limit: any(named: 'limit'),
-        sort: any(named: 'sort'),
-        before: any(named: 'before'),
-        beforeId: any(named: 'beforeId'),
-      ),
-    ).thenAnswer(
-      (_) async => (
-        items: [
-          const TripRequest(
-            id: 42,
-            tripId: 'okinawa',
-            message: '幫我看行程',
-            status: RequestStatus.failed,
-            terminalReason: TerminalReason.cancelled,
-          ),
-        ],
-        hasMore: false,
+  testWidgets('請求從進行中走到終結後,按鈕消失、換成終結說明', (tester) async {
+    // 恆真陷阱:直接餵一個 failed row 進來的話,按鈕在任何實作下都不會被建出來
+    // —— 那條測試拿掉整個接線也會綠。這裡從**進行中**起手,真的走一次轉場。
+    stubPending();
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      find.byKey(const ValueKey('chat-stop-waiting-42')),
+      findsOneWidget,
+      reason: '起手要真的有按鈕,否則後面的 findsNothing 是恆真的',
+    );
+
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.timedOut,
       ),
     );
-    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
 
     expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
-    expect(find.textContaining('已停止等待'), findsOneWidget);
+    expect(find.textContaining('可以重新送出'), findsOneWidget);
   });
 
   testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet', (tester) async {

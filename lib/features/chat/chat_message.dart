@@ -62,14 +62,14 @@ String _displayUserText(String message) {
   return message;
 }
 
-/// 一筆 row → 1~2 個氣泡（message 非空 → user 氣泡;依 status → assistant 氣泡）。
 /// 終結說明。沿用 web 原句(跨端一致),文案本身編碼了一個正確性約束。
 ///
 /// `cancelled` 那句的「行程也可能已被更動」**不是客套話**:停止等待不會停掉
 /// worker,而寫入權限走行程擁有者身分、不受它影響。刪掉那半句就變成騙人 ——
-/// ADR-0007 明文不得寫成「已中止」。
+/// 後端 `raychiutw/trip-planner` 的 `docs/adr/0007` 明文不得寫成「已中止」。
 ///
-/// `error` 不在這裡 —— 那條走既有的錯誤訊息管線。
+/// `error` 與缺漏共用通用文案:後端把細節寫進 `reply`,那條在上面的 reply
+/// 分支就被接走了,走不到這裡。
 String terminationText(TerminalReason? reason) => switch (reason) {
   TerminalReason.cancelled => '已停止等待。AI 若仍在處理，完成後的回報還是會出現在這裡，行程也可能已被更動。',
   TerminalReason.timedOut => 'AI 一直沒有回應，已自動停止。可以重新送出這則訊息。',
@@ -77,6 +77,7 @@ String terminationText(TerminalReason? reason) => switch (reason) {
   TerminalReason.error || null => 'AI 處理失敗。',
 };
 
+/// 一筆 row → 1~2 個氣泡（message 非空 → user 氣泡;依 status → assistant 氣泡）。
 List<ChatMessage> rowToMessages(TripRequest r) {
   final out = <ChatMessage>[];
   if (r.message.isNotEmpty) {
