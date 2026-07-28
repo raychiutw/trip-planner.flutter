@@ -870,7 +870,7 @@ void main() {
     expect(find.byKey(const ValueKey('entry-drag-11')), findsNothing);
     expect(find.byKey(const ValueKey('entry-category-11')), findsOneWidget);
     expect(find.text('4.6'), findsOneWidget);
-    expect(find.text('黑潮之海旁集合'), findsOneWidget);
+    expect(find.text('黑潮之海旁集合'), findsNothing, reason: '描述收在展開區裡');
     expect(find.byType(TravelPill), findsWidgets);
     final normalCardHeight = tester
         .getSize(find.byKey(const ValueKey('entry-card-11')))
@@ -1765,6 +1765,51 @@ void main() {
     await tester.tap(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+  });
+
+  testWidgets('多張停留點卡片各自獨立展開，不互相收合', (tester) async {
+    const detailedDays = [
+      TripDay(
+        id: 1,
+        dayNum: 1,
+        version: 1,
+        timeline: [
+          TimelineEntry(
+            id: 11,
+            sortOrder: 0,
+            version: 1,
+            title: '美麗海水族館',
+            description: '黑潮之海旁集合',
+          ),
+          TimelineEntry(
+            id: 12,
+            sortOrder: 1,
+            version: 1,
+            title: '海人食堂',
+            description: '海葡萄丼要先預訂',
+          ),
+        ],
+      ),
+    ];
+    await _pumpTimeline(tester, fetchDays: () => detailedDays);
+
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.text('黑潮之海旁集合'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('海人食堂'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('海人食堂'));
+    await tester.pumpAndSettle();
+    expect(find.text('海葡萄丼要先預訂'), findsOneWidget);
+    expect(find.text('黑潮之海旁集合'), findsOneWidget, reason: '展開第二張不該收掉第一張');
+
+    await tester.ensureVisible(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.text('黑潮之海旁集合'), findsNothing);
+    expect(find.text('海葡萄丼要先預訂'), findsOneWidget, reason: '收合第一張不影響第二張');
   });
 
   testWidgets('時間軸資料刷新保留已展開的停留點', (tester) async {
