@@ -196,6 +196,44 @@ Future<void> _startTipsThenEmergency(WidgetTester tester) async {
   await tester.pump();
 }
 
+/// 只按「一般」(行前須知),用來單獨觀察一條通道的進度文案。
+Future<void> _startTips(WidgetTester tester) async {
+  await _expandAiSections(tester);
+  await tester.tap(find.byKey(const ValueKey('note-ai-tips')));
+  await tester.pump();
+  await tester.pump();
+}
+
+Future<void> _pumpAiScreen(
+  WidgetTester tester,
+  ({
+    _MockTripRepository repo,
+    _MockRequestsRepository requestsRepo,
+    StreamController<TripRequestEvent> tipsEvents,
+    StreamController<TripRequestEvent> emergencyEvents,
+  })
+  mocks,
+) async {
+  await tester.pumpWidget(
+    _buildScreen(
+      _sampleNotes(),
+      repo: mocks.repo,
+      requestsRepo: mocks.requestsRepo,
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// 行前須知那條進度面板上實際顯示的字。
+String _pendingText(WidgetTester tester) => tester
+    .widget<Text>(
+      find.descendant(
+        of: find.byKey(const ValueKey('notes-ai-pending-tips')),
+        matching: find.byType(Text),
+      ),
+    )
+    .data!;
+
 VoidCallback? _aiButtonAction(WidgetTester tester, String key) =>
     tester.widget<OutlinedButton>(find.byKey(ValueKey(key))).onPressed;
 
@@ -628,7 +666,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, 800));
     await tester.pump();
     expect(find.byKey(const ValueKey('notes-ai-pending')), findsOneWidget);
-    expect(find.textContaining('AI 正在生成行前須知'), findsOneWidget);
+    expect(find.textContaining('行前須知'), findsWidgets);
   });
 
   testWidgets('沒有住宿時住宿 AI 生成保持 disabled 並說明原因', (tester) async {
@@ -1021,6 +1059,31 @@ void main() {
     expect(find.textContaining('ApiError'), findsNothing);
   });
 
+  testWidgets('進度事件會換掉文案:送出→讀行程→整理內容,不是從頭到尾一句話', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    await _pumpAiScreen(tester, mocks);
+    await _startTips(tester);
+
+    // 剛送出:還沒有任何進度事件。
+    final submitted = _pendingText(tester);
+    expect(submitted, isNot(contains('處理中')), reason: '不得用無資訊量的字眼');
+
+    // 後端回報開始處理 —— 現況 listener 第一行就 `if (!event.isTerminal) return;`,
+    // 所有中間事件被丟掉,文案不會變。
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.processing),
+    );
+    await tester.pump();
+    final processing = _pendingText(tester);
+    expect(
+      processing,
+      isNot(submitted),
+      reason: '收到 processing 事件後文案必須改變,不能從頭到尾同一句',
+    );
+    expect(processing, isNot(contains('處理中')));
+  });
+
   testWidgets('行前須知生成中時緊急聯絡仍可按,而且第二個生成真的送出;兩個 job 各走各的通道', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
@@ -1064,8 +1127,8 @@ void main() {
       find.byKey(const ValueKey('notes-ai-pending-emergency')),
       findsOneWidget,
     );
-    expect(find.textContaining('AI 正在生成行前須知（一般）'), findsOneWidget);
-    expect(find.textContaining('AI 正在生成緊急聯絡'), findsOneWidget);
+    expect(find.textContaining('已送出行前須知（一般）的生成'), findsOneWidget);
+    expect(find.textContaining('已送出緊急聯絡的生成'), findsOneWidget);
 
     // 第三道陷阱:啟動第二個生成不得把第一個的進度通道殺掉。訂閱若共用單一
     // subscription,畫面上兩個進行中都在(前面的斷言全綠),但 tips 的完成事件
