@@ -43,6 +43,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   /// job 已啟動、還在等終態的 docType。
   final _aiPending = <NoteGenerationType>{};
 
+  /// 每種生成目前走到哪一階段 —— 進度提示的文案由它決定。
+  final _aiStage = <NoteGenerationType, _NotesAiStage>{};
+
   /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
   /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
   final _aiSubscriptions =
@@ -133,6 +136,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
                       _NotesAiPendingPanel(
                         key: ValueKey('notes-ai-pending-${type.pathSegment}'),
                         label: type.pendingLabel,
+                        stage: _aiStage[type] ?? _NotesAiStage.queued,
                       ),
                 ],
               ),
@@ -275,6 +279,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         // 不一併清掉,進行中面板與錯誤面板會同時在、按鈕仍卡死,連重試都被
         // `_startAiGeneration` 開頭的守衛擋回去。
         _aiPending.remove(type);
+        _aiStage.remove(type);
         _aiFailure = (message: _notesAiErrorMessage(error), type: type);
       });
     }
@@ -290,7 +295,12 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         .watchRequestEvents(requestId)
         .listen(
           (event) {
-            if (!event.isTerminal) return;
+            if (!event.isTerminal) {
+              // 中間事件不能丟掉 —— 丟了畫面從按下去到結束都是同一句話,
+              // 使用者不知道它在做什麼、也不知道有沒有在動。
+              _handleAiProgress(event, type);
+              return;
+            }
             _handleAiTerminal(event, type);
           },
           onError: (Object error) {
@@ -298,10 +308,23 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
             if (!mounted) return;
             setState(() {
               _aiPending.remove(type);
+              _aiStage.remove(type);
               _aiFailure = (message: _notesAiErrorMessage(error), type: type);
             });
           },
         );
+  }
+
+  /// 只有階段**真的改變**才 setState —— 後端可能連送多個同階段事件,
+  /// 每次都重建會讓 live region 把同一句重複播報。
+  void _handleAiProgress(TripRequestEvent event, NoteGenerationType type) {
+    if (!mounted) return;
+    final stage = switch (event.status) {
+      RequestStatus.processing => _NotesAiStage.processing,
+      _ => _NotesAiStage.queued,
+    };
+    if (_aiStage[type] == stage) return;
+    setState(() => _aiStage[type] = stage);
   }
 
   void _handleAiTerminal(TripRequestEvent event, NoteGenerationType type) {
@@ -318,6 +341,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     final rawError = event.error;
     setState(() {
       _aiPending.remove(type);
+      _aiStage.remove(type);
       _aiFailure = (
         // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
         // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
@@ -381,10 +405,39 @@ class _NoteAiAction {
   final String? disabledText;
 }
 
+/// 生成走到哪一階段。文案要講清楚正在做什麼 —— HIG generative-ai:
+/// 「instead of "Processing…", say "Summarizing key themes from your notes."」
+enum _NotesAiStage {
+  /// 已送出,還沒被領走。
+  queued,
+
+  /// 已被領走,正在讀行程並整理內容。
+  processing,
+}
+
+extension _NotesAiStageX on _NotesAiStage {
+  /// `label` 是該種生成的中文名(行前須知(一般)/緊急聯絡…)。
+  String message(String label) => switch (this) {
+    _NotesAiStage.queued => '已送出$label的生成，正在等待排程。通常需 3-7 分鐘。',
+    _NotesAiStage.processing => '正在讀行程並整理$label的內容，完成後會自動更新。',
+  };
+
+  /// 不只靠顏色 —— 灰階下也分得出兩個階段。
+  IconData get icon => switch (this) {
+    _NotesAiStage.queued => CupertinoIcons.clock,
+    _NotesAiStage.processing => CupertinoIcons.sparkles,
+  };
+}
+
 class _NotesAiPendingPanel extends StatelessWidget {
-  const _NotesAiPendingPanel({super.key, required this.label});
+  const _NotesAiPendingPanel({
+    super.key,
+    required this.label,
+    required this.stage,
+  });
 
   final String label;
+  final _NotesAiStage stage;
 
   @override
   Widget build(BuildContext context) {
@@ -408,10 +461,12 @@ class _NotesAiPendingPanel extends StatelessWidget {
               color: colors.primary,
             ),
           ),
-          const SizedBox(width: TpSpacing.s3),
+          const SizedBox(width: TpSpacing.s2),
+          Icon(stage.icon, size: 16, color: colors.onSecondaryContainer),
+          const SizedBox(width: TpSpacing.s2),
           Expanded(
             child: Text(
-              'AI 正在生成$label，完成後會自動更新。通常需 3-7 分鐘。',
+              stage.message(label),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSecondaryContainer,
                 fontWeight: FontWeight.w600,
