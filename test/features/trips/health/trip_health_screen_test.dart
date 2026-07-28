@@ -6,9 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/models/day.dart';
+import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_health.dart';
@@ -17,8 +19,11 @@ import 'package:tripline/theme/app_theme.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
+class MockRequestsRepository extends Mock implements RequestsRepository {}
+
 void main() {
   late MockTripRepository repository;
+  late MockRequestsRepository requestsRepo;
 
   const trip = Trip(id: 'trip-1', name: 'okinawa-trip', title: '沖繩家族旅行');
   const nonEmptyDays = [
@@ -43,7 +48,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         retry: (retryCount, error) => null,
-        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          tripRepositoryProvider.overrideWithValue(repository),
+          requestsRepositoryProvider.overrideWithValue(requestsRepo),
+        ],
         child: MaterialApp(
           theme: theme ?? AppTheme.light(),
           builder: (context, child) => MediaQuery(
@@ -111,6 +119,7 @@ void main() {
 
   setUp(() {
     repository = MockTripRepository();
+    requestsRepo = MockRequestsRepository();
     when(() => repository.fetchTrip('trip-1')).thenAnswer((_) async => trip);
     when(
       () => repository.fetchDays('trip-1'),
@@ -241,6 +250,59 @@ void main() {
 
     verify(() => repository.startHealthCheck('trip-1')).called(1);
     expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+  });
+
+  TripHealthReport pendingReport() => const TripHealthReport(
+    tripId: 'trip-1',
+    userId: 'user-1',
+    status: TripHealthStatus.pending,
+    requestId: 43,
+    createdAt: '2026-07-09T10:02:00Z',
+  );
+
+  testWidgets('健檢進行中可以停止等待', (tester) async {
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    when(() => requestsRepo.stopWaiting(any())).thenAnswer((_) async {});
+    await pumpScreen(tester);
+
+    expect(find.byKey(const ValueKey('trip-health-stop')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('trip-health-stop')));
+    await tester.pump();
+    await tester.pump();
+
+    verify(() => requestsRepo.stopWaiting(43)).called(1);
+  });
+
+  testWidgets('請求已終結但報告仍 pending 時,說得出那是什麼狀況', (tester) async {
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    // 牆鐘直接 UPDATE 不經 PATCH,所以完成 hook 不跑、報告表停在 pending。
+    when(() => requestsRepo.fetchRequest(43)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 43,
+        tripId: 'trip-1',
+        message: '健檢',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.timedOut,
+      ),
+    );
+    await pumpScreen(tester);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('trip-health-stalled')),
+      findsOneWidget,
+      reason: '請求終結但報告 pending —— 要說得出來,不能讓人一直重整',
+    );
+    expect(
+      find.byKey(const ValueKey('trip-health-pending')),
+      findsNothing,
+      reason: '不能再顯示會讓人以為還在跑的提示',
+    );
   });
 
   testWidgets('空行程顯示 guard 並停用開始健檢', (tester) async {
