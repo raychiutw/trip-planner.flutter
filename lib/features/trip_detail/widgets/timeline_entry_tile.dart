@@ -18,7 +18,7 @@ class TimelineEntryTile extends StatelessWidget {
     this.compact = false,
     this.expanded = false,
     this.onTap,
-    this.onEditTime,
+    this.onLongPress,
     this.trailing,
     this.mapLinks,
     this.expandedChild,
@@ -31,7 +31,9 @@ class TimelineEntryTile extends StatelessWidget {
   final bool compact;
   final bool expanded;
   final VoidCallback? onTap;
-  final VoidCallback? onEditTime;
+
+  /// 長按卡片的入口；畫面接的是 `⋯` 那顆選單的 [MenuController]。
+  final VoidCallback? onLongPress;
   final Widget? trailing;
   final Widget? mapLinks;
   final Widget? expandedChild;
@@ -48,19 +50,27 @@ class TimelineEntryTile extends StatelessWidget {
       timeLabel,
       categoryLabel ?? '停留點',
     ].join('，');
+    final details = _details(entry);
+    // 展開區裝的是「這個停留點的細節」—— 七個欄位與備選景點。兩者都沒有時展開區是
+    // 空的,此時不該留下可點但展不開的空殼。
+    final expandable =
+        onTap != null && (details.isNotEmpty || entry.alternates.isNotEmpty);
+    final onExpandTap = expandable ? onTap : null;
 
     final card = Semantics(
       key: ValueKey('timeline-entry-content-${entry.id}'),
       container: true,
       explicitChildNodes: true,
       label: semanticsLabel,
-      hint: onTap == null ? null : (expanded ? '點兩下收合備選景點' : '點兩下展開備選景點'),
-      button: onTap != null,
-      expanded: onTap == null ? null : expanded,
-      onTap: onTap,
+      hint: expandable ? (expanded ? '點兩下收合停留點細節' : '點兩下展開停留點細節') : null,
+      button: expandable,
+      expanded: expandable ? expanded : null,
+      onTap: onExpandTap,
+      onLongPress: onLongPress,
       child: InkWell(
         excludeFromSemantics: true,
-        onTap: onTap,
+        onTap: onExpandTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(18),
         child: _EntryCard(
           entry: entry,
@@ -68,12 +78,17 @@ class TimelineEntryTile extends StatelessWidget {
           categoryLabel: categoryLabel,
           compact: compact,
           timeLabel: timeLabel,
-          onEditTime: onEditTime,
           trailing: trailing,
           mapLinks: mapLinks,
         ),
       ),
     );
+
+    final expansionChildren = <Widget>[
+      if (expanded && details.isNotEmpty)
+        _EntryDetailsPanel(entryId: entry.id, details: details),
+      ?expandedChild,
+    ];
 
     return KeyedSubtree(
       key: ValueKey('timeline-entry-d1-${entry.id}'),
@@ -118,7 +133,7 @@ class TimelineEntryTile extends StatelessWidget {
             duration: TpMotion.resolve(context, TpMotion.normal),
             curve: TpMotion.appleEase,
             alignment: Alignment.topCenter,
-            child: expandedChild == null
+            child: expansionChildren.isEmpty
                 ? const SizedBox.shrink()
                 : IntrinsicHeight(
                     child: Row(
@@ -139,7 +154,11 @@ class TimelineEntryTile extends StatelessWidget {
                             padding: const EdgeInsets.only(
                               bottom: TpSpacing.s3,
                             ),
-                            child: expandedChild!,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              spacing: TpSpacing.s2,
+                              children: expansionChildren,
+                            ),
                           ),
                         ),
                       ],
@@ -233,7 +252,6 @@ class _EntryCard extends StatelessWidget {
     required this.categoryLabel,
     required this.compact,
     required this.timeLabel,
-    this.onEditTime,
     this.trailing,
     this.mapLinks,
   });
@@ -243,7 +261,6 @@ class _EntryCard extends StatelessWidget {
   final String? categoryLabel;
   final bool compact;
   final String timeLabel;
-  final VoidCallback? onEditTime;
   final Widget? trailing;
   final Widget? mapLinks;
 
@@ -256,7 +273,6 @@ class _EntryCard extends StatelessWidget {
       _resolvedStartTime(entry),
       _resolvedEndTime(entry),
     );
-    final details = _details(entry);
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 2;
 
     return Container(
@@ -312,27 +328,38 @@ class _EntryCard extends StatelessWidget {
                   runSpacing: TpSpacing.s1,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    ActionChip(
+                    // 時間是純顯示:不是 chip、不是按鈕。點它與點卡片其他地方
+                    // 一樣會展開 —— 整張卡片行為一致,不留死區(使用者拍板)。
+                    KeyedSubtree(
                       key: ValueKey('entry-time-${entry.id}'),
-                      avatar: accessibilityText
-                          ? null
-                          : const Icon(CupertinoIcons.clock, size: 14),
-                      // The approved D1 layout keeps the full range on one line.
-                      // Remove the decorative icon first; scale only when the
-                      // accessibility glyphs physically exceed the card width.
-                      label: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          timeLabel,
-                          maxLines: 1,
-                          softWrap: false,
-                          style: const TextStyle(
-                            fontFeatures: [FontFeature.tabularFigures()],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!accessibilityText) ...[
+                            Icon(CupertinoIcons.clock, size: 14, color: muted),
+                            const SizedBox(width: 4),
+                          ],
+                          // 定版版面要求完整起訖時間維持一行。先拿掉裝飾性圖示,
+                          // 只有無障礙字級真的撐破卡片寬度時才等比縮小。
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                timeLabel,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      onPressed: onEditTime,
                     ),
                     if (duration != null)
                       Text(
@@ -388,16 +415,37 @@ class _EntryCard extends StatelessWidget {
               const SizedBox(height: TpSpacing.s1),
               mapLinks!,
             ],
-            if (details.isNotEmpty) ...[
-              const SizedBox(height: TpSpacing.s1),
-              Text(
-                details.join('\n'),
-                key: ValueKey('entry-details-${entry.id}'),
-                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-              ),
-            ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 展開區裡的七個欄位。與備選景點並排在同一個展開區,因此沿用同一套卡片樣式。
+class _EntryDetailsPanel extends StatelessWidget {
+  const _EntryDetailsPanel({required this.entryId, required this.details});
+
+  final int entryId;
+  final List<String> details;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TpSpacing.s4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Text(
+        details.join('\n'),
+        key: ValueKey('entry-details-$entryId'),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }

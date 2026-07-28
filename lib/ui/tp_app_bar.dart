@@ -725,6 +725,7 @@ class TpMoreMenuButton<T> extends StatefulWidget {
     this.enabled = true,
     this.tooltip = '更多',
     this.triggerChild,
+    this.controller,
   });
 
   final List<TpActionItem<T>> items;
@@ -732,6 +733,10 @@ class TpMoreMenuButton<T> extends StatefulWidget {
   final bool enabled;
   final String tooltip;
   final Widget? triggerChild;
+
+  /// 外部控制器：讓觸發鈕以外的入口（例如長按整張卡片）開**同一份**選單，
+  /// 而不是各自組一份。省略時自行建立，行為與過去相同。
+  final MenuController? controller;
 
   @override
   State<TpMoreMenuButton<T>> createState() => _TpMoreMenuButtonState<T>();
@@ -748,7 +753,9 @@ abstract final class _TpMenuMetrics {
 }
 
 class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
-  final _menuController = MenuController();
+  final _ownMenuController = MenuController();
+
+  MenuController get _menuController => widget.controller ?? _ownMenuController;
 
   /// 選擇的派發時機維持在**項目本身的回呼**。
   ///

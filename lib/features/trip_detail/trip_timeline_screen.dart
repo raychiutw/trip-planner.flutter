@@ -383,6 +383,9 @@ class _TimelineBody extends ConsumerStatefulWidget {
 class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   Map<int, GlobalKey> _daySectionKeys = {};
   Map<int, GlobalKey> _entryKeys = {};
+
+  /// 每個停留點一顆選單控制器：`⋯` 與長按卡片共用同一顆，開的是同一份選單。
+  Map<int, MenuController> _entryMenuControllers = {};
   late _EntriesSnapshot _visibleEntriesByDayId;
   late int _activeDayNum;
   final _scrollController = ScrollController();
@@ -390,7 +393,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   bool _daySyncScheduled = false;
   int? _programmaticDayNum;
   var _programmaticScrollGeneration = 0;
-  int? _expandedEntryId;
+  final _expandedEntryIds = <int>{};
   var _reorderSubmitting = false;
   final _settingMasterEntryIds = <int>{};
   Timer? _autoScrollTimer;
@@ -419,7 +422,8 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     if (tripChanged) {
       _daySectionKeys = {};
       _entryKeys = {};
-      _expandedEntryId = null;
+      _entryMenuControllers = {};
+      _expandedEntryIds.clear();
       _reorderSubmitting = false;
       _settingMasterEntryIds.clear();
       _visibleEntriesByDayId = _entriesFromDays(widget.days);
@@ -432,7 +436,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       return;
     }
     if (!oldWidget.isEditing && widget.isEditing) {
-      _expandedEntryId = null;
+      _expandedEntryIds.clear();
     }
     final entryFocusChanged = oldWidget.initialEntryId != widget.initialEntryId;
     final dayFocusChanged =
@@ -468,6 +472,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   void _rebuildKeys() {
     final oldDayKeys = _daySectionKeys;
     final oldEntryKeys = _entryKeys;
+    final oldEntryMenuControllers = _entryMenuControllers;
     _daySectionKeys = {
       for (final day in widget.days)
         day.dayNum: oldDayKeys[day.dayNum] ?? GlobalKey(),
@@ -476,6 +481,11 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       for (final day in widget.days)
         for (final entry in day.timeline)
           entry.id: oldEntryKeys[entry.id] ?? GlobalKey(),
+    };
+    _entryMenuControllers = {
+      for (final day in widget.days)
+        for (final entry in day.timeline)
+          entry.id: oldEntryMenuControllers[entry.id] ?? MenuController(),
     };
   }
 
@@ -493,9 +503,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     setState(() => _visibleEntriesByDayId = snapshot);
   }
 
+  /// 每張卡片各自獨立展開 —— 展開一張不收合其他張。
   void _toggleExpanded(int entryId) {
     setState(() {
-      _expandedEntryId = _expandedEntryId == entryId ? null : entryId;
+      if (!_expandedEntryIds.remove(entryId)) _expandedEntryIds.add(entryId);
     });
   }
 
@@ -890,10 +901,11 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                         const <TimelineEntry>[],
                     tripId: widget.tripId,
                     entryKeys: _entryKeys,
+                    entryMenuControllers: _entryMenuControllers,
                     focusedEntryId: widget.initialEntryId,
                     isEditing: widget.isEditing,
                     reorderSubmitting: _reorderSubmitting,
-                    expandedEntryId: _expandedEntryId,
+                    expandedEntryIds: _expandedEntryIds,
                     settingMasterEntryIds: _settingMasterEntryIds,
                     onToggleExpanded: _toggleExpanded,
                     onStartEditing: widget.onStartEditing,
@@ -1023,10 +1035,11 @@ class _DaySection extends ConsumerWidget {
     required this.dayCount,
     required this.timeline,
     required this.entryKeys,
+    required this.entryMenuControllers,
     this.focusedEntryId,
     required this.isEditing,
     required this.reorderSubmitting,
-    required this.expandedEntryId,
+    required this.expandedEntryIds,
     required this.settingMasterEntryIds,
     required this.onToggleExpanded,
     required this.onStartEditing,
@@ -1043,10 +1056,11 @@ class _DaySection extends ConsumerWidget {
   final int dayCount;
   final List<TimelineEntry> timeline;
   final Map<int, GlobalKey> entryKeys;
+  final Map<int, MenuController> entryMenuControllers;
   final int? focusedEntryId;
   final bool isEditing;
   final bool reorderSubmitting;
-  final int? expandedEntryId;
+  final Set<int> expandedEntryIds;
   final Set<int> settingMasterEntryIds;
   final ValueChanged<int> onToggleExpanded;
   final VoidCallback onStartEditing;
@@ -1195,7 +1209,9 @@ class _DaySection extends ConsumerWidget {
     final travelSegment = previous == null
         ? null
         : _findSegment(segments, previous.id, entry.id);
-    final expanded = !isEditing && expandedEntryId == entry.id;
+    final expanded = !isEditing && expandedEntryIds.contains(entry.id);
+    // 排序模式不掛選單（`⋯` 也不顯示），長按自然跟著沒有入口。
+    final menuController = isEditing ? null : entryMenuControllers[entry.id];
     final tile = TimelineEntryTile(
       entry: entry,
       number: index + 1,
@@ -1204,11 +1220,7 @@ class _DaySection extends ConsumerWidget {
       compact: isEditing,
       expanded: expanded,
       onTap: isEditing ? null : () => onToggleExpanded(entry.id),
-      onEditTime: isEditing
-          ? null
-          : () => context.push(
-              '/trips/${Uri.encodeComponent(tripId)}/entries/${entry.id}/edit',
-            ),
+      onLongPress: menuController?.open,
       mapLinks: isEditing || entry.master == null
           ? null
           : EntryMapLinks(
@@ -1282,7 +1294,7 @@ class _DaySection extends ConsumerWidget {
                   kTimelineRailWidth -
                   10,
             )
-          : _entryMenu(context, ref, entry, index),
+          : _entryMenu(context, ref, entry, index, menuController),
     );
     final row = isEditing
         ? tile
@@ -1327,10 +1339,12 @@ class _DaySection extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
     int index,
+    MenuController? menuController,
   ) {
     final canChangeDay = dayCount > 1;
     return TpMoreMenuButton<_EntryMoreAction>(
       key: ValueKey('entry-more-${entry.id}'),
+      controller: menuController,
       tooltip: '景點操作',
       items: [
         TpActionItem(
