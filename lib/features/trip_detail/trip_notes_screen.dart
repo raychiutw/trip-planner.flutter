@@ -33,7 +33,8 @@ class TripNotesScreen extends ConsumerStatefulWidget {
   ConsumerState<TripNotesScreen> createState() => _TripNotesScreenState();
 }
 
-class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
+class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
+    with WidgetsBindingObserver {
   // 三種生成是三條獨立的線:送出中、進行中、進度通道全部 per-docType。
   // 任何一格退回單一欄位,生成行前須知時緊急聯絡就會被連坐。
 
@@ -65,7 +66,15 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadAiState();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 回到前景重讀一次 —— 使用者可能在別的裝置按了生成,或這支 app 被系統
+    // 回收過。沿用 notifications_screen 的 WidgetsBindingObserver 手法。
+    if (state == AppLifecycleState.resumed) unawaited(_loadAiState());
   }
 
   /// 進頁面時讀一次持久狀態。**失敗只記在 [_aiStateError]**,不讓它冒泡到
@@ -86,7 +95,10 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         }
       });
       // 接上既有的進度通道 —— **不新增輪詢**,狀態只讀這一次。
+      // 已經訂閱過的不重接:resume 與離線佇列 flush 可能同時觸發重讀,
+      // 重接會讓同一個 job 的事件被收兩次。
       for (final job in state.activeJobs) {
+        if (_aiSubscriptions.containsKey(job.docType)) continue;
         _watchAiJob(job.requestId, job.docType!);
       }
     } catch (error) {
@@ -97,6 +109,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final subscription in _aiSubscriptions.values) {
       subscription.cancel();
     }
