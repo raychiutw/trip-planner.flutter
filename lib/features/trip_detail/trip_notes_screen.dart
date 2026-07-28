@@ -50,6 +50,12 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
   /// 從後端讀回來的持久狀態。讀失敗只影響 AI 區塊,筆記本體照常。
   String? _aiStateError;
 
+  /// 最近一次完成的摘要。
+  TripNoteAiJob? _aiSummary;
+
+  /// 逾時的那一種(逾時與一般失敗要分開呈現)。
+  NoteGenerationType? _aiTimedOut;
+
   /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
   /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
   final _aiSubscriptions =
@@ -167,6 +173,25 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
           key: const ValueKey('notes-ai-status'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_aiSummary case final job?)
+              _NotesAiSummaryPanel(
+                key: const ValueKey('notes-ai-summary'),
+                job: job,
+                onDismiss: () => setState(() => _aiSummary = null),
+              ),
+            if (_aiTimedOut case final type?)
+              _NotesAiErrorPanel(
+                key: const ValueKey('notes-ai-timeout'),
+                panelKey: const ValueKey('notes-ai-timeout-panel'),
+                retryKey: const ValueKey('notes-ai-timeout-retry'),
+                title: '生成逾時',
+                message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
+                onRetry: () {
+                  setState(() => _aiTimedOut = null);
+                  _startAiGeneration(type);
+                },
+                onDismiss: () => setState(() => _aiTimedOut = null),
+              ),
             if (_aiStateError case final message?)
               _NotesAiErrorPanel(
                 key: const ValueKey('notes-ai-state-error'),
@@ -393,6 +418,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
       setState(() => _aiPending.remove(type));
       ref.invalidate(tripNotesProvider(widget.tripId));
       _scheduleAiCompletionNotice(type);
+      // 摘要只能從這裡拿 —— 進度事件只帶 status/error,沒有 payload。
+      // 這是**終態後的一次性重讀**,不是輪詢。
+      unawaited(_refreshAiOutcome(type));
       return;
     }
 
@@ -409,6 +437,33 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
         type: type,
       );
     });
+    // 逾時與一般失敗在進度通道上長得一樣(後端 #1217 把逾時的 job 對應的
+    // request 也標成 failed),要靠重讀狀態才分得出來。client 不自己倒數。
+    unawaited(_refreshAiOutcome(type));
+  }
+
+  /// 終態後重讀一次狀態,拿完成摘要或確認是不是逾時。**一次性,不是輪詢。**
+  Future<void> _refreshAiOutcome(NoteGenerationType type) async {
+    try {
+      final state = await ref
+          .read(tripRepositoryProvider)
+          .fetchNotesAiState(widget.tripId);
+      if (!mounted) return;
+      final job = state.jobFor(type);
+      if (job == null) return;
+      setState(() {
+        if (job.status == TripNoteAiJobStatus.timedOut) {
+          _aiTimedOut = type;
+          _aiFailure = null;
+          _aiSummary = null;
+        } else if (job.status == TripNoteAiJobStatus.completed) {
+          _aiSummary = job;
+          _aiTimedOut = null;
+        }
+      });
+    } on Object {
+      // 摘要拿不到不影響主流程 —— 生成本身已經完成或失敗了。
+    }
   }
 
   /// 完成提示延到 frame 結束才發:同一幀內完成的合成一則,兩張浮層才不會疊在
@@ -537,6 +592,68 @@ class _NotesAiPendingPanel extends StatelessWidget {
   }
 }
 
+/// 完成摘要:用中文句子講「動了什麼」,不是裸露的數字表格。
+class _NotesAiSummaryPanel extends StatelessWidget {
+  const _NotesAiSummaryPanel({
+    super.key,
+    required this.job,
+    required this.onDismiss,
+  });
+
+  final TripNoteAiJob job;
+  final VoidCallback onDismiss;
+
+  /// 為零或缺漏的 count 直接略過 —— 「抑制 0 則」是雜訊不是資訊。
+  String get _sentence {
+    final parts = <String>[
+      if (job.insertedCount > 0) '新增 ${job.insertedCount} 則',
+      if (job.replacedCount > 0) '替換 ${job.replacedCount} 則',
+      if (job.preservedManualCount > 0)
+        '保留你手動維護的 ${job.preservedManualCount} 則',
+      if (job.duplicateExcludedCount > 0)
+        '略過重複的 ${job.duplicateExcludedCount} 則',
+      if (job.suppressedCount > 0) '略過你排除過的 ${job.suppressedCount} 則',
+    ];
+    if (parts.isEmpty) return '這次生成沒有變更任何項目。';
+    return '這次生成${parts.join('、')}。';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+      padding: const EdgeInsets.all(TpSpacing.s3),
+      decoration: BoxDecoration(
+        color: colors.secondaryContainer,
+        borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            CupertinoIcons.checkmark_circle,
+            size: 18,
+            color: colors.onSecondaryContainer,
+          ),
+          const SizedBox(width: TpSpacing.s2),
+          Expanded(
+            child: Text(
+              _sentence,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSecondaryContainer,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onDismiss, child: const Text('關閉')),
+        ],
+      ),
+    );
+  }
+}
+
 class _NotesAiErrorPanel extends StatelessWidget {
   const _NotesAiErrorPanel({
     super.key,
@@ -545,6 +662,7 @@ class _NotesAiErrorPanel extends StatelessWidget {
     required this.onDismiss,
     this.panelKey = const ValueKey('notes-ai-error'),
     this.retryKey = const ValueKey('notes-ai-retry'),
+    this.title = 'AI 生成失敗',
   });
 
   final String message;
@@ -555,6 +673,7 @@ class _NotesAiErrorPanel extends StatelessWidget {
   final VoidCallback onDismiss;
   final Key panelKey;
   final Key retryKey;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -584,7 +703,7 @@ class _NotesAiErrorPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AI 生成失敗',
+                        title,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: colors.onErrorContainer,
                           fontWeight: FontWeight.w700,

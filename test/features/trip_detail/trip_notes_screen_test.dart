@@ -1166,6 +1166,116 @@ void main() {
     verify(() => mocks.requestsRepo.watchRequestEvents(99)).called(1);
   });
 
+  testWidgets('生成完成後重讀狀態,把摘要用中文句子講出來', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    var call = 0;
+    when(() => mocks.repo.fetchNotesAiState('trip-1')).thenAnswer((_) async {
+      call++;
+      // 第一次(進頁面)什麼都沒有;完成事件之後才有摘要。
+      return call == 1
+          ? const TripNoteAiState()
+          : const TripNoteAiState(
+              jobs: [
+                TripNoteAiJob(
+                  jobId: 7,
+                  requestId: 99,
+                  docType: NoteGenerationType.tips,
+                  status: TripNoteAiJobStatus.completed,
+                  insertedCount: 2,
+                  replacedCount: 5,
+                  preservedManualCount: 3,
+                  duplicateExcludedCount: 1,
+                  suppressedCount: 0,
+                ),
+              ],
+            );
+    });
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+        stubAiState: false,
+      ),
+    );
+    await tester.pump();
+    await _startTips(tester);
+
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.completed),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(call, 2, reason: '摘要只能從終態後重讀 ai-state 拿到,SSE 事件不帶 payload');
+    final summary = tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('notes-ai-summary')),
+                matching: find.byType(Text),
+              )
+              .first,
+        )
+        .data!;
+    expect(summary, contains('2'), reason: '新增 2 則');
+    expect(summary, contains('5'), reason: '替換 5 則');
+    expect(summary, contains('3'), reason: '保留 3 則人工');
+    expect(summary, isNot(contains('抑制 0')), reason: '缺漏或為零的 count 要略過');
+  });
+
+  testWidgets('逾時走既有進度通道抵達,有自己的面板與重試', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    var call = 0;
+    when(() => mocks.repo.fetchNotesAiState('trip-1')).thenAnswer((_) async {
+      call++;
+      return call == 1
+          ? const TripNoteAiState()
+          : const TripNoteAiState(
+              jobs: [
+                TripNoteAiJob(
+                  jobId: 7,
+                  requestId: 99,
+                  docType: NoteGenerationType.tips,
+                  status: TripNoteAiJobStatus.timedOut,
+                  errorCode: 'NOTES_AI_JOB_STALE',
+                  errorMessage: 'AI 生成超過 10 分鐘',
+                ),
+              ],
+            );
+    });
+    await tester.pumpWidget(
+      _buildScreen(
+        _sampleNotes(),
+        repo: mocks.repo,
+        requestsRepo: mocks.requestsRepo,
+        stubAiState: false,
+      ),
+    );
+    await tester.pump();
+    await _startTips(tester);
+
+    // 後端 #1217:job 逾時時對應的 request 也被標成 failed,所以逾時透過
+    // 既有的進度通道抵達,client 不必新增輪詢也不自己倒數。
+    mocks.tipsEvents.add(
+      const TripRequestEvent(status: RequestStatus.failed, error: '逾時'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('notes-ai-timeout')),
+      findsOneWidget,
+      reason: '逾時要有自己的面板,不能跟一般失敗混為一談',
+    );
+    expect(
+      find.byKey(const ValueKey('notes-ai-timeout-retry')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
