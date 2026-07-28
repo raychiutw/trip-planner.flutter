@@ -222,10 +222,20 @@ enum TpDestructiveConfirmSource {
   direct,
 }
 
-/// 破壞性動作的確認,依 [source] 選擇 HIG 規定的確認界面。
+/// 破壞性動作的確認,依 [source] 與 size class 選擇確認界面。
 ///
 /// action sheet 只放一個破壞性動作加取消 —— 內容保持一屏,避免 `action-sheets`
-/// 頁禁止的捲動。
+/// 頁禁止的捲動(截行規則見 [showAppActionSheet])。
+///
+/// regular size class 不走 action sheet:HIG `action-sheets` 說 iPadOS 要以
+/// popover 呈現、錨在觸發的控制項上,而 `showCupertinoModalPopup` 只會貼在
+/// 螢幕底部,在 iPad 上是橫跨整個寬度的一條 —— 比 alert 更不像原生。
+///
+/// **已知限制**:這裡回退到 alert,不是真正的 popover。要畫 popover 需要選單
+/// 觸發鈕的 anchor rect,而 `TpMoreMenuButton.onSelected` 只回傳選中的值、
+/// 不帶錨點,補上得改動所有選單呼叫端的簽章。alert 至少滿足 HIG 要求 action
+/// sheet 的理由(出現在與選單不同的位置、需要刻意關閉),且 `action-sheets`
+/// 頁明文允許 alert 確認破壞性動作。
 Future<bool> showAppDestructiveConfirm(
   BuildContext context, {
   required TpDestructiveConfirmSource source,
@@ -234,7 +244,8 @@ Future<bool> showAppDestructiveConfirm(
   required String confirmLabel,
   String cancelLabel = '取消',
 }) async {
-  if (source == TpDestructiveConfirmSource.direct) {
+  if (source == TpDestructiveConfirmSource.direct ||
+      appIsRegularSizeClass(context)) {
     return showAppConfirm(
       context,
       title: title,
@@ -252,8 +263,6 @@ Future<bool> showAppDestructiveConfirm(
       TpActionItem(
         value: true,
         label: confirmLabel,
-        // action sheet 不畫字符,這裡只是 [TpActionItem] 的必填欄位。
-        icon: CupertinoIcons.exclamationmark_triangle,
         role: TpActionRole.destructive,
       ),
     ],
@@ -287,7 +296,23 @@ Future<void> showAppAlert(
   );
 }
 
+/// action sheet 抬頭的行數上限 —— HIG `action-sheets`「Avoid letting an action
+/// sheet scroll」的守門手段。
+///
+/// 呼叫端會把使用者可控的內容插進抬頭(共編成員的 email、分享連結的標籤都在
+/// title,停留點名稱在 message),不設上限的話最大 Dynamic Type 下會撐爆一屏。
+///
+/// 這組數字是量出來的,不是估的:螢幕 375×667(iOS 16 最小支援尺寸)、
+/// Dynamic Type 3.2×(AX5)時,title 3 行 + message 4 行的 sheet 高 563.5pt,
+/// 不捲動;同樣內容不截行則實測會捲動。正常字級下這兩個上限碰不到 —— 66 字元的
+/// email 在 375pt 寬只佔 3 行。
+const _kActionSheetTitleMaxLines = 3;
+const _kActionSheetMessageMaxLines = 4;
+
 /// 顯示 HIG 動作選單,回傳使用者選擇的動作值(取消回傳 `null`)。
+///
+/// 項目不畫字符 —— HIG action sheet 的項目只有標題。[TpActionItem.icon] 因此
+/// 留空即可。
 Future<T?> showAppActionSheet<T>(
   BuildContext context, {
   String? title,
@@ -298,8 +323,20 @@ Future<T?> showAppActionSheet<T>(
   return showCupertinoModalPopup<T>(
     context: context,
     builder: (sheetContext) => CupertinoActionSheet(
-      title: title == null ? null : Text(title),
-      message: message == null ? null : Text(message),
+      title: title == null
+          ? null
+          : Text(
+              title,
+              maxLines: _kActionSheetTitleMaxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
+      message: message == null
+          ? null
+          : Text(
+              message,
+              maxLines: _kActionSheetMessageMaxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
       actions: [
         for (final action in actions)
           if (action.enabled)
@@ -700,6 +737,15 @@ Future<T?> showAppSelectionSheet<T>(
   );
 }
 
+/// 全 App 判定 regular size class(iPad、大螢幕)的**唯一**規則。
+///
+/// 門檻沿用 [showAppContentSheet] 原本就在用的那一組,不另訂新的寬度;需要依
+/// size class 分流的地方一律呼叫這裡,不要各自量 `MediaQuery`。
+bool appIsRegularSizeClass(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  return size.width >= 720 && size.height >= 700;
+}
+
 Future<T?> showAppContentSheet<T>(
   BuildContext context, {
   required String title,
@@ -707,8 +753,7 @@ Future<T?> showAppContentSheet<T>(
   bool dismissible = true,
 }) {
   final sheetNavigatorKey = GlobalKey<NavigatorState>();
-  final size = MediaQuery.sizeOf(context);
-  if (size.width >= 720 && size.height >= 700) {
+  if (appIsRegularSizeClass(context)) {
     return showDialog<T>(
       context: context,
       useRootNavigator: true,

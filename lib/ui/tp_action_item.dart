@@ -7,7 +7,7 @@ class TpActionItem<T> {
   const TpActionItem({
     required this.value,
     required this.label,
-    required this.icon,
+    this.icon,
     this.key,
     this.semanticLabel,
     this.selected = false,
@@ -18,7 +18,12 @@ class TpActionItem<T> {
 
   final T value;
   final String label;
-  final IconData icon;
+
+  /// 選單(`TpMoreMenuButton`)的項目字符，畫在標題前。
+  ///
+  /// 可省略：`showAppActionSheet` 依 HIG 不畫字符，action sheet 專用的項目給
+  /// 字符也不會被畫出來 —— 那種情況一律留空，不要為了填欄位塞一個看不到的值。
+  final IconData? icon;
   final Key? key;
   final String? semanticLabel;
 

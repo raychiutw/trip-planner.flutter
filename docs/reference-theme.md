@@ -75,6 +75,9 @@
 - `SwipeToDelete`：左滑只揭露紅色刪除，點擊後才進確認。
 - `AppKeyboardDismissRegion`：全 App 點外部／拖曳收鍵盤並保留草稿。
 - `AppSearchField` / `showAppActionSheet` / `showAppConfirm` / `showAppAlert` / `showAppDatePicker` / `showAppTimePicker`：全平台共用 Apple HIG 產品語意。
+- `showAppDestructiveConfirm`：破壞性動作的確認,依 `TpDestructiveConfirmSource` 分流 —— 從 `TpMoreMenuButton` 選單選中的走 action sheet(HIG `pull-down-buttons`),左滑刪除、列上按鈕這類直接觸發的走 alert。破壞性確認一律經過這裡,不要自己組 `showAppConfirm`。regular size class 目前回退成 alert（真正的 popover 需要選單觸發鈕的 anchor rect，屬已知限制）。
+- `appIsRegularSizeClass`：判定 iPad／大螢幕的唯一規則。需要依 size class 分流時呼叫它,不要各自量 `MediaQuery`。
+- `showAppActionSheet` 的抬頭會截行(title 3 行、message 4 行)：抬頭常插入使用者可控的 email／標籤／停留點名稱,不截行的話最大 Dynamic Type 下會撐爆一屏並開始捲動,違反 HIG `action-sheets` 的「Avoid letting an action sheet scroll」。
 
 ## 系統權限
 

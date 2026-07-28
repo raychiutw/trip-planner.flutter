@@ -447,7 +447,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.widgetWithText(CupertinoActionSheetAction, '撤銷'),
-    ); // 對話框確認
+    ); // action sheet 確認
     await tester.pump();
 
     expect(

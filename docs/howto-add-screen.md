@@ -63,6 +63,7 @@ flutter run    # 實機/模擬器確認視覺(注意:連 prod API,用測試帳�
 |---|---|
 | 新 tab 點了沒反應 | `AppShell` 的 `NavigationBar` destinations 與 branches 是按 index 對應的 — 兩邊順序要一致 |
 | iOS 顯示 Android 樣式的確認框/搜尋列 | feature 自己建了 Material 元件 — 改用 `showAppConfirm` / `showAppActionSheet` / `AppSearchField` |
+| 從 `⋯` 選單選刪除，確認卻是原地跳出的對話框 | 破壞性確認直接呼叫了 `showAppConfirm` — 改用 `showAppDestructiveConfirm`（或 `confirmAndRunIrreversibleAction` / `confirmAndDelete`）並傳 `TpDestructiveConfirmSource.menu`；左滑、列上按鈕等非選單來源傳 `.direct` |
 | 寬螢幕內容撐滿、難以閱讀 | 畫面沒包 `AppAdaptiveContent`，依內容角色選 `AppContentWidth` |
 | 錯誤一閃就消失 | 用了 `showAppNotice` 或 SnackBar — 真錯誤改用 `showAppError`，並提供 retry |
 | 畫面一進來就被踢去 `/login` | widget test 沒 override `authStateProvider`,啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗 → 視同未登入 |

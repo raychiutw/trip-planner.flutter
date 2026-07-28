@@ -1033,8 +1033,12 @@ class _TpMenuItem<T> extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(item.icon, size: 22),
-            const SizedBox(width: 12),
+            // 選單項目本來就該有字符;省略只發生在 action sheet 專用的項目上,
+            // 那種項目不會走到這裡。
+            if (item.icon != null) ...[
+              Icon(item.icon, size: 22),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Text(
                 item.label,
