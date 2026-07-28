@@ -15,6 +15,7 @@ import '../../../models/poi_type.dart';
 import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../../ui/tp_compact_time_field.dart';
 import '../../trip_detail/trip_providers.dart';
 import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
@@ -94,12 +95,21 @@ class AddToTripScreen extends ConsumerStatefulWidget {
 
 class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   final _dismissController = AppUnsavedChangesController();
+
+  /// 起訖兩顆共用一個群組：展開其中一顆，另一顆自動收起。
+  final _timeFieldGroup = TpTimeFieldGroup();
   String? _tripId;
   int? _dayNum;
   TimeOfDay _start = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _end = const TimeOfDay(hour: 11, minute: 0);
   bool _submitting = false;
   bool _dirty = false;
+
+  @override
+  void dispose() {
+    _timeFieldGroup.dispose();
+    super.dispose();
+  }
 
   String get _title => switch (widget.args) {
     AddToTripFavorite(:final displayName) => displayName,
@@ -122,17 +132,11 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     }
   }
 
-  Future<void> _pickTime(bool isStart) async {
-    final picked = await showAppTimePicker(
-      context,
-      initialTime: isStart ? _start : _end,
-    );
-    if (picked != null) {
-      setState(() {
-        isStart ? _start = picked : _end = picked;
-        _dirty = true;
-      });
-    }
+  void _pickTime(bool isStart, TimeOfDay picked) {
+    setState(() {
+      isStart ? _start = picked : _end = picked;
+      _dirty = true;
+    });
   }
 
   Future<void> _submit(String tripId, int dayNum) async {
@@ -316,24 +320,23 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             ),
           ),
         const SizedBox(height: TpSpacing.s4),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                key: const ValueKey('add-to-trip-start'),
-                onPressed: () => _pickTime(true),
-                child: Text('開始 ${_fmt(_start)}'),
-              ),
-            ),
-            const SizedBox(width: TpSpacing.s3),
-            Expanded(
-              child: OutlinedButton(
-                key: const ValueKey('add-to-trip-end'),
-                onPressed: () => _pickTime(false),
-                child: Text('結束 ${_fmt(_end)}'),
-              ),
-            ),
-          ],
+        // compact picker 就地展開會把下方內容往下推，兩顆必須各佔一列。
+        TpCompactTimeField(
+          key: const ValueKey('add-to-trip-start-group'),
+          buttonKey: const ValueKey('add-to-trip-start'),
+          label: '開始',
+          value: _start,
+          group: _timeFieldGroup,
+          onChanged: (picked) => _pickTime(true, picked),
+        ),
+        const SizedBox(height: TpSpacing.s2),
+        TpCompactTimeField(
+          key: const ValueKey('add-to-trip-end-group'),
+          buttonKey: const ValueKey('add-to-trip-end'),
+          label: '結束',
+          value: _end,
+          group: _timeFieldGroup,
+          onChanged: (picked) => _pickTime(false, picked),
         ),
         if (!_timeValid)
           Padding(

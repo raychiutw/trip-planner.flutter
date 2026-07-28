@@ -12,6 +12,7 @@ import '../../../app/app_feedback.dart';
 import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
+import '../../../ui/tp_compact_time_field.dart';
 import '../trip_providers.dart';
 
 /// 編輯/新增停留點的模式參數。
@@ -126,6 +127,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   late final TextEditingController _lng;
   TimeOfDay? _start;
   TimeOfDay? _end;
+
+  /// 起訖兩顆共用一個群組：展開其中一顆，另一顆自動收起。
+  final _timeFieldGroup = TpTimeFieldGroup();
   String _baseDescription = '';
   String? _baseStartTime;
   String? _baseEndTime;
@@ -341,6 +345,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     _desc.dispose();
     _lat.dispose();
     _lng.dispose();
+    _timeFieldGroup.dispose();
     super.dispose();
   }
 
@@ -408,21 +413,14 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
         : args.dayNum;
   }
 
-  Future<void> _pick(bool isStart) async {
+  void _pick(bool isStart, TimeOfDay picked) {
     FocusManager.instance.primaryFocus?.unfocus();
-    final picked = await showAppTimePicker(
-      context,
-      initialTime:
-          (isStart ? _start : _end) ?? const TimeOfDay(hour: 9, minute: 0),
-    );
-    if (picked != null) {
-      if (isStart) {
-        _start = picked;
-      } else {
-        _end = picked;
-      }
-      _markTimeChanged(isStart);
+    if (isStart) {
+      _start = picked;
+    } else {
+      _end = picked;
     }
+    _markTimeChanged(isStart);
   }
 
   Future<void> _recomputeDay(int dayNum) async {
@@ -728,15 +726,11 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
               ),
               const SizedBox(height: TpSpacing.s3),
             ],
-            Wrap(
-              spacing: TpSpacing.s2,
-              runSpacing: TpSpacing.s2,
-              crossAxisAlignment: WrapCrossAlignment.start,
-              children: [
-                _timeField(true),
-                _timeField(false, errorText: timeValid ? null : '結束時間需晚於開始時間'),
-              ],
-            ),
+            // compact picker 就地展開會把下方內容往下推，兩顆必須各佔一列；
+            // 並排會讓展開的輪盤壓縮到讀不出數字。
+            _timeField(true),
+            const SizedBox(height: TpSpacing.s2),
+            _timeField(false, errorText: timeValid ? null : '結束時間需晚於開始時間'),
             const SizedBox(height: TpSpacing.s3),
             TextField(
               key: const ValueKey('entry-edit-desc'),
@@ -787,55 +781,29 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   Widget _timeField(bool isStart, {String? errorText}) {
     final t = isStart ? _start : _end;
-    final displayTime = t?.format(context) ?? '未設定';
-    return Column(
+    return TpCompactTimeField(
       key: ValueKey(
         isStart ? 'entry-edit-start-group' : 'entry-edit-end-group',
       ),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InputChip(
-          key: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
-          avatar: const Icon(CupertinoIcons.clock, size: 18),
-          label: Text('${isStart ? '開始' : '結束'} $displayTime'),
-          tooltip: '${isStart ? '開始時間' : '結束時間'} $displayTime',
-          onPressed: _submitting ? null : () => _pick(isStart),
-          deleteIcon: t == null
-              ? null
-              : Icon(
-                  CupertinoIcons.xmark_circle_fill,
-                  key: ValueKey(
-                    isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
-                  ),
-                  size: 18,
-                ),
-          onDeleted: t == null || _submitting
-              ? null
-              : () {
-                  if (isStart) {
-                    _start = null;
-                  } else {
-                    _end = null;
-                  }
-                  _markTimeChanged(isStart);
-                },
-        ),
-        if (errorText != null)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(
-              start: TpSpacing.s2,
-              top: TpSpacing.s1,
-            ),
-            child: Text(
-              errorText,
-              key: const ValueKey('entry-edit-end-error'),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 11,
-              ),
-            ),
-          ),
-      ],
+      buttonKey: ValueKey(isStart ? 'entry-edit-start' : 'entry-edit-end'),
+      clearKey: ValueKey(
+        isStart ? 'entry-edit-start-clear' : 'entry-edit-end-clear',
+      ),
+      errorKey: const ValueKey('entry-edit-end-error'),
+      label: isStart ? '開始' : '結束',
+      value: t,
+      group: _timeFieldGroup,
+      enabled: !_submitting,
+      errorText: errorText,
+      onChanged: (picked) => _pick(isStart, picked),
+      onCleared: () {
+        if (isStart) {
+          _start = null;
+        } else {
+          _end = null;
+        }
+        _markTimeChanged(isStart);
+      },
     );
   }
 }

@@ -296,6 +296,36 @@ void main() {
     expect(find.textContaining('午餐'), findsOneWidget); // conflict entry 標題
   });
 
+  testWidgets('起訖時間就地展開，兩顆不會同時展開', (tester) async {
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoDatePicker), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-start')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-to-trip-start-group')),
+        matching: find.byType(CupertinoDatePicker),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-end')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-to-trip-end-group')),
+        matching: find.byType(CupertinoDatePicker),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('trips 為空 → 送出鈕 disabled（不靜默 return）', (tester) async {
     when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(const []));
 

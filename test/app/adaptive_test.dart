@@ -119,7 +119,7 @@ void main() {
     expect(find.byType(DatePickerDialog), findsNothing);
   });
 
-  testWidgets('iOS 完成回傳 wheel 顯示的五分鐘值，取消不回寫', (tester) async {
+  testWidgets('iOS 沒滾動就完成，回傳原值不被五分鐘量化；取消不回寫', (tester) async {
     late Future<TimeOfDay?> result;
     await tester.pumpWidget(
       host(TargetPlatform.iOS, (context) {
@@ -135,10 +135,11 @@ void main() {
     final picker = tester.widget<CupertinoDatePicker>(
       find.byType(CupertinoDatePicker),
     );
+    // 輪盤位置仍要 round（minuteInterval 的 assert 要求），但沒滾動不得回寫。
     expect(picker.initialDateTime, DateTime(2000, 1, 1, 10, 5));
     await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
-    expect(await result, const TimeOfDay(hour: 10, minute: 5));
+    expect(await result, const TimeOfDay(hour: 10, minute: 7));
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
