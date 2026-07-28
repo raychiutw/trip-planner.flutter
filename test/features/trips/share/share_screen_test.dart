@@ -409,6 +409,30 @@ void main() {
     expect(expiresAt, expected);
   });
 
+  testWidgets('選單的撤銷與刪除都以 action sheet 確認', (tester) async {
+    when(() => repo.revokeShare(any(), any())).thenAnswer((_) async {});
+    when(() => repo.deleteShare(any(), any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    for (final action in const ['share-revoke-1', 'share-delete-1']) {
+      await tester.tap(find.byKey(const ValueKey('share-actions-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(action)));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoActionSheet), findsOneWidget, reason: action);
+      expect(find.byType(CupertinoAlertDialog), findsNothing, reason: action);
+      await tester.tap(
+        find.widgetWithText(CupertinoActionSheetAction, '取消').last,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    verifyNever(() => repo.revokeShare(any(), any()));
+    verifyNever(() => repo.deleteShare(any(), any()));
+  });
+
   testWidgets('撤銷 → 確認 → 呼叫 revoke', (tester) async {
     final completed = Completer<void>();
     when(
@@ -421,7 +445,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-revoke-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷')); // 對話框確認
+    await tester.tap(
+      find.widgetWithText(CupertinoActionSheetAction, '撤銷'),
+    ); // action sheet 確認
     await tester.pump();
 
     expect(
@@ -443,7 +469,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('share-delete-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteShare('t', 1)).called(1);

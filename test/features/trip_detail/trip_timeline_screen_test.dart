@@ -2202,6 +2202,62 @@ void main() {
     );
   });
 
+  testWidgets('從選單刪除景點以 action sheet 確認，左滑刪除仍是 alert', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.deleteEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pumpTimeline(tester, repo: repo);
+
+    // 選單來源：HIG pull-down-buttons 要求 action sheet，不得用 alert。
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.byType(CupertinoAlertDialog), findsNothing);
+    await tester.tap(
+      find.widgetWithText(CupertinoActionSheetAction, '取消').last,
+    );
+    await tester.pumpAndSettle();
+    verifyNever(() => repo.deleteEntry(tripId: _tripId, entryId: 11));
+
+    // 非選單來源：左滑刪除維持 alert，不順手改。
+    await tester.drag(
+      find.byKey(const ValueKey('entry-dismiss-11')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey<Object>((
+          'swipe-delete-action',
+          ValueKey('entry-dismiss-11'),
+        )),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+    expect(find.byType(CupertinoActionSheet), findsNothing);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CupertinoAlertDialog),
+        matching: find.text('刪除'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
+  });
+
   testWidgets('景點選單刪除先確認，確認前不呼叫 API', (tester) async {
     final repo = _MockTripRepository();
     final pendingDelete = Completer<void>();
@@ -2227,12 +2283,7 @@ void main() {
     expect(find.textContaining('相關交通時間將重新計算'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(CupertinoAlertDialog),
-        matching: find.text('刪除'),
-      ),
-    );
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
     await tester.pump();
     expect(find.byKey(const ValueKey('delete-progress')), findsOneWidget);
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);
@@ -2264,12 +2315,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(CupertinoAlertDialog),
-        matching: find.text('刪除'),
-      ),
-    );
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('entry-11')), findsOneWidget);
@@ -2301,12 +2347,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('entry-delete-11')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(CupertinoAlertDialog),
-        matching: find.text('刪除'),
-      ),
-    );
+    await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
     await tester.pumpAndSettle();
 
     verify(() => repo.deleteEntry(tripId: _tripId, entryId: 11)).called(1);

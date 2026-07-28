@@ -496,6 +496,8 @@ class _NotesSection extends ConsumerWidget {
   Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
     return confirmAndDelete(
       context,
+      // 筆記列只有左滑刪除這條路徑，不是選單來源，alert 仍合規。
+      source: TpDestructiveConfirmSource.direct,
       title: '刪除筆記',
       message: '「$title」中的這筆資料會永久刪除，且無法復原。',
       delete: () => ref
