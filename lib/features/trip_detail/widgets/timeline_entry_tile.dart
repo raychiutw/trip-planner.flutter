@@ -307,8 +307,8 @@ class _EntryCard extends StatelessWidget {
                   runSpacing: TpSpacing.s1,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    // 時間是純顯示：不是 chip、不是按鈕，點下去不會發生任何事。
-                    // 這個 GestureDetector 只用來吃掉點擊，避免落到卡片的展開手勢
+                    // 時間是純顯示:不是 chip、不是按鈕,點下去不會發生任何事。
+                    // 這個 GestureDetector 只用來吃掉點擊,避免落到卡片的展開手勢
                     // 上;它不進語意樹,讀螢幕看到的只有時間文字本身。
                     GestureDetector(
                       key: ValueKey('entry-time-${entry.id}'),
