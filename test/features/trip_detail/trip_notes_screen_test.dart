@@ -233,10 +233,12 @@ Future<void> _pumpAiScreen(
 /// 行前須知那條進度面板上實際顯示的字。
 String _pendingText(WidgetTester tester) => tester
     .widget<Text>(
-      find.descendant(
-        of: find.byKey(const ValueKey('notes-ai-pending-tips')),
-        matching: find.byType(Text),
-      ),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('notes-ai-pending-tips')),
+            matching: find.byType(Text),
+          )
+          .first,
     )
     .data!;
 
@@ -1484,6 +1486,34 @@ void main() {
 
     expect(find.bySemanticsLabel('AI 產生'), findsOneWidget);
     semantics.dispose();
+  });
+
+  testWidgets('生成中可以停止等待,只停這一種、不連坐另一種', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    when(() => mocks.requestsRepo.stopWaiting(any())).thenAnswer((_) async {});
+    await _pumpAiScreen(tester, mocks);
+    await _startTipsThenEmergency(tester);
+
+    expect(find.byKey(const ValueKey('notes-ai-stop-tips')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notes-ai-stop-emergency')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('notes-ai-stop-tips')));
+    await tester.pump();
+    await tester.pump();
+
+    // requestId 99 是 tips 那一條(見 _parallelAiMocks)。
+    verify(() => mocks.requestsRepo.stopWaiting(99)).called(1);
+    verifyNever(() => mocks.requestsRepo.stopWaiting(100));
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsOneWidget,
+      reason: '停一種不能連坐另一種正在跑的',
+    );
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
   });
 
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
