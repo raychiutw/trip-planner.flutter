@@ -268,7 +268,7 @@ void main() {
       expect(tapped, 1);
     });
 
-    testWidgets('時間與地圖控制不會誤觸卡片展開', (tester) async {
+    testWidgets('地圖控制不會誤觸卡片展開，時間則跟著卡片一起展開', (tester) async {
       var cardTaps = 0;
       var mapTaps = 0;
       await tester.pumpWidget(
@@ -295,10 +295,14 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const ValueKey('entry-time-13')));
       await tester.tap(find.byKey(const ValueKey('test-map-link')));
       expect(mapTaps, 1);
-      expect(cardTaps, 0);
+      expect(cardTaps, 0, reason: '地圖控制有自己的動作，不該再冒泡到卡片');
+
+      // 時間沒有自己的動作，點它等同點卡片 —— 卡片中央不留死區。
+      await tester.tap(find.byKey(const ValueKey('entry-time-13')));
+      expect(cardTaps, 1);
+      expect(mapTaps, 1);
     });
 
     testWidgets('內容卡以單一語意朗讀名稱、時間、類型與動作', (tester) async {
@@ -668,7 +672,7 @@ void main() {
       );
     });
 
-    testWidgets('點時間沒有反應，點卡片本體才展開', (tester) async {
+    testWidgets('點時間與點卡片本體一樣會展開，整張卡行為一致', (tester) async {
       await tester.pumpWidget(
         const _ExpandableTileHost(
           entry: TimelineEntry(
@@ -682,20 +686,18 @@ void main() {
         ),
       );
 
+      // 時間是純顯示（不是按鈕、沒有自己的動作），但它就長在卡片上，
+      // 點它與點卡片其他地方一樣展開 —— 不留一塊點了沒反應的死區。
       await tester.tap(find.text('09：30 - 11：00'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('展開後的細節'),
-        findsNothing,
-        reason: '時間是純顯示，點它不該發生任何事（含誤觸展開）',
-      );
+      expect(find.text('展開後的細節'), findsOneWidget, reason: '點時間應展開');
 
       await tester.tap(find.text('互動測試'));
       await tester.pumpAndSettle();
       expect(
         find.text('展開後的細節'),
-        findsOneWidget,
-        reason: '對照組：點卡片本體仍會展開，證明上面的斷言不是恆真',
+        findsNothing,
+        reason: '對照組：再點一次收合，證明上面的斷言不是恆真',
       );
     });
   });
