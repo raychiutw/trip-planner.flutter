@@ -22,7 +22,6 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_root_scaffold.dart';
-import '../../ui/tp_scope_menu.dart';
 import '../../ui/swipe_to_delete.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';

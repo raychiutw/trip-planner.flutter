@@ -7,12 +7,32 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
 import 'tp_glass_surface.dart';
-import 'tp_scope_menu.dart';
 
 /// 高度與寬度共用同一份文字樣式，避免兩套基準各自漂移。
 TextStyle? _labelStyle(BuildContext context) => Theme.of(
   context,
 ).textTheme.labelMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w700);
+
+/// [TpHorizontalSelector] 的單一選項描述。
+class TpScopeOption<T> {
+  const TpScopeOption({
+    required this.value,
+    required this.label,
+    this.semanticsLabel,
+    this.icon,
+    this.indicatorColor,
+    this.isAction = false,
+    this.key,
+  });
+
+  final T value;
+  final String label;
+  final String? semanticsLabel;
+  final IconData? icon;
+  final Color? indicatorColor;
+  final bool isAction;
+  final Key? key;
+}
 
 /// 行程／地圖頁共用的同層選擇器；跨頁動作應放在頁首工具列。
 class TpHorizontalSelector<T> extends StatefulWidget {

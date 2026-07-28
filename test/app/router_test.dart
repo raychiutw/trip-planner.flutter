@@ -35,6 +35,7 @@ import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
+import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
@@ -120,6 +121,9 @@ ProviderContainer _buildContainer({
   when(
     () => mockTripRepository.fetchNotes(any()),
   ).thenAnswer((_) async => const TripNotes());
+  when(
+    () => mockTripRepository.watchNotes(any()),
+  ).thenAnswer((_) => Stream.value(const TripNotes()));
   when(
     () => mockTripRepository.fetchHealthReport(any()),
   ).thenAnswer((_) async => null);
@@ -575,6 +579,33 @@ void main() {
 
     container.read(appRouterProvider).go('/trips');
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('已登入可進入 /trips/:tripId/notes 與 web alias', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go('/trips/trip-1/notes');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripNotesScreen), findsOneWidget);
+    expect(find.text('行程筆記'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+
+    container.read(appRouterProvider).go('/trip/trip-1/notes');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TripNotesScreen), findsOneWidget);
+    expect(find.text('行程筆記'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
   });
 
   testWidgets('已登入可進入 /trips/:tripId/health 與 web alias', (tester) async {

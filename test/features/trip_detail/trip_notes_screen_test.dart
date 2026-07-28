@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
@@ -105,22 +104,6 @@ Widget _buildScreen(
   ThemeData? theme,
   TextScaler? textScaler,
 }) {
-  final router = GoRouter(
-    routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const TripNotesScreen(tripId: 'trip-1'),
-      ),
-      GoRoute(
-        path: '/trips/:tripId',
-        builder: (context, state) => const Scaffold(body: Text('trip-page')),
-      ),
-      GoRoute(
-        path: '/trips/:tripId/map',
-        builder: (context, state) => const Scaffold(body: Text('map-page')),
-      ),
-    ],
-  );
   return ProviderScope(
     retry: (retryCount, error) => null,
     overrides: [
@@ -131,7 +114,7 @@ Widget _buildScreen(
       if (requestsRepo != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepo),
     ],
-    child: MaterialApp.router(
+    child: MaterialApp(
       theme: theme ?? AppTheme.light(),
       builder: textScaler == null
           ? null
@@ -139,7 +122,7 @@ Widget _buildScreen(
               data: MediaQuery.of(context).copyWith(textScaler: textScaler),
               child: child!,
             ),
-      routerConfig: router,
+      home: const TripNotesScreen(tripId: 'trip-1'),
     ),
   );
 }
@@ -155,8 +138,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('行程筆記'), findsOneWidget);
-    expect(find.byKey(const ValueKey('trip-section-scope')), findsOneWidget);
-    expect(find.text('筆記'), findsOneWidget);
     expect(find.text('航班'), findsOneWidget);
     expect(find.text('住宿'), findsOneWidget);
     expect(find.text('預訂'), findsOneWidget);
@@ -268,16 +249,26 @@ void main() {
     expect(attempts, 2);
   });
 
-  testWidgets('從筆記 scope 可回到行程', (tester) async {
+  testWidgets('筆記頁頂端第一個內容是航班區，不再有行程/地圖/筆記下拉', (tester) async {
     await tester.pumpWidget(_buildScreen(_sampleNotes()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('trip-section-scope')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('trip-section-itinerary')));
-    await tester.pumpAndSettle();
+    // 使用者一進頁面看到的第一個東西就是筆記內容：航班區緊貼列表頂端，
+    // 中間只隔著 ListView 自己的 16pt padding。
+    final listTop = tester
+        .getRect(find.byKey(const ValueKey('trip-notes-list')))
+        .top;
+    final flightsTop = tester
+        .getRect(find.byKey(const ValueKey('notes-section-flights')))
+        .top;
+    expect(flightsTop - listTop, closeTo(16, 0.01));
 
-    expect(find.text('trip-page'), findsOneWidget);
+    // 下拉整組消失：觸發鈕與三個選項都不在樹上。切換交由 root tab 承擔，
+    // 退出筆記頁走返回鍵。
+    expect(find.byKey(const ValueKey('trip-section-scope')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-section-itinerary')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-section-map')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-section-notes')), findsNothing);
   });
 
   testWidgets('航班預設展開顯示 row；展開住宿、預訂顯示各自欄位', (tester) async {

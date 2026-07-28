@@ -20,7 +20,6 @@ import 'notes/note_edit_sheet.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/reorderable_row.dart';
-import 'widgets/trip_section_menu.dart';
 
 /// 行程筆記：5-section accordion（航班/住宿/預訂/行前須知/緊急聯絡）。
 class TripNotesScreen extends ConsumerStatefulWidget {
@@ -88,14 +87,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TripSectionMenu(
-            section: TripSection.notes,
-            tripId: widget.tripId,
-          ),
-        ),
-        const SizedBox(height: TpSpacing.s3),
         if (_aiError != null)
           _NotesAiErrorPanel(
             message: _aiError!,
