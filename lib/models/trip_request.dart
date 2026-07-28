@@ -12,6 +12,21 @@ RequestStatus parseRequestStatus(String? s) => switch (s) {
   _ => RequestStatus.processing, // unknown 續 poll,不誤判終止
 };
 
+/// 為什麼結束 —— 後端 `raychiutw/trip-planner` 的 `docs/adr/0007-request-termination-cancel-and-reap.md` 把「結束了沒」與「為什麼結束」拆成兩個欄位。
+///
+/// `status` 維持既有四值(後端刻意不改它的 CHECK constraint,理由見該 ADR),
+/// 這個是獨立的新欄位。**讀取端必須同時看兩個欄位。**
+enum TerminalReason { cancelled, timedOut, error, needsConsent }
+
+/// 未知值一律 null —— 不誤判成任何已知原因,寧可退回通用文案。
+TerminalReason? parseTerminalReason(String? raw) => switch (raw) {
+  'cancelled' => TerminalReason.cancelled,
+  'timed_out' => TerminalReason.timedOut,
+  'error' => TerminalReason.error,
+  'needs_consent' => TerminalReason.needsConsent,
+  _ => null,
+};
+
 extension RequestStatusX on RequestStatus {
   bool get isTerminal =>
       this == RequestStatus.completed || this == RequestStatus.failed;
@@ -29,6 +44,7 @@ class TripRequest {
     this.processedBy,
     this.createdAt,
     this.updatedAt,
+    this.terminalReason,
   });
 
   final int id;
@@ -39,12 +55,33 @@ class TripRequest {
   final String? reply;
   final RequestStatus status;
 
+  /// 為什麼結束;未結束或後端沒帶就是 null。與 [status] 一起讀。
+  final TerminalReason? terminalReason;
+
   /// 送出者 email。
   final String? submittedBy;
   final String? submittedByDisplayName;
   final String? processedBy;
   final String? createdAt;
   final String? updatedAt;
+
+  /// 使用者按了停止等待但伺服器沒確認 —— 本地推進到終結態。
+  ///
+  /// 伺服器那筆還是 processing,後端的兜底機制之後會自己追上。這只影響畫面,
+  /// 不寫回任何地方。
+  TripRequest asLocallyStopped() => TripRequest(
+    id: id,
+    tripId: tripId,
+    message: message,
+    reply: reply,
+    status: RequestStatus.failed,
+    submittedBy: submittedBy,
+    submittedByDisplayName: submittedByDisplayName,
+    processedBy: processedBy,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    terminalReason: TerminalReason.cancelled,
+  );
 
   factory TripRequest.fromJson(Map<String, dynamic> json) => TripRequest(
     id: (json['id'] as num).toInt(),
@@ -57,6 +94,7 @@ class TripRequest {
     processedBy: json['processedBy'] as String?,
     createdAt: json['createdAt'] as String?,
     updatedAt: json['updatedAt'] as String?,
+    terminalReason: parseTerminalReason(json['terminalReason'] as String?),
   );
 }
 

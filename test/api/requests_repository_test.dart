@@ -148,4 +148,32 @@ void main() {
       throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
     );
   });
+
+  test('stopWaiting 打對 method/path/body —— wire 打錯是最貴的失敗模式', () async {
+    var hit = false;
+    dioAdapter.onPatch(
+      '/requests/42',
+      (server) {
+        hit = true;
+        server.reply(200, null);
+      },
+      // data matcher:body 不符就不會命中這個 handler。
+      data: {'status': 'failed', 'terminalReason': 'cancelled'},
+    );
+
+    await repo.stopWaiting(42);
+    expect(hit, isTrue, reason: 'PATCH /requests/42 加上那組 body 才算數');
+  });
+
+  test('stopWaiting 遇 4xx 丟 ApiError —— 畫面的「沒有確認」分支靠它', () async {
+    dioAdapter.onPatch(
+      '/requests/42',
+      (server) => server.reply(500, {
+        'error': {'code': 'SYS', 'message': 'boom'},
+      }),
+      data: {'status': 'failed', 'terminalReason': 'cancelled'},
+    );
+
+    await expectLater(() => repo.stopWaiting(42), throwsA(isA<ApiError>()));
+  });
 }

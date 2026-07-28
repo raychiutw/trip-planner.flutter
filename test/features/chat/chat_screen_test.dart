@@ -145,6 +145,122 @@ void main() {
     );
   }
 
+  TripRequest pendingRow() =>
+      _req(id: 42, message: '幫我看行程', status: RequestStatus.processing);
+
+  void stubPending() {
+    when(
+      () => reqRepo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: [pendingRow()], hasMore: false));
+    when(() => reqRepo.fetchRequest(42)).thenAnswer((_) async => pendingRow());
+  }
+
+  testWidgets('等待中的泡泡有「停止等待」,按下去送出取消', (tester) async {
+    stubPending();
+    when(() => reqRepo.stopWaiting(any())).thenAnswer((_) async {});
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    // 進行中泡泡有一顆永遠在轉的 spinner,pumpAndSettle 會 timeout。
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('chat-stop-waiting-42')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(() => reqRepo.stopWaiting(42)).called(1);
+
+    // 取消之後後端那筆會變終結 —— 讓輪詢自然收掉,否則 timer 留到 teardown。
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.cancelled,
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+  });
+
+  testWidgets('取消送不出去時仍換成終結態,但誠實說伺服器沒確認', (tester) async {
+    stubPending();
+    when(
+      () => reqRepo.stopWaiting(any()),
+    ).thenThrow(ApiError(status: 500, code: 'SYS', message: 'boom'));
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    // PATCH 失敗 → 後端那筆**沒有變**。stub 保持 pending 才是寫實的。
+    await tester.tap(find.byKey(const ValueKey('chat-stop-waiting-42')));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(
+      find.textContaining('伺服器沒有確認'),
+      findsOneWidget,
+      reason: '標不掉就是標不掉,不能假裝成功',
+    );
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
+
+    // 讓那筆的輪詢自然收掉,否則 timer 留到 teardown。
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.cancelled,
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+  });
+
+  testWidgets('請求從進行中走到終結後,按鈕消失、換成終結說明', (tester) async {
+    // 恆真陷阱:直接餵一個 failed row 進來的話,按鈕在任何實作下都不會被建出來
+    // —— 那條測試拿掉整個接線也會綠。這裡從**進行中**起手,真的走一次轉場。
+    stubPending();
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      find.byKey(const ValueKey('chat-stop-waiting-42')),
+      findsOneWidget,
+      reason: '起手要真的有按鈕,否則後面的 findsNothing 是恆真的',
+    );
+
+    when(() => reqRepo.fetchRequest(42)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 42,
+        tripId: 'okinawa',
+        message: '幫我看行程',
+        status: RequestStatus.failed,
+        terminalReason: TerminalReason.timedOut,
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
+    expect(find.textContaining('可以重新送出'), findsOneWidget);
+  });
+
   testWidgets('Root Glass Header 直接顯示目前行程並提供 HIG sheet', (tester) async {
     when(tripRepo.watchMyTrips).thenAnswer(
       (_) => Stream.value(const [

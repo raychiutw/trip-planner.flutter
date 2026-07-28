@@ -72,4 +72,40 @@ void main() {
       expect(event.isTerminal, isTrue);
     });
   });
+
+  group('TerminalReason（後端 ADR-0007：為什麼結束,獨立於 status）', () {
+    test('解析四個已知值', () {
+      expect(parseTerminalReason('cancelled'), TerminalReason.cancelled);
+      expect(parseTerminalReason('timed_out'), TerminalReason.timedOut);
+      expect(parseTerminalReason('error'), TerminalReason.error);
+      expect(parseTerminalReason('needs_consent'), TerminalReason.needsConsent);
+    });
+
+    test('未知值與缺漏都是 null,不得誤判成任何已知值', () {
+      expect(parseTerminalReason('brand_new_reason'), isNull);
+      expect(parseTerminalReason(null), isNull);
+      expect(parseTerminalReason(''), isNull);
+    });
+
+    test('TripRequest 解析 terminalReason;缺漏是 null', () {
+      final cancelled = TripRequest.fromJson(const {
+        'id': 1,
+        'tripId': 't',
+        'message': 'm',
+        'status': 'failed',
+        'terminalReason': 'cancelled',
+      });
+      expect(cancelled.terminalReason, TerminalReason.cancelled);
+      // status 維持既有四值,不因為新欄位而擴充。
+      expect(cancelled.status, RequestStatus.failed);
+
+      final plain = TripRequest.fromJson(const {
+        'id': 2,
+        'tripId': 't',
+        'message': 'm',
+        'status': 'completed',
+      });
+      expect(plain.terminalReason, isNull);
+    });
+  });
 }

@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
+import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
@@ -23,6 +24,7 @@ import '../trips/current_trip_provider.dart';
 import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'ai_consent_sheet.dart';
+import '../../models/trip_request.dart';
 import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
@@ -264,6 +266,10 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
   bool _sendInProgress = false;
   double _composerHeight = 0;
 
+  /// 使用者按過「停止等待」但伺服器沒確認的那幾筆。伺服器那邊還是 processing,
+  /// 靠這個把畫面推進到終結態 —— 後端的兜底機制之後會自己追上。
+  final _locallyStopped = <int>{};
+
   /// 目前是否停在最新那一端;同時決定箭頭要不要出現,以及重拉的邊緣觸發。
   bool _atLatest = true;
 
@@ -332,6 +338,26 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     if (atLatest == _atLatest) return;
     if (atLatest) unawaited(controller.refreshLatest());
     setState(() => _atLatest = atLatest);
+  }
+
+  /// 停止等待 —— **不中止 AI**(後端 `raychiutw/trip-planner` 的 `docs/adr/0007`:不追殺 worker)。
+  ///
+  /// 標不掉也照樣把畫面換成終結態(與 web 一致),但**文案不能假裝成功** ——
+  /// 伺服器沒確認就是沒確認,後端另有兜底機制會補上。
+  Future<void> _stopWaiting(int id) async {
+    var confirmed = true;
+    try {
+      await ref.read(requestsRepositoryProvider).stopWaiting(id);
+    } on Object {
+      confirmed = false;
+    }
+    if (!mounted) return;
+    // 標不掉的時候伺服器那筆**沒有變**,重抓只會拿回同一個 processing ——
+    // 所以本地先記下來,否則畫面會留在「思考中…」,使用者等於沒有出口。
+    setState(() => _locallyStopped.add(id));
+    await ref.read(chatControllerProvider(widget.tripId).notifier).reload();
+    if (!mounted || confirmed) return;
+    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
   }
 
   /// 回到最新訊息那一端(reverse list 底部 = offset 0);重拉由 [_onScroll] 接手。
@@ -430,7 +456,17 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
       AsyncData(:final value) => value,
       _ => null,
     };
-    final msgs = state.messages;
+    // 伺服器沒確認的停止,在這裡推進到終結態 —— row 本身還是 processing。
+    final msgs = _locallyStopped.isEmpty
+        ? state.messages
+        : [
+            for (final r in state.requests)
+              ...rowToMessages(
+                _locallyStopped.contains(r.id) && !r.status.isTerminal
+                    ? r.asLocallyStopped()
+                    : r,
+              ),
+          ];
     final hasBanner =
         state.authExpired || (state.error != null && msgs.isNotEmpty);
     final contentTop = hasBanner
@@ -516,6 +552,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                               tripId: widget.tripId,
                               myEmail: currentUser?.email,
                               myDisplayName: currentUser?.displayName,
+                              onStopWaiting: _stopWaiting,
                             );
                           },
                         ),
@@ -617,6 +654,7 @@ String? _emailLocalPart(String? email) {
 /// 三方氣泡:自己(accent,右)/ 協作者(indigo,左+名字)/ AI(neutral,左+名稱)。
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
+    this.onStopWaiting,
     required this.message,
     required this.tripId,
     required this.myEmail,
@@ -627,6 +665,9 @@ class _MessageBubble extends StatelessWidget {
   final String tripId;
   final String? myEmail;
   final String? myDisplayName;
+
+  /// 停止等待 —— 只在等待中的泡泡上出現。
+  final ValueChanged<int>? onStopWaiting;
 
   @override
   Widget build(BuildContext context) {
@@ -684,7 +725,7 @@ class _MessageBubble extends StatelessWidget {
     }
 
     final Widget content;
-    if (message.pendingRequestId != null) {
+    if (message.pendingRequestId case final pendingId?) {
       content = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -695,6 +736,29 @@ class _MessageBubble extends StatelessWidget {
           ),
           const SizedBox(width: TpSpacing.s2),
           Text(message.text),
+          // 次要文字鈕,陪在「思考中…」旁邊 —— 不換掉送出鍵、不進工具列。
+          // 送出鍵在等待時變成停止鍵是 Claude／ChatGPT 的慣例,但那個手勢在
+          // 那些產品裡是「中止生成」;這裡按下去**不中止 AI**,沿用會騙人。
+          // 而且本 app 的輸入框在等待期間本來就沒鎖,換掉送出鍵是倒退。
+          if (onStopWaiting != null) ...[
+            const SizedBox(width: TpSpacing.s2),
+            Semantics(
+              button: true,
+              label: '停止等待',
+              hint: '停止等待這則回覆。AI 若仍在處理，完成後的回報還是會出現，行程也可能已被更動。',
+              excludeSemantics: true,
+              child: TextButton(
+                key: ValueKey('chat-stop-waiting-$pendingId'),
+                onPressed: () => onStopWaiting!(pendingId),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, TpSpacing.tapMin),
+                  padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s2),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text('停止等待'),
+              ),
+            ),
+          ],
         ],
       );
     } else if (isAssistant && message.isMarkdown) {

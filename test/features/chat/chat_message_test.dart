@@ -86,4 +86,49 @@ void main() {
     test('U+FFFD → true', () => expect(isGarbledText('a\uFFFDb'), isTrue));
     test('C1 控制字元 → true', () => expect(isGarbledText('a\u0085b'), isTrue));
   });
+
+  group('終結原因驅動泡泡文案（ADR-0007）', () {
+    TripRequest req(TerminalReason? reason, {String? reply}) => TripRequest(
+      id: 1,
+      tripId: 't',
+      message: '問題',
+      reply: reply,
+      status: RequestStatus.failed,
+      terminalReason: reason,
+    );
+
+    test('使用者自己停的:講清楚不是中止,行程仍可能被改', () {
+      final msgs = rowToMessages(req(TerminalReason.cancelled));
+      final assistant = msgs.last;
+      expect(assistant.text, contains('已停止等待'));
+      expect(
+        assistant.text,
+        contains('行程也可能已被更動'),
+        reason: '取消不停 worker,這半句是 load-bearing 不能砍',
+      );
+      expect(assistant.text, isNot(contains('已中止')));
+    });
+
+    test('系統收屍:告訴使用者可以重送', () {
+      final msgs = rowToMessages(req(TerminalReason.timedOut));
+      expect(msgs.last.text, contains('可以重新送出'));
+    });
+
+    test('需要授權:講出問題在哪', () {
+      final msgs = rowToMessages(req(TerminalReason.needsConsent));
+      expect(msgs.last.text, contains('授權'));
+    });
+
+    test('後端有回 reply 時以 reply 為準,不用終結文案', () {
+      final msgs = rowToMessages(
+        req(TerminalReason.cancelled, reply: 'AI 遲到的回報'),
+      );
+      expect(msgs.last.text, 'AI 遲到的回報');
+    });
+
+    test('沒有終結原因就走既有的通用失敗文案', () {
+      final msgs = rowToMessages(req(null));
+      expect(msgs.last.text, 'AI 處理失敗。');
+    });
+  });
 }
