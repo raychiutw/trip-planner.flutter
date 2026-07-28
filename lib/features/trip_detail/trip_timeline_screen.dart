@@ -390,7 +390,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   bool _daySyncScheduled = false;
   int? _programmaticDayNum;
   var _programmaticScrollGeneration = 0;
-  int? _expandedEntryId;
+  final _expandedEntryIds = <int>{};
   var _reorderSubmitting = false;
   final _settingMasterEntryIds = <int>{};
   Timer? _autoScrollTimer;
@@ -419,7 +419,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     if (tripChanged) {
       _daySectionKeys = {};
       _entryKeys = {};
-      _expandedEntryId = null;
+      _expandedEntryIds.clear();
       _reorderSubmitting = false;
       _settingMasterEntryIds.clear();
       _visibleEntriesByDayId = _entriesFromDays(widget.days);
@@ -432,7 +432,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       return;
     }
     if (!oldWidget.isEditing && widget.isEditing) {
-      _expandedEntryId = null;
+      _expandedEntryIds.clear();
     }
     final entryFocusChanged = oldWidget.initialEntryId != widget.initialEntryId;
     final dayFocusChanged =
@@ -493,9 +493,10 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     setState(() => _visibleEntriesByDayId = snapshot);
   }
 
+  /// 每張卡片各自獨立展開 —— 展開一張不收合其他張。
   void _toggleExpanded(int entryId) {
     setState(() {
-      _expandedEntryId = _expandedEntryId == entryId ? null : entryId;
+      if (!_expandedEntryIds.remove(entryId)) _expandedEntryIds.add(entryId);
     });
   }
 
@@ -893,7 +894,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                     focusedEntryId: widget.initialEntryId,
                     isEditing: widget.isEditing,
                     reorderSubmitting: _reorderSubmitting,
-                    expandedEntryId: _expandedEntryId,
+                    expandedEntryIds: _expandedEntryIds,
                     settingMasterEntryIds: _settingMasterEntryIds,
                     onToggleExpanded: _toggleExpanded,
                     onStartEditing: widget.onStartEditing,
@@ -1026,7 +1027,7 @@ class _DaySection extends ConsumerWidget {
     this.focusedEntryId,
     required this.isEditing,
     required this.reorderSubmitting,
-    required this.expandedEntryId,
+    required this.expandedEntryIds,
     required this.settingMasterEntryIds,
     required this.onToggleExpanded,
     required this.onStartEditing,
@@ -1046,7 +1047,7 @@ class _DaySection extends ConsumerWidget {
   final int? focusedEntryId;
   final bool isEditing;
   final bool reorderSubmitting;
-  final int? expandedEntryId;
+  final Set<int> expandedEntryIds;
   final Set<int> settingMasterEntryIds;
   final ValueChanged<int> onToggleExpanded;
   final VoidCallback onStartEditing;
@@ -1195,7 +1196,7 @@ class _DaySection extends ConsumerWidget {
     final travelSegment = previous == null
         ? null
         : _findSegment(segments, previous.id, entry.id);
-    final expanded = !isEditing && expandedEntryId == entry.id;
+    final expanded = !isEditing && expandedEntryIds.contains(entry.id);
     final tile = TimelineEntryTile(
       entry: entry,
       number: index + 1,

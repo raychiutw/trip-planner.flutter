@@ -13,6 +13,10 @@ Future<void> pumpTile(
   TimelineEntry entry, {
   int number = 1,
   bool isFirst = false,
+  bool expanded = false,
+  VoidCallback? onTap,
+  Widget? expandedChild,
+  Widget? mapLinks,
   TextScaler textScaler = TextScaler.noScaling,
 }) {
   return tester.pumpWidget(
@@ -25,6 +29,10 @@ Future<void> pumpTile(
             entry: entry,
             number: number,
             isFirst: isFirst,
+            expanded: expanded,
+            onTap: onTap,
+            expandedChild: expandedChild,
+            mapLinks: mapLinks,
           ),
         ),
       ),
@@ -39,7 +47,228 @@ Color dotColor(WidgetTester tester, int entryId) {
   return (container.decoration! as BoxDecoration).color!;
 }
 
+/// 七個欄位(行程描述、地點描述、行程備註、地點備註、價格、營業時間、訂位)全滿的停留點。
+const _sevenFieldEntry = TimelineEntry(
+  id: 60,
+  sortOrder: 0,
+  version: 1,
+  startTime: '09:30',
+  endTime: '11:00',
+  title: '美麗海水族館',
+  description: '黑潮之海旁集合',
+  note: '行程備註：帶泳具',
+  master: EntryPoiInfo(
+    poiId: 601,
+    name: '沖縄美ら海水族館',
+    type: 'attraction',
+    category: '景點',
+    description: '世界最大級水槽',
+    note: '3-37 Toyosaki, Tomigusuku, Okinawa 901-0225日本',
+    price: '成人 2180 日圓',
+    hours: '08:30–18:30',
+    reservation: '線上預約可享折扣',
+  ),
+);
+
+const _sevenFieldTexts = [
+  '黑潮之海旁集合',
+  '備註：行程備註：帶泳具',
+  '世界最大級水槽',
+  '備註：3-37 Toyosaki, Tomigusuku, Okinawa 901-0225日本',
+  '成人 2180 日圓',
+  '08:30–18:30',
+  '線上預約可享折扣',
+];
+
 void main() {
+  group('TimelineEntryTile 收合與展開', () {
+    testWidgets('收合時七個欄位一個都畫不出來，標題/時間/分類/地圖按鈕仍在', (tester) async {
+      await pumpTile(
+        tester,
+        _sevenFieldEntry,
+        onTap: () {},
+        mapLinks: TextButton(
+          key: const ValueKey('test-map-link'),
+          onPressed: () {},
+          child: const Text('Google 地圖'),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('entry-details-60')), findsNothing);
+      for (final text in _sevenFieldTexts) {
+        expect(
+          find.textContaining(text, findRichText: true),
+          findsNothing,
+          reason: '收合狀態不得畫出「$text」',
+        );
+      }
+
+      expect(find.text('美麗海水族館'), findsOneWidget);
+      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.text('景點'), findsOneWidget);
+      expect(find.byKey(const ValueKey('test-map-link')), findsOneWidget);
+    });
+
+    testWidgets('長備註不再撐高收合的卡片 —— 與沒有備註時同高', (tester) async {
+      await pumpTile(tester, _sevenFieldEntry, onTap: () {});
+      final withDetails = tester.getSize(
+        find.byKey(const ValueKey('entry-card-60')),
+      );
+
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 60,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '美麗海水族館',
+          master: EntryPoiInfo(
+            poiId: 601,
+            name: '沖縄美ら海水族館',
+            type: 'attraction',
+            category: '景點',
+          ),
+        ),
+        onTap: () {},
+      );
+      final withoutDetails = tester.getSize(
+        find.byKey(const ValueKey('entry-card-60')),
+      );
+
+      expect(withDetails.height, withoutDetails.height);
+    });
+
+    testWidgets('展開後七個欄位可見，且與備選景點同在卡片下方的展開區', (tester) async {
+      await pumpTile(
+        tester,
+        _sevenFieldEntry,
+        expanded: true,
+        onTap: () {},
+        expandedChild: Container(
+          key: const ValueKey('test-alternates'),
+          height: 40,
+          color: const Color(0xFF00FF00),
+        ),
+      );
+
+      for (final text in _sevenFieldTexts) {
+        expect(
+          find.textContaining(text, findRichText: true),
+          findsOneWidget,
+          reason: '展開後必須看得到「$text」',
+        );
+      }
+
+      final card = tester.getRect(find.byKey(const ValueKey('entry-card-60')));
+      final details = tester.getRect(
+        find.byKey(const ValueKey('entry-details-60')),
+      );
+      final alternates = tester.getRect(
+        find.byKey(const ValueKey('test-alternates')),
+      );
+      expect(
+        details.top,
+        greaterThanOrEqualTo(card.bottom),
+        reason: '欄位要落在收合卡片之外的展開區',
+      );
+      expect(
+        alternates.top,
+        greaterThanOrEqualTo(details.bottom),
+        reason: '欄位與備選景點同一個展開區，欄位在上',
+      );
+      expect(alternates.left, closeTo(card.left, 0.1), reason: '展開區與收合卡片左緣切齊');
+      expect(details.left, greaterThanOrEqualTo(alternates.left));
+    });
+
+    testWidgets('七個欄位與備選景點皆空 → 沒有可點但展不開的空殼', (tester) async {
+      var taps = 0;
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 61,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          title: '沒有任何細節的停留點',
+        ),
+        onTap: () => taps++,
+      );
+
+      final semantics = tester.ensureSemantics();
+      await tester.tap(find.text('沒有任何細節的停留點'));
+      await tester.pumpAndSettle();
+      expect(taps, 0, reason: '沒東西可展開就不該吃點擊');
+
+      final node = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-61')),
+      );
+      expect(node.getSemanticsData().flagsCollection.isButton, isFalse);
+      expect(node.getSemanticsData().hint, isEmpty);
+      expect(
+        node.getSemanticsData().flagsCollection.isExpanded,
+        Tristate.none,
+        reason: '不該對讀螢幕宣告可展開',
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('只有備選景點、七個欄位全空時仍可展開', (tester) async {
+      var taps = 0;
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 62,
+          sortOrder: 0,
+          version: 1,
+          title: '只有備選的停留點',
+          alternates: [EntryPoiInfo(poiId: 620, name: '備選景點')],
+        ),
+        onTap: () => taps++,
+      );
+
+      await tester.tap(find.text('只有備選的停留點'));
+      expect(taps, 1);
+    });
+
+    testWidgets('無障礙提示描述整個展開區，不再只提備選景點', (tester) async {
+      final semantics = tester.ensureSemantics();
+
+      await pumpTile(tester, _sevenFieldEntry, onTap: () {});
+      var node = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-60')),
+      );
+      expect(node.getSemanticsData().hint, '點兩下展開停留點細節');
+
+      await pumpTile(tester, _sevenFieldEntry, expanded: true, onTap: () {});
+      node = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-60')),
+      );
+      expect(node.getSemanticsData().hint, '點兩下收合停留點細節');
+      semantics.dispose();
+    });
+
+    testWidgets('放大字級時收合的卡片仍排得下標題與時間', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await pumpTile(
+        tester,
+        _sevenFieldEntry,
+        onTap: () {},
+        textScaler: const TextScaler.linear(2),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('美麗海水族館'), findsOneWidget);
+      expect(find.text('09：30 - 11：00'), findsOneWidget);
+      expect(find.byKey(const ValueKey('entry-details-60')), findsNothing);
+    });
+  });
+
   group('TimelineEntryTile', () {
     testWidgets('顯示時間、標題、master meta（名稱/分類/評分)', (tester) async {
       await pumpTile(
@@ -64,10 +293,10 @@ void main() {
       expect(find.text('美麗海水族館'), findsOneWidget);
       expect(find.text('景點'), findsOneWidget);
       expect(find.text('4.6'), findsOneWidget);
-      expect(find.text('世界最大級水槽'), findsOneWidget);
+      expect(find.text('世界最大級水槽'), findsNothing, reason: '描述已收進展開區');
     });
 
-    testWidgets('完整顯示多行備註，不截斷或改成刪節號', (tester) async {
+    testWidgets('展開後完整顯示多行備註，不截斷或改成刪節號', (tester) async {
       const note = '第一行：集合地點\n第二行：取票方式\n第三行：預約代碼\n第四行：飲食需求\n第五行：其他提醒';
       await pumpTile(
         tester,
@@ -78,6 +307,8 @@ void main() {
           title: '首里城',
           description: note,
         ),
+        expanded: true,
+        onTap: () {},
       );
 
       final details = tester.widget<Text>(
@@ -99,6 +330,8 @@ void main() {
           description: '使用者行程備註',
           note: '地點資料備註',
         ),
+        expanded: true,
+        onTap: () {},
       );
 
       final details = tester.widget<Text>(
@@ -256,6 +489,7 @@ void main() {
                 sortOrder: 0,
                 version: 1,
                 title: '首里城',
+                description: '正殿復原工程中',
               ),
               number: 1,
               onTap: () => tapped++,
@@ -282,6 +516,7 @@ void main() {
                 version: 1,
                 startTime: '09:30',
                 title: '互動測試',
+                description: '有細節，所以卡片可展開',
               ),
               number: 1,
               onTap: () => cardTaps++,
@@ -316,6 +551,7 @@ void main() {
                 version: 1,
                 startTime: '09:30',
                 title: '首里城',
+                description: '正殿復原工程中',
                 master: EntryPoiInfo(poiId: 2, type: 'attraction'),
               ),
               number: 1,
@@ -327,7 +563,7 @@ void main() {
 
       expect(find.bySemanticsLabel('首里城，09：30，景點'), findsOneWidget);
       final node = tester.getSemantics(find.bySemanticsLabel('首里城，09：30，景點'));
-      expect(node.getSemanticsData().hint, '點兩下展開備選景點');
+      expect(node.getSemanticsData().hint, '點兩下展開停留點細節');
       expect(node.getSemanticsData().flagsCollection.isButton, isTrue);
       expect(
         node.getSemanticsData().flagsCollection.isExpanded,
@@ -466,8 +702,7 @@ void main() {
             id: 46,
             sortOrder: 0,
             version: 1,
-            title: '第一個會因內容增高的停留點',
-            description: '使用較多內容讓卡片高度不再等於固定的圓點位置。',
+            title: '第一個會因為標題折成兩行而長高的停留點，標題本身就夠長了',
           ),
           isFirst: true,
         );
