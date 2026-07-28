@@ -1903,6 +1903,73 @@ void main() {
     expect(find.text('entry-edit-11'), findsNothing);
   });
 
+  testWidgets('長按停留點卡片叫出的是 ⋯ 那一份選單', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.longPress(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+    for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    // 長按只叫選單，不順手把卡片展開。
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+
+    // 同一份選單也走同一組動作：編輯開的是短任務表單 sheet。
+    await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯停留點'), findsOneWidget);
+  });
+
+  testWidgets('長按與 ⋯ 的選單面板落在同一個位置', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    final byMoreButton = tester.getRect(
+      find.byKey(const ValueKey('tp-menu-panel')),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+
+    await tester.longPress(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getRect(find.byKey(const ValueKey('tp-menu-panel'))),
+      byMoreButton,
+    );
+  });
+
+  testWidgets('排序編輯模式下長按停留點卡片不叫選單', (tester) async {
+    await _pumpTimeline(tester);
+    await _enableTimelineEditing(tester);
+
+    await tester.longPress(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    expect(find.text('編輯景點'), findsNothing);
+    expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
+  });
+
+  testWidgets('長按之後點卡片仍然展開備選景點', (tester) async {
+    await _pumpTimeline(tester);
+
+    await tester.longPress(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('美麗海水族館'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entry-alternates-11')), findsOneWidget);
+  });
+
   testWidgets('只有一天時移動與複製停用並說明原因', (tester) async {
     final semantics = tester.ensureSemantics();
     await _pumpTimeline(tester, fetchDays: () => [_fakeDays.first]);

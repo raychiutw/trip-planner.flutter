@@ -1,12 +1,16 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderBox, RenderParagraph;
+import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/models/entry.dart';
 import 'package:tripline/features/trip_detail/widgets/timeline_entry_tile.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
+import 'package:tripline/ui/tp_action_item.dart';
+import 'package:tripline/ui/tp_app_bar.dart';
 
 Future<void> pumpTile(
   WidgetTester tester,
@@ -38,6 +42,67 @@ Future<void> pumpTile(
       ),
     ),
   );
+}
+
+/// 依時間軸畫面的接法組裝停留點卡片：`⋯` 與長按共用同一顆 [MenuController]，
+/// 點卡片則切換展開區塊。
+class _MenuTileHost extends StatefulWidget {
+  const _MenuTileHost({this.longPressEnabled = true});
+
+  /// 排序編輯模式下畫面不會給長按入口，以 false 模擬。
+  final bool longPressEnabled;
+
+  @override
+  State<_MenuTileHost> createState() => _MenuTileHostState();
+}
+
+class _MenuTileHostState extends State<_MenuTileHost> {
+  final MenuController _menuController = MenuController();
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TimelineEntryTile(
+      entry: const TimelineEntry(
+        id: 60,
+        sortOrder: 0,
+        version: 1,
+        title: '首里城',
+      ),
+      number: 1,
+      expanded: _expanded,
+      onTap: () => setState(() => _expanded = !_expanded),
+      onLongPress: widget.longPressEnabled ? _menuController.open : null,
+      expandedChild: _expanded ? const Text('展開區塊') : null,
+      trailing: TpMoreMenuButton<int>(
+        key: const ValueKey('entry-more-60'),
+        controller: _menuController,
+        tooltip: '景點操作',
+        items: const [
+          TpActionItem(value: 0, label: '編輯景點', icon: CupertinoIcons.pencil),
+          TpActionItem(value: 1, label: '刪除景點', icon: CupertinoIcons.delete),
+        ],
+        onSelected: (_) {},
+      ),
+    );
+  }
+}
+
+Future<void> pumpMenuTile(
+  WidgetTester tester, {
+  bool longPressEnabled = true,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(body: _MenuTileHost(longPressEnabled: longPressEnabled)),
+    ),
+  );
+}
+
+Future<void> dismissMenu(WidgetTester tester) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+  await tester.pumpAndSettle();
 }
 
 Color dotColor(WidgetTester tester, int entryId) {
@@ -501,9 +566,8 @@ void main() {
       expect(tapped, 1);
     });
 
-    testWidgets('時間與地圖控制不會誤觸卡片展開', (tester) async {
+    testWidgets('地圖控制不會誤觸卡片展開，時間則跟著卡片一起展開', (tester) async {
       var cardTaps = 0;
-      var timeTaps = 0;
       var mapTaps = 0;
       await tester.pumpWidget(
         MaterialApp(
@@ -520,7 +584,6 @@ void main() {
               ),
               number: 1,
               onTap: () => cardTaps++,
-              onEditTime: () => timeTaps++,
               mapLinks: TextButton(
                 key: const ValueKey('test-map-link'),
                 onPressed: () => mapTaps++,
@@ -531,11 +594,14 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const ValueKey('entry-time-13')));
       await tester.tap(find.byKey(const ValueKey('test-map-link')));
-      expect(timeTaps, 1);
       expect(mapTaps, 1);
-      expect(cardTaps, 0);
+      expect(cardTaps, 0, reason: '地圖控制有自己的動作，不該再冒泡到卡片');
+
+      // 時間沒有自己的動作，點它等同點卡片 —— 卡片中央不留死區。
+      await tester.tap(find.byKey(const ValueKey('entry-time-13')));
+      expect(cardTaps, 1);
+      expect(mapTaps, 1);
     });
 
     testWidgets('內容卡以單一語意朗讀名稱、時間、類型與動作', (tester) async {
@@ -818,12 +884,9 @@ void main() {
       final timeText = tester.widget<Text>(timeFinder);
       expect(timeText.maxLines, 1);
       expect(timeText.softWrap, isFalse);
-      final timeChip = tester.widget<ActionChip>(
-        find.byKey(const ValueKey('entry-time-48')),
-      );
       expect(
-        timeChip.avatar,
-        isNull,
+        find.byIcon(CupertinoIcons.clock),
+        findsNothing,
         reason: '大字級時移除裝飾性圖示，把寬度留給完整時間與 Dynamic Type',
       );
 
@@ -832,19 +895,234 @@ void main() {
       expect(
         paragraph.size.width,
         greaterThanOrEqualTo(naturalSize.width - 0.1),
-        reason: '完整起訖時間不得被 ActionChip 的 fade overflow 裁掉',
+        reason: '完整起訖時間不得被截斷或改成刪節號',
       );
-      final timeBox = tester.renderObject<RenderBox>(timeFinder);
-      final paintedStart = timeBox.localToGlobal(Offset.zero);
-      final paintedEnd = timeBox.localToGlobal(Offset(timeBox.size.width, 0));
-      final chipWidth = tester
-          .getSize(find.byKey(const ValueKey('entry-time-48')))
-          .width;
+      final cardRect = tester.getRect(
+        find.byKey(const ValueKey('entry-card-48')),
+      );
+      final paintedTime = tester.getRect(timeFinder);
       expect(
-        paintedEnd.dx - paintedStart.dx,
-        lessThan(chipWidth),
-        reason: '定版要求不折行；實際繪製後的完整時間必須落在 chip 內',
+        paintedTime.left,
+        greaterThanOrEqualTo(cardRect.left),
+        reason: '定版要求不折行；實際繪製後的完整時間必須落在卡片內',
+      );
+      expect(
+        paintedTime.right,
+        lessThanOrEqualTo(cardRect.right),
+        reason: '定版要求不折行；實際繪製後的完整時間必須落在卡片內',
       );
     });
+
+    testWidgets('時間在語意上不是按鈕，也沒有點擊動作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 60,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '純顯示時間',
+        ),
+      );
+
+      final node = tester.getSemantics(find.text('09：30 - 11：00'));
+      final data = node.getSemanticsData();
+      expect(
+        data.flagsCollection.isButton,
+        isFalse,
+        reason: '時間是純顯示，讀螢幕不該把它念成按鈕',
+      );
+      expect(
+        data.hasAction(SemanticsAction.tap),
+        isFalse,
+        reason: '時間不該提供「點兩下以啟動」的動作',
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('時間貼合文字高度，不再撐出 chip 的最小點擊區', (tester) async {
+      await pumpTile(
+        tester,
+        const TimelineEntry(
+          id: 61,
+          sortOrder: 0,
+          version: 1,
+          startTime: '09:30',
+          endTime: '11:00',
+          title: '純顯示時間',
+        ),
+      );
+
+      expect(
+        find.byType(ActionChip),
+        findsNothing,
+        reason: '時間不得再做成 ActionChip',
+      );
+      final timeBox = tester.getRect(
+        find.byKey(const ValueKey('entry-time-61')),
+      );
+      final timeText = tester.getRect(find.text('09：30 - 11：00'));
+      expect(
+        timeBox.height,
+        closeTo(timeText.height, 1),
+        reason: '純顯示的時間只佔文字高度，不再帶按鈕的內距與最小點擊區',
+      );
+    });
+
+    testWidgets('點時間與點卡片本體一樣會展開，整張卡行為一致', (tester) async {
+      await tester.pumpWidget(
+        const _ExpandableTileHost(
+          entry: TimelineEntry(
+            id: 62,
+            sortOrder: 0,
+            version: 1,
+            startTime: '09:30',
+            endTime: '11:00',
+            title: '互動測試',
+          ),
+        ),
+      );
+
+      // 時間是純顯示（不是按鈕、沒有自己的動作），但它就長在卡片上，
+      // 點它與點卡片其他地方一樣展開 —— 不留一塊點了沒反應的死區。
+      await tester.tap(find.text('09：30 - 11：00'));
+      await tester.pumpAndSettle();
+      expect(find.text('展開後的細節'), findsOneWidget, reason: '點時間應展開');
+
+      await tester.tap(find.text('互動測試'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('展開後的細節'),
+        findsNothing,
+        reason: '對照組：再點一次收合，證明上面的斷言不是恆真',
+      );
+    });
+
+    testWidgets('長按內容卡叫出動作選單', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('編輯景點'), findsOneWidget);
+      expect(find.text('刪除景點'), findsOneWidget);
+    });
+
+    testWidgets('長按與 ⋯ 叫出同一份選單：同樣的項目、同樣的位置', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.tap(find.byKey(const ValueKey('entry-more-60')));
+      await tester.pumpAndSettle();
+      final byMoreButton = tester.getRect(
+        find.byKey(const ValueKey('tp-menu-panel')),
+      );
+      final labelsByMoreButton = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('tp-menu-panel')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data)
+          .toList();
+      await dismissMenu(tester);
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+      final byLongPress = tester.getRect(
+        find.byKey(const ValueKey('tp-menu-panel')),
+      );
+      final labelsByLongPress = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('tp-menu-panel')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((text) => text.data)
+          .toList();
+
+      expect(labelsByLongPress, labelsByMoreButton);
+      expect(byLongPress, byMoreButton, reason: '同一份選單面板，位置也該一致');
+    });
+
+    testWidgets('長按不觸發卡片展開，收起選單後點卡片仍會展開', (tester) async {
+      await pumpMenuTile(tester);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+      expect(find.text('展開區塊'), findsNothing);
+
+      await dismissMenu(tester);
+      await tester.tap(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('展開區塊'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    });
+
+    testWidgets('沒有長按入口時（排序編輯模式）長按不叫選單', (tester) async {
+      await pumpMenuTile(tester, longPressEnabled: false);
+
+      await tester.longPress(find.text('首里城'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+      expect(find.text('刪除景點'), findsNothing);
+    });
+
+    testWidgets('讀螢幕使用者可用長按語意動作叫出同一份選單', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpMenuTile(tester);
+
+      final node = tester.getSemantics(
+        find.byKey(const ValueKey('timeline-entry-content-60')),
+      );
+      expect(
+        node.getSemanticsData().hasAction(SemanticsAction.longPress),
+        isTrue,
+      );
+
+      node.owner!.performAction(node.id, SemanticsAction.longPress);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('刪除景點'), findsOneWidget);
+      semantics.dispose();
+    });
   });
+}
+
+/// 讓 `expanded` 真的隨點擊變動的宿主，測「點下去畫面有沒有變」而非 callback。
+class _ExpandableTileHost extends StatefulWidget {
+  const _ExpandableTileHost({required this.entry});
+
+  final TimelineEntry entry;
+
+  @override
+  State<_ExpandableTileHost> createState() => _ExpandableTileHostState();
+}
+
+class _ExpandableTileHostState extends State<_ExpandableTileHost> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      theme: AppTheme.light(),
+      home: Scaffold(
+        body: TimelineEntryTile(
+          entry: widget.entry,
+          number: 1,
+          expanded: _expanded,
+          onTap: () => setState(() => _expanded = !_expanded),
+          expandedChild: _expanded ? const Text('展開後的細節') : null,
+        ),
+      ),
+    );
+  }
 }
