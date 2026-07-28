@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,23 +99,34 @@ Rect _labelRect(WidgetTester tester, int index) {
 Rect _activeIconRect(WidgetTester tester, int index) =>
     tester.getRect(find.byKey(ValueKey('root-tab-active-${_labels[index]}')));
 
-/// 靜止態的選取膠囊 —— 直接量它畫出來的 `ShapeDecoration` 方框,不看參數。
-Rect _pillRect(WidgetTester tester) {
+/// 第 [index] 個 tab 的靜止態選取膠囊 —— 直接量它畫出來的方框,不看參數。
+Rect _pillRect(WidgetTester tester, int index) =>
+    tester.getRect(find.byKey(ValueKey('root-tab-pill-${_labels[index]}')));
+
+/// 玻璃列裡每一個膠囊形 `ShapeDecoration` 實際畫出來的方框與填色。
+///
+/// 0.23.0 把靜止態 indicator 的形狀從 `LiquidRoundedSuperellipse` 換成
+/// `LiquidRoundedRectangle`(#178 升級時發現)。兩種都收 —— 這裡量的是膠囊的
+/// 實際方框,不是它用哪個 shape 類別。
+List<(Rect, Color)> _paintedPills(WidgetTester tester) {
   final finder = find.descendant(
     of: _tabBar,
     matching: find.byWidgetPredicate((widget) {
       if (widget is! DecoratedBox) return false;
       final decoration = widget.decoration;
-      // 0.23.0 把靜止態 indicator 的形狀從 `LiquidRoundedSuperellipse` 換成
-      // `LiquidRoundedRectangle`(#178 升級時發現)。兩種都收 —— 這條測試量的
-      // 是膠囊的實際方框,不是它用哪個 shape 類別。
       return decoration is ShapeDecoration &&
           decoration.color != null &&
           (decoration.shape is LiquidRoundedSuperellipse ||
               decoration.shape is LiquidRoundedRectangle);
     }),
   );
-  return tester.getRect(finder);
+  return [
+    for (final element in finder.evaluate())
+      (
+        tester.getRect(find.byWidget(element.widget)),
+        ((element.widget as DecoratedBox).decoration as ShapeDecoration).color!,
+      ),
+  ];
 }
 
 void _expectAligned(
@@ -177,7 +190,7 @@ void main() {
       await _pumpShell(tester);
       final bar = _barRect(tester);
       final columnWidth = bar.width / _labels.length;
-      final pill = _pillRect(tester);
+      final pill = _pillRect(tester, 0);
 
       expect(
         pill.center.dx,
@@ -187,6 +200,96 @@ void main() {
       // #160:膠囊不得寬於自己的欄位,否則會壓到左右鄰居。
       expect(pill.width, lessThanOrEqualTo(columnWidth));
       expect(pill.width, greaterThan(columnWidth * 0.6));
+    });
+
+    // #179:PR #164 宣稱把膠囊收到約欄寬 70%,實際上只有拖曳中生效 —— 套件的
+    // `AnimatedGlassIndicator` 靜止時走 `RelativeRect.fill`,實測 390pt 螢幕下
+    // 膠囊 87.5pt / 欄寬 89.5pt = 98%。以下三條全部量**畫出來的方框**。
+    testWidgets('靜止態膠囊約佔欄寬 70%', (tester) async {
+      await _pumpShell(tester);
+      final columnWidth = _barRect(tester).width / _labels.length;
+
+      for (var index = 0; index < _labels.length; index++) {
+        if (index > 0) {
+          await tester.tapAt(_iconRect(tester, index).center);
+          await tester.pumpAndSettle();
+        }
+        final pill = _pillRect(tester, index);
+        expect(
+          pill.width / columnWidth,
+          closeTo(0.70, 0.03),
+          reason: '第 $index 個 tab:膠囊實際寬度 ${pill.width} / 欄寬 $columnWidth',
+        );
+      }
+    });
+
+    testWidgets('靜止態膠囊與玻璃列上下同心', (tester) async {
+      for (final scale in [1.0, 2.0]) {
+        await _pumpShell(tester, textScale: scale);
+        final bar = _barRect(tester);
+        final pill = _pillRect(tester, 0);
+        // 膠囊畫在字符底下,而字符只是「字符 + 標籤」那一疊的上半;算錯垂直
+        // 位移,膠囊就會整顆偏上。
+        expect(
+          pill.center.dy,
+          closeTo(bar.center.dy, _tolerance),
+          reason: '字級 $scale:膠囊沒有與玻璃列同心',
+        );
+        expect(pill.height, lessThan(bar.height), reason: '字級 $scale:膠囊高過玻璃列');
+      }
+    });
+
+    testWidgets('自畫膠囊完整落在套件選取層的裁切範圍內', (tester) async {
+      await _pumpShell(tester);
+      // 套件把選取層裁成「欄位內縮 4pt」的膠囊(`JellyClipper`)。自畫的膠囊
+      // 只要有一角落在外面就會被切掉 —— 而 `getRect` 量不出「被切掉」這件事,
+      // 所以這裡直接拿**畫面上那個 clipper 實例**算出裁切路徑來驗。
+      final clipFinder = find.descendant(
+        of: _tabBar,
+        matching: find.byWidgetPredicate((widget) {
+          final clipper = widget is ClipPath ? widget.clipper : null;
+          return clipper is JellyClipper && !clipper.inverse;
+        }),
+      );
+      expect(clipFinder, findsOneWidget);
+      final clipBox = tester.getRect(clipFinder);
+      final clipper =
+          tester.widget<ClipPath>(clipFinder).clipper! as JellyClipper;
+      final clip = clipper.getClip(clipBox.size);
+
+      final pill = _pillRect(tester, 0).translate(-clipBox.left, -clipBox.top);
+      final radius = pill.height / 2;
+      // 沿膠囊輪廓取樣一圈:兩端的圓弧最容易被裁掉。
+      for (var step = 0; step < 72; step++) {
+        final angle = step * math.pi / 36;
+        final capCentre = math.cos(angle) >= 0
+            ? pill.right - radius
+            : pill.left + radius;
+        final point = Offset(
+          capCentre + radius * math.cos(angle),
+          pill.center.dy + radius * math.sin(angle),
+        );
+        expect(
+          clip.contains(point),
+          isTrue,
+          reason: '膠囊輪廓上的 $point 落在裁切範圍外,會被切角',
+        );
+      }
+    });
+
+    testWidgets('沒有第二顆整格寬的膠囊被畫出來', (tester) async {
+      await _pumpShell(tester);
+      final columnWidth = _barRect(tester).width / _labels.length;
+
+      for (final (rect, color) in _paintedPills(tester)) {
+        if (color.a == 0) continue;
+        // 套件自己那顆靜止態指示器必須是透明的,否則整格寬的底又回來了。
+        expect(
+          rect.width,
+          lessThan(columnWidth * 0.9),
+          reason: '有一顆 alpha ${color.a} 的膠囊寬 ${rect.width},欄寬 $columnWidth',
+        );
+      }
     });
   });
 

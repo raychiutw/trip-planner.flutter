@@ -58,6 +58,21 @@ const _states = [
   _HigState(brightness: Brightness.dark, reduceTransparency: true),
 ];
 
+/// 靜止態 root tab 選取膠囊**實際畫出來**的填色。
+///
+/// #179:不要改回讀 `GlassTabBar.indicatorColor` —— 那個參數現在恆為透明,
+/// 靜止態的膠囊是 `AppleRootTabBar` 自畫的。四顆膠囊同色,取畫得出來的第一顆。
+Color _selectedPillColor(WidgetTester tester) {
+  final finder = find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    return widget is DecoratedBox &&
+        key is ValueKey<String> &&
+        key.value.startsWith('root-tab-pill-');
+  });
+  final box = tester.widget<DecoratedBox>(finder.first);
+  return (box.decoration as ShapeDecoration).color!;
+}
+
 void main() {
   for (final state in _states) {
     testWidgets('${state.name} keeps shared HIG geometry and behavior', (
@@ -211,9 +226,8 @@ void main() {
       );
 
       if (expectsOpaqueGlass) {
-        final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
-          tabBar.indicatorColor,
+          _selectedPillColor(tester),
           scheme.surfaceContainerHigh.withValues(alpha: 1),
           reason: '無障礙 fallback 仍收斂為中性不透明，避免大面積品牌色',
         );
@@ -227,12 +241,12 @@ void main() {
         // 選取指示一律「中性底 + tint 前景」。iOS 26 電話 app 實測:選取膠囊
         // 是 #363636 中性灰(比容器亮約 20 階),系統藍在字符與標籤上 ——
         // 強調色在前景,不在背景(ADR-0004 取代 ADR-0003)。
-        final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
-          rgb(tabBar.indicatorColor!),
+          rgb(_selectedPillColor(tester)),
           isNot(rgb(scheme.primary)),
           reason: '品牌柔褐不得鋪成 root tab 選取膠囊的背景',
         );
+        final tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
         expect(
           tabBar.selectedIconColor,
           scheme.primary,
@@ -250,11 +264,14 @@ void main() {
       );
 
       // 未選取態也是實心字符：兩態同字符、靠 tint 區分，不做 outline↔filled 切換。
-      final rootTabs = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
-      for (final tab in rootTabs.tabs) {
+      // 量**畫出來的字符**：選取態的字符包在自畫膠囊外層裡（#179），轉型看不到。
+      for (final label in const ['聊天', '行程', '地圖', '收藏']) {
+        final active = find.byKey(ValueKey('root-tab-active-$label'));
+        // 選取層只畫選取態附近的 tab，畫出來的才驗。
+        if (active.evaluate().isEmpty) continue;
         expect(
-          (tab.activeIcon! as Icon).icon,
-          (tab.icon! as Icon).icon,
+          tester.widget<Icon>(active).icon,
+          tester.widget<Icon>(find.byKey(ValueKey('root-tab-$label'))).icon,
           reason: 'root tab 的選取態與未選取態必須是同一個字符',
         );
       }
