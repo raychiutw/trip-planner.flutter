@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -234,6 +236,44 @@ void main() {
           reason: '字級 $scale:膠囊沒有與玻璃列同心',
         );
         expect(pill.height, lessThan(bar.height), reason: '字級 $scale:膠囊高過玻璃列');
+      }
+    });
+
+    testWidgets('自畫膠囊完整落在套件選取層的裁切範圍內', (tester) async {
+      await _pumpShell(tester);
+      // 套件把選取層裁成「欄位內縮 4pt」的膠囊(`JellyClipper`)。自畫的膠囊
+      // 只要有一角落在外面就會被切掉 —— 而 `getRect` 量不出「被切掉」這件事,
+      // 所以這裡直接拿**畫面上那個 clipper 實例**算出裁切路徑來驗。
+      final clipFinder = find.descendant(
+        of: _tabBar,
+        matching: find.byWidgetPredicate((widget) {
+          final clipper = widget is ClipPath ? widget.clipper : null;
+          return clipper is JellyClipper && !clipper.inverse;
+        }),
+      );
+      expect(clipFinder, findsOneWidget);
+      final clipBox = tester.getRect(clipFinder);
+      final clipper =
+          tester.widget<ClipPath>(clipFinder).clipper! as JellyClipper;
+      final clip = clipper.getClip(clipBox.size);
+
+      final pill = _pillRect(tester, 0).translate(-clipBox.left, -clipBox.top);
+      final radius = pill.height / 2;
+      // 沿膠囊輪廓取樣一圈:兩端的圓弧最容易被裁掉。
+      for (var step = 0; step < 72; step++) {
+        final angle = step * math.pi / 36;
+        final capCentre = math.cos(angle) >= 0
+            ? pill.right - radius
+            : pill.left + radius;
+        final point = Offset(
+          capCentre + radius * math.cos(angle),
+          pill.center.dy + radius * math.sin(angle),
+        );
+        expect(
+          clip.contains(point),
+          isTrue,
+          reason: '膠囊輪廓上的 $point 落在裁切範圍外,會被切角',
+        );
       }
     });
 
