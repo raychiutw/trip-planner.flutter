@@ -11,6 +11,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
+import '../../../app/error_message.dart';
 import '../../../models/day.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
@@ -811,11 +812,9 @@ String _formatTimestamp(String value) {
 
 String _healthErrorMessage(Object error, String fallback) {
   if (error is ApiError) {
-    if (_hasCjk(error.message)) return error.message;
+    if (hasCjk(error.message)) return error.message;
     if (error.code == 'TRIP_EMPTY') return '此行程尚無景點，請先加入景點再執行健檢';
     return fallback;
   }
   return fallback;
 }
-
-bool _hasCjk(String value) => RegExp(r'[一-鿿]').hasMatch(value);
