@@ -119,7 +119,7 @@ class TpToolbarActionGroup extends StatelessWidget {
       child: GlassContainer(
         key: const ValueKey('tp-toolbar-action-group'),
         useOwnLayer: true,
-        quality: GlassQuality.standard,
+        quality: GlassQuality.premium,
         clipBehavior: Clip.antiAlias,
         shape: LiquidRoundedSuperellipse(
           borderRadius: 22,
@@ -212,7 +212,7 @@ class TpToolbarGlassButton extends StatelessWidget {
           enabled: onPressed != null,
           onTap: onPressed ?? () {},
           useOwnLayer: true,
-          quality: GlassQuality.standard,
+          quality: GlassQuality.premium,
           platformViewBackdrop: platformViewBackdrop,
           interactionScale: 1.03,
           stretch: 0.12,
@@ -662,7 +662,7 @@ class TpToolbarActionSurface extends StatelessWidget {
       child: GlassContainer(
         key: const ValueKey('tp-toolbar-action-surface'),
         useOwnLayer: true,
-        quality: GlassQuality.standard,
+        quality: GlassQuality.premium,
         shape: LiquidRoundedSuperellipse(
           borderRadius: 22,
           side: BorderSide(color: tpGlassEdgeColor(context)),

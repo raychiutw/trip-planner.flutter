@@ -78,38 +78,21 @@ class TpBarForeground extends StatelessWidget {
   }
 }
 
-/// 一般模式描一條**細邊**；「提高對比」才換成明顯的實心邊。
+/// 一般模式**不描邊**；「提高對比」才補一條明顯的實心邊。
 ///
-/// iOS 26 的玻璃邊緣實測是**峰值高出內部填色約 +30**，且沿周長均勻
-/// （訊息 app 標題膠囊 x 360→810 全程 +28~+33；電話 app 編輯膠囊 +29）。
-/// 這條細邊就是對齊那個量級，而不是舊描邊那種 +119 的貼紙感。
+/// PR #163 曾經加過一條 `onSurface @ 0.12` 的細邊，因為當時走
+/// `GlassQuality.standard`，那條路徑的材質完全不產生可見邊緣（模擬器實測
+/// 差值恆為 0）。換到 `premium` 之後材質自己就給得出來 —— 真機 v0.16.0
+/// 量到標題膠囊總共 **+60**，其中我們這條細邊約 **+27**、材質約 **+33**，
+/// 而目標是 +30。**再畫一條等於把量翻倍**，所以拿掉。
 ///
-/// **量測（#169，iPhone 17 Pro 模擬器 / iOS 26.5 / @3x）**：這條邊實體上是
-/// 3px 的實色，沿邊緣完全一致，左右對稱。
+/// 邊緣強度現在由 [tpGlassRecipe] 的 `fresnelStrength`／`lightIntensity`／
+/// `ambientStrength` 控制，全部只在 premium 生效。
+/// 把邊緣畫在玻璃**之上**（只有「提高對比」時才有顏色）。
 ///
-/// | | 內部填色 | 邊緣 | 差 |
-/// |---|---|---|---|
-/// | 深色 標題膠囊 / 選擇器軌 | 4 | 34 | **+30** |
-/// | 淺色 標題膠囊 / 選擇器軌 | 255 | 224 | **−31** |
-/// | 提高對比（深色） | 28 | 255 | +227 |
-/// | 提高對比（淺色） | 243 | 19 | −224 |
-///
-/// 同一批截圖裡玻璃材質自身**沒有**產生任何邊緣（內部填色與背景只差 4）——
-/// 模擬器不渲染材質邊緣光，真機上那一層是 +125，見 [tpGlassRecipe]。
-/// 換句話說**上表只驗到「我們自己畫的那條邊」**，材質那一半未經真機確認。
-///
-/// 顏色由 `onSurface` 導出而非寫死白色：深色模式得到偏亮的細邊，淺色模式得到
-/// 偏暗的細邊 —— 淺色的填色本來就接近白，再加白邊等於沒有。
-const double _tpGlassEdgeAlpha = 0.12;
-
-/// 把邊緣畫在玻璃**之上**。
-///
-/// 不能靠 shape 的 `side`：`AdaptiveGlass` 一般模式只拿 shape 去 clip
-/// （`ClipRRect`／`ClipPath`），**從不呼叫 `shape.paint`**，所以 `BorderSide`
-/// 在有 blur 時完全畫不出來 —— 只有無障礙 fallback 走 `ShapeDecoration` 才會
-/// 現形。這是先前「日期選擇器軌道 18% 細邊是死碼」那條的同一個機制。
-///
-/// `ShapeDecoration` 會畫 side，所以改用 `foregroundDecoration` 疊在玻璃上。
+/// 不能靠 shape 的 `side`：`AdaptiveGlass` 一般模式只拿 shape 去 clip，
+/// **從不呼叫 `shape.paint`**，`BorderSide` 在有 blur 時畫不出來 —— 只有
+/// 無障礙 fallback 走 `ShapeDecoration` 才現形。
 class TpGlassEdge extends StatelessWidget {
   const TpGlassEdge({
     super.key,
@@ -133,10 +116,7 @@ class TpGlassEdge extends StatelessWidget {
 }
 
 Color tpGlassEdgeColor(BuildContext context) {
-  final scheme = Theme.of(context).colorScheme;
-  if (!MediaQuery.highContrastOf(context)) {
-    return scheme.onSurface.withValues(alpha: _tpGlassEdgeAlpha);
-  }
+  if (!MediaQuery.highContrastOf(context)) return Colors.transparent;
   return Theme.of(context).brightness == Brightness.dark
       ? Colors.white
       : Colors.black.withValues(alpha: 0.72);

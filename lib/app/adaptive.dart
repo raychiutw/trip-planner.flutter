@@ -558,7 +558,7 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         settings: settings,
         halfSettings: settings,
         expandedColor: Theme.of(context).colorScheme.surface,
-        quality: GlassQuality.standard,
+        quality: GlassQuality.premium,
         // 定版近滿版 sheet 是「實色內容畫布＋玻璃控制元件」；只在進場時
         // 保留玻璃過渡，固定於 93% detent 後即使用完整 canvas 色，避免
         // 背後地圖穿透而降低文字與 grouped list 的對比。

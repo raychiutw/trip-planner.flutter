@@ -1005,6 +1005,10 @@ void main() {
       // 品牌色只出現在前景：字符、標籤與光暈。
       expect(glass.selectedIconColor, scheme.primary);
 
+      // root tab bar 走 premium。`standard` 的邊緣寫死在 shader 常數裡,
+      // 任何 settings 都調不動 —— 真機連續多版量到 +125~+138(目標 +30)。
+      expect(glass.quality, GlassQuality.premium);
+
       // 膠囊不得寬於自己的欄位。套件預設 `horizontal: 12` 是往外擴，實測
       // 膠囊 341px 落在 275px 的欄位裡 = 124%，壓到左右鄰居；改成往內收，
       // 模擬器實測約 75%（按參數計算 69%，差額是柔邊）。Apple 約 70%。
