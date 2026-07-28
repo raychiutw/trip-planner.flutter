@@ -3,6 +3,8 @@ import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
 
 void main() {
+  _aiStateContractTests();
+
   group('TripFlight.fromJson', () {
     test('解析完整欄位', () {
       final flight = TripFlight.fromJson({
@@ -337,6 +339,109 @@ void main() {
       expect(docTypeOf('tips'), NoteGenerationType.tips);
       expect(docTypeOf('emergency'), NoteGenerationType.emergency);
       expect(docTypeOf('weather'), isNull);
+    });
+  });
+}
+
+void _aiStateContractTests() {
+  group('TripNoteAiState.fromJson（契約以後端 #1216/#1217 原始碼為準）', () {
+    test('解析三種類型的完整欄位', () {
+      final state = TripNoteAiState.fromJson(const {
+        'jobs': [
+          {
+            'docType': 'lodging-tips',
+            'status': 'idle',
+            'jobId': null,
+            'requestId': null,
+            'generation': 0,
+            'insertedCount': 0,
+            'replacedCount': 0,
+            'preservedManualCount': 0,
+            'duplicateExcludedCount': 0,
+            'suppressedCount': 0,
+            'errorCode': null,
+            'errorMessage': null,
+            'createdAt': null,
+            'startedAt': null,
+            'timeoutAt': null,
+            'completedAt': null,
+            'exclusionCount': 0,
+          },
+          {
+            'docType': 'tips',
+            'status': 'processing',
+            'jobId': 7,
+            'requestId': 99,
+            'generation': 3,
+            'insertedCount': 2,
+            'replacedCount': 5,
+            'preservedManualCount': 3,
+            'duplicateExcludedCount': 1,
+            'suppressedCount': 1,
+            'errorCode': null,
+            'errorMessage': null,
+            'createdAt': '2026-07-28T00:00:00Z',
+            'startedAt': '2026-07-28T00:01:00Z',
+            'timeoutAt': '2026-07-28T00:10:00Z',
+            'completedAt': null,
+            'exclusionCount': 2,
+          },
+          {
+            'docType': 'emergency',
+            'status': 'timedOut',
+            'jobId': 8,
+            'requestId': 100,
+            'errorCode': 'NOTES_AI_JOB_STALE',
+            'errorMessage': 'AI 生成超過 10 分鐘',
+            'exclusionCount': 0,
+          },
+        ],
+      });
+
+      expect(state.jobs, hasLength(3));
+      final tips = state.jobFor(NoteGenerationType.tips)!;
+      expect(tips.status, TripNoteAiJobStatus.processing);
+      expect(tips.requestId, 99);
+      expect(tips.generation, 3);
+      // 五個 count 是**攤平在 job 上**的,契約沒有 summary 這一層。
+      expect(tips.insertedCount, 2);
+      expect(tips.replacedCount, 5);
+      expect(tips.preservedManualCount, 3);
+      expect(tips.duplicateExcludedCount, 1);
+      expect(tips.suppressedCount, 1);
+      expect(tips.exclusionCount, 2);
+      // 時間戳存字串不轉 DateTime(全專案慣例)。
+      expect(tips.startedAt, '2026-07-28T00:01:00Z');
+
+      final lodging = state.jobFor(NoteGenerationType.lodgingTips)!;
+      expect(lodging.status, TripNoteAiJobStatus.idle, reason: '從沒生成過是 idle');
+      expect(lodging.jobId, 0);
+      expect(lodging.timeoutAt, isNull);
+
+      final emergency = state.jobFor(NoteGenerationType.emergency)!;
+      expect(emergency.status, TripNoteAiJobStatus.timedOut);
+      // 錯誤是拆成 code 與 message 兩欄,不是單一 error 物件。
+      expect(emergency.errorCode, 'NOTES_AI_JOB_STALE');
+      expect(emergency.errorMessage, 'AI 生成超過 10 分鐘');
+    });
+
+    test('jobs 缺漏回空 list', () {
+      expect(TripNoteAiState.fromJson(const {}).jobs, isEmpty);
+    });
+
+    test('未知 status 一律非終止,不誤判成結束', () {
+      final state = TripNoteAiState.fromJson(const {
+        'jobs': [
+          {'docType': 'tips', 'status': 'brand_new_status'},
+        ],
+      });
+      final job = state.jobFor(NoteGenerationType.tips)!;
+      expect(job.status.isTerminal, isFalse);
+    });
+
+    test('idle 與 timedOut 的終止判定', () {
+      expect(TripNoteAiJobStatus.idle.isTerminal, isFalse);
+      expect(TripNoteAiJobStatus.timedOut.isTerminal, isTrue);
     });
   });
 }

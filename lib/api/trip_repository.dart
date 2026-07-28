@@ -450,6 +450,22 @@ class TripRepository {
     );
   }
 
+  /// GET /trips/:id/notes/ai-state（三種 docType 的最新 job 與排除數量）。
+  ///
+  /// **不寫快取、也不回退快取**：job 狀態沒有 stale 價值。照 [ApiClient.get]
+  /// 的預設走，離線或冷啟會拿到早就結束的 job 顯示成生成中，或反過來蓋掉真正
+  /// 在跑的那一個。
+  Future<TripNoteAiState> fetchNotesAiState(String tripId) async {
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/ai-state',
+      writeCache: false,
+      fallbackToCache: false,
+    );
+    return TripNoteAiState.fromJson(
+      body is Map ? Map<String, dynamic>.from(body) : const {},
+    );
+  }
+
   /// GET /trips/:id/audit（依 trip 權限讀 audit log；requestId 可篩單次 AI/job）。
   Future<List<TripAuditRow>> fetchAuditLog(
     String id, {

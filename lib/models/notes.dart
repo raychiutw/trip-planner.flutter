@@ -318,21 +318,43 @@ class TripNotes {
 }
 
 /// AI 生成 job 的狀態。
-enum TripNoteAiJobStatus { pending, processing, completed, failed }
+/// job 狀態。契約以後端 `#1216`/`#1217` 原始碼為準:除了 issue 描述的五種,
+/// 實際還會回 `idle`(這種 docType 從沒生成過);`timed_out` 由 server 轉成
+/// `timedOut` 才送出。
+enum TripNoteAiJobStatus {
+  idle,
+  pending,
+  processing,
+  completed,
+  failed,
+  timedOut,
+}
 
 /// 解析 job status;未知字串當成還在跑,不誤判成終止態(比照 `parseRequestStatus`)。
 TripNoteAiJobStatus parseTripNoteAiJobStatus(String? raw) => switch (raw) {
   'completed' => TripNoteAiJobStatus.completed,
   'failed' => TripNoteAiJobStatus.failed,
+  'timedOut' => TripNoteAiJobStatus.timedOut,
   'processing' => TripNoteAiJobStatus.processing,
+  'idle' => TripNoteAiJobStatus.idle,
   _ => TripNoteAiJobStatus.pending,
 };
 
 extension TripNoteAiJobStatusX on TripNoteAiJobStatus {
-  /// 只有 completed / failed 是終止態。
-  bool get isTerminal =>
-      this == TripNoteAiJobStatus.completed ||
-      this == TripNoteAiJobStatus.failed;
+  /// 走到底了沒。`idle` 是「還沒開始」不是「結束」,所以不算終止。
+  bool get isTerminal => switch (this) {
+    TripNoteAiJobStatus.completed ||
+    TripNoteAiJobStatus.failed ||
+    TripNoteAiJobStatus.timedOut => true,
+    TripNoteAiJobStatus.idle ||
+    TripNoteAiJobStatus.pending ||
+    TripNoteAiJobStatus.processing => false,
+  };
+
+  /// 有沒有一個正在跑的 job 值得接上進度通道。
+  bool get isActive =>
+      this == TripNoteAiJobStatus.pending ||
+      this == TripNoteAiJobStatus.processing;
 }
 
 /// `POST /trips/:id/notes/:type/generate` 的回應（啟動一個 AI 生成 job）。
@@ -352,6 +374,16 @@ class TripNoteAiJob {
     this.docType,
     this.generation = 0,
     this.timeoutAt,
+    this.startedAt,
+    this.completedAt,
+    this.errorCode,
+    this.errorMessage,
+    this.insertedCount = 0,
+    this.replacedCount = 0,
+    this.preservedManualCount = 0,
+    this.duplicateExcludedCount = 0,
+    this.suppressedCount = 0,
+    this.exclusionCount = 0,
   });
 
   final int jobId;
@@ -369,6 +401,22 @@ class TripNoteAiJob {
 
   /// job 的逾時時刻（ISO8601 字串;全專案慣例不轉 DateTime）。
   final String? timeoutAt;
+  final String? startedAt;
+  final String? completedAt;
+
+  /// 失敗原因;契約拆成 code 與 message 兩欄,不是單一 error 物件。
+  final String? errorCode;
+  final String? errorMessage;
+
+  /// 完成摘要的五個 count —— 攤平在 job 上,契約沒有 `summary` 那一層。
+  final int insertedCount;
+  final int replacedCount;
+  final int preservedManualCount;
+  final int duplicateExcludedCount;
+  final int suppressedCount;
+
+  /// 這一種 docType 目前被排除的項目數。
+  final int exclusionCount;
 
   factory TripNoteAiJob.fromJson(Map<String, dynamic> json) => TripNoteAiJob(
     jobId: (json['jobId'] as num?)?.toInt() ?? 0,
@@ -378,5 +426,49 @@ class TripNoteAiJob {
     docType: parseNoteGenerationType(json['docType'] as String?),
     generation: (json['generation'] as num?)?.toInt() ?? 0,
     timeoutAt: json['timeoutAt'] as String?,
+    startedAt: json['startedAt'] as String?,
+    completedAt: json['completedAt'] as String?,
+    errorCode: json['errorCode'] as String?,
+    errorMessage: json['errorMessage'] as String?,
+    insertedCount: (json['insertedCount'] as num?)?.toInt() ?? 0,
+    replacedCount: (json['replacedCount'] as num?)?.toInt() ?? 0,
+    preservedManualCount: (json['preservedManualCount'] as num?)?.toInt() ?? 0,
+    duplicateExcludedCount:
+        (json['duplicateExcludedCount'] as num?)?.toInt() ?? 0,
+    suppressedCount: (json['suppressedCount'] as num?)?.toInt() ?? 0,
+    exclusionCount: (json['exclusionCount'] as num?)?.toInt() ?? 0,
   );
+}
+
+/// `GET /trips/:tripId/notes/ai-state` 的整包回應。
+///
+/// **契約與 issue 描述有出入,以後端原始碼為準**:回應只有 `jobs` 一個 key、
+/// 永遠回三筆(三種 docType 各一,沒生成過也會回一筆 `idle`);五個 count 是
+/// 攤平在 job 上的,沒有 `summary` 那一層;錯誤拆成 `errorCode` 與
+/// `errorMessage` 兩欄;排除數量是每筆 job 上的 `exclusionCount`,頂層沒有
+/// `exclusionCounts` 物件。
+class TripNoteAiState {
+  const TripNoteAiState({this.jobs = const []});
+
+  final List<TripNoteAiJob> jobs;
+
+  /// 取某一種 docType 的 job;沒有就回 null。
+  TripNoteAiJob? jobFor(NoteGenerationType type) {
+    for (final job in jobs) {
+      if (job.docType == type) return job;
+    }
+    return null;
+  }
+
+  /// 目前有正在跑的 job 的那幾種。
+  Iterable<TripNoteAiJob> get activeJobs =>
+      jobs.where((job) => job.docType != null && job.status.isActive);
+
+  factory TripNoteAiState.fromJson(Map<String, dynamic> json) =>
+      TripNoteAiState(
+        jobs: ((json['jobs'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => TripNoteAiJob.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
 }

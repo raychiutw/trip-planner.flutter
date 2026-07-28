@@ -46,6 +46,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   /// 每種生成目前走到哪一階段 —— 進度提示的文案由它決定。
   final _aiStage = <NoteGenerationType, _NotesAiStage>{};
 
+  /// 從後端讀回來的持久狀態。讀失敗只影響 AI 區塊,筆記本體照常。
+  String? _aiStateError;
+
   /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
   /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
   final _aiSubscriptions =
@@ -58,6 +61,25 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   /// 兩個 job 幾乎同時完成時各發一則,兩張浮層會疊在同一個位置互相蓋掉。
   final _aiJustCompleted = <NoteGenerationType>{};
   bool _aiNoticeScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAiState();
+  }
+
+  /// 進頁面時讀一次持久狀態。**失敗只記在 [_aiStateError]**,不讓它冒泡到
+  /// 整頁 —— 筆記的增刪改與拖曳排序與這支 API 無關,不該被它拖垮。
+  Future<void> _loadAiState() async {
+    try {
+      await ref.read(tripRepositoryProvider).fetchNotesAiState(widget.tripId);
+      if (!mounted) return;
+      setState(() => _aiStateError = null);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _aiStateError = _notesAiErrorMessage(error));
+    }
+  }
 
   @override
   void dispose() {
@@ -118,6 +140,15 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
           key: const ValueKey('notes-ai-status'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_aiStateError case final message?)
+              _NotesAiErrorPanel(
+                key: const ValueKey('notes-ai-state-error'),
+                panelKey: const ValueKey('notes-ai-state-error-panel'),
+                retryKey: const ValueKey('notes-ai-state-retry'),
+                message: message,
+                onRetry: _loadAiState,
+                onDismiss: () => setState(() => _aiStateError = null),
+              ),
             if (_aiFailure case final failure?)
               _NotesAiErrorPanel(
                 message: failure.message,
@@ -481,21 +512,29 @@ class _NotesAiPendingPanel extends StatelessWidget {
 
 class _NotesAiErrorPanel extends StatelessWidget {
   const _NotesAiErrorPanel({
+    super.key,
     required this.message,
     required this.onRetry,
     required this.onDismiss,
+    this.panelKey = const ValueKey('notes-ai-error'),
+    this.retryKey = const ValueKey('notes-ai-retry'),
   });
 
   final String message;
+
+  /// 內層容器的 key。兩個面板(生成失敗 / 狀態讀取失敗)共用這個 widget,
+  /// 但測試要分得出是哪一個。
   final VoidCallback onRetry;
   final VoidCallback onDismiss;
+  final Key panelKey;
+  final Key retryKey;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     return Container(
-      key: const ValueKey('notes-ai-error'),
+      key: panelKey,
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
       padding: const EdgeInsets.all(TpSpacing.s3),
       decoration: BoxDecoration(
@@ -543,7 +582,7 @@ class _NotesAiErrorPanel extends StatelessWidget {
                 TextButton(onPressed: onDismiss, child: const Text('關閉')),
                 const SizedBox(width: TpSpacing.s2),
                 FilledButton(
-                  key: const ValueKey('notes-ai-retry'),
+                  key: retryKey,
                   onPressed: onRetry,
                   child: const Text('重試'),
                 ),
