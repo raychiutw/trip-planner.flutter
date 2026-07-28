@@ -967,13 +967,17 @@ class _TpMenuPanelState extends State<_TpMenuPanel>
       // 空間不足往上翻時，scale 原點必須跟著改成底部對齊，否則面板會從遠離
       // 觸發鈕的那一端長出來。時間軸卡片是最常觸發往上翻的呼叫點。
       alignment: widget.flipUp ? Alignment.bottomRight : Alignment.topRight,
-      child: FadeTransition(
-        opacity: curve,
-        child: TpGlassSurface(
-          key: const ValueKey('tp-menu-panel'),
-          borderRadius: const BorderRadius.all(Radius.circular(24)),
-          padding: const EdgeInsets.all(_TpMenuMetrics.panelPadding),
-          glassSettings: widget.settings,
+      // 淡入只包內容，不包玻璃。玻璃被 opacity 包住時引擎會為它開一層
+      // saveLayer，面板的兩個 backdrop filter 因此失去直接翻用 onscreen
+      // target 的資格 —— 整段 250ms 玻璃讀到的是空背景，到最後一幀才突然
+      // 變成毛玻璃。套件作者自己的 `GlassPopover` 也是只淡內容。
+      child: TpGlassSurface(
+        key: const ValueKey('tp-menu-panel'),
+        borderRadius: const BorderRadius.all(Radius.circular(24)),
+        padding: const EdgeInsets.all(_TpMenuMetrics.panelPadding),
+        glassSettings: widget.settings,
+        child: FadeTransition(
+          opacity: curve,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: widget.children,

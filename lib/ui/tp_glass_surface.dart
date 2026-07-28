@@ -133,17 +133,15 @@ Color tpGlassEdgeColor(BuildContext context) {
 /// 真機（v0.13.0）量到標題膠囊與頭像圓鈕的邊緣高出內部填色 **+125~+138**，
 /// day tab 是 **+20~+31**，iOS 26 是 **+29~+31**。
 ///
-/// **不要試圖用 `ambientRim`／`glowIntensity` 調它 —— 在我們的算圖路徑上那兩個
-/// 參數是死的。** 讀 0.22.1 與 0.23.0 原始碼皆確認:
+/// 旋鈕是 `fresnelStrength`，它只在 `GlassQuality.premium` 生效 —— 而本檔
+/// 底下傳的正是 `premium`（v0.17.0 起）。
 ///
-/// - `AdaptiveGlass` 只在 `quality == premium` 時走 renderer 原生路徑（那裡才
-///   `setFloat(settings.ambientRim)`）；我們固定傳 `standard`，走
-///   `LightweightLiquidGlass`。
-/// - `shaders/lightweight_glass.frag` **沒有 `ambientRim` uniform**；
-///   `uData4.w`（uGlowIntensity）取的是 widget 欄位而非 `settings.glowIntensity`。
-/// - 0.23.0 的 rim 常數與 0.22.1 一字未改。
-///
-/// 真正的旋鈕是 `fresnelStrength`，且只在 `GlassQuality.premium` 生效。
+/// 歷史紀錄:這段註解原本寫「`ambientRim`／`glowIntensity` 是死的，因為我們
+/// 固定傳 `standard`」。前半在 `standard` 那條路徑上仍然成立
+/// （`shaders/lightweight_glass.frag` 沒有 `ambientRim` uniform，
+/// `uData4.w` 取的是 widget 欄位而非 `settings.glowIntensity`），但**後半的
+/// 前提已經不成立**,而基於它推導出來的結論被人沿用過。改成 `premium` 之後
+/// renderer 原生路徑會 `setFloat(settings.ambientRim)`，那兩個參數不再是死的。
 LiquidGlassSettings tpGlassRecipe(
   BuildContext context, {
   required Color tint,
