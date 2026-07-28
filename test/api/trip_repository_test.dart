@@ -12,6 +12,7 @@ import 'package:tripline/api/session_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/models/destination_input.dart';
 import 'package:tripline/models/note_section.dart';
+import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/models/poi_search_result.dart';
 import 'package:tripline/models/segment.dart';
@@ -738,6 +739,8 @@ void main() {
             'status': 'pending',
             'tripId': 'okinawa',
             'docType': c.path,
+            'generation': 2,
+            'timeoutAt': '2026-07-25T10:07:00Z',
           }),
         );
 
@@ -748,12 +751,31 @@ void main() {
 
         expect(job.jobId, 12);
         expect(job.requestId, 34);
-        expect(job.status, 'pending');
+        expect(job.status, TripNoteAiJobStatus.pending);
         expect(job.tripId, 'okinawa');
-        expect(job.docType, c.path);
+        expect(job.docType, c.type);
+        expect(job.generation, 2);
+        expect(job.timeoutAt, '2026-07-25T10:07:00Z');
       },
     );
   }
+
+  test('generateNotes：非預期 body 走預設值而不丟 TypeError', () async {
+    dioAdapter.onPost(
+      '/trips/okinawa/notes/tips/generate',
+      (server) => server.reply(202, {'status': 'pending'}),
+    );
+
+    final job = await tripRepository.generateNotes(
+      NoteGenerationType.tips,
+      tripId: 'okinawa',
+    );
+
+    expect(job.jobId, 0);
+    expect(job.requestId, 0);
+    expect(job.docType, isNull);
+    expect(job.status.isTerminal, isFalse);
+  });
 
   test('fetchAuditLog：GET /trips/:id/audit 帶 limit/request_id', () async {
     dioAdapter.onGet(

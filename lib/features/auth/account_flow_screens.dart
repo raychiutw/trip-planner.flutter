@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
+import '../../app/error_message.dart';
 import '../../app/external_links.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
@@ -828,10 +829,8 @@ String _authErrorMessage(
   String defaultMessage,
 ) {
   if (error is ApiError) {
-    if (_hasCjk(error.message)) return error.message;
+    if (hasCjk(error.message)) return error.message;
     return fallbackByCode[error.code] ?? defaultMessage;
   }
   return '網路連線失敗，請稍後再試';
 }
-
-bool _hasCjk(String value) => RegExp(r'[一-鿿]').hasMatch(value);

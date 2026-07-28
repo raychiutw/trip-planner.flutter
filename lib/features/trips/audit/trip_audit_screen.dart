@@ -8,6 +8,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive_content.dart';
 import '../../../app/app_loading_skeleton.dart';
+import '../../../app/error_message.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
@@ -412,8 +413,6 @@ String _formatTimestamp(String value) {
 }
 
 String _auditErrorMessage(Object error) {
-  if (error is ApiError && _hasCjk(error.message)) return error.message;
+  if (error is ApiError && hasCjk(error.message)) return error.message;
   return '載入異動紀錄失敗，請稍後再試';
 }
-
-bool _hasCjk(String value) => RegExp(r'[一-鿿]').hasMatch(value);

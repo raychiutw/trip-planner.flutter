@@ -435,20 +435,18 @@ class TripRepository {
   }
 
   /// POST /trips/:id/notes/:type/generate（啟動 AI 產生筆記 job）。
-  Future<
-    ({int jobId, int requestId, String status, String tripId, String docType})
-  >
-  generateNotes(NoteGenerationType type, {required String tripId}) async {
+  ///
+  /// 回應解析全部交給 [TripNoteAiJob.fromJson];非預期 body 走預設值而不是丟
+  /// `TypeError`，畫面層不需要知道任何 json key。
+  Future<TripNoteAiJob> generateNotes(
+    NoteGenerationType type, {
+    required String tripId,
+  }) async {
     final body = await _client.post(
       '/trips/${Uri.encodeComponent(tripId)}/notes/${type.pathSegment}/generate',
     );
-    final map = body as Map<String, dynamic>;
-    return (
-      jobId: (map['jobId'] as num).toInt(),
-      requestId: (map['requestId'] as num).toInt(),
-      status: map['status'] as String? ?? 'pending',
-      tripId: map['tripId'] as String? ?? tripId,
-      docType: map['docType'] as String? ?? type.pathSegment,
+    return TripNoteAiJob.fromJson(
+      body is Map ? Map<String, dynamic>.from(body) : const {},
     );
   }
 

@@ -14,6 +14,7 @@ import '../../api/oauth/oauth_login_service.dart';
 import '../../api/oauth/oauth_providers.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive_content.dart';
+import '../../app/error_message.dart';
 import '../../theme/tokens.dart';
 
 /// 密碼登入畫面（/login，shell 外）。
@@ -39,8 +40,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     'LOGIN_INVALID': 'Email 或密碼錯誤',
     'AUTH_NO_SESSION_COOKIE': '登入回應異常，請稍後再試',
   };
-
-  static final _cjkPattern = RegExp(r'[一-鿿]');
 
   @override
   void dispose() {
@@ -87,7 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// 錯誤訊息：server 回繁中直接用；否則查 code 對照表；再不然通用訊息。
   String _loginErrorMessage(Object error) {
     if (error is ApiError) {
-      if (_cjkPattern.hasMatch(error.message)) return error.message;
+      if (hasCjk(error.message)) return error.message;
       return _fallbackMessageByCode[error.code] ?? '登入失敗，請稍後再試';
     }
     return '登入失敗，請檢查網路後再試';

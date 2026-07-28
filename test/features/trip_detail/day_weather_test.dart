@@ -57,7 +57,66 @@ const _okinawaDay = TripDay(
   ],
 );
 
+/// 沒有任何 entry 掛上 POI 座標的一天 —— web 版就是從不存在的欄位取座標,
+/// 導致每天都沒有天氣。
+const _dayWithoutCoordinates = TripDay(
+  id: 7,
+  dayNum: 2,
+  date: '2026-04-24',
+  title: '自由活動',
+  version: 1,
+  timeline: [
+    TimelineEntry(
+      id: 71,
+      sortOrder: 0,
+      startTime: '10:00',
+      title: '飯店休息',
+      version: 1,
+    ),
+    TimelineEntry(
+      id: 72,
+      sortOrder: 1,
+      startTime: '14:00',
+      title: '市區隨意逛',
+      version: 1,
+      master: EntryPoiInfo(poiId: 201, name: '待確認的店'),
+    ),
+  ],
+);
+
 void main() {
+  test('沒有任何 POI 座標的一天,不構成可查詢的預報日', () {
+    expect(buildWeatherDay(_dayWithoutCoordinates), isNull);
+    expect(hasWeatherDay(_dayWithoutCoordinates), isFalse);
+    expect(hasWeatherDay(_okinawaDay), isTrue);
+  });
+
+  testWidgets('沒有任何 POI 座標的一天顯示「尚無可用預報位置」且不打預報 API', (tester) async {
+    var calls = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dayWeatherFetcherProvider.overrideWithValue((request) async {
+            calls++;
+            return TripWeatherHourly.empty();
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(
+            body: DayWeatherCard(day: _dayWithoutCoordinates),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('尚無可用預報位置'), findsOneWidget);
+    expect(find.text('天氣示意'), findsOneWidget);
+    expect(calls, 0, reason: '沒有座標就沒得查,不該送出注定沒有結果的請求');
+  });
+
   test('buildWeatherDay 使用 entry POI 產生去重後的取樣地點', () {
     final weatherDay = buildWeatherDay(_okinawaDay);
 
