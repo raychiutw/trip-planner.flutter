@@ -450,6 +450,38 @@ class TripRepository {
     );
   }
 
+  /// GET /trips/:id/notes/:docType/exclusions（被排除的 AI 項目)。
+  ///
+  /// **段名走 [NoteGenerationTypeX.pathSegment]**(`tips`／`lodging-tips`／
+  /// `emergency`)——與維護權的 `NoteSection.name` 不是同一組字。
+  Future<List<TripNoteExclusion>> fetchNoteExclusions(
+    NoteGenerationType docType, {
+    required String tripId,
+  }) async {
+    final body = await _client.get(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${docType.pathSegment}/exclusions',
+      writeCache: false,
+      fallbackToCache: false,
+    );
+    return TripNoteExclusion.listFromJson(
+      body is Map ? Map<String, dynamic>.from(body) : const {},
+    );
+  }
+
+  /// DELETE /trips/:id/notes/:docType/exclusions/:id（恢復,移除 tombstone)。
+  ///
+  /// 恢復改的是「下次會不會生成」,不是當下的內容 —— 那一則要等下一次生成
+  /// 才會再出現在筆記裡。
+  Future<void> restoreNoteExclusion(
+    NoteGenerationType docType, {
+    required String tripId,
+    required int exclusionId,
+  }) async {
+    await _client.delete(
+      '/trips/${Uri.encodeComponent(tripId)}/notes/${docType.pathSegment}/exclusions/$exclusionId',
+    );
+  }
+
   /// GET /trips/:id/notes/ai-state（三種 docType 的最新 job 與排除數量）。
   ///
   /// **不寫快取、也不回退快取**：job 狀態沒有 stale 價值。照 [ApiClient.get]

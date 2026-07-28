@@ -498,6 +498,45 @@ class TripNoteAiJob {
   );
 }
 
+/// 被排除(刪除過)的 AI 項目。刪掉 AI 產生的列時後端留下的 tombstone,
+/// 下次生成不會再長回來,直到使用者恢復它。
+///
+/// 契約:`GET /trips/:tripId/notes/:docType/exclusions` 回 `{ "items": [...] }`。
+class TripNoteExclusion {
+  const TripNoteExclusion({
+    this.id = 0,
+    this.docType,
+    this.semanticKey,
+    this.label = '',
+    this.deletedAt,
+  });
+
+  final int id;
+  final NoteGenerationType? docType;
+  final String? semanticKey;
+
+  /// 給使用者看的標題,讓他認得出刪掉的是什麼。
+  final String label;
+
+  /// 刪除時刻(ISO8601 字串;全專案慣例不轉 DateTime)。
+  final String? deletedAt;
+
+  factory TripNoteExclusion.fromJson(Map<String, dynamic> json) =>
+      TripNoteExclusion(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        docType: parseNoteGenerationType(json['docType'] as String?),
+        semanticKey: json['semanticKey'] as String?,
+        label: json['label'] as String? ?? '',
+        deletedAt: json['deletedAt'] as String?,
+      );
+
+  static List<TripNoteExclusion> listFromJson(Map<String, dynamic> json) =>
+      ((json['items'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => TripNoteExclusion.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+}
+
 /// `GET /trips/:tripId/notes/ai-state` 的整包回應。
 ///
 /// **契約與 issue 描述有出入,以後端原始碼為準**:回應只有 `jobs` 一個 key、

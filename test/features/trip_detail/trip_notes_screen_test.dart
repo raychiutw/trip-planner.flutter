@@ -285,6 +285,7 @@ Widget _buildScreen(
 void main() {
   setUpAll(() {
     registerFallbackValue(NoteSection.flights);
+    registerFallbackValue(NoteGenerationType.tips);
     registerFallbackValue(<String, dynamic>{});
   });
 
@@ -1274,6 +1275,80 @@ void main() {
       find.byKey(const ValueKey('notes-ai-timeout-retry')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('已排除 N 項:N=0 不出現;點開可逐項恢復', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 2,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.emergency,
+            status: TripNoteAiJobStatus.idle,
+          ),
+        ],
+      ),
+    );
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer(
+      (_) async => const [
+        TripNoteExclusion(
+          id: 3,
+          docType: NoteGenerationType.tips,
+          label: '插座與電壓',
+          deletedAt: '2026-07-28T09:00:00Z',
+        ),
+      ],
+    );
+    when(
+      () => repo.restoreNoteExclusion(
+        any(),
+        tripId: any(named: 'tripId'),
+        exclusionId: any(named: 'exclusionId'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // 行前須知有 2 項被排除 → 入口出現;緊急聯絡 0 項 → 不出現。
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-pretrip')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-emergency')),
+      findsNothing,
+      reason: 'N = 0 時入口不出現,版面一如現狀',
+    );
+    expect(find.textContaining('已排除 2 項'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-pretrip')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('插座與電壓'), findsOneWidget, reason: '認得出刪掉的是什麼');
+    await tester.tap(find.byKey(const ValueKey('notes-exclusion-restore-3')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(
+      () => repo.restoreNoteExclusion(
+        NoteGenerationType.tips,
+        tripId: 'trip-1',
+        exclusionId: 3,
+      ),
+    ).called(1);
   });
 
   testWidgets('目前由 AI 維護的列顯示標記,改過的不顯示', (tester) async {
