@@ -136,6 +136,23 @@ enum NoteGenerationType { tips, lodgingTips, emergency }
 
 `NoteGenerationType` 對應 AI 生成 doc type：`tips`、`lodging-tips`、`emergency`。筆記 CRUD 仍使用 `NoteSection` 的 5 區名稱。
 
+```dart
+enum TripNoteAiJobStatus { pending, processing, completed, failed } // isTerminal: completed/failed
+
+class TripNoteAiJob {
+  final int jobId;          // 缺漏 → 0
+  final int requestId;      // 缺漏 → 0，SSE 進度靠它訂閱
+  final TripNoteAiJobStatus status; // 未知字串 → pending（不誤判終止）
+  final String tripId;      // 缺漏 → ''
+  final NoteGenerationType? docType; // 未知/缺漏 → null
+  final int generation;     // 缺漏 → 0
+  final String? createdAt;  // ISO8601 字串，不轉 DateTime
+  final String? timeoutAt;
+}
+```
+
+`TripNoteAiJob` 承接 `POST /trips/:id/notes/:type/generate` 的回應，全欄位皆有預設值：非預期 body 走預設值而不丟 `TypeError`。`docType` 由 `parseNoteGenerationType()` 解析，同時接受 URL 形（`lodging-tips`）與 enum 形（`lodgingTips`）—— 後端契約尚未凍結，凍結後再收斂成單一形。
+
 ## user.dart
 
 ### UserInfo — `GET /oauth/userinfo` 回應

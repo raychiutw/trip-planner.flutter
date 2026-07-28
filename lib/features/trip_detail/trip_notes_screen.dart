@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/adaptive_content.dart';
@@ -35,7 +36,9 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   ({int requestId, int jobId, NoteGenerationType type})? _aiJob;
   StreamSubscription<TripRequestEvent>? _aiSubscription;
   bool _aiSubmitting = false;
-  String? _aiError;
+
+  /// 生成失敗時的顯示訊息與可重試的類型；null 代表目前沒有錯誤。
+  ({String message, NoteGenerationType type})? _aiFailure;
 
   @override
   void dispose() {
@@ -87,13 +90,22 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        if (_aiError != null)
-          _NotesAiErrorPanel(
-            message: _aiError!,
-            onDismiss: () => setState(() => _aiError = null),
-          ),
-        if (_aiJob != null)
-          _NotesAiPendingPanel(label: _aiJob!.type.pendingLabel),
+        // 固定佔一個 slot:ListView 的 children 一旦增減,後面每個 slot 的 widget
+        // 都會換位而重建,展開中的 section 會被收合。狀態面板永遠在這個 Column 裡進出。
+        Column(
+          key: const ValueKey('notes-ai-status'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_aiFailure case final failure?)
+              _NotesAiErrorPanel(
+                message: failure.message,
+                onRetry: () => _startAiGeneration(failure.type),
+                onDismiss: () => setState(() => _aiFailure = null),
+              ),
+            if (_aiJob case final job?)
+              _NotesAiPendingPanel(label: job.type.pendingLabel),
+          ],
+        ),
         _NotesSection(
           tripId: widget.tripId,
           section: NoteSection.flights,
@@ -197,7 +209,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
     if (_aiSubmitting || _aiJob != null) return;
     setState(() {
       _aiSubmitting = true;
-      _aiError = null;
+      _aiFailure = null;
     });
 
     try {
@@ -210,11 +222,13 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         _aiJob = (requestId: job.requestId, jobId: job.jobId, type: type);
       });
       _watchAiJob(job.requestId, type);
-    } on Exception catch (error) {
+    } catch (error) {
+      // 攔 Error 與 Exception 兩類:解析非預期回應丟的是 TypeError,只攔
+      // Exception 會讓它逃逸,送出旗標永遠留在真、三顆按鈕從此按不下去。
       if (!mounted) return;
       setState(() {
         _aiSubmitting = false;
-        _aiError = _notesAiErrorMessage(error);
+        _aiFailure = (message: _notesAiErrorMessage(error), type: type);
       });
     }
   }
@@ -233,7 +247,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
             if (!mounted) return;
             setState(() {
               _aiJob = null;
-              _aiError = _notesAiErrorMessage(error);
+              _aiFailure = (message: _notesAiErrorMessage(error), type: type);
             });
           },
         );
@@ -254,7 +268,10 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
 
     setState(() {
       _aiJob = null;
-      _aiError = event.error ?? 'AI 生成失敗';
+      _aiFailure = (
+        message: event.error ?? _notesAiFallbackMessage,
+        type: type,
+      );
     });
   }
 }
@@ -334,9 +351,14 @@ class _NotesAiPendingPanel extends StatelessWidget {
 }
 
 class _NotesAiErrorPanel extends StatelessWidget {
-  const _NotesAiErrorPanel({required this.message, required this.onDismiss});
+  const _NotesAiErrorPanel({
+    required this.message,
+    required this.onRetry,
+    required this.onDismiss,
+  });
 
   final String message;
+  final VoidCallback onRetry;
   final VoidCallback onDismiss;
 
   @override
@@ -352,46 +374,76 @@ class _NotesAiErrorPanel extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(TpRadius.md)),
         border: Border.all(color: colors.error),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline, color: colors.onErrorContainer),
-          const SizedBox(width: TpSpacing.s3),
-          Expanded(
-            child: Column(
+      child: Semantics(
+        liveRegion: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'AI 生成失敗',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colors.onErrorContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: TpSpacing.s1),
-                Text(
-                  '$message。可重試或手動填寫。',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onErrorContainer,
+                Icon(Icons.error_outline, color: colors.onErrorContainer),
+                const SizedBox(width: TpSpacing.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI 生成失敗',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colors.onErrorContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: TpSpacing.s1),
+                      Text(
+                        '$message。可重試或手動填寫。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onErrorContainer,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          TextButton(onPressed: onDismiss, child: const Text('關閉')),
-        ],
+            const SizedBox(height: TpSpacing.s1),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: onDismiss, child: const Text('關閉')),
+                const SizedBox(width: TpSpacing.s2),
+                FilledButton(
+                  key: const ValueKey('notes-ai-retry'),
+                  onPressed: onRetry,
+                  child: const Text('重試'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
+/// 生成期的 error code → 人話。維護權相關的 code（`NOTES_AI_NOT_REASSIGNABLE`／
+/// `NOTES_AI_JOB_STALE`）只會在維護權 PATCH 出現，這裡不列，避免留下沒有呼叫端的死碼。
+const _notesAiErrorMessages = <String, String>{
+  'NOTES_AI_INVALID_OUTPUT': 'AI 這次產生的內容格式不正確',
+  'NOTES_AI_NO_VALID_ITEMS': 'AI 這次沒有產生可用的項目',
+  'NOTES_AI_JOB_ACTIVE': '這個行程已有一個生成中的工作',
+  'NOTES_AI_APPLY_FAILED': 'AI 內容寫回筆記時失敗',
+};
+
+const _notesAiFallbackMessage = '目前無法完成 AI 生成';
+
+/// 任何失敗都翻成使用者看得懂的中文；原始 error code 與型別文字不外流到畫面。
 String _notesAiErrorMessage(Object error) {
-  final text = error.toString();
-  const exceptionPrefix = 'Exception: ';
-  if (text.startsWith(exceptionPrefix)) {
-    return text.substring(exceptionPrefix.length);
+  if (error is ApiError) {
+    return _notesAiErrorMessages[error.code] ?? _notesAiFallbackMessage;
   }
-  return text;
+  return _notesAiFallbackMessage;
 }
 
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
