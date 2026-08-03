@@ -31,7 +31,6 @@ import '../trips/collab/collab_screen.dart';
 import '../trips/edit/edit_trip_screen.dart';
 import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
-import 'day_weather.dart';
 import 'reorder_helpers.dart';
 import 'selected_day_provider.dart';
 import 'trip_providers.dart';
@@ -58,8 +57,8 @@ enum _TripMoreAction {
 
 enum _EntryMoreAction { reorder, changePoi, edit, move, copy, delete }
 
-/// 行程時間軸畫面：AppBar（可切換 trip／地圖 + 功能選單）→ DAY selector →
-/// 逐日 section（day header → 天氣示意 → timeline rail + travel pill）。
+/// 行程時間軸畫面：浮動 header（可切換行程／地圖 + 功能選單）→ 日期選擇器 →
+/// 逐日 section（day header → timeline rail + travel pill）。
 class TripTimelineScreen extends ConsumerStatefulWidget {
   const TripTimelineScreen({
     super.key,
@@ -1159,8 +1158,6 @@ class _DaySection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DayHeader(day: day, segments: segments),
-        const SizedBox(height: TpSpacing.s3),
-        DayWeatherCard(day: day),
         const SizedBox(height: TpSpacing.s3),
         if (isEditing) ...[
           for (var index = 0; index < timeline.length; index++) ...[

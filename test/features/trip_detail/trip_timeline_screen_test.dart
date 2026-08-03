@@ -11,7 +11,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
-import 'package:tripline/features/trip_detail/day_weather.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
@@ -213,7 +212,6 @@ Future<void> _pumpTimeline(
   List<TripSegment> segments = const [],
   int? initialEntryId,
   int? initialDayNum,
-  DayWeatherFetcher? dayWeatherFetcher,
   bool disableAnimations = false,
   TextScaler? textScaler,
   List<TripSummary>? trips,
@@ -315,8 +313,6 @@ Future<void> _pumpTimeline(
         if (trips != null)
           myTripsProvider.overrideWith((ref) => Stream.value(trips)),
         if (repo != null) tripRepositoryProvider.overrideWithValue(repo),
-        if (dayWeatherFetcher != null)
-          dayWeatherFetcherProvider.overrideWithValue(dayWeatherFetcher),
         if (initialSelectedDay != null)
           selectedDayProvider.overrideWith(
             () => SeededSelectedDayController(initialSelectedDay),
@@ -1332,41 +1328,11 @@ void main() {
     expect(find.byKey(const ValueKey('hotel-card-9')), findsNothing);
   });
 
-  testWidgets('行程每日使用明確標示的天氣示意資料樣式', (tester) async {
-    await _pumpTimeline(
-      tester,
-      fetchDays: () => const [
-        TripDay(
-          id: 91,
-          dayNum: 1,
-          date: '2026-04-23',
-          title: '北部海岸線',
-          version: 1,
-          timeline: [
-            TimelineEntry(
-              id: 911,
-              sortOrder: 0,
-              startTime: '09:00',
-              title: '美麗海水族館',
-              version: 1,
-              master: EntryPoiInfo(
-                poiId: 901,
-                name: '沖繩美麗海水族館',
-                lat: 26.6942,
-                lng: 127.8778,
-              ),
-            ),
-          ],
-        ),
-      ],
-      dayWeatherFetcher: (request) =>
-          throw StateError('timeline 天氣示意不應呼叫遠端 weather API'),
-    );
+  testWidgets('行程每日不顯示天氣內容', (tester) async {
+    await _pumpTimeline(tester);
 
-    expect(find.text('天氣示意'), findsOneWidget);
-    expect(find.text('晴時多雲'), findsOneWidget);
-    expect(find.text('28°C'), findsOneWidget);
-    expect(find.text('降雨 20%'), findsOneWidget);
+    expect(find.text('天氣示意'), findsNothing);
+    expect(find.text('逐時預報'), findsNothing);
   });
 
   testWidgets('itinerary uses one pinned Sliver selector without overview', (
