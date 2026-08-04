@@ -5,9 +5,9 @@
 > 更新：2026-07-23
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
-> 決策背景：[ADR-0001 全平台採用 iOS HIG 設計語言](docs/adr/0001-universal-ios-hig.md)
+> 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
 
-根目錄的 `/design.md` 是 Tripline App UI／UX 的唯一規範來源（Single Source of Truth）。它覆蓋較早的設計 session、`docs/superpowers/specs/`、`docs/superpowers/plans/` 與本文件舊版；歷史文件只保留決策脈絡。實作尚未完成的項目是 migration target，不得以現況反向修改本規範。
+根目錄的 `/design.md` 是 Tripline App UI／UX 的規範來源。較早的設計 session、spec 與 plan 已隨舊工作流文件一併歸檔，只在 git history 保留決策脈絡；難以逆轉的決策另記於 [`docs/adr/`](docs/adr)。實作尚未完成的項目是 migration target，不得以現況反向修改本規範。
 
 ## 1. 規範標記
 
@@ -62,14 +62,13 @@ iPhone 固定四個 root tabs：
 [返回／取消]      [Inline Title]      [主要動作] […] [帳號]
 ```
 
-- **Tripline 決策**：全 App 不使用 Large Title；所有頁面使用 system inline navigation title。
+- **Tripline 決策**：全 App 不使用 Large Title；標題一律 inline 呈現。標題由 `TpRootScaffold`／`TpAppBar` 自繪，不使用 `CupertinoNavigationBar`（見 [ADR-0001](docs/adr/0001-keep-liquid-glass-over-native-cupertino.md)）。
 - **HIG 必須**：返回、關閉或取消位於 leading；頁面動作與帳號位於 trailing。
 - **Tripline 決策**：每個 App 內容頁右上角固定顯示 `person.crop.circle`，不顯示照片、姓名縮寫或自訂頭像。
 - **Tripline 決策**：Account sheet 本身、登入／註冊流程與系統 modal 不重複顯示帳號 icon。
 - **HIG 必須**：帳號 icon 的可點區至少 44×44pt，VoiceOver label 為「帳號」。
 - **Tripline 決策**：帳號左側最多直接顯示一個當頁主要動作；其他動作進入 system `…` menu。
 - **HIG 必須**：`完成`、`取消`、`儲存`等動作用文字按鈕；只有語意明確的動作使用 SF Symbol。
-- **HIG 必須**：不替每個 icon 自製圓框、厚 border 或不同尺寸；由 system toolbar／Liquid Glass 分組。
 - **HIG 必須**：disabled action 保留位置並降低強調，不造成 toolbar 跳動。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
 
@@ -306,6 +305,24 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：symbol-only control 提供 tooltip、VoiceOver label 與至少 44×44pt 點擊區域。
 - **HIG 必須**：icon 的 selected、disabled、loading 與 destructive 狀態使用系統慣例。
 
+### 16.5 App Icon
+
+圖形是圓角定位圖釘外框，中央為實心指南針箭頭。三種外觀維持**完全相同的輪廓與比例**，只換配色。
+
+| 外觀 | 背景 | 圖形 |
+|---|---|---|
+| Default | 木棕 `#A97A4A` | 奶油白 `#FFFBF5` |
+| Dark | 棕黑 `#1A140F` | 木棕 `#A97A4A` |
+| Tinted | 等亮度灰 `#818181` | 白色（供系統著色） |
+
+- **Tripline 決策**：不預先裁圓角，由系統套用遮罩。
+- **Tripline 決策**：主圖保留足夠安全邊距，確保 20pt 小尺寸仍可辨識。
+- **Tripline 決策**：iOS 沿用 `Assets.xcassets/AppIcon.appiconset` 的 Single Size 格式，提供 Default／Dark／Tinted 三個 1024×1024 主檔，各尺寸由 Xcode 產生。
+- **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
+- 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
+
+木棕 `#A97A4A` 就是 CONTEXT.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
+
 ## 17. Motion 與 haptics
 
 - **HIG 必須**：navigation、sheet、menu、tab 與鍵盤使用系統節奏。
@@ -352,9 +369,12 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ## 20. 來源階層與實作落差
 
-1. 本文件。
-2. [ADR-0001](docs/adr/0001-universal-ios-hig.md) 與 [CONTEXT.md](CONTEXT.md)。
-3. `reference-theme.md`、`explanation-adaptive-ui.md` 等衍生說明。
-4. 歷史 design session、spec 與 plan。
+UI 規範的來源階層，由高到低：
 
-`reference-navigation.md` 在 migration 完成前仍描述目前五 branch router；它是現況參考，不是目標 UI 規範。若實作、測試或舊文件與本文件衝突，以本文件為準並建立 migration work，不得靜默保留舊規則。
+1. [`docs/adr/`](docs/adr) —— ADR 記錄的是決策當下的取捨與被拒方案，且會標註更正史。與本文件衝突時**以 ADR 為準**（例：導覽 chrome 的膠囊分組見 [ADR-0004](docs/adr/0004-neutral-selection-surface-with-tinted-foreground.md)）。
+2. 本文件。
+3. [CONTEXT.md](CONTEXT.md) —— 只定義語彙，不定義規範；但本文件用到的名稱必須與它一致。
+
+`code-review` 的 Standards 軸同時讀 [`CONTRIBUTING.md`](CONTRIBUTING.md) 與本文件；本文件裡「每個 PR 都該逐條對」的部分（刪除動線、Accessibility release gate、驗收矩陣、動作動詞實作層規範）已折入 `CONTRIBUTING.md` §UI 規範，兩處內容相同時以本文件為原文。
+
+若實作或測試與本文件衝突，以本文件為準並建立 migration work，不得靜默保留舊規則 —— 除非該項已有 ADR 明文推翻。

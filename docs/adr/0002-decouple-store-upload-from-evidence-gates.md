@@ -38,3 +38,7 @@ status: accepted
   ```
 - **Test Lab 失敗不再等於發版失敗,但也不再有人被迫看它。** 排程跑出來的紅燈需要有人主動追,否則外部裝置證據會靜靜地爛掉。
 - 契約由 `test/platform/google_maps_configuration_test.dart` 與 `test/features/map/map_platform_config_test.dart` 守住:前者驗 store job 沒有 `needs:`、但保有 environment 與 master-only;後者驗 `mobile-e2e.yml` 保有自己的觸發來源,不會因為沒人呼叫而變成孤兒 workflow。
+- **build number 的公式是 `GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT`,而且不能改用 `GITHUB_RUN_ID`。**
+  解耦之後兩個 store job 沒有共同的前置 job 可以幫它們產號,只能各自從 run 身分推導,因此同一條公式在兩邊各寫一次:iOS build number 在 `.github/workflows/mobile.yml:125`,Android version code 在 `.github/workflows/mobile.yml:208`。`GITHUB_RUN_ID` 看起來是更省事的單調遞增值,但現行 GitHub run ID 的量級已經超過 Google Play version code 的上限 `2100000000`,用了會直接被 Play 退件;Android job 在 `.github/workflows/mobile.yml:209-212` 另外留一道上限檢查當保險。
+- **`GITHUB_RUN_ATTEMPT < 100` 是硬性守門條件,不是防呆。**
+  乘數 100 等於替每個 run 切出 100 格的 attempt 區間;attempt 一旦到 100,算出來的值就會溢位撞進下一個 `RUN_NUMBER` 的區間,跟未來某次 run 產生重號的 version code —— 而 Play 對重複的 version code 是拒收。所以兩個 job 都在建置動作之前直接 `exit 1`(`.github/workflows/mobile.yml:121-124`、`204-207`),寧可讓發版失敗也不讓它靜靜溢位。代價是同一個 run 重跑滿 99 次之後只能改開新 run,不能再 re-run 舊的。

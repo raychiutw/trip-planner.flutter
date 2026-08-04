@@ -32,44 +32,46 @@ flutter run        # 連 prod API（注意：請用測試帳號）
 lib/
   theme/        # iOS 系統語意色 tokens + Light／Dark／High Contrast ThemeData
   models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
-  api/          # dio 封裝（cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
+  api/          # dio 封裝（Bearer／cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
+    cache/      # drift 永續快取、離線佇列、樂觀更新與 rebase 合併
+  ui/           # Tp* 共用 widget（TpAppBar／TpGlassSurface／TpStateView…）
   app/          # go_router（4-tab StatefulShellRoute、Account sheet + auth redirect）
-  features/     # auth / trips / trip_detail（timeline·map·notes）/ account / shell
+  features/     # account / auth / chat / favorites / invite / map / offline
+                # / share / shell / trip_detail（timeline·map·notes）/ trips
 docs/
-  PORTING_PLAN.md   # 移植藍圖與架構決策
-  CONTRACTS.md      # 模組介面契約（多 agent 平行開發用）
-  discovery/        # 來源 SPA 的畫面/API/模型/設計系統調查報告
+  adr/          # 架構決策與被拒方案（13 份）
+  agents/       # agent 用的 issue tracker／triage labels／domain docs 設定
+  mobile-e2e.md # Patrol／Firebase Test Lab 與發布 runbook
 ```
 
 ## 文件
 
 | 想做什麼 | 看哪份 |
 |---|---|
-| 從零跑起來、走一輪 TDD | [新手教學](docs/tutorial-getting-started.md) |
-| 懂整體設計與取捨 | [架構說明](docs/explanation-architecture.md) |
-| 新增 API endpoint | [How to 新增 API endpoint](docs/howto-add-endpoint.md) |
-| 新增畫面 | [How to 新增畫面](docs/howto-add-screen.md) |
-| 改連本機後端 | [How to 指向本機後端](docs/howto-local-backend.md) |
-| 啟用 OAuth PKCE | [How to 啟用 OAuth PKCE](docs/howto-oauth-pkce.md) |
-| 寫測試（provider override） | [How to 用 provider override 寫測試](docs/howto-test-with-providers.md) |
-| 跑 Patrol／Firebase Test Lab 外部裝置證據 | [Mobile E2E automation](docs/mobile-e2e.md) |
-| 發布 TestFlight／Google Play internal | [Mobile release runbook 與發布紀錄](docs/mobile-e2e.md#run-and-interpret) |
-| 查 API 層介面 | [reference-api](docs/reference-api.md) |
-| 查 model 欄位與解析規則 | [reference-models](docs/reference-models.md) |
-| 查設計 token / 自適應 UI 規格 | [reference-theme](docs/reference-theme.md) |
-| 理解 Apple Music / Apple HIG 對標取捨 | [自適應 UI 設計理由](docs/explanation-adaptive-ui.md) |
-| 查路由表 / auth redirect | [reference-navigation](docs/reference-navigation.md) |
-| 貢獻流程與慣例 | [CONTRIBUTING](CONTRIBUTING.md) |
-| 變更紀錄 / 待辦 | [CHANGELOG](CHANGELOG.md) · [TODOS](TODOS.md) |
+| 貢獻流程、環境與開發流程 | [CONTRIBUTING](CONTRIBUTING.md) |
+| 懂分層與依賴方向 | [CONTRIBUTING § 分層與依賴方向](CONTRIBUTING.md#分層與依賴方向) |
+| 新增 API endpoint | [CONTRIBUTING § API 層規範](CONTRIBUTING.md#api-層規範) |
+| 查 model 欄位與 fromJson 解析規則 | [CONTRIBUTING § Model 與 fromJson 解析規則](CONTRIBUTING.md#model-與-fromjson-解析規則) |
+| 新增畫面、導覽玻璃與鍵盤 | [CONTRIBUTING § 畫面撰寫規範](CONTRIBUTING.md#畫面撰寫規範) · [§ 導覽玻璃與鍵盤](CONTRIBUTING.md#導覽玻璃與鍵盤) |
+| 寫測試（provider override、不可假綠） | [CONTRIBUTING § Provider 與測試 seam](CONTRIBUTING.md#provider-與測試-seam) · [§ 測試規範](CONTRIBUTING.md#測試規範) · [§ 測試不可假綠](CONTRIBUTING.md#測試不可假綠) |
+| 查 UI／UX 規範（iOS HIG） | [design.md](design.md) · [CONTRIBUTING § UI 規範](CONTRIBUTING.md#ui-規範) |
+| 查領域詞彙（停留點、正選／備選 POI、工單） | [CONTEXT.md](CONTEXT.md) |
+| 理解架構決策與被拒方案 | [docs/adr/](docs/adr/)（13 份） |
+| 跑 Patrol／Firebase Test Lab、發布 TestFlight／Google Play | [docs/mobile-e2e.md](docs/mobile-e2e.md) |
+| 設定 agent 的 issue tracker／triage labels／domain docs | [docs/agents/](docs/agents/) |
+| 看變更紀錄 | [CHANGELOG](CHANGELOG.md) |
+| 找待辦、spec 與 PRD | [GitHub Issues](https://github.com/raychiutw/trip-planner.flutter/issues) |
 
 技術棧：Flutter 3.44.7 stable / Dart 3.12.2（pubspec `sdk: ^3.11.3`）、flutter_riverpod 3、go_router 17、dio 5、google_navigation_flutter 0.10。
 
 ## API client 關鍵行為（與 web `src/lib/apiClient.ts` 對齊）
 
-- mutating request 一律帶 `Origin: https://trip-planner-dby.pages.dev`（後端 CSRF Origin allowlist，缺少 → 403）
+- 雙軌認證：有 Bearer access token 就走 Bearer 模式（帶 `Authorization: Bearer …`，不送 Cookie／Origin，後端對此跳過 CSRF 檢查）；否則走 cookie 模式，帶 `Cookie: tripline_session=…`
+- cookie 模式的 mutating request 一律帶 `Origin`，值為 `kTriplineOrigin`（`String.fromEnvironment('TRIPLINE_API_ORIGIN')`，預設 `https://trip-planner-dby.pages.dev`）—— 後端 CSRF Origin allowlist，缺少 → 403
+- Bearer 模式收到 401 會先嘗試 refresh，成功才用同參數重送一次
 - 429 讀 `Retry-After`（cap 30s）只 retry GET 一次；mutation 不 retry
 - 錯誤 shape `{error:{code,message,detail}}`；204 → null
 
 ## 設計
 
-Flutter 的互動與版型以根目錄 [`design.md`](design.md) 為唯一設計 SOT，[設計系統參考](docs/reference-theme.md)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。
+Flutter 的互動與版型以根目錄 [`design.md`](design.md) 為唯一設計 SOT，[CONTRIBUTING § UI 規範](CONTRIBUTING.md#ui-規範)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。

@@ -120,6 +120,35 @@ The current Tripline bucket is `trip-planner-490413-test-lab-results` in `ASIA-E
 
 The Android job reuses the existing upload-keystore secrets to sign Patrol's debug APK. This is required because the Maps key is restricted to the Tripline package and signing SHA-1; an ephemeral GitHub debug key would render an unauthorized blank map. Keep three `com.raychiu.tripline` SHA-1 allowlist entries on the Android key: local debug, CI/upload, and the distinct Google Play app-signing certificate. Firebase Test Lab proves only the debug/upload-signed path; a successful Test Lab map smoke does not prove that the Play-delivered APK can load map tiles. Every Android store release therefore needs one final install/update from the internal-track opt-in page and a map-render check on that Play-signed build.
 
+### Android upload key 與 Maps key 的既成事實
+
+這些值無法從 repo 或 git history 逆推,遺失就得重新申請並重新設定 Play 與 Google Cloud。
+
+| 項目 | 值 |
+|---|---|
+| Upload key alias | `tripline-upload` |
+| Keystore 檔 | `android/upload-keystore.jks`(已在 `.gitignore`,**永不覆寫**) |
+| Upload-certificate SHA-1 | `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA` |
+| macOS Keychain 項目(keystore 密碼) | `tripline-android-upload-keystore` |
+| macOS Keychain 項目(Maps key) | `tripline-google-maps-android` |
+| Package name | `com.raychiu.tripline` |
+
+SHA-1 是公開的憑證指紋,不是密鑰;密碼只存在 macOS Keychain 與 GitHub secrets。
+
+Upload key 的產生參數(需要重建時照這組,否則指紋對不上 Play 已登記的值):PKCS12
+storetype、RSA 2048、`SHA256withRSA`、validity 10000、
+`CN=Tripline Android Upload, OU=Mobile, O=Tripline, L=Taipei, ST=Taiwan, C=TW`。
+密碼用 `openssl rand -base64 36` 產生後直接寫進 Keychain,不落地、不印出。
+
+Google Cloud 的 Android Maps 憑證設定:**Application restrictions → Android apps**
+填 package `com.raychiu.tripline` 加上上表的 upload-certificate SHA-1;
+**API restrictions → Restrict key** 只勾 Maps SDK for Android。
+**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與金鑰一律走
+Gradle 的 `ANDROID_KEYSTORE_*` 環境變數契約,由 Keychain 或 GitHub secrets 供應。
+
+若 `android/upload-keystore.jks` 已存在,先檢查它的 alias 與指紋是否與上表相符,
+**絕不覆寫** —— 覆寫等於失去對已上架 app 的上傳權,只能走 Play 的 upload key reset 流程。
+
 Refresh device variables before changing the matrix:
 
 ```bash
@@ -305,7 +334,7 @@ iOS 的注入方式：Patrol 4.8.0 的 server extension
 Dart 端以 HTTP POST 請求手勢，由 `XCUIElement` 的公開多指介面執行。**不**依賴
 accessibility tree —— iOS 實機的 XCUI a11y tree 裡沒有任何 Flutter `Semantics`
 節點，`setSemanticsTreeEnabled()` 與 `ensureSemanticsEnabled()` 都無法改變這點
-（詳見 issue #104 與 `docs/discovery/native-map-gestures.md`）。
+（詳見 issue #104 與 [ADR-0012](adr/0012-custom-patrol-extension-for-map-gestures.md)）。
 
 ⚠️ **Google POI 斷言依賴裝置的對外網路。**
 [Run 30178928266](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30178928266)
@@ -313,165 +342,3 @@ accessibility tree —— iOS 實機的 XCUI a11y tree 裡沒有任何 Flutter `
 而完全載不到地圖圖磚，九次 tap 點在空白畫布上、POI 斷言失敗 —— 那是基礎設施
 故障，不是產品缺陷。現在測試會分流回報（觸控未抵達 vs 底圖不可用），CI 也會在
 DNS 全黑時發出 `::warning::`。
-
-## 歷史 release records
-
-## 2026-07-23 v0.9.6 store release record
-
-Final source SHA `4ac7776d95135cbcf1baded91511a11d28d171c9` was released from
-[workflow run 29964801571](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29964801571).
-Run number `127`, attempt `1`, produced shared iOS／Android build `12701` for
-version `0.9.6`. The final Test Lab navigation fix was merged through
-[PR #80](https://github.com/raychiutw/trip-planner.flutter/pull/80) after
-[PR CI run 29963049945](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963049945)
-completed successfully; the exact merge commit then passed
-[master CI run 29963722375](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963722375).
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Analyzer／full Flutter suite | PASS | Analyzer reported 0 issues; 1,402 tests passed locally, in PR CI, on the merge commit, and independently in both store jobs |
-| Local Patrol product flow | PASS | iOS simulator completed 1 app-owned flow covering login, chat input, all five root tabs, and favorites search |
-| iOS Firebase Test Lab | PASS | [Run 29963749443](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29963749443) tested the exact final SHA on iPhone 14 Pro／iOS 16.6 and reported `3 test cases passed` |
-| TestFlight | PASS | Build `12701` uploaded through the App Store API; processing returned `VALID` |
-| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `14630000200256184012` committed |
-
-The `mobile-release` Environment approved both store jobs. The release dispatch
-kept `run_optional_evidence=false` to avoid rerunning the already-passing iOS
-matrix; Android Test Lab and the staging favorite-restore contract were not
-claimed as part of this release record.
-
-## 2026-07-21 v0.9.4 store release record
-
-Source SHA `e9517dd131836e80424b3aae6a7046df75f8a053` was released from
-[workflow run 29848648325](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29848648325).
-Run number `112`, attempt `1`, produced shared iOS／Android build `11201` for
-version `0.9.4`. The source was merged through
-[PR #73](https://github.com/raychiutw/trip-planner.flutter/pull/73) after
-[PR CI run 29846766960](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29846766960)
-completed successfully; the exact merge commit then passed
-[master CI run 29847777356](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29847777356).
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Analyzer／format／workflow lint | PASS | Flutter analyzer reported 0 issues; Dart format, actionlint, and `git diff --check` passed |
-| Full Flutter suite | PASS | 1,355 tests passed locally, in PR CI, on the merge commit, and independently in both store jobs |
-| Android build evidence | PASS | PR and master CI each completed the Android debug build; the release job produced and preserved the signed AAB |
-| iOS simulator evidence | PASS | Timeline rail, exact duration, compact map links, large-text cancel action, native Google POIs, light map style, and zoom `13` were visually and semantically verified |
-| TestFlight | PASS | Build `11201` uploaded through the App Store API; processing returned `VALID` |
-| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `03552382695613245559` committed |
-
-The `mobile-release` Environment approved both store jobs. Optional Firebase
-and staging evidence was disabled for this publish-first run and remains an
-independent evidence path rather than a claimed pass.
-
-## 2026-07-21 v0.9.3 store release record
-
-Source SHA `eb4c493bb16c9317017c268fe225b43fa6fa801e` was released from
-[workflow run 29830338702](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29830338702).
-Run number `107`, attempt `1`, produced shared iOS／Android build `10701` for
-version `0.9.3`. The source was merged through
-[PR #71](https://github.com/raychiutw/trip-planner.flutter/pull/71) after
-[PR CI run 29829527458](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29829527458)
-completed successfully.
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Analyzer／format／workflow lint | PASS | Flutter analyzer reported 0 issues; Dart format, actionlint, and `git diff --check` passed |
-| Full Flutter suite | PASS | 1,347 tests passed locally and in PR CI, including POSIX release contracts and timeline drag-feedback geometry |
-| PR build evidence | PASS | Run 29829527458 completed analyzer, full tests, named UI artifacts, and Android debug build |
-| TestFlight | PASS | Build `10701` uploaded through the App Store API; processing returned `VALID` |
-| Google Play internal | PASS | Signed AAB uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `06867052877178981510` committed |
-
-The `mobile-release` Environment approved both store jobs. Optional Firebase
-and staging evidence was disabled for this publish-first run and remains an
-independent evidence path rather than a claimed pass.
-
-## 2026-07-21 v0.9.2 store release record
-
-Source SHA `12a8721c1f8361e244af6395fcad51df4745b002` was released from
-[workflow run 29802745365](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29802745365).
-Run number `101`, attempt `1`, produced the shared iOS／Android build number
-`10101` for version `0.9.2`. This release standardizes local and GitHub Actions builds on Flutter
-3.44.7 stable／Dart 3.12.2. The public privacy policy returned HTTP 200 at
-`https://trip-planner-dby.pages.dev/privacy`; signup forwards the user's actual
-`privacyConsent`, account settings link to the same policy, and in-app account
-deletion uses an uncached preview followed by `DELETE /api/account`.
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Analyzer | PASS | Flutter 3.44.7, 0 issues |
-| Focused release／API／account／trip tests | PASS | 218 tests, including the four stale assertions from the previous failed Linux run |
-| Full Windows host run | PARTIAL | 1,314 passed; 12 Bash-invocation cases in the two workflow contract files are not reliable under Windows/MSYS and remain mandatory Ubuntu CI gates |
-| Push CI | PASS | [Run 29802168723](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29802168723): actionlint, analyzer, complete Ubuntu suite including Bash contracts, and Android debug build |
-| Workflow／signing configuration | PASS | Flutter version pinned to 3.44.7; App Store, Play, Maps, and signing secrets produced valid signed artifacts |
-| Public privacy policy | PASS | Anonymous HTTPS GET returned 200 on 2026-07-21 |
-| Favorite restore staging contract | BLOCKED | Protected staging credentials and reviewed real staging allowlist are still absent; publish with `run_optional_evidence=false` |
-| TestFlight | PASS | Build `10101` uploaded through the App Store API; processing returned `VALID` |
-| Google Play internal | PASS | Build `10101` uploaded to `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `06752822212770581126` committed |
-
-The `mobile-release` Environment approved both store deployments. Optional
-Firebase and staging evidence was deliberately disabled for this publish-first
-run; the blocked restore contract remains an independent evidence task and is
-not represented as passed.
-
-## 2026-07-20 HIG／offline／restore implementation verification
-
-The 2026-07-20 App implementation completed the HIG navigation, typography,
-search, swipe-delete, sheet semantics, map POI interaction, and reconnect-sync
-tasks. Local verification used Flutter 3.44.6:
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Dart formatting and analyzer | PASS | All changed Dart files formatted; analyzer reported 0 issues |
-| Product Flutter suite | PASS | 1,284 tests across API, app, features, flows, models, platform, theme, and UI |
-| Android native compile | PASS | `flutter build apk --debug` produced `app-debug.apk` |
-| Favorite restore App wiring | PASS | `POST /poi-favorites/{id}/restore`; release builds enable `FAVORITE_RESTORE_ENABLED=true` |
-| Real staging restore contract | BLOCKED | The protected `mobile-release` environment has no real staging secrets or variables, and the reviewed allowlist contains only the reserved `.test` fixture |
-
-The two Bash-based workflow test files are not a Windows/MSYS verification
-surface because Dart-launched Git Bash does not preserve their POSIX path and
-environment assumptions. They remain mandatory Linux CI gates. Do not interpret
-this host limitation as staging contract evidence.
-
-## 2026-07-20 store release record
-
-Source SHA `e4ebcb5f60ce0eaaa9b397683d793da0e3b8eb96` was released from one approved `release_target=both` dispatch. Workflow run [29699386889](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29699386889) used run number `92`, attempt `1`, and the shared build-number formula to produce iOS and Android build `9201` for version `0.9.1`.
-
-| Store | Result | Evidence |
-| --- | --- | --- |
-| TestFlight | PASS | Build `9201` uploaded through the App Store API; App Store processing returned `VALID` |
-| Google Play internal | PASS | Signed AAB uploaded to package `com.raychiu.tripline`, track `internal`, status `completed`; Play edit `08259896710714327432` committed |
-
-Optional Firebase and staging evidence was deliberately disabled for this publish-first run. Those independent gates remain tracked below and can be collected without invalidating the completed store release.
-
-## 2026-07-19 pre-release verification record
-
-Source SHA `fec66f90` (the `master` head at verification time) was verified with
-the following layered evidence. A blocked external gate is deliberately not
-counted as a pass.
-
-| Layer | Result | Evidence |
-| --- | --- | --- |
-| Dart formatting | PASS | 335 files checked, no changes |
-| Focused UI/app/flow tests | PASS | 109 tests |
-| Full Flutter tests and analyzer | PASS | local worktree run |
-| iOS simulator build | PASS | unsigned `Runner.app` built locally |
-| Deterministic iOS integration flow | PASS | `integration_test/app_smoke_test.dart`, 1 test |
-| Native iOS map smoke | PASS | `patrol_cli` 4.4.0, 1 passing UI test covering ready, zoom 12, theme, gesture, and location; `build/ios_results_1784405657116.xcresult` |
-| Deterministic visual matrix | PASS | 54 named Light/Dark, 100%/200% text, accessibility screenshots under `build/test-artifacts/app-owned/` |
-| Android build and fast CI | PASS | [Mobile CI run 29658333281](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29658333281), SHA `fec66f90` |
-| Android external device | PASS | [Firebase Test Lab run 29657342097](https://github.com/raychiutw/trip-planner.flutter/actions/runs/29657342097), SHA `d47e88d0` |
-| iOS Firebase physical device | BLOCKED | No Apple Development P12 for team `8Z6WVFJ574` in the protected environment |
-| Favorite restore staging contract | BLOCKED | Backend identity endpoint and server-side expected-environment mutation guard are not deployed; the deployed origin/environment pair is not committed to `tool/staging-release-environments.txt`; protected staging URL, account cookies, fixture POI, and contract guard are not configured |
-| TestFlight upload for this snapshot | NOT RUN | At this point in the verification sequence, release was still coupled to the two blocked optional gates above |
-
-This table records the pre-release state at source SHA `fec66f90`. The later
-store record above supersedes its upload status after store delivery was safely
-decoupled from optional external-device and staging evidence.
-
-The Android Test Lab run is one CI-only scheduling commit behind the recorded
-master SHA. The diff from `d47e88d0` to `fec66f90` changes only
-`.github/workflows/mobile-e2e.yml` and its workflow contract test; Flutter,
-native runner, and Patrol test sources are identical. It therefore proves the
-current product/test binaries, but it is not described as exact-commit
-evidence.

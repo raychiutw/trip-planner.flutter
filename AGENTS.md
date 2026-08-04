@@ -1,8 +1,8 @@
 # AGENTS.md
 
-本檔是 Codex 與其他 coding agent 在此 repository 的強制工作契約。**每次開始任何探索、編輯、測試或外部操作前，必須先完整閱讀根目錄 `AGENTS.md`**；若工作範圍內另有更深層的 `AGENTS.md`，也必須一併閱讀並套用。
+本檔是 Codex 與其他 coding agent 在此 repository 的強制工作契約。**每次開始任何探索、編輯、測試或外部操作前，必須先完整閱讀根目錄 `AGENTS.md`**。
 
-本檔依使用者明確要求與 `CLAUDE.md` 並存。兩者的共同規則變更時必須同步；若內容衝突，不得自行挑選，先向使用者指出差異。
+本檔依使用者明確要求與 `CLAUDE.md` 並存。兩者各自維護，沒有自動同步機制；改到共同規則時記得兩邊都改。若內容衝突，不得自行挑選，先向使用者指出差異。
 
 ## 開工前檢查
 
@@ -30,14 +30,14 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 - When MCP tools return insufficient results
 
 ## Examples
-- Find a handler: `search_graph(name_pattern=".*OrderHandler.*")`
-- Who calls it: `trace_path(function_name="OrderHandler", direction="inbound")`
-- Read source: `get_code_snippet(qualified_name="pkg/orders.OrderHandler")`
+- Find a class: `search_graph(name_pattern=".*TripRepository.*")`
+- Who calls it: `trace_path(function_name="ApiClient", direction="inbound")`
+- Read source: `get_code_snippet(qualified_name="lib.api.api_client.ApiClient")`
 <!-- codebase-memory-mcp:end -->
 
 ## 專案性質
 
-本 repo 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS／Android Flutter 移植版。**後端不動**：共用 Cloudflare Pages Functions API（`https://trip-planner-dby.pages.dev/api`），此 repo 只是另一個 client。P0（唯讀畫面）已完成；P1／P2 範圍見 `docs/PORTING_PLAN.md`。
+本 repo 是 [trip-planner React SPA](https://github.com/raychiutw/trip-planner) 的 iOS／Android Flutter 移植版。**後端不動**：共用 Cloudflare Pages Functions API（`https://trip-planner-dby.pages.dev/api`），此 repo 只是另一個 client。P0（唯讀畫面）、P1（收藏／停留點 CRUD／AI 聊天／共編）與 P2（分享匯入、設定、OAuth PKCE Bearer 認證、離線快取）皆已完成，現在是既有功能的維護與增修。
 
 ## 強制開發流程
 
@@ -80,22 +80,24 @@ flutter run                                           # 連 prod API；一律使
 
 ## 架構
 
-分層單向依賴（上層使用下層）：`features/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart，不 import Flutter；`theme/` 不依賴其他層。深度說明見 `docs/explanation-architecture.md`，文件索引見 README「文件」一節。
+分層單向依賴（上層使用下層）：`features/` → `ui/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart，不 import Flutter；`theme/` 不依賴其他層。完整規則與既有例外見 `CONTRIBUTING.md`「分層與依賴方向」一節。
 
 ### Provider 鏈（Riverpod 3.x）
 
 `sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`tripRepositoryProvider` → `authStateProvider`（全 app 認證 SoT）→ `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
 
-行程詳情的 trip／days／notes 使用 `FutureProvider.family<_, String tripId>`（`lib/features/trip_detail/trip_providers.dart`）；timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
+行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24,33,43`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
 
 Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 list literal 傳入 `ProviderScope`。
 
 ### 認證與 API 安全規則
 
-後端使用瀏覽器導向的 session cookie 與 CSRF Origin allowlist，app 扮演瀏覽器：
+認證有 **cookie 與 Bearer 兩種互斥模式**，由 `_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 access token 二選一，repository 與畫面層都不得自己拼這些 header：
 
-- 登入走 raw `client.dio` 讀取 `set-cookie`，解析 `tripline_session` 並存入 `flutter_secure_storage`。
-- 每個 request 手動帶 `Cookie:`；**mutating request 必帶 `Origin: https://trip-planner-dby.pages.dev`**，否則回 403。`ApiClient` 已統一處理，不得繞過它用 raw Dio 呼叫 API。
+- **cookie 模式**（無 Bearer token）：後端使用瀏覽器導向的 session cookie 與 CSRF Origin allowlist，app 扮演瀏覽器。登入走 `postForResponse`（`lib/api/auth_repository.dart:101`）讀取 `set-cookie`，解析 `tripline_session` 並存入 `flutter_secure_storage`；之後每個 request 帶 `Cookie:`，**且非 `GET`／`HEAD` 的 mutating request 必帶 `Origin:`**，否則回 403。
+- **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
+- Origin 值是 `kTriplineOrigin = String.fromEnvironment('TRIPLINE_API_ORIGIN', defaultValue: 'https://trip-planner-dby.pages.dev')`（`lib/api/api_client.dart:21-24`），同時決定 base URL 與 CSRF header，本機後端靠 `--dart-define` 覆寫，不得改回字面常數。
+- 以上 `ApiClient` 已統一處理，不得繞過它用 raw Dio 呼叫 API。
 - `currentUser()` 收到 401 時回傳 `null`，不 throw。登入後跳轉靠 router redirect（`refreshListenable` 橋接 `authState` 變化）；`LoginScreen` 本身不導航。
 
 ### ApiClient 行為規則
@@ -103,13 +105,13 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 每條規則都有對應測試，改動時必須同步測試：
 
 1. 非 2xx → throw `ApiError`（三層 fallback 解析見 `api_error.dart`）。
-2. 429 只 retry GET 一次（讀取 `Retry-After`，上限 30 秒）；mutation 絕不 retry。
+2. 三條分支共用「同參數重送一次」的 `retry()`（`lib/api/api_client.dart:795-806`），各自靠 `isRetryAttempt` 限制**最多一次**：①**429** 僅 `GET`／`HEAD`，讀 `Retry-After` 等待後重送（clamp 0–30 秒，缺漏回 1 秒）；②**edge block page**（2xx 非 204 但 `Content-Type` 含 `text/html` 的 CDN 攔截頁）重試條件與 429 完全相同，重送後仍是攔截頁則丟 `SYS_UPSTREAM_UNAVAILABLE`；③**Bearer 401** 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**（`POST`／`PATCH`／`DELETE` 一樣重送）。「mutation 絕不 retry」是錯的說法，只有 429／edge block 不重送 mutation。SSE 串流版 `_getTextStream()`（`lib/api/api_client.dart:884-911`）走同一組規則，改重試邏輯要兩處一起改。
 3. 204／空 body → `null`。
 4. 路徑參數使用 `Uri.encodeComponent`。
 
 ### Model 解析規則
 
-Wire 格式是 camelCase（server `deepCamel()`）；數字使用 `(json['x'] as num?)?.toInt()`／`.toDouble()`；bool flag 接受 0／1 與 bool：`json['x'] == 1 || json['x'] == true`；日期時間保留字串，不轉 `DateTime`；缺少 list → `[]`；缺少 `sortOrder`／`version` → `0`。欄位表見 `docs/reference-models.md`。`docs/CONTRACTS.md` 是多 agent 開發的歷史契約，個別欄位以程式碼為準。
+Wire 格式是 camelCase（server `deepCamel()`）；數字使用 `(json['x'] as num?)?.toInt()`／`.toDouble()`；bool flag 接受 0／1 與 bool：`json['x'] == 1 || json['x'] == true`；日期時間保留字串，不轉 `DateTime`；缺少 list → `[]`；缺少 `sortOrder`／`version` → `0`。完整規則、欄位行號與後端契約細節見 `CONTRIBUTING.md`「Model 與 fromJson 解析規則」與「API 層規範／後端契約細節」兩節；個別欄位仍以程式碼為準。
 
 ### Theme 取色規則
 
@@ -117,7 +119,7 @@ Widget 一律透過 `Theme.of(context).colorScheme` 取色。柔褐 tint 是唯�
 
 ### OCC
 
-Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409 `STALE_ENTRY` 時重抓後再套用。P0 唯讀未使用，P1 Entry CRUD 會使用。
+Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409 `STALE_ENTRY` 時重抓 server 真相後再套用，離線佇列走三方 rebase。停留點 meta、筆記與交通段的編輯路徑都已在用；行程本身無 `version`（走 `PUT /trips/:id`，last-write-wins），另有字串型的 `entryPoisVersion` 管 POI 結構操作，兩套 OCC 不可混用。
 
 ## 測試慣例
 
@@ -127,7 +129,7 @@ Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409
 - API：`http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 - Screens：widget test + `ProviderScope` override、mocktail mock repository、假 `GoRouter` 作為導航探針。
 
-具體手法見 `docs/howto-test-with-providers.md`。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
+具體手法（provider override、關掉 error 態自動重試、假綠燈防線）見 `CONTRIBUTING.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
 
 ## Agent skills
 
