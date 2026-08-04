@@ -306,6 +306,24 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：symbol-only control 提供 tooltip、VoiceOver label 與至少 44×44pt 點擊區域。
 - **HIG 必須**：icon 的 selected、disabled、loading 與 destructive 狀態使用系統慣例。
 
+### 16.5 App Icon
+
+圖形是圓角定位圖釘外框，中央為實心指南針箭頭。三種外觀維持**完全相同的輪廓與比例**，只換配色。
+
+| 外觀 | 背景 | 圖形 |
+|---|---|---|
+| Default | 木棕 `#A97A4A` | 奶油白 `#FFFBF5` |
+| Dark | 棕黑 `#1A140F` | 木棕 `#A97A4A` |
+| Tinted | 等亮度灰 `#818181` | 白色（供系統著色） |
+
+- **Tripline 決策**：不預先裁圓角，由系統套用遮罩。
+- **Tripline 決策**：主圖保留足夠安全邊距，確保 20pt 小尺寸仍可辨識。
+- **Tripline 決策**：iOS 沿用 `Assets.xcassets/AppIcon.appiconset` 的 Single Size 格式，提供 Default／Dark／Tinted 三個 1024×1024 主檔，各尺寸由 Xcode 產生。
+- **Tripline 決策**：Android 沿用既有 `mipmap-*/ic_launcher.png`，以 Default 版本縮放覆蓋，不引入額外的啟動圖示框架。
+- 所有 PNG 必須是正方形、正確像素尺寸且**不含 alpha**。
+
+木棕 `#A97A4A` 就是 CONTEXT.md 定義的 tint（品牌柔褐）；App Icon 是它唯一以「大面積填色」出現的地方，App 內一律只上前景。
+
 ## 17. Motion 與 haptics
 
 - **HIG 必須**：navigation、sheet、menu、tab 與鍵盤使用系統節奏。

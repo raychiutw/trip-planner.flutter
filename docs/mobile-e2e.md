@@ -120,6 +120,35 @@ The current Tripline bucket is `trip-planner-490413-test-lab-results` in `ASIA-E
 
 The Android job reuses the existing upload-keystore secrets to sign Patrol's debug APK. This is required because the Maps key is restricted to the Tripline package and signing SHA-1; an ephemeral GitHub debug key would render an unauthorized blank map. Keep three `com.raychiu.tripline` SHA-1 allowlist entries on the Android key: local debug, CI/upload, and the distinct Google Play app-signing certificate. Firebase Test Lab proves only the debug/upload-signed path; a successful Test Lab map smoke does not prove that the Play-delivered APK can load map tiles. Every Android store release therefore needs one final install/update from the internal-track opt-in page and a map-render check on that Play-signed build.
 
+### Android upload key 與 Maps key 的既成事實
+
+這些值無法從 repo 或 git history 逆推,遺失就得重新申請並重新設定 Play 與 Google Cloud。
+
+| 項目 | 值 |
+|---|---|
+| Upload key alias | `tripline-upload` |
+| Keystore 檔 | `android/upload-keystore.jks`(已在 `.gitignore`,**永不覆寫**) |
+| Upload-certificate SHA-1 | `58:EC:91:65:F1:A7:CF:8C:C6:B6:BB:B2:B4:1A:3F:6B:27:8C:EB:FA` |
+| macOS Keychain 項目(keystore 密碼) | `tripline-android-upload-keystore` |
+| macOS Keychain 項目(Maps key) | `tripline-google-maps-android` |
+| Package name | `com.raychiu.tripline` |
+
+SHA-1 是公開的憑證指紋,不是密鑰;密碼只存在 macOS Keychain 與 GitHub secrets。
+
+Upload key 的產生參數(需要重建時照這組,否則指紋對不上 Play 已登記的值):PKCS12
+storetype、RSA 2048、`SHA256withRSA`、validity 10000、
+`CN=Tripline Android Upload, OU=Mobile, O=Tripline, L=Taipei, ST=Taiwan, C=TW`。
+密碼用 `openssl rand -base64 36` 產生後直接寫進 Keychain,不落地、不印出。
+
+Google Cloud 的 Android Maps 憑證設定:**Application restrictions → Android apps**
+填 package `com.raychiu.tripline` 加上上表的 upload-certificate SHA-1;
+**API restrictions → Restrict key** 只勾 Maps SDK for Android。
+**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與金鑰一律走
+Gradle 的 `ANDROID_KEYSTORE_*` 環境變數契約,由 Keychain 或 GitHub secrets 供應。
+
+若 `android/upload-keystore.jks` 已存在,先檢查它的 alias 與指紋是否與上表相符,
+**絕不覆寫** —— 覆寫等於失去對已上架 app 的上傳權,只能走 Play 的 upload key reset 流程。
+
 Refresh device variables before changing the matrix:
 
 ```bash
