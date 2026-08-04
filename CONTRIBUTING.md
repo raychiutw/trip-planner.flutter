@@ -12,7 +12,26 @@ flutter pub get
 flutter test         # 全綠才算環境就緒;數量以當次輸出為準
 ```
 
-改連本機後端見 [How to 指向本機後端](docs/howto-local-backend.md)。
+### 指向本機後端
+
+預設連正式站 `https://trip-planner-dby.pages.dev`。**連 prod 時破壞性操作(刪除等)會真的打到正式資料** —— 測破壞性流程一律先改指本機後端,或使用測試帳號。
+
+用 `--dart-define` 覆寫 origin(值是 origin,**不含** `/api`;app 會自動補 `/api`,並用同一個 origin 當 CSRF `Origin` header):
+
+```bash
+flutter run --dart-define=TRIPLINE_API_ORIGIN=http://localhost:8787
+```
+
+多個 define 可重複加旗標,或用 `--dart-define-from-file`。本機後端的 CSRF allowlist 必須允許你傳入的 origin。
+
+驗證覆寫真的生效:
+
+```bash
+flutter test --dart-define=TRIPLINE_API_ORIGIN=https://example.test \
+  test/api/api_client_test.dart
+```
+
+`dart-define TRIPLINE_API_ORIGIN` group 的測試在帶旗標時會真正斷言 `kTriplineOrigin` 已變成注入值,未帶旗標時是 no-op。
 
 ## 開發流程
 
