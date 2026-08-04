@@ -216,7 +216,7 @@ restore endpoint 是否退休不屬於 Flutter release pipeline 的責任範圍�
 
 以下依日期排列的 release records 是當時版本的歷史證據。凡其中提到
 Account 外觀頁、第五個 root tab、favorite restore App wiring、restore staging
-contract 或 restore feature flag，均已由 #96 與現行 `design.md` 取代，不代表
+contract 或 restore feature flag，均已由 #96 與現行 `DESIGN.md` 取代，不代表
 目前 App 或 release workflow 的契約。
 
 Test Lab exit codes are not swallowed:

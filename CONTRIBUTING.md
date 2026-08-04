@@ -2,7 +2,7 @@
 
 個人專案,但流程照團隊標準走。讀完這頁就能開工。
 
-**本頁是 `code-review` Standards 軸的主要依據** —— 審查程式碼是否符合本 repo 規範時以本頁條文為準,不要只讀連結。UI 變更另須一併讀取根目錄 [`design.md`](design.md),見〈UI 規範〉。領域詞彙見 [`CONTEXT.md`](CONTEXT.md);架構決策的理由與被拒方案見 [`docs/adr/`](docs/adr)。
+**本頁是 `code-review` Standards 軸的主要依據** —— 審查程式碼是否符合本 repo 規範時以本頁條文為準,不要只讀連結。UI 變更另須一併讀取根目錄 [`DESIGN.md`](DESIGN.md),見〈UI 規範〉。領域詞彙見 [`CONTEXT.md`](CONTEXT.md);架構決策的理由與被拒方案見 [`docs/adr/`](docs/adr)。
 
 ## 環境
 
@@ -304,9 +304,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ## UI 規範
 
-**`design.md` 是本 repo 的第二份 standards source。** `code-review` 的 Standards 軸除了本檔,**必須一併讀取根目錄 `design.md`**(Tripline iOS HIG 規範,約 360 行,含「HIG 必須／HIG 建議／Tripline 決策」三級強制標記)。任何動到 `lib/ui/`、`lib/features/`、`lib/theme/`、`lib/app/adaptive.dart` 的 diff,兩份文件都要對。判讀強制等級:`design.md` 標「HIG 必須」= release blocker,標「HIG 建議」的偏離要在 PR 說明補一筆理由,標「Tripline 決策」= 不得單方面改動。
+**`DESIGN.md` 是本 repo 的第二份 standards source。** `code-review` 的 Standards 軸除了本檔,**必須一併讀取根目錄 `DESIGN.md`**(Tripline iOS HIG 規範,約 360 行,含「HIG 必須／HIG 建議／Tripline 決策」三級強制標記)。任何動到 `lib/ui/`、`lib/features/`、`lib/theme/`、`lib/app/adaptive.dart` 的 diff,兩份文件都要對。判讀強制等級:`DESIGN.md` 標「HIG 必須」= release blocker,標「HIG 建議」的偏離要在 PR 說明補一筆理由,標「Tripline 決策」= 不得單方面改動。
 
-下面四塊是 `design.md` 裡**每個 PR 都該逐條對**的部分(折自 §12 刪除動線、§18 Accessibility release gate、§19 驗收矩陣,加上 `CONTEXT.md`「動作動詞」的實作層規範),已對程式碼驗證。其餘章節仍以 `design.md` 原文為準。
+下面四塊是 `DESIGN.md` 裡**每個 PR 都該逐條對**的部分(折自 §12 刪除動線、§18 Accessibility release gate、§19 驗收矩陣,加上 `CONTEXT.md`「動作動詞」的實作層規範),已對程式碼驗證。其餘章節仍以 `DESIGN.md` 原文為準。
 
 ### 動作動詞的圖示與顏色
 
@@ -325,9 +325,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:642`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。
 - 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用。
 
-> 標註(與 `design.md` 原文的差異):**這張表是從程式碼歸納的,`design.md` 沒有寫圖示與顏色規則**,只在 §4.1 L74 泛稱「destructive action 使用 system destructive role」。表中的三處已知 outlier,審查看到不必當新違規、但也不要照抄擴散:`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
+> 標註(與 `DESIGN.md` 原文的差異):**這張表是從程式碼歸納的,`DESIGN.md` 沒有寫圖示與顏色規則**,只在 §4.1 L74 泛稱「destructive action 使用 system destructive role」。表中的三處已知 outlier,審查看到不必當新違規、但也不要照抄擴散:`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
 
-### 刪除語意(design.md §12,決策脈絡見 ADR-0008)
+### 刪除語意(DESIGN.md §12,決策脈絡見 ADR-0008)
 
 - **刪除一律不可復原。** 不得新增 Undo、垃圾桶、復原期限或 restore 動線,對行程、Day、停留點、筆記、分享連結、收藏一體適用。
 - **一律先確認。** 每個刪除入口都要走 `confirmAndDelete` / `confirmAndRunIrreversibleAction`(`lib/app/irreversible_action.dart:87` / `:14`)。diff 裡直接呼叫 repository 的 delete 而沒有經過這兩支 = 違反。
@@ -337,7 +337,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **伺服器成功後才從畫面移除資料**,失敗保留原資料與選取狀態並提供重試(`lib/app/irreversible_action.dart:76`)。樂觀刪除(先改畫面再送請求)= 違反。
 - **左滑刪除必須有不依賴手勢的替代 action** —— `CustomSemanticsAction`,已由 `SwipeToDelete` 統一提供(`lib/ui/swipe_to_delete.dart:69`)。
 
-### Accessibility release gate(design.md §18)
+### Accessibility release gate(DESIGN.md §18)
 
 以下任一失敗**阻擋 release**,不是「之後再補」:
 
@@ -348,13 +348,13 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **支援 Dynamic Type 與 Bold Text**:不載入自訂字型(`pubspec.yaml` 的 `fonts:` 保持註解狀態),不以固定高度裁切內容 —— 卡片、表單列、訊息、設定 row 隨字級增高。
 - **Increase Contrast**:走 `MediaQuery.highContrastOf(context)`,主題側由 `lib/main.dart:154`／`:156` 的 `highContrastTheme` 供給。
 - **Reduce Transparency**:**Flutter 沒有這個 MediaQuery flag**,一律走 `AppAccessibilityScope.reduceTransparencyOf(context)`(`lib/app/accessibility_scope.dart:24`)。用 MediaQuery 找這個設定 = 違反。
-- **Reduce Motion**:位移、縮放、彈性動畫的時間走 `TpMotion.resolve(context, ...)`(`lib/theme/tokens.dart:133`),或在動畫前用 `MediaQuery.disableAnimationsOf(context)` 早退。純淡入淡出可豁免(design.md §17 明文允許以短淡入淡出替代)。
+- **Reduce Motion**:位移、縮放、彈性動畫的時間走 `TpMotion.resolve(context, ...)`(`lib/theme/tokens.dart:133`),或在動畫前用 `MediaQuery.disableAnimationsOf(context)` 早退。純淡入淡出可豁免(DESIGN.md §17 明文允許以短淡入淡出替代)。
 - **focus 不被浮動 header、鍵盤、root tab bar、sheet 或行程 POI accessory 遮住。**
 - **不以顏色為唯一資訊來源** —— 地圖 marker、Day、路線、錯誤與選取都要另有編號、線型、字符或 selected flag。
 
-> 標註:design.md §18 原文列出「支援全部 …… Differentiate Without Color 與 Button Shapes」。**Flutter 的 `MediaQueryData` 沒有這兩個 flag**(可用的只有 `accessibleNavigation`、`invertColors`、`highContrast`、`onOffSwitchLabels`、`disableAnimations`、`boldText`),無法直接偵測,因此改寫為上面最後一條可稽核的「不以顏色為唯一資訊來源」。Reduce Transparency 那條也同理,原文沒說它得自己接 platform channel。
+> 標註:DESIGN.md §18 原文列出「支援全部 …… Differentiate Without Color 與 Button Shapes」。**Flutter 的 `MediaQueryData` 沒有這兩個 flag**(可用的只有 `accessibleNavigation`、`invertColors`、`highContrast`、`onOffSwitchLabels`、`disableAnimations`、`boldText`),無法直接偵測,因此改寫為上面最後一條可稽核的「不以顏色為唯一資訊來源」。Reduce Transparency 那條也同理,原文沒說它得自己接 platform channel。
 
-### 驗收矩陣(design.md §19)
+### 驗收矩陣(DESIGN.md §19)
 
 **自動驗收 —— 每個 PR 必過,與 CI 一致:**
 
@@ -376,14 +376,14 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、行程 POI、收藏、Account,以及**全部不可復原刪除流程**
 - 真機或 simulator 驗證 Liquid Glass、PlatformView、效能與 raster jank
 
-> 標註(與 design.md §19 原文的差異,以程式碼與 CI 為準):
+> 標註(與 DESIGN.md §19 原文的差異,以程式碼與 CI 為準):
 > 1. §19.1 寫的格式指令是 `dart format --output=none --set-exit-if-changed .`。**照抄會誤判** —— repo 根目錄跑 `.` 會撞到 `build/` 產物,而 CI 另外排除了 `patrol_test/test_bundle.dart`(由 `patrol build` 重新產生,格式不受控)。上面採用 CI 的實際指令。
 > 2. §19.1 寫「關鍵畫面 screenshot／golden regression」。**repo 裡沒有 golden 檔**(`test/` 下無 `.png` 基準,無 `matchesGoldenFile`);實際做的是 `app_owned_release_flow_artifacts_test.dart` 產出 140 張 PNG 供人眼比對,以及 `hig_regression_matrix_test.dart` 以數值斷言鎖住玻璃參數與幾何。上面照實寫,沒有把 golden regression 列為必過項。
 > 3. §19.1 的「320pt compact 與 regular width widget tests」不是集中一支,而是散在各畫面測試裡,因此改寫成對新畫面的要求。
 
 ### 已知失效條文(不予採用)
 
-以下 `design.md` 條文與現行程式碼／ADR 衝突,**Standards 審查不得據以報違規**:
+以下 `DESIGN.md` 條文與現行程式碼／ADR 衝突,**Standards 審查不得據以報違規**:
 
 - **§4.1 L72「不替每個 icon 自製圓框、厚 border 或不同尺寸;由 system toolbar／Liquid Glass 分組」** —— 已被 [ADR-0004](docs/adr/0004-neutral-selection-surface-with-tinted-foreground.md) 推翻。現行結構是**每個控制項各自成膠囊,不是一整片玻璃板**(`lib/ui/tp_root_scaffold.dart:118` 的註解與 `CONTEXT.md`「動作群組」)。該條掛著「HIG 必須」,照它審會對每個 header 變更報假陽性。
 - **§4.1 L65 後半／§16.3「所有頁面使用 system inline navigation title」** —— 不成立。[ADR-0001](docs/adr/0001-keep-liquid-glass-over-native-cupertino.md) 決定不用 Cupertino 導覽元件,實作是自繪的浮動玻璃 header(`TpRootScaffold`)與固定 bar(`TpAppBar`)。**只保留同句前半的「全 App 不使用 Large Title」**(§16.3 L301 亦有獨立敘述),那條仍然有效。
@@ -467,7 +467,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 > **注意兩則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
 > 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
 > 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
-> 3. `design.md:337` 寫格式檢查是 `dart format --output=none --set-exit-if-changed .`。CI 實際用 `git ls-files` pathspec，且 `.` 會撞 `build/`；以 CI 寫法為準。
+> 3. `DESIGN.md:337` 寫格式檢查是 `dart format --output=none --set-exit-if-changed .`。CI 實際用 `git ls-files` pathspec，且 `.` 會撞 `build/`；以 CI 寫法為準。
 > 4. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
@@ -475,5 +475,5 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **新測試一寫完就綠 = 可疑。** 宣稱一支測試守住某行為之前，先做 mutation check：暫時把實作或斷言期望值改壞 → 跑 → 確認 **FAIL** → 改回 → 確認 PASS。沒紅過的測試不算數。
 - 特別容易假綠的兩類：斷言目標其實不在畫面上（`findsNothing` 恆真）、清單／捲動測試的資料量不足以觸發被測條件。既有測試已用註解標明過這個陷阱：「清單必須長到溢出視窗,否則捲不動、最後一張卡停在畫面中段,斷言會假綠燈」（`test/features/trips/trips_list_screen_test.dart:134`）。
 - **為既有已出貨的 code 補測試時，流程反過來**：寫測試刻畫既有行為 → 跑 → **預期 PASS**。若預期 PASS 卻 FAIL，停下調查（可能是理解錯，也可能既有 code 真有 bug），**不要改測試去遷就實作**。
-- 測試寫完後自然就紅、且紅的原因正是它要抓的東西時，不需要另做 mutation check —— 那已經是真紅燈。例：`test/docs/doc_links_test.dart` 一寫完就抓到 `design.md` 的兩條懸空連結。
+- 測試寫完後自然就紅、且紅的原因正是它要抓的東西時，不需要另做 mutation check —— 那已經是真紅燈。例：`test/docs/doc_links_test.dart` 一寫完就抓到 `DESIGN.md` 的兩條懸空連結。
 - PR 描述要寫出實際的 `flutter test` 通過數；沒跑起來的測試（例如缺 device 的 `integration_test`）如實標明環境限制，不得假裝通過。
