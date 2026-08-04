@@ -5,7 +5,7 @@ status: accepted
 # 離線快取存原始 wire JSON,快取層設在 ApiClient 而非 model 或 repository
 
 Tripline 的殺手情境是「人在國外、弱網或離線,要看自己的行程」,所以離線能力的價值排序是先讀後寫
-(`docs/superpowers/specs/2026-06-12-offline-cache-design.md:7-12`)。要做離線就得把資料落地,問題只有
+(見已歸檔的離線快取設計 spec 第 7~12 行)。要做離線就得把資料落地,問題只有
 一個:**落地的是什麼形狀的東西,在哪一層攔截。**
 
 決定:快取存的是**後端回來的原始 wire JSON**(`Object?` —— 可能是 Map、List、純量),攔截點在
@@ -26,9 +26,9 @@ write-through(`api_client.dart:840-855`)、連線層失敗時在該處回退快�
 永遠對稱,寫漏一個欄位不會編譯失敗,只會在離線時安靜地掉資料。要避免手寫就得引入 `json_serializable`
 + `build_runner`,但本專案明確決定手寫 `fromJson`、不引入 codegen —— server 端 `deepCamel()` 已把回應
 轉成 camelCase,欄位 1:1 對應,codegen 換來的只有建置複雜度
-(`docs/explanation-architecture.md:92-97`、`docs/PORTING_PLAN.md:18`)。為了快取而推翻那個決定,是讓
+(見 [ADR-0013](0013-hand-written-fromjson-no-codegen.md))。為了快取而推翻那個決定,是讓
 次要需求去改寫主要架構。spec 當時量到的是「41 個 model 中 39 個沒有 `toJson`」
-(`2026-06-12-offline-cache-design.md:31`),數字隨版本變動,結論不變。
+(該 spec 第 31 行),數字隨版本變動,結論不變。
 
 **在各 repository 方法內自行讀寫快取** —— 攔截點會從 1 個變成幾十個。`TripRepository` 光是走
 SWR 的讀就有 7 處(`lib/api/trip_repository.dart:111`、`222`、`257`、`332`、`743`、`785`,加
@@ -38,9 +38,9 @@ SWR 的讀就有 7 處(`lib/api/trip_repository.dart:111`、`222`、`257`、`332
 HTTP 4xx/5xx 是 server 有回應,不算)。
 
 **靠 riverpod provider 既有的記憶體快取** —— `FutureProvider.family` 本來就會快取,從 timeline 切到
-map 不會重打 API(`docs/explanation-architecture.md:90`),看起來已經有一層快取了。但它活在 process
+map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看起來已經有一層快取了。但它活在 process
 記憶體裡,app 一關就沒了,而離線寫的目標明確要求「編輯立即反映於 UI 且**重啟後仍在**」
-(`2026-06-12-offline-cache-design.md:18`)。provider 快取解決的是同一次啟動內的重複請求,不是離線。
+(該 spec 第 18 行)。provider 快取解決的是同一次啟動內的重複請求,不是離線。
 
 ## Consequences
 
@@ -61,13 +61,13 @@ map 不會重打 API(`docs/explanation-architecture.md:90`),看起來已經有�
   這是 typed 快取方案本來可以靠編譯器抓到、而我們換成靠測試抓的部分。
 - **後端加欄位不需要快取 migration。** 持久層沒有 per-model schema,新欄位只是 JSON 文字裡多一個
   key;反過來,舊快取缺新欄位時由 `fromJson` 的缺漏預設吸收(list → `[]`、`version` → `0`,見
-  `docs/reference-models.md`)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
+  `CONTRIBUTING.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
   重抓(`lib/api/cache/cache_migration.dart:12-13`)。
 - **「快取內容 = wire JSON」是整個離線層的前提,不只是實作細節。** `getStream` 的 stale → fresh 兩段式
   發射(`api_client.dart:192-253`)、`sendMutation` 的離線佇列(`api_client.dart:265-335`)、
   `flushQueue` 的 409 rebase(`api_client.dart:422-522`)全部建在它上面 —— 核心不變式「任一 cache key
   的值 = server 真相 + 所有尚未 flush 的樂觀 patch」之所以能成立,正是因為 patch 的輸入與輸出跟 server
   回應是同一種形狀,可以反覆疊套而不需要來回 parse。要換成 typed 快取,這三塊都得重寫。
-- **本 ADR 目前是離線層唯一的常駐紀錄。** `docs/` 沒有離線章節,只有 `README.md` 與
-  `docs/PORTING_PLAN.md:46` 各一行「離線快取已完成」;設計 spec 放在 `docs/superpowers/specs/`,
-  是一次性的交付文件。改動離線層的人會先讀到這裡。
+- **本 ADR 目前是離線層唯一的常駐紀錄。** `docs/` 沒有離線章節,只有 `README.md:18` 與 `:36`
+  各一行提到離線快取;設計 spec 是一次性的交付文件,已隨舊工作流文件一併歸檔。改動離線層的人會
+  先讀到這裡。

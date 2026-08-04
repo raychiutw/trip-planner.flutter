@@ -4,9 +4,9 @@ status: accepted
 
 # 手寫 fromJson，不引入 json_serializable 與 build_runner
 
-後端是共用的 Cloudflare Pages Functions API，回應在 server 端已經過 `deepCamel()`，wire format 是 camelCase(`docs/CONTRACTS.md:11`)。也就是說 JSON key 與 Dart 欄位名幾乎 1:1 對應 —— codegen 最常見的價值(snake_case ↔ camelCase 對映、大量 `@JsonKey` 標註)在這個專案裡幾乎不存在。
+後端是共用的 Cloudflare Pages Functions API，回應在 server 端已經過 `deepCamel()`，wire format 是 camelCase(`CONTRIBUTING.md` 〈Model 與 fromJson 解析規則〉)。也就是說 JSON key 與 Dart 欄位名幾乎 1:1 對應 —— codegen 最常見的價值(snake_case ↔ camelCase 對映、大量 `@JsonKey` 標註)在這個專案裡幾乎不存在。
 
-決定:`lib/models/` 的所有 model 一律手寫 immutable class —— `const` 建構子 + named 參數 + `factory X.fromJson(Map<String, dynamic> json)`(`docs/CONTRACTS.md:15`)，**不對 model 的 JSON 解析引入 codegen**。目前是 29 個檔、3643 行、59 個 `fromJson` factory。
+決定:`lib/models/` 的所有 model 一律手寫 immutable class —— `const` 建構子 + named 參數 + `factory X.fromJson(Map<String, dynamic> json)`，**不對 model 的 JSON 解析引入 codegen**。目前是 29 個檔、3643 行、59 個 `fromJson` factory。
 
 措辭要精準:**這不是「本 repo 不用 codegen」**。`build_runner: ^2.15.1` 與 `drift_dev: ^2.34.0` 確實在 dev_dependencies 裡(`pubspec.yaml:79-80`)，供快取層的 drift 使用 —— 全 repo 唯一的產生檔是 `lib/api/cache/drift_cache_store.g.dart`(1320 行，`part` 宣告在 `lib/api/cache/drift_cache_store.dart:16`)。drift 的 schema-to-DAO 是 codegen 真正划算的場合:產生的是型別安全的查詢 API，手寫等於重寫一個 ORM。**model 的 JSON 解析不是那個場合。**
 
@@ -20,7 +20,7 @@ status: accepted
 
 ## Consequences
 
-**紀律成本，這是後人最可能想推翻本決策的理由。** 沒有 codegen 就沒有編譯期的一致性保證，每個新 model 都得手動遵守同一組解析規則(`docs/reference-models.md:11-18`):
+**紀律成本，這是後人最可能想推翻本決策的理由。** 沒有 codegen 就沒有編譯期的一致性保證，每個新 model 都得手動遵守同一組解析規則(`CONTRIBUTING.md` 〈Model 與 fromJson 解析規則〉):
 
 - 數字一律 `(json['x'] as num?)?.toInt()` / `?.toDouble()` —— server 可能回 int 也可能回 double(`lib/models/entry.dart:30`、`:78-79`)
 - bool flag 接受 0/1 或 bool:`json['x'] == true || json['x'] == 1`(`lib/models/entry.dart:33`)
@@ -30,7 +30,7 @@ status: accepted
 
 漏掉其中任何一條，**建置不會紅**。`json['rating'] as double` 在 server 回整數 `4` 的那天才會炸，而且炸在使用者手上，不是 CI 上。這是本決策付出的真實代價，明確接受。
 
-風險靠兩件事壓住:規則集中在單一處文件化，並在 `CONTRIBUTING.md:36` 的「不可妥協的慣例」有指向(規則本文折進 `CONTRIBUTING.md` 是票 #248 的範圍，本 ADR 不重述);以及每個 model 都有對照後端實際輸出的 `fromJson` 測試(`docs/explanation-architecture.md:96-97`)。**測試是這裡唯一的執行機制** —— 沒有 codegen 幫忙時，「規則有測試覆蓋」不是加分項而是前提。
+風險靠兩件事壓住:規則集中在單一處文件化 —— 規則本文已折進 `CONTRIBUTING.md` 的〈Model 與 fromJson 解析規則〉一節，本 ADR 不重述;以及每個 model 都有對照後端實際輸出的 `fromJson` 測試(同節末條要求每個新 model 至少一個 `fromJson` 測試，且必須含欄位缺漏、int↔double、0/1 bool 等 edge case)。**測試是這裡唯一的執行機制** —— 沒有 codegen 幫忙時，「規則有測試覆蓋」不是加分項而是前提。
 
 另外兩點:
 

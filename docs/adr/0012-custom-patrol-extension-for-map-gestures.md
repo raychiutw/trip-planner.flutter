@@ -7,7 +7,7 @@ status: accepted
 issue #104 要為原生 Google Map platform view 取得 pinch／rotate／double-tap 的自動化證據。
 Patrol 直到 4.8.0 都沒有任何多指手勢 API —— 對 4.8.0 套件原始碼做 `pinch|rotate|multitouch`
 全文搜尋只命中內附的 DevTools build 產物,Dart 公開手勢面只有 `tap`／`doubleTap`／`tapAt`／
-`swipe`／`swipeBack`／`longPress`(`docs/discovery/native-map-gestures.md:33-40`)。所以手勢
+`swipe`／`swipeBack`／`longPress`(見已歸檔的調查報告第 33~40 行)。所以手勢
 一定得自己注入,問題只在「原生端怎麼知道現在該注入」。
 
 原本的設計是單向旗標:Dart 端把按鈕文字改成 `Tripline native map pinch request`,原生端輪詢
@@ -31,7 +31,7 @@ accessibility tree**。Android 沒有這個問題,維持既有的 UiAutomator �
 沒有 PR、沒有 roadmap 訊號。等官方支援等於無限期等待,不可規劃。
 
 **Dart 端 `PlatformDispatcher.instance.setSemanticsTreeEnabled(true)`** —— 這是調查報告
-明列的首選路徑(`docs/discovery/native-map-gestures.md:242,248`),理由是 `flutter_test` 的
+明列的首選路徑,理由是 `flutter_test` 的
 `TestPlatformDispatcher` 沒轉發這支 API、被 `noSuchMethod` 吞掉,所以繞過 wrapper 直接打
 dart:ui 的真 singleton 就該通。**實測失敗**(commit `de67380`)。一行測試碼、零 production
 風險、針對報告找出的「唯一已知阻斷點」—— 成本最低的路徑,但它沒有讓 Flutter 的 semantics

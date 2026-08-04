@@ -29,16 +29,16 @@ Material 版本等於要再長出一套平行的 tab bar、header、選單與日
 Android tablet 使用相同 iOS HIG 視覺」直接列進手動驗收項目。
 
 **依作業系統分兩套版型** —— 會讓 Android 平板與 iPad 的行為漂移：兩者螢幕尺寸重疊、使用情境相同，卻因為
-OS 不同而拿到不同的導覽（`docs/explanation-adaptive-ui.md:34`）。更根本的問題是上面那三格——OS 不變、
+OS 不同而拿到不同的導覽（`design.md:52` 明文要求 Android tablet 依相同 width 規則呈現 iPad 型態）。更根本的問題是上面那三格——OS 不變、
 可用寬度會變。iPad multitasking resize（`design.md:25`、`design.md:53`）在同一個 OS、同一個 process 裡
 就要求配置切換，OS 分支對此無話可說。
 
 **手機畫面等比放大到 tablet** —— `design.md:24` 直接把它列為 HIG 必須不得做。放大版沒有利用寬版空間
-（`docs/explanation-adaptive-ui.md:35`），行程 detail 這種天生兩欄的內容仍然只能一次看一邊，
+（對照 `app_shell.dart:148`–`:166` 在 regular 下並排出來的 320pt 側欄），行程 detail 這種天生兩欄的內容仍然只能一次看一邊，
 寬螢幕換來的只是更長的行寬與更多留白。
 
 **另建 tablet 專用 store listing** —— 兩份 listing 意味著兩條發版線與兩份要同步的內容，而它想解決的
-「平板體驗不同」其實是版面問題，不是發布問題（`docs/explanation-adaptive-ui.md:35`）。決定只改 layout，
+「平板體驗不同」其實是版面問題，不是發布問題。決定只改 layout，
 不動發布結構、也不建立 tablet 專用的 domain state。
 
 **Android 平板改用 `NavigationRail`** —— 這是本 ADR 最容易被質疑的一點，所以正面回答：**不用**

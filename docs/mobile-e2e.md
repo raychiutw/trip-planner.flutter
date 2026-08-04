@@ -334,7 +334,7 @@ iOS 的注入方式：Patrol 4.8.0 的 server extension
 Dart 端以 HTTP POST 請求手勢，由 `XCUIElement` 的公開多指介面執行。**不**依賴
 accessibility tree —— iOS 實機的 XCUI a11y tree 裡沒有任何 Flutter `Semantics`
 節點，`setSemanticsTreeEnabled()` 與 `ensureSemanticsEnabled()` 都無法改變這點
-（詳見 issue #104 與 `docs/discovery/native-map-gestures.md`）。
+（詳見 issue #104 與 [ADR-0012](adr/0012-custom-patrol-extension-for-map-gestures.md)）。
 
 ⚠️ **Google POI 斷言依賴裝置的對外網路。**
 [Run 30178928266](https://github.com/raychiutw/trip-planner.flutter/actions/runs/30178928266)

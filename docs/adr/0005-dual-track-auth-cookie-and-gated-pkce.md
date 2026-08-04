@@ -14,7 +14,7 @@ status: accepted
 
 **後端加 mobile 專用 token endpoint** —— 最直覺的解法:請後端開一個吃帳密、回 token 的 mobile endpoint,認證就不必假裝自己是瀏覽器,也不必偽造 `Origin`。拒絕的理由是它直接破壞本專案的前提。本 repo 與 web SPA 共用同一套 Pages Functions,任何為 mobile 新開的認證面同時也是 web 的攻擊面;而且兩個 client 的認證行為會就此分岔 —— 移植版有一半的價值來自「合約與 web 版一樣」,分岔掉的部分之後每個功能都要付一次代價。
 
-**custom scheme redirect(`tripline://`)** —— OAuth 授權完回跳最順的作法,使用者不會看到中間頁。後端的 `redirect_uris` 是 exact-match 比對,`tripline-mobile` 註冊的是 `["http://127.0.0.1:8765"]`,custom scheme 直接被拒(`docs/howto-oauth-pkce.md:19`、`docs/howto-oauth-pkce.md:24`)。要讓後端收 `tripline://` 就得改 client 註冊政策 —— 又回到上一條被拒的方案。因此 redirect 改走 RFC 8252 loopback `http://127.0.0.1:<port>`,port 由 `TRIPLINE_OAUTH_REDIRECT_PORT` 決定、預設 8765(`lib/api/oauth/oauth_config.dart:10-15`),且必須與後端註冊值完全一致。
+**custom scheme redirect(`tripline://`)** —— OAuth 授權完回跳最順的作法,使用者不會看到中間頁。後端的 `redirect_uris` 是 exact-match 比對,`tripline-mobile` 註冊的是 `["http://127.0.0.1:8765"]`,custom scheme 直接被拒(後端 client 的註冊值,一手考證在已歸檔的 PKCE 設定文件)。要讓後端收 `tripline://` 就得改 client 註冊政策 —— 又回到上一條被拒的方案。因此 redirect 改走 RFC 8252 loopback `http://127.0.0.1:<port>`,port 由 `TRIPLINE_OAUTH_REDIRECT_PORT` 決定、預設 8765(`lib/api/oauth/oauth_config.dart:10-15`),且必須與後端註冊值完全一致。
 
 **出貨版直接把 PKCE 設為預設路徑** —— client 端寫完了、後端 client 也是 active,看起來可以直接切過去。沒切有兩個原因:loopback redirect 在 iOS 上的回跳體驗是斷的(見 Consequences);以及 `OAuthLoginService` 的瀏覽器/loopback 編排相依於裝置,目前**沒有自動化的實機 e2e**。PKCE、token 交換與刷新、Bearer 模式的 `ApiClient` 都有單元測試,但「開系統瀏覽器 → 收 code → 跳回 App」這一段只有手動驗證。在這條驗完並自動化之前,把所有使用者的登入押在上面不划算。
 

@@ -4,7 +4,7 @@ status: accepted
 
 # 刪除一律不可復原,不提供 Undo、垃圾桶或 restore
 
-Tripline 一度往相反方向走過。`docs/backend-tasks/2026-07-18-poi-favorites-undo-restore-api.md` 是一份完整的後端交付規格:`poi_favorites` 加 `deleted_at` 改軟刪除、新增 `POST /api/poi-favorites/:id/restore`、伺服器保留 10 分鐘復原期限、逾時回 `410 UNDO_EXPIRED`(該文件第 31~36、50~81 行)。那份規格的目的只有一個 —— 讓收藏的取消可以在 App 的 Undo 提示期間收回。
+Tripline 一度往相反方向走過。2026-07-18 有一份完整的後端交付規格(POI 收藏 Undo／restore API,現已歸檔):`poi_favorites` 加 `deleted_at` 改軟刪除、新增 `POST /api/poi-favorites/:id/restore`、伺服器保留 10 分鐘復原期限、逾時回 `410 UNDO_EXPIRED`(該文件第 31~36、50~81 行)。那份規格的目的只有一個 —— 讓收藏的取消可以在 App 的 Undo 提示期間收回。
 
 **現在的決定是:使用者資料的刪除一律永久。** 適用於行程、Day、停留點、筆記、分享連結與收藏,全部走「先具名確認 → 伺服器成功後才從畫面移除 → 失敗保留原資料並可重試」,沒有 Undo、沒有垃圾桶、沒有復原期限、沒有 restore 動線。這條線寫在 `design.md:214` 與 `design.md:234`,並由 `design.md:237` 明文覆蓋上面那份後端交付文件。程式碼側的收斂點是 `lib/app/irreversible_action.dart:87`(`confirmAndDelete`),行程項目、筆記、備選 POI 都掛在它下面。
 
@@ -14,7 +14,7 @@ Tripline 一度往相反方向走過。`docs/backend-tasks/2026-07-18-poi-favori
 
 ## Considered Options
 
-**後端軟刪除 + server 端復原視窗(被拒的主要方案)** —— 也就是 `2026-07-18-poi-favorites-undo-restore-api.md` 那份規格。它的成本不在 App:需要 `ALTER TABLE poi_favorites ADD COLUMN deleted_at`(第 90 行),需要把「同一使用者 + 同一 POI」的唯一性換成 partial unique index `WHERE deleted_at IS NULL`(第 96~98 行),而且**所有直接查詢或 join `poi_favorites` 的 route 都要補上 active 條件**,規格自己註明「不能只改收藏清單 route」(第 101 行)。這是一次 **schema migration,而且發生在另一個 repository** —— 後端在 `trip-planner`,本專案是它的 client,「後端不動」是這個 repo 的前提。為了一個 Undo 按鈕去動共用後端的資料表結構,代價與收益不成比例。
+**後端軟刪除 + server 端復原視窗(被拒的主要方案)** —— 也就是開頭那份已歸檔的後端交付規格。它的成本不在 App:需要 `ALTER TABLE poi_favorites ADD COLUMN deleted_at`(第 90 行),需要把「同一使用者 + 同一 POI」的唯一性換成 partial unique index `WHERE deleted_at IS NULL`(第 96~98 行),而且**所有直接查詢或 join `poi_favorites` 的 route 都要補上 active 條件**,規格自己註明「不能只改收藏清單 route」(第 101 行)。這是一次 **schema migration,而且發生在另一個 repository** —— 後端在 `trip-planner`,本專案是它的 client,「後端不動」是這個 repo 的前提。為了一個 Undo 按鈕去動共用後端的資料表結構,代價與收益不成比例。
 
 而規格本身暴露了這個方案真正的問題:**server 的復原期限是 10 分鐘,App 的 Undo 按鈕只顯示 6 秒**(第 77 行)。差了一百倍,而規格對這個落差的解釋是「較長的 server window 用於網路重試,不新增最近刪除 UI」。換句話說,使用者能感知的復原期是 6 秒,但資料庫要為此多背 10 分鐘的 soft-deleted 狀態(實際保留下限是 24 小時,第 103 行),外加 restore 與重新 POST 的競速處理(第 82、149 行)、`poi_favorite.restored` audit event(第 120 行)、以及三個寫入路徑各自的快取失效(第 121 行)。6 秒的使用者價值,買了一套永久存在於 schema 與每一條查詢裡的雙態資料。
 
