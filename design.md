@@ -5,7 +5,7 @@
 > 更新：2026-07-23
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
-> 決策背景：[ADR-0001 全平台採用 iOS HIG 設計語言](docs/adr/0001-universal-ios-hig.md)
+> 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
 
 根目錄的 `/design.md` 是 Tripline App UI／UX 的唯一規範來源（Single Source of Truth）。它覆蓋較早的設計 session、`docs/superpowers/specs/`、`docs/superpowers/plans/` 與本文件舊版；歷史文件只保留決策脈絡。實作尚未完成的項目是 migration target，不得以現況反向修改本規範。
 
@@ -353,7 +353,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 ## 20. 來源階層與實作落差
 
 1. 本文件。
-2. [ADR-0001](docs/adr/0001-universal-ios-hig.md) 與 [CONTEXT.md](CONTEXT.md)。
+2. [ADR-0009](docs/adr/0009-universal-ios-hig-width-driven-layout.md) 與 [CONTEXT.md](CONTEXT.md)。
 3. `reference-theme.md`、`explanation-adaptive-ui.md` 等衍生說明。
 4. 歷史 design session、spec 與 plan。
 
