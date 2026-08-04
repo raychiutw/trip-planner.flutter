@@ -70,6 +70,9 @@ const _skippedDirectories = {
   '.git',
   '.gradle',
   '.idea',
+  // CocoaPods 在本機 `pod install` 後才生成，內容是第三方套件的 README，
+  // 與 `Pods` 同類：不是本 repo 擁有的文件，它們的連結不歸這道閘門管。
+  '.symlinks',
   'build',
   'node_modules',
   'Pods',

@@ -6,7 +6,7 @@ status: accepted
 
 Tripline 一度往相反方向走過。2026-07-18 有一份完整的後端交付規格(POI 收藏 Undo／restore API,現已歸檔):`poi_favorites` 加 `deleted_at` 改軟刪除、新增 `POST /api/poi-favorites/:id/restore`、伺服器保留 10 分鐘復原期限、逾時回 `410 UNDO_EXPIRED`(該文件第 31~36、50~81 行)。那份規格的目的只有一個 —— 讓收藏的取消可以在 App 的 Undo 提示期間收回。
 
-**現在的決定是:使用者資料的刪除一律永久。** 適用於行程、Day、停留點、筆記、分享連結與收藏,全部走「先具名確認 → 伺服器成功後才從畫面移除 → 失敗保留原資料並可重試」,沒有 Undo、沒有垃圾桶、沒有復原期限、沒有 restore 動線。這條線寫在 `design.md:214` 與 `design.md:234`,並由 `design.md:237` 明文覆蓋上面那份後端交付文件。程式碼側的收斂點是 `lib/app/irreversible_action.dart:87`(`confirmAndDelete`),行程項目、筆記、備選 POI 都掛在它下面。
+**現在的決定是:使用者資料的刪除一律永久。** 適用於行程、Day、停留點、筆記、分享連結與收藏,全部走「先具名確認 → 伺服器成功後才從畫面移除 → 失敗保留原資料並可重試」,沒有 Undo、沒有垃圾桶、沒有復原期限、沒有 restore 動線。這條線寫在 `DESIGN.md:214` 與 `DESIGN.md:234`,並由 `DESIGN.md:237` 明文覆蓋上面那份後端交付文件。程式碼側的收斂點是 `lib/app/irreversible_action.dart:87`(`confirmAndDelete`),行程項目、筆記、備選 POI 都掛在它下面。
 
 需要為此開一份 ADR,是因為**收藏是全 App 唯一一處「後端有復原能力、App 卻刻意不用」的地方**。後端的 restore endpoint 與 `deleted_at` 欄位並沒有退休 —— 交付文件第 5 行寫的是「Flutter #88 已停止呼叫 restore endpoint,後端 endpoint 是否退休不在本次範圍」。也就是說,任何人翻到後端 API 或那份規格,都會看到一條 App 沒有接上的復原路徑,而 `lib/api/favorites_repository.dart:37` 只有 `deleteFavorite`,沒有對應的 `restoreFavorite`。沒有這份文件,那個落差看起來就是「Undo 漏做了」,而不是「Undo 被拿掉了」。
 
@@ -18,13 +18,13 @@ Tripline 一度往相反方向走過。2026-07-18 有一份完整的後端交付
 
 而規格本身暴露了這個方案真正的問題:**server 的復原期限是 10 分鐘,App 的 Undo 按鈕只顯示 6 秒**(第 77 行)。差了一百倍,而規格對這個落差的解釋是「較長的 server window 用於網路重試,不新增最近刪除 UI」。換句話說,使用者能感知的復原期是 6 秒,但資料庫要為此多背 10 分鐘的 soft-deleted 狀態(實際保留下限是 24 小時,第 103 行),外加 restore 與重新 POST 的競速處理(第 82、149 行)、`poi_favorite.restored` audit event(第 120 行)、以及三個寫入路徑各自的快取失效(第 121 行)。6 秒的使用者價值,買了一套永久存在於 schema 與每一條查詢裡的雙態資料。
 
-**Client 端 optimistic undo(不真的送 DELETE,6 秒後才送)** —— 不用改後端,聽起來便宜。但它與 `design.md:233` 直接衝突:伺服器成功後才從畫面移除資料。optimistic 的作法是先騙畫面、後送請求,一旦那 6 秒內 app 被切走、網路斷掉或程序被系統回收,使用者看到的「已刪除」與伺服器狀態就永久分岔,而且分岔的方向是**使用者以為刪掉了、其實沒有**。用一個新的不一致來源去換一個 6 秒的反悔窗口,不划算。
+**Client 端 optimistic undo(不真的送 DELETE,6 秒後才送)** —— 不用改後端,聽起來便宜。但它與 `DESIGN.md:233` 直接衝突:伺服器成功後才從畫面移除資料。optimistic 的作法是先騙畫面、後送請求,一旦那 6 秒內 app 被切走、網路斷掉或程序被系統回收,使用者看到的「已刪除」與伺服器狀態就永久分岔,而且分岔的方向是**使用者以為刪掉了、其實沒有**。用一個新的不一致來源去換一個 6 秒的反悔窗口,不划算。
 
 **App 用 `POST /api/poi-favorites` 猜測式重建** —— 這是後端 restore 出現前的作法,也正是那份規格開宗明義要淘汰的(第 13 行:「不再由 App 用 `POST /api/poi-favorites` 猜測式重建」)。它做不到還原:新建的是另一個 favorite id,原本的 note 與 `favorited_at` 已經沒了,而且遇到 active duplicate 還會撞 `409 DATA_CONFLICT`(第 113 行)。一個會把使用者的備註默默丟掉的 Undo,比沒有 Undo 更糟 —— 它承諾了復原,交付的是重建。
 
 **最近刪除 / 垃圾桶頁** —— 唯一能讓「復原」名副其實的方案,但它要求**每一種可刪除資源都實作軟刪除**,不只收藏,還有行程、Day、停留點、筆記、分享連結。規格自己把範圍劃在單筆收藏,並明講「本期不做通用回收桶」(第 16、103 行)。除了後端成本,它還要在 App 裡多一個一級目的地,而 root tab bar 只有聊天 / 行程 / 地圖 / 收藏四格,沒有第五格給一個使用者一年用不到一次的頁面。
 
-**選定:一律永久刪除,把成本壓在刪除之前** —— 復原路徑的替代品是**具名確認**。`design.md:225` 要求確認畫面顯示對象名稱、影響與「無法復原」,`design.md:226` 要求安全選項是預設焦點、破壞性按鈕明寫「刪除」。實際文案都指名對象:`lib/features/trips/trips_list_screen.dart:684`(「這會刪除其中所有行程日與景點」)、`lib/features/trips/edit/edit_trip_screen.dart:199`(「這會刪除當天所有景點,並重新編號後續行程日」)、`lib/features/trip_detail/trip_timeline_screen.dart:1093`(「刪除『X』後,相關交通時間將重新計算」)、`lib/features/trip_detail/trip_notes_screen.dart:1006`、`lib/features/trips/share/share_screen.dart:191` 與 `:203`、`lib/features/trip_detail/entry_poi_screen.dart:259`。收藏的單筆與批次確認在 `lib/features/favorites/favorites_screen.dart:600` 與 `:530`。`design.md:219` 另外停用了 full swipe 直接執行 —— 右滑只揭露刪除按鈕,不會一滑到底就沒了。
+**選定:一律永久刪除,把成本壓在刪除之前** —— 復原路徑的替代品是**具名確認**。`DESIGN.md:225` 要求確認畫面顯示對象名稱、影響與「無法復原」,`DESIGN.md:226` 要求安全選項是預設焦點、破壞性按鈕明寫「刪除」。實際文案都指名對象:`lib/features/trips/trips_list_screen.dart:684`(「這會刪除其中所有行程日與景點」)、`lib/features/trips/edit/edit_trip_screen.dart:199`(「這會刪除當天所有景點,並重新編號後續行程日」)、`lib/features/trip_detail/trip_timeline_screen.dart:1093`(「刪除『X』後,相關交通時間將重新計算」)、`lib/features/trip_detail/trip_notes_screen.dart:1006`、`lib/features/trips/share/share_screen.dart:191` 與 `:203`、`lib/features/trip_detail/entry_poi_screen.dart:259`。收藏的單筆與批次確認在 `lib/features/favorites/favorites_screen.dart:600` 與 `:530`。`DESIGN.md:219` 另外停用了 full swipe 直接執行 —— 右滑只揭露刪除按鈕,不會一滑到底就沒了。
 
 ## Consequences
 

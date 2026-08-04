@@ -7,7 +7,7 @@
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
 > 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
 
-根目錄的 `/design.md` 是 Tripline App UI／UX 的規範來源。較早的設計 session、spec 與 plan 已隨舊工作流文件一併歸檔，只在 git history 保留決策脈絡；難以逆轉的決策另記於 [`docs/adr/`](docs/adr)。實作尚未完成的項目是 migration target，不得以現況反向修改本規範。
+根目錄的 `/DESIGN.md` 是 Tripline App UI／UX 的規範來源。較早的設計 session、spec 與 plan 已隨舊工作流文件一併歸檔，只在 git history 保留決策脈絡；難以逆轉的決策另記於 [`docs/adr/`](docs/adr)。實作尚未完成的項目是 migration target，不得以現況反向修改本規範。
 
 ## 1. 規範標記
 
