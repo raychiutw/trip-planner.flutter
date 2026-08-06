@@ -340,7 +340,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - VoiceOver reading order、label、value、hint、selected、expanded 與 destructive 語意正確。
 - Voice Control 名稱可對應可見 label。
 - Switch Control、Full Keyboard Access、外接鍵盤與 pointer 可完成核心流程。
-- 支援全部 Dynamic Type、Bold Text、Increase Contrast、Reduce Transparency、Reduce Motion、Differentiate Without Color 與 Button Shapes。
+- 支援 Dynamic Type、Bold Text、Increase Contrast、Reduce Motion（`MediaQuery` 均可偵測），以及 Reduce Transparency（**Flutter 沒有這個 flag**，一律走 `AppAccessibilityScope.reduceTransparencyOf(context)`；用 `MediaQuery` 找它 = 違反）。
+  Differentiate Without Color 與 Button Shapes **Flutter 偵測不到**（`MediaQueryData` 只有 `accessibleNavigation`／`invertColors`／`highContrast`／`onOffSwitchLabels`／`disableAnimations`／`boldText`），因此不列為可稽核項；等效要求由下面「不只靠顏色」那條承擔。
 - focus 不被固定 Header、鍵盤、tab bar、sheet 或 POI accessory 遮住。
 - 拖拉與 swipe 都有不依賴手勢的替代 action。
 - 地圖標記、Day、路線、錯誤與選取不只靠顏色。
@@ -351,11 +352,14 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ### 19.1 自動驗收
 
-- `dart format --output=none --set-exit-if-changed .`
-- `flutter analyze --no-fatal-infos`
-- `flutter test`
-- 關鍵畫面 screenshot／golden regression
-- Light／Dark、一般字級、最大 Accessibility Size、320pt compact 與 regular width widget tests
+與 CI（`.github/workflows/mobile.yml`）一致，逐項對得上：
+
+- 格式：`git ls-files -z '*.dart' ':!:patrol_test/test_bundle.dart' | xargs -0 dart format --output=none --set-exit-if-changed`（`:58`）。**不要簡寫成 `dart format .`** —— 會撞到 `build/` 的 Gradle 產物，且 `patrol_test/test_bundle.dart` 由 `patrol build` 重新產生、格式不受控，CI 已排除它。
+- `flutter analyze --no-fatal-infos` 零 error／warning（`:61`）
+- `flutter test` 全綠 —— 跑**整個** `test/`，不挑檔（`:69`）
+- HIG 十態矩陣：`test/flows/hig_regression_matrix_test.dart` 的 Light／Dark ×（一般字級、2× 字級、Reduce Motion、Increased Contrast、Reduce Transparency），於 390×844 驗證幾何與行為。**新增 chrome 元件要進這支測試。**
+- 畫面證據集：`test/flows/app_owned_release_flow_artifacts_test.dart` 產出 14 畫面 × 10 態 = 140 張 PNG 到 `build/test-artifacts/app-owned`，供人眼比對。**repo 裡沒有 golden 基準檔**（無 `matchesGoldenFile`），所以 golden regression 不是必過項；新增 root 畫面要進 `expected` 集合。
+- 新畫面的 widget test 至少覆蓋 320×568 與 `TextScaler.linear(2)` 以上（範圍分散在各畫面測試，不集中於單一支）
 
 ### 19.2 手動驗收
 
@@ -375,6 +379,6 @@ UI 規範的來源階層，由高到低：
 2. 本文件。
 3. [CONTEXT.md](CONTEXT.md) —— 只定義語彙，不定義規範；但本文件用到的名稱必須與它一致。
 
-`code-review` 的 Standards 軸同時讀 [`CONTRIBUTING.md`](CONTRIBUTING.md) 與本文件；本文件裡「每個 PR 都該逐條對」的部分（刪除動線、Accessibility release gate、驗收矩陣、動作動詞實作層規範）已折入 `CONTRIBUTING.md` §UI 規範，兩處內容相同時以本文件為原文。
+`code-review` 的 Standards 軸同時讀 [`CONTRIBUTING.md`](CONTRIBUTING.md) 與本文件。**UI 條文不重複維護**：刪除動線（§12）、Accessibility release gate（§18）、驗收矩陣（§19）只寫在本文件，`CONTRIBUTING.md` §UI 規範不複述，只記兩件本文件沒有或說錯的事 —— 動作動詞的圖示與顏色對照表（本文件沒寫），以及本文件的失效與誤導條文清單（照抄會報假陽性或誤判）。
 
 若實作或測試與本文件衝突，以本文件為準並建立 migration work，不得靜默保留舊規則 —— 除非該項已有 ADR 明文推翻。

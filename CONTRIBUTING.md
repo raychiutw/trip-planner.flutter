@@ -223,8 +223,8 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### 共用元件邊界
 
 - 確認框、action sheet、搜尋列、日期／時間選擇、短暫通知一律重用 `lib/app/adaptive.dart`，不得在 feature 內重寫平台判斷。
-- `lib/features/**` 不得出現 `showModalBottomSheet`、`showCupertinoModalPopup`、`showGeneralDialog`、`showAppLargeSheet`、`showAppLargeScreenSheet`。守門測試在 `test/ui/shared_ui_usage_test.dart:44`；`lib/` 全域只有 `lib/app/adaptive.dart` 可以呼叫這三個平台 API（同檔 `:65`）。
-- feature 不得直接建 `AppBar` / `SliverAppBar` / `GlassAppBar`；標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar）。守門測試 `test/ui/shared_ui_usage_test.dart:6`，唯一豁免是 `lib/features/auth/welcome_screen.dart`。
+- 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
+- **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
 - 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:247`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
   - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_app_bar.dart:720`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
@@ -236,7 +236,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 成功／低風險結果用 `showAppNotice`（`lib/app/adaptive.dart:1135`）—— 頂部橫幅，約 2.5 秒自動消失，沒有動作按鈕。
 - 真正的錯誤用 `showAppError`（`lib/app/app_feedback.dart:4`）—— 持續留在畫面上直到使用者關閉或重試。可恢復的錯誤必須傳 `onRetry`。
-- 不得用 `showAppNotice` 或裸 `SnackBar` 報錯誤（一閃就消失）。`allowDismiss: false` 時必須同時給 `onRetry`，否則觸發 assert（`lib/app/app_feedback.dart:11`）。
+- 不得用 `showAppNotice` 或裸 `SnackBar` 報錯誤（一閃就消失）。
 
 ### 字體與溢位
 
@@ -246,7 +246,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 路由與測試
 
-- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`），新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
+- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`）。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId`（`:182`）只是 web 時代留下的 alias,`redirect` 到複數版（`_tripAlias`,`:507`）—— 子頁一律加在複數路徑下，新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
 - shell 外的整頁（無 root tab bar）加在 `routes` 頂層、`StatefulShellRoute` 之外。
 - 未登入時 shell 內的頁自動被 redirect 到 **`/welcome`**（`lib/app/router.dart:72-74`，經 `_welcomeLocationWithRedirect`），不是 `/login`。原始請求路徑會保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進 `_publicShellOutsideRoutes`（`lib/app/router.dart:495`），否則同樣被踢到 `/welcome`。
 - widget test 必須 override `authStateProvider`，否則啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗，畫面一進來就被視為未登入。
@@ -270,7 +270,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 導覽材質只有兩種語意，由 `TpNavigationGlassRecipe`（`lib/ui/tp_glass_surface.dart:6`）表達：
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
-- **alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)`。守門測試 `test/ui/shared_ui_usage_test.dart:97` 斷言 `lib/ui/tp_app_bar.dart`、`lib/features/shell/apple_root_tab_bar.dart`、`lib/ui/tp_root_scaffold.dart`、`lib/ui/tp_horizontal_selector.dart` 四處都必須含 `tpNavigationGlassSettings(` 且不得含 `LiquidGlassSettings(`。
+- **alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
 - `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：地圖分頁的 root tab bar 傳 `selectedIndex == 2`（`lib/features/shell/apple_root_tab_bar.dart:224`）、行程地圖傳 `true`（`lib/features/trip_detail/trip_map_screen.dart:142`）、bottom accessory 傳 `true`（`lib/ui/tp_bottom_accessory.dart:34`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。
@@ -288,29 +288,19 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ---
 
-### 來源文件修正紀錄
+### 已知既有債（不是許可）
 
-以下是**容易寫錯的實際值**與**既有債**,全部對程式碼驗證過。舊文件曾就這幾項給出相反或過時的說法,以本節為準：
-
-- **`PlaceholderScreen`**—— 全 repo 無此符號。四個 branch 現在都直接掛真 screen（`lib/app/router.dart:333-487`）。整條「換掉 placeholder tab」步驟已剔除。
-- **`AppMapLoadingSkeleton`**—— 不存在。`lib/app/app_loading_skeleton.dart` 只有 `AppListLoadingSkeleton`（`:6`）。已改為只提後者。
-- **未登入導向 `/login`**—— 實際導向 `/welcome`（`lib/app/router.dart:72-74`），並帶 `redirect_after`。已改正。
-- **`TpRootScrollScaffold`**—— 已刪除，`test/ui/shared_ui_usage_test.dart:30` 斷言檔案不得存在、`:133` 斷言符號不得回到 `lib/`。已改為 `TpRootTabGeometry.clearance(context)`（`lib/theme/tokens.dart:113`）與 `TpRootScrollView`（`lib/ui/tp_root_scaffold.dart:237`）。
-- **`/trips/:tripId`（複數）是正確的**，與交辦說明相反。`lib/app/router.dart:354` 的 `:tripId` 掛在 `/trips` 之下，是真正建畫面的路由；單數 `/trip/:tripId`（`lib/app/router.dart:182`）只是 web 時代留下的 alias，`redirect` 到複數版（`_tripAlias`，`:507`）。子頁一律加在複數路徑下。
-- **玻璃 alpha 表**—— 只有 regular 的 Light `.40`／Dark `.48` 正確（`lib/ui/tp_glass_surface.dart:194`）。PlatformView 實際是 `Colors.black` alpha `0.35`（`tpMediaScrimOpacity`，同檔 `:44`、`:192`），不是 `.56/.62`；High Contrast 實際是 alpha `1` 全不透明（同檔 `:22`），不是 `.96`。本節依程式碼描述，未沿用該表數字。
-- **`AppContentWidth` 少一項**—— 除了 `form` 720 / `conversation` 860 / `feed` 920，還有 `authCard` 420（`lib/app/adaptive_content.dart:10`），已補上。
-- **`AppKeyboardDismissRegion` 的掛法**（舊計畫文件曾寫「表單內容外層使用」）—— 實作收斂成只掛 app root 一次（`lib/main.dart:163`）。已改寫為「feature 不得再包一層」。
-- **已知既有債（不是許可）**：「不直接引用 Light／Dark 常數」這條目前有 3 處 feature 違反，都是取語意 success 色 —— `lib/features/auth/login_screen.dart:106-107`、`lib/features/auth/welcome_screen.dart:441-442`、`lib/features/invite/invite_screen.dart:639-640`。新程式碼不得比照辦理。
+「不直接引用 `TpSystemColorsLight`／`TpSystemColorsDark`」這條目前有 3 處 feature 違反,都是取語意 success 色 —— `lib/features/auth/login_screen.dart:106-107`、`lib/features/auth/welcome_screen.dart:441-442`、`lib/features/invite/invite_screen.dart:639-640`。**新程式碼不得比照辦理**;審查看到既有的三處不算新違規。
 
 ## UI 規範
 
 **`design.md` 是本 repo 的第二份 standards source。** `code-review` 的 Standards 軸除了本檔,**必須一併讀取根目錄 `design.md`**(Tripline iOS HIG 規範,約 360 行,含「HIG 必須／HIG 建議／Tripline 決策」三級強制標記)。任何動到 `lib/ui/`、`lib/features/`、`lib/theme/`、`lib/app/adaptive.dart` 的 diff,兩份文件都要對。判讀強制等級:`design.md` 標「HIG 必須」= release blocker,標「HIG 建議」的偏離要在 PR 說明補一筆理由,標「Tripline 決策」= 不得單方面改動。
 
-下面四塊是 `design.md` 裡**每個 PR 都該逐條對**的部分(折自 §12 刪除動線、§18 Accessibility release gate、§19 驗收矩陣,加上 `CONTEXT.md`「動作動詞」的實作層規範),已對程式碼驗證。其餘章節仍以 `design.md` 原文為準。
+**條文一律以 `design.md` 原文為準,本節不複述** —— 刪除動線(§12)、Accessibility release gate(§18)、驗收矩陣(§19)都在那裡,審查時直接讀那份。本節只補一件 `design.md` **沒有**的東西。
 
 ### 動作動詞的圖示與顏色
 
-四個動詞的**語意定義在 [`CONTEXT.md`](CONTEXT.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
+`design.md` 只在 §4.1 泛稱「destructive action 使用 system destructive role」,沒寫圖示與顏色。以下由程式碼歸納。四個動詞的**語意定義在 [`CONTEXT.md`](CONTEXT.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
 
 | 動詞 | 圖示 | `TpActionItem.role` | 顏色 |
 |---|---|---|---|
@@ -325,69 +315,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:642`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。
 - 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用。
 
-> 標註(與 `design.md` 原文的差異):**這張表是從程式碼歸納的,`design.md` 沒有寫圖示與顏色規則**,只在 §4.1 L74 泛稱「destructive action 使用 system destructive role」。表中的三處已知 outlier,審查看到不必當新違規、但也不要照抄擴散:`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
-
-### 刪除語意(design.md §12,決策脈絡見 ADR-0008)
-
-- **刪除一律不可復原。** 不得新增 Undo、垃圾桶、復原期限或 restore 動線,對行程、Day、停留點、筆記、分享連結、收藏一體適用。
-- **一律先確認。** 每個刪除入口都要走 `confirmAndDelete` / `confirmAndRunIrreversibleAction`(`lib/app/irreversible_action.dart:87` / `:14`)。diff 裡直接呼叫 repository 的 delete 而沒有經過這兩支 = 違反。
-- **確認文案必須指名對象與連帶影響**,不得只寫「確定要刪除嗎?」。沒有復原路徑時,含糊文案等於資料遺失(ADR-0008 Consequences)。破壞性按鈕明寫「刪除」,不用「確定」。
-- **永久刪除只可由左滑揭露後點擊執行,不允許 full swipe 直接執行。** 左滑外殼固定用 `SwipeToDelete`(`lib/ui/swipe_to_delete.dart`);手勢只揭露紅色動作,執行仍走 `onDelete` 內的確認流程。`Dismissible` 或任何 `DismissDirection` 直接觸發刪除 = 違反。
-- **確認界面依觸發來源分流,不可寫死。** 呼叫端必填 `TpDestructiveConfirmSource`:選單觸發用 `menu`(走 action sheet),右滑／列上按鈕用 `direct`(走 alert)。理由與 HIG 引文在 `lib/app/adaptive.dart:214`。
-- **伺服器成功後才從畫面移除資料**,失敗保留原資料與選取狀態並提供重試(`lib/app/irreversible_action.dart:76`)。樂觀刪除(先改畫面再送請求)= 違反。
-- **左滑刪除必須有不依賴手勢的替代 action** —— `CustomSemanticsAction`,已由 `SwipeToDelete` 統一提供(`lib/ui/swipe_to_delete.dart:69`)。
-
-### Accessibility release gate(design.md §18)
-
-以下任一失敗**阻擋 release**,不是「之後再補」:
-
-- **所有互動控制至少 44×44pt**,尺寸走 `TpSpacing.tapMin`(`lib/theme/tokens.dart:88`),不寫魔術數字 44。`test/flows/hig_regression_matrix_test.dart:98`／`:102` 對 header 動作與帳號鈕鎖了實際量測值。
-- **VoiceOver 的 label、value、hint、selected、expanded 語意正確。** 選取狀態走 `Semantics.selected` flag,**不要把「已選取」寫進 label 字串**(`lib/ui/tp_horizontal_selector.dart:269`)。
-- **Voice Control 名稱要對得上可見 label。** 用了 `excludeSemantics: true` 的 widget,`label` 必須包含畫面上看得到的文字;`semanticLabel` 覆寫時必須以可見 label 開頭再接補充(範例:`lib/features/trip_detail/trip_timeline_screen.dart:1377` 停用時的「移動到其他天,目前行程只有一天,無法使用」)。
-- **Switch Control、Full Keyboard Access、外接鍵盤與 pointer 可完成核心流程。** 拖拉排序必須同時提供 `CustomSemanticsAction`(上移／下移／移至其他 Day)與 `CallbackShortcuts` 方向鍵(`lib/features/trip_detail/trip_timeline_screen.dart:1604`、`:1615`;`lib/features/trip_detail/widgets/reorderable_row.dart:60`、`:73`)。新增可排序清單時三者缺一 = 違反。
-- **支援 Dynamic Type 與 Bold Text**:不載入自訂字型(`pubspec.yaml` 的 `fonts:` 保持註解狀態),不以固定高度裁切內容 —— 卡片、表單列、訊息、設定 row 隨字級增高。
-- **Increase Contrast**:走 `MediaQuery.highContrastOf(context)`,主題側由 `lib/main.dart:154`／`:156` 的 `highContrastTheme` 供給。
-- **Reduce Transparency**:**Flutter 沒有這個 MediaQuery flag**,一律走 `AppAccessibilityScope.reduceTransparencyOf(context)`(`lib/app/accessibility_scope.dart:24`)。用 MediaQuery 找這個設定 = 違反。
-- **Reduce Motion**:位移、縮放、彈性動畫的時間走 `TpMotion.resolve(context, ...)`(`lib/theme/tokens.dart:133`),或在動畫前用 `MediaQuery.disableAnimationsOf(context)` 早退。純淡入淡出可豁免(design.md §17 明文允許以短淡入淡出替代)。
-- **focus 不被浮動 header、鍵盤、root tab bar、sheet 或行程 POI accessory 遮住。**
-- **不以顏色為唯一資訊來源** —— 地圖 marker、Day、路線、錯誤與選取都要另有編號、線型、字符或 selected flag。
-
-> 標註:design.md §18 原文列出「支援全部 …… Differentiate Without Color 與 Button Shapes」。**Flutter 的 `MediaQueryData` 沒有這兩個 flag**(可用的只有 `accessibleNavigation`、`invertColors`、`highContrast`、`onOffSwitchLabels`、`disableAnimations`、`boldText`),無法直接偵測,因此改寫為上面最後一條可稽核的「不以顏色為唯一資訊來源」。Reduce Transparency 那條也同理,原文沒說它得自己接 platform channel。
-
-### 驗收矩陣(design.md §19)
-
-**自動驗收 —— 每個 PR 必過,與 CI 一致:**
-
-- `flutter analyze --no-fatal-infos` 零 error/warning(`.github/workflows/mobile.yml:61`)
-- `flutter test` 全綠 —— 跑**整個** `test/`,不挑檔(`.github/workflows/mobile.yml:69`)
-- 格式檢查:`git ls-files -z '*.dart' ':!:patrol_test/test_bundle.dart' | xargs -0 dart format --output=none --set-exit-if-changed`(`.github/workflows/mobile.yml:58`)
-- HIG 十態矩陣:`test/flows/hig_regression_matrix_test.dart:47` 的 `_states` —— Light／Dark × (一般字級、2× 字級、Reduce Motion、Increased Contrast、Reduce Transparency),於 390×844 驗證幾何與行為。**新增 chrome 元件要進這支測試。**
-- 畫面證據集:`test/flows/app_owned_release_flow_artifacts_test.dart:104` 的 14 個畫面 × 10 態 = 140 張 PNG,輸出到 `build/test-artifacts/app-owned`(`:144` 鎖住總數)。**新增 root 畫面要進 `expected` 集合。**
-- 共用元件邊界:`test/ui/shared_ui_usage_test.dart` —— `lib/features/` 不得出現 `AppBar`／`SliverAppBar`(`:6`)、不得直接呼叫 `showModalBottomSheet`／`showCupertinoModalPopup`／`showGeneralDialog`(`:44`),平台 sheet API 只有 `lib/app/adaptive.dart` 能碰(`:65`)。
-- 窄版與大字級:新畫面的 widget test 至少覆蓋 320×568 與 `TextScaler.linear(2)` 以上(既有範例:`test/features/favorites/favorites_screen_test.dart:233`、`test/features/share/public_share_screen_test.dart:198` 用到 3.2×)。
-
-**手動驗收 —— release 前逐項走過:**
-
-- iPhone compact、iPhone landscape、iPad regular、iPad split view
-- Android phone 與 Android tablet 呈現同一套 iOS HIG 視覺
-- Light／Dark、Increase Contrast、Reduce Transparency、Reduce Motion、Bold Text
-- VoiceOver、Voice Control、Switch Control、Full Keyboard Access、pointer 與外接鍵盤
-- 鍵盤、safe area、旋轉、sheet、tab state restoration、edge-back
-- 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、行程 POI、收藏、Account,以及**全部不可復原刪除流程**
-- 真機或 simulator 驗證 Liquid Glass、PlatformView、效能與 raster jank
-
-> 標註(與 design.md §19 原文的差異,以程式碼與 CI 為準):
-> 1. §19.1 寫的格式指令是 `dart format --output=none --set-exit-if-changed .`。**照抄會誤判** —— repo 根目錄跑 `.` 會撞到 `build/` 產物,而 CI 另外排除了 `patrol_test/test_bundle.dart`(由 `patrol build` 重新產生,格式不受控)。上面採用 CI 的實際指令。
-> 2. §19.1 寫「關鍵畫面 screenshot／golden regression」。**repo 裡沒有 golden 檔**(`test/` 下無 `.png` 基準,無 `matchesGoldenFile`);實際做的是 `app_owned_release_flow_artifacts_test.dart` 產出 140 張 PNG 供人眼比對,以及 `hig_regression_matrix_test.dart` 以數值斷言鎖住玻璃參數與幾何。上面照實寫,沒有把 golden regression 列為必過項。
-> 3. §19.1 的「320pt compact 與 regular width widget tests」不是集中一支,而是散在各畫面測試裡,因此改寫成對新畫面的要求。
-
-### 已知失效條文(不予採用)
-
-以下 `design.md` 條文與現行程式碼／ADR 衝突,**Standards 審查不得據以報違規**:
-
-- **§4.1 L72「不替每個 icon 自製圓框、厚 border 或不同尺寸;由 system toolbar／Liquid Glass 分組」** —— 已被 [ADR-0004](docs/adr/0004-neutral-selection-surface-with-tinted-foreground.md) 推翻。現行結構是**每個控制項各自成膠囊,不是一整片玻璃板**(`lib/ui/tp_root_scaffold.dart:118` 的註解與 `CONTEXT.md`「動作群組」)。該條掛著「HIG 必須」,照它審會對每個 header 變更報假陽性。
-- **§4.1 L65 後半／§16.3「所有頁面使用 system inline navigation title」** —— 不成立。[ADR-0001](docs/adr/0001-keep-liquid-glass-over-native-cupertino.md) 決定不用 Cupertino 導覽元件,實作是自繪的浮動玻璃 header(`TpRootScaffold`)與固定 bar(`TpAppBar`)。**只保留同句前半的「全 App 不使用 Large Title」**(§16.3 L301 亦有獨立敘述),那條仍然有效。
-- **§20 來源階層** —— 整節不採用,它描述的是一份即將刪除的文件。
+三處已知 outlier(審查看到不必當新違規,但不要照抄擴散):`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
 
 ## 測試規範
 
