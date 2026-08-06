@@ -8,8 +8,9 @@
 
 1. 先讀本檔，再讀任務明確點名或依工作流需要使用的每一份 `SKILL.md`；必要 skill 不可用時必須停下並回報，不得跳過，也不得以手動步驟冒充已執行 skill。
 2. 讀取 `CONTEXT.md` 與工作範圍相關的 `docs/adr/`，沿用既有領域詞彙與決策。
-3. 先確認目前 branch、worktree 與既有變更；不得覆蓋或順手提交不屬於本次任務的內容。
-4. 程式碼探索優先使用下列 Codebase Knowledge Graph；不足時才退回文字或檔案搜尋。
+3. **要寫或改 `lib/` 的程式碼前，先讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 中與工作範圍相關的節**。那份是本 repo 編碼規範的唯一出處，也是 `code-review` Standards 軸的主要依據；本檔只留摘要，兩者衝突時以該份為準。UI／UX 另讀 `design.md`。
+4. 先確認目前 branch、worktree 與既有變更；不得覆蓋或順手提交不屬於本次任務的內容。
+5. 程式碼探索優先使用下列 Codebase Knowledge Graph；不足時才退回文字或檔案搜尋。
 
 <!-- codebase-memory-mcp:start -->
 # Codebase Knowledge Graph (codebase-memory-mcp)
@@ -80,7 +81,7 @@ flutter run                                           # 連 prod API；一律使
 
 ## 架構
 
-分層單向依賴（上層使用下層）：`features/` → `ui/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart，不 import Flutter；`theme/` 不依賴其他層。完整規則與既有例外見 `CONTRIBUTING.md`「分層與依賴方向」一節。
+分層單向依賴（上層使用下層）：`features/` → `ui/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart，不 import Flutter；`theme/` 不依賴其他層。完整規則與既有例外見 `CODING_STANDARDS.md`「分層與依賴方向」一節。
 
 ### Provider 鏈（Riverpod 3.x）
 
@@ -111,7 +112,7 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 
 ### Model 解析規則
 
-Wire 格式是 camelCase（server `deepCamel()`）；數字使用 `(json['x'] as num?)?.toInt()`／`.toDouble()`；bool flag 接受 0／1 與 bool：`json['x'] == 1 || json['x'] == true`；日期時間保留字串，不轉 `DateTime`；缺少 list → `[]`；缺少 `sortOrder`／`version` → `0`。完整規則、欄位行號與後端契約細節見 `CONTRIBUTING.md`「Model 與 fromJson 解析規則」與「API 層規範／後端契約細節」兩節；個別欄位仍以程式碼為準。
+Wire 格式是 camelCase（server `deepCamel()`）；數字使用 `(json['x'] as num?)?.toInt()`／`.toDouble()`；bool flag 接受 0／1 與 bool：`json['x'] == 1 || json['x'] == true`；日期時間保留字串，不轉 `DateTime`；缺少 list → `[]`；缺少 `sortOrder`／`version` → `0`。完整規則、欄位行號與後端契約細節見 `CODING_STANDARDS.md`「Model 與 fromJson 解析規則」與「API 層規範／後端契約細節」兩節；個別欄位仍以程式碼為準。
 
 ### Theme 取色規則
 
@@ -129,7 +130,7 @@ Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409
 - API：`http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 - Screens：widget test + `ProviderScope` override、mocktail mock repository、假 `GoRouter` 作為導航探針。
 
-具體手法（provider override、關掉 error 態自動重試、假綠燈防線）見 `CONTRIBUTING.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
+具體手法（provider override、關掉 error 態自動重試、假綠燈防線）見 `CODING_STANDARDS.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
 
 ## Agent skills
 

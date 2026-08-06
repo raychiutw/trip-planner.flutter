@@ -25,7 +25,7 @@ flutter run                                           # 連 prod API — 一律�
   - **步驟 1~3 要在同一個 context window 內完成**,不要中途 compact;接近上限就 `/handoff` 換新 session。每個 `/implement` 開新 context。
   - 分流:bug 用 `/diagnosing-bugs`;外部進來的 issue 用 `/triage`(自己 `/to-tickets` 產的票不要 triage);設計問題需要跑起來才答得出來時用 `/prototype`;範圍大到一個 session 裝不下的用 `/wayfinder`。
   - 忘記該用哪個 skill 就問 `/ask-matt`。
-- **編碼規範以 `CONTRIBUTING.md` 為準**(九節,附行號):它是 `/code-review` Standards 軸的主要依據,規則有異動改那裡,本檔只留摘要。UI 規範在 `design.md`,詞彙在 `CONTEXT.md`,難逆轉的決策在 `docs/adr/`。
+- **寫 `lib/` 的程式碼前先讀 `CODING_STANDARDS.md`** 中相關的節(九節,附行號):它是編碼規範的唯一出處,也是 `/code-review` Standards 軸的主要依據,規則有異動改那裡,本檔只留摘要、衝突時以它為準。UI／UX 在 `design.md`,詞彙在 `CONTEXT.md`,難逆轉的決策在 `docs/adr/`,貢獻流程在 `CONTRIBUTING.md`。
 - **TDD 紅綠重構**:任何 production code 變更先寫失敗測試。修 bug 先寫重現測試。
 - **完成定義**:`flutter analyze` 零 error/warning + `flutter test` 全綠。
 - **不直接 commit 到 `master`**:開 feature branch → `/ship` 開 PR。base branch 是 `master`(無 `main`)。
@@ -33,7 +33,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ## 架構
 
-分層單向依賴(上層用下層):`features/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart(不 import Flutter),`theme/` 不依賴任何人。分層規範與兩個既有例外見 `CONTRIBUTING.md`「分層與依賴方向」。
+分層單向依賴(上層用下層):`features/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart(不 import Flutter),`theme/` 不依賴任何人。分層規範與兩個既有例外見 `CODING_STANDARDS.md`「分層與依賴方向」。
 
 ### Provider 鏈(riverpod 3.x)
 
@@ -59,7 +59,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ### Model 解析規則(所有 fromJson 一致)
 
-wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.toDouble()`(server 可能回 int 或 double);bool flag 是 0/1:`json['x'] == 1 || json['x'] == true`;日期時間存字串不轉 DateTime;list 缺漏 → `[]`;`sortOrder`/`version` 缺漏 → `0`。完整規則與行號見 `CONTRIBUTING.md`「Model 與 fromJson 解析規則」;無法從程式碼反推的後端行為(兩套 OCC、筆記段名三套字、停留點時間必填、`trips` 表無 `version`)見同檔「後端契約細節」。
+wire 是 camelCase(server `deepCamel()`);數字 `(json['x'] as num?)?.toInt()/.toDouble()`(server 可能回 int 或 double);bool flag 是 0/1:`json['x'] == 1 || json['x'] == true`;日期時間存字串不轉 DateTime;list 缺漏 → `[]`;`sortOrder`/`version` 缺漏 → `0`。完整規則與行號見 `CODING_STANDARDS.md`「Model 與 fromJson 解析規則」;無法從程式碼反推的後端行為(兩套 OCC、筆記段名三套字、停留點時間必填、`trips` 表無 `version`)見同檔「API 層規範／後端契約細節」。
 
 ### Theme 取色守則
 
@@ -71,7 +71,7 @@ Widget 取色一律走 `Theme.of(context).colorScheme`；柔褐 tint 是唯一�
 
 ## 測試慣例
 
-三層鏡像 `lib/`:models(純 fromJson + edge case)、api(`http_mock_adapter` + `InMemorySessionStore`,不碰 `SecureSessionStore`)、screens(widget test + `ProviderScope` override,mocktail mock repository,假 GoRouter 當導航探針)。具體手法、provider override 與假綠燈防呆見 `CONTRIBUTING.md`「測試規範」「測試不可假綠」。
+三層鏡像 `lib/`:models(純 fromJson + edge case)、api(`http_mock_adapter` + `InMemorySessionStore`,不碰 `SecureSessionStore`)、screens(widget test + `ProviderScope` override,mocktail mock repository,假 GoRouter 當導航探針)。具體手法、provider override 與假綠燈防呆見 `CODING_STANDARDS.md`「測試規範」「測試不可假綠」。
 
 ## Agent skills
 

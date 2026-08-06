@@ -48,13 +48,14 @@ docs/
 
 | 想做什麼 | 看哪份 |
 |---|---|
-| 貢獻流程、環境與開發流程 | [CONTRIBUTING](CONTRIBUTING.md) |
-| 懂分層與依賴方向 | [CONTRIBUTING § 分層與依賴方向](CONTRIBUTING.md#分層與依賴方向) |
-| 新增 API endpoint | [CONTRIBUTING § API 層規範](CONTRIBUTING.md#api-層規範) |
-| 查 model 欄位與 fromJson 解析規則 | [CONTRIBUTING § Model 與 fromJson 解析規則](CONTRIBUTING.md#model-與-fromjson-解析規則) |
-| 新增畫面、導覽玻璃與鍵盤 | [CONTRIBUTING § 畫面撰寫規範](CONTRIBUTING.md#畫面撰寫規範) · [§ 導覽玻璃與鍵盤](CONTRIBUTING.md#導覽玻璃與鍵盤) |
-| 寫測試（provider override、不可假綠） | [CONTRIBUTING § Provider 與測試 seam](CONTRIBUTING.md#provider-與測試-seam) · [§ 測試規範](CONTRIBUTING.md#測試規範) · [§ 測試不可假綠](CONTRIBUTING.md#測試不可假綠) |
-| 查 UI／UX 規範（iOS HIG） | [design.md](design.md) · [CONTRIBUTING § UI 規範](CONTRIBUTING.md#ui-規範) |
+| 貢獻流程、環境設定與 PR 規矩 | [CONTRIBUTING](CONTRIBUTING.md) |
+| **程式碼該怎麼寫（全部規範）** | **[CODING_STANDARDS](CODING_STANDARDS.md)** |
+| 懂分層與依賴方向 | [CODING_STANDARDS § 分層與依賴方向](CODING_STANDARDS.md#分層與依賴方向) |
+| 新增 API endpoint | [CODING_STANDARDS § API 層規範](CODING_STANDARDS.md#api-層規範) |
+| 查 model 欄位與 fromJson 解析規則 | [CODING_STANDARDS § Model 與 fromJson 解析規則](CODING_STANDARDS.md#model-與-fromjson-解析規則) |
+| 新增畫面、導覽玻璃與鍵盤 | [CODING_STANDARDS § 畫面撰寫規範](CODING_STANDARDS.md#畫面撰寫規範) · [§ 導覽玻璃與鍵盤](CODING_STANDARDS.md#導覽玻璃與鍵盤) |
+| 寫測試（provider override、不可假綠） | [CODING_STANDARDS § Provider 與測試 seam](CODING_STANDARDS.md#provider-與測試-seam) · [§ 測試規範](CODING_STANDARDS.md#測試規範) · [§ 測試不可假綠](CODING_STANDARDS.md#測試不可假綠) |
+| 查 UI／UX 規範（iOS HIG） | [design.md](design.md) · [CODING_STANDARDS § UI 規範](CODING_STANDARDS.md#ui-規範) |
 | 查領域詞彙（停留點、正選／備選 POI、工單） | [CONTEXT.md](CONTEXT.md) |
 | 理解架構決策與被拒方案 | [docs/adr/](docs/adr/)（13 份） |
 | 跑 Patrol／Firebase Test Lab、發布 TestFlight／Google Play | [docs/mobile-e2e.md](docs/mobile-e2e.md) |
@@ -74,4 +75,4 @@ docs/
 
 ## 設計
 
-Flutter 的互動與版型以根目錄 [`design.md`](design.md) 為唯一設計 SOT，[CONTRIBUTING § UI 規範](CONTRIBUTING.md#ui-規範)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。
+Flutter 的互動與版型以根目錄 [`design.md`](design.md) 為唯一設計 SOT，[CODING_STANDARDS § UI 規範](CODING_STANDARDS.md#ui-規範)只補充實作方式。方向是保留單一柔褐 tint，內容使用 iOS 系統語意 surface、Apple Music 的內容階層、Liquid Glass 功能層與 Apple HIG 平台慣例；舊三色內容分類已退場。

@@ -61,7 +61,7 @@ map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看�
   這是 typed 快取方案本來可以靠編譯器抓到、而我們換成靠測試抓的部分。
 - **後端加欄位不需要快取 migration。** 持久層沒有 per-model schema,新欄位只是 JSON 文字裡多一個
   key;反過來,舊快取缺新欄位時由 `fromJson` 的缺漏預設吸收(list → `[]`、`version` → `0`,見
-  `CONTRIBUTING.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
+  `CODING_STANDARDS.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
   重抓(`lib/api/cache/cache_migration.dart:12-13`)。
 - **「快取內容 = wire JSON」是整個離線層的前提,不只是實作細節。** `getStream` 的 stale → fresh 兩段式
   發射(`api_client.dart:192-253`)、`sendMutation` 的離線佇列(`api_client.dart:265-335`)、
