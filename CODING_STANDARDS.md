@@ -4,7 +4,7 @@
 
 搭配讀:
 
-- UI／UX 變更另須一併讀 [`design.md`](design.md) —— 見〈UI 規範〉,那裡說明兩份文件的分工
+- UI／UX 變更另須一併讀 [`DESIGN.md`](DESIGN.md) —— 見〈UI 規範〉,那裡說明兩份文件的分工
 - 領域詞彙見 [`CONTEXT.md`](CONTEXT.md);同一個東西有多種叫法時以它為準
 - 「為什麼是這樣」見 [`docs/adr/`](docs/adr) —— 本頁只寫規則,不寫決策脈絡
 - 貢獻流程、環境設定與 PR 規矩見 [`CONTRIBUTING.md`](CONTRIBUTING.md)
@@ -261,13 +261,13 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ## UI 規範
 
-**`design.md` 是本 repo 的第二份 standards source。** `code-review` 的 Standards 軸除了本檔,**必須一併讀取根目錄 `design.md`**(Tripline iOS HIG 規範,約 360 行,含「HIG 必須／HIG 建議／Tripline 決策」三級強制標記)。任何動到 `lib/ui/`、`lib/features/`、`lib/theme/`、`lib/app/adaptive.dart` 的 diff,兩份文件都要對。判讀強制等級:`design.md` 標「HIG 必須」= release blocker,標「HIG 建議」的偏離要在 PR 說明補一筆理由,標「Tripline 決策」= 不得單方面改動。
+**`DESIGN.md` 是本 repo 的第二份 standards source。** `code-review` 的 Standards 軸除了本檔,**必須一併讀取根目錄 `DESIGN.md`**(Tripline iOS HIG 規範,約 360 行,含「HIG 必須／HIG 建議／Tripline 決策」三級強制標記)。任何動到 `lib/ui/`、`lib/features/`、`lib/theme/`、`lib/app/adaptive.dart` 的 diff,兩份文件都要對。判讀強制等級:`DESIGN.md` 標「HIG 必須」= release blocker,標「HIG 建議」的偏離要在 PR 說明補一筆理由,標「Tripline 決策」= 不得單方面改動。
 
-**條文一律以 `design.md` 原文為準,本節不複述** —— 刪除動線(§12)、Accessibility release gate(§18)、驗收矩陣(§19)都在那裡,審查時直接讀那份。本節只補一件 `design.md` **沒有**的東西。
+**條文一律以 `DESIGN.md` 原文為準,本節不複述** —— 刪除動線(§12)、Accessibility release gate(§18)、驗收矩陣(§19)都在那裡,審查時直接讀那份。本節只補一件 `DESIGN.md` **沒有**的東西。
 
 ### 動作動詞的圖示與顏色
 
-`design.md` 只在 §4.1 泛稱「destructive action 使用 system destructive role」,沒寫圖示與顏色。以下由程式碼歸納。四個動詞的**語意定義在 [`CONTEXT.md`](CONTEXT.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
+`DESIGN.md` 只在 §4.1 泛稱「destructive action 使用 system destructive role」,沒寫圖示與顏色。以下由程式碼歸納。四個動詞的**語意定義在 [`CONTEXT.md`](CONTEXT.md#動作動詞)**(新增／加入／移除／刪除),本節只規範對應的圖示與顏色,兩者一起看才完整。
 
 | 動詞 | 圖示 | `TpActionItem.role` | 顏色 |
 |---|---|---|---|
@@ -362,7 +362,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 > **注意兩則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
 > 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
 > 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
-> 3. `design.md:337` 寫格式檢查是 `dart format --output=none --set-exit-if-changed .`。CI 實際用 `git ls-files` pathspec，且 `.` 會撞 `build/`；以 CI 寫法為準。
+> 3. `DESIGN.md:337` 寫格式檢查是 `dart format --output=none --set-exit-if-changed .`。CI 實際用 `git ls-files` pathspec，且 `.` 會撞 `build/`；以 CI 寫法為準。
 > 4. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
@@ -370,5 +370,5 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - **新測試一寫完就綠 = 可疑。** 宣稱一支測試守住某行為之前，先做 mutation check：暫時把實作或斷言期望值改壞 → 跑 → 確認 **FAIL** → 改回 → 確認 PASS。沒紅過的測試不算數。
 - 特別容易假綠的兩類：斷言目標其實不在畫面上（`findsNothing` 恆真）、清單／捲動測試的資料量不足以觸發被測條件。既有測試已用註解標明過這個陷阱：「清單必須長到溢出視窗,否則捲不動、最後一張卡停在畫面中段,斷言會假綠燈」（`test/features/trips/trips_list_screen_test.dart:134`）。
 - **為既有已出貨的 code 補測試時，流程反過來**：寫測試刻畫既有行為 → 跑 → **預期 PASS**。若預期 PASS 卻 FAIL，停下調查（可能是理解錯，也可能既有 code 真有 bug），**不要改測試去遷就實作**。
-- 測試寫完後自然就紅、且紅的原因正是它要抓的東西時，不需要另做 mutation check —— 那已經是真紅燈。例：`test/docs/doc_links_test.dart` 一寫完就抓到 `design.md` 的兩條懸空連結。
+- 測試寫完後自然就紅、且紅的原因正是它要抓的東西時，不需要另做 mutation check —— 那已經是真紅燈。例：`test/docs/doc_links_test.dart` 一寫完就抓到 `DESIGN.md` 的兩條懸空連結。
 - PR 描述要寫出實際的 `flutter test` 通過數；沒跑起來的測試（例如缺 device 的 `integration_test`）如實標明環境限制，不得假裝通過。

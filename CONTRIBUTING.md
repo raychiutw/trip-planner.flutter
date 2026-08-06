@@ -2,7 +2,7 @@
 
 個人專案,但流程照團隊標準走。讀完這頁就能開工。
 
-本頁只談**怎麼參與**:環境、流程、PR 規矩。**程式碼該怎麼寫在 [`CODING_STANDARDS.md`](CODING_STANDARDS.md)** —— 那份是 `code-review` Standards 軸的主要依據,動手前先讀。UI／UX 規範在 [`design.md`](design.md),領域詞彙在 [`CONTEXT.md`](CONTEXT.md),架構決策的理由與被拒方案在 [`docs/adr/`](docs/adr)。
+本頁只談**怎麼參與**:環境、流程、PR 規矩。**程式碼該怎麼寫在 [`CODING_STANDARDS.md`](CODING_STANDARDS.md)** —— 那份是 `code-review` Standards 軸的主要依據,動手前先讀。UI／UX 規範在 [`DESIGN.md`](DESIGN.md),領域詞彙在 [`CONTEXT.md`](CONTEXT.md),架構決策的理由與被拒方案在 [`docs/adr/`](docs/adr)。
 
 ## 環境
 

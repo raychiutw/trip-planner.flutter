@@ -8,7 +8,7 @@
 
 1. 先讀本檔，再讀任務明確點名或依工作流需要使用的每一份 `SKILL.md`；必要 skill 不可用時必須停下並回報，不得跳過，也不得以手動步驟冒充已執行 skill。
 2. 讀取 `CONTEXT.md` 與工作範圍相關的 `docs/adr/`，沿用既有領域詞彙與決策。
-3. **要寫或改 `lib/` 的程式碼前，先讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 中與工作範圍相關的節**。那份是本 repo 編碼規範的唯一出處，也是 `code-review` Standards 軸的主要依據；本檔只留摘要，兩者衝突時以該份為準。UI／UX 另讀 `design.md`。
+3. **要寫或改 `lib/` 的程式碼前，先讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 中與工作範圍相關的節**。那份是本 repo 編碼規範的唯一出處，也是 `code-review` Standards 軸的主要依據；本檔只留摘要，兩者衝突時以該份為準。UI／UX 另讀 `DESIGN.md`。
 4. 先確認目前 branch、worktree 與既有變更；不得覆蓋或順手提交不屬於本次任務的內容。
 5. 程式碼探索優先使用下列 Codebase Knowledge Graph；不足時才退回文字或檔案搜尋。
 

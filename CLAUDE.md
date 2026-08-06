@@ -25,7 +25,7 @@ flutter run                                           # 連 prod API — 一律�
   - **步驟 1~3 要在同一個 context window 內完成**,不要中途 compact;接近上限就 `/handoff` 換新 session。每個 `/implement` 開新 context。
   - 分流:bug 用 `/diagnosing-bugs`;外部進來的 issue 用 `/triage`(自己 `/to-tickets` 產的票不要 triage);設計問題需要跑起來才答得出來時用 `/prototype`;範圍大到一個 session 裝不下的用 `/wayfinder`。
   - 忘記該用哪個 skill 就問 `/ask-matt`。
-- **寫 `lib/` 的程式碼前先讀 `CODING_STANDARDS.md`** 中相關的節(九節,附行號):它是編碼規範的唯一出處,也是 `/code-review` Standards 軸的主要依據,規則有異動改那裡,本檔只留摘要、衝突時以它為準。UI／UX 在 `design.md`,詞彙在 `CONTEXT.md`,難逆轉的決策在 `docs/adr/`,貢獻流程在 `CONTRIBUTING.md`。
+- **寫 `lib/` 的程式碼前先讀 `CODING_STANDARDS.md`** 中相關的節(九節,附行號):它是編碼規範的唯一出處,也是 `/code-review` Standards 軸的主要依據,規則有異動改那裡,本檔只留摘要、衝突時以它為準。UI／UX 在 `DESIGN.md`,詞彙在 `CONTEXT.md`,難逆轉的決策在 `docs/adr/`,貢獻流程在 `CONTRIBUTING.md`。
 - **TDD 紅綠重構**:任何 production code 變更先寫失敗測試。修 bug 先寫重現測試。
 - **完成定義**:`flutter analyze` 零 error/warning + `flutter test` 全綠。
 - **不直接 commit 到 `master`**:開 feature branch → `/ship` 開 PR。base branch 是 `master`(無 `main`)。

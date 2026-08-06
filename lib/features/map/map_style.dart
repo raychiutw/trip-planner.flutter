@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 /// 順序必須與 web `DAY_PALETTE` 逐色一致，否則同一趟行程在 web 與 app 的
 /// 日別色會對不起來。
 ///
-/// design.md data-viz 例外的**範圍**（對齊 web dayPalette.ts 的使用範圍註記）：
+/// DESIGN.md data-viz 例外的**範圍**（對齊 web dayPalette.ts 的使用範圍註記）：
 /// 只用於路線色與 marker 的外圈／數字，**不可當 marker 填色或 UI chrome**。
 const List<Color> kDayPinPalette = [
   Color(0xFF0EA5E9), // sky-500     day 1
