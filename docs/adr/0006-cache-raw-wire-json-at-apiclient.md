@@ -37,7 +37,7 @@ SWR 的讀就有 7 處(`lib/api/trip_repository.dart:111`、`222`、`257`、`332
 呼叫點重複一次,而它其實只有一個正確答案(`api_client.dart:1026-1036`:連線層錯誤才算離線,
 HTTP 4xx/5xx 是 server 有回應,不算)。
 
-**靠 riverpod provider 既有的記憶體快取** —— `FutureProvider.family` 本來就會快取,從 timeline 切到
+**靠 riverpod provider 既有的記憶體快取** —— `StreamProvider.family` 本來就會快取,從 timeline 切到
 map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看起來已經有一層快取了。但它活在 process
 記憶體裡,app 一關就沒了,而離線寫的目標明確要求「編輯立即反映於 UI 且**重啟後仍在**」
 (該 spec 第 18 行)。provider 快取解決的是同一次啟動內的重複請求,不是離線。

@@ -70,7 +70,7 @@ docs/
 - 雙軌認證：有 Bearer access token 就走 Bearer 模式（帶 `Authorization: Bearer …`，不送 Cookie／Origin，後端對此跳過 CSRF 檢查）；否則走 cookie 模式，帶 `Cookie: tripline_session=…`
 - cookie 模式的 mutating request 一律帶 `Origin`，值為 `kTriplineOrigin`（`String.fromEnvironment('TRIPLINE_API_ORIGIN')`，預設 `https://trip-planner-dby.pages.dev`）—— 後端 CSRF Origin allowlist，缺少 → 403
 - Bearer 模式收到 401 會先嘗試 refresh，成功才用同參數重送一次
-- 429 讀 `Retry-After`（cap 30s）只 retry GET 一次；mutation 不 retry
+- 429 與 edge block page 只 retry GET／HEAD 一次；Bearer 401 refresh 成功後則不分 method，以同參數重送一次
 - 錯誤 shape `{error:{code,message,detail}}`；204 → null
 
 ## 設計

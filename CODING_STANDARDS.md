@@ -52,7 +52,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### 行程詳情 family
 
 - `trip`／`days`／`notes`／`entry`／`segments` 一律用 **`StreamProvider.family`**，不是 `FutureProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24,33,43`）。
-  > 修正：`AGENTS.md:89` 寫成 `FutureProvider.family` 是過期敘述。改 `StreamProvider` 是為了 SWR 兩段式發射（stale → fresh，見同檔 `:10-12` 註解），改回 `FutureProvider` 會直接砍掉離線 stale 那一段。測試對應寫法是 `Stream.error(...)` / `Stream.value(...)`（`test/features/favorites/favorites_screen_test.dart:449-452`）。
+  > 修正：早期 `AGENTS.md` 曾寫成 `FutureProvider.family`，那是過期敘述。改 `StreamProvider` 是為了 SWR 兩段式發射（stale → fresh，見同檔 `:10-12` 註解），改回 `FutureProvider` 會直接砍掉離線 stale 那一段。測試對應寫法是 `Stream.error(...)` / `Stream.value(...)`（`test/features/favorites/favorites_screen_test.dart:449-452`）。
 - timeline／map／notes 三畫面 watch **同一個 family 實例**共用 fetch：`trip_timeline_screen.dart:209-210`、`trip_map_screen.dart:129`、`trip_notes_screen.dart:141`。新畫面要行程資料時 watch 既有 family，**不得自行呼叫 `tripRepository.fetch*` 重打 API**。
 - 寫入後刷新一律 `ref.invalidate(tripXxxProvider(tripId))`，不是重呼叫 repository（範例：`lib/features/chat/chat_controller.dart:319-321`、`lib/features/trips/edit/edit_trip_controller.dart:244-245`）。
 

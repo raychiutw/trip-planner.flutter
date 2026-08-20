@@ -3,7 +3,7 @@
 Tripline uses two complementary test layers:
 
 - `flutter_test` and `integration_test` for deterministic app-owned state and navigation;
-- Patrol 4.6.1 plus Firebase Test Lab for native Google Maps, platform views, system theme, and real-device behavior.
+- Patrol package 4.8.0、`patrol_cli` 4.6.1 與 Firebase Test Lab，用於原生 Google Maps、platform views、system theme 與 real-device behavior。
 
 The external device workflow is `.github/workflows/mobile-e2e.yml`. A weekday schedule runs one Android matrix. iOS is manual because Firebase iOS devices are physical and require Apple Development signing. Store uploads are independent: a manual `Mobile CI / Releases` dispatch starts the selected store jobs directly. Both Test Lab jobs remain master-only and use the `mobile-e2e` GitHub Environment; configure that environment to allow deployments only from `master`.
 
@@ -236,7 +236,7 @@ gitignored. Before a local platform build, copy the corresponding checked-in
 value. A missing iOS file causes `AppDelegate` to stop at launch because the
 native map key is required.
 
-`patrol_cli` 4.4.0 can automate the iOS location permission dialog only when the
+`patrol_cli` 4.6.1 can automate the iOS location permission dialog only when the
 simulator uses one of its supported languages. CI pins the Firebase iOS matrix
 to `en_US`; the SpringBoard tutorial guard also matches the English
 `Edit Home Screen` and `Dismiss` labels. For a local run, use an English
@@ -245,7 +245,7 @@ developer's original locale after the test. These are test automation
 limitations, not Tripline localization requirements.
 
 ```bash
-dart pub global activate patrol_cli 4.4.0
+dart pub global activate patrol_cli 4.6.1
 export PATH="$PATH:$HOME/.pub-cache/bin"
 patrol build android \
   --target patrol_test/native_map_smoke_test.dart \
@@ -270,7 +270,7 @@ XCODE_XCCONFIG_FILE="$PWD/ios/Flutter/LocalDeviceSigning.xcconfig" \
   --device DEVICE_ID
 ```
 
-請保持裝置解鎖。若 Wi-Fi 配對的裝置無法在 Patrol CLI 4.4.0 的一秒
+請保持裝置解鎖。若 Wi-Fi 配對的裝置無法在 Patrol CLI 的一秒
 destination timeout 內就緒，先 build 一次，再交由 Xcode 等待 tunnel：
 
 ```bash
