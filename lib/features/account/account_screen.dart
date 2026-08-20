@@ -20,8 +20,10 @@ import '../../ui/tp_settings_group.dart';
 import 'account_sessions_screen.dart';
 import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
+import 'settings/appearance_screen.dart';
 import 'settings/notifications_screen.dart';
 import 'settings/profile_edit_screen.dart';
+import 'settings/theme_mode_controller.dart';
 
 /// 帳號 hub。
 class AccountScreen extends ConsumerStatefulWidget {
@@ -191,12 +193,13 @@ String _resolveDisplayName(UserInfo user) {
 }
 
 /// 設定群組：iOS grouped inset 風格,依語意分「帳號」「偏好」「安全性」三 section。
-class _SettingsGroup extends StatelessWidget {
+class _SettingsGroup extends ConsumerWidget {
   const _SettingsGroup();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     void open(Widget page) => _openSheetPage(context, page);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,6 +207,13 @@ class _SettingsGroup extends StatelessWidget {
         TpSettingsGroup(
           title: '偏好',
           children: [
+            TpSettingsRow(
+              key: const ValueKey('settings-appearance'),
+              leading: const Icon(CupertinoIcons.paintbrush),
+              title: '外觀',
+              value: themeModeLabel(themeMode),
+              onTap: () => open(const AppearanceScreen()),
+            ),
             TpSettingsRow(
               key: const ValueKey('settings-notifications'),
               leading: const Icon(CupertinoIcons.bell),

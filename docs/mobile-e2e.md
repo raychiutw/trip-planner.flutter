@@ -15,7 +15,7 @@ reusing the same deterministic app-owned fixture.
 
 The Patrol bundle contains two independent evidence suites:
 
-- `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與跟隨系統的 appearance（確認沒有 App 內 Appearance 設定頁）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
+- `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與本機 appearance 三選一（確認立即套用後可切回跟隨系統）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
 - `native_map_smoke_test.dart` checks real native map creation, dispose／recreate lifecycle, zoom 13 before and after remount, overlays, theme switching, location permission, pan／pinch／rotate／double-tap gestures, and native POI callbacks. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI fails unless a Google native POI produces the platform callback.
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.

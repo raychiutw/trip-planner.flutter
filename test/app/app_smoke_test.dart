@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/account/settings/theme_mode_controller.dart';
 import 'package:tripline/main.dart';
 import 'package:tripline/models/user.dart';
 
@@ -58,5 +60,41 @@ void main() {
       findsNothing,
     );
     expect(find.byKey(const ValueKey('account-avatar-button')), findsOneWidget);
+  });
+
+  testWidgets('外觀模式切換會立即套用到 App 根節點與已登入內容', (tester) async {
+    final mockTripRepository = _MockTripRepository();
+    when(mockTripRepository.watchMyTrips).thenAnswer((_) => Stream.value([]));
+    final container = ProviderContainer(
+      overrides: [
+        authStateProvider.overrideWith(_FakeAuthNotifier.new),
+        tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        appNetworkAvailabilityProvider.overrideWithValue(const Stream.empty()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await container.read(themeModeProvider.notifier).setMode(ThemeMode.dark);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
+    expect(
+      Theme.of(
+        tester.element(find.byKey(const ValueKey('apple-root-tab-bar'))),
+      ).brightness,
+      Brightness.dark,
+    );
   });
 }
