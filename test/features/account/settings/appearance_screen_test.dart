@@ -95,5 +95,18 @@ void main() {
     expect(find.text('淺色'), findsOneWidget);
     expect(find.text('深色'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('theme-light')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('theme-light')))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    expect(tester.takeException(), isNull);
   });
 }
