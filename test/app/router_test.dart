@@ -21,6 +21,7 @@ import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/account_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
+import 'package:tripline/features/account/settings/appearance_screen.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
@@ -1417,6 +1418,79 @@ void main() {
     );
   });
 
+  testWidgets('已登入的外觀 aliases 直接開啟同一外觀頁並保留返回與關閉行為', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    for (final alias in ['/account/appearance', '/settings/appearance']) {
+      router.go('/trips');
+      await tester.pumpAndSettle();
+      router.go(alias);
+      await tester.pumpAndSettle();
+
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        '/trips?account=appearance',
+      );
+      expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
+      expect(find.byType(AppearanceScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsNothing);
+
+      if (alias == '/account/appearance') {
+        await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+        await tester.pumpAndSettle();
+        expect(find.byType(AccountScreen), findsOneWidget);
+        expect(find.byType(AppearanceScreen), findsNothing);
+      }
+
+      final closeButtonKey = alias == '/account/appearance'
+          ? const ValueKey('app-sheet-close')
+          : const ValueKey('app-large-sheet-close');
+      final closeButton = find.byKey(closeButtonKey).hitTestable();
+      expect(closeButton, findsOneWidget);
+      await tester.tap(closeButton);
+      await tester.pumpAndSettle();
+      expect(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+        '/trips',
+      );
+      expect(find.byKey(const ValueKey('app-large-sheet')), findsNothing);
+    }
+  });
+
+  testWidgets('未登入的外觀 aliases 仍由既有認證規則導向 Welcome', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    for (final alias in ['/account/appearance', '/settings/appearance']) {
+      router.go(alias);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(find.byType(AppearanceScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsNothing);
+    }
+  });
+
   testWidgets('已登入可使用 web route aliases', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -1449,26 +1523,6 @@ void main() {
     )!.settings;
     expect(editPage, isA<MaterialPage<void>>());
     expect((editPage as MaterialPage<void>).fullscreenDialog, isTrue);
-
-    container.read(appRouterProvider).go('/account/appearance');
-    await tester.pumpAndSettle();
-
-    expect(
-      container
-          .read(appRouterProvider)
-          .routerDelegate
-          .currentConfiguration
-          .uri
-          .toString(),
-      '/trips?account=root',
-    );
-    expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
-    expect(find.byType(AccountScreen), findsOneWidget);
-    expect(find.byKey(const ValueKey('settings-appearance')), findsNothing);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
-    await tester.pumpAndSettle();
 
     container.read(appRouterProvider).go('/account/sessions');
     await tester.pumpAndSettle();

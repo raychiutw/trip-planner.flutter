@@ -354,7 +354,7 @@ void main() {
     );
   });
 
-  test('Router 固定四個 root branches，舊 Account／Appearance 路徑回 Account root', () {
+  test('Router 固定四個 root branches，兩條 Appearance alias 共用外觀頁', () {
     final source = File('lib/app/router.dart').readAsStringSync();
     expect(
       RegExp(r'StatefulShellBranch\s*\(').allMatches(source),
@@ -374,7 +374,7 @@ void main() {
     expect(
       RegExp(
         r"path: '/(?:account/appearance|settings/appearance)'[\s\S]{0,120}"
-        r"accountSheetAlias\(state, 'root'\)",
+        r"accountSheetAlias\(state, 'appearance'\)",
       ).allMatches(source),
       hasLength(2),
     );
