@@ -37,7 +37,7 @@ SWR 的讀就有 7 處(`lib/api/trip_repository.dart:111`、`222`、`257`、`332
 呼叫點重複一次,而它其實只有一個正確答案(`api_client.dart:1026-1036`:連線層錯誤才算離線,
 HTTP 4xx/5xx 是 server 有回應,不算)。
 
-**靠 riverpod provider 既有的記憶體快取** —— `FutureProvider.family` 本來就會快取,從 timeline 切到
+**靠 riverpod provider 既有的記憶體快取** —— `StreamProvider.family` 本來就會快取,從 timeline 切到
 map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看起來已經有一層快取了。但它活在 process
 記憶體裡,app 一關就沒了,而離線寫的目標明確要求「編輯立即反映於 UI 且**重啟後仍在**」
 (該 spec 第 18 行)。provider 快取解決的是同一次啟動內的重複請求,不是離線。
@@ -61,7 +61,7 @@ map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看�
   這是 typed 快取方案本來可以靠編譯器抓到、而我們換成靠測試抓的部分。
 - **後端加欄位不需要快取 migration。** 持久層沒有 per-model schema,新欄位只是 JSON 文字裡多一個
   key;反過來,舊快取缺新欄位時由 `fromJson` 的缺漏預設吸收(list → `[]`、`version` → `0`,見
-  `CONTRIBUTING.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
+  `CODING_STANDARDS.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
   重抓(`lib/api/cache/cache_migration.dart:12-13`)。
 - **「快取內容 = wire JSON」是整個離線層的前提,不只是實作細節。** `getStream` 的 stale → fresh 兩段式
   發射(`api_client.dart:192-253`)、`sendMutation` 的離線佇列(`api_client.dart:265-335`)、

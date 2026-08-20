@@ -6,7 +6,7 @@ status: accepted
 
 本 repo 是 trip-planner React SPA 的行動版移植,前提是**後端不動** —— 兩個 client 共用同一套 Cloudflare Pages Functions API。而那套後端的認證是為瀏覽器設計的:`POST /api/oauth/login` 發 `Set-Cookie: tripline_session`,之後靠 cookie 辨識身分;CSRF 防護是對 mutating request 檢查 `Origin` header allowlist。
 
-決定是:**出貨版只走 cookie,app 自己扮演瀏覽器**。登入走 raw dio 讀 response 的 `set-cookie`,以 regex 撈出 `tripline_session`(`lib/api/auth_repository.dart:86`、`lib/api/auth_repository.dart:304`)存進 flutter_secure_storage;之後每個 request 手動帶 `Cookie:`,mutating request 再補一個 `Origin`(`lib/api/api_client.dart:961-965`),值取自 `kTriplineOrigin`(`lib/api/api_client.dart:21`),預設就是正式站網域。少了這個 header,後端會擋成 403 —— 對後端而言,app 跟正式站的網頁長得一模一樣。
+決定是:**出貨版只走 cookie,app 自己扮演瀏覽器**。登入走 `ApiClient.postForResponse` 讀 response 的 `set-cookie`,以 regex 撈出 `tripline_session`(`lib/api/auth_repository.dart:101`、`:303-310`)存進 flutter_secure_storage;之後由 `ApiClient` 統一帶 `Cookie:`,mutating request 再補一個 `Origin`(`lib/api/api_client.dart:961-965`),值取自 `kTriplineOrigin`(`lib/api/api_client.dart:21`),預設就是正式站網域。少了這個 header,後端會擋成 403 —— 對後端而言,app 跟正式站的網頁長得一模一樣。
 
 同時,OAuth 2.1 authorization-code + PKCE 的 client 端**已完整實作**,production backend 也已 provision public client `tripline-mobile`。但它在出貨版是關的,而且是**編譯期**就關的:`OAuthConfig.clientId` 讀 `String.fromEnvironment('TRIPLINE_OAUTH_CLIENT_ID')` 且**沒有 defaultValue**(`lib/api/oauth/oauth_config.dart:7`),沒帶 `--dart-define` 就是空字串 → `isConfigured` 為 false(`lib/api/oauth/oauth_config.dart:18`)→ `oauthEnabledProvider` 為 false(`lib/api/oauth/oauth_providers.dart:15`)→ 登入頁的 OAuth 按鈕整段不建(`lib/features/auth/login_screen.dart:286`)。而 `.github/workflows/mobile.yml` 全檔沒有任何 `dart-define`,所以 TestFlight 與 Google Play internal 送出去的 build,兩條發布路徑都是 cookie。**PKCE 是備好的第二軌,不是現行出貨路徑。**
 

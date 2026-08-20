@@ -6,8 +6,8 @@ status: accepted
 
 Tripline 要同時上 iPhone、iPad、Android 手機與 Android 平板四種形態。一般作法是「各平台走各自的原生語言」——
 iOS 走 HIG、Android 走 Material——再依作業系統挑版型。本專案**兩件事都不做**：全平台使用同一套 iOS 26
-system-app 的視覺與互動，不另外建立 Material 版本（`design.md:22`）；導覽究竟走 compact 或 regular，
-由**該 subtree 實際拿到的可用寬度**決定，與作業系統無關（`design.md:24`、`design.md:52`）。
+system-app 的視覺與互動，不另外建立 Material 版本（`DESIGN.md:22`）；導覽究竟走 compact 或 regular，
+由**該 subtree 實際拿到的可用寬度**決定，與作業系統無關（`DESIGN.md:24`、`DESIGN.md:52`）。
 
 實作只有一條門檻：`lib/features/shell/app_shell.dart:39` 的 `regularNavigationWidth = 720.0`，
 在 `app_shell.dart:73` 用 `LayoutBuilder` 的 `constraints.maxWidth` 比對。過門檻時同一組 root tab bar 以
@@ -23,17 +23,17 @@ system-app 的視覺與互動，不另外建立 Material 版本（`design.md:22`
 
 **每平台各自原生（Android 走 Material）** —— 這是成本最高的選項，而且成本不在寫的時候，在維護的時候。
 導覽 chrome 整組建在 `liquid_glass_widgets` 之上（見 [ADR-0001](0001-keep-liquid-glass-over-native-cupertino.md)），
-Material 版本等於要再長出一套平行的 tab bar、header、選單與日期選擇器；`design.md` 從 §4 到 §17 的每一條
-「HIG 必須」都要有對應的 Material 條文，`design.md:333` 的驗收矩陣要拆成兩份，關鍵畫面的 golden 也要兩套。
-使用者只有一個人、App 只有一套資訊架構，卻要付兩份持續成本。`design.md:346` 因此把「Android phone 與
+Material 版本等於要再長出一套平行的 tab bar、header、選單與日期選擇器；`DESIGN.md` 從 §4 到 §17 的每一條
+「HIG 必須」都要有對應的 Material 條文，`DESIGN.md:333` 的驗收矩陣要拆成兩份，關鍵畫面的 golden 也要兩套。
+使用者只有一個人、App 只有一套資訊架構，卻要付兩份持續成本。`DESIGN.md:346` 因此把「Android phone 與
 Android tablet 使用相同 iOS HIG 視覺」直接列進手動驗收項目。
 
 **依作業系統分兩套版型** —— 會讓 Android 平板與 iPad 的行為漂移：兩者螢幕尺寸重疊、使用情境相同，卻因為
-OS 不同而拿到不同的導覽（`design.md:52` 明文要求 Android tablet 依相同 width 規則呈現 iPad 型態）。更根本的問題是上面那三格——OS 不變、
-可用寬度會變。iPad multitasking resize（`design.md:25`、`design.md:53`）在同一個 OS、同一個 process 裡
+OS 不同而拿到不同的導覽（`DESIGN.md:52` 明文要求 Android tablet 依相同 width 規則呈現 iPad 型態）。更根本的問題是上面那三格——OS 不變、
+可用寬度會變。iPad multitasking resize（`DESIGN.md:25`、`DESIGN.md:53`）在同一個 OS、同一個 process 裡
 就要求配置切換，OS 分支對此無話可說。
 
-**手機畫面等比放大到 tablet** —— `design.md:24` 直接把它列為 HIG 必須不得做。放大版沒有利用寬版空間
+**手機畫面等比放大到 tablet** —— `DESIGN.md:24` 直接把它列為 HIG 必須不得做。放大版沒有利用寬版空間
 （對照 `app_shell.dart:148`–`:166` 在 regular 下並排出來的 320pt 側欄），行程 detail 這種天生兩欄的內容仍然只能一次看一邊，
 寬螢幕換來的只是更長的行寬與更多留白。
 
@@ -42,9 +42,9 @@ OS 不同而拿到不同的導覽（`design.md:52` 明文要求 Android tablet �
 不動發布結構、也不建立 tablet 專用的 domain state。
 
 **Android 平板改用 `NavigationRail`** —— 這是本 ADR 最容易被質疑的一點，所以正面回答：**不用**
-（`design.md:52`）。rail 是 Material 的頂層導覽語彙，採用它等於在一套 iOS 26 chrome 裡開一個唯一的
+（`DESIGN.md:52`）。rail 是 Material 的頂層導覽語彙，採用它等於在一套 iOS 26 chrome 裡開一個唯一的
 Material 破口，而且是最顯眼的那個。它還會連帶要求一套自己的選取指示、label 與 selected semantics，
-以及 branch stack 保留行為（`design.md:44`）——也就是上面「每平台各自原生」那筆成本的縮小版。
+以及 branch stack 保留行為（`DESIGN.md:44`）——也就是上面「每平台各自原生」那筆成本的縮小版。
 這條規則不只寫在文件裡：`app_shell_test.dart:241` 與 `app_shell_test.dart:285` 對整個尺寸矩陣斷言
 `find.byType(NavigationRail)` 為 `findsNothing`，它是被測試守住的不變式。
 
@@ -60,6 +60,4 @@ Material 破口，而且是最顯眼的那個。它還會連帶要求一套自�
   祖先，就是為了讓 iPad multitasking resize 不重建 detail、不掉目前行程與 Day。用 `if (regular) return A;
   else return B;` 這種直覺寫法會靜默破壞它，而且不會有測試以外的徵兆。
 - **Android 使用者的預期落差由手動驗收承接，不由程式碼調和。** 返回手勢、選單、日期 picker 在 Android 上
-  都不是系統原生觀感，這是本決策明知並接受的代價；`design.md:346` 的手動矩陣是唯一會抓到它的地方。
-- `design.md:8` 與 `design.md:356` 目前連到不存在的 `docs/adr/0001-universal-ios-hig.md`，本 ADR 即該文件的
-  正主；連結修正屬 #250 的範圍，不在此處變更。
+  都不是系統原生觀感，這是本決策明知並接受的代價；`DESIGN.md:346` 的手動矩陣是唯一會抓到它的地方。

@@ -11,7 +11,7 @@ P0 的 shell 是**五個** root branch(`1106e18`「5-tab shell/router」),第五
 `:441`、`:454`)。
 
 決定:root branch 固定四個,Account 從內容頁 Header 的 44pt `person.crop.circle` 開啟一個
-**自帶 Navigation Stack 的 sheet**(`design.md:98`)。`/account`、`/settings/*` 與
+**自帶 Navigation Stack 的 sheet**(`DESIGN.md:98`)。`/account`、`/settings/*` 與
 `/developer/apps*` 這些 deep link 不再是獨立畫面,而是經 `accountSheetAlias` 轉成目前位置的
 `?account=<page>` query(`lib/app/router.dart:47`、`:131`–`:180`),由 shell 在**目前
 branch 上**開出對應的 sheet 頁面。
@@ -20,7 +20,7 @@ branch 上**開出對應的 sheet 頁面。
 收藏是同一份行程資料的四個面向,使用者在它們之間**橫向切換**,各自的 Navigation Stack、Day
 與捲動位置值得長期保留;Account 是低頻的、與「現在在哪個行程哪一天」完全無關的離場動作,
 進去就該從根頁開始。把它塞進 tab bar 等於讓底部那條列同時承載「切換內容」與「離開內容」兩種
-語意,也違反 `design.md:41`「tab bar 只負責頂層導覽」。
+語意,也違反 `DESIGN.md:41`「tab bar 只負責頂層導覽」。
 
 ## Considered Options
 
@@ -41,7 +41,7 @@ push 到哪一個 branch 上?
 `StatefulShellRoute` 外面當一般 `GoRoute`)。問題是 shell 外意味著整個 `indexedStack` 被蓋掉:
 root tab bar 消失、四個 branch 的 element 全數卸載。捲動位置、表單輸入與未送出的聊天草稿都是
 靠 branch element 常駐才活著的,離開一趟 Account 就全沒了。這正好撞上
-`design.md:105`「關閉 Account sheet 後回到原頁,保留 Day、捲動位置、表單與未送出的聊天草稿」。
+`DESIGN.md:105`「關閉 Account sheet 後回到原頁,保留 Day、捲動位置、表單與未送出的聊天草稿」。
 
 **每個設定子頁各自開一個 modal** —— 不共用 Navigation Stack,一頁一個 sheet。被拒是因為
 Account 的 deep link 有兩層深的(`/settings/developer-apps/new`):沒有共用 stack 就沒有中間層
