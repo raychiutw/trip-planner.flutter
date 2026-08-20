@@ -143,8 +143,10 @@ storetype、RSA 2048、`SHA256withRSA`、validity 10000、
 Google Cloud 的 Android Maps 憑證設定:**Application restrictions → Android apps**
 填 package `com.raychiu.tripline` 加上上表的 upload-certificate SHA-1;
 **API restrictions → Restrict key** 只勾 Maps SDK for Android。
-**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與金鑰一律走
-Gradle 的 `ANDROID_KEYSTORE_*` 環境變數契約,由 Keychain 或 GitHub secrets 供應。
+CI 與商店發布**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與
+金鑰一律走 Gradle 的環境變數契約，由 GitHub secrets 供應。本機 Maps 建置可依下方
+「Local build checks」從 example 複製 `android/maps.properties`；本機簽章仍由 Keychain
+注入 `ANDROID_KEYSTORE_*`，不建立 `android/key.properties`。
 
 若 `android/upload-keystore.jks` 已存在,先檢查它的 alias 與指紋是否與上表相符,
 **絕不覆寫** —— 覆寫等於失去對已上架 app 的上傳權,只能走 Play 的 upload key reset 流程。

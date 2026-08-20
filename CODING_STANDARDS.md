@@ -26,7 +26,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 新增 import 前先確認方向。下層檔案出現指向上層目錄的 `import '../<上層>/...'` 一律退回。
 - `models/` 是純 Dart：`lib/models/` 內**不得出現任何 `package:flutter` import**（含 `flutter_riverpod`、`flutter_secure_storage`）。目前實測零命中，這條是硬邊界。
 - `theme/` 不依賴專案內任何其他層。只允許 `package:flutter/material.dart` 與 theme 內部互引（`lib/theme/app_theme.dart:1,3`、`lib/theme/tokens.dart:1`）。
-- `api/` 不得 import `package:flutter/*`（無 widget、無 `BuildContext`）。允許的 Flutter 生態套件僅限 `flutter_riverpod`（`lib/api/providers.dart:4`）與 `flutter_secure_storage`（`lib/api/session_store.dart:4`、`lib/api/settings_store.dart:4`、`lib/api/oauth/oauth_token_store.dart:6`）。PR 若在 `api/` 引入 `material.dart` 即違反。
+- `api/` 不得 import `package:flutter/*`（無 widget、無 `BuildContext`）。允許的 Flutter 生態套件僅限 `flutter_riverpod`（`lib/api/providers.dart:4`）與 `flutter_secure_storage`（`lib/api/session_store.dart:4`、`lib/api/oauth/oauth_token_store.dart:6`）。非機敏 App 偏好的抽象介面留在 `lib/api/settings_store.dart`，平台 `shared_preferences` 實作放在 `lib/app/shared_preferences_settings_store.dart`，由 `lib/main.dart` 組裝。PR 若在 `api/` 引入 `material.dart` 即違反。
 - `ui/` 的 widget 不得 import `features/`。共用 widget 需要資料時由呼叫端以參數傳入，不自行 watch feature provider。
 
 ### `lib/api/cache/` 的位置
@@ -162,7 +162,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### Widget 型別與資料狀態
 
-- 無本地 state 的畫面用 `ConsumerWidget`；有表單、`TextEditingController`、`ScrollController`、動畫或任何 `dispose` 需求的用 `ConsumerStatefulWidget`。目前 `lib/features/` 有 9 個 `ConsumerWidget`、37 個 `ConsumerStatefulWidget`，兩者都是常態，判準是「有沒有需要釋放的物件」，不是畫面大小。
+- 無本地 state 的畫面用 `ConsumerWidget`；有表單、`TextEditingController`、`ScrollController`、動畫或任何 `dispose` 需求的用 `ConsumerStatefulWidget`。目前 `lib/features/` 有 13 個 `ConsumerWidget`、46 個 `ConsumerStatefulWidget`，兩者都是常態，判準是「有沒有需要釋放的物件」，不是畫面大小。
 - 所有 async 資料一律 `ref.watch(xxxProvider).when(data:, error:, loading:)`，三態都要有實體 UI，不得省略任一分支或用 `.value ?? fallback` 繞過。
 - error 態必須提供 retry 入口，且 retry 動作要真的重抓資料。參考 `lib/features/trips/trips_list_screen.dart:452` 的 `_ErrorState(onRetry: () => ref.invalidate(myTripsProvider))`，元件本體在同檔 `:752`。只印錯誤字串沒有按鈕視為違反。
 - loading 態用 `AppListLoadingSkeleton`（`lib/app/app_loading_skeleton.dart:6`）保留版型；不得只留空白或在頁面中央放單一 spinner。

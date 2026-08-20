@@ -2,7 +2,7 @@
 
 > 狀態：Accepted
 >
-> 更新：2026-07-23
+> 更新：2026-08-20
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
 > 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
