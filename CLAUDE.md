@@ -19,7 +19,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ## 開發流程(強制)
 
-- **一律走 mattpocock skill 工作流**,同類任務優先於 superpowers / gstack 的對應 skill:
+- **一律走 Matt Pocock engineering skill 工作流**:
   - 主線:`/grill-with-docs`(訪談收斂,同時產出 `CONTEXT.md` 詞彙與 `docs/adr/`)→ `/to-spec`(合成 spec 並發成 GitHub Issue,貼 `ready-for-agent`)→ `/to-tickets`(拆成 tracer-bullet 票)→ `/implement`(內部驅動 `/tdd` 一次一個紅綠切片,收尾跑 `/code-review`)。
   - 單一 session 做得完的小功能可跳過 `/to-tickets`,`/to-spec` 後直接 `/implement`。
   - **步驟 1~3 要在同一個 context window 內完成**,不要中途 compact;接近上限就 `/handoff` 換新 session。每個 `/implement` 開新 context。

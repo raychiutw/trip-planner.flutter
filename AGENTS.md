@@ -42,7 +42,7 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 
 ## 強制開發流程
 
-凡新增、移除或改變產品行為，或修改 production code，必須使用 Matt Pocock engineering skills，且同類任務優先於 Superpowers／gstack：
+凡新增、移除或改變產品行為，或修改 production code，必須使用 Matt Pocock engineering skills，並依下列強制主線執行：
 
 `grill-with-docs → to-spec → to-tickets → implement → code-review`
 
