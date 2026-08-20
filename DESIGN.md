@@ -379,6 +379,6 @@ UI 規範的來源階層，由高到低：
 2. 本文件。
 3. [CONTEXT.md](CONTEXT.md) —— 只定義語彙，不定義規範；但本文件用到的名稱必須與它一致。
 
-`code-review` 的 Standards 軸同時讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 與本文件。**UI 條文不重複維護**：刪除動線（§12）、Accessibility release gate（§18）、驗收矩陣（§19）只寫在本文件，`CODING_STANDARDS.md` §UI 規範不複述，只記兩件本文件沒有或說錯的事 —— 動作動詞的圖示與顏色對照表（本文件沒寫），以及本文件的失效與誤導條文清單（照抄會報假陽性或誤判）。
+`code-review` 的 Standards 軸同時讀 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 與本文件。**UI 條文不重複維護**：刪除動線（§12）、Accessibility release gate（§18）、驗收矩陣（§19）只寫在本文件；`CODING_STANDARDS.md` §UI 規範不複述，只補上本文件沒有的動作動詞圖示與顏色對照表。
 
 若實作或測試與本文件衝突，以本文件為準並建立 migration work，不得靜默保留舊規則 —— 除非該項已有 ADR 明文推翻。

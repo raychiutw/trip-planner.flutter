@@ -359,11 +359,10 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   `patrol_test/test_bundle.dart` 由 `patrol build` 產生、格式不受控，**排除它是刻意的**，不要把它加回檢查範圍。
 - 完成定義：`flutter analyze --no-fatal-infos` 零 error/warning + `flutter test`（跑整個 `test/`）全綠。`patrol_test/` 不在 `flutter test` 預設範圍，由 `mobile-e2e.yml` 另跑。
 
-> **注意兩則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
+> **注意三則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
 > 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
 > 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
-> 3. `DESIGN.md:337` 寫格式檢查是 `dart format --output=none --set-exit-if-changed .`。CI 實際用 `git ls-files` pathspec，且 `.` 會撞 `build/`；以 CI 寫法為準。
-> 4. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
+> 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
 

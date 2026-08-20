@@ -21,7 +21,7 @@ flutter run                                           # 連 prod API — 一律�
 
 - **一律走 Matt Pocock engineering skill 工作流**:
   - 主線:`/grill-with-docs`(訪談收斂,同時產出 `CONTEXT.md` 詞彙與 `docs/adr/`)→ `/to-spec`(合成 spec 並發成 GitHub Issue,貼 `ready-for-agent`)→ `/to-tickets`(拆成 tracer-bullet 票)→ `/implement`(內部驅動 `/tdd` 一次一個紅綠切片,收尾跑 `/code-review`)。
-  - 單一 session 做得完的小功能可跳過 `/to-tickets`,`/to-spec` 後直接 `/implement`。
+  - 單一 fresh context 做得完、沒有 blocker、沒有需要另行發布的產品決策，且無有意義垂直切片的小功能，可在 `/grill-with-docs` 確認範圍與測試 seam 後略過 `/to-spec`、`/to-tickets`，直接進入 `/implement`。
   - **步驟 1~3 要在同一個 context window 內完成**,不要中途 compact;接近上限就 `/handoff` 換新 session。每個 `/implement` 開新 context。
   - 分流:bug 用 `/diagnosing-bugs`;外部進來的 issue 用 `/triage`(自己 `/to-tickets` 產的票不要 triage);設計問題需要跑起來才答得出來時用 `/prototype`;範圍大到一個 session 裝不下的用 `/wayfinder`。
   - 忘記該用哪個 skill 就問 `/ask-matt`。
@@ -33,7 +33,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ## 架構
 
-分層單向依賴(上層用下層):`features/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart(不 import Flutter),`theme/` 不依賴任何人。分層規範與兩個既有例外見 `CODING_STANDARDS.md`「分層與依賴方向」。
+分層單向依賴(上層用下層):`features/` → `ui/` → `app/` → `api/` → `models/` → `theme/`。`models/` 是純 Dart(不 import Flutter),`theme/` 不依賴任何人。分層規範與兩個既有例外見 `CODING_STANDARDS.md`「分層與依賴方向」。
 
 ### Provider 鏈(riverpod 3.x)
 
@@ -45,8 +45,8 @@ flutter run                                           # 連 prod API — 一律�
 
 後端是瀏覽器導向的 session cookie + CSRF Origin allowlist,app 扮演瀏覽器:
 
-- 登入走 raw `client.dio` 讀 `set-cookie` 解析 `tripline_session`,存 flutter_secure_storage
-- 每個 request 手動帶 `Cookie:`;**mutating request 必帶 `Origin: kTriplineOrigin`**(缺少 → 403)。origin 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', ...)`(`lib/api/api_client.dart:21-24`),不得寫死字面值,本機後端靠 `--dart-define` 覆寫
+- 登入走 `postForResponse` 讀 `set-cookie`,解析 `tripline_session` 後存進 flutter_secure_storage
+- Cookie 模式由 `ApiClient` 統一帶 `Cookie:`;**mutating request 必帶 `Origin: kTriplineOrigin`**(缺少 → 403)。origin 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', ...)`(`lib/api/api_client.dart:21-24`),不得寫死字面值,本機後端靠 `--dart-define` 覆寫
 - Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`_authHeadersFor`,`lib/api/api_client.dart:946-968`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
 - `currentUser()` 401 回 null 不 throw;登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
 

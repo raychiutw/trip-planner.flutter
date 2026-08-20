@@ -36,9 +36,9 @@ flutter test --dart-define=TRIPLINE_API_ORIGIN=https://example.test \
 ## 開發流程
 
 1. **開 feature branch** — 不直接 commit 到 `master`(base branch 是 `master`,無 `main`)
-2. **TDD 紅綠重構** — 任何 production code 變更先寫失敗測試;修 bug 先寫重現測試。見〈測試規範〉與〈測試不可假綠〉
+2. **TDD 紅綠重構** — 任何 production code 變更先寫失敗測試;修 bug 先寫重現測試。見 [`CODING_STANDARDS.md`](CODING_STANDARDS.md) 的〈測試規範〉與〈測試不可假綠〉
 3. **完成定義** — `flutter analyze` 零 error/warning、`flutter test` 全綠、新增 public class/method 有 `///` 文件註解
 4. **開 PR** — commit message 與 PR 一律繁體中文(台灣用語),技術名詞保留英文
-5. **同步文件** — 規範變更改本頁;難以逆轉且有真實被拒方案的決策開 ADR;領域詞彙進 `CONTEXT.md`;使用者可感知的變更補進 `CHANGELOG.md` 的 `[Unreleased]`
+5. **同步文件** — 編碼規範改 `CODING_STANDARDS.md`;UI／UX 規範改 `DESIGN.md`;難以逆轉且有真實被拒方案的決策開 ADR;領域詞彙進 `CONTEXT.md`;使用者可感知的變更補進 `CHANGELOG.md` 的 `[Unreleased]`
 
 **待辦、規格與 PRD 一律走 GitHub Issues**,不用檔案追蹤。完整的 agent 工作流規定見 [`CLAUDE.md`](CLAUDE.md) 與 [`AGENTS.md`](AGENTS.md)。

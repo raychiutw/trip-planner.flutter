@@ -42,21 +42,21 @@ ALWAYS prefer MCP graph tools over grep/glob/file-search for code discovery.
 
 ## 強制開發流程
 
-凡新增、移除或改變產品行為，或修改 production code，必須使用 Matt Pocock engineering skills，並依下列強制主線執行：
+凡新增、移除或改變產品行為，或修改 production code，必須使用 Matt Pocock engineering skills，並依下列主線執行：
 
 `grill-with-docs → to-spec → to-tickets → implement → code-review`
 
 本節即為使用者對這條 repo 工作流的預先指定；不必等使用者逐一重打 slash command，但每個 skill 規定的停點、確認與外部發布步驟仍必須照做。
 
 - `grill-with-docs`：在寫 code 前逐題收斂共同理解；一次只問一題。能由 repository 回答的事自行查證，不問使用者。即時維護 `CONTEXT.md` 詞彙；ADR 只在「難以逆轉、缺少脈絡會困惑、存在真實 trade-off」三者都成立時建立。
-- `to-spec`：**一律不可省略**。沿用已完成的討論，不重新訪談；探索現況、提出最少且最高層的既有測試 seam，取得使用者確認後，將 spec 發布到 GitHub Issues 並加上 `ready-for-agent`。在 spec Issue 建立前不得修改 production code。
-- `to-tickets`：將工作拆成可獨立驗證、可在單一 fresh context 完成的 tracer-bullet 垂直切片，標示 blocking edges，取得使用者同意後發布。**只有整個變更確定可在單一 fresh context 完成、沒有 blocker，且無有意義的垂直切片可拆時才可省略**；省略後必須由 `to-spec` 直接進入 `implement`，不得同時省略前後兩步。
-- `implement`：**一律不可省略，也不得以直接手動編輯取代**。從已核准的 spec 或 tickets 開始，每個 `implement` 使用 fresh context；在已確認的 seam 以 `tdd` 一次完成一個 red → green 垂直切片，定期跑單檔測試與 type check，結尾跑完整測試，再依 `code-review` 對 Standards／Spec 兩軸審查，最後才提交目前 feature branch。
-- `code-review` 是 `implement` 的完成 gate，不是可選的事後補件；必須能追溯到原始 spec／Issue，並使用明確 fixed point。
+- `to-spec`：預設不可省略。沿用已完成的討論，不重新訪談；探索現況、提出最少且最高層的既有測試 seam，取得使用者確認後，將 spec 發布到 GitHub Issues 並加上 `ready-for-agent`。**只有單一 fresh context 做得完、沒有 blocker、沒有需要另行發布的產品決策，且不具備有意義垂直切片的小功能，才可略過 `to-spec`**；略過時仍須先由 `grill-with-docs` 確認範圍與測試 seam，再直接進入 `implement`。
+- `to-tickets`：將工作拆成可獨立驗證、可在單一 fresh context 完成的 tracer-bullet 垂直切片，標示 blocking edges，取得使用者同意後發布。**只有整個變更確定可在單一 fresh context 完成、沒有 blocker，且無有意義的垂直切片可拆時才可省略**；省略後由已確認的 spec，或符合上一條例外的共同理解，直接進入 `implement`。
+- `implement`：**一律不可省略，也不得以直接手動編輯取代**。從已核准的 spec、tickets，或符合上述小功能例外的已確認範圍開始，每個 `implement` 使用 fresh context；在已確認的 seam 以 `tdd` 一次完成一個 red → green 垂直切片，定期跑單檔測試與 type check，結尾跑完整測試，再依 `code-review` 對 Standards／Spec 兩軸審查，最後才提交目前 feature branch。
+- `code-review` 是 `implement` 的完成 gate，不是可選的事後補件；必須能追溯到原始 spec／Issue，或小功能例外的已確認範圍，並使用明確 fixed point。
 
-流程分流仍不得繞過 `to-spec`／`implement`：bug 先用 `diagnosing-bugs` 找 root cause 與重現方式；外部 issue 先用 `triage`（自己由 `to-tickets` 建立的票不 triage）；需要跑起來才能回答的設計問題用 `prototype`；大到一個 session 裝不下的工作先用 `wayfinder`；不確定流程時用 `ask-matt`。
+流程分流仍不得繞過 `implement`；除上述小功能例外外，也不得繞過 `to-spec`：bug 先用 `diagnosing-bugs` 找 root cause 與重現方式；外部 issue 先用 `triage`（自己由 `to-tickets` 建立的票不 triage）；需要跑起來才能回答的設計問題用 `prototype`；大到一個 session 裝不下的工作先用 `wayfinder`；不確定流程時用 `ask-matt`。
 
-`grill-with-docs`、`to-spec` 與需要的 `to-tickets` 應在同一 context window 完成，不得中途 compact；接近上限時用 `handoff` 換新 session。每個 `implement` 另開 fresh context。
+`grill-with-docs`、需要的 `to-spec` 與 `to-tickets` 應在同一 context window 完成，不得中途 compact；接近上限時用 `handoff` 換新 session。每個 `implement` 另開 fresh context。
 
 純唯讀回答、狀態查核，以及只維護 agent 指令本身，不需要為此建立產品 spec；但使用者明確點名的 skill 仍必須完整執行。
 
