@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/settings_store.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/app_version.dart';
 import 'package:tripline/features/account/account_sheet.dart';
@@ -55,6 +56,7 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           appVersionProvider.overrideWith((ref) => Future.value(version)),
         ],
         child: MaterialApp(
@@ -101,6 +103,7 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           appVersionProvider.overrideWith(
             (ref) => Future.value(
               const AppVersion(version: '0.9.1', buildNumber: '12'),
@@ -329,10 +332,14 @@ void main() {
     expect(find.text('R'), findsOneWidget);
   });
 
-  testWidgets('帳號設定 rows 可進子頁；通知 row 已轉正', (tester) async {
+  testWidgets('帳號偏好顯示目前外觀並可進入外觀頁', (tester) async {
     await pumpAccountScreen(tester);
 
-    expect(find.byKey(const ValueKey('settings-appearance')), findsNothing);
+    final appearance = find.byKey(const ValueKey('settings-appearance'));
+    expect(appearance, findsOneWidget);
+    final appearanceRow = tester.widget<TpSettingsRow>(appearance);
+    expect(appearanceRow.value, '跟隨系統');
+    expect(appearanceRow.onTap, isNotNull);
     expect(find.byKey(const ValueKey('settings-sessions')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-connected-apps')),
@@ -361,6 +368,25 @@ void main() {
       find.byKey(const ValueKey('settings-notifications')),
     );
     expect(notificationsTile.onTap, isNotNull);
+
+    await tester.tap(appearance);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('appearance-page')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('theme-dark')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<TpSettingsRow>(
+            find.byKey(const ValueKey('settings-appearance')),
+          )
+          .value,
+      '深色',
+    );
   });
 
   testWidgets('刪除帳號顯示影響數字並要求密碼，錯誤時保留對話框', (tester) async {

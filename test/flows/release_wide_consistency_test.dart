@@ -159,35 +159,21 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('外觀只跟隨系統，Account 不保留第五分頁時代的獨立契約', () {
+  test('外觀由單一本機模式控制，Account 不恢復第五分頁契約', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final accountSource = File(
       'lib/features/account/account_screen.dart',
-    ).readAsStringSync();
-    final accountSheetSource = File(
-      'lib/features/account/account_sheet.dart',
-    ).readAsStringSync();
-    final sessionsSource = File(
-      'lib/features/account/account_sessions_screen.dart',
     ).readAsStringSync();
     final repositorySource = File(
       'lib/api/trip_repository.dart',
     ).readAsStringSync();
     final userSource = File('lib/models/user.dart').readAsStringSync();
 
-    expect(mainSource, contains('themeMode: ThemeMode.system'));
+    expect(mainSource, contains('themeMode: ref.watch(themeModeProvider)'));
     expect(mainSource, contains('highContrastTheme:'));
     expect(mainSource, contains('highContrastDarkTheme:'));
-
-    for (final source in [
-      mainSource,
-      accountSource,
-      accountSheetSource,
-      sessionsSource,
-    ]) {
-      expect(source, isNot(contains('themeModeProvider')));
-      expect(source, isNot(contains('AppearanceScreen')));
-    }
+    expect(accountSource, contains("ValueKey('settings-appearance')"));
+    expect(accountSource, contains('AppearanceScreen'));
     expect(accountSource, isNot(contains('accountStatsProvider')));
     expect(accountSource, isNot(contains('_ProfileHero')));
     expect(accountSource, isNot(contains('_StatsRow')));
@@ -199,11 +185,11 @@ void main() {
       File(
         'lib/features/account/settings/theme_mode_controller.dart',
       ).existsSync(),
-      isFalse,
+      isTrue,
     );
     expect(
       File('lib/features/account/settings/appearance_screen.dart').existsSync(),
-      isFalse,
+      isTrue,
     );
   });
 
@@ -368,7 +354,7 @@ void main() {
     );
   });
 
-  test('Router 固定四個 root branches，舊 Account／Appearance 路徑回 Account root', () {
+  test('Router 固定四個 root branches，兩條 Appearance alias 共用外觀頁', () {
     final source = File('lib/app/router.dart').readAsStringSync();
     expect(
       RegExp(r'StatefulShellBranch\s*\(').allMatches(source),
@@ -388,7 +374,7 @@ void main() {
     expect(
       RegExp(
         r"path: '/(?:account/appearance|settings/appearance)'[\s\S]{0,120}"
-        r"accountSheetAlias\(state, 'root'\)",
+        r"accountSheetAlias\(state, 'appearance'\)",
       ).allMatches(source),
       hasLength(2),
     );

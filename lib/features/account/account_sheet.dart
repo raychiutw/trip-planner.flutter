@@ -7,6 +7,7 @@ import 'account_screen.dart';
 import 'account_sessions_screen.dart';
 import 'connected_apps_screen.dart';
 import 'developer_apps_screen.dart';
+import 'settings/appearance_screen.dart';
 import 'settings/notifications_screen.dart';
 import 'settings/profile_edit_screen.dart';
 
@@ -49,6 +50,7 @@ class _AccountSheetContentState extends State<_AccountSheetContent> {
   Widget build(BuildContext context) => const AccountScreen();
 
   List<Widget> _pagesFor(String? page) => switch (page) {
+    'appearance' => const [AppearanceScreen()],
     'profile' => const [ProfileEditScreen()],
     'notifications' => const [NotificationsScreen()],
     'sessions' => const [AccountSessionsScreen()],

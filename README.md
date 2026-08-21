@@ -11,7 +11,7 @@
 - 行程時間軸（單層 day selector、D1 單 rail、單行起訖時間、Google 分類、travel pill）
 - 行程地圖（原生 Google Maps、逐日 marker、路線 polyline、day tabs、entry cards 同步）
 - 行程筆記（航班/住宿/預訂/行前/緊急 5-section accordion，支援新增、編輯、刪除與排序）
-- 帳號（profile、通知、登入裝置、隱私權政策、不可復原刪除與登出；外觀跟隨系統）
+- 帳號（profile、通知、登入裝置、隱私權政策、不可復原刪除與登出；外觀可選跟隨系統／淺色／深色並在本機保存）
 - 未登入首頁（功能導覽、隱私權政策入口與登入後開始使用）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。

@@ -17,7 +17,9 @@ import 'api/providers.dart';
 import 'app/accessibility_scope.dart';
 import 'app/adaptive.dart';
 import 'app/router.dart';
+import 'app/shared_preferences_settings_store.dart';
 import 'features/account/account_sheet.dart';
+import 'features/account/settings/theme_mode_controller.dart';
 import 'features/offline/offline_sync.dart';
 import 'theme/app_theme.dart';
 import 'theme/tokens.dart';
@@ -74,6 +76,8 @@ const _triplineGlassTheme = GlassThemeData(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LiquidGlassWidgets.initialize();
+  final settingsStore = SharedPreferencesSettingsStore();
+  final initialThemeMode = await loadInitialThemeMode(settingsStore);
   // 開永續離線快取 DB（目錄取 app documents），override 預設的記憶體版。
   // 開啟失敗(磁碟/權限/檔案損毀)時退回預設 InMemory,不阻擋 app 啟動。
   DriftCacheStore? cacheStore;
@@ -96,6 +100,10 @@ Future<void> main() async {
       child: AppAccessibilityScope(
         child: ProviderScope(
           overrides: [
+            settingsStoreProvider.overrideWithValue(settingsStore),
+            themeModeProvider.overrideWith(
+              () => ThemeModeController(initialMode: initialThemeMode),
+            ),
             if (cacheStore != null)
               cacheStoreProvider.overrideWithValue(cacheStore),
           ],
@@ -154,7 +162,7 @@ class _TriplineAppState extends ConsumerState<TriplineApp> {
       highContrastTheme: AppTheme.light(highContrast: true),
       darkTheme: AppTheme.dark(),
       highContrastDarkTheme: AppTheme.dark(highContrast: true),
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       supportedLocales: kSupportedLocales,
       routerConfig: ref.watch(appRouterProvider),

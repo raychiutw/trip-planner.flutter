@@ -15,7 +15,7 @@ reusing the same deterministic app-owned fixture.
 
 The Patrol bundle contains two independent evidence suites:
 
-- `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與跟隨系統的 appearance（確認沒有 App 內 Appearance 設定頁）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
+- `app_owned_flow_test.dart` runs Welcome／Login, four root tabs, trips, itinerary and Day fallback, notes, map/itinerary switching, Tripline and external POIs, Account 與本機 appearance 三選一（確認立即套用後可切回跟隨系統）, chat draft retention, favorites branch restoration, forms, destructive confirmation, offline state, error, and recovery against deterministic repository fixtures. It never calls production services.
 - `native_map_smoke_test.dart` checks real native map creation, dispose／recreate lifecycle, zoom 13 before and after remount, overlays, theme switching, location permission, pan／pinch／rotate／double-tap gestures, and native POI callbacks. Test Lab builds with `E2E_EXPECT_GOOGLE_POI=true`, so CI fails unless a Google native POI produces the platform callback.
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
@@ -143,8 +143,10 @@ storetype、RSA 2048、`SHA256withRSA`、validity 10000、
 Google Cloud 的 Android Maps 憑證設定:**Application restrictions → Android apps**
 填 package `com.raychiu.tripline` 加上上表的 upload-certificate SHA-1;
 **API restrictions → Restrict key** 只勾 Maps SDK for Android。
-**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與金鑰一律走
-Gradle 的 `ANDROID_KEYSTORE_*` 環境變數契約,由 Keychain 或 GitHub secrets 供應。
+CI 與商店發布**不要建立 `android/maps.properties` 或 `android/key.properties`** —— 簽章與
+金鑰一律走 Gradle 的環境變數契約，由 GitHub secrets 供應。本機 Maps 建置可依下方
+「Local build checks」從 example 複製 `android/maps.properties`；本機簽章仍由 Keychain
+注入 `ANDROID_KEYSTORE_*`，不建立 `android/key.properties`。
 
 若 `android/upload-keystore.jks` 已存在,先檢查它的 alias 與指紋是否與上表相符,
 **絕不覆寫** —— 覆寫等於失去對已上架 app 的上傳權,只能走 Play 的 upload key reset 流程。

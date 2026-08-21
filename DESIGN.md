@@ -2,7 +2,7 @@
 
 > 狀態：Accepted
 >
-> 更新：2026-07-23
+> 更新：2026-08-20
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
 > 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
@@ -99,7 +99,7 @@ iPhone 固定四個 root tabs：
 - **HIG 必須**：Account 使用 grouped list、inset separator、system controls 與標準 navigation。
 - **HIG 必須**：一般、低頻設定集中在 Account；只影響目前任務的選項留在相關畫面。
 - **HIG 必須**：不得重複實作系統已有的 Dynamic Type、accessibility、鍵盤、捲動或認證偏好。
-- **Tripline 決策**：App appearance 跟隨系統；只有真正屬於 Tripline 的外觀選項才可留在 Account。
+- **Tripline 決策**：App appearance 預設跟隨系統；使用者可在 Account 選擇「跟隨系統／淺色／深色」。選擇立即套用全 App、只保存在本機，登出不清除。
 - **HIG 建議**：需要帳號時優先提供 Sign in with Apple，並清楚說明用途與權益。
 - **HIG 必須**：關閉 Account sheet 後回到原頁，保留 Day、捲動位置、表單與未送出的聊天草稿。
 
@@ -156,7 +156,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **Tripline 決策**：地圖頁不提供搜尋。
 - **HIG 必須**：保留地圖原生 pan、pinch zoom、rotate、double-tap 與 POI 手勢；上層控制不得攔截地圖空白區。
 - **HIG 必須**：定位使用獨立 floating control，首次點擊才請求位置權限。
-- **HIG 必須**：地圖 appearance 在 provider 支援時跟隨系統 Light／Dark，並維持標記與文字對比。
+- **HIG 必須**：地圖控制元件、標記與文字在 App 的 Light／Dark appearance 下維持對比。
+- **Tripline 決策**：App appearance 只切換地圖上的控制元件與 overlay；地圖 provider 圖磚維持既有日間樣式。
 - **Tripline 決策**：切換 `全部／Day` 同步更新標記、路線與行程 POI accessory。
 - **HIG 必須**：marker、route 不只靠顏色區分；需搭配編號、線型、選取狀態與 semantics。
 

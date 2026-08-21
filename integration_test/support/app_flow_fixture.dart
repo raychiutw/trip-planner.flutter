@@ -535,7 +535,29 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.text('版本 0.9.1（12）'), findsOneWidget);
   await captureState('account');
-  expect(find.byKey(const ValueKey('settings-appearance')), findsNothing);
+  final appearanceRow = find.byKey(const ValueKey('settings-appearance'));
+  await tester.scrollUntilVisible(
+    appearanceRow,
+    -200,
+    scrollable: accountScroll,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(appearanceRow);
+  await tester.pumpAndSettle();
+  expect(find.byKey(const ValueKey('appearance-page')), findsOneWidget);
+  await tester.tap(find.byKey(const ValueKey('theme-dark')));
+  await tester.pumpAndSettle();
+  expect(
+    Theme.of(
+      tester.element(find.byKey(const ValueKey('appearance-page'))),
+    ).brightness,
+    Brightness.dark,
+  );
+  await tester.tap(find.byKey(const ValueKey('theme-system')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+  await tester.pumpAndSettle();
+  expect(find.text('跟隨系統'), findsOneWidget);
   await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('app-large-sheet')), findsNothing);

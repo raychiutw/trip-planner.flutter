@@ -24,7 +24,7 @@ final sessionStoreProvider = Provider<SessionStore>(
 );
 
 final settingsStoreProvider = Provider<SettingsStore>(
-  (ref) => SecureSettingsStore(),
+  (ref) => InMemorySettingsStore(),
 );
 
 /// 離線快取 store。預設記憶體版;app 於 main() override 成 DriftCacheStore。
