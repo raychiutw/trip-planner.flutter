@@ -3,7 +3,6 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -42,12 +41,6 @@ class AppearanceScreen extends ConsumerWidget {
                     title: themeModeLabel(mode),
                     selected: selectedMode == mode,
                     inMutuallyExclusiveGroup: true,
-                    trailing: selectedMode == mode
-                        ? Icon(
-                            CupertinoIcons.checkmark,
-                            color: Theme.of(context).colorScheme.primary,
-                          )
-                        : null,
                     onTap: () => unawaited(
                       ref.read(themeModeProvider.notifier).setMode(mode),
                     ),

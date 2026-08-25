@@ -87,6 +87,9 @@ class TpGroupedSurface extends StatelessWidget {
 }
 
 class TpSettingsRow extends StatelessWidget {
+  /// 互斥選項列的勾選欄寬度,未選中時同寬留白讓各列標題欄一致。
+  static const _checkmarkSlot = 24.0;
+
   const TpSettingsRow({
     super.key,
     required this.title,
@@ -157,10 +160,14 @@ class TpSettingsRow extends StatelessWidget {
             ),
             if (value != null) ...[
               const SizedBox(width: TpSpacing.s3),
-              Flexible(
+              // 必須是 Expanded(tight):與 title 同為 loose 時 Row 會留下未分配
+              // 空間,把 value 與 chevron 一起往左推,右緣就對不齊隔壁列。
+              Expanded(
                 child: Text(
                   value!,
                   textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -170,6 +177,20 @@ class TpSettingsRow extends StatelessWidget {
             if (trailing != null) ...[
               const SizedBox(width: TpSpacing.s2),
               trailing!,
+            ] else if (selected != null) ...[
+              // 互斥選項列:選中打勾,未選中留等寬空位,不放 disclosure chevron
+              // (chevron 代表「還會往下一層」,選項列點下去只是就地切換)。
+              const SizedBox(width: TpSpacing.s2),
+              SizedBox(
+                width: _checkmarkSlot,
+                child: selected!
+                    ? Icon(
+                        CupertinoIcons.checkmark,
+                        size: _checkmarkSlot,
+                        color: theme.colorScheme.primary,
+                      )
+                    : null,
+              ),
             ] else if (onTap != null) ...[
               const SizedBox(width: TpSpacing.s2),
               Icon(
