@@ -129,6 +129,40 @@ void main() {
     expect(divider.endIndent, TpSpacing.s4);
   });
 
+  testWidgets('TpSettingsRow 帶 value 時 chevron 仍貼齊右緣', (tester) async {
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: TpSettingsGroup(
+            children: [
+              TpSettingsRow(title: '外觀', value: '跟隨系統', onTap: () {}),
+              TpSettingsRow(title: '通知', onTap: () {}),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final chevrons = find.byIcon(CupertinoIcons.chevron_forward);
+    expect(chevrons, findsNWidgets(2));
+    final rowRight = tester.getRect(find.byType(TpSettingsRow).first).right;
+    final chevronWithValue = tester.getRect(chevrons.first);
+    final chevronWithoutValue = tester.getRect(chevrons.last);
+
+    expect(
+      chevronWithValue.right,
+      moreOrLessEquals(chevronWithoutValue.right, epsilon: 0.5),
+    );
+    expect(
+      chevronWithValue.right,
+      moreOrLessEquals(rowRight - TpSpacing.s4, epsilon: 0.5),
+    );
+    expect(
+      tester.getRect(find.text('跟隨系統')).right,
+      moreOrLessEquals(chevronWithValue.left - TpSpacing.s2, epsilon: 0.5),
+    );
+  });
+
   testWidgets('TpContentSurface 是內容材質而不是 glass', (tester) async {
     await tester.pumpWidget(
       app(

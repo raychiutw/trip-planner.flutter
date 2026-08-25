@@ -109,4 +109,36 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('外觀選項列不顯示 disclosure chevron,未選中保留勾選佔位', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const AppearanceScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(CupertinoIcons.chevron_forward), findsNothing);
+    expect(find.byIcon(CupertinoIcons.checkmark), findsOneWidget);
+
+    final selectedRow = find.byKey(const ValueKey('theme-system'));
+    final unselectedRow = find.byKey(const ValueKey('theme-light'));
+    final checkmark = tester.getRect(find.byIcon(CupertinoIcons.checkmark));
+    expect(
+      checkmark.right,
+      moreOrLessEquals(tester.getRect(selectedRow).right - 16, epsilon: 0.5),
+    );
+
+    // 未選中列保留等寬佔位,標題欄可用寬度才不會跟選中列不同。
+    double titleWidth(Finder row) => tester
+        .getRect(find.descendant(of: row, matching: find.byType(Column)).first)
+        .width;
+    expect(titleWidth(unselectedRow), titleWidth(selectedRow));
+  });
 }
