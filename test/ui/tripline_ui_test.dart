@@ -991,6 +991,8 @@ void main() {
       find.descendant(of: accessory, matching: find.byType(GlassContainer)),
     );
     expect(glass.platformViewBackdrop, isTrue);
+    expect(glass.settings?.chromaticAberration, 0);
+    expect(find.byType(AnimatedContainer), findsNothing);
 
     // 對照組:沒有媒體背景時 accessory 要讀到 false,不是寫死 true。
     await tester.pumpWidget(
@@ -1015,8 +1017,6 @@ void main() {
       ),
     );
     expect(plainGlass.platformViewBackdrop, isFalse);
-    expect(glass.settings?.chromaticAberration, 0);
-    expect(find.byType(AnimatedContainer), findsNothing);
   });
 }
 

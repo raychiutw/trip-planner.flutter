@@ -10,9 +10,9 @@ enum TpNavigationGlassRecipe { regular, platformView }
 /// 由地圖 route / root shell 設定一次;浮動 header、root tab bar、bottom
 /// accessory 各自讀它,不再用參數手傳 bool、也不用 tab 索引猜。缺席 = 非媒體。
 ///
-/// 已知例外:root tab bar 掛在 shell 那一層,讀到的是 shell 依分支宣告的值;
-/// 行程內的 `/trips/:id/map` 只有地圖畫面自己宣告,tab bar 仍是非媒體樣式
-/// (master 就如此,依 ADR-0001 要真機目視才決定要不要改)。
+/// 已知差異:root tab bar 掛在 shell 那一層,讀到的是 shell 依分支宣告的值;
+/// root 地圖的空 / 載入 / 錯誤狀態把 header 蓋回非媒體,tab bar 仍是媒體樣式
+/// (master 用索引判斷時就如此,依 ADR-0001 要真機目視才決定要不要改)。
 class TpMediaBackdropScope extends InheritedWidget {
   const TpMediaBackdropScope({
     super.key,

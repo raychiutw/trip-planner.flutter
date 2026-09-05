@@ -157,15 +157,18 @@ void main() {
       'lib/features/shell/apple_root_tab_bar.dart',
     ).readAsStringSync();
     expect(
-      RegExp(r'selectedIndex\s*==\s*\d').hasMatch(tabBar),
+      RegExp(
+        r'(?:selectedIndex|currentIndex|index)\s*[=!]=\s*\d',
+      ).hasMatch(tabBar),
       isFalse,
       reason: '「是不是地圖分頁」不能用整數索引猜,要讀 TpMediaBackdropScope。',
     );
     final offenders = <String>[];
     for (final entity in Directory('lib/features').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      // 字面值、否定、比較都不行;只允許把讀到的 scope 值原樣往下傳。
       if (RegExp(
-        r'platformViewBackdrop:\s*(?:true|false)\b',
+        r'platformViewBackdrop:\s*(?:true|false|!|[^,\n]*[=<>])',
       ).hasMatch(entity.readAsStringSync())) {
         offenders.add(entity.path);
       }
