@@ -411,15 +411,16 @@ void main() {
       final band = tester.getRect(
         find.byKey(const ValueKey('tp-root-tab-band')),
       );
-      final solidTop = band.bottom - band.height * 0.55;
       expect(
         pixels.verticalContrast(
           200,
-          solidTop.round() + 6,
+          band.top.round() + 6,
           band.bottom.round() - 6,
         ),
         0,
-        reason: '底部帶的純色區在 fallback 下也不能透出',
+        reason:
+            '底部帶在 fallback 下整條不透明(master 就是整條 ColoredBox),'
+            'tab bar 上半段也不能透出',
       );
       // 羽化區照 master 仍淡出到 0(不是硬邊):帶內緣往內幾格要量得到內容。
       final featherEnd =

@@ -435,6 +435,12 @@ class _TpRootBand extends StatelessWidget {
         ? 1.0
         : (onMedia ? tpMediaScrimOpacity : veilPeakAlpha);
     final edgeAlpha = opaqueFallback ? 1.0 : peak * veilEdgeRatio;
+    // fallback 下底部帶整條不透明(膠囊 tab bar 上半段也不能透出),
+    // 頂部帶則維持純色區 + 從不透明淡出的羽化 —— 兩者都是 master 的行為。
+    final solid = opaqueFallback && !_top
+        ? solidExtent + featherExtent
+        : solidExtent;
+    final feather = opaqueFallback && !_top ? 0.0 : featherExtent;
 
     return IgnorePointer(
       child: Stack(
@@ -444,9 +450,7 @@ class _TpRootBand extends StatelessWidget {
               _anchored(
                 offset: 0,
                 // 逐層縮短:最外層最厚，越往內越薄，疊出漸進的模糊。
-                height:
-                    solidExtent +
-                    featherExtent * (blurLayers - index) / blurLayers,
+                height: solid + feather * (blurLayers - index) / blurLayers,
                 child: ClipRect(
                   // tileMode 用預設的 clamp：畫面邊界外沿用邊緣像素，跟系統
                   // bar 的模糊一致。decal 會在畫面最頂端淡成透明，露出一條縫。
@@ -461,7 +465,7 @@ class _TpRootBand extends StatelessWidget {
               ),
           _anchored(
             offset: 0,
-            height: solidExtent,
+            height: solid,
             // 無障礙 fallback 用純色而不是同色漸層：漸層著色器會 dither，
             // 帶內就量得到 ±1 的雜訊，「內容一格都不透出」便驗不乾淨。
             child: opaqueFallback
@@ -475,20 +479,20 @@ class _TpRootBand extends StatelessWidget {
                     ),
                   ),
           ),
-          // 羽化區在 fallback 下也照樣淡出到 0(從不透明起跳),不做硬邊:
-          // 不透明只保證膠囊帶底下一格不透出,帶的內緣仍要柔和收掉。
-          _anchored(
-            offset: solidExtent,
-            height: featherExtent,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: _fade([
-                  veil.withValues(alpha: edgeAlpha),
-                  veil.withValues(alpha: 0),
-                ]),
+          // 羽化區從純色區的內緣起跳淡出到 0,不做同色硬邊。
+          if (feather > 0)
+            _anchored(
+              offset: solid,
+              height: feather,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: _fade([
+                    veil.withValues(alpha: edgeAlpha),
+                    veil.withValues(alpha: 0),
+                  ]),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

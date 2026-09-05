@@ -253,13 +253,10 @@ class TpGlassSurface extends StatelessWidget {
           onMedia: platformViewBackdrop,
           blur: blurSigma,
         );
-    // 呼叫端自帶 settings(例如 tpNavigationGlassSettings)又沒指定 tint 時,
-    // fallback 的不透明色已經算過,這裡不再用預設 tint 蓋掉,否則深色模式的
-    // 動作群組會與旁邊的單顆玻璃鈕不同色;有指定 tintColor 才由它決定。
     final resolvedSettings = tpResolveGlassSettings(
       context,
       baseSettings,
-      opaqueColor: glassSettings == null || tintColor != null ? tint : null,
+      opaqueColor: tint,
     );
 
     return TpGlassEdge(
