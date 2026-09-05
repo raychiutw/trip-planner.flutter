@@ -33,6 +33,7 @@ import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
 import 'reorder_helpers.dart';
 import 'selected_day_provider.dart';
+import 'entry_mutations.dart';
 import 'trip_providers.dart';
 import 'trip_notes_screen.dart';
 import 'trip_print_screen.dart';
@@ -341,10 +342,9 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
         error: (error, stackTrace) => initiallyBelowHeader(
           _TimelineError(
-            onRetry: () {
-              ref.invalidate(tripDetailProvider(tripId));
-              ref.invalidate(tripDaysProvider(tripId));
-            },
+            onRetry: () => ref
+                .read(entryMutationsProvider(tripId).notifier)
+                .refreshAfter({TripChange.detail, TripChange.days}),
           ),
         ),
       ),
@@ -562,26 +562,21 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
       _visibleEntriesByDayId = after;
       _reorderSubmitting = true;
     });
+    // notifier 活在 container 上;await 之後畫面可能已 unmount,那時不能再碰 ref。
+    final mutations = ref.read(entryMutationsProvider(tripId).notifier);
     try {
       await repository.reorderEntries(tripId: tripId, updates: plan.updates);
-      final dayNums = [
-        for (final day in days)
-          if (affected.contains(day.id)) day.dayNum,
-      ];
-      for (final dayNum in dayNums) {
-        try {
-          await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
-        } on Exception {
-          // 排序已完成；交通資料會在下一次刷新自行補齊。
+      for (final day in days) {
+        if (affected.contains(day.id)) {
+          await mutations.recomputeTravel(dayNum: day.dayNum);
         }
       }
       if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
-        ref.invalidate(tripSegmentsProvider(tripId));
+        mutations.refreshAfter({TripChange.days, TripChange.segments});
       }
     } on Exception {
+      mutations.refreshAfter({TripChange.days});
       if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
         if (widget.tripId == tripId) {
           _restoreEntries(before);
           showAppError(context, '排序失敗，已還原原本順序');
@@ -651,7 +646,9 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
                     targetDayId: targetDayId,
                   );
               if (!mounted) return true;
-              ref.invalidate(tripDaysProvider(tripId));
+              ref.read(entryMutationsProvider(tripId).notifier).refreshAfter({
+                TripChange.days,
+              });
               dismissalLocked.value = false;
               if (sheetContext.mounted) select(targetDayId);
               return true;
@@ -675,28 +672,20 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   ) async {
     if (!_settingMasterEntryIds.add(entry.id)) return;
     final tripId = widget.tripId;
-    final repository = ref.read(tripRepositoryProvider);
     setState(() {});
     try {
-      await repository.setEntryMaster(
-        tripId: tripId,
-        entryId: entry.id,
-        poiId: alternate.poiId,
-        entryPoisVersion: entry.entryPoisVersion,
-      );
-      try {
-        await repository.recomputeTravel(tripId: tripId, day: '$dayNum');
-      } on Exception {
-        // 正選已更新；交通資料可稍後重算。
-      }
-      if (mounted) {
-        ref.invalidate(tripDaysProvider(tripId));
-        ref.invalidate(tripSegmentsProvider(tripId));
-      }
-    } on Exception {
-      if (mounted && widget.tripId == tripId) {
-        showAppError(context, '設為正選失敗，請重新載入後再試');
-      }
+      await ref
+          .read(entryMutationsProvider(tripId).notifier)
+          .setMaster(
+            context,
+            entry: entry,
+            alternate: alternate,
+            sameDayEntries: _visibleEntriesByDayId.values.firstWhere(
+              (entries) => entries.any((e) => e.id == entry.id),
+              orElse: () => const <TimelineEntry>[],
+            ),
+            dayNum: dayNum,
+          );
     } finally {
       _settingMasterEntryIds.remove(entry.id);
       if (mounted && widget.tripId == tripId) setState(() {});
@@ -1020,10 +1009,6 @@ List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
   ];
 }
 
-// ponytail: process-local auto recompute UI state; move to repo helper if retries need persistence.
-final _requestedTravelGapRecomputes = <String>{};
-final _stalledTravelRecomputeScopes = <String>{};
-
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -1101,7 +1086,9 @@ class _DaySection extends ConsumerWidget {
           // DELETE 已成功，交通重算屬於次要修復，不可因此允許再次刪除。
         }
       },
-      onSuccess: () => ref.invalidate(tripDaysProvider(tripId)),
+      onSuccess: () => ref
+          .read(entryMutationsProvider(tripId).notifier)
+          .refreshAfter({TripChange.days}),
     );
   }
 
@@ -1110,36 +1097,13 @@ class _DaySection extends ConsumerWidget {
     await _recomputeDay(ref, day.dayNum);
   }
 
-  Future<void> _recomputeDay(
-    WidgetRef ref,
-    int dayNum, {
-    bool auto = false,
-  }) async {
+  Future<void> _recomputeDay(WidgetRef ref, int dayNum) async {
     // 這裡的 ref 屬於 _DaySection 的 element。unmount 之後碰它會擲 StateError,
-    // 而 StateError 不是 Exception 子類 —— 下面的 `on Exception` 攔不到,會一路
-    // 逃成未捕捉例外把 App 打掛。auto 路徑由 build() 以 unawaited 觸發,和使用者
-    // 離開頁面天然競速,所以每次碰 ref 前都要確認還活著。
-    // (`ref.context.mounted` 正是 riverpod 內部 _assertNotDisposed 的同一條件。)
+    // 所以先拿到 notifier(它活在 container 上,不隨畫面 unmount)再等。
     if (!ref.context.mounted) return;
-    final scope = '$tripId:$dayNum';
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .recomputeTravel(tripId: tripId, day: '$dayNum');
-      // scope 記錄是 module-level state,unmount 後仍要更新 —— 該日之後重新
-      // mount 時要看到正確的「待更新」狀態。只有碰 ref 需要守衛。
-      _stalledTravelRecomputeScopes.remove(scope);
-      if (!ref.context.mounted) return;
-      ref.invalidate(tripDaysProvider(tripId));
-      ref.invalidate(tripSegmentsProvider(tripId));
-    } on Exception {
-      if (auto) {
-        _stalledTravelRecomputeScopes.add(scope);
-        if (!ref.context.mounted) return;
-        ref.invalidate(tripSegmentsProvider(tripId));
-      }
-      // 交通重算失敗忽略
-    }
+    final mutations = ref.read(entryMutationsProvider(tripId).notifier);
+    await mutations.recomputeTravel(dayNum: dayNum);
+    mutations.refreshAfter({TripChange.days, TripChange.segments});
   }
 
   @override
@@ -1327,9 +1291,10 @@ class _DaySection extends ConsumerWidget {
               segmentsReady: segmentsReady,
               missingSegment:
                   segmentsReady && travelSegment == null && travel != null,
-              recomputeStalled: _stalledTravelRecomputeScopes.contains(
-                '$tripId:${day.dayNum}',
-              ),
+              recomputeStalled: ref
+                  .watch(entryMutationsProvider(tripId))
+                  .stalledDays
+                  .contains(day.dayNum),
               missingCoords: _missingTravelCoords(previous, entry),
             ),
           row,
@@ -1463,10 +1428,9 @@ class _DaySection extends ConsumerWidget {
     }
     if (gapIds.isEmpty) return;
 
-    final key = '$tripId:${day.dayNum}:${gapIds.join('|')}';
-    if (!_requestedTravelGapRecomputes.add(key)) return;
-    _stalledTravelRecomputeScopes.remove('$tripId:${day.dayNum}');
-    unawaited(_recomputeDay(ref, day.dayNum, auto: true));
+    ref
+        .read(entryMutationsProvider(tripId).notifier)
+        .requestGapRecompute(dayNum: day.dayNum, gapKey: gapIds.join('|'));
   }
 }
 

@@ -13,6 +13,7 @@ import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_compact_time_field.dart';
+import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
 /// 編輯/新增停留點的模式參數。
@@ -423,15 +424,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     _markTimeChanged(isStart);
   }
 
-  Future<void> _recomputeDay(int dayNum) async {
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .recomputeTravel(tripId: widget.tripId, day: '$dayNum');
-    } catch (_) {
-      // 交通重算失敗不影響停留點新增結果。
-    }
-  }
+  Future<void> _recomputeDay(int dayNum) => ref
+      .read(entryMutationsProvider(widget.tripId).notifier)
+      .recomputeTravel(dayNum: dayNum);
 
   void _retryAfterStale() {
     if (!mounted) return;
@@ -443,13 +438,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   Future<bool> _submitForSheet() => _save();
 
   void _invalidateEntryCaches() {
-    ref.invalidate(tripDaysProvider(widget.tripId));
-    if (_isEdit) {
-      final entry = _existingEntry;
-      ref.invalidate(
-        entryDetailProvider((tripId: widget.tripId, entryId: entry.id)),
-      );
-    }
+    ref.read(entryMutationsProvider(widget.tripId).notifier).refreshAfter({
+      TripChange.days,
+      if (_isEdit) TripChange.entry,
+    }, entryId: _isEdit ? _existingEntry.id : null);
   }
 
   Future<void> _submitLegacy() async {
@@ -492,11 +484,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             startTime: _fmt(_start),
             endTime: _fmt(_end),
           );
-          try {
-            await repo.recomputeTravel(tripId: widget.tripId);
-          } catch (_) {
-            // Entry save succeeded; travel can self-heal on the next refresh.
-          }
+          await ref
+              .read(entryMutationsProvider(widget.tripId).notifier)
+              .recomputeTravel();
         case final EntryEditNew args:
           final dayNum = _selectedDayNum(args);
           final lat = _coordValue(_lat.text, min: -90, max: 90);

@@ -8,7 +8,7 @@ import '../../api/cache/cache_store.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
-import '../trip_detail/trip_providers.dart';
+import '../trip_detail/entry_mutations.dart';
 import 'offline_sync.dart';
 
 enum _ConflictChoice { ours, theirs }
@@ -32,13 +32,7 @@ Future<void> showConflictResolveSheet(
   }
 }
 
-void _invalidateTripFamilies(WidgetRef ref) {
-  ref.invalidate(tripDetailProvider);
-  ref.invalidate(tripDaysProvider);
-  ref.invalidate(tripNotesProvider);
-  ref.invalidate(tripSegmentsProvider);
-  ref.invalidate(entryDetailProvider);
-}
+void _invalidateTripFamilies(WidgetRef ref) => invalidateTripFamilies(ref);
 
 String _fieldLabel(String field) {
   switch (field) {

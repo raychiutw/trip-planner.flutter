@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +21,7 @@ import '../../ui/tp_app_bar.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
 import '../favorites/favorites_providers.dart';
+import 'entry_mutations.dart';
 import 'trip_providers.dart';
 
 /// 開啟 POI 訂位連結的注入點，讓測試可替換外部瀏覽器呼叫。
@@ -63,21 +62,24 @@ class EntryPoiScreen extends ConsumerWidget {
     bool showFailure = true,
   }) async {
     try {
+      // 先拿 notifier:它活在 container 上,await 之後畫面 unmount 也不會擲 StateError。
+      final mutations = ref.read(entryMutationsProvider(tripId).notifier);
       await op();
       if (recomputeTravel) {
-        await _recomputeTravel(ref);
+        await mutations.recomputeTravel(dayNum: _dayNumOf(ref));
       }
-      // 守衛必須在 ref.invalidate 之前 —— await 期間使用者可能已離開,此時碰 ref
-      // 會擲 StateError。StateError 不是 Exception 子類,底下的 `on Exception`
-      // 攔不到,會一路逃成未捕捉例外把 App 打掛。
+      mutations.refreshAfter({
+        TripChange.entry,
+        TripChange.days,
+      }, entryId: entryId);
       if (!context.mounted) return true;
-      ref.invalidate(entryDetailProvider(_key));
-      ref.invalidate(tripDaysProvider(tripId));
       showAppNotice(context, success);
       return true;
     } on ApiError catch (error) {
       if (!context.mounted) return false;
-      ref.invalidate(entryDetailProvider(_key));
+      ref.read(entryMutationsProvider(tripId).notifier).refreshAfter({
+        TripChange.entry,
+      }, entryId: entryId);
       if (showFailure) {
         showAppError(
           context,
@@ -92,15 +94,14 @@ class EntryPoiScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _recomputeTravel(WidgetRef ref) async {
-    // 由 _run 在 `await op()` 之後才呼叫 → 進來時可能早已 unmount,連 ref.read
-    // 都不安全（同樣會擲 StateError 而非 Exception）。
-    if (!ref.context.mounted) return;
-    try {
-      await ref.read(tripRepositoryProvider).recomputeTravel(tripId: tripId);
-    } on Exception {
-      // 交通重算失敗不影響地點管理結果。
+  /// 這個停留點在第幾天;days 還沒到手就 null(→ 整趟重算)。
+  int? _dayNumOf(WidgetRef ref) {
+    final days = ref.read(tripDaysProvider(tripId)).value;
+    if (days == null) return null;
+    for (final day in days) {
+      if (day.timeline.any((e) => e.id == entryId)) return day.dayNum;
     }
+    return null;
   }
 
   @override
@@ -283,32 +284,15 @@ class EntryPoiScreen extends ConsumerWidget {
     TimelineEntry entry,
     EntryPoiInfo alternate,
     List<TimelineEntry> sameDayEntries,
-  ) async {
-    final warning = _crossRegionWarning(alternate, sameDayEntries, entry.id);
-    final ok = await showAppConfirm(
-      context,
-      title: '設為正選？',
-      message:
-          '要將「${alternate.name ?? '未命名地點'}」設為此停留點的正選嗎？'
-          '${warning == null ? '' : '\n\n$warning'}',
-      confirmLabel: '設為正選',
-    );
-    if (!ok || !context.mounted) return;
-    await _run(
-      context,
-      ref,
-      () => ref
-          .read(tripRepositoryProvider)
-          .setEntryMaster(
-            tripId: tripId,
-            entryId: entryId,
-            poiId: alternate.poiId,
-            entryPoisVersion: entry.entryPoisVersion,
-          ),
-      success: '已設為正選',
-      recomputeTravel: true,
-    );
-  }
+  ) => ref
+      .read(entryMutationsProvider(tripId).notifier)
+      .setMaster(
+        context,
+        entry: entry,
+        alternate: alternate,
+        sameDayEntries: sameDayEntries,
+        dayNum: _dayNumOf(ref),
+      );
 
   Future<void> _editPoiInfo(
     BuildContext context,
@@ -598,11 +582,6 @@ class _PoiCard extends StatelessWidget {
   }
 }
 
-typedef _LatLng = ({double lat, double lng});
-
-const _crossRegionThresholdM = 50000.0;
-const _earthRadiusM = 6371000.0;
-
 List<TimelineEntry> _sameDayEntries(List<TripDay> days, int entryId) {
   for (final day in days) {
     for (final entry in day.timeline) {
@@ -611,61 +590,6 @@ List<TimelineEntry> _sameDayEntries(List<TripDay> days, int entryId) {
   }
   return const <TimelineEntry>[];
 }
-
-String? _crossRegionWarning(
-  EntryPoiInfo alternate,
-  List<TimelineEntry> sameDayEntries,
-  int entryId,
-) {
-  final lat = alternate.lat;
-  final lng = alternate.lng;
-  if (lat == null || lng == null) return null;
-
-  final siblingCoords = <_LatLng>[
-    for (final entry in sameDayEntries)
-      if (entry.id != entryId &&
-          entry.master?.lat != null &&
-          entry.master?.lng != null)
-        (lat: entry.master!.lat!, lng: entry.master!.lng!),
-  ];
-  final center = _avgLatLng(siblingCoords);
-  if (center == null) return null;
-
-  final distance = _haversineMeters((lat: lat, lng: lng), center);
-  if (distance <= _crossRegionThresholdM) return null;
-
-  final km = distance >= 100000
-      ? (distance / 1000).round().toString()
-      : (distance / 1000).toStringAsFixed(1);
-  return '新正選距離本日其他點約 $km km，可能跨區，前後車程會誤算。確定要設為正選？';
-}
-
-_LatLng? _avgLatLng(List<_LatLng> points) {
-  if (points.isEmpty) return null;
-  var lat = 0.0;
-  var lng = 0.0;
-  for (final point in points) {
-    lat += point.lat;
-    lng += point.lng;
-  }
-  return (lat: lat / points.length, lng: lng / points.length);
-}
-
-double _haversineMeters(_LatLng a, _LatLng b) {
-  final phi1 = _toRadians(a.lat);
-  final phi2 = _toRadians(b.lat);
-  final dPhi = _toRadians(b.lat - a.lat);
-  final dLambda = _toRadians(b.lng - a.lng);
-  final h =
-      math.sin(dPhi / 2) * math.sin(dPhi / 2) +
-      math.cos(phi1) *
-          math.cos(phi2) *
-          math.sin(dLambda / 2) *
-          math.sin(dLambda / 2);
-  return 2 * _earthRadiusM * math.atan2(math.sqrt(h), math.sqrt(1 - h));
-}
-
-double _toRadians(double degrees) => degrees * math.pi / 180;
 
 Uri? _safeReservationUri(String? rawUrl) {
   final value = rawUrl?.trim();

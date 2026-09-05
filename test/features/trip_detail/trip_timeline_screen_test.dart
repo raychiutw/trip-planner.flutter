@@ -1837,6 +1837,14 @@ void main() {
     await tester.ensureVisible(setMaster);
     await tester.pumpAndSettle();
     await tester.tap(setMaster);
+    // 確認期間該列顯示忙碌 spinner(永遠在轉),不能 pumpAndSettle。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    // 與 POI 畫面同一套政策:設為正選一律先確認。
+    expect(find.text('設為正選？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '設為正選'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
     verify(
