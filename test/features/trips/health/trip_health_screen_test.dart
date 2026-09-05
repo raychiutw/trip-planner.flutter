@@ -55,7 +55,7 @@ void main() {
           requestsRepositoryProvider.overrideWithValue(requestsRepo),
           // 就算 SSE 收掉也不落入真 timer 的輪詢。
           requestPollWaitProvider.overrideWithValue(
-            () => Completer<void>().future,
+            (_) => Completer<void>().future,
           ),
         ],
         child: MaterialApp(

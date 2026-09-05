@@ -31,11 +31,13 @@ void main() {
   late _MockRepo repo;
   late StreamController<TripRequestEvent> events;
   late List<Completer<void>> waits;
+  late List<Duration> delays;
 
   setUp(() {
     repo = _MockRepo();
     events = StreamController<TripRequestEvent>();
     waits = [];
+    delays = [];
     when(() => repo.watchRequestEvents(7)).thenAnswer((_) => events.stream);
   });
 
@@ -43,9 +45,10 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(repo),
-        requestPollWaitProvider.overrideWithValue(() {
+        requestPollWaitProvider.overrideWithValue((delay) {
           final w = Completer<void>();
           waits.add(w);
+          delays.add(delay);
           return w.future;
         }),
       ],
@@ -337,5 +340,86 @@ void main() {
 
     final state = sub.read() as RequestTerminal;
     expect(state.terminalReason, TerminalReason.cancelled);
+  });
+
+  test('輪詢間隔退避:4s 起每次加倍,30s 封頂', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await events.close();
+    await _flush();
+    for (var i = 0; i < 5; i++) {
+      waits[i].complete();
+      await _flush();
+    }
+
+    expect(delays.map((d) => d.inSeconds).toList(), [4, 8, 16, 30, 30, 30]);
+  });
+
+  test('讀取還在飛時再觸發重讀(回前景)→ 不重複打 API', () async {
+    final pending = Completer<TripRequest>();
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) {
+      calls++;
+      return pending.future;
+    });
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    expect(calls, 1, reason: '種子讀取還在飛');
+    // 同狀態不會再派送,要先 inactive 再 resumed 才算一次真正的回前景。
+    for (final s in [AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(s);
+    }
+    await _flush();
+
+    expect(calls, 1, reason: '回前景共用飛行中的那一次');
+    pending.complete(_req(RequestStatus.processing));
+    await _flush();
+  });
+
+  test('app 進背景時輪詢暫停,回前景重讀一次並重設退避', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      return _req(RequestStatus.processing);
+    });
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await events.close();
+    await _flush();
+    waits[0].complete();
+    await _flush();
+    expect(delays, hasLength(2), reason: '第二輪等待(8s)已排上');
+
+    // 真機由 _handleLifecycleMessage 補齊中間狀態;測試要自己走完,
+    // 不然 AppLifecycleListener 會 assert 跳級轉換非法。
+    for (final s in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(s);
+    }
+    final before = calls;
+    waits[1].complete();
+    await _flush();
+    expect(calls, before, reason: '背景中等待到期也不打 API');
+    expect(delays, hasLength(2), reason: '背景中不再排新的等待');
+
+    for (final s in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(s);
+    }
+    await _flush();
+    expect(calls, before + 1, reason: '回前景只補讀一次');
+    expect(delays.last.inSeconds, 4, reason: '退避從頭算');
   });
 }
