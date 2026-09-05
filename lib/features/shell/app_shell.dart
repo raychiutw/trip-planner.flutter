@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../account/account_sheet.dart';
 import '../offline/offline_status_banner.dart';
@@ -64,57 +65,68 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  /// 媒體背景分支:root 地圖(`/map`)。用分支的預設路由判斷,不用索引猜。
+  bool get _onMediaBranch {
+    final shell = widget.navigationShell;
+    return shell.route.branches[shell.currentIndex].defaultRoute?.path ==
+        '/map';
+  }
+
   @override
   Widget build(BuildContext context) {
     final showRootTab =
         widget.showRootTab && MediaQuery.viewInsetsOf(context).bottom == 0;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final regular = constraints.maxWidth >= AppShell.regularNavigationWidth;
-        final rootTabs = AppleRootTabBar(
-          selectedIndex: widget.navigationShell.currentIndex,
-          onSelected: (index) => _selectTab(context, index),
-          inline: regular,
-          focusNodes: _rootTabFocusNodes,
-        );
-        return Scaffold(
-          extendBody: showRootTab && !regular,
-          appBar: showRootTab && regular
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(80),
-                  child: KeyedSubtree(
-                    key: const ValueKey('apple-regular-root-tabs'),
-                    child: SafeArea(
-                      bottom: false,
-                      child: SizedBox(height: 80, child: rootTabs),
+    return TpMediaBackdropScope(
+      onMedia: _onMediaBranch,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final regular =
+              constraints.maxWidth >= AppShell.regularNavigationWidth;
+          final rootTabs = AppleRootTabBar(
+            selectedIndex: widget.navigationShell.currentIndex,
+            onSelected: (index) => _selectTab(context, index),
+            inline: regular,
+            focusNodes: _rootTabFocusNodes,
+          );
+          return Scaffold(
+            extendBody: showRootTab && !regular,
+            appBar: showRootTab && regular
+                ? PreferredSize(
+                    preferredSize: const Size.fromHeight(80),
+                    child: KeyedSubtree(
+                      key: const ValueKey('apple-regular-root-tabs'),
+                      child: SafeArea(
+                        bottom: false,
+                        child: SizedBox(height: 80, child: rootTabs),
+                      ),
+                    ),
+                  )
+                : null,
+            // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
+            body: TpRootReselectScope(
+              notifier: _rootReselects,
+              child: Column(
+                children: [
+                  Expanded(
+                    key: const ValueKey('app-shell-content'),
+                    child: KeyedSubtree(
+                      key: const ValueKey('app-shell-detail'),
+                      child: widget.navigationShell,
                     ),
                   ),
-                )
-              : null,
-          // 內容下方、底部導航上方夾一條離線狀態列(無事時不佔空間)。
-          body: TpRootReselectScope(
-            notifier: _rootReselects,
-            child: Column(
-              children: [
-                Expanded(
-                  key: const ValueKey('app-shell-content'),
-                  child: KeyedSubtree(
-                    key: const ValueKey('app-shell-detail'),
-                    child: widget.navigationShell,
-                  ),
-                ),
-                const OfflineStatusBanner(),
-                if (widget.accountPage != null)
-                  _AccountSheetDeepLink(
-                    page: widget.accountPage!,
-                    returnLocation: widget.accountReturnLocation,
-                  ),
-              ],
+                  const OfflineStatusBanner(),
+                  if (widget.accountPage != null)
+                    _AccountSheetDeepLink(
+                      page: widget.accountPage!,
+                      returnLocation: widget.accountReturnLocation,
+                    ),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: showRootTab && !regular ? rootTabs : null,
-        );
-      },
+            bottomNavigationBar: showRootTab && !regular ? rootTabs : null,
+          );
+        },
+      ),
     );
   }
 
