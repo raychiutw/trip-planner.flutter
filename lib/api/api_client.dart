@@ -3,7 +3,6 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HttpDate;
 
 import 'package:dio/dio.dart';
 
@@ -13,6 +12,7 @@ import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
 import 'cache/optimistic_patchers.dart';
 import 'cache/rebase_merge.dart';
+import 'retry_policy.dart' as retry;
 import 'session_store.dart';
 
 /// 本 build 連線的 origin。預設正式站，可用 --dart-define=TRIPLINE_API_ORIGIN
@@ -110,7 +110,7 @@ class ApiClient {
     bool followRedirects = true,
   }) async {
     final auth = await _authHeadersFor('POST');
-    return _dio.request<dynamic>(
+    final response = await _dio.request<dynamic>(
       path,
       queryParameters: query,
       data: body,
@@ -120,6 +120,10 @@ class ApiClient {
         followRedirects: followRedirects,
       ),
     );
+    // 登入 / 註冊的 raw POST 不重送:429 是 mutation,401 就是憑證錯(走 Bearer
+    // refresh 會重放憑證,refresh 失敗還會把 OAuth session 清掉)。只轉錯誤。
+    _throwIfFailed(response, acceptRedirects: !followRedirects);
+    return response;
   }
 
   Future<dynamic> get(
@@ -173,15 +177,8 @@ class ApiClient {
       query: query,
       followRedirects: false,
     );
-    final statusCode = response.statusCode ?? 0;
-    if (_isEdgeBlockPage(response)) {
-      throw _upstreamUnavailable(statusCode);
-    }
-    if (statusCode < 200 || statusCode >= 400) {
-      throw ApiError.fromResponse(statusCode, response.data);
-    }
     return ApiRedirectResponse(
-      statusCode: statusCode,
+      statusCode: response.statusCode ?? 0,
       location: response.headers.value('location'),
     );
   }
@@ -699,26 +696,9 @@ class ApiClient {
     };
   }
 
-  /// 解析 Retry-After（delta-seconds 或 HTTP-date），cap 30 秒；無效值回 1。
-  static int parseRetryAfterSeconds(String? headerValue) {
-    const maxWaitSeconds = 30;
-    const defaultWaitSeconds = 1;
-    final trimmedValue = headerValue?.trim();
-    if (trimmedValue == null || trimmedValue.isEmpty) {
-      return defaultWaitSeconds;
-    }
-    final deltaSeconds = int.tryParse(trimmedValue);
-    if (deltaSeconds != null) {
-      return deltaSeconds.clamp(0, maxWaitSeconds).toInt();
-    }
-    try {
-      final retryAt = HttpDate.parse(trimmedValue);
-      final secondsUntilRetry = retryAt.difference(DateTime.now()).inSeconds;
-      return secondsUntilRetry.clamp(0, maxWaitSeconds).toInt();
-    } on Exception {
-      return defaultWaitSeconds;
-    }
-  }
+  /// 解析 Retry-After;實作在 retry_policy.dart,這裡只是給既有測試的別名。
+  static int parseRetryAfterSeconds(String? headerValue) =>
+      retry.parseRetryAfterSeconds(headerValue);
 
   static bool _isEdgeBlockPage(Response<dynamic> response) {
     final statusCode = response.statusCode ?? 0;
@@ -737,6 +717,55 @@ class ApiClient {
     code: 'SYS_UPSTREAM_UNAVAILABLE',
     message: '伺服器暫時無法回應，請稍後重試',
   );
+
+  /// 一般請求與 SSE 共用的重送決策;RetryAfterRefresh 已把 refresh 做掉,失敗即 NoRetry。
+  Future<retry.RetryDecision> _retryDecision(
+    Response<dynamic> response, {
+    required bool useBearer,
+    required bool retryableMethod,
+    required bool isRetryAttempt,
+    CancelToken? cancelToken,
+  }) async {
+    final decision = retry.decideRetry(
+      statusCode: response.statusCode ?? 0,
+      retryAfterHeader: response.headers.value('retry-after'),
+      isEdgeBlockPage: _isEdgeBlockPage(response),
+      useBearer: useBearer,
+      retryableMethod: retryableMethod,
+      isRetryAttempt: isRetryAttempt,
+    );
+    switch (decision) {
+      case retry.RetryAfterWait(:final seconds):
+        await _waitForRetry(seconds, cancelToken);
+        return decision;
+      case retry.RetryAfterRefresh():
+        final source = _bearerSource;
+        return source != null && await source.refresh()
+            ? decision
+            : const retry.NoRetry();
+      case retry.NoRetry():
+        return decision;
+    }
+  }
+
+  /// 非成功回應 → ApiError;edge block page → 上游不可用。
+  static void _throwIfFailed(
+    Response<dynamic> response, {
+    bool acceptRedirects = false,
+  }) {
+    final statusCode = response.statusCode ?? 0;
+    if (_isEdgeBlockPage(response)) throw _upstreamUnavailable(statusCode);
+    final upperBound = acceptRedirects ? 400 : 300;
+    if (statusCode < 200 || statusCode >= upperBound) {
+      throw ApiError.fromResponse(
+        statusCode,
+        response.data,
+        retryAfterSeconds: int.tryParse(
+          response.headers.value('retry-after') ?? '',
+        ),
+      );
+    }
+  }
 
   static Future<void> _waitForRetry(
     int seconds,
@@ -789,44 +818,29 @@ class ApiClient {
       rethrow;
     }
 
-    final statusCode = response.statusCode ?? 0;
-    final isEdgeBlockPage = _isEdgeBlockPage(response);
-    final isRetryableMethod = method == 'GET' || method == 'HEAD';
-    // 429、edge block page、401 Bearer-refresh 共用「同參數重送一次」。
-    Future<dynamic> retry() => _send(
-      method,
-      path,
-      query: query,
-      body: body,
+    final decision = await _retryDecision(
+      response,
+      useBearer: auth.useBearer,
+      retryableMethod: method == 'GET' || method == 'HEAD',
+      isRetryAttempt: isRetryAttempt,
       cancelToken: cancelToken,
-      isRetryAttempt: true,
-      fallbackToCache: fallbackToCache,
-      writeCache: writeCache,
-      evictMutationCache: evictMutationCache,
     );
-    if ((statusCode == 429 || isEdgeBlockPage) &&
-        isRetryableMethod &&
-        !isRetryAttempt) {
-      final waitSeconds = parseRetryAfterSeconds(
-        response.headers.value('retry-after'),
+    if (decision is! retry.NoRetry) {
+      // 429、edge block page、401 Bearer-refresh 共用「同參數重送一次」。
+      return _send(
+        method,
+        path,
+        query: query,
+        body: body,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+        fallbackToCache: fallbackToCache,
+        writeCache: writeCache,
+        evictMutationCache: evictMutationCache,
       );
-      await _waitForRetry(waitSeconds, cancelToken);
-      return retry();
     }
-    // Bearer 模式遇 401 → 嘗試 refresh 後重試一次
-    if (statusCode == 401 &&
-        auth.useBearer &&
-        !isRetryAttempt &&
-        _bearerSource != null &&
-        await _bearerSource.refresh()) {
-      return retry();
-    }
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(statusCode, response.data);
-    }
-    if (isEdgeBlockPage) {
-      throw _upstreamUnavailable(statusCode);
-    }
+    _throwIfFailed(response);
+    final statusCode = response.statusCode ?? 0;
     if (statusCode == 204) {
       if (evictMutationCache) {
         await _evictForMutation(method, path, body);
@@ -879,41 +893,38 @@ class ApiClient {
       cancelToken: cancelToken,
     );
 
+    // 429 / edge block 的 body 不是事件流:先收掉再等 Retry-After,
+    // 不要讓連線在最長 30 秒的等待期間一直開著。
+    // 已是重送就不會再重送,body 要留給下面轉 ApiError 用。
+    var drained = false;
+    if (!isRetryAttempt &&
+        ((response.statusCode ?? 0) == 429 || _isEdgeBlockPage(response))) {
+      await response.data?.stream.drain<void>();
+      drained = true;
+    }
+    final decision = await _retryDecision(
+      response,
+      useBearer: auth.useBearer,
+      retryableMethod: true,
+      isRetryAttempt: isRetryAttempt,
+      cancelToken: cancelToken,
+    );
+    if (decision is! retry.NoRetry) {
+      if (!drained) await response.data?.stream.drain<void>();
+      yield* _getTextStream(
+        path,
+        query: query,
+        cancelToken: cancelToken,
+        isRetryAttempt: true,
+      );
+      return;
+    }
     final statusCode = response.statusCode ?? 0;
-    final isEdgeBlockPage = _isEdgeBlockPage(response);
-    if ((statusCode == 429 || isEdgeBlockPage) && !isRetryAttempt) {
-      final waitSeconds = parseRetryAfterSeconds(
-        response.headers.value('retry-after'),
-      );
-      await response.data?.stream.drain<void>();
-      await _waitForRetry(waitSeconds, cancelToken);
-      yield* _getTextStream(
-        path,
-        query: query,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-      );
-      return;
-    }
-    if (statusCode == 401 &&
-        auth.useBearer &&
-        !isRetryAttempt &&
-        _bearerSource != null &&
-        await _bearerSource.refresh()) {
-      await response.data?.stream.drain<void>();
-      yield* _getTextStream(
-        path,
-        query: query,
-        cancelToken: cancelToken,
-        isRetryAttempt: true,
-      );
-      return;
-    }
     if (statusCode < 200 || statusCode >= 300) {
       final body = await _decodeStreamBody(response.data);
       throw ApiError.fromResponse(statusCode, body);
     }
-    if (isEdgeBlockPage) {
+    if (_isEdgeBlockPage(response)) {
       await response.data?.stream.drain<void>();
       throw _upstreamUnavailable(statusCode);
     }

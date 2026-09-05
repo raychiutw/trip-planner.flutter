@@ -53,6 +53,22 @@ ResponseBody jsonResponseBody(
   );
 }
 
+class _RefreshingSource implements BearerTokenSource {
+  _RefreshingSource(this._token);
+  String? _token;
+  int refreshCalls = 0;
+
+  @override
+  Future<String?> accessToken() async => _token;
+
+  @override
+  Future<bool> refresh() async {
+    refreshCalls++;
+    _token = 'new';
+    return true;
+  }
+}
+
 ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
   '<!doctype html><title>Attention Required</title>',
   200,
@@ -250,6 +266,41 @@ void main() {
       );
       expect(sequencedAdapter.recordedRequests, hasLength(1));
     });
+
+    for (final c in [
+      (
+        name: 'PATCH',
+        call: (ApiClient c) => c.patch('/entries/e1', body: {'x': 1}),
+      ),
+      (name: 'DELETE', call: (ApiClient c) => c.delete('/entries/e1')),
+    ]) {
+      test('429 ${c.name} 不 retry 直接丟 ApiError', () async {
+        final sequencedAdapter = SequencedResponseAdapter([
+          jsonResponseBody(
+            429,
+            {
+              'error': {'code': 'SYS_RATE_LIMIT', 'message': '請稍後再試'},
+            },
+            extraHeaders: {
+              'retry-after': ['0'],
+            },
+          ),
+          jsonResponseBody(200, {'ok': true}),
+        ]);
+        final client = ApiClient(
+          sessionStore: sessionStore,
+          dio: Dio()..httpClientAdapter = sequencedAdapter,
+        );
+
+        await expectLater(
+          c.call(client),
+          throwsA(
+            isA<ApiError>().having((error) => error.status, 'status', 429),
+          ),
+        );
+        expect(sequencedAdapter.recordedRequests, hasLength(1));
+      });
+    }
 
     test('200 text/html GET 讀 Retry-After 後 retry 一次', () async {
       final adapter = SequencedResponseAdapter([
@@ -527,6 +578,45 @@ void main() {
         ),
       );
       expect(adapter.recordedRequests, hasLength(2));
+    });
+  });
+
+  group('streaming GET + Bearer', () {
+    test('getTextStream 遇 Bearer 401 且 refresh 成功 → 帶新 token 重送一次', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          jsonEncode({
+            'error': {'code': 'AUTH_REQUIRED', 'message': 'login'},
+          }),
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+        ResponseBody.fromString(
+          'data: {"status":"completed"}\n\n',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/event-stream'],
+          },
+        ),
+      ]);
+      final source = _RefreshingSource('old');
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+        bearerSource: source,
+      );
+
+      final text = await client.getTextStream('/requests/7/events').join();
+
+      expect(text, 'data: {"status":"completed"}\n\n');
+      expect(source.refreshCalls, 1);
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(
+        adapter.recordedRequests.last.headers['Authorization'],
+        'Bearer new',
+      );
     });
   });
 
