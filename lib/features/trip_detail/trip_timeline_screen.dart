@@ -33,6 +33,7 @@ import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
 import 'reorder_helpers.dart';
 import 'selected_day_provider.dart';
+import 'trip_days_lookup.dart';
 import 'trip_providers.dart';
 import 'trip_notes_screen.dart';
 import 'trip_print_screen.dart';
@@ -83,6 +84,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   int? _activeDayNum;
   String? _editingTripId;
 
+  /// 上一格 build 是不是前景分支:切回前景那一格要補讀背景期間的共用值。
   bool _wasActiveBranch = true;
 
   @override
@@ -124,16 +126,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
         ref.read(selectedDayProvider).dayNumFor(widget.tripId);
   }
 
-  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
-  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
-  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
-  void _publishSelectedDay(int dayNum) {
-    if (!TickerMode.valuesOf(context).enabled) return;
-    ref
-        .read(selectedDayProvider.notifier)
-        .select(tripId: widget.tripId, dayNum: dayNum);
-  }
-
   void _openActionSheet(Widget screen) {
     unawaited(showAppScreenSheet<void>(context, builder: (_) => screen));
   }
@@ -173,8 +165,9 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
     // 重建，才接得住其他 tab 期間變動的共用選取日（保活的分支子樹本身不重建）。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
-    // 時間軸沒有「全部」：前景看到的第幾天必定已寫進共用狀態，所以切回前景時
-    // 無條件接手即可，不必（也無從測出）再比對「共用值有沒有被別人改過」。
+    // 用 listen 不用 watch:時間軸每捲過一天就寫一次,不該整頁重建。
+    // riverpod 只暫停 watch、不暫停 listen,所以背景時自己擋掉,切回前景那一格
+    // 再補讀一次。時間軸沒有「全部」:共用值是「全部」時維持原本那一天。
     if (isActiveBranch && !_wasActiveBranch) {
       final sharedDayNum = ref
           .read(selectedDayProvider)
@@ -182,6 +175,12 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
       if (sharedDayNum != null) _activeDayNum = sharedDayNum;
     }
     _wasActiveBranch = isActiveBranch;
+    ref.listen(selectedDayProvider, (_, next) {
+      if (!TickerMode.valuesOf(context).enabled) return;
+      final sharedDayNum = next.dayNumFor(widget.tripId);
+      if (sharedDayNum == null || sharedDayNum == _activeDayNum) return;
+      setState(() => _activeDayNum = sharedDayNum);
+    });
     final selectedAsync = isActiveBranch
         ? ref.watch(currentTripIdProvider)
         : ref.read(currentTripIdProvider);
@@ -209,19 +208,7 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final daysAsync = ref.watch(tripDaysProvider(tripId));
     final trip = tripAsync.value;
-    final detailTitle = trip?.title?.trim();
-    final detailName = trip?.name.trim();
-    final summaryTitle = currentTrip?.title?.trim();
-    final summaryName = currentTrip?.name.trim();
-    final tripTitle = detailTitle?.isNotEmpty ?? false
-        ? detailTitle!
-        : summaryTitle?.isNotEmpty ?? false
-        ? summaryTitle!
-        : detailName?.isNotEmpty ?? false
-        ? detailName!
-        : summaryName?.isNotEmpty ?? false
-        ? summaryName!
-        : '行程';
+    final tripTitle = tripDisplayTitle(detail: trip, summary: currentTrip);
     final fallbackDayNum = daysAsync.value?.firstOrNull?.dayNum;
 
     return TpRootScaffold(
@@ -335,7 +322,9 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 onStartEditing: () => setState(() => _editingTripId = tripId),
                 onActiveDayChanged: (dayNum) {
                   _activeDayNum = dayNum;
-                  _publishSelectedDay(dayNum);
+                  ref
+                      .read(selectedDayProvider.notifier)
+                      .publish(context, tripId: widget.tripId, dayNum: dayNum);
                 },
               ),
         loading: () => initiallyBelowHeader(const _TimelineSkeleton()),
@@ -749,11 +738,8 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   int? _initialDayNum() {
     final entryId = widget.initialEntryId;
     if (entryId != null) {
-      for (final day in widget.days) {
-        if (day.timeline.any((entry) => entry.id == entryId)) {
-          return day.dayNum;
-        }
-      }
+      final containing = dayNumContaining(widget.days, entryId);
+      if (containing != null) return containing;
     }
     final dayNum = widget.initialDayNum;
     if (dayNum != null && widget.days.any((day) => day.dayNum == dayNum)) {

@@ -247,7 +247,7 @@ Widget _buildScreen(
   GoogleMapsExternalLauncher externalLauncher =
       const GoogleMapsExternalLauncher(),
   bool renderSelectedTripMap = false,
-  SelectedTripDay? initialSelectedDay,
+  SelectedDay? initialSelectedDay,
   ValueListenable<bool>? branchActive,
 }) {
   final router = GoRouter(
@@ -746,7 +746,7 @@ void main() {
     expect(_sharedDayNum(tester), 2);
   });
 
-  testWidgets('「全部」不寫入共用選取日', (tester) async {
+  testWidgets('「全部」以自己的型別寫入共用選取日,不是某一天', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -756,8 +756,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
-    // 地圖的空值是「全部」，時間軸的空值是「未指定 → 第一天」，不可混用。
-    expect(_sharedDayNum(tester), 2);
+    // 共用狀態能直接表達「全部」;時間軸讀到它時維持自己那一天。
+    final shared = _containerOf(tester).read(selectedDayProvider);
+    expect(shared.showsAllDaysFor('trip-1'), isTrue);
+    expect(shared.dayNumFor('trip-1'), isNull);
   });
 
   testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
@@ -873,6 +875,104 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
+  });
+
+  testWidgets('地圖選「全部」後,時間軸在背景期間寫入某一天 → 回到地圖仍是「全部」', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    active.value = false;
+    await tester.pumpAndSettle();
+    _containerOf(
+      tester,
+    ).read(selectedDayProvider.notifier).select(tripId: 'trip-1', dayNum: 2);
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0, reason: '「全部」是地圖自己的模式');
+  });
+
+  testWidgets('共用值是「全部」時重新建立地圖 → 一開就是「全部」,不寫回第 1 天', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], initialSelectedDay: const SelectedAllDays(tripId: 'trip-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
+  });
+
+  testWidgets('days 內容變動後 POI 卡跟著更新(stopsByDay 快取要失效)', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(_buildScreen(const [], daysStream: days.stream));
+    days.add([_dayOne]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('entry-card-999')), findsNothing);
+
+    days.add([
+      TripDay(
+        id: _dayOne.id,
+        dayNum: _dayOne.dayNum,
+        date: _dayOne.date,
+        version: _dayOne.version + 1,
+        // 插在最前面:PageView 只建鄰近幾頁,放最後會找不到卡片。
+        timeline: [
+          _entry(id: 999, title: '新景點', lat: 26.2, lng: 127.7),
+          ..._dayOne.timeline,
+        ],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('entry-card-999')), findsOneWidget);
+  });
+
+  testWidgets('選「全部」後再點 DAY 2 → 停在 DAY 2,共用值也是第 2 天', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('共用值是第 2 天時開地圖再點「全部」→ 停在「全部」', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialSelectedDay: const SelectedTripDay(tripId: 'trip-1', dayNum: 2),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 2);
+
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
   });
 
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {
