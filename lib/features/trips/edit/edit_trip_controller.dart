@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/providers.dart';
+import '../../../api/cache/cache_read_policy.dart';
 import '../../../api/trip_repository.dart';
 import '../../../models/day.dart';
 import '../../../models/destination_input.dart';
@@ -357,7 +358,7 @@ class EditTripController extends Notifier<EditTripState> {
     try {
       final days = await _repo.fetchDaySummaries(
         tripId,
-        fallbackToCache: false,
+        policy: CacheReadPolicy.networkOnly,
       );
       if (_disposed) return null;
       final targetStillPresent = days.any((day) => day.id == pending.targetId);
@@ -422,7 +423,7 @@ class EditTripController extends Notifier<EditTripState> {
     try {
       final days = await _repo.fetchDaySummaries(
         tripId,
-        fallbackToCache: false,
+        policy: CacheReadPolicy.networkOnly,
       );
       if (_disposed) return false;
       state = state.copyWith(
