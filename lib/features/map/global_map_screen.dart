@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/tokens.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/current_trip_provider.dart';
@@ -163,13 +164,18 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   }
 
   Widget _rootState(BuildContext context, Widget body, {String title = '地圖'}) {
-    return TpRootScaffold(
-      header: TpRootHeaderConfig(title: Text(title)),
-      body: Padding(
-        padding: EdgeInsets.only(
-          top: TpRootGeometry.initialContentTop(context),
+    // 空 / 載入 / 錯誤狀態底下是一般 surface,不是地圖:shell 依分支宣告的
+    // 媒體背景在這裡要蓋回 false,不然 header 會用白字與暗化層畫在淺色底上。
+    return TpMediaBackdropScope(
+      onMedia: false,
+      child: TpRootScaffold(
+        header: TpRootHeaderConfig(title: Text(title)),
+        body: Padding(
+          padding: EdgeInsets.only(
+            top: TpRootGeometry.initialContentTop(context),
+          ),
+          child: body,
         ),
-        child: body,
       ),
     );
   }

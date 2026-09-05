@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
@@ -104,6 +105,20 @@ void main() {
       ),
     );
   }
+
+  testWidgets('根地圖沒有行程時(空狀態)header 不在媒體背景上,即使 shell 宣告是地圖分支', (tester) async {
+    await tester.pumpWidget(
+      TpMediaBackdropScope(onMedia: true, child: buildApp(trips: const [])),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('尚無行程'), findsWidgets);
+
+    expect(
+      TpMediaBackdropScope.of(tester.element(find.text('尚無行程').first)),
+      isFalse,
+      reason: '空狀態底下是一般 surface,不是地圖',
+    );
+  });
 
   testWidgets('根地圖預設顯示第一個行程，而非跨收藏地圖', (tester) async {
     await tester.pumpWidget(buildApp());

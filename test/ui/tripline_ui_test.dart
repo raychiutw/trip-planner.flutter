@@ -991,6 +991,30 @@ void main() {
       find.descendant(of: accessory, matching: find.byType(GlassContainer)),
     );
     expect(glass.platformViewBackdrop, isTrue);
+
+    // 對照組:沒有媒體背景時 accessory 要讀到 false,不是寫死 true。
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          body: Stack(
+            children: [
+              TpMediaBackdropScope(
+                onMedia: false,
+                child: TpBottomAccessory(child: Text('plain')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final plainGlass = tester.widget<GlassContainer>(
+      find.descendant(
+        of: find.byType(TpBottomAccessory),
+        matching: find.byType(GlassContainer),
+      ),
+    );
+    expect(plainGlass.platformViewBackdrop, isFalse);
     expect(glass.settings?.chromaticAberration, 0);
     expect(find.byType(AnimatedContainer), findsNothing);
   });
