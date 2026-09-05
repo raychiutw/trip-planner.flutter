@@ -508,52 +508,32 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     });
   }
 
+  /// [targetPosition] 是移動後在目標 Day 的位置;slot 語意由呼叫端先換算。
   Future<void> _reorderEntry(
     _EntryDragData data,
     int targetDayId,
-    int targetIndex,
+    int targetPosition,
   ) async {
     if (_reorderSubmitting) return;
     final tripId = widget.tripId;
     final days = widget.days;
     final repository = ref.read(tripRepositoryProvider);
     final before = _snapshotEntries();
-    EntryReorderPlan<TimelineEntry> plan;
-    try {
-      if (!before.containsKey(targetDayId)) {
-        throw StateError('target Day no longer exists');
-      }
-      int? currentSourceDayId;
-      var currentSourceIndex = -1;
-      for (final day in before.entries) {
-        final index = day.value.indexWhere(
-          (entry) => entry.id == data.entry.id,
-        );
-        if (index >= 0) {
-          currentSourceDayId = day.key;
-          currentSourceIndex = index;
-          break;
-        }
-      }
-      if (currentSourceDayId == null) {
-        throw StateError('entry no longer exists');
-      }
-      if (currentSourceDayId != data.sourceDayId) {
-        throw StateError('entry moved to another Day');
-      }
-      plan = planEntryReorder<TimelineEntry>(
-        before,
-        sourceDayId: currentSourceDayId,
-        sourceIndex: currentSourceIndex,
-        targetDayId: targetDayId,
-        targetIndex: targetIndex,
-        idOf: (entry) => entry.id,
-      );
-    } on Object {
-      if (mounted) {
-        showAppError(context, '行程內容已更新，請重新操作');
-      }
-      return;
+    final outcome = planEntryMove<TimelineEntry>(
+      before,
+      entryId: data.entry.id,
+      expectedSourceDayId: data.sourceDayId,
+      targetDayId: targetDayId,
+      targetPosition: targetPosition,
+      idOf: (entry) => entry.id,
+    );
+    final EntryReorderPlan<TimelineEntry> plan;
+    switch (outcome) {
+      case EntryReorderRejected():
+        if (mounted) showAppError(context, '行程內容已更新，請重新操作');
+        return;
+      case EntryReorderPlanned(plan: final planned):
+        plan = planned;
     }
     final after = plan.entriesByDayId;
     if (_sameEntryOrder(before, after)) return;
@@ -997,18 +977,6 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-/// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
-List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
-  List<int> entryIds,
-  int oldIndex,
-  int newIndex,
-) {
-  return [
-    for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
-      (id: u.id, sortOrder: u.sortOrder, dayId: null),
-  ];
-}
-
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -1092,6 +1060,18 @@ class _DaySection extends ConsumerWidget {
     );
   }
 
+  /// 拖放目標給的是 slot(項目之間的縫);換成移動後的位置再交給 onReorder。
+  Future<void> _acceptDrop(_EntryDragData data, int targetDayId, int slot) =>
+      onReorder(
+        data,
+        targetDayId,
+        slotToPosition(
+          slot: slot,
+          sameDay: targetDayId == data.sourceDayId,
+          sourceIndex: data.sourceIndex,
+        ),
+      );
+
   /// reorder 後重算交通,完成再刷新（交通重算失敗不影響排序結果）。
   Future<void> _recomputeAndRefresh(WidgetRef ref) async {
     await _recomputeDay(ref, day.dayNum);
@@ -1128,7 +1108,7 @@ class _DaySection extends ConsumerWidget {
             _EntryDropTarget(
               targetDayId: day.id,
               targetIndex: index,
-              onAccept: onReorder,
+              onAccept: _acceptDrop,
             ),
             _buildEntryRow(context, ref, index, segments, segmentsReady),
           ],
@@ -1136,7 +1116,7 @@ class _DaySection extends ConsumerWidget {
             targetDayId: day.id,
             targetIndex: timeline.length,
             empty: timeline.isEmpty,
-            onAccept: onReorder,
+            onAccept: _acceptDrop,
           ),
         ] else
           for (var index = 0; index < timeline.length; index++)
@@ -1235,7 +1215,7 @@ class _DaySection extends ConsumerWidget {
                           entry: entry,
                         ),
                         day.id,
-                        index + 2,
+                        index + 1,
                       ),
                     ),
               onMoveToDay: dayCount > 1

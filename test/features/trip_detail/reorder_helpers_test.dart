@@ -60,4 +60,117 @@ void main() {
       },
     );
   });
+
+  group('planEntryMove:給拖曳與快照,產出計畫或說明原因的拒絕;索引一律是「移動後的位置」', () {
+    const snapshot = {
+      10: [1, 2, 3],
+      20: [4],
+    };
+    int idOf(int e) => e;
+
+    test('同日上移:位置 index - 1', () {
+      final outcome = planEntryMove<int>(
+        snapshot,
+        entryId: 3,
+        expectedSourceDayId: 10,
+        targetDayId: 10,
+        targetPosition: 1,
+        idOf: idOf,
+      );
+      expect(outcome, isA<EntryReorderPlanned<int>>());
+      expect((outcome as EntryReorderPlanned<int>).plan.entriesByDayId[10], [
+        1,
+        3,
+        2,
+      ]);
+    });
+
+    test('同日下移:位置 index + 1,不必 +2 補償', () {
+      final outcome = planEntryMove<int>(
+        snapshot,
+        entryId: 1,
+        expectedSourceDayId: 10,
+        targetDayId: 10,
+        targetPosition: 1,
+        idOf: idOf,
+      );
+      expect((outcome as EntryReorderPlanned<int>).plan.entriesByDayId[10], [
+        2,
+        1,
+        3,
+      ]);
+    });
+
+    test('跨日移動:插到目標位置,兩天都在 updates 裡', () {
+      final outcome =
+          planEntryMove<int>(
+                snapshot,
+                entryId: 2,
+                expectedSourceDayId: 10,
+                targetDayId: 20,
+                targetPosition: 0,
+                idOf: idOf,
+              )
+              as EntryReorderPlanned<int>;
+      expect(outcome.plan.entriesByDayId, {
+        10: [1, 3],
+        20: [2, 4],
+      });
+      expect(outcome.plan.affectedDayIds, {10, 20});
+    });
+
+    test('來源已失效(entry 不見 / 換了 Day / 目標 Day 不見)→ 說明原因的拒絕', () {
+      expect(
+        planEntryMove<int>(
+          snapshot,
+          entryId: 99,
+          expectedSourceDayId: 10,
+          targetDayId: 10,
+          targetPosition: 0,
+          idOf: idOf,
+        ),
+        isA<EntryReorderRejected>().having(
+          (r) => r.reason,
+          'reason',
+          EntryReorderRejection.entryMissing,
+        ),
+      );
+      expect(
+        planEntryMove<int>(
+          snapshot,
+          entryId: 4,
+          expectedSourceDayId: 10,
+          targetDayId: 10,
+          targetPosition: 0,
+          idOf: idOf,
+        ),
+        isA<EntryReorderRejected>().having(
+          (r) => r.reason,
+          'reason',
+          EntryReorderRejection.entryMovedToAnotherDay,
+        ),
+      );
+      expect(
+        planEntryMove<int>(
+          snapshot,
+          entryId: 1,
+          expectedSourceDayId: 10,
+          targetDayId: 30,
+          targetPosition: 0,
+          idOf: idOf,
+        ),
+        isA<EntryReorderRejected>().having(
+          (r) => r.reason,
+          'reason',
+          EntryReorderRejection.targetDayMissing,
+        ),
+      );
+    });
+
+    test('slotToPosition:拖放的 slot 換成移動後位置;同日往下要扣掉自己', () {
+      expect(slotToPosition(slot: 3, sameDay: true, sourceIndex: 0), 2);
+      expect(slotToPosition(slot: 0, sameDay: true, sourceIndex: 2), 0);
+      expect(slotToPosition(slot: 3, sameDay: false, sourceIndex: 0), 3);
+    });
+  });
 }
