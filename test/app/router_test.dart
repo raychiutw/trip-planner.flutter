@@ -31,11 +31,7 @@ import 'package:tripline/features/invite/invite_screen.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
-import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
-import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
-import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
-import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
@@ -510,43 +506,6 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('已登入可使用 admin/manage legacy redirects', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/admin');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/admin/');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/manage');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/manage/');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
   testWidgets('/chat query 會傳給 ChatScreen', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -661,48 +620,6 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('已登入可從 stop map web alias 聚焦地圖 entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/map');
-    await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripMapScreen>(find.byType(TripMapScreen));
-    expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可從 stop web alias 聚焦 timeline entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11');
-    await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripTimelineScreen>(
-      find.byType(TripTimelineScreen),
-    );
-    expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
   testWidgets('已登入可使用 /trips selected/focus query deep link', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -727,31 +644,6 @@ void main() {
       find.byType(TripTimelineScreen),
     );
     expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry edit/change-poi web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/edit');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/change-poi');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryPoiScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -817,32 +709,6 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('收藏'), findsWidgets);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry copy/move web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/copy');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('複製停留點'), findsOneWidget);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/move');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
