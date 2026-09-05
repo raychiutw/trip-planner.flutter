@@ -1393,10 +1393,7 @@ void main() {
     await tester.pump();
 
     // 行前須知有 2 項被排除 → 入口出現;緊急聯絡 0 項 → 不出現。
-    expect(
-      find.byKey(const ValueKey('notes-exclusions-pretrip')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('notes-exclusions-tips')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('notes-exclusions-emergency')),
       findsNothing,
@@ -1404,7 +1401,7 @@ void main() {
     );
     expect(find.textContaining('已排除 2 項'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('notes-exclusions-pretrip')));
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -1418,6 +1415,81 @@ void main() {
         NoteGenerationType.tips,
         tripId: 'trip-1',
         exclusionId: 3,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('住宿生成的排除清單也看得到、能恢復,且與一般生成互不干擾', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.lodgingTips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 1,
+          ),
+        ],
+      ),
+    );
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer(
+      (_) async => const [
+        TripNoteExclusion(
+          id: 9,
+          docType: NoteGenerationType.lodgingTips,
+          label: '飯店早餐時間',
+          deletedAt: '2026-07-28T09:00:00Z',
+        ),
+      ],
+    );
+    when(
+      () => repo.restoreNoteExclusion(
+        any(),
+        tripId: any(named: 'tripId'),
+        exclusionId: any(named: 'exclusionId'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+      findsOneWidget,
+      reason: '住宿生成的排除清單以前在 UI 永遠不可達',
+    );
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-tips')),
+      findsNothing,
+      reason: '一般生成 0 項,不連坐',
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('飯店早餐時間'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('notes-exclusion-restore-9')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(
+      () => repo.restoreNoteExclusion(
+        NoteGenerationType.lodgingTips,
+        tripId: 'trip-1',
+        exclusionId: 9,
       ),
     ).called(1);
   });
