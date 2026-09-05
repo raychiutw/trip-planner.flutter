@@ -12,17 +12,19 @@ void main() {
       version: 0,
       timeline: [TimelineEntry(id: 11, sortOrder: 0, title: 'a', version: 0)],
     ),
+    // id / dayNum / 陣列索引三者刻意都不同:回錯任何一種都會被抓到。
     TripDay(
-      id: 2,
-      dayNum: 2,
+      id: 7,
+      dayNum: 3,
       version: 0,
       timeline: [TimelineEntry(id: 22, sortOrder: 0, title: 'b', version: 0)],
     ),
   ];
 
-  test('dayNumContaining:找到停留點所在的 Day;找不到回 null', () {
-    expect(dayNumContaining(days, 22), 2);
+  test('dayNumContaining:找到停留點所在的 Day(回 dayNum 不是 id 或索引);找不到回 null', () {
+    expect(dayNumContaining(days, 22), 3);
     expect(dayNumContaining(days, 99), isNull);
+    expect(dayNumContaining(const [], 22), isNull);
   });
 
   test(

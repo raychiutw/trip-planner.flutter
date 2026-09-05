@@ -74,6 +74,9 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
   /// 上一次 build 看到的共用選取日;只有它「變了」才接手。
   SelectedDay? _lastSharedDay;
 
+  /// 地圖現在顯示「全部」:那是地圖自己的模式,時間軸寫進來的某一天不接手。
+  bool _showingAllDays = false;
+
   /// 地圖 view 目前顯示的那一天(null = 全部);自己寫進共用狀態的值不必再接手,
   /// 否則 view 會把 initialDayNum 的變動當成深連結而重新載入路線。
   int? _shownDayNum;
@@ -99,17 +102,22 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     final shared = ref.read(selectedDayProvider);
     _lastSharedDay = shared;
     _initialDayNum = widget.initialDayNum ?? shared.dayNumFor(widget.tripId);
+    // 共用值是「全部」而路由沒指定日期 → 重建的地圖一開就是「全部」。
+    _showingAllDays =
+        widget.initialDayNum == null && shared.showsAllDaysFor(widget.tripId);
   }
 
   @override
   Widget build(BuildContext context) {
     // 背景時 riverpod 暫停這個訂閱;回到前景才會拿到其他分支寫的值。
-    // 共用值是「全部」時就維持「全部」(那是自己寫的),不動 initialDayNum。
+    // 顯示「全部」時不接手時間軸寫的某一天:「全部」是地圖自己的模式。
     final sharedDay = ref.watch(selectedDayProvider);
     if (sharedDay != _lastSharedDay) {
       _lastSharedDay = sharedDay;
       final sharedDayNum = sharedDay.dayNumFor(widget.tripId);
-      if (sharedDayNum != null && sharedDayNum != _shownDayNum) {
+      if (sharedDayNum != null &&
+          !_showingAllDays &&
+          sharedDayNum != _shownDayNum) {
         _initialDayNum = sharedDayNum;
       }
     }
@@ -155,12 +163,16 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             days: days,
             initialEntryId: widget.initialEntryId,
             initialDayNum: _initialDayNum,
+            initialAllDays: _showingAllDays,
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             locationSettingsOpener: widget.locationSettingsOpener,
             externalLauncher: widget.externalLauncher,
             onActiveDayChanged: (dayNum) {
+              // 空行程沒有「全部」可言,不寫進共用狀態。
+              if (days.isEmpty) return;
               _shownDayNum = dayNum;
+              _showingAllDays = dayNum == null;
               ref
                   .read(selectedDayProvider.notifier)
                   .publish(context, tripId: widget.tripId, dayNum: dayNum);
@@ -221,6 +233,7 @@ class _TripMapView extends ConsumerStatefulWidget {
     required this.days,
     this.initialEntryId,
     this.initialDayNum,
+    this.initialAllDays = false,
     this.mapBuilder,
     this.locationService,
     this.locationSettingsOpener,
@@ -232,6 +245,9 @@ class _TripMapView extends ConsumerStatefulWidget {
   final List<TripDay> days;
   final int? initialEntryId;
   final int? initialDayNum;
+
+  /// 一開就顯示「全部」(共用值是全部且路由沒指定日期)。
+  final bool initialAllDays;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
   final Future<bool> Function(TripMapLocationSettingsTarget)?
@@ -317,6 +333,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (oldWidget.tripId != widget.tripId ||
         oldWidget.initialEntryId != widget.initialEntryId ||
         oldWidget.initialDayNum != widget.initialDayNum ||
+        oldWidget.initialAllDays != widget.initialAllDays ||
         !identical(oldWidget.days, widget.days)) {
       _stopsByDay = _buildStopsByDay();
       _selectedTabIndex = _initialTabIndex();
@@ -398,6 +415,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         ? null
         : dayNumContaining(widget.days, entryId);
     final initialDayNum = entryDayNum ?? widget.initialDayNum;
+    if (initialDayNum == null && widget.initialAllDays) return 0;
     if (initialDayNum != null) {
       final index = widget.days.indexWhere(
         (day) => day.dayNum == initialDayNum,
