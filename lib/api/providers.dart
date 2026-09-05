@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/user.dart';
+import 'account_repository.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
@@ -17,7 +18,6 @@ import 'reports_repository.dart';
 import 'session_store.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
-import 'account_repository.dart';
 import 'trip_repository.dart';
 
 final sessionStoreProvider = Provider<SessionStore>(
