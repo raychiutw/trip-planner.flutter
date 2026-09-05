@@ -729,6 +729,56 @@ void main() {
     (type: NoteGenerationType.emergency, path: 'emergency'),
   ]) {
     test(
+      'fetchNoteExclusions:GET /trips/:id/notes/${c.path}/exclusions',
+      () async {
+        dioAdapter.onGet(
+          '/trips/okinawa/notes/${c.path}/exclusions',
+          (server) => server.reply(200, {
+            'items': [
+              {
+                'id': 3,
+                'docType': c.path,
+                'label': '插座與電壓',
+                'deletedAt': '2026-07-28T09:00:00Z',
+              },
+            ],
+          }),
+        );
+
+        final items = await tripRepository.fetchNoteExclusions(
+          c.type,
+          tripId: 'okinawa',
+        );
+
+        expect(items.single.id, 3);
+        expect(items.single.docType, c.type);
+        expect(items.single.label, '插座與電壓');
+      },
+    );
+
+    test(
+      'restoreNoteExclusion:DELETE /trips/:id/notes/${c.path}/exclusions/:id',
+      () async {
+        dioAdapter.onDelete(
+          '/trips/okinawa/notes/${c.path}/exclusions/3',
+          (server) => server.reply(204, null),
+        );
+
+        await tripRepository.restoreNoteExclusion(
+          c.type,
+          tripId: 'okinawa',
+          exclusionId: 3,
+        );
+      },
+    );
+  }
+
+  for (final c in const [
+    (type: NoteGenerationType.tips, path: 'tips'),
+    (type: NoteGenerationType.lodgingTips, path: 'lodging-tips'),
+    (type: NoteGenerationType.emergency, path: 'emergency'),
+  ]) {
+    test(
       'generateNotes：POST /trips/:id/notes/${c.path}/generate 回 AI job',
       () async {
         dioAdapter.onPost(

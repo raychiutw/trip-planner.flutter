@@ -263,6 +263,7 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
                 type: _aiExclusionCounts[type] ?? 0,
             },
             rows: _rowsFor(section, notes),
+            onExclusionsChanged: _loadAiState,
           ),
       ],
     );
@@ -955,6 +956,7 @@ class _NotesSection extends ConsumerWidget {
     this.aiBusyTypes = const {},
     this.onGenerateNotes,
     this.exclusionCounts = const {},
+    this.onExclusionsChanged,
   });
 
   final String tripId;
@@ -964,6 +966,14 @@ class _NotesSection extends ConsumerWidget {
 
   /// 每一種生成類型各有幾則被排除。**0 就不顯示入口**,版面一如現狀。
   final Map<NoteGenerationType, int> exclusionCounts;
+
+  /// 排除清單 sheet 關掉後呼叫(裡面可能恢復了幾則)。
+  final VoidCallback? onExclusionsChanged;
+
+  List<MapEntry<NoteGenerationType, int>> get _excluded => [
+    for (final e in exclusionCounts.entries)
+      if (e.value > 0) e,
+  ];
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
   final List<_NoteAiAction> aiActions;
@@ -1049,24 +1059,6 @@ class _NotesSection extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (exclusionCounts.values.any((n) => n > 0)) const Spacer(),
-              for (final MapEntry(key: type, value: count)
-                  in exclusionCounts.entries)
-                if (count > 0)
-                  TextButton(
-                    key: ValueKey('notes-exclusions-${type.pathSegment}'),
-                    onPressed: () => showNoteExclusionsSheet(
-                      context,
-                      tripId: tripId,
-                      docType: type,
-                    ),
-                    // 同一區有兩種生成時,標出是哪一種的排除清單。
-                    child: Text(
-                      exclusionCounts.length > 1
-                          ? '${type.label}已排除 $count 項'
-                          : '已排除 $count 項',
-                    ),
-                  ),
             ],
           ),
           childrenPadding: const EdgeInsets.fromLTRB(
@@ -1116,6 +1108,29 @@ class _NotesSection extends ConsumerWidget {
                             ),
                           ),
                       ],
+                      // 排除清單入口放在生成按鈕旁(它改的是下次生成的內容)。
+                      // header 在手機寬度只剩約 130px,兩顆入口塞不下。
+                      for (final MapEntry(key: type, value: count) in _excluded)
+                        TextButton(
+                          // key 走 docType(pathSegment)不走 section.name:
+                          // 同一區可能有兩種 docType 的排除清單。
+                          key: ValueKey('notes-exclusions-${type.pathSegment}'),
+                          onPressed: () async {
+                            await showNoteExclusionsSheet(
+                              context,
+                              tripId: tripId,
+                              docType: type,
+                            );
+                            // 恢復改的是排除數,徽章要重讀 ai-state 才會跟著變。
+                            onExclusionsChanged?.call();
+                          },
+                          // 多於一種生成有排除時,標出是哪一種的清單。
+                          child: Text(
+                            _excluded.length > 1
+                                ? '${type.label}已排除 $count 項'
+                                : '已排除 $count 項',
+                          ),
+                        ),
                     ],
                   ),
                 ),
