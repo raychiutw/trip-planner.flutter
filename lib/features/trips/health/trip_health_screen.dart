@@ -50,15 +50,22 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   /// 不經 PATCH,完成 hook 不跑 —— 這個狀態要同時看兩邊才判斷得出來。
   bool _requestTerminated = false;
 
+  /// PATCH 還沒回來,停止鈕先停用,連點不會送第二次。
+  bool _stopping = false;
+
   /// 停止等待 —— 走工單 lifecycle;它不中止 AI,只讓使用者脫身。
   Future<void> _stopWaiting() async {
     final requestId = _report?.requestId;
     if (requestId == null) return;
+    setState(() => _stopping = true);
     final confirmed = await ref
         .read(requestLifecycleProvider(requestId).notifier)
         .stopWaiting();
     if (!mounted) return;
-    setState(() => _requestTerminated = true);
+    setState(() {
+      _stopping = false;
+      _requestTerminated = true;
+    });
     if (confirmed) return;
     showAppError(context, kStopWaitingUnconfirmedMessage);
   }
@@ -67,6 +74,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   Future<void> _onRequestTerminal() async {
     final generation = _generation;
     final tripId = widget.tripId;
+    final terminatedRequestId = _report?.requestId;
     TripHealthReport? next;
     try {
       next = await ref.read(tripRepositoryProvider).fetchHealthReport(tripId);
@@ -76,7 +84,9 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     if (!_isCurrent(generation, tripId)) return;
     setState(() {
       if (next != null) _report = next;
-      _requestTerminated = _isPending;
+      // 讀回來是另一張新工單的 pending(別的裝置又發了一次)→ 照常訂閱它。
+      _requestTerminated =
+          _isPending && _report?.requestId == terminatedRequestId;
     });
   }
 
@@ -259,7 +269,8 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
                             report: _report,
                             tripId: widget.tripId,
                             requestTerminated: _requestTerminated,
-                            onStopWaiting: _report?.requestId == null
+                            onStopWaiting:
+                                _report?.requestId == null || _stopping
                                 ? null
                                 : _stopWaiting,
                           ),

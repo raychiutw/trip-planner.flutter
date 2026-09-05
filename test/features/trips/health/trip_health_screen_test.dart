@@ -384,6 +384,49 @@ void main() {
     expect(find.text(kStopWaitingUnconfirmedMessage), findsOneWidget);
   });
 
+  testWidgets('工單終結後讀到另一張新工單的 pending → 不標停滯,改訂閱新工單', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      return reads == 1
+          ? pendingReport()
+          : const TripHealthReport(
+              tripId: 'trip-1',
+              userId: 'user-1',
+              status: TripHealthStatus.pending,
+              requestId: 44,
+              createdAt: '2026-07-09T10:03:00Z',
+            );
+    });
+    await pumpScreen(tester);
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+    verify(() => requestsRepo.watchRequestEvents(44)).called(1);
+  });
+
+  testWidgets('停止等待鈕在 PATCH 回來前停用,連點只送一次', (tester) async {
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    final stop = Completer<void>();
+    when(() => requestsRepo.stopWaiting(any())).thenAnswer((_) => stop.future);
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-health-stop')));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('trip-health-stop')), findsNothing);
+    verify(() => requestsRepo.stopWaiting(43)).called(1);
+    stop.complete();
+    await tester.pump();
+    await tester.pump();
+  });
+
   testWidgets('app 回前景時補讀工單;已終結就換成終結態', (tester) async {
     var calls = 0;
     when(
