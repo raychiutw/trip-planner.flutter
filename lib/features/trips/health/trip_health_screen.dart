@@ -17,9 +17,9 @@ import '../../../models/day.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
-import '../../requests/request_lifecycle.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
+import '../../requests/request_lifecycle.dart';
 
 /// Shows the latest AI health report and lets the user start a new check.
 class TripHealthScreen extends ConsumerStatefulWidget {

@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trips/health/trip_health_screen.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/trip_request.dart';
@@ -24,6 +25,7 @@ class MockRequestsRepository extends Mock implements RequestsRepository {}
 void main() {
   late MockTripRepository repository;
   late MockRequestsRepository requestsRepo;
+  late StreamController<TripRequestEvent> sseEvents;
 
   const trip = Trip(id: 'trip-1', name: 'okinawa-trip', title: '沖繩家族旅行');
   const nonEmptyDays = [
@@ -51,6 +53,10 @@ void main() {
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
           requestsRepositoryProvider.overrideWithValue(requestsRepo),
+          // 就算 SSE 收掉也不落入真 timer 的輪詢。
+          requestPollWaitProvider.overrideWithValue(
+            () => Completer<void>().future,
+          ),
         ],
         child: MaterialApp(
           theme: theme ?? AppTheme.light(),
@@ -139,10 +145,12 @@ void main() {
         status: RequestStatus.processing,
       ),
     );
+    sseEvents = StreamController<TripRequestEvent>.broadcast();
     when(
       () => requestsRepo.watchRequestEvents(any()),
-    ).thenAnswer((_) => StreamController<TripRequestEvent>().stream);
+    ).thenAnswer((_) => sseEvents.stream);
   });
+  tearDown(() => sseEvents.close());
 
   testWidgets('顯示 completed report findings 與 POI health 摘要', (tester) async {
     when(() => repository.fetchHealthReport('trip-1')).thenAnswer(
@@ -315,6 +323,65 @@ void main() {
       findsNothing,
       reason: '不能再顯示會讓人以為還在跑的提示',
     );
+  });
+
+  testWidgets('工單終結 → 重讀報告表 → 完成報告取代 pending', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      return reads == 1
+          ? pendingReport()
+          : const TripHealthReport(
+              tripId: 'trip-1',
+              userId: 'user-1',
+              status: TripHealthStatus.completed,
+              requestId: 43,
+              createdAt: '2026-07-09T10:02:00Z',
+            );
+    });
+    await pumpScreen(tester);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsNothing);
+    expect(reads, 2, reason: '終結後只重讀一次,不是輪詢');
+  });
+
+  testWidgets('工單終結但報告表讀不到 → 維持現況並標成停滯', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      if (reads > 1) throw Exception('offline');
+      return pendingReport();
+    });
+    await pumpScreen(tester);
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+  });
+
+  testWidgets('停止等待:伺服器沒確認 → 仍換成停滯態,且誠實提示', (tester) async {
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    when(() => requestsRepo.stopWaiting(any())).thenThrow(Exception('offline'));
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('trip-health-stop')));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+    expect(find.text(kStopWaitingUnconfirmedMessage), findsOneWidget);
   });
 
   testWidgets('app 回前景時補讀工單;已終結就換成終結態', (tester) async {

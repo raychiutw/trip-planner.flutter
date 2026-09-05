@@ -12,7 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/providers.dart';
 import '../../models/trip_request.dart';
 
-/// 停止等待但伺服器沒有確認時的提示。**只存在這一份。**
+/// 停止等待但伺服器沒有確認時的提示。畫面遷移到 lifecycle 後一律用這一份
+/// (健檢已遷;聊天與筆記在 #274 / #275 遷移時把自己那份換掉)。
 const kStopWaitingUnconfirmedMessage = '已停止等待，但伺服器沒有確認。它可能仍在處理。';
 
 sealed class RequestLifecycleState {
@@ -41,10 +42,13 @@ final class RequestTerminal extends RequestLifecycleState {
   final bool serverConfirmed;
 }
 
+/// SSE 收不到時的輪詢間隔。
+const kRequestPollInterval = Duration(seconds: 4);
+
 /// 輪詢用的等待;測試 override 成可手動放行的 Completer。
 final requestPollWaitProvider = Provider<Future<void> Function()>(
   (_) =>
-      () => Future<void>.delayed(const Duration(seconds: 4)),
+      () => Future<void>.delayed(kRequestPollInterval),
 );
 
 class RequestLifecycle extends Notifier<RequestLifecycleState> {
@@ -59,6 +63,10 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
 
   @override
   RequestLifecycleState build() {
+    // riverpod 3 重建(invalidate)時沿用同一個 Notifier 實例,旗標要歸零。
+    _disposed = false;
+    _polling = false;
+    _events = null;
     ref.onDispose(() {
       _disposed = true;
       _events?.cancel();
@@ -96,21 +104,28 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
 
   void _watchEvents() {
     if (_disposed || state is RequestTerminal) return;
-    _events = ref
-        .read(requestsRepositoryProvider)
-        .watchRequestEvents(requestId)
-        .listen(
-          (event) {
-            if (!event.isTerminal) return;
-            _terminate(
-              event.status ?? RequestStatus.failed,
-              event.error != null ? TerminalReason.error : null,
-            );
-          },
-          onError: (Object _) => _fallbackToPolling(),
-          onDone: _fallbackToPolling,
-          cancelOnError: true,
+    final Stream<TripRequestEvent> stream;
+    try {
+      stream = ref
+          .read(requestsRepositoryProvider)
+          .watchRequestEvents(requestId);
+    } on Object {
+      // SSE 開不起來不是失敗:改輪詢。
+      unawaited(_fallbackToPolling());
+      return;
+    }
+    _events = stream.listen(
+      (event) {
+        if (!event.isTerminal) return;
+        _terminate(
+          event.status ?? RequestStatus.failed,
+          event.error != null ? TerminalReason.error : null,
         );
+      },
+      onError: (Object _) => _fallbackToPolling(),
+      onDone: _fallbackToPolling,
+      cancelOnError: true,
+    );
   }
 
   /// SSE 收不到終結就改輪詢;等待由 [requestPollWaitProvider] 決定。
@@ -155,7 +170,8 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     } on Object {
       confirmed = false;
     }
-    if (_disposed) return confirmed;
+    // 等 PATCH 的期間伺服器可能已經先終結:保留伺服器那一份。
+    if (_disposed || state is RequestTerminal) return true;
     _terminate(
       RequestStatus.failed,
       TerminalReason.cancelled,

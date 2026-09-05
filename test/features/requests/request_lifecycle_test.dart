@@ -166,4 +166,128 @@ void main() {
     final state = sub.read() as RequestTerminal;
     expect(state.terminalReason, TerminalReason.timedOut);
   });
+
+  test('種子讀取失敗 → 當作進行中並開 SSE', () async {
+    when(() => repo.fetchRequest(7)).thenThrow(Exception('offline'));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    expect(sub.read(), isA<RequestInFlight>());
+    verify(() => repo.watchRequestEvents(7)).called(1);
+  });
+
+  test('SSE 開不起來或中途出錯 → 改輪詢;輪詢途中讀取失敗一次不中斷', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 2) throw Exception('blip');
+      return _req(
+        calls >= 3 ? RequestStatus.completed : RequestStatus.processing,
+      );
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.addError(Exception('sse'));
+    await _flush();
+
+    expect(waits, hasLength(1), reason: 'onError 也要進輪詢');
+    waits[0].complete();
+    await _flush();
+    expect(sub.read(), isA<RequestInFlight>(), reason: '第二次讀取丟例外,還在跑');
+    expect(waits, hasLength(2));
+    waits[1].complete();
+    await _flush();
+    expect(sub.read(), isA<RequestTerminal>());
+  });
+
+  test('SSE 事件對應:只帶 error → failed / error;processing 事件不終結', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    events.add(const TripRequestEvent(status: RequestStatus.processing));
+    await _flush();
+    expect(sub.read(), isA<RequestInFlight>());
+
+    events.add(const TripRequestEvent(error: 'boom'));
+    await _flush();
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.failed);
+    expect(state.terminalReason, TerminalReason.error);
+  });
+
+  test('讀取還在飛時 container 被丟掉 → 不丟例外', () async {
+    final pending = Completer<TripRequest>();
+    when(() => repo.fetchRequest(7)).thenAnswer((_) => pending.future);
+    when(() => repo.stopWaiting(7)).thenAnswer((_) => Completer<void>().future);
+    final c = ProviderContainer(
+      overrides: [requestsRepositoryProvider.overrideWithValue(repo)],
+    );
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    unawaited(c.read(requestLifecycleProvider(7).notifier).stopWaiting());
+    c.dispose();
+    pending.complete(_req(RequestStatus.completed));
+    await _flush();
+    // 走到這裡沒有 uncaught error 就是通過。
+  });
+
+  test('停止等待途中 SSE 先送終結 → 保留伺服器的終結態', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final stop = Completer<void>();
+    when(() => repo.stopWaiting(7)).thenAnswer((_) => stop.future);
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    final stopping = c.read(requestLifecycleProvider(7).notifier).stopWaiting();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+    stop.completeError(Exception('already terminal'));
+    await stopping;
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
+    expect(state.serverConfirmed, isTrue);
+  });
+
+  test('provider 被 invalidate 後重建 → 重新讀取,不會卡在 InFlight', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      return _req(
+        calls >= 2 ? RequestStatus.completed : RequestStatus.processing,
+      );
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    expect(sub.read(), isA<RequestInFlight>());
+
+    c.invalidate(requestLifecycleProvider(7));
+    await _flush();
+
+    expect(calls, 2);
+    expect(sub.read(), isA<RequestTerminal>());
+  });
+
+  test('SSE 一開就丟例外 → 改輪詢,不當失敗', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    when(() => repo.watchRequestEvents(7)).thenThrow(StateError('no sse'));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    expect(sub.read(), isA<RequestInFlight>());
+    expect(waits, hasLength(1));
+  });
 }
