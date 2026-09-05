@@ -25,7 +25,14 @@ sealed class RequestLifecycleState {
 
 /// 還在等(open / processing)。
 final class RequestInFlight extends RequestLifecycleState {
-  const RequestInFlight({super.request, this.authExpired = false});
+  const RequestInFlight({
+    super.request,
+    this.status = RequestStatus.open,
+    this.authExpired = false,
+  });
+
+  /// 目前走到哪:open(排隊中)或 processing(已被領走);由種子 row 與 SSE 進度事件更新。
+  final RequestStatus status;
 
   /// 讀取遇 401:不再等了,畫面該提示重新登入。
   final bool authExpired;
@@ -37,12 +44,16 @@ final class RequestTerminal extends RequestLifecycleState {
     required this.status,
     this.terminalReason,
     this.serverConfirmed = true,
+    this.errorMessage,
     super.request,
   });
 
   final RequestStatus status;
   final TerminalReason? terminalReason;
   final bool serverConfirmed;
+
+  /// SSE 終結事件帶的原始錯誤字串(可能是 code 或人話);畫面自己翻譯。
+  final String? errorMessage;
 }
 
 /// 輪詢用的等待;測試 override 成可手動放行的 Completer。
@@ -92,12 +103,16 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
         _terminate(row.status, row.terminalReason, request: row);
         return true;
       }
-      state = RequestInFlight(request: row);
+      state = RequestInFlight(request: row, status: row.status);
       return false;
     } on ApiError catch (e) {
       if (e.status != 401 || _disposed) return _disposed;
       _events?.cancel();
-      state = RequestInFlight(request: state.request, authExpired: true);
+      state = RequestInFlight(
+        request: state.request,
+        status: (state as RequestInFlight).status,
+        authExpired: true,
+      );
       return true; // 沒登入就別再等了
     } on Object {
       return _disposed; // 暫時性錯誤:當作還在跑
@@ -117,10 +132,17 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     }
     _events = stream.listen(
       (event) {
-        if (!event.isTerminal) return;
+        if (!event.isTerminal) {
+          // 進度事件:只更新階段,不換狀態種類。
+          if (event.status case final status? when !_disposed) {
+            state = RequestInFlight(request: state.request, status: status);
+          }
+          return;
+        }
         _terminate(
           event.status ?? RequestStatus.failed,
           event.error != null ? TerminalReason.error : null,
+          errorMessage: event.error,
         );
       },
       onError: (Object _) => _fallbackToPolling(),
@@ -148,6 +170,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     RequestStatus status,
     TerminalReason? reason, {
     bool serverConfirmed = true,
+    String? errorMessage,
     TripRequest? request,
   }) {
     _events?.cancel();
@@ -156,6 +179,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       status: status,
       terminalReason: reason,
       serverConfirmed: serverConfirmed,
+      errorMessage: errorMessage,
       request: request ?? state.request,
     );
   }
