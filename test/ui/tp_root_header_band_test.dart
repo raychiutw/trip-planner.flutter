@@ -386,6 +386,32 @@ void main() {
         0,
         reason: '無障礙 fallback 下不做模糊，改用不透明帶，內容一格都不能透出',
       );
+      // 底部 root tab 帶同一套 fallback:膠囊帶底下也一格都不透出。
+      final band = tester.getRect(
+        find.byKey(const ValueKey('tp-root-tab-band')),
+      );
+      final solidTop = band.bottom - band.height * 0.55;
+      expect(
+        pixels.verticalContrast(
+          200,
+          solidTop.round() + 6,
+          band.bottom.round() - 6,
+        ),
+        0,
+        reason: '底部帶的純色區在 fallback 下也不能透出',
+      );
+      // 羽化區照 master 仍淡出到 0(不是硬邊):帶內緣往內幾格要量得到內容。
+      final featherEnd =
+          header.bottom.round() + TpRootGeometry.bandFeather.round();
+      expect(
+        pixels.verticalContrast(
+          gapX,
+          header.bottom.round() + 1,
+          featherEnd - 1,
+        ),
+        greaterThan(0),
+        reason: 'fallback 只把帶做成不透明,羽化區仍淡出,不是硬邊',
+      );
     });
   }
 }

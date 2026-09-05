@@ -467,14 +467,16 @@ class _TpRootBand extends StatelessWidget {
                     ),
                   ),
           ),
+          // 羽化區在 fallback 下也照樣淡出到 0(從不透明起跳),不做硬邊:
+          // 不透明只保證膠囊帶底下一格不透出,帶的內緣仍要柔和收掉。
           _anchored(
             offset: solidExtent,
             height: featherExtent,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: _fade([
-                  veil.withValues(alpha: opaqueFallback ? 1.0 : edgeAlpha),
-                  veil.withValues(alpha: opaqueFallback ? 1.0 : 0),
+                  veil.withValues(alpha: edgeAlpha),
+                  veil.withValues(alpha: 0),
                 ]),
               ),
             ),
