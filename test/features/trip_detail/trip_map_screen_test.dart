@@ -746,7 +746,7 @@ void main() {
     expect(_sharedDayNum(tester), 2);
   });
 
-  testWidgets('「全部」不寫入共用選取日', (tester) async {
+  testWidgets('「全部」以自己的型別寫入共用選取日,不是某一天', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -756,8 +756,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
-    // 地圖的空值是「全部」，時間軸的空值是「未指定 → 第一天」，不可混用。
-    expect(_sharedDayNum(tester), 2);
+    // 共用狀態能直接表達「全部」;時間軸讀到它時維持自己那一天。
+    final shared = _containerOf(tester).read(selectedDayProvider);
+    expect(shared.showsAllDaysFor('trip-1'), isTrue);
+    expect(shared.dayNumFor('trip-1'), isNull);
   });
 
   testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
