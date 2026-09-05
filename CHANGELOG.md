@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-09-05
+
+### 內部
+
+- GET 的快取政策改用 `CacheReadPolicy`(`cached` / `networkOnly` / `noStore`)取代兩個 bool 旗標;各站點的讀回退與寫入行為不變,守門測試確保畫面層不再看到 transport 旗標。
+
 ## [0.23.1] - 2026-08-25
 
 ### 修正

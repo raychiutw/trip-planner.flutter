@@ -5,6 +5,7 @@ library;
 
 import '../models/trip_member.dart';
 import 'api_client.dart';
+import 'cache/cache_read_policy.dart';
 
 class CollabRepository {
   CollabRepository({required ApiClient client}) : _client = client;
@@ -34,8 +35,7 @@ class CollabRepository {
     final body = await _client.get(
       '/invitations',
       query: {'token': token.trim()},
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return InvitationDetails.fromJson(body as Map<String, dynamic>);
   }

@@ -8,6 +8,7 @@ import '../models/oauth.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
 import 'api_error.dart';
+import 'cache/cache_read_policy.dart';
 import 'session_store.dart';
 
 class SignupJoinedTrip {
@@ -169,11 +170,7 @@ class AuthRepository {
 
   /// GET /account：刪除前顯示會受影響的行程與共編者。
   Future<AccountDeletionPreview> fetchAccountDeletionPreview() async {
-    final body = await _client.get(
-      '/account',
-      writeCache: false,
-      fallbackToCache: false,
-    );
+    final body = await _client.get('/account', policy: CacheReadPolicy.noStore);
     return AccountDeletionPreview.fromJson(body as Map<String, dynamic>);
   }
 
@@ -261,8 +258,7 @@ class AuthRepository {
     final body = await _client.get(
       '/oauth/client-info',
       query: {'client_id': clientId.trim()},
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     if (body is! Map) return null;
     final name = body['app_name']?.toString().trim();
@@ -273,8 +269,7 @@ class AuthRepository {
   Future<bool> fetchAiAuthorization() async {
     final body = await _client.get(
       '/account/ai-authorization',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return body is Map && body['authorized'] == true;
   }

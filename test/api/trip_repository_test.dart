@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_client.dart';
+import 'package:tripline/api/cache/cache_read_policy.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
@@ -464,26 +465,26 @@ void main() {
     expect(days.single.timeline, isEmpty);
   });
 
-  test('fetchDaySummaries 可明確關閉 cache fallback 取得 server truth', () async {
+  test('fetchDaySummaries 可指定 networkOnly 取得 server truth', () async {
     final client = _MockApiClient();
     when(
       () => client.get(
         '/trips/okinawa-trip-2026-Ray/days',
-        fallbackToCache: false,
+        policy: CacheReadPolicy.networkOnly,
       ),
     ).thenAnswer((_) async => <dynamic>[]);
     final repository = TripRepository(client: client);
 
     final days = await repository.fetchDaySummaries(
       'okinawa-trip-2026-Ray',
-      fallbackToCache: false,
+      policy: CacheReadPolicy.networkOnly,
     );
 
     expect(days, isEmpty);
     verify(
       () => client.get(
         '/trips/okinawa-trip-2026-Ray/days',
-        fallbackToCache: false,
+        policy: CacheReadPolicy.networkOnly,
       ),
     ).called(1);
   });
