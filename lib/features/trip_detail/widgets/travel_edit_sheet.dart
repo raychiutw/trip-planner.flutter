@@ -8,6 +8,7 @@ import '../../../app/adaptive.dart';
 import '../../../app/app_feedback.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
+import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
 /// 開啟交通編輯 bottom sheet。
@@ -231,8 +232,10 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
           noTravel: _noTravel,
         );
       }
-      ref.invalidate(tripDaysProvider(widget.tripId));
-      ref.invalidate(tripSegmentsProvider(widget.tripId));
+      ref.read(entryMutationsProvider(widget.tripId).notifier).refreshAfter({
+        TripChange.days,
+        TripChange.segments,
+      });
       if (!mounted) return false;
       HapticFeedback.lightImpact();
       _dirty = false;
