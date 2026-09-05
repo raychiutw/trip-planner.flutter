@@ -14,12 +14,14 @@ import '../../app/irreversible_action.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/note_section.dart';
 import '../../models/notes.dart';
-import '../../models/trip_request.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
+import 'notes/note_field_spec.dart';
+import 'notes/notes_ai_controller.dart';
+import '../requests/request_lifecycle.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/reorderable_row.dart';
@@ -34,110 +36,22 @@ class TripNotesScreen extends ConsumerStatefulWidget {
   ConsumerState<TripNotesScreen> createState() => _TripNotesScreenState();
 }
 
-class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
-    with WidgetsBindingObserver {
-  // 三種生成是三條獨立的線:送出中、進行中、進度通道全部 per-docType。
-  // 任何一格退回單一欄位,生成行前須知時緊急聯絡就會被連坐。
-
-  /// POST 已送出、還沒拿到 job 的 docType（同型連點的守衛）。
-  final _aiSubmitting = <NoteGenerationType>{};
-
-  /// job 已啟動、還在等終態的 docType。
-  final _aiPending = <NoteGenerationType>{};
-
-  /// 每種生成目前走到哪一階段 —— 進度提示的文案由它決定。
-  final _aiStage = <NoteGenerationType, _NotesAiStage>{};
-
-  /// 每種生成對應的 request id —— 停止等待要打的就是它。
-  final _aiRequestIds = <NoteGenerationType, int>{};
-
-  /// 從後端讀回來的持久狀態。讀失敗只影響 AI 區塊,筆記本體照常。
-  String? _aiStateError;
-
-  /// 最近一次完成的摘要。
-  TripNoteAiJob? _aiSummary;
-
-  /// 逾時的那一種(逾時與一般失敗要分開呈現)。
-  NoteGenerationType? _aiTimedOut;
-
-  /// 每種 docType 目前被排除幾則。契約把它放在每筆 job 上,頂層沒有
-  /// exclusionCounts 物件。
-  final _aiExclusionCounts = <NoteGenerationType, int>{};
-
-  /// 每個 docType 各自的 SSE 進度通道。共用單一 subscription 會讓「啟動第二個生成」
-  /// 順手殺掉第一個的通道 —— 畫面上兩個進行中都在,但第一個的完成事件永遠不到。
-  final _aiSubscriptions =
-      <NoteGenerationType, StreamSubscription<TripRequestEvent>>{};
-
-  /// 生成失敗時的顯示訊息與可重試的類型；null 代表目前沒有錯誤。
-  ({String message, NoteGenerationType type})? _aiFailure;
-
+class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
   /// 這一幀內完成的 docType;統一在 frame 結束後合成一則提示。
   /// 兩個 job 幾乎同時完成時各發一則,兩張浮層會疊在同一個位置互相蓋掉。
   final _aiJustCompleted = <NoteGenerationType>{};
   bool _aiNoticeScheduled = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _loadAiState();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 回到前景重讀一次 —— 使用者可能在別的裝置按了生成,或這支 app 被系統
-    // 回收過。沿用 notifications_screen 的 WidgetsBindingObserver 手法。
-    if (state == AppLifecycleState.resumed) unawaited(_loadAiState());
-  }
-
-  /// 進頁面時讀一次持久狀態。**失敗只記在 [_aiStateError]**,不讓它冒泡到
-  /// 整頁 —— 筆記的增刪改與拖曳排序與這支 API 無關,不該被它拖垮。
-  Future<void> _loadAiState() async {
-    try {
-      final state = await ref
-          .read(tripRepositoryProvider)
-          .fetchNotesAiState(widget.tripId);
-      if (!mounted) return;
-      setState(() {
-        _aiStateError = null;
-        for (final job in state.jobs) {
-          if (job.docType != null) {
-            _aiExclusionCounts[job.docType!] = job.exclusionCount;
-          }
-        }
-        for (final job in state.activeJobs) {
-          _aiPending.add(job.docType!);
-          _aiStage[job.docType!] = job.status == TripNoteAiJobStatus.processing
-              ? _NotesAiStage.processing
-              : _NotesAiStage.queued;
-        }
-      });
-      // 接上既有的進度通道 —— **不新增輪詢**,狀態只讀這一次。
-      // 已經訂閱過的不重接:resume 與離線佇列 flush 可能同時觸發重讀,
-      // 重接會讓同一個 job 的事件被收兩次。
-      for (final job in state.activeJobs) {
-        if (_aiSubscriptions.containsKey(job.docType)) continue;
-        _watchAiJob(job.requestId, job.docType!);
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _aiStateError = _notesAiErrorMessage(error));
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    for (final subscription in _aiSubscriptions.values) {
-      subscription.cancel();
-    }
-    _aiSubscriptions.clear();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    ref.listen(notesAiControllerProvider(widget.tripId), (previous, next) {
+      for (final type in NoteGenerationType.values) {
+        if (previous?.of(type).phase != NotesAiPhase.completed &&
+            next.of(type).phase == NotesAiPhase.completed) {
+          _scheduleAiCompletionNotice(type);
+        }
+      }
+    });
     final notesAsync = ref.watch(tripNotesProvider(widget.tripId));
     return Scaffold(
       appBar: const TpAppBar(role: TpAppBarRole.detail, title: Text('行程筆記')),
@@ -175,7 +89,27 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
   }
 
   Widget _buildSections(BuildContext context, TripNotes notes) {
-    final aiBusyTypes = {..._aiSubmitting, ..._aiPending};
+    final ai = ref.watch(notesAiControllerProvider(widget.tripId));
+    final controller = ref.read(
+      notesAiControllerProvider(widget.tripId).notifier,
+    );
+    NoteGenerationType? firstWith(NotesAiPhase phase) => NoteGenerationType
+        .values
+        .where((t) => ai.of(t).phase == phase)
+        .firstOrNull;
+    final summaryType = NoteGenerationType.values
+        .where(
+          (t) =>
+              ai.of(t).phase == NotesAiPhase.completed &&
+              ai.of(t).summary != null,
+        )
+        .firstOrNull;
+    final timedOutType = firstWith(NotesAiPhase.timedOut);
+    final failedType = firstWith(NotesAiPhase.failed);
+    final pendingTypes = [
+      for (final t in NoteGenerationType.values)
+        if (ai.of(t).phase == NotesAiPhase.pending) t,
+    ];
     return ListView(
       key: const ValueKey('trip-notes-list'),
       padding: const EdgeInsets.all(TpSpacing.s4),
@@ -186,13 +120,13 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
           key: const ValueKey('notes-ai-status'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_aiSummary case final job?)
+            if (summaryType case final type?)
               _NotesAiSummaryPanel(
                 key: const ValueKey('notes-ai-summary'),
-                job: job,
-                onDismiss: () => setState(() => _aiSummary = null),
+                job: ai.of(type).summary!,
+                onDismiss: () => controller.dismiss(type),
               ),
-            if (_aiTimedOut case final type?)
+            if (timedOutType case final type?)
               _NotesAiErrorPanel(
                 key: const ValueKey('notes-ai-timeout'),
                 panelKey: const ValueKey('notes-ai-timeout-panel'),
@@ -200,317 +134,120 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
                 title: '生成逾時',
                 message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
                 onRetry: () {
-                  setState(() => _aiTimedOut = null);
-                  _startAiGeneration(type);
+                  controller.dismiss(type);
+                  unawaited(controller.generate(type));
                 },
-                onDismiss: () => setState(() => _aiTimedOut = null),
+                onDismiss: () => controller.dismiss(type),
               ),
-            if (_aiStateError case final message?)
+            if (ai.stateError case final message?)
               _NotesAiErrorPanel(
                 key: const ValueKey('notes-ai-state-error'),
                 panelKey: const ValueKey('notes-ai-state-error-panel'),
                 retryKey: const ValueKey('notes-ai-state-retry'),
                 message: message,
-                onRetry: _loadAiState,
-                onDismiss: () => setState(() => _aiStateError = null),
+                onRetry: () => unawaited(controller.load()),
+                onDismiss: () => controller.clearStateError(),
               ),
-            if (_aiFailure case final failure?)
+            if (failedType case final type?)
               _NotesAiErrorPanel(
-                message: failure.message,
-                onRetry: () => _startAiGeneration(failure.type),
-                onDismiss: () => setState(() => _aiFailure = null),
+                message: ai.of(type).failureMessage ?? notesAiFallbackMessage,
+                onRetry: () {
+                  controller.dismiss(type);
+                  unawaited(controller.generate(type));
+                },
+                onDismiss: () => controller.dismiss(type),
               ),
             // 進行中的每一種各佔一列,並固定用 enum 的宣告順序,避免先後啟動
             // 造成面板上下跳動。
-            if (_aiPending.isNotEmpty)
+            if (pendingTypes.isNotEmpty)
               Column(
                 key: const ValueKey('notes-ai-pending'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final type in NoteGenerationType.values)
-                    if (_aiPending.contains(type))
-                      _NotesAiPendingPanel(
-                        key: ValueKey('notes-ai-pending-${type.pathSegment}'),
-                        label: type.pendingLabel,
-                        stage: _aiStage[type] ?? _NotesAiStage.queued,
-                        stopKey: ValueKey('notes-ai-stop-${type.pathSegment}'),
-                        onStopWaiting: () => _stopWaitingFor(type),
-                      ),
+                  for (final type in pendingTypes)
+                    _NotesAiPendingPanel(
+                      key: ValueKey('notes-ai-pending-${type.pathSegment}'),
+                      label: type.pendingLabel,
+                      stage: ai.of(type).stage,
+                      stopKey: ValueKey('notes-ai-stop-${type.pathSegment}'),
+                      onStopWaiting: () => _stopWaitingFor(type),
+                    ),
                 ],
               ),
           ],
         ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.flights,
-          icon: CupertinoIcons.airplane,
-          title: '航班',
-          // mobile 預設展開航班（對齊 web TripNotesPage 行為）
-          initiallyExpanded: true,
-          rows: [
-            for (final f in notes.flights)
-              _NoteRowData(
-                id: f.id,
-                version: f.version,
-                editFields: f.toEditFields(),
-                display: _FlightRow(f),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.lodgings,
-          icon: CupertinoIcons.bed_double,
-          title: '住宿',
-          rows: [
-            for (final l in notes.lodgings)
-              _NoteRowData(
-                id: l.id,
-                version: l.version,
-                editFields: l.toEditFields(),
-                display: _LodgingRow(l),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.reservations,
-          icon: CupertinoIcons.ticket,
-          title: '預訂',
-          rows: [
-            for (final r in notes.reservations)
-              _NoteRowData(
-                id: r.id,
-                version: r.version,
-                editFields: r.toEditFields(),
-                display: _ReservationRow(r),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.pretrip,
-          icon: CupertinoIcons.list_bullet,
-          title: '行前須知',
-          aiActions: [
-            const _NoteAiAction(type: NoteGenerationType.tips, label: '一般'),
-            _NoteAiAction(
-              type: NoteGenerationType.lodgingTips,
-              label: '住宿',
-              enabled: notes.lodgings.isNotEmpty,
-              disabledText: '需先新增住宿',
-            ),
-          ],
-          aiBusyTypes: aiBusyTypes,
-          onGenerateNotes: _startAiGeneration,
-          exclusionDocType: NoteGenerationType.tips,
-          exclusionCount: _aiExclusionCounts[NoteGenerationType.tips] ?? 0,
-          rows: [
-            for (final p in notes.pretripNotes)
-              _NoteRowData(
-                id: p.id,
-                version: p.version,
-                editFields: p.toEditFields(),
-                display: _PretripNoteRow(p),
-                canReassignToAi: p.canReassignToAi,
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.emergency,
-          icon: Icons.support_agent_outlined,
-          title: '緊急聯絡',
-          aiActions: const [
-            _NoteAiAction(type: NoteGenerationType.emergency, label: 'AI'),
-          ],
-          aiBusyTypes: aiBusyTypes,
-          onGenerateNotes: _startAiGeneration,
-          exclusionDocType: NoteGenerationType.emergency,
-          exclusionCount: _aiExclusionCounts[NoteGenerationType.emergency] ?? 0,
-          rows: [
-            for (final c in notes.emergencyContacts)
-              _NoteRowData(
-                id: c.id,
-                version: c.version,
-                editFields: c.toEditFields(),
-                display: _EmergencyContactRow(c),
-                canReassignToAi: c.canReassignToAi,
-              ),
-          ],
-        ),
+        for (final section in NoteSection.values)
+          _NotesSection(
+            tripId: widget.tripId,
+            section: section,
+            // mobile 預設展開航班(對齊 web TripNotesPage 行為)
+            initiallyExpanded: section == NoteSection.flights,
+            hasLodgings: notes.lodgings.isNotEmpty,
+            rows: _rowsFor(section, notes),
+          ),
       ],
     );
   }
 
-  Future<void> _startAiGeneration(NoteGenerationType type) async {
-    // 守衛只看**這一種**:全域守衛會讓「按鈕按得下去但什麼都沒送出」——
-    // 比按鈕直接 disabled 更糟,使用者按了以為在跑,其實什麼都沒發生。
-    if (_aiSubmitting.contains(type) || _aiPending.contains(type)) return;
-    setState(() {
-      _aiSubmitting.add(type);
-      _aiFailure = null;
-    });
-
-    try {
-      final job = await ref
-          .read(tripRepositoryProvider)
-          .generateNotes(type, tripId: widget.tripId);
-      if (!mounted) return;
-      setState(() {
-        _aiSubmitting.remove(type);
-        _aiPending.add(type);
-      });
-      _watchAiJob(job.requestId, type);
-    } catch (error) {
-      // 攔 Error 與 Exception 兩類:解析非預期回應丟的是 TypeError,只攔
-      // Exception 會讓它逃逸,送出旗標永遠留在真、按鈕從此按不下去。
-      if (!mounted) return;
-      if (_isAlreadyRunning(error)) {
-        // 後端說同一份文件已經有 job 在跑（同 trip + docType）。那正是使用者
-        // 要的結果,呈現成紅色錯誤面板等於把成功講成失敗。這次回應沒帶
-        // requestId,所以只接上進行中狀態、沒有自己的進度通道 —— 重新接回
-        // 通道是「離開再回來還看得到它在跑」那張票的事。
-        setState(() {
-          _aiSubmitting.remove(type);
-          _aiPending.add(type);
-        });
-        return;
-      }
-      setState(() {
-        _aiSubmitting.remove(type);
-        // `_watchAiJob` 在進行中狀態設值之後才跑,而它也在 try 內。它丟例外時若
-        // 不一併清掉,進行中面板與錯誤面板會同時在、按鈕仍卡死,連重試都被
-        // `_startAiGeneration` 開頭的守衛擋回去。
-        _aiPending.remove(type);
-        _aiStage.remove(type);
-        _aiFailure = (message: _notesAiErrorMessage(error), type: type);
-      });
-    }
-  }
-
-  void _watchAiJob(int requestId, NoteGenerationType type) {
-    _aiRequestIds[type] = requestId;
-    // 只收掉**同一種**的舊通道（重試同一種時)。這裡若動到別的 docType,
-    // 啟動第二個生成就會殺掉第一個的進度通道:畫面上兩個進行中都在,
-    // 但第一個 job 的完成事件永遠不會到達,進行中狀態從此清不掉。
-    _aiSubscriptions.remove(type)?.cancel();
-    _aiSubscriptions[type] = ref
-        .read(requestsRepositoryProvider)
-        .watchRequestEvents(requestId)
-        .listen(
-          (event) {
-            if (!event.isTerminal) {
-              // 中間事件不能丟掉 —— 丟了畫面從按下去到結束都是同一句話,
-              // 使用者不知道它在做什麼、也不知道有沒有在動。
-              _handleAiProgress(event, type);
-              return;
-            }
-            _handleAiTerminal(event, type);
-          },
-          onError: (Object error) {
-            _aiSubscriptions.remove(type)?.cancel();
-            if (!mounted) return;
-            setState(() {
-              _aiPending.remove(type);
-              _aiStage.remove(type);
-              _aiFailure = (message: _notesAiErrorMessage(error), type: type);
-            });
-          },
-        );
-  }
-
-  /// 只有階段**真的改變**才 setState —— 後端可能連送多個同階段事件,
-  /// 每次都重建會讓 live region 把同一句重複播報。
-  void _handleAiProgress(TripRequestEvent event, NoteGenerationType type) {
-    if (!mounted) return;
-    final stage = switch (event.status) {
-      RequestStatus.processing => _NotesAiStage.processing,
-      _ => _NotesAiStage.queued,
-    };
-    if (_aiStage[type] == stage) return;
-    setState(() => _aiStage[type] = stage);
-  }
-
-  void _handleAiTerminal(TripRequestEvent event, NoteGenerationType type) {
-    _aiSubscriptions.remove(type)?.cancel();
-    if (!mounted) return;
-
-    if (event.status == RequestStatus.completed && event.error == null) {
-      setState(() => _aiPending.remove(type));
-      ref.invalidate(tripNotesProvider(widget.tripId));
-      _scheduleAiCompletionNotice(type);
-      // 摘要只能從這裡拿 —— 進度事件只帶 status/error,沒有 payload。
-      // 這是**終態後的一次性重讀**,不是輪詢。
-      unawaited(_refreshAiOutcome(type));
-      return;
-    }
-
-    final rawError = event.error;
-    setState(() {
-      _aiPending.remove(type);
-      _aiStage.remove(type);
-      _aiRequestIds.remove(type);
-      _aiFailure = (
-        // 非同步失敗是這條功能的主場景，走跟 POST 例外同一條翻譯管線：
-        // `event.error` 是後端原字串，直接貼上面板會把 code 露給使用者看。
-        message: rawError == null
-            ? _notesAiFallbackMessage
-            : _notesAiErrorMessage(rawError),
-        type: type,
-      );
-    });
-    // 逾時與一般失敗在進度通道上長得一樣(後端 #1217 把逾時的 job 對應的
-    // request 也標成 failed),要靠重讀狀態才分得出來。client 不自己倒數。
-    unawaited(_refreshAiOutcome(type));
-  }
-
-  /// 停止等待 —— **不中止 AI**(後端 ADR-0007)。只停這一種,不連坐別的。
-  ///
-  /// 標不掉也照樣把這一種換成終結態(與聊天、與 web 一致),但文案不假裝成功。
+  /// 停止等待 —— 走 controller;伺服器沒確認時誠實提示。
   Future<void> _stopWaitingFor(NoteGenerationType type) async {
-    final requestId = _aiRequestIds[type];
-    if (requestId == null) return;
-    var confirmed = true;
-    try {
-      await ref.read(requestsRepositoryProvider).stopWaiting(requestId);
-    } on Object {
-      confirmed = false;
-    }
-    if (!mounted) return;
-    setState(() {
-      _aiSubscriptions.remove(type)?.cancel();
-      _aiPending.remove(type);
-      _aiStage.remove(type);
-      _aiRequestIds.remove(type);
-    });
-    if (confirmed) return;
-    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
+    final confirmed = await ref
+        .read(notesAiControllerProvider(widget.tripId).notifier)
+        .stopWaiting(type);
+    if (!mounted || confirmed) return;
+    showAppError(context, kStopWaitingUnconfirmedMessage);
   }
 
-  /// 終態後重讀一次狀態,拿完成摘要或確認是不是逾時。**一次性,不是輪詢。**
-  Future<void> _refreshAiOutcome(NoteGenerationType type) async {
-    try {
-      final state = await ref
-          .read(tripRepositoryProvider)
-          .fetchNotesAiState(widget.tripId);
-      if (!mounted) return;
-      final job = state.jobFor(type);
-      if (job == null) return;
-      setState(() {
-        if (job.status == TripNoteAiJobStatus.timedOut) {
-          _aiTimedOut = type;
-          _aiFailure = null;
-          _aiSummary = null;
-        } else if (job.status == TripNoteAiJobStatus.completed) {
-          _aiSummary = job;
-          _aiTimedOut = null;
-        }
-      });
-    } on Object {
-      // 摘要拿不到不影響主流程 —— 生成本身已經完成或失敗了。
-    }
-  }
+  List<_NoteRowData> _rowsFor(NoteSection section, TripNotes notes) =>
+      switch (section) {
+        NoteSection.flights => [
+          for (final f in notes.flights)
+            _NoteRowData(
+              id: f.id,
+              version: f.version,
+              editFields: f.toEditFields(),
+              display: _FlightRow(f),
+            ),
+        ],
+        NoteSection.lodgings => [
+          for (final l in notes.lodgings)
+            _NoteRowData(
+              id: l.id,
+              version: l.version,
+              editFields: l.toEditFields(),
+              display: _LodgingRow(l),
+            ),
+        ],
+        NoteSection.reservations => [
+          for (final r in notes.reservations)
+            _NoteRowData(
+              id: r.id,
+              version: r.version,
+              editFields: r.toEditFields(),
+              display: _ReservationRow(r),
+            ),
+        ],
+        NoteSection.pretrip => [
+          for (final p in notes.pretripNotes)
+            _NoteRowData(
+              id: p.id,
+              version: p.version,
+              editFields: p.toEditFields(),
+              display: _PretripNoteRow(p),
+              canReassignToAi: p.canReassignToAi,
+            ),
+        ],
+        NoteSection.emergency => [
+          for (final c in notes.emergencyContacts)
+            _NoteRowData(
+              id: c.id,
+              version: c.version,
+              editFields: c.toEditFields(),
+              display: _EmergencyContactRow(c),
+              canReassignToAi: c.canReassignToAi,
+            ),
+        ],
+      };
 
   /// 完成提示延到 frame 結束才發:同一幀內完成的合成一則,兩張浮層才不會疊在
   /// 同一個位置互相蓋掉,也不會連發兩則。
@@ -528,10 +265,6 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
       showAppNotice(context, 'AI 生成完成：$labels');
     });
   }
-
-  /// 後端說「同一份文件已經有一個生成中的 job」——不是失敗,是接上既有 job。
-  bool _isAlreadyRunning(Object error) =>
-      error is ApiError && error.code == _notesAiJobActiveCode;
 }
 
 /// 單一筆記 row 的資料：id/version（OCC）、editFields（編輯預填）、display（唯讀卡片）。
@@ -555,40 +288,27 @@ class _NoteRowData {
 
 /// AI 生成按鈕資料；只在可生成的 section 展開後顯示。
 class _NoteAiAction {
-  const _NoteAiAction({
-    required this.type,
-    required this.label,
-    this.enabled = true,
-    this.disabledText,
-  });
+  const _NoteAiAction({required this.type, this.disabledText});
 
   final NoteGenerationType type;
-  final String label;
-  final bool enabled;
+  String get label => type.label;
+  bool get enabled => disabledText == null;
+
+  /// 不能生成的原因;有值就是 disabled。
   final String? disabledText;
 }
 
-/// 生成走到哪一階段。文案要講清楚正在做什麼 —— HIG generative-ai:
-/// 「instead of "Processing…", say "Summarizing key themes from your notes."」
-enum _NotesAiStage {
-  /// 已送出,還沒被領走。
-  queued,
-
-  /// 已被領走,正在讀行程並整理內容。
-  processing,
-}
-
-extension _NotesAiStageX on _NotesAiStage {
+extension _NotesAiStageX on NotesAiStage {
   /// `label` 是該種生成的中文名(行前須知(一般)/緊急聯絡…)。
   String message(String label) => switch (this) {
-    _NotesAiStage.queued => '已送出$label的生成，正在等待排程。通常需 3-7 分鐘。',
-    _NotesAiStage.processing => '正在讀行程並整理$label的內容，完成後會自動更新。',
+    NotesAiStage.queued => '已送出$label的生成，正在等待排程。通常需 3-7 分鐘。',
+    NotesAiStage.processing => '正在讀行程並整理$label的內容，完成後會自動更新。',
   };
 
   /// 不只靠顏色 —— 灰階下也分得出兩個階段。
   IconData get icon => switch (this) {
-    _NotesAiStage.queued => CupertinoIcons.clock,
-    _NotesAiStage.processing => CupertinoIcons.sparkles,
+    NotesAiStage.queued => CupertinoIcons.clock,
+    NotesAiStage.processing => CupertinoIcons.sparkles,
   };
 }
 
@@ -602,7 +322,7 @@ class _NotesAiPendingPanel extends StatelessWidget {
   });
 
   final String label;
-  final _NotesAiStage stage;
+  final NotesAiStage stage;
   final Key stopKey;
 
   /// 停止等待 —— 次要文字鈕,不換掉生成按鈕、不進工具列。
@@ -813,39 +533,6 @@ class _NotesAiErrorPanel extends StatelessWidget {
   }
 }
 
-/// 「同一份文件已經有 job 在跑」。這個 code 不走錯誤翻譯,由
-/// [_TripNotesScreenState._isAlreadyRunning] 攔下來當成接上既有 job。
-const _notesAiJobActiveCode = 'NOTES_AI_JOB_ACTIVE';
-
-/// 生成期的 error code → 人話。維護權相關的 code（`NOTES_AI_NOT_REASSIGNABLE`／
-/// `NOTES_AI_JOB_STALE`）只會在維護權 PATCH 出現，這裡不列，避免留下沒有呼叫端的死碼;
-/// [_notesAiJobActiveCode] 同理 —— 它不是失敗,沒有任何路徑會把它翻成錯誤訊息。
-const _notesAiErrorMessages = <String, String>{
-  'NOTES_AI_INVALID_OUTPUT': 'AI 這次產生的內容格式不正確',
-  'NOTES_AI_NO_VALID_ITEMS': 'AI 這次沒有產生可用的項目',
-  'NOTES_AI_APPLY_FAILED': 'AI 內容寫回筆記時失敗',
-};
-
-const _notesAiFallbackMessage = '目前無法完成 AI 生成';
-
-/// 三條失敗路徑（POST 例外／stream onError／SSE 終止事件）共用這一條翻譯管線，
-/// 走全 app 一致的三層 fallback：**server 回繁中就直接用 → 否則查 code 對照表 →
-/// 再不然通用訊息**。原始 error code 與型別文字一律不外流到畫面。
-///
-/// 終止事件的 `TripRequestEvent.error` 是後端原字串，可能是 code（`NOTES_AI_*`）
-/// 也可能是繁中訊息，兩種都由這裡收斂；少了第一層，429 `SYS_RATE_LIMIT`、403 權限
-/// 這些後端已經給了人話的失敗會全部退化成一句通用訊息。
-String _notesAiErrorMessage(Object error) {
-  final (String? code, String? message) = switch (error) {
-    ApiError() => (error.code, error.message),
-    String() => (error, error),
-    _ => (null, null),
-  };
-  if (message != null && hasCjk(message)) return message;
-  if (code == null) return _notesAiFallbackMessage;
-  return _notesAiErrorMessages[code] ?? _notesAiFallbackMessage;
-}
-
 /// 排除清單:被刪掉的 AI 項目,可逐項恢復。
 ///
 /// 恢復改的是「下次會不會生成」,不是當下的內容 —— 那一則要等下一次生成
@@ -962,40 +649,42 @@ class _NoteExclusionsListState extends ConsumerState<_NoteExclusionsList> {
   }
 }
 
+const _sectionIcons = <NoteSection, IconData>{
+  NoteSection.flights: CupertinoIcons.airplane,
+  NoteSection.lodgings: CupertinoIcons.bed_double,
+  NoteSection.reservations: CupertinoIcons.ticket,
+  NoteSection.pretrip: CupertinoIcons.list_bullet,
+  NoteSection.emergency: Icons.support_agent_outlined,
+};
+
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
 class _NotesSection extends ConsumerWidget {
   const _NotesSection({
     required this.tripId,
     required this.section,
-    required this.icon,
-    required this.title,
     required this.rows,
     this.initiallyExpanded = false,
-    this.aiActions = const [],
-    this.aiBusyTypes = const {},
-    this.onGenerateNotes,
-    this.exclusionCount = 0,
-    this.exclusionDocType,
+    this.hasLodgings = false,
   });
 
   final String tripId;
   final NoteSection section;
-  final IconData icon;
-  final String title;
-
-  /// 這一區有幾則被排除。**0 就不顯示入口**,版面一如現狀。
-  final int exclusionCount;
-
-  /// 排除清單走的 docType(與維護權的 section 不是同一組字)。
-  final NoteGenerationType? exclusionDocType;
+  IconData get icon => _sectionIcons[section]!;
+  String get title => noteSectionTitles[section]!;
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
-  final List<_NoteAiAction> aiActions;
 
-  /// 正在送出或進行中的生成類型;每顆按鈕只看自己那一種。
-  final Set<NoteGenerationType> aiBusyTypes;
-  final void Function(NoteGenerationType type)? onGenerateNotes;
+  /// 住宿生成的前置條件;其餘 AI 資料都從 docType 描述子與 controller 查得。
+  final bool hasLodgings;
+
+  List<_NoteAiAction> get aiActions => [
+    for (final type in section.generationTypes)
+      _NoteAiAction(
+        type: type,
+        disabledText: type.disabledReason(hasLodgings: hasLodgings),
+      ),
+  ];
 
   Future<void> _delete(BuildContext context, WidgetRef ref, int rowId) {
     return confirmAndDelete(
@@ -1039,6 +728,16 @@ class _NotesSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    // AI 相關資料全部從 controller 與 docType 描述子查得,不由父層一路手傳。
+    final ai = ref.watch(notesAiControllerProvider(tripId));
+    final aiBusyTypes = ai.busyTypes;
+    final exclusionCounts = {
+      for (final type in section.generationTypes)
+        type: ai.of(type).exclusionCount,
+    };
+    void onGenerateNotes(NoteGenerationType type) => unawaited(
+      ref.read(notesAiControllerProvider(tripId).notifier).generate(type),
+    );
     return Card(
       key: ValueKey('notes-section-${section.name}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s3),
@@ -1074,18 +773,24 @@ class _NotesSection extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (exclusionCount > 0 && exclusionDocType != null) ...[
-                const Spacer(),
-                TextButton(
-                  key: ValueKey('notes-exclusions-${section.name}'),
-                  onPressed: () => showNoteExclusionsSheet(
-                    context,
-                    tripId: tripId,
-                    docType: exclusionDocType!,
+              if (exclusionCounts.values.any((n) => n > 0)) const Spacer(),
+              for (final MapEntry(key: type, value: count)
+                  in exclusionCounts.entries)
+                if (count > 0)
+                  TextButton(
+                    key: ValueKey('notes-exclusions-${type.pathSegment}'),
+                    onPressed: () => showNoteExclusionsSheet(
+                      context,
+                      tripId: tripId,
+                      docType: type,
+                    ),
+                    // 同一區有兩種生成時,標出是哪一種的排除清單。
+                    child: Text(
+                      exclusionCounts.length > 1
+                          ? '${type.label}已排除 $count 項'
+                          : '已排除 $count 項',
+                    ),
                   ),
-                  child: Text('已排除 $exclusionCount 項'),
-                ),
-              ],
             ],
           ),
           childrenPadding: const EdgeInsets.fromLTRB(
@@ -1113,10 +818,9 @@ class _NotesSection extends ConsumerWidget {
                           key: ValueKey('note-ai-${action.type.pathSegment}'),
                           onPressed:
                               aiBusyTypes.contains(action.type) ||
-                                  !action.enabled ||
-                                  onGenerateNotes == null
+                                  !action.enabled
                               ? null
-                              : () => onGenerateNotes!(action.type),
+                              : () => onGenerateNotes(action.type),
                           icon: const Icon(Icons.auto_awesome_outlined),
                           label: Text(
                             aiBusyTypes.contains(action.type)
