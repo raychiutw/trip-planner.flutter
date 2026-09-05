@@ -154,11 +154,13 @@ void main() {
 
   test('features 不知道 cache 旗標;讀取政策只透過 CacheReadPolicy 表達', () {
     final offenders = <String>[];
-    for (final entity in Directory('lib/features').listSync(recursive: true)) {
-      if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      final source = entity.readAsStringSync();
-      if (RegExp(r'\b(?:fallbackToCache|writeCache)\b').hasMatch(source)) {
-        offenders.add(entity.path);
+    for (final dir in ['lib/features', 'lib/ui', 'lib/app']) {
+      for (final entity in Directory(dir).listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final source = entity.readAsStringSync();
+        if (RegExp(r'\b(?:fallbackToCache|writeCache)\b').hasMatch(source)) {
+          offenders.add(entity.path);
+        }
       }
     }
     expect(

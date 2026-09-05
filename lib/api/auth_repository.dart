@@ -7,8 +7,8 @@ import '../models/user.dart';
 import '../models/oauth.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
-import 'cache/cache_read_policy.dart';
 import 'api_error.dart';
+import 'cache/cache_read_policy.dart';
 import 'session_store.dart';
 
 class SignupJoinedTrip {

@@ -106,6 +106,33 @@ void main() {
     ]);
   });
 
+  test('GET noStore + 連線失敗 + 有快取 → 不回退,直接拋錯', () async {
+    await cache.writeResponse(
+      cacheKeyFor('GET', '/invitations', {'token': 'raw-token'}),
+      {'tripId': 'stale-trip'},
+    );
+    adapter.onGet(
+      '/invitations',
+      (s) => s.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/invitations'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+      queryParameters: {'token': 'raw-token'},
+    );
+
+    await expectLater(
+      client.get(
+        '/invitations',
+        query: {'token': 'raw-token'},
+        policy: CacheReadPolicy.noStore,
+      ),
+      throwsA(isA<DioException>()),
+    );
+  });
+
   test('GET networkOnly → 有快取也不回退', () async {
     await cache.writeResponse(
       cacheKeyFor('GET', '/invitations', {'token': 'raw-token'}),
