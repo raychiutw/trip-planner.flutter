@@ -19,7 +19,7 @@ import 'connected_apps_screen.dart';
 
 /// 登入裝置清單 provider（GET /account/sessions）。
 final accountSessionsProvider = FutureProvider<AccountSessionsPage>((ref) {
-  return ref.watch(tripRepositoryProvider).fetchAccountSessions();
+  return ref.watch(accountRepositoryProvider).fetchAccountSessions();
 });
 
 /// 登入裝置管理頁。
@@ -103,7 +103,7 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
       _mutationError = null;
     });
     try {
-      await ref.read(tripRepositoryProvider).revokeAccountSession(sid);
+      await ref.read(accountRepositoryProvider).revokeAccountSession(sid);
       if (!mounted) return '登出裝置失敗，請稍後再試';
       ref.invalidate(accountSessionsProvider);
       showAppNotice(context, '已登出該裝置');

@@ -96,7 +96,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
     });
     try {
       final tripId = await ref
-          .read(tripRepositoryProvider)
+          .read(accountRepositoryProvider)
           .clonePublicTripShare(_token);
       if (!mounted) return;
       HapticFeedback.lightImpact();

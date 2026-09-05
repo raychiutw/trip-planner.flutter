@@ -17,6 +17,7 @@ import 'reports_repository.dart';
 import 'session_store.dart';
 import 'settings_store.dart';
 import 'share_repository.dart';
+import 'account_repository.dart';
 import 'trip_repository.dart';
 
 final sessionStoreProvider = Provider<SessionStore>(
@@ -51,6 +52,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final tripRepositoryProvider = Provider<TripRepository>(
   (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+);
+
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(client: ref.watch(apiClientProvider)),
 );
 
 final requestsRepositoryProvider = Provider<RequestsRepository>(

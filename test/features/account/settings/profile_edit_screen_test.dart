@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/models/user.dart';
@@ -13,7 +14,7 @@ import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
-class _MockTripRepo extends Mock implements TripRepository {}
+class _MockTripRepo extends Mock implements TripRepository, AccountRepository {}
 
 void main() {
   late _MockAuthRepo authRepo;
@@ -42,6 +43,7 @@ void main() {
       overrides: [
         authRepositoryProvider.overrideWithValue(authRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
+        accountRepositoryProvider.overrideWithValue(tripRepo),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
