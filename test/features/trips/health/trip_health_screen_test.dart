@@ -425,6 +425,31 @@ void main() {
     stop.complete();
     await tester.pump();
     await tester.pump();
+    expect(find.text(kStopWaitingUnconfirmedMessage), findsNothing);
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+  });
+
+  testWidgets('停止等待後重新整理:報告仍是同一張 pending → 停滯態保留', (tester) async {
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    when(() => requestsRepo.stopWaiting(any())).thenAnswer((_) async {});
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(const ValueKey('trip-health-stop')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+
+    when(
+      () => requestsRepo.fetchRequest(any()),
+    ).thenThrow(Exception('offline'));
+    await tester.tap(find.byKey(const ValueKey('trip-health-refresh-button')));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
   });
 
   testWidgets('app 回前景時補讀工單;已終結就換成終結態', (tester) async {

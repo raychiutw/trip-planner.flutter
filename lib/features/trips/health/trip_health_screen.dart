@@ -78,7 +78,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     TripHealthReport? next;
     try {
       next = await ref.read(tripRepositoryProvider).fetchHealthReport(tripId);
-    } on Exception {
+    } on Object {
       next = null; // 讀不到就沿用現況
     }
     if (!_isCurrent(generation, tripId)) return;
@@ -136,9 +136,10 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       setState(() {
         _trip = results[0] as Trip;
         _days = results[1] as List<TripDay>;
+        // 同一張工單的停滯判定要留住;換了工單才重來。
+        if (report?.requestId != _report?.requestId) _requestTerminated = false;
         _report = report;
         _poiHealth = results[3] as TripPoiHealthReport;
-        _requestTerminated = false;
       });
     } on Exception catch (error) {
       if (!_isCurrent(generation, tripId)) return;

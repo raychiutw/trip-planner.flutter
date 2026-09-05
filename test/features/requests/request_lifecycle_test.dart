@@ -224,17 +224,20 @@ void main() {
   test('讀取還在飛時 container 被丟掉 → 不丟例外', () async {
     final pending = Completer<TripRequest>();
     when(() => repo.fetchRequest(7)).thenAnswer((_) => pending.future);
-    when(() => repo.stopWaiting(7)).thenAnswer((_) => Completer<void>().future);
+    final stop = Completer<void>();
+    when(() => repo.stopWaiting(7)).thenAnswer((_) => stop.future);
     final c = ProviderContainer(
       overrides: [requestsRepositoryProvider.overrideWithValue(repo)],
     );
     c.listen(requestLifecycleProvider(7), (_, _) {});
     await _flush();
-    unawaited(c.read(requestLifecycleProvider(7).notifier).stopWaiting());
+    final stopping = c.read(requestLifecycleProvider(7).notifier).stopWaiting();
     c.dispose();
     pending.complete(_req(RequestStatus.completed));
+    stop.complete();
     await _flush();
-    // 走到這裡沒有 uncaught error 就是通過。
+    // dispose 後兩條 continuation 都不能碰 state;走到這裡沒有例外就是通過。
+    expect(await stopping, isTrue);
   });
 
   test('停止等待途中 SSE 先送終結 → 保留伺服器的終結態', () async {
@@ -289,5 +292,50 @@ void main() {
 
     expect(sub.read(), isA<RequestInFlight>());
     expect(waits, hasLength(1));
+  });
+
+  test('輪詢中被 invalidate → 舊迴圈作廢,不會變成兩條迴圈', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      return _req(RequestStatus.processing);
+    });
+    when(
+      () => repo.watchRequestEvents(7),
+    ).thenAnswer((_) => const Stream<TripRequestEvent>.empty());
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    expect(waits, hasLength(1), reason: 'SSE 立刻收線 → 輪詢');
+
+    c.invalidate(requestLifecycleProvider(7));
+    await _flush();
+    expect(waits, hasLength(2), reason: '重建後自己的輪詢');
+    final before = calls;
+
+    waits[0].complete(); // 舊迴圈醒來
+    await _flush();
+    expect(calls, before, reason: '舊迴圈不得再打 API');
+
+    waits[1].complete();
+    await _flush();
+    expect(calls, before + 1);
+  });
+
+  test('停止等待後遲到的 SSE 終結事件不覆蓋本機終結態', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    when(() => repo.stopWaiting(7)).thenAnswer((_) async {});
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await c.read(requestLifecycleProvider(7).notifier).stopWaiting();
+
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.terminalReason, TerminalReason.cancelled);
   });
 }
