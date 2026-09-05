@@ -10,6 +10,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/features/trip_detail/notes/note_field_spec.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/note_section.dart';
@@ -118,6 +119,13 @@ Never _decodeGenerateBodyMissingJobId() {
 
 /// 三顆 AI 按鈕分散在兩個預設收合的 section,量按鈕狀態前要先讓它們都在樹上。
 /// 拉高 viewport 讓兩區展開後仍不需捲動,避免斷言被捲動時序干擾。
+/// 排除入口在展開後的內容區,先展開那一區。
+Future<void> _expand(WidgetTester tester, NoteSection section) async {
+  await tester.tap(find.byKey(ValueKey('notes-section-${section.name}')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
 void _useTallViewport(WidgetTester tester) {
   tester.view.physicalSize = const Size(600, 2400);
   tester.view.devicePixelRatio = 1;
@@ -1392,11 +1400,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    await _expand(tester, NoteSection.pretrip);
     // 行前須知有 2 項被排除 → 入口出現;緊急聯絡 0 項 → 不出現。
-    expect(
-      find.byKey(const ValueKey('notes-exclusions-pretrip')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('notes-exclusions-tips')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('notes-exclusions-emergency')),
       findsNothing,
@@ -1404,7 +1410,7 @@ void main() {
     );
     expect(find.textContaining('已排除 2 項'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('notes-exclusions-pretrip')));
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -1418,6 +1424,192 @@ void main() {
         NoteGenerationType.tips,
         tripId: 'trip-1',
         exclusionId: 3,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('行前須知兩種生成都有排除:手機寬度不撐爆 header,各自標出類型', (tester) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 2,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.lodgingTips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 1,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await _expand(tester, NoteSection.pretrip);
+    expect(tester.takeException(), isNull, reason: 'RenderFlex 不可 overflow');
+    expect(find.text('一般已排除 2 項'), findsOneWidget);
+    expect(find.text('住宿已排除 1 項'), findsOneWidget);
+    // 不 overflow 還不夠:分到的寬度太窄會把字擠成兩行甚至一字一行。
+    expect(
+      tester.getSize(find.text('一般已排除 2 項')).height,
+      lessThan(30),
+      reason: '標籤要是單行',
+    );
+    expect(tester.getSize(find.text('住宿已排除 1 項')).height, lessThan(30));
+  });
+
+  test('noteSectionTitles 涵蓋每一區(畫面用 ! 取值,少一個就 crash)', () {
+    for (final s in NoteSection.values) {
+      expect(noteSectionTitles[s], isNotNull, reason: s.name);
+    }
+  });
+
+  testWidgets('只有一種生成有排除時,入口不加類型前綴', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 2,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await _expand(tester, NoteSection.pretrip);
+    expect(find.text('已排除 2 項'), findsOneWidget);
+    expect(find.textContaining('一般已排除'), findsNothing);
+  });
+
+  testWidgets('排除清單 sheet 關掉後重新讀 ai-state,徽章數字才會跟著變', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    var aiStateReads = 0;
+    when(() => repo.fetchNotesAiState(any())).thenAnswer((_) async {
+      aiStateReads++;
+      return TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: aiStateReads == 1 ? 1 : 0,
+          ),
+        ],
+      );
+    });
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer((_) async => const []);
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+    await _expand(tester, NoteSection.pretrip);
+    expect(find.byKey(const ValueKey('notes-exclusions-tips')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    // 關掉 sheet。
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(aiStateReads, 2, reason: 'sheet 關掉後重讀一次');
+    expect(find.byKey(const ValueKey('notes-exclusions-tips')), findsNothing);
+  });
+
+  testWidgets('住宿生成的排除清單也看得到、能恢復,且與一般生成互不干擾', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.lodgingTips,
+            status: TripNoteAiJobStatus.idle,
+            exclusionCount: 1,
+          ),
+        ],
+      ),
+    );
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: any(named: 'tripId')),
+    ).thenAnswer(
+      (_) async => const [
+        TripNoteExclusion(
+          id: 9,
+          docType: NoteGenerationType.lodgingTips,
+          label: '飯店早餐時間',
+          deletedAt: '2026-07-28T09:00:00Z',
+        ),
+      ],
+    );
+    when(
+      () => repo.restoreNoteExclusion(
+        any(),
+        tripId: any(named: 'tripId'),
+        exclusionId: any(named: 'exclusionId'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await _expand(tester, NoteSection.pretrip);
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+      findsOneWidget,
+      reason: '住宿生成的排除清單以前在 UI 永遠不可達',
+    );
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-tips')),
+      findsNothing,
+      reason: '一般生成 0 項,不連坐',
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('飯店早餐時間'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('notes-exclusion-restore-9')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(
+      () => repo.restoreNoteExclusion(
+        NoteGenerationType.lodgingTips,
+        tripId: 'trip-1',
+        exclusionId: 9,
       ),
     ).called(1);
   });
