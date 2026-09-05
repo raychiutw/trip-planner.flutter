@@ -312,8 +312,13 @@ void main() {
         'tp-toolbar-action-surface',
         'tp-toolbar-action-group',
       ]) {
+        // 群組容器已改走 TpGlassSurface,key 在表面 widget 上,材質在它底下。
         final container = tester.widget<GlassContainer>(
-          find.byKey(ValueKey(key)),
+          find.descendant(
+            of: find.byKey(ValueKey(key)),
+            matching: find.byType(GlassContainer),
+            matchRoot: true,
+          ),
         );
         expect(
           (container.shape as LiquidRoundedSuperellipse).side.color.a,
@@ -1062,5 +1067,60 @@ void main() {
       greaterThan(64),
     );
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
+  });
+
+  testWidgets('large sheet 的固定 bar 與一般路徑用同一套動作寬度;關閉鈕視為一般動作', (tester) async {
+    late BuildContext captured;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: TpLargeSheetNavigationScope(
+          onClose: () {},
+          child: Builder(
+            builder: (context) {
+              captured = context;
+              return Scaffold(
+                appBar: TpAppBar(
+                  role: TpAppBarRole.detail,
+                  title: const Text('Sheet'),
+                  actions: [
+                    TpToolbarIconButton(
+                      icon: CupertinoIcons.share,
+                      tooltip: '分享',
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+                body: const SizedBox(),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // 一個 icon 動作 + 關閉鈕 = 兩個 44pt slot + 一個 8pt 間距,再加 16pt 外距。
+    final expected =
+        TpToolbarSlots.actionsWidth(captured, [
+          TpToolbarIconButton(
+            icon: CupertinoIcons.share,
+            tooltip: '分享',
+            onPressed: () {},
+          ),
+          const SizedBox(),
+        ]) +
+        TpSpacing.s4;
+    expect(expected, 2 * TpSpacing.tapMin + TpSpacing.s2 + TpSpacing.s4);
+
+    final actionsBox = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('tp-app-bar-actions')),
+    );
+    expect(actionsBox.width, expected);
+    // 標題置中:左側佔位與右側動作等寬。
+    final leadingBox = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('tp-app-bar-leading')),
+    );
+    expect(leadingBox.width, expected);
   });
 }
