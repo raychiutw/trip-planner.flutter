@@ -1,5 +1,5 @@
 /// AI 聊天狀態機:state = `List<TripRequest>`(工單,asc);送訊息走樂觀更新 →
-/// POST 換真 row → polling 到 terminal;completed 後 invalidate 行程相關 providers
+/// POST 換真 row → 交給工單 lifecycle 等到 terminal;completed 後 invalidate 行程相關 providers
 /// （AI 會直接改行程,畫面要重抓才看得到）。per-trip autoDispose family。
 library;
 
@@ -13,6 +13,7 @@ import '../../api/requests_repository.dart';
 import '../../models/trip_request.dart';
 import '../../models/user.dart';
 import '../favorites/favorites_providers.dart';
+import '../requests/request_lifecycle.dart';
 import '../trip_detail/trip_providers.dart';
 import 'chat_message.dart';
 
@@ -81,14 +82,13 @@ class ChatController extends Notifier<ChatState> {
   /// 由 family arg 經 constructor 注入(riverpod 3.x 慣例)。
   final String tripId;
 
-  static const _pollInterval = Duration(seconds: 4);
   static const _pageSize = 10;
 
   int _tempId = -1;
   bool _disposed = false;
   bool _initStarted = false;
   bool _refreshing = false;
-  final Set<int> _polling = <int>{};
+  final Set<int> _watched = <int>{};
 
   @override
   ChatState build() {
@@ -126,7 +126,7 @@ class ChatController extends Notifier<ChatState> {
         error: null,
       );
       for (final r in rows) {
-        if (!r.status.isTerminal) _startPoll(r.id);
+        if (!r.status.isTerminal) _watch(r.id);
       }
     } on Exception catch (e) {
       if (_disposed) return;
@@ -180,7 +180,7 @@ class ChatController extends Notifier<ChatState> {
         error: null,
       );
       for (final r in latest) {
-        if (!r.status.isTerminal) _startPoll(r.id);
+        if (!r.status.isTerminal) _watch(r.id);
       }
     } on Exception {
       // 重拉失敗不擋畫面:維持既有訊息,也不覆蓋既有錯誤狀態。
@@ -213,7 +213,7 @@ class ChatController extends Notifier<ChatState> {
             : (createdAt: older.first.createdAt, id: older.first.id),
       );
       for (final r in older) {
-        if (!r.status.isTerminal) _startPoll(r.id);
+        if (!r.status.isTerminal) _watch(r.id);
       }
     } on Exception {
       if (_disposed) return;
@@ -252,7 +252,7 @@ class ChatController extends Notifier<ChatState> {
       if (row.status.isTerminal) {
         if (row.status == RequestStatus.completed) _invalidate();
       } else {
-        _startPoll(row.id);
+        _watch(row.id);
       }
     } on Exception catch (e) {
       if (_disposed) return;
@@ -267,45 +267,47 @@ class ChatController extends Notifier<ChatState> {
     }
   }
 
-  void _startPoll(int id) {
-    if (_polling.add(id)) unawaited(_poll(id));
+  /// 交給工單 lifecycle 等終結;每筆只掛一次。
+  void _watch(int id) {
+    if (!_watched.add(id)) return;
+    ref.listen(requestLifecycleProvider(id), (_, next) {
+      switch (next) {
+        case RequestInFlight(authExpired: true):
+          if (!_disposed) state = state.copyWith(authExpired: true);
+        case RequestTerminal():
+          unawaited(_onTerminal(id, next));
+        case RequestInFlight():
+          break;
+      }
+    });
   }
 
-  /// 第一次立即抓(測試友善:不必等 4s);未終態才進 delay 迴圈。
-  Future<void> _poll(int id) async {
-    try {
-      if (await _pollOnce(id)) return;
-      while (!_disposed) {
-        await Future<void>.delayed(_pollInterval);
-        if (_disposed) break;
-        if (await _pollOnce(id)) break;
+  /// 終結了 → 重讀 row 拿 reply(SSE 只帶狀態);讀不到就用 lifecycle 的終結態覆寫。
+  Future<void> _onTerminal(int id, RequestTerminal terminal) async {
+    TripRequest? row;
+    if (terminal.serverConfirmed) {
+      try {
+        row = await _repo.fetchRequest(id);
+      } on ApiError catch (e) {
+        if (e.status == 401) {
+          if (!_disposed) state = state.copyWith(authExpired: true);
+          return;
+        }
+      } on Exception {
+        // 讀不到 reply,下面用終結態覆寫,至少讓畫面脫離「思考中」。
       }
-    } finally {
-      _polling.remove(id);
     }
-  }
-
-  /// 抓一次;回 true = 停止 polling(terminal / 401 / disposed)。
-  Future<bool> _pollOnce(int id) async {
-    TripRequest row;
-    try {
-      row = await _repo.fetchRequest(id);
-    } on ApiError catch (e) {
-      if (e.status == 401) {
-        if (!_disposed) state = state.copyWith(authExpired: true);
-        return true;
-      }
-      return false; // 暫時性錯誤,續 poll
-    } on Exception {
-      return false;
+    if (_disposed) return;
+    final current = state.requests.where((r) => r.id == id).firstOrNull;
+    if (current == null) return;
+    if (row == null || !row.status.isTerminal) {
+      row = (row ?? current).terminated(
+        status: terminal.status,
+        reason: terminal.terminalReason,
+      );
     }
-    if (_disposed) return true;
     _replace(row);
-    if (row.status.isTerminal) {
-      if (row.status == RequestStatus.completed) _invalidate();
-      return true;
-    }
-    return false;
+    if (row.status == RequestStatus.completed) _invalidate();
   }
 
   void _replace(TripRequest row) {

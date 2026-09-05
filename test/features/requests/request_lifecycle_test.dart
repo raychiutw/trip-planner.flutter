@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
@@ -165,5 +166,19 @@ void main() {
     expect(calls, 2);
     final state = sub.read() as RequestTerminal;
     expect(state.terminalReason, TerminalReason.timedOut);
+  });
+
+  test('讀取遇 401 → 標記 authExpired,不再開 SSE', () async {
+    when(() => repo.fetchRequest(7)).thenThrow(
+      const ApiError(status: 401, code: 'AUTH_REQUIRED', message: 'login'),
+    );
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    final state = sub.read();
+    expect(state, isA<RequestInFlight>());
+    expect((state as RequestInFlight).authExpired, isTrue);
+    verifyNever(() => repo.watchRequestEvents(any()));
   });
 }

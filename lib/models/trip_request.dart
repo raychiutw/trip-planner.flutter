@@ -65,22 +65,25 @@ class TripRequest {
   final String? createdAt;
   final String? updatedAt;
 
-  /// 使用者按了停止等待但伺服器沒確認 —— 本地推進到終結態。
+  /// 以工單 lifecycle 判定的終結態覆寫這筆 row。
   ///
-  /// 伺服器那筆還是 processing,後端的兜底機制之後會自己追上。這只影響畫面,
-  /// 不寫回任何地方。
-  TripRequest asLocallyStopped() => TripRequest(
+  /// 用在伺服器沒確認停止等待(那筆還是 processing)、或 SSE 只帶狀態不帶 reply
+  /// 而重讀失敗時 —— 至少讓畫面脫離「思考中」。只影響畫面,不寫回任何地方。
+  TripRequest terminated({
+    required RequestStatus status,
+    TerminalReason? reason,
+  }) => TripRequest(
     id: id,
     tripId: tripId,
     message: message,
     reply: reply,
-    status: RequestStatus.failed,
+    status: status,
     submittedBy: submittedBy,
     submittedByDisplayName: submittedByDisplayName,
     processedBy: processedBy,
     createdAt: createdAt,
     updatedAt: updatedAt,
-    terminalReason: TerminalReason.cancelled,
+    terminalReason: reason,
   );
 
   factory TripRequest.fromJson(Map<String, dynamic> json) => TripRequest(

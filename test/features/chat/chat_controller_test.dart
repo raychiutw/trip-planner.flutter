@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -45,11 +46,16 @@ Future<void> _flush() async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized(); // 工單 lifecycle 掛 AppLifecycleListener
   setUpAll(() {
     registerFallbackValue(<TripDay>[]);
   });
 
   ProviderContainer makeContainer(_MockRepo repo, {void Function()? onDays}) {
+    // SSE 預設永不吐事件:工單狀態由 fetchRequest 的 stub 決定,不落入輪詢。
+    when(
+      () => repo.watchRequestEvents(any()),
+    ).thenAnswer((_) => StreamController<TripRequestEvent>().stream);
     final c = ProviderContainer(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(repo),
@@ -173,7 +179,7 @@ void main() {
     },
   );
 
-  test('poll 401 → authExpired', () async {
+  test('工單讀取 401 → authExpired', () async {
     final repo = _MockRepo();
     when(
       () => repo.fetchRequests(
@@ -201,6 +207,51 @@ void main() {
     await _flush();
 
     expect(c.read(chatControllerProvider('t')).authExpired, isTrue);
+  });
+
+  test('app 回前景 → 思考中的工單被重讀;已完成就換成完成態', () async {
+    final repo = _MockRepo();
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
+    when(
+      () => repo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer((_) async => _req(id: 9, status: RequestStatus.processing));
+    var calls = 0;
+    when(() => repo.fetchRequest(9)).thenAnswer((_) async {
+      calls++;
+      return calls >= 2
+          ? _req(id: 9, status: RequestStatus.completed, reply: 'done')
+          : _req(id: 9, status: RequestStatus.processing);
+    });
+
+    final c = makeContainer(repo);
+    final ctrl = ctrlOf(c);
+    await ctrl.loadInitial();
+    await ctrl.send('hi');
+    await _flush();
+    expect(
+      c.read(chatControllerProvider('t')).requests.single.status,
+      RequestStatus.processing,
+    );
+
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+    await _flush();
+
+    final row = c.read(chatControllerProvider('t')).requests.single;
+    expect(row.status, RequestStatus.completed);
+    expect(row.reply, 'done');
   });
 
   test('loadOlder：before/beforeId → prepend 更舊', () async {
