@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../api/api_error.dart';
+import '../../../api/cache/rebase_merge.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../models/day.dart';
@@ -15,6 +16,7 @@ import '../../../theme/tokens.dart';
 import '../../../ui/tp_compact_time_field.dart';
 import '../entry_mutations.dart';
 import '../trip_providers.dart';
+import 'entry_field_merge.dart';
 
 /// 編輯/新增停留點的模式參數。
 sealed class EntryEditArgs {
@@ -55,7 +57,7 @@ Future<void> showEntryEditSheet(
       submitLabel: isEdit ? '儲存' : '新增',
       submitKey: const ValueKey('entry-edit-submit'),
       controller: controller,
-      builder: (_) => _LiveEntryEditSheet(
+      builder: (_) => EntryEditSheet(
         tripId: tripId,
         args: args,
         formController: controller,
@@ -63,40 +65,6 @@ Future<void> showEntryEditSheet(
     );
   } finally {
     controller.dispose();
-  }
-}
-
-class _LiveEntryEditSheet extends ConsumerWidget {
-  const _LiveEntryEditSheet({
-    required this.tripId,
-    required this.args,
-    required this.formController,
-  });
-
-  final String tripId;
-  final EntryEditArgs args;
-  final AppSheetFormController formController;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    EntryEditArgs liveArgs = args;
-    Object? refreshError;
-    if (args case EntryEditExisting(:final entry)) {
-      final detailAsync = ref.watch(
-        entryDetailProvider((tripId: tripId, entryId: entry.id)),
-      );
-      final detail = detailAsync.value;
-      refreshError = detailAsync.error;
-      liveArgs = EntryEditExisting(
-        detail != null && detail.version >= entry.version ? detail : entry,
-      );
-    }
-    return EntryEditSheet(
-      tripId: tripId,
-      args: liveArgs,
-      formController: formController,
-      refreshError: refreshError,
-    );
   }
 }
 
@@ -108,14 +76,12 @@ class EntryEditSheet extends ConsumerStatefulWidget {
     required this.args,
     this.onSaved,
     this.formController,
-    this.refreshError,
   });
 
   final String tripId;
   final EntryEditArgs args;
   final VoidCallback? onSaved;
   final AppSheetFormController? formController;
-  final Object? refreshError;
 
   @override
   ConsumerState<EntryEditSheet> createState() => _EntryEditSheetState();
@@ -131,23 +97,24 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   /// 起訖兩顆共用一個群組：展開其中一顆，另一顆自動收起。
   final _timeFieldGroup = TpTimeFieldGroup();
-  String _baseDescription = '';
-  String? _baseStartTime;
-  String? _baseEndTime;
+
+  /// 上次接受的伺服器版本的三個可編輯欄位;三方合併的 base。
+  EntryFields _base = const {};
+
+  /// 與協作者真衝突的欄位;非空就要先問「保留你的版本？」。
+  Set<String> _conflicts = const {};
   String _poiType = 'attraction';
   int? _newDayNum;
   bool _submitting = false;
   bool _dirty = false;
   bool _syncingFromModel = false;
-  bool _descriptionDirty = false;
-  bool _startDirty = false;
-  bool _endDirty = false;
-  bool _descriptionConflict = false;
-  bool _startConflict = false;
-  bool _endConflict = false;
   bool _waitingForFresh = false;
   int? _staleVersion;
   TimelineEntry? _acceptedEntry;
+
+  /// 由 entryEditSourceProvider 在 build 時寫入;404 = 已被刪除。
+  bool _deleted = false;
+  Object? _loadError;
 
   bool get _isEdit => widget.args is EntryEditExisting;
   TimelineEntry get _existingEntry =>
@@ -163,9 +130,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _desc = TextEditingController(text: args.entry.description ?? '');
       _start = _parseHm(args.entry.startTime);
       _end = _parseHm(args.entry.endTime);
-      _baseDescription = args.entry.description ?? '';
-      _baseStartTime = _fmt(_start);
-      _baseEndTime = _fmt(_end);
+      _base = entryFieldsOf(args.entry);
     } else {
       _title = TextEditingController();
       _desc = TextEditingController();
@@ -187,32 +152,24 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   @override
   void didUpdateWidget(covariant EntryEditSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final wasDeleted =
-        oldWidget.refreshError is ApiError &&
-        (oldWidget.refreshError! as ApiError).status == 404;
-    if (wasDeleted != _entryDeleted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _syncFormState();
-      });
-    }
     final previousArgs = oldWidget.args;
     final nextArgs = widget.args;
     if (previousArgs is EntryEditNew &&
         nextArgs is EntryEditNew &&
         previousArgs.dayNum != nextArgs.dayNum) {
       _newDayNum = nextArgs.dayNum;
-    } else if (previousArgs is EntryEditExisting &&
-        nextArgs is EntryEditExisting) {
-      final acceptedEntry = _acceptedEntry ?? previousArgs.entry;
-      if (nextArgs.entry.id == acceptedEntry.id &&
-          nextArgs.entry.version < acceptedEntry.version) {
-        return;
-      }
-      if (_entryChanged(acceptedEntry, nextArgs.entry)) {
-        _acceptedEntry = nextArgs.entry;
-        _mergeExistingEntry(nextArgs.entry);
-      }
     }
+  }
+
+  /// provider 給了比已接受版本更新的停留點 → 合併進表單。
+  void _acceptFresh(TimelineEntry entry) {
+    final accepted = _acceptedEntry;
+    if (accepted != null && !_entryChanged(accepted, entry)) return;
+    _acceptedEntry = entry;
+    // build 期間不能改 controller / setState,排到 frame 結束。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mergeExistingEntry(entry);
+    });
   }
 
   static bool _entryChanged(TimelineEntry previous, TimelineEntry next) {
@@ -224,48 +181,46 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
         previous.endTime != next.endTime;
   }
 
-  bool get _hasRemoteConflict =>
-      _descriptionConflict || _startConflict || _endConflict;
+  bool get _hasRemoteConflict => _conflicts.isNotEmpty;
+
+  /// 表單目前的三個可編輯欄位(與 [entryFieldsOf] 同一套正規化)。
+  EntryFields get _oursFromForm => {
+    'description': _desc.text,
+    'startTime': _fmt(_start),
+    'endTime': _fmt(_end),
+  };
 
   void _mergeExistingEntry(TimelineEntry entry) {
-    final description = entry.description ?? '';
-    final start = _parseHm(entry.startTime);
-    final end = _parseHm(entry.endTime);
-    final startTime = _fmt(start);
-    final endTime = _fmt(end);
-    _descriptionConflict =
-        (_descriptionConflict && _desc.text != description) ||
-        (_descriptionDirty &&
-            description != _baseDescription &&
-            _desc.text != description);
-    _startConflict =
-        (_startConflict && _start != start) ||
-        (_startDirty && startTime != _baseStartTime && _start != start);
-    _endConflict =
-        (_endConflict && _end != end) ||
-        (_endDirty && endTime != _baseEndTime && _end != end);
+    final theirs = entryFieldsOf(entry);
+    final merged = mergeEntryFields(
+      base: _base,
+      ours: _oursFromForm,
+      theirs: theirs,
+      previousConflicts: _conflicts,
+    );
+    _conflicts = merged.conflicts;
 
     _syncingFromModel = true;
     _title.value = TextEditingValue(
       text: entry.title,
       selection: TextSelection.collapsed(offset: entry.title.length),
     );
-    if (!_descriptionDirty) {
+    if (merged.adopt.contains('description')) {
+      final description = theirs['description'] as String;
       _desc.value = TextEditingValue(
         text: description,
         selection: TextSelection.collapsed(offset: description.length),
       );
     }
-    if (!_startDirty) _start = start;
-    if (!_endDirty) _end = end;
+    if (merged.adopt.contains('startTime')) {
+      _start = _parseHm(theirs['startTime'] as String?);
+    }
+    if (merged.adopt.contains('endTime')) {
+      _end = _parseHm(theirs['endTime'] as String?);
+    }
     _syncingFromModel = false;
-    _baseDescription = description;
-    _baseStartTime = startTime;
-    _baseEndTime = endTime;
-    _descriptionDirty = _desc.text != description;
-    _startDirty = _fmt(_start) != startTime;
-    _endDirty = _fmt(_end) != endTime;
-    _dirty = _descriptionDirty || _startDirty || _endDirty;
+    _base = theirs;
+    _dirty = dirtyFields(_base, _oursFromForm).isNotEmpty;
     final staleVersion = _staleVersion;
     final freshAfterConflict =
         _waitingForFresh &&
@@ -275,18 +230,18 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _waitingForFresh = false;
       _staleVersion = null;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {});
-      _syncFormState();
-      if (freshAfterConflict) {
-        if (_hasRemoteConflict) {
-          showAppError(context, '協作者也更新了這筆資料。你的修改已保留；再次儲存前請確認是否覆蓋對方版本。');
-        } else {
-          showAppNotice(context, '已載入最新資料；你的修改已保留。');
-        }
+    // 這裡永遠在 frame 之外被呼叫(_acceptFresh 排到 post-frame),可以直接 setState;
+    // 再排一層 post-frame 的話,沒有新 frame 它就永遠不會跑。
+    if (!mounted) return;
+    setState(() {});
+    _syncFormState();
+    if (freshAfterConflict) {
+      if (_hasRemoteConflict) {
+        showAppError(context, '協作者也更新了這筆資料。你的修改已保留；再次儲存前請確認是否覆蓋對方版本。');
+      } else {
+        showAppNotice(context, '已載入最新資料；你的修改已保留。');
       }
-    });
+    }
   }
 
   void _onChanged() {
@@ -300,8 +255,15 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _markChanged();
       return;
     }
-    _descriptionDirty = _desc.text != _baseDescription;
-    if (!_descriptionDirty) _descriptionConflict = false;
+    _fieldChanged('description');
+  }
+
+  /// 使用者把某欄改回 base 的值 → 該欄的衝突解除。
+  void _fieldChanged(String field) {
+    final ours = _oursFromForm;
+    if (ours[field] == _base[field] && _conflicts.contains(field)) {
+      _conflicts = {..._conflicts}..remove(field);
+    }
     _updateEditDirty();
   }
 
@@ -310,18 +272,11 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _markChanged();
       return;
     }
-    if (isStart) {
-      _startDirty = _fmt(_start) != _baseStartTime;
-      if (!_startDirty) _startConflict = false;
-    } else {
-      _endDirty = _fmt(_end) != _baseEndTime;
-      if (!_endDirty) _endConflict = false;
-    }
-    _updateEditDirty();
+    _fieldChanged(isStart ? 'startTime' : 'endTime');
   }
 
   void _updateEditDirty() {
-    _dirty = _descriptionDirty || _startDirty || _endDirty;
+    _dirty = dirtyFields(_base, _oursFromForm).isNotEmpty;
     setState(() {});
     _syncFormState();
   }
@@ -403,9 +358,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       entryTimeRangeValid(_start, _end) &&
       _coordsValid;
 
-  bool get _entryDeleted =>
-      widget.refreshError is ApiError &&
-      (widget.refreshError! as ApiError).status == 404;
+  bool get _entryDeleted => _deleted;
 
   int _selectedDayNum(EntryEditNew args) {
     final dayNum = _newDayNum ?? args.dayNum;
@@ -461,9 +414,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
         isDestructive: true,
       );
       if (!mounted || !overwrite) return false;
-      _descriptionConflict = false;
-      _startConflict = false;
-      _endConflict = false;
+      _conflicts = const {};
     }
     final title = _title.text.trim();
     final description = _desc.text.trim().isEmpty ? null : _desc.text.trim();
@@ -509,9 +460,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
       _invalidateEntryCaches();
       HapticFeedback.lightImpact();
       _dirty = false;
-      _descriptionDirty = false;
-      _startDirty = false;
-      _endDirty = false;
+      if (_isEdit) _base = _oursFromForm;
       _submitting = false;
       _syncFormState();
       final onSaved = widget.onSaved;
@@ -562,8 +511,26 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     final showDayPicker =
         dayOptions.length > 1 &&
         dayOptions.any((d) => d.dayNum == selectedDayNum);
-    final refreshError = widget.refreshError;
-    final entryDeleted = refreshError is ApiError && refreshError.status == 404;
+    if (args case EntryEditExisting(:final entry)) {
+      final source = ref.watch(
+        entryEditSourceProvider((
+          tripId: widget.tripId,
+          entryId: entry.id,
+          seedVersion: (_acceptedEntry ?? entry).version,
+        )),
+      );
+      final wasDeleted = _deleted;
+      _deleted = source.deleted;
+      _loadError = source.error;
+      if (wasDeleted != _deleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncFormState();
+        });
+      }
+      if (source.fresher case final fresh?) _acceptFresh(fresh);
+    }
+    final refreshError = _loadError;
+    final entryDeleted = _deleted;
     return SafeArea(
       child: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

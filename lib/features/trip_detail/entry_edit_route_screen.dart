@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_error.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
 import '../../models/entry.dart';
@@ -82,8 +81,17 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
     final latestEntry = entryAsync.value;
     if (latestEntry != null) _lastEntry = latestEntry;
     final visibleEntry = latestEntry ?? _lastEntry;
-    final refreshError = entryAsync.error;
-    final entryDeleted = refreshError is ApiError && refreshError.status == 404;
+    final entryDeleted =
+        visibleEntry != null &&
+        ref
+            .watch(
+              entryEditSourceProvider((
+                tripId: widget.tripId,
+                entryId: widget.entryId,
+                seedVersion: visibleEntry.version,
+              )),
+            )
+            .deleted;
     return AnimatedBuilder(
       animation: _formController,
       builder: (context, _) => AppUnsavedChangesGuard(
@@ -136,7 +144,6 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
                         tripId: widget.tripId,
                         args: EntryEditExisting(visibleEntry),
                         formController: _formController,
-                        refreshError: refreshError,
                       ),
                     ),
                   ],
