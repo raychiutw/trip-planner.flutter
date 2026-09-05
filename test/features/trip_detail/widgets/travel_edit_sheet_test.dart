@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/widgets/travel_edit_sheet.dart';
+import 'package:tripline/models/entry.dart';
 import 'package:tripline/models/segment.dart';
 import 'package:tripline/theme/app_theme.dart';
 
@@ -66,5 +67,43 @@ void main() {
         expectedVersion: any(named: 'expectedVersion'),
       ),
     );
+  });
+
+  testWidgets('缺 segment 時以 Travel 物件帶入初始值,不再拆成五個欄位', (tester) async {
+    final repository = _MockTripRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () => showTravelEditSheet(
+                  context,
+                  tripId: 'trip-1',
+                  fromEntryId: 11,
+                  toEntryId: 12,
+                  travel: const Travel(
+                    type: 'walking',
+                    min: 12,
+                    source: 'manual',
+                  ),
+                ),
+                child: const Text('開啟'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final minField = tester.widget<TextField>(
+      find.byKey(const ValueKey('travel-min')),
+    );
+    expect(minField.controller?.text, '12', reason: 'Travel.min 帶進分鐘欄');
   });
 }

@@ -1325,12 +1325,15 @@ class _DaySection extends ConsumerWidget {
               fromEntryId: previous.id,
               toEntryId: entry.id,
               segmentsReady: segmentsReady,
-              missingSegment:
-                  segmentsReady && travelSegment == null && travel != null,
-              recomputeStalled: _stalledTravelRecomputeScopes.contains(
-                '$tripId:${day.dayNum}',
+              status: _travelStatusFor(
+                segment: travelSegment,
+                travel: travel,
+                segmentsReady: segmentsReady,
+                missingCoords: _missingTravelCoords(previous, entry),
+                recomputeStalled: _stalledTravelRecomputeScopes.contains(
+                  '$tripId:${day.dayNum}',
+                ),
               ),
-              missingCoords: _missingTravelCoords(previous, entry),
             ),
           row,
         ],
@@ -1914,6 +1917,42 @@ bool _missingTravelCoords(TimelineEntry from, TimelineEntry to) {
 }
 
 /// travel pill 列：沿用 D1 的固定 rail + 內容起點，可編輯或補建交通 segment。
+/// 移動段這一列的狀態;由呼叫端一次算好,列本身只負責顯示。
+enum _TravelStatus {
+  /// 沒有要提示的狀況。
+  ok,
+
+  /// 兩端缺座標,後端算不了車程。
+  missingCoords,
+
+  /// 交通重算已經卡住(排過重算但一直沒回來)。
+  recomputeStalled,
+
+  /// 交通重算進行中(segment 缺或 stale)。
+  recomputing;
+
+  String? get label => switch (this) {
+    ok => null,
+    missingCoords => '缺座標，無法計算車程',
+    recomputeStalled => '車程待更新',
+    recomputing => '車程重新計算中',
+  };
+}
+
+_TravelStatus _travelStatusFor({
+  required TripSegment? segment,
+  required Travel? travel,
+  required bool segmentsReady,
+  required bool missingCoords,
+  required bool recomputeStalled,
+}) {
+  final missingSegment = segmentsReady && segment == null && travel != null;
+  if (!missingSegment && segment?.isStale != true) return _TravelStatus.ok;
+  if (missingCoords) return _TravelStatus.missingCoords;
+  if (recomputeStalled) return _TravelStatus.recomputeStalled;
+  return _TravelStatus.recomputing;
+}
+
 class _TravelRow extends StatelessWidget {
   const _TravelRow({
     required this.travel,
@@ -1922,9 +1961,7 @@ class _TravelRow extends StatelessWidget {
     required this.segmentsReady,
     this.segment,
     this.tripId,
-    this.missingSegment = false,
-    this.recomputeStalled = false,
-    this.missingCoords = false,
+    this.status = _TravelStatus.ok,
   });
 
   final Travel? travel;
@@ -1933,26 +1970,17 @@ class _TravelRow extends StatelessWidget {
   final bool segmentsReady;
   final TripSegment? segment;
   final String? tripId;
-  final bool missingSegment;
-  final bool recomputeStalled;
-  final bool missingCoords;
+  final _TravelStatus status;
 
   @override
   Widget build(BuildContext context) {
     final railLineColor = Theme.of(context).colorScheme.outlineVariant;
     final seg = segment;
-    final needsStatus = missingSegment || seg?.isStale == true;
     Widget pill = TravelPill(
       travel: travel,
       segment: seg,
       missing: seg == null && travel == null,
-      statusLabel: needsStatus
-          ? (missingCoords
-                ? '缺座標，無法計算車程'
-                : recomputeStalled
-                ? '車程待更新'
-                : '車程重新計算中')
-          : null,
+      statusLabel: status.label,
     );
     final id = tripId;
     final canEdit = seg != null || segmentsReady;
@@ -1967,11 +1995,7 @@ class _TravelRow extends StatelessWidget {
           segment: seg,
           fromEntryId: fromEntryId,
           toEntryId: toEntryId,
-          initialMode: travel?.type,
-          initialSubmode: travel?.submode,
-          initialMin: travel?.min,
-          initialSource: travel?.source,
-          initialNoTravel: travel?.sameplace ?? false,
+          travel: travel,
         ),
         borderRadius: BorderRadius.circular(TpRadius.md),
         child: pill,

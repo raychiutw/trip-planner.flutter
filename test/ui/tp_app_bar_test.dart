@@ -272,7 +272,6 @@ void main() {
                     onPressed: () {},
                     child: const Icon(Icons.more_horiz),
                   ),
-                  const TpToolbarActionSurface(icon: Icons.person),
                   TpToolbarActionGroup(
                     children: [
                       TpToolbarIconButton(
@@ -307,11 +306,8 @@ void main() {
         reason: '$reason：工具列玻璃圓鈕',
       );
 
-      // 動作表面與群組容器沒有覆寫參數，各自獨立改過。
-      for (final key in [
-        'tp-toolbar-action-surface',
-        'tp-toolbar-action-group',
-      ]) {
+      // 群組容器沒有覆寫參數，獨立改過。
+      for (final key in ['tp-toolbar-action-group']) {
         final container = tester.widget<GlassContainer>(
           find.byKey(ValueKey(key)),
         );
