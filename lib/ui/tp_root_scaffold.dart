@@ -88,15 +88,20 @@ class TpRootScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
-            child: _TpRootBand(
-              key: const ValueKey('tp-root-tab-band'),
-              edge: _TpBandEdge.bottom,
-              onMedia: header.platformViewBackdrop,
-              // 與原本 0.55 / 0.45 的三段漸層等價:前 55% 是膠囊帶,其餘羽化。
-              solidExtent:
-                  (TpRootTabGeometry.clearance(context) + TpSpacing.s4) * 0.55,
-              featherExtent:
-                  (TpRootTabGeometry.clearance(context) + TpSpacing.s4) * 0.45,
+            child: Builder(
+              builder: (context) {
+                final bandHeight =
+                    TpRootTabGeometry.clearance(context) + TpSpacing.s4;
+                // 與原本 0.55 / 0.45 的三段漸層等價:前 55% 是膠囊帶,其餘羽化。
+                final solid = bandHeight * _tabBandSolidRatio;
+                return _TpRootBand(
+                  key: const ValueKey('tp-root-tab-band'),
+                  edge: _TpBandEdge.bottom,
+                  onMedia: header.platformViewBackdrop,
+                  solidExtent: solid,
+                  featherExtent: bandHeight - solid,
+                );
+              },
             ),
           ),
           Positioned(
@@ -340,6 +345,9 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
 }
 
 enum _TpBandEdge { top, bottom }
+
+/// 底部帶純色區占帶高的比例;其餘羽化。
+const _tabBandSolidRatio = 0.55;
 
 /// 帶狀遮蔽:對膠囊底下捲過去的內容做漸進模糊與淡出。頂部(浮動 header)與
 /// 底部(root tab bar)是同一套參數、方向相反,所以只有這一個 widget。

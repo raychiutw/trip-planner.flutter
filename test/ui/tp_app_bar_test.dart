@@ -1100,18 +1100,26 @@ void main() {
     );
     await tester.pump();
 
-    // 一個 icon 動作 + 關閉鈕 = 兩個 44pt slot + 一個 8pt 間距,再加 16pt 外距。
-    final expected =
-        TpToolbarSlots.actionsWidth(captured, [
-          TpToolbarIconButton(
-            icon: CupertinoIcons.share,
-            tooltip: '分享',
-            onPressed: () {},
-          ),
-          const SizedBox(),
-        ]) +
-        TpSpacing.s4;
-    expect(expected, 2 * TpSpacing.tapMin + TpSpacing.s2 + TpSpacing.s4);
+    // 一個 icon 動作 + 關閉鈕 = 兩個 44pt slot + 一個 8pt 間距,再加 16pt 外距
+    // = 112。期望值寫死數字,不用實作常數算(算法改錯會跟著錯)。
+    const expected = 112.0;
+    expect(
+      TpToolbarSlots.actionsWidth(captured, [
+            TpToolbarIconButton(
+              icon: CupertinoIcons.share,
+              tooltip: '分享',
+              onPressed: () {},
+            ),
+            TpToolbarGlassButton(
+              tooltip: '關閉',
+              onPressed: () {},
+              child: const Icon(CupertinoIcons.xmark),
+            ),
+          ]) +
+          TpSpacing.s4,
+      expected,
+      reason: '關閉鈕是一般的玻璃 icon 動作,寬度算法要一致',
+    );
 
     final actionsBox = tester.widget<SizedBox>(
       find.byKey(const ValueKey('tp-app-bar-actions')),

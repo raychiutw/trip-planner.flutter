@@ -344,6 +344,27 @@ void main() {
     expect(taps, 1, reason: '膠囊仍要可點');
   });
 
+  testWidgets('底部 root tab 帶不吃觸控:帶內仍可捲動', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = _boundarySize;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final boundaryKey = GlobalKey();
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _scene(boundaryKey: boundaryKey, controller: controller),
+    );
+
+    final band = tester.getRect(find.byKey(const ValueKey('tp-root-tab-band')));
+    // 起手點落在帶的上緣附近(膠囊 tab bar 之上、帶之內)。
+    final gapPoint = Offset(band.center.dx, band.top + 8);
+    await tester.dragFrom(gapPoint, const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(controller.offset, greaterThan(0), reason: '底部帶內起手的拖曳要穿透到底下的內容');
+  });
+
   for (final fallback in const [
     (label: '提高對比', highContrast: true, reduceTransparency: false),
     (label: '降低透明度', highContrast: false, reduceTransparency: true),
