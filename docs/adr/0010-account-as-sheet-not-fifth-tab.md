@@ -7,13 +7,12 @@ status: accepted
 P0 的 shell 是**五個** root branch(`1106e18`「5-tab shell/router」),第五個就是 `/account`。
 `1bdf683`(finalize HIG four-tab experience)把它拿掉,#96 的 contract 階段再清掉殘留的
 第五 branch dead code。現在 `StatefulShellRoute.indexedStack` 底下只有四個
-`StatefulShellBranch` —— 聊天、行程、地圖、收藏(`lib/app/router.dart:334`、`:346`、
-`:441`、`:454`)。
+`StatefulShellBranch` —— 聊天、行程、地圖、收藏(`lib/app/router.dart`)。
 
 決定:root branch 固定四個,Account 從內容頁 Header 的 44pt `person.crop.circle` 開啟一個
 **自帶 Navigation Stack 的 sheet**(`DESIGN.md:98`)。`/account`、`/settings/*` 與
-`/developer/apps*` 這些 deep link 不再是獨立畫面,而是經 `accountSheetAlias` 轉成目前位置的
-`?account=<page>` query(`lib/app/router.dart:47`、`:131`–`:180`),由 shell 在**目前
+`/developer/apps*` 這些 deep link 不再是獨立畫面,而是經 `legacy_aliases.dart` 的 `accountAliases` 表與 `accountSheetLocation` 轉成目前位置的
+`?account=<page>` query(`lib/app/router.dart`),由 shell 在**目前
 branch 上**開出對應的 sheet 頁面。
 
 理由不是「tab 不夠放」,而是 Account 與其他四個 tab 不是同一種東西。聊天 / 行程 / 地圖 /
@@ -52,9 +51,8 @@ Account 的 deep link 有兩層深的(`/settings/developer-apps/new`):沒有共�
 
 - **改回第五 tab 不是加一個 branch 而已**,要同時動 shell 結構與所有 deep link ——
   `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 全部建在
-  `accountSheetAlias` → `?account=<page>` 這條轉換上(`lib/app/router.dart:131`–`:180`、
-  `:300`–`:308`),shell 端則靠 `accountPage` / `accountReturnLocation` 兩個參數接手
-  (`lib/app/router.dart:330`–`:331`)。
+  `accountSheetLocation` → `?account=<page>` 這條轉換上(`lib/app/legacy_aliases.dart`),shell 端則靠 `accountPage` / `accountReturnLocation` 兩個參數接手
+  (`lib/app/router.dart`)。
 
 - **sheet 內只有一個 `Navigator`**(`sheetNavigatorKey`,`lib/app/adaptive.dart:763`),compact
   的近滿版 sheet 與 regular 的置中 form sheet 共用同一顆。設定子頁在同一個 stack push
@@ -70,8 +68,9 @@ Account 的 deep link 有兩層深的(`/settings/developer-apps/new`):沒有共�
   (`:107`–`:111`)。任何把 Account 改成蓋掉 shell 內容的實作(包含改回 branch)都會破壞它,
   改動前先確認這條還守得住。
 
-- **同一條 `/account` 在不同 branch 開,回程位置不同。** router 用 `accountSheetOrigin` 記住
-  最後一個非 Account 的 shell 內容位置(`lib/app/router.dart:46`–`:48`、`:60`–`:63`),關閉時
+- **同一條 `/account` 在不同 branch 開,回程位置不同。** router 的 `accountSheetOrigin()` 取
+  redirect 當下的目前位置,是 shell 內容頁就用它、不是(shell 外全螢幕頁)就回 `/trips`
+  (`lib/app/router.dart`;2026-09-05 #268 起不再另外記「上一個 shell 頁」),關閉時
   `router.go(_withoutAccount(uri))` 把 `account` query 拿掉回到原位
   (`lib/features/shell/app_shell.dart:303`–`:308`)。這是刻意的 —— Account 沒有自己的「首頁」,
   它永遠是某個位置上的一層覆蓋。

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tripline/app/legacy_aliases.dart';
 
 void main() {
   test('正式主題只保留系統語意色與單一 tint 契約', () {
@@ -365,18 +366,12 @@ void main() {
       "path: '/trips'",
       "path: '/map'",
       "path: '/favorites'",
-      "path: '/account'",
-      "path: '/account/appearance'",
-      "path: '/settings/appearance'",
     ]) {
       expect(source, contains(path), reason: path);
     }
-    expect(
-      RegExp(
-        r"path: '/(?:account/appearance|settings/appearance)'[\s\S]{0,120}"
-        r"accountSheetAlias\(state, 'appearance'\)",
-      ).allMatches(source),
-      hasLength(2),
-    );
+    // 帳號 alias 現在是資料表:兩條 Appearance alias 都指到同一頁。
+    expect(accountAliases['/account'], 'root');
+    expect(accountAliases['/account/appearance'], 'appearance');
+    expect(accountAliases['/settings/appearance'], 'appearance');
   });
 }
