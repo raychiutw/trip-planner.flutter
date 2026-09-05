@@ -53,6 +53,22 @@ ResponseBody jsonResponseBody(
   );
 }
 
+class _RefreshingSource implements BearerTokenSource {
+  _RefreshingSource(this._token);
+  String? _token;
+  int refreshCalls = 0;
+
+  @override
+  Future<String?> accessToken() async => _token;
+
+  @override
+  Future<bool> refresh() async {
+    refreshCalls++;
+    _token = 'new';
+    return true;
+  }
+}
+
 ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
   '<!doctype html><title>Attention Required</title>',
   200,
@@ -527,6 +543,45 @@ void main() {
         ),
       );
       expect(adapter.recordedRequests, hasLength(2));
+    });
+  });
+
+  group('streaming GET + Bearer', () {
+    test('getTextStream 遇 Bearer 401 且 refresh 成功 → 帶新 token 重送一次', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          jsonEncode({
+            'error': {'code': 'AUTH_REQUIRED', 'message': 'login'},
+          }),
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+        ResponseBody.fromString(
+          'data: {"status":"completed"}\n\n',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/event-stream'],
+          },
+        ),
+      ]);
+      final source = _RefreshingSource('old');
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+        bearerSource: source,
+      );
+
+      final text = await client.getTextStream('/requests/7/events').join();
+
+      expect(text, 'data: {"status":"completed"}\n\n');
+      expect(source.refreshCalls, 1);
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(
+        adapter.recordedRequests.last.headers['Authorization'],
+        'Bearer new',
+      );
     });
   });
 
