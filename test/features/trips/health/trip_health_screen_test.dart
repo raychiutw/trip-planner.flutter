@@ -130,6 +130,18 @@ void main() {
     when(
       () => repository.fetchPoiHealth('trip-1'),
     ).thenAnswer((_) async => noPoiIssues);
+    // 工單預設還在跑、SSE 永不吐事件:不會落入輪詢留 timer。
+    when(() => requestsRepo.fetchRequest(any())).thenAnswer(
+      (_) async => const TripRequest(
+        id: 43,
+        tripId: 'trip-1',
+        message: '健檢',
+        status: RequestStatus.processing,
+      ),
+    );
+    when(
+      () => requestsRepo.watchRequestEvents(any()),
+    ).thenAnswer((_) => StreamController<TripRequestEvent>().stream);
   });
 
   testWidgets('顯示 completed report findings 與 POI health 摘要', (tester) async {
@@ -303,6 +315,33 @@ void main() {
       findsNothing,
       reason: '不能再顯示會讓人以為還在跑的提示',
     );
+  });
+
+  testWidgets('app 回前景時補讀工單;已終結就換成終結態', (tester) async {
+    var calls = 0;
+    when(
+      () => repository.fetchHealthReport('trip-1'),
+    ).thenAnswer((_) async => pendingReport());
+    when(() => requestsRepo.fetchRequest(43)).thenAnswer((_) async {
+      calls++;
+      return TripRequest(
+        id: 43,
+        tripId: 'trip-1',
+        message: '健檢',
+        status: calls >= 2 ? RequestStatus.failed : RequestStatus.processing,
+        terminalReason: calls >= 2 ? TerminalReason.timedOut : null,
+      );
+    });
+    await pumpScreen(tester);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(calls, 2, reason: '回前景要重讀一次工單');
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
   });
 
   testWidgets('空行程顯示 guard 並停用開始健檢', (tester) async {

@@ -14,14 +14,12 @@ import '../../../app/app_loading_skeleton.dart';
 import '../../../app/error_message.dart';
 import '../../../app/app_feedback.dart';
 import '../../../models/day.dart';
-import '../../../models/trip_request.dart';
 import '../../../models/trip.dart';
 import '../../../models/trip_health.dart';
 import '../../../models/trip_poi_health.dart';
+import '../../requests/request_lifecycle.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
-
-const _pollInterval = Duration(seconds: 5);
 
 /// Shows the latest AI health report and lets the user start a new check.
 class TripHealthScreen extends ConsumerStatefulWidget {
@@ -41,7 +39,6 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   List<TripDay> _days = const [];
   TripHealthReport? _report;
   TripPoiHealthReport? _poiHealth;
-  Timer? _pollTimer;
   var _generation = 0;
 
   int get _entryCount =>
@@ -53,39 +50,34 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   /// 不經 PATCH,完成 hook 不跑 —— 這個狀態要同時看兩邊才判斷得出來。
   bool _requestTerminated = false;
 
-  /// 停止等待 —— **不中止 AI**(後端 ADR-0007)。
-  ///
-  /// 標不掉也照樣把畫面換成終結態,但文案不假裝成功。
+  /// 停止等待 —— 走工單 lifecycle;它不中止 AI,只讓使用者脫身。
   Future<void> _stopWaiting() async {
     final requestId = _report?.requestId;
     if (requestId == null) return;
-    var confirmed = true;
-    try {
-      await ref.read(requestsRepositoryProvider).stopWaiting(requestId);
-    } on Object {
-      confirmed = false;
-    }
+    final confirmed = await ref
+        .read(requestLifecycleProvider(requestId).notifier)
+        .stopWaiting();
     if (!mounted) return;
-    _pollTimer?.cancel();
     setState(() => _requestTerminated = true);
     if (confirmed) return;
-    showAppError(context, '已停止等待，但伺服器沒有確認。它可能仍在處理。');
+    showAppError(context, kStopWaitingUnconfirmedMessage);
   }
 
-  /// 報告還是 pending 時順手看一下對應的 request 有沒有已經被收掉。
-  Future<void> _syncRequestTermination() async {
-    final requestId = _report?.requestId;
-    if (requestId == null || !_isPending || _requestTerminated) return;
+  /// 工單終結了 → 再讀一次報告表;還停在 pending 就是後端牆鐘收掉的情況。
+  Future<void> _onRequestTerminal() async {
+    final generation = _generation;
+    final tripId = widget.tripId;
+    TripHealthReport? next;
     try {
-      final row = await ref
-          .read(requestsRepositoryProvider)
-          .fetchRequest(requestId);
-      if (!mounted || !row.status.isTerminal) return;
-      _pollTimer?.cancel();
-      setState(() => _requestTerminated = true);
-    } on Object {
-      // 查不到就當它還在跑,下一輪再看。
+      next = await ref.read(tripRepositoryProvider).fetchHealthReport(tripId);
+    } on Exception {
+      next = null; // 讀不到就沿用現況
     }
+    if (!_isCurrent(generation, tripId)) return;
+    setState(() {
+      if (next != null) _report = next;
+      _requestTerminated = _isPending;
+    });
   }
 
   @override
@@ -98,7 +90,6 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   void didUpdateWidget(covariant TripHealthScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId) {
-      _pollTimer?.cancel();
       _trip = null;
       _days = const [];
       _report = null;
@@ -111,7 +102,6 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   @override
   void dispose() {
     _generation++;
-    _pollTimer?.cancel();
     super.dispose();
   }
 
@@ -119,7 +109,6 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     if (!mounted || _starting) return;
     final generation = ++_generation;
     final tripId = widget.tripId;
-    _pollTimer?.cancel();
     setState(() {
       _loading = true;
       _error = null;
@@ -139,9 +128,8 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
         _days = results[1] as List<TripDay>;
         _report = report;
         _poiHealth = results[3] as TripPoiHealthReport;
+        _requestTerminated = false;
       });
-      _schedulePoll(report, generation, tripId);
-      unawaited(_syncRequestTermination());
     } on Exception catch (error) {
       if (!_isCurrent(generation, tripId)) return;
       setState(() => _error = _healthErrorMessage(error, '載入健檢資料失敗，請稍後重試'));
@@ -156,10 +144,10 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     if (_starting || _isPending || _entryCount == 0) return;
     final generation = ++_generation;
     final tripId = widget.tripId;
-    _pollTimer?.cancel();
     setState(() {
       _starting = true;
       _error = null;
+      _requestTerminated = false;
     });
     try {
       final report = await ref
@@ -167,7 +155,6 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
           .startHealthCheck(tripId);
       if (!_isCurrent(generation, tripId)) return;
       setState(() => _report = report);
-      _schedulePoll(report, generation, tripId);
     } on Exception catch (error) {
       if (!_isCurrent(generation, tripId)) return;
       setState(() => _error = _healthErrorMessage(error, '觸發健檢失敗，請稍後再試'));
@@ -181,29 +168,14 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   bool _isCurrent(int generation, String tripId) =>
       mounted && generation == _generation && widget.tripId == tripId;
 
-  void _schedulePoll(TripHealthReport? report, int generation, String tripId) {
-    _pollTimer?.cancel();
-    if (!_isCurrent(generation, tripId) ||
-        report?.status != TripHealthStatus.pending) {
-      return;
-    }
-    _pollTimer = Timer(_pollInterval, () async {
-      try {
-        final next = await ref
-            .read(tripRepositoryProvider)
-            .fetchHealthReport(tripId);
-        if (!_isCurrent(generation, tripId) || next == null) return;
-        setState(() => _report = next);
-        _schedulePoll(next, generation, tripId);
-      } on Exception {
-        if (!_isCurrent(generation, tripId)) return;
-        _schedulePoll(_report, generation, tripId);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final requestId = _report?.requestId;
+    if (_isPending && requestId != null && !_requestTerminated) {
+      ref.listen(requestLifecycleProvider(requestId), (_, next) {
+        if (next is RequestTerminal) unawaited(_onRequestTerminal());
+      });
+    }
     final tripTitle = _trip?.title ?? _trip?.name ?? '行程';
     return Scaffold(
       appBar: TpAppBar(
