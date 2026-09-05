@@ -34,6 +34,10 @@ import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
+import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
+import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
+import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
+import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
@@ -168,6 +172,85 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  testWidgets('已登入時 admin/manage 與停留點 web aliases 經真 GoRouter 到達正確畫面', (
+    tester,
+  ) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    for (final (path, screen) in <(String, Type)>[
+      ('/admin', TripsListScreen),
+      ('/manage', ChatScreen),
+      ('/trip/trip-1/stop/11/edit', EntryEditRouteScreen),
+      ('/trip/trip-1/stop/11/change-poi', EntryPoiScreen),
+      ('/trip/trip-1/stop/11/copy', EntryActionRouteScreen),
+      ('/trip/trip-1/stop/11/move', EntryActionRouteScreen),
+    ]) {
+      router.go(path);
+      if (screen == ChatScreen) {
+        // 聊天畫面有持續動畫,pumpAndSettle 不會停。
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+      } else {
+        await tester.pumpAndSettle();
+      }
+      expect(find.byType(screen), findsOneWidget, reason: path);
+      expect(find.byType(LoginScreen), findsNothing, reason: path);
+    }
+
+    router.go('/trip/trip-1/stop/11/map');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TripMapScreen>(find.byType(TripMapScreen)).initialEntryId,
+      11,
+    );
+
+    router.go('/trip/trip-1/stop/11');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TripTimelineScreen>(find.byType(TripTimelineScreen))
+          .initialEntryId,
+      11,
+    );
+  });
+
+  testWidgets('從 shell 外全螢幕頁深連結帳號 sheet,關掉後回 /trips(不是上一個 shell 頁)', (
+    tester,
+  ) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    router.go('/trips/trip-1');
+    await tester.pumpAndSettle();
+    router.go('/collab/trip-1');
+    await tester.pumpAndSettle();
+    router.go('/account/sessions');
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountSessionsScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/trips');
+  });
+
   testWidgets('未登入時 redirect 到 /welcome', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);

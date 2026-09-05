@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/providers.dart';
-import 'auth_redirect_policy.dart';
-import 'legacy_aliases.dart';
 import '../features/auth/account_flow_screens.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/oauth_consent_screen.dart';
@@ -37,6 +35,8 @@ import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
 import '../models/oauth.dart';
+import 'auth_redirect_policy.dart';
+import 'legacy_aliases.dart';
 
 final tripMapCanvasBuilderProvider = Provider<TripMapCanvasBuilder?>((ref) {
   return null;

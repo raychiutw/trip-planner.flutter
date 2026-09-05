@@ -76,31 +76,60 @@ void main() {
     expect(withoutAccount(Uri.parse('/trips?account=root')), '/trips');
   });
 
-  test('alias 表:每個舊路徑都有對應改寫,帳號類另列', () {
-    expect(
-      redirectAliases.keys,
-      containsAll([
-        '/admin',
-        '/manage',
-        '/trips/new',
-        '/explore',
-        '/add-to-trip',
-        '/trip/:tripId/stop/:entryId/edit',
-      ]),
-    );
-    expect(redirectAliases['/admin']!(const {}, Uri.parse('/admin')), '/trips');
-    expect(
-      redirectAliases['/add-to-trip']!(
-        const {},
-        Uri.parse('/add-to-trip?place_id=p1'),
-      ),
-      '/favorites/add-to-trip?place_id=p1',
-    );
-    expect(
-      accountAliases['/settings/developer-apps/new'],
-      'developer-apps/new',
-    );
-    expect(accountAliases['/developer/apps'], 'developer-apps');
+  test('alias 表:每一行的目標都釘住;表就是規格,少一行或改錯都要紅', () {
+    const params = {'tripId': 't 1', 'entryId': '11'};
+    final expected = <String, String>{
+      '/admin': '/trips',
+      '/manage': '/chat',
+      '/trips/new': '/new-trip',
+      '/explore': '/favorites/explore',
+      '/add-to-trip': '/favorites/add-to-trip?place_id=p1',
+      '/trip/:tripId': '/trips/t%201',
+      '/trip/:tripId/map': '/trips/t%201/map',
+      '/trip/:tripId/notes': '/trips/t%201/notes',
+      '/trip/:tripId/print': '/trips/t%201/print',
+      '/trip/:tripId/health': '/trips/t%201/health',
+      '/trip/:tripId/audit': '/trips/t%201/audit',
+      '/trip/:tripId/collab': '/collab/t%201',
+      '/trip/:tripId/edit': '/edit-trip/t%201',
+      '/trip/:tripId/add-entry':
+          '/trips/t%201/entries/new?place_id=p1&mode=search',
+      '/trip/:tripId/add-stop':
+          '/trips/t%201/entries/new?place_id=p1&mode=search',
+      '/trip/:tripId/add-custom-stop':
+          '/trips/t%201/entries/new?place_id=p1&mode=custom',
+      '/trip/:tripId/stop/:entryId': '/trips/t%201?place_id=p1&entry=11',
+      '/trip/:tripId/stop/:entryId/map':
+          '/trips/t%201/map?place_id=p1&entry=11',
+      '/trip/:tripId/stop/:entryId/edit': '/trips/t%201/entries/11/edit',
+      '/trip/:tripId/stop/:entryId/change-poi': '/trips/t%201/entries/11/pois',
+      '/trip/:tripId/stop/:entryId/copy': '/trips/t%201/entries/11/copy',
+      '/trip/:tripId/stop/:entryId/move': '/trips/t%201/entries/11/move',
+    };
+    expect(redirectAliases.keys.toSet(), expected.keys.toSet());
+    for (final MapEntry(key: path, value: target) in expected.entries) {
+      final uri = Uri.parse(
+        '${path.replaceAll(':tripId', 't%201').replaceAll(':entryId', '11')}?place_id=p1',
+      );
+      expect(redirectAliases[path]!(params, uri), target, reason: path);
+    }
+
+    expect(accountAliases, const {
+      '/account': 'root',
+      '/account/appearance': 'appearance',
+      '/account/sessions': 'sessions',
+      '/account/connected-apps': 'connected-apps',
+      '/account/notifications': 'notifications',
+      '/settings/appearance': 'appearance',
+      '/settings/profile': 'profile',
+      '/settings/notifications': 'notifications',
+      '/settings/sessions': 'sessions',
+      '/settings/connected-apps': 'connected-apps',
+      '/settings/developer-apps': 'developer-apps',
+      '/settings/developer-apps/new': 'developer-apps/new',
+      '/developer/apps': 'developer-apps',
+      '/developer/apps/new': 'developer-apps/new',
+    });
     expect(
       accountAliases.keys.toSet().intersection(redirectAliases.keys.toSet()),
       isEmpty,
