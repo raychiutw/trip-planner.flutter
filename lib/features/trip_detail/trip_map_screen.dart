@@ -75,7 +75,11 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
   SelectedDay? _lastSharedDay;
 
   /// 地圖現在顯示「全部」:那是地圖自己的模式,時間軸寫進來的某一天不接手。
+  /// 隨自己的點按翻轉,**不傳給 view**(傳了就會把自己的點按當成重設)。
   bool _showingAllDays = false;
+
+  /// 解析當下共用值就是「全部」:只在換行程 / 換深連結時重算,給 view 當起點。
+  bool _initialAllDays = false;
 
   /// 地圖 view 目前顯示的那一天(null = 全部);自己寫進共用狀態的值不必再接手,
   /// 否則 view 會把 initialDayNum 的變動當成深連結而重新載入路線。
@@ -103,8 +107,10 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
     _lastSharedDay = shared;
     _initialDayNum = widget.initialDayNum ?? shared.dayNumFor(widget.tripId);
     // 共用值是「全部」而路由沒指定日期 → 重建的地圖一開就是「全部」。
-    _showingAllDays =
+    _initialAllDays =
         widget.initialDayNum == null && shared.showsAllDaysFor(widget.tripId);
+    _showingAllDays = _initialAllDays;
+    _shownDayNum = null;
   }
 
   @override
@@ -163,7 +169,7 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             days: days,
             initialEntryId: widget.initialEntryId,
             initialDayNum: _initialDayNum,
-            initialAllDays: _showingAllDays,
+            initialAllDays: _initialAllDays,
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             locationSettingsOpener: widget.locationSettingsOpener,

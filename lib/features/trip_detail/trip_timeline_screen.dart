@@ -84,8 +84,8 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   int? _activeDayNum;
   String? _editingTripId;
 
-  /// 上一次 build 看到的共用選取日;只有它「變了」才接手,避免路由帶來的
-  /// `?day=` 在同一格被舊的共用值蓋掉。
+  /// 上一格 build 是不是前景分支:切回前景那一格要補讀背景期間的共用值。
+  bool _wasActiveBranch = true;
 
   @override
   void initState() {
@@ -120,7 +120,6 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
   }
 
   /// 路由查詢參數優先；缺席時才由共用選取日供值。
-  /// 同時記下當下的共用值,這一格 build 不會再拿它蓋掉查詢參數。
   void _resolveActiveDayNum() {
     _activeDayNum =
         widget.initialDayNum ??
@@ -166,10 +165,18 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
     // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
     // 重建，才接得住其他 tab 期間變動的共用選取日（保活的分支子樹本身不重建）。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
-    // 背景時 riverpod 暫停這個訂閱;回到前景才會補送其他分支寫的值。
     // 用 listen 不用 watch:時間軸每捲過一天就寫一次,不該整頁重建。
-    // 時間軸沒有「全部」:共用值是「全部」時維持原本那一天。
+    // riverpod 只暫停 watch、不暫停 listen,所以背景時自己擋掉,切回前景那一格
+    // 再補讀一次。時間軸沒有「全部」:共用值是「全部」時維持原本那一天。
+    if (isActiveBranch && !_wasActiveBranch) {
+      final sharedDayNum = ref
+          .read(selectedDayProvider)
+          .dayNumFor(widget.tripId);
+      if (sharedDayNum != null) _activeDayNum = sharedDayNum;
+    }
+    _wasActiveBranch = isActiveBranch;
     ref.listen(selectedDayProvider, (_, next) {
+      if (!TickerMode.valuesOf(context).enabled) return;
       final sharedDayNum = next.dayNumFor(widget.tripId);
       if (sharedDayNum == null || sharedDayNum == _activeDayNum) return;
       setState(() => _activeDayNum = sharedDayNum);

@@ -941,6 +941,40 @@ void main() {
     expect(find.byKey(const ValueKey('entry-card-999')), findsOneWidget);
   });
 
+  testWidgets('選「全部」後再點 DAY 2 → 停在 DAY 2,共用值也是第 2 天', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+  });
+
+  testWidgets('共用值是第 2 天時開地圖再點「全部」→ 停在「全部」', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialSelectedDay: const SelectedTripDay(tripId: 'trip-1', dayNum: 2),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 2);
+
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
+  });
+
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {
     final repository = _StubMapRepository();
     await tester.pumpWidget(_buildScreen([_dayOne], mapRepository: repository));
