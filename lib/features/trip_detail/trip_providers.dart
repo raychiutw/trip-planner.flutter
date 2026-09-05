@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
@@ -37,6 +38,33 @@ final entryDetailProvider =
       return ref
           .watch(tripRepositoryProvider)
           .watchEntry(tripId: key.tripId, entryId: key.entryId);
+    });
+
+/// 編輯表單要的停留點來源:比種子(打開表單時那一版)新的 detail 才採用 ——
+/// SWR 會先吐舊快取,不能讓它把 OCC version 倒退;404 表示這個停留點已被刪除。
+typedef EntryEditSource = ({
+  TimelineEntry? fresher,
+  bool deleted,
+  Object? error,
+});
+
+final entryEditSourceProvider = Provider.autoDispose
+    .family<EntryEditSource, ({String tripId, int entryId, int seedVersion})>((
+      ref,
+      key,
+    ) {
+      final detail = ref.watch(
+        entryDetailProvider((tripId: key.tripId, entryId: key.entryId)),
+      );
+      final value = detail.value;
+      final error = detail.error;
+      return (
+        fresher: value != null && value.version >= key.seedVersion
+            ? value
+            : null,
+        deleted: error is ApiError && error.status == 404,
+        error: error,
+      );
     });
 
 /// 行程交通段（交通編輯用;含 segment id/version,供 travel pill 比對與 PATCH）。
