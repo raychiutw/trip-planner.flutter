@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/trip_request.dart';
 
@@ -24,7 +25,10 @@ sealed class RequestLifecycleState {
 
 /// 還在等(open / processing)。
 final class RequestInFlight extends RequestLifecycleState {
-  const RequestInFlight({super.request});
+  const RequestInFlight({super.request, this.authExpired = false});
+
+  /// 讀取遇 401:不再等了,畫面該提示重新登入。
+  final bool authExpired;
 }
 
 /// 已終結。[serverConfirmed] 為 false 表示是本機先終結(停止等待沒送到)。
@@ -64,6 +68,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       _events?.cancel();
       _lifecycle?.dispose();
     });
+    // 需要 WidgetsBinding;純 unit test 記得先 TestWidgetsFlutterBinding.ensureInitialized()。
     _lifecycle = AppLifecycleListener(onResume: () => unawaited(_refetch()));
     // build 回傳前不能碰 state,所以排到下一個 microtask 再起跑。
     unawaited(Future<void>.microtask(_start));
@@ -89,6 +94,11 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       }
       state = RequestInFlight(request: row);
       return false;
+    } on ApiError catch (e) {
+      if (e.status != 401 || _disposed) return _disposed;
+      _events?.cancel();
+      state = RequestInFlight(request: state.request, authExpired: true);
+      return true; // 沒登入就別再等了
     } on Object {
       return _disposed; // 暫時性錯誤:當作還在跑
     }
@@ -96,21 +106,27 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
 
   void _watchEvents() {
     if (_disposed || state is RequestTerminal) return;
-    _events = ref
-        .read(requestsRepositoryProvider)
-        .watchRequestEvents(requestId)
-        .listen(
-          (event) {
-            if (!event.isTerminal) return;
-            _terminate(
-              event.status ?? RequestStatus.failed,
-              event.error != null ? TerminalReason.error : null,
-            );
-          },
-          onError: (Object _) => _fallbackToPolling(),
-          onDone: _fallbackToPolling,
-          cancelOnError: true,
+    final Stream<TripRequestEvent> stream;
+    try {
+      stream = ref
+          .read(requestsRepositoryProvider)
+          .watchRequestEvents(requestId);
+    } on Object {
+      unawaited(_fallbackToPolling());
+      return;
+    }
+    _events = stream.listen(
+      (event) {
+        if (!event.isTerminal) return;
+        _terminate(
+          event.status ?? RequestStatus.failed,
+          event.error != null ? TerminalReason.error : null,
         );
+      },
+      onError: (Object _) => _fallbackToPolling(),
+      onDone: _fallbackToPolling,
+      cancelOnError: true,
+    );
   }
 
   /// SSE 收不到終結就改輪詢;等待由 [requestPollWaitProvider] 決定。
