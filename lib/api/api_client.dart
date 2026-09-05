@@ -121,9 +121,11 @@ class ApiClient {
         followRedirects: followRedirects,
       ),
     );
+    // 登入 / 註冊的 raw POST:401 就是憑證錯,不走 Bearer refresh 重送 ——
+    // 否則密碼打錯會觸發 refresh,refresh 失敗還會把 OAuth session 清掉。
     final decision = await _retryDecision(
       response,
-      useBearer: auth.useBearer,
+      useBearer: false,
       retryableMethod: false,
       isRetryAttempt: isRetryAttempt,
     );
@@ -907,6 +909,15 @@ class ApiClient {
       cancelToken: cancelToken,
     );
 
+    // 429 / edge block 的 body 不是事件流:先收掉再等 Retry-After,
+    // 不要讓連線在最長 30 秒的等待期間一直開著。
+    // 已是重送就不會再重送,body 要留給下面轉 ApiError 用。
+    var drained = false;
+    if (!isRetryAttempt &&
+        ((response.statusCode ?? 0) == 429 || _isEdgeBlockPage(response))) {
+      await response.data?.stream.drain<void>();
+      drained = true;
+    }
     final decision = await _retryDecision(
       response,
       useBearer: auth.useBearer,
@@ -915,7 +926,7 @@ class ApiClient {
       cancelToken: cancelToken,
     );
     if (decision is! retry.NoRetry) {
-      await response.data?.stream.drain<void>();
+      if (!drained) await response.data?.stream.drain<void>();
       yield* _getTextStream(
         path,
         query: query,

@@ -267,6 +267,41 @@ void main() {
       expect(sequencedAdapter.recordedRequests, hasLength(1));
     });
 
+    for (final c in [
+      (
+        name: 'PATCH',
+        call: (ApiClient c) => c.patch('/entries/e1', body: {'x': 1}),
+      ),
+      (name: 'DELETE', call: (ApiClient c) => c.delete('/entries/e1')),
+    ]) {
+      test('429 ${c.name} 不 retry 直接丟 ApiError', () async {
+        final sequencedAdapter = SequencedResponseAdapter([
+          jsonResponseBody(
+            429,
+            {
+              'error': {'code': 'SYS_RATE_LIMIT', 'message': '請稍後再試'},
+            },
+            extraHeaders: {
+              'retry-after': ['0'],
+            },
+          ),
+          jsonResponseBody(200, {'ok': true}),
+        ]);
+        final client = ApiClient(
+          sessionStore: sessionStore,
+          dio: Dio()..httpClientAdapter = sequencedAdapter,
+        );
+
+        await expectLater(
+          c.call(client),
+          throwsA(
+            isA<ApiError>().having((error) => error.status, 'status', 429),
+          ),
+        );
+        expect(sequencedAdapter.recordedRequests, hasLength(1));
+      });
+    }
+
     test('200 text/html GET 讀 Retry-After 後 retry 一次', () async {
       final adapter = SequencedResponseAdapter([
         htmlBlockResponseBody(),

@@ -53,7 +53,7 @@ flutter run                                           # 連 prod API — 一律�
 ### ApiClient 行為規則(每條有對應測試,改動需同步測試)
 
 1. 非 2xx → throw `ApiError`(三層 fallback 解析,見 `api_error.dart`)
-2. 三條分支共用同一個「同參數重送一次」(`lib/api/api_client.dart:795-823`,`isRetryAttempt` 限一次):429 僅 GET/HEAD(讀 `Retry-After`,cap 30s)、edge block page(2xx 但 `text/html`)同條件、Bearer 401 且 `refresh()` 成功則重送**不分 method**。SSE 版 `_getTextStream` 同規則(`:884-911`),改一處要兩處一起改。「mutation 絕不 retry」是錯的說法
+2. 「同參數重送一次」的決策是純函式 `decideRetry`(`lib/api/retry_policy.dart`),`ApiClient._retryDecision` 包一層做等待 / refresh,一般請求、SSE `_getTextStream`、`postForResponse`(登入 / 註冊 raw POST,不做 401 refresh)三個站點共用,`isRetryAttempt` 限一次:429 僅 GET/HEAD(讀 `Retry-After`,cap 30s)、edge block page(2xx 但 `text/html`)同條件、Bearer 401 且 `refresh()` 成功則重送**不分 method**。改重試規則只改 `retry_policy.dart` 一處。「mutation 絕不 retry」是錯的說法
 3. 204/空 body → `null`
 4. 路徑參數 `Uri.encodeComponent`
 
