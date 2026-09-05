@@ -20,6 +20,7 @@ import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'notes/note_edit_sheet.dart';
+import 'notes/note_field_spec.dart';
 import 'reorder_helpers.dart';
 import 'trip_providers.dart';
 import 'widgets/reorderable_row.dart';
@@ -240,108 +241,83 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen>
               ),
           ],
         ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.flights,
-          icon: CupertinoIcons.airplane,
-          title: '航班',
-          // mobile 預設展開航班（對齊 web TripNotesPage 行為）
-          initiallyExpanded: true,
-          rows: [
-            for (final f in notes.flights)
-              _NoteRowData(
-                id: f.id,
-                version: f.version,
-                editFields: f.toEditFields(),
-                display: _FlightRow(f),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.lodgings,
-          icon: CupertinoIcons.bed_double,
-          title: '住宿',
-          rows: [
-            for (final l in notes.lodgings)
-              _NoteRowData(
-                id: l.id,
-                version: l.version,
-                editFields: l.toEditFields(),
-                display: _LodgingRow(l),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.reservations,
-          icon: CupertinoIcons.ticket,
-          title: '預訂',
-          rows: [
-            for (final r in notes.reservations)
-              _NoteRowData(
-                id: r.id,
-                version: r.version,
-                editFields: r.toEditFields(),
-                display: _ReservationRow(r),
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.pretrip,
-          icon: CupertinoIcons.list_bullet,
-          title: '行前須知',
-          aiActions: [
-            const _NoteAiAction(type: NoteGenerationType.tips, label: '一般'),
-            _NoteAiAction(
-              type: NoteGenerationType.lodgingTips,
-              label: '住宿',
-              enabled: notes.lodgings.isNotEmpty,
-              disabledText: '需先新增住宿',
-            ),
-          ],
-          aiBusyTypes: aiBusyTypes,
-          onGenerateNotes: _startAiGeneration,
-          exclusionDocType: NoteGenerationType.tips,
-          exclusionCount: _aiExclusionCounts[NoteGenerationType.tips] ?? 0,
-          rows: [
-            for (final p in notes.pretripNotes)
-              _NoteRowData(
-                id: p.id,
-                version: p.version,
-                editFields: p.toEditFields(),
-                display: _PretripNoteRow(p),
-                canReassignToAi: p.canReassignToAi,
-              ),
-          ],
-        ),
-        _NotesSection(
-          tripId: widget.tripId,
-          section: NoteSection.emergency,
-          icon: Icons.support_agent_outlined,
-          title: '緊急聯絡',
-          aiActions: const [
-            _NoteAiAction(type: NoteGenerationType.emergency, label: 'AI'),
-          ],
-          aiBusyTypes: aiBusyTypes,
-          onGenerateNotes: _startAiGeneration,
-          exclusionDocType: NoteGenerationType.emergency,
-          exclusionCount: _aiExclusionCounts[NoteGenerationType.emergency] ?? 0,
-          rows: [
-            for (final c in notes.emergencyContacts)
-              _NoteRowData(
-                id: c.id,
-                version: c.version,
-                editFields: c.toEditFields(),
-                display: _EmergencyContactRow(c),
-                canReassignToAi: c.canReassignToAi,
-              ),
-          ],
-        ),
+        for (final section in NoteSection.values)
+          _NotesSection(
+            tripId: widget.tripId,
+            section: section,
+            // mobile 預設展開航班(對齊 web TripNotesPage 行為)
+            initiallyExpanded: section == NoteSection.flights,
+            aiActions: [
+              for (final type in section.generationTypes)
+                _NoteAiAction(
+                  type: type,
+                  disabledText: type.disabledReason(
+                    hasLodgings: notes.lodgings.isNotEmpty,
+                  ),
+                ),
+            ],
+            aiBusyTypes: aiBusyTypes,
+            onGenerateNotes: _startAiGeneration,
+            exclusionCounts: {
+              for (final type in section.generationTypes)
+                type: _aiExclusionCounts[type] ?? 0,
+            },
+            rows: _rowsFor(section, notes),
+          ),
       ],
     );
   }
+
+  List<_NoteRowData> _rowsFor(NoteSection section, TripNotes notes) =>
+      switch (section) {
+        NoteSection.flights => [
+          for (final f in notes.flights)
+            _NoteRowData(
+              id: f.id,
+              version: f.version,
+              editFields: f.toEditFields(),
+              display: _FlightRow(f),
+            ),
+        ],
+        NoteSection.lodgings => [
+          for (final l in notes.lodgings)
+            _NoteRowData(
+              id: l.id,
+              version: l.version,
+              editFields: l.toEditFields(),
+              display: _LodgingRow(l),
+            ),
+        ],
+        NoteSection.reservations => [
+          for (final r in notes.reservations)
+            _NoteRowData(
+              id: r.id,
+              version: r.version,
+              editFields: r.toEditFields(),
+              display: _ReservationRow(r),
+            ),
+        ],
+        NoteSection.pretrip => [
+          for (final p in notes.pretripNotes)
+            _NoteRowData(
+              id: p.id,
+              version: p.version,
+              editFields: p.toEditFields(),
+              display: _PretripNoteRow(p),
+              canReassignToAi: p.canReassignToAi,
+            ),
+        ],
+        NoteSection.emergency => [
+          for (final c in notes.emergencyContacts)
+            _NoteRowData(
+              id: c.id,
+              version: c.version,
+              editFields: c.toEditFields(),
+              display: _EmergencyContactRow(c),
+              canReassignToAi: c.canReassignToAi,
+            ),
+        ],
+      };
 
   Future<void> _startAiGeneration(NoteGenerationType type) async {
     // 守衛只看**這一種**:全域守衛會讓「按鈕按得下去但什麼都沒送出」——
@@ -555,16 +531,13 @@ class _NoteRowData {
 
 /// AI 生成按鈕資料；只在可生成的 section 展開後顯示。
 class _NoteAiAction {
-  const _NoteAiAction({
-    required this.type,
-    required this.label,
-    this.enabled = true,
-    this.disabledText,
-  });
+  const _NoteAiAction({required this.type, this.disabledText});
 
   final NoteGenerationType type;
-  final String label;
-  final bool enabled;
+  String get label => type.label;
+  bool get enabled => disabledText == null;
+
+  /// 不能生成的原因;有值就是 disabled。
   final String? disabledText;
 }
 
@@ -962,33 +935,35 @@ class _NoteExclusionsListState extends ConsumerState<_NoteExclusionsList> {
   }
 }
 
+const _sectionIcons = <NoteSection, IconData>{
+  NoteSection.flights: CupertinoIcons.airplane,
+  NoteSection.lodgings: CupertinoIcons.bed_double,
+  NoteSection.reservations: CupertinoIcons.ticket,
+  NoteSection.pretrip: CupertinoIcons.list_bullet,
+  NoteSection.emergency: Icons.support_agent_outlined,
+};
+
 /// 單一 accordion section：hairline 卡片 + ExpansionTile header（icon/標題/count badge）。
 /// 區內 rows 可拖曳排序、點擊編輯、左滑刪除;底部「+ 新增」。
 class _NotesSection extends ConsumerWidget {
   const _NotesSection({
     required this.tripId,
     required this.section,
-    required this.icon,
-    required this.title,
     required this.rows,
     this.initiallyExpanded = false,
     this.aiActions = const [],
     this.aiBusyTypes = const {},
     this.onGenerateNotes,
-    this.exclusionCount = 0,
-    this.exclusionDocType,
+    this.exclusionCounts = const {},
   });
 
   final String tripId;
   final NoteSection section;
-  final IconData icon;
-  final String title;
+  IconData get icon => _sectionIcons[section]!;
+  String get title => noteSectionTitles[section]!;
 
-  /// 這一區有幾則被排除。**0 就不顯示入口**,版面一如現狀。
-  final int exclusionCount;
-
-  /// 排除清單走的 docType(與維護權的 section 不是同一組字)。
-  final NoteGenerationType? exclusionDocType;
+  /// 每一種生成類型各有幾則被排除。**0 就不顯示入口**,版面一如現狀。
+  final Map<NoteGenerationType, int> exclusionCounts;
   final List<_NoteRowData> rows;
   final bool initiallyExpanded;
   final List<_NoteAiAction> aiActions;
@@ -1074,18 +1049,24 @@ class _NotesSection extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (exclusionCount > 0 && exclusionDocType != null) ...[
-                const Spacer(),
-                TextButton(
-                  key: ValueKey('notes-exclusions-${section.name}'),
-                  onPressed: () => showNoteExclusionsSheet(
-                    context,
-                    tripId: tripId,
-                    docType: exclusionDocType!,
+              if (exclusionCounts.values.any((n) => n > 0)) const Spacer(),
+              for (final MapEntry(key: type, value: count)
+                  in exclusionCounts.entries)
+                if (count > 0)
+                  TextButton(
+                    key: ValueKey('notes-exclusions-${type.pathSegment}'),
+                    onPressed: () => showNoteExclusionsSheet(
+                      context,
+                      tripId: tripId,
+                      docType: type,
+                    ),
+                    // 同一區有兩種生成時,標出是哪一種的排除清單。
+                    child: Text(
+                      exclusionCounts.length > 1
+                          ? '${type.label}已排除 $count 項'
+                          : '已排除 $count 項',
+                    ),
                   ),
-                  child: Text('已排除 $exclusionCount 項'),
-                ),
-              ],
             ],
           ),
           childrenPadding: const EdgeInsets.fromLTRB(
