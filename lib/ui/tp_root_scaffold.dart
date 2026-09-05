@@ -14,13 +14,11 @@ class TpRootHeaderConfig {
     required this.title,
     this.leading,
     this.actions = const <Widget>[],
-    this.platformViewBackdrop = false,
   });
 
   final Widget title;
   final Widget? leading;
   final List<Widget> actions;
-  final bool platformViewBackdrop;
 }
 
 abstract final class TpRootGeometry {
@@ -59,6 +57,7 @@ class TpRootScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onMedia = TpMediaBackdropScope.of(context);
     return Scaffold(
       extendBody: true,
       body: Stack(
@@ -73,7 +72,7 @@ class TpRootScaffold extends StatelessWidget {
             height: TpRootGeometry.bandBottom(context),
             child: _TpRootHeaderBand(
               key: const ValueKey('tp-root-header-band'),
-              onMedia: header.platformViewBackdrop,
+              onMedia: onMedia,
             ),
           ),
           // 底部同一套。root tab bar 自己是玻璃，但玻璃只糊它蓋住的那一塊，
@@ -87,7 +86,7 @@ class TpRootScaffold extends StatelessWidget {
             height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
             child: _TpRootTabBand(
               key: const ValueKey('tp-root-tab-band'),
-              onMedia: header.platformViewBackdrop,
+              onMedia: onMedia,
             ),
           ),
           Positioned(
@@ -109,6 +108,7 @@ class TpRootGlassHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onMedia = TpMediaBackdropScope.of(context);
     assert(
       config.actions.length <= 2 &&
           (config.actions.length <= 1 ||
@@ -130,7 +130,7 @@ class TpRootGlassHeader extends StatelessWidget {
       key: const ValueKey('tp-root-glass-header'),
       height: TpRootGeometry.headerHeight,
       child: TpBarForeground(
-        onMedia: config.platformViewBackdrop,
+        onMedia: onMedia,
         child: Row(
           children: [
             // 返回鍵與標題是**同一組**,包在同一顆膠囊裡 —— 對照 iOS 26
@@ -146,10 +146,10 @@ class TpRootGlassHeader extends StatelessWidget {
                 child: KeyedSubtree(
                   key: const ValueKey('tp-glass-surface'),
                   child: TpGlassSurface(
-                    platformViewBackdrop: config.platformViewBackdrop,
+                    platformViewBackdrop: onMedia,
                     glassSettings: tpNavigationGlassSettings(
                       context,
-                      recipe: config.platformViewBackdrop
+                      recipe: onMedia
                           ? TpNavigationGlassRecipe.platformView
                           : TpNavigationGlassRecipe.regular,
                     ),

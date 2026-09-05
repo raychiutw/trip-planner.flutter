@@ -246,4 +246,35 @@ void main() {
     expect(glass.settings!.lightIntensity, lessThanOrEqualTo(0.25));
     expect(glass.settings!.ambientStrength, lessThanOrEqualTo(0.04));
   });
+
+  group('TpMediaBackdropScope', () {
+    testWidgets('缺席時預設非媒體背景;宣告後子樹讀得到', (tester) async {
+      late bool outside;
+      late bool inside;
+      await tester.pumpWidget(
+        Column(
+          textDirection: TextDirection.ltr,
+          children: [
+            Builder(
+              builder: (context) {
+                outside = TpMediaBackdropScope.of(context);
+                return const SizedBox();
+              },
+            ),
+            TpMediaBackdropScope(
+              onMedia: true,
+              child: Builder(
+                builder: (context) {
+                  inside = TpMediaBackdropScope.of(context);
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+      expect(outside, isFalse);
+      expect(inside, isTrue);
+    });
+  });
 }

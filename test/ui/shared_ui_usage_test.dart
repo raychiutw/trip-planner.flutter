@@ -151,4 +151,25 @@ void main() {
 
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
+
+  test('媒體背景由 TpMediaBackdropScope 宣告;features 不傳 bool、tab bar 不用魔術索引', () {
+    final tabBar = File(
+      'lib/features/shell/apple_root_tab_bar.dart',
+    ).readAsStringSync();
+    expect(
+      RegExp(r'selectedIndex\s*==\s*\d').hasMatch(tabBar),
+      isFalse,
+      reason: '「是不是地圖分頁」不能用整數索引猜,要讀 TpMediaBackdropScope。',
+    );
+    final offenders = <String>[];
+    for (final entity in Directory('lib/features').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      if (RegExp(
+        r'platformViewBackdrop:\s*(?:true|false)\b',
+      ).hasMatch(entity.readAsStringSync())) {
+        offenders.add(entity.path);
+      }
+    }
+    expect(offenders, isEmpty, reason: '媒體背景是 scope,不是 widget 之間手傳的 bool。');
+  });
 }

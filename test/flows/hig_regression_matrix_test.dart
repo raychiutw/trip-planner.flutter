@@ -353,20 +353,22 @@ void main() {
                 disableAnimations: state.reduceMotion,
                 highContrast: state.increasedContrast,
               ),
-              child: TpRootScaffold(
-                header: TpRootHeaderConfig(
-                  title: const Text('地圖'),
-                  platformViewBackdrop: true,
-                  actions: [
-                    TpToolbarIconButton(
-                      icon: CupertinoIcons.share,
-                      tooltip: '分享',
-                      onPressed: () {},
-                    ),
-                  ],
-                ),
-                body: const TpRootScrollView(
-                  slivers: [SliverToBoxAdapter(child: Text('地圖內容'))],
+              child: TpMediaBackdropScope(
+                onMedia: true,
+                child: TpRootScaffold(
+                  header: TpRootHeaderConfig(
+                    title: const Text('地圖'),
+                    actions: [
+                      TpToolbarIconButton(
+                        icon: CupertinoIcons.share,
+                        tooltip: '分享',
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                  body: const TpRootScrollView(
+                    slivers: [SliverToBoxAdapter(child: Text('地圖內容'))],
+                  ),
                 ),
               ),
             ),
