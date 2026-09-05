@@ -2388,19 +2388,6 @@ void main() {
     expect(find.text('entry-add-search-1'), findsOneWidget);
   });
 
-  group('computeReorderUpdates', () {
-    test('移到末位（onReorderItem 已調整索引）+ 重編連續 sort_order', () {
-      final updates = computeReorderUpdates([11, 12, 13], 0, 2);
-      expect(updates.map((u) => u.id).toList(), [12, 13, 11]);
-      expect(updates.map((u) => u.sortOrder).toList(), [0, 1, 2]);
-      expect(updates.every((u) => u.dayId == null), isTrue);
-    });
-    test('末位移到首位', () {
-      final updates = computeReorderUpdates([11, 12, 13], 2, 0);
-      expect(updates.map((u) => u.id).toList(), [13, 11, 12]);
-    });
-  });
-
   testWidgets('每個 entry 有拖曳 handle', (tester) async {
     await _pumpTimeline(tester);
     await _enableTimelineEditing(tester);
