@@ -108,7 +108,6 @@ class ApiClient {
     Object? body,
     Map<String, dynamic>? query,
     bool followRedirects = true,
-    bool isRetryAttempt = false,
   }) async {
     final auth = await _authHeadersFor('POST');
     final response = await _dio.request<dynamic>(
@@ -121,23 +120,8 @@ class ApiClient {
         followRedirects: followRedirects,
       ),
     );
-    // 登入 / 註冊的 raw POST:401 就是憑證錯,不走 Bearer refresh 重送 ——
-    // 否則密碼打錯會觸發 refresh,refresh 失敗還會把 OAuth session 清掉。
-    final decision = await _retryDecision(
-      response,
-      useBearer: false,
-      retryableMethod: false,
-      isRetryAttempt: isRetryAttempt,
-    );
-    if (decision is! retry.NoRetry) {
-      return postForResponse(
-        path,
-        body: body,
-        query: query,
-        followRedirects: followRedirects,
-        isRetryAttempt: true,
-      );
-    }
+    // 登入 / 註冊的 raw POST 不重送:429 是 mutation,401 就是憑證錯(走 Bearer
+    // refresh 會重放憑證,refresh 失敗還會把 OAuth session 清掉)。只轉錯誤。
     _throwIfFailed(response, acceptRedirects: !followRedirects);
     return response;
   }
@@ -734,7 +718,7 @@ class ApiClient {
     message: '伺服器暫時無法回應，請稍後重試',
   );
 
-  /// 四個站點共用的重送決策;RetryAfterRefresh 已把 refresh 做掉,失敗即 NoRetry。
+  /// 一般請求與 SSE 共用的重送決策;RetryAfterRefresh 已把 refresh 做掉,失敗即 NoRetry。
   Future<retry.RetryDecision> _retryDecision(
     Response<dynamic> response, {
     required bool useBearer,

@@ -47,13 +47,13 @@ flutter run                                           # 連 prod API — 一律�
 
 - 登入走 `postForResponse` 讀 `set-cookie`,解析 `tripline_session` 後存進 flutter_secure_storage
 - Cookie 模式由 `ApiClient` 統一帶 `Cookie:`;**mutating request 必帶 `Origin: kTriplineOrigin`**(缺少 → 403)。origin 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', ...)`(`lib/api/api_client.dart:21-24`),不得寫死字面值,本機後端靠 `--dart-define` 覆寫
-- Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`_authHeadersFor`,`lib/api/api_client.dart:946-968`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
+- Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`ApiClient._authHeadersFor`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
 - `currentUser()` 401 回 null 不 throw;登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
 
 ### ApiClient 行為規則(每條有對應測試,改動需同步測試)
 
 1. 非 2xx → throw `ApiError`(三層 fallback 解析,見 `api_error.dart`)
-2. 「同參數重送一次」的決策是純函式 `decideRetry`(`lib/api/retry_policy.dart`),`ApiClient._retryDecision` 包一層做等待 / refresh,一般請求、SSE `_getTextStream`、`postForResponse`(登入 / 註冊 raw POST,不做 401 refresh)三個站點共用,`isRetryAttempt` 限一次:429 僅 GET/HEAD(讀 `Retry-After`,cap 30s)、edge block page(2xx 但 `text/html`)同條件、Bearer 401 且 `refresh()` 成功則重送**不分 method**。改重試規則只改 `retry_policy.dart` 一處。「mutation 絕不 retry」是錯的說法
+2. 「同參數重送一次」的決策是純函式 `decideRetry`(`lib/api/retry_policy.dart`),`ApiClient._retryDecision` 包一層做等待 / refresh,一般請求與 SSE `_getTextStream` 兩個站點共用,`isRetryAttempt` 限一次;`postForResponse`(登入 / 註冊 raw POST)不重送、只走 `_throwIfFailed` 轉錯誤:429 僅 GET/HEAD(讀 `Retry-After`,cap 30s)、edge block page(2xx 但 `text/html`)同條件、Bearer 401 且 `refresh()` 成功則重送**不分 method**。改重試規則只改 `retry_policy.dart` 一處。「mutation 絕不 retry」是錯的說法
 3. 204/空 body → `null`
 4. 路徑參數 `Uri.encodeComponent`
 
@@ -67,7 +67,7 @@ Widget 取色一律走 `Theme.of(context).colorScheme`；柔褐 tint 是唯一�
 
 ### OCC
 
-帶 `version` 的 model:後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用,離線佇列走三方 rebase(`_tryRebase`,`lib/api/api_client.dart:541-575`;決策見 ADR-0007)。行程本身無 `version`,更新走 `PUT /trips/:id` 且不送 `expectedVersion`。
+帶 `version` 的 model:後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用,離線佇列走三方 rebase(`ApiClient._tryRebase`;決策見 ADR-0007)。行程本身無 `version`,更新走 `PUT /trips/:id` 且不送 `expectedVersion`。
 
 ## 測試慣例
 
