@@ -105,5 +105,49 @@ void main() {
       find.byKey(const ValueKey('travel-min')),
     );
     expect(minField.controller?.text, '12', reason: 'Travel.min 帶進分鐘欄');
+    expect(
+      tester
+          .widget<ChoiceChip>(find.byKey(const ValueKey('travel-mode-walking')))
+          .selected,
+      isTrue,
+      reason: 'Travel.type 帶進交通方式',
+    );
+  });
+
+  testWidgets('Travel.sameplace 帶進「不需計算路程」', (tester) async {
+    final repository = _MockTripRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () => showTravelEditSheet(
+                  context,
+                  tripId: 'trip-1',
+                  fromEntryId: 11,
+                  toEntryId: 12,
+                  travel: const Travel(type: 'car', sameplace: true),
+                ),
+                child: const Text('開啟'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('travel-mode-no-travel')),
+          )
+          .selected,
+      isTrue,
+    );
   });
 }

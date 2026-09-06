@@ -20,7 +20,12 @@ Future<void> showTravelEditSheet(
   int? toEntryId,
   Travel? travel,
 }) async {
-  // 不變式由 TravelEditSheet 的建構子守,這裡不再重複 assert。
+  // 建構子也守同一條不變式;這裡先擋,才會在呼叫點同步失敗,而不是 sheet
+  // 已經開到一半才在 builder 裡炸。
+  assert(
+    segment != null || (fromEntryId != null && toEntryId != null),
+    'Missing segment creation requires fromEntryId and toEntryId.',
+  );
   final controller = AppSheetFormController();
   try {
     await showAppFormSheet(
