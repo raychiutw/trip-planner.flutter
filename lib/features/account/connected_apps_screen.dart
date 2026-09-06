@@ -127,13 +127,13 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   }
 
   Future<void> _confirmRevoke(ConnectedApp app) async {
-    final shouldRevoke = await showAppConfirm(
+    final shouldRevoke = await showAppDestructiveConfirm(
+      source: TpDestructiveConfirmSource.direct,
       context,
       title: '撤銷 ${app.appName}？',
       message:
           '這會立即撤銷 ${app.appName} 的存取權與既有授權，應用程式將無法再讀取你的 Tripline 資料。這項操作無法復原；之後必須重新授權。',
       confirmLabel: '撤銷',
-      isDestructive: true,
     );
     if (!shouldRevoke || !mounted) return;
 

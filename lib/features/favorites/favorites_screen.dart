@@ -524,13 +524,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     _confirmingSelected = true;
     _pendingFavoriteIds.addAll(ids);
     try {
-      final confirmed = await showAppConfirm(
+      final confirmed = await showAppDestructiveConfirm(
+        source: TpDestructiveConfirmSource.direct,
         context,
         title: '刪除 ${ids.length} 個收藏？',
         message: '將刪除${names.join('、')}。刪除後無法復原。',
         confirmLabel: '刪除',
         cancelLabel: '保留',
-        isDestructive: true,
       );
       if (!confirmed || !mounted) return;
 
@@ -594,13 +594,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   ) async {
     if (!_pendingFavoriteIds.add(favorite.id)) return;
     try {
-      final confirmed = await showAppConfirm(
+      final confirmed = await showAppDestructiveConfirm(
+        source: TpDestructiveConfirmSource.direct,
         context,
         title: '刪除「${favorite.displayName}」？',
         message: '將從收藏移除「${favorite.displayName}」。刪除後無法復原。',
         confirmLabel: '刪除',
         cancelLabel: '保留',
-        isDestructive: true,
       );
       if (!confirmed || !context.mounted) return;
 

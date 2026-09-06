@@ -2,13 +2,19 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// ADR-0008:刪除不可復原,確認一律用破壞性樣式。
+/// ADR-0008 / CODING_STANDARDS「破壞性確認一律經 showAppDestructiveConfirm」。
 ///
-/// 掃 lib/features 內每一個 `showAppConfirm(` 呼叫:確認鈕是「刪除」的,必須帶
-/// `isDestructive: true`。非「刪除」的(登出、撤銷、設為正選…)不在此限。
+/// 掃 lib/features 內每一個 `showAppConfirm(` 呼叫:
+/// 1. 不得自己帶 `isDestructive: true`(要破壞性樣式就走 wrapper,來源必填);
+/// 2. 確認鈕是「刪除」「移除」的,一律不得直接用 `showAppConfirm`。
+/// 非這兩個動詞的(登出、撤銷、設為正選…)不在此限。
+///
+/// 已知邊界:只認單引號字面值 `confirmLabel: '刪除'`;`confirmLabel` 來自變數的
+/// 呼叫抓不到,目前沒有這種寫法。
 void main() {
-  test('所有「刪除」確認都走破壞性樣式', () {
+  test('破壞性確認一律經 showAppDestructiveConfirm,features 不自己組', () {
     final offenders = <String>[];
+    final label = RegExp(r'''confirmLabel:\s*['"](刪除|移除)['"]''');
     for (final entity in Directory('lib/features').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
       final source = entity.readAsStringSync();
@@ -19,14 +25,19 @@ void main() {
         final end = _matchingParen(source, start + 'showAppConfirm'.length);
         final call = source.substring(start, end);
         searchFrom = end;
-        if (!call.contains("confirmLabel: '刪除'")) continue;
-        if (!call.contains('isDestructive: true')) {
-          final line = '\n'.allMatches(source.substring(0, start)).length + 1;
-          offenders.add('${entity.path}:$line');
+        final line = '\n'.allMatches(source.substring(0, start)).length + 1;
+        if (call.contains('isDestructive: true')) {
+          offenders.add('${entity.path}:$line 自己帶 isDestructive');
+        } else if (label.hasMatch(call)) {
+          offenders.add('${entity.path}:$line 刪除 / 移除沒走 wrapper');
         }
       }
     }
-    expect(offenders, isEmpty, reason: '「刪除」是永久銷毀,確認鈕必須是破壞性樣式(ADR-0008)。');
+    expect(
+      offenders,
+      isEmpty,
+      reason: '破壞性確認一律經 showAppDestructiveConfirm(source: …)(ADR-0008)。',
+    );
   });
 }
 

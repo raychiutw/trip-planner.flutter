@@ -460,13 +460,13 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
 
   Future<bool> _save() async {
     if (_hasRemoteConflict) {
-      final overwrite = await showAppConfirm(
+      final overwrite = await showAppDestructiveConfirm(
+        source: TpDestructiveConfirmSource.direct,
         context,
         title: '保留你的版本？',
         message: '協作者也修改了相同欄位。繼續會以你目前的內容覆蓋對方版本。',
         confirmLabel: '保留我的版本',
         cancelLabel: '繼續編輯',
-        isDestructive: true,
       );
       if (!mounted || !overwrite) return false;
       _descriptionConflict = false;

@@ -125,12 +125,12 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final shouldLogout = await showAppConfirm(
+    final shouldLogout = await showAppDestructiveConfirm(
+      source: TpDestructiveConfirmSource.direct,
       context,
       title: '登出帳號',
       message: '確定要登出嗎？',
       confirmLabel: '登出',
-      isDestructive: true,
     );
     if (shouldLogout && mounted) {
       await ref.read(authStateProvider.notifier).logout();
@@ -472,12 +472,12 @@ class _SessionDetailsState extends State<_SessionDetails> {
 
   Future<void> _confirmRevoke() async {
     final sessionName = widget.session.uaSummary ?? '此裝置';
-    final confirmed = await showAppConfirm(
+    final confirmed = await showAppDestructiveConfirm(
+      source: TpDestructiveConfirmSource.direct,
       context,
       title: '登出 $sessionName？',
       message: '這會立即移除此裝置的登入狀態，之後必須重新登入。這項操作無法復原。',
       confirmLabel: '登出',
-      isDestructive: true,
     );
     if (!confirmed || !mounted) return;
     setState(() {

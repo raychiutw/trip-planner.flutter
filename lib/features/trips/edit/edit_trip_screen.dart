@@ -191,14 +191,14 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
   }) async {
     final label = 'DAY ${day.dayNum}・${day.displayTitle}';
     if (requiresConfirmation) {
-      final confirmed = await showAppConfirm(
+      final confirmed = await showAppDestructiveConfirm(
+        source: TpDestructiveConfirmSource.direct,
         context,
         title: '刪除行程日',
         message:
             '確定要刪除「$label」嗎？'
             '這會刪除當天所有景點，並重新編號後續行程日。此動作無法復原。',
         confirmLabel: '刪除',
-        isDestructive: true,
       );
       if (!confirmed || !mounted) return;
     }

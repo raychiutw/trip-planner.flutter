@@ -583,12 +583,12 @@ class _DeveloperAppFormScreenState
   Future<void> _confirmDelete() async {
     final app = _app;
     if (app == null || _isSubmitting) return;
-    final confirmed = await showAppConfirm(
+    final confirmed = await showAppDestructiveConfirm(
+      source: TpDestructiveConfirmSource.direct,
       context,
       title: '刪除 ${app.appName}？',
       message: '這會停用 ${app.appName} 的 OAuth 憑證，所有既有連線都將失效。這項操作無法復原。',
       confirmLabel: '刪除',
-      isDestructive: true,
     );
     if (!confirmed || !mounted) return;
     setState(() {
