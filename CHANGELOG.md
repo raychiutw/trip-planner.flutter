@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.25.8] - 2026-09-06
+
+### 內部
+
+- 固定 bar 刪除零引用的 `TpToolbarActionSurface`;選單堆疊獨立成 `tp_more_menu.dart`。移動段編輯 sheet 改收 `Travel` 物件,列的狀態改用 enum;行為不變。
+
 ## [0.23.1] - 2026-08-25
 
 ### 修正
