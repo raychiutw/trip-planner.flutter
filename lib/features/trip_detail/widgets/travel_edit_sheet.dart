@@ -6,6 +6,7 @@ import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/app_feedback.dart';
+import '../../../models/entry.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -17,12 +18,10 @@ Future<void> showTravelEditSheet(
   TripSegment? segment,
   int? fromEntryId,
   int? toEntryId,
-  String? initialMode,
-  String? initialSubmode,
-  int? initialMin,
-  String? initialSource,
-  bool initialNoTravel = false,
+  Travel? travel,
 }) async {
+  // 建構子也守同一條不變式;這裡先擋,才會在呼叫點同步失敗,而不是 sheet
+  // 已經開到一半才在 builder 裡炸。
   assert(
     segment != null || (fromEntryId != null && toEntryId != null),
     'Missing segment creation requires fromEntryId and toEntryId.',
@@ -40,11 +39,7 @@ Future<void> showTravelEditSheet(
         segment: segment,
         fromEntryId: fromEntryId,
         toEntryId: toEntryId,
-        initialMode: initialMode,
-        initialSubmode: initialSubmode,
-        initialMin: initialMin,
-        initialSource: initialSource,
-        initialNoTravel: initialNoTravel,
+        travel: travel,
         formController: controller,
       ),
     );
@@ -62,11 +57,7 @@ class TravelEditSheet extends ConsumerStatefulWidget {
     this.segment,
     this.fromEntryId,
     this.toEntryId,
-    this.initialMode,
-    this.initialSubmode,
-    this.initialMin,
-    this.initialSource,
-    this.initialNoTravel = false,
+    this.travel,
     this.formController,
   }) : assert(
          segment != null || (fromEntryId != null && toEntryId != null),
@@ -77,11 +68,9 @@ class TravelEditSheet extends ConsumerStatefulWidget {
   final TripSegment? segment;
   final int? fromEntryId;
   final int? toEntryId;
-  final String? initialMode;
-  final String? initialSubmode;
-  final int? initialMin;
-  final String? initialSource;
-  final bool initialNoTravel;
+
+  /// 缺 segment row 時的初始值來源(時間軸上停留點自帶的移動段資料)。
+  final Travel? travel;
   final AppSheetFormController? formController;
 
   @override
@@ -102,15 +91,16 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
   @override
   void initState() {
     super.initState();
-    final mode = widget.segment?.mode ?? widget.initialMode;
-    final submode = widget.segment?.submode ?? widget.initialSubmode;
-    final source = widget.segment?.source ?? widget.initialSource;
+    final travel = widget.travel;
+    final mode = widget.segment?.mode ?? travel?.type;
+    final submode = widget.segment?.submode ?? travel?.submode;
+    final source = widget.segment?.source ?? travel?.source;
     _methodKey = travelMethodKey(mode, submode);
     _initialMethodKey = _methodKey;
     _initialSource = source;
-    _noTravel = widget.segment?.noTravel ?? widget.initialNoTravel;
+    _noTravel = widget.segment?.noTravel ?? travel?.sameplace ?? false;
     final option = _optionFor(_methodKey);
-    final currentMin = widget.segment?.min ?? widget.initialMin;
+    final currentMin = widget.segment?.min ?? travel?.min;
     _initialMin = currentMin;
     _min = TextEditingController(
       text: !option.automatic || source == 'manual'
