@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
@@ -13,7 +14,8 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockTripRepository extends Mock
+    implements TripRepository, AccountRepository {}
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -64,6 +66,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        accountRepositoryProvider.overrideWithValue(mockTripRepository),
         authRepositoryProvider.overrideWithValue(mockAuthRepository),
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),
@@ -151,6 +154,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        accountRepositoryProvider.overrideWithValue(mockTripRepository),
         authRepositoryProvider.overrideWithValue(mockAuthRepository),
         authStateProvider.overrideWith(
           () => _FakeAuthNotifier(loggedInUser, logoutCalls),

@@ -7,13 +7,15 @@ import 'package:mocktail/mocktail.dart';
 import 'dart:async';
 import 'dart:ui' show SemanticsAction;
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/account/developer_apps_screen.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockTripRepository extends Mock
+    implements TripRepository, AccountRepository {}
 
 void main() {
   late MockTripRepository mockTripRepository;
@@ -80,6 +82,7 @@ void main() {
         retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockTripRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -103,6 +106,7 @@ void main() {
         retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockTripRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
@@ -726,6 +730,7 @@ void main() {
       ProviderScope(
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockTripRepository),
         ],
         child: MaterialApp(
           theme: AppTheme.light(),

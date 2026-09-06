@@ -4,6 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/user.dart';
+import 'account_repository.dart';
 import 'api_client.dart';
 import 'auth_repository.dart';
 import 'cache/cache_store.dart';
@@ -51,6 +52,10 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final tripRepositoryProvider = Provider<TripRepository>(
   (ref) => TripRepository(client: ref.watch(apiClientProvider)),
+);
+
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(client: ref.watch(apiClientProvider)),
 );
 
 final requestsRepositoryProvider = Provider<RequestsRepository>(

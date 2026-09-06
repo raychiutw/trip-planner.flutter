@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
 import 'package:tripline/features/trip_detail/trip_pdf_service.dart';
@@ -18,7 +19,8 @@ import 'package:tripline/models/share.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockTripRepository extends Mock
+    implements TripRepository, AccountRepository {}
 
 class FakeTripPrintActions implements TripPrintActions {
   final printed = <TripPrintData>[];
@@ -127,6 +129,7 @@ void main() {
         retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
+          accountRepositoryProvider.overrideWithValue(repository),
           tripPrintActionsProvider.overrideWithValue(printActions),
           authStateProvider.overrideWith(() => FakeAuthNotifier(user)),
         ],
