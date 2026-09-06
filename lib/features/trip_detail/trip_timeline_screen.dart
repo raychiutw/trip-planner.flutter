@@ -1916,7 +1916,6 @@ bool _missingTravelCoords(TimelineEntry from, TimelineEntry to) {
   return missing(from) || missing(to);
 }
 
-/// travel pill 列：沿用 D1 的固定 rail + 內容起點，可編輯或補建交通 segment。
 /// 移動段這一列的狀態;由呼叫端一次算好,列本身只負責顯示。
 enum _TravelStatus {
   /// 沒有要提示的狀況。
@@ -1953,6 +1952,7 @@ _TravelStatus _travelStatusFor({
   return _TravelStatus.recomputing;
 }
 
+/// travel pill 列：沿用 D1 的固定 rail + 內容起點，可編輯或補建交通 segment。
 class _TravelRow extends StatelessWidget {
   const _TravelRow({
     required this.travel,
