@@ -224,7 +224,11 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
             : _trip == null
             ? _ErrorState(message: _error ?? '載入健檢資料失敗，請稍後重試', onRetry: _load)
             : _reportFetchFailed
-            ? _ErrorState(message: '健檢已結束，但報告讀取失敗，請重試', onRetry: _load)
+            // 重試只再讀報告表(不重載整頁):再失敗就還是這個狀態,不退回停滯。
+            ? _ErrorState(
+                message: '健檢已結束，但報告讀取失敗，請重試',
+                onRetry: _onRequestTerminal,
+              )
             : RefreshIndicator(
                 onRefresh: _starting ? () async {} : _load,
                 child: ListView(

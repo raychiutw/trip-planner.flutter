@@ -383,7 +383,31 @@ void main() {
 
     expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsNothing);
     expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
-    expect(reads, 3, reason: '重試就是再讀一次');
+    expect(reads, 3, reason: '重試就是再讀一次報告表');
+  });
+
+  testWidgets('報告表重試再失敗 → 仍是讀取失敗,不退回停滯面板', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      if (reads >= 2) throw Exception('offline');
+      return pendingReport();
+    });
+    await pumpScreen(tester);
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsNothing);
+    expect(reads, 3);
   });
 
   testWidgets('停止等待:伺服器沒確認 → 仍換成停滯態,且誠實提示', (tester) async {

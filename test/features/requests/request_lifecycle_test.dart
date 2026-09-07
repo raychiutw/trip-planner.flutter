@@ -526,4 +526,59 @@ void main() {
     final state = sub.read() as RequestTerminal;
     expect(state.status, RequestStatus.completed);
   });
+
+  test('SSE 終結事件補讀期間 stopWaiting → 不用 cancelled 蓋掉,等 row 回來以伺服器為準', () async {
+    var calls = 0;
+    final row = Completer<TripRequest>();
+    when(() => repo.fetchRequest(7)).thenAnswer((_) {
+      calls++;
+      return calls == 1
+          ? Future.value(_req(RequestStatus.processing))
+          : row.future;
+    });
+    when(() => repo.stopWaiting(7)).thenAnswer((_) async {});
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.failed));
+    await _flush();
+    expect(sub.read(), isA<RequestInFlight>(), reason: '補讀還在飛');
+
+    final confirmed = await c
+        .read(requestLifecycleProvider(7).notifier)
+        .stopWaiting();
+    expect(confirmed, isTrue);
+    expect(sub.read(), isA<RequestInFlight>(), reason: '伺服器已終結,不做本機 cancelled');
+
+    row.complete(
+      _req(RequestStatus.failed, reason: TerminalReason.needsConsent),
+    );
+    await _flush();
+    final state = sub.read() as RequestTerminal;
+    expect(state.terminalReason, TerminalReason.needsConsent);
+  });
+
+  test('SSE 終結事件的補讀與回前景的補讀共用同一個 in-flight', () async {
+    var calls = 0;
+    final row = Completer<TripRequest>();
+    when(() => repo.fetchRequest(7)).thenAnswer((_) {
+      calls++;
+      return calls == 1
+          ? Future.value(_req(RequestStatus.processing))
+          : row.future;
+    });
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+    for (final s in [AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(s);
+    }
+    await _flush();
+
+    expect(calls, 2, reason: '回前景共用飛行中的補讀,不另外打');
+    row.complete(_req(RequestStatus.completed));
+    await _flush();
+  });
 }

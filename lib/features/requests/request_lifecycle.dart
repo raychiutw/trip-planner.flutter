@@ -83,6 +83,10 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   Completer<void>? _resumed;
   Duration _pollDelay = kRequestPollInterval;
 
+  /// SSE 已送來終結事件、正在補讀 row:伺服器已經有結果,stopWaiting 不做本機
+  /// cancelled,等補讀回來以伺服器為準。
+  bool _terminalEventSeen = false;
+
   bool _stale(int run) => run != _run;
 
   @override
@@ -92,6 +96,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     _events = null;
     _inflight = null;
     _resumed = null;
+    _terminalEventSeen = false;
     _pollDelay = kRequestPollInterval;
     ref.onDispose(() {
       if (_run == run) _run++;
@@ -189,18 +194,10 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   Future<void> _terminateFromEvent(int run, TripRequestEvent event) async {
     _events?.cancel();
     _events = null;
-    try {
-      final row = await ref
-          .read(requestsRepositoryProvider)
-          .fetchRequest(requestId);
-      if (_stale(run) || state is RequestTerminal) return;
-      if (row.status.isTerminal) {
-        _terminate(row.status, row.terminalReason, request: row);
-        return;
-      }
-    } on Object {
-      // 補讀失敗:下面用事件內容終結。
-    }
+    _terminalEventSeen = true;
+    // 走 _refetch 共用 in-flight:回前景那一下撞上就共用同一次,不另外打。
+    // 回 true = row 已終結(state 已更新)或已作廢;false = 沒讀到 / 還沒終結。
+    if (await _refetch(run)) return;
     if (_stale(run) || state is RequestTerminal) return;
     _terminate(
       event.status ?? RequestStatus.failed,
@@ -260,8 +257,11 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     } on Object {
       confirmed = false;
     }
-    // 等 PATCH 的期間伺服器可能已經先終結:保留伺服器那一份。
-    if (_stale(run) || state is RequestTerminal) return true;
+    // 等 PATCH 的期間伺服器可能已經先終結(或終結事件已到、正在補讀):
+    // 保留伺服器那一份,不做本機 cancelled。
+    if (_stale(run) || state is RequestTerminal || _terminalEventSeen) {
+      return true;
+    }
     _terminate(
       RequestStatus.failed,
       TerminalReason.cancelled,
