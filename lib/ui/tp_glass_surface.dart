@@ -5,6 +5,34 @@ import '../app/accessibility_scope.dart';
 
 enum TpNavigationGlassRecipe { regular, platformView }
 
+/// 「這一段子樹在媒體背景上」(照片或地圖圖磚)的唯一宣告點。
+///
+/// 由地圖 route / root shell 設定一次;浮動 header、root tab bar、bottom
+/// accessory 各自讀它,不再用參數手傳 bool、也不用 tab 索引猜。缺席 = 非媒體。
+///
+/// 已知差異:root tab bar 掛在 shell 那一層,讀到的是 shell 依分支宣告的值;
+/// root 地圖的空 / 載入 / 錯誤狀態把 header 蓋回非媒體,tab bar 仍是媒體樣式
+/// (master 用索引判斷時就如此,依 ADR-0001 要真機目視才決定要不要改)。
+class TpMediaBackdropScope extends InheritedWidget {
+  const TpMediaBackdropScope({
+    super.key,
+    required this.onMedia,
+    required super.child,
+  });
+
+  final bool onMedia;
+
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<TpMediaBackdropScope>()
+          ?.onMedia ??
+      false;
+
+  @override
+  bool updateShouldNotify(TpMediaBackdropScope oldWidget) =>
+      oldWidget.onMedia != onMedia;
+}
+
 /// 依 Increased Contrast 與 Reduce Transparency 的個別系統狀態，
 /// 將任一 glass recipe 收斂為相同的不透明、無 blur accessibility fallback。
 LiquidGlassSettings tpResolveGlassSettings(

@@ -17,6 +17,7 @@ import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -873,6 +874,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
+  });
+
+  testWidgets('行程地圖自己宣告媒體背景 scope,不靠 shell', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    expect(
+      TpMediaBackdropScope.of(tester.element(find.byType(TpBottomAccessory))),
+      isTrue,
+    );
   });
 
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {

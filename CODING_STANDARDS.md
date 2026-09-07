@@ -238,7 +238,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
 - **alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
-- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：地圖分頁的 root tab bar 傳 `selectedIndex == 2`（`lib/features/shell/apple_root_tab_bar.dart:224`）、行程地圖傳 `true`（`lib/features/trip_detail/trip_map_screen.dart:142`）、bottom accessory 傳 `true`（`lib/ui/tp_bottom_accessory.dart:34`）。
+- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。
 
