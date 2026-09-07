@@ -7,6 +7,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
+import 'package:tripline/api/cache/cache_read_policy.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/session_store.dart';
 
@@ -105,7 +106,7 @@ void main() {
     ]);
   });
 
-  test('GET fallbackToCache:false → 有快取也不回退', () async {
+  test('GET noStore + 連線失敗 + 有快取 → 不回退,直接拋錯', () async {
     await cache.writeResponse(
       cacheKeyFor('GET', '/invitations', {'token': 'raw-token'}),
       {'tripId': 'stale-trip'},
@@ -126,7 +127,34 @@ void main() {
       client.get(
         '/invitations',
         query: {'token': 'raw-token'},
-        fallbackToCache: false,
+        policy: CacheReadPolicy.noStore,
+      ),
+      throwsA(isA<DioException>()),
+    );
+  });
+
+  test('GET networkOnly → 有快取也不回退', () async {
+    await cache.writeResponse(
+      cacheKeyFor('GET', '/invitations', {'token': 'raw-token'}),
+      {'tripId': 'stale-trip'},
+    );
+    adapter.onGet(
+      '/invitations',
+      (s) => s.throws(
+        503,
+        DioException(
+          requestOptions: RequestOptions(path: '/invitations'),
+          type: DioExceptionType.connectionError,
+        ),
+      ),
+      queryParameters: {'token': 'raw-token'},
+    );
+
+    await expectLater(
+      client.get(
+        '/invitations',
+        query: {'token': 'raw-token'},
+        policy: CacheReadPolicy.networkOnly,
       ),
       throwsA(isA<DioException>()),
     );
@@ -501,17 +529,26 @@ void main() {
     expect(await plain.get('/trips'), []);
   });
 
-  group('writeCache 開關', () {
-    test('writeCache:false → GET 成功後快取不被寫入(仍為 null)', () async {
+  group('讀取政策', () {
+    test('noStore → GET 成功後快取不被寫入(仍為 null)', () async {
       final key = cacheKeyFor('GET', '/trips/t1');
       adapter.onGet('/trips/t1', (s) => s.reply(200, {'id': 't1'}));
 
-      await client.get('/trips/t1', writeCache: false);
+      await client.get('/trips/t1', policy: CacheReadPolicy.noStore);
 
       expect(await cache.readResponse(key), isNull);
     });
 
-    test('預設 writeCache:true → GET 成功後快取有新值(回歸保護)', () async {
+    test('networkOnly → 不讀快取,但成功後仍寫入', () async {
+      final key = cacheKeyFor('GET', '/trips/t1');
+      adapter.onGet('/trips/t1', (s) => s.reply(200, {'id': 't1'}));
+
+      await client.get('/trips/t1', policy: CacheReadPolicy.networkOnly);
+
+      expect((await cache.readResponse(key))!.data, {'id': 't1'});
+    });
+
+    test('預設 cached → GET 成功後快取有新值(回歸保護)', () async {
       final key = cacheKeyFor('GET', '/trips/t1');
       adapter.onGet('/trips/t1', (s) => s.reply(200, {'id': 't1'}));
 

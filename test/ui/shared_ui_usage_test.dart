@@ -151,4 +151,23 @@ void main() {
 
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
+
+  test('features 不知道 cache 旗標;讀取政策只透過 CacheReadPolicy 表達', () {
+    final offenders = <String>[];
+    for (final dir in ['lib/features', 'lib/ui', 'lib/app']) {
+      for (final entity in Directory(dir).listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final source = entity.readAsStringSync();
+        if (RegExp(r'\b(?:fallbackToCache|writeCache)\b').hasMatch(source)) {
+          offenders.add(entity.path);
+        }
+      }
+    }
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'transport 的 cache bool 不得外漏到 features;要 network-only 用 CacheReadPolicy。',
+    );
+  });
 }
