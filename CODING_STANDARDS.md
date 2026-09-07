@@ -192,7 +192,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 確認框、action sheet、搜尋列、日期／時間選擇、短暫通知一律重用 `lib/app/adaptive.dart`，不得在 feature 內重寫平台判斷。
 - 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
 - **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
-- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:247`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
+- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart`），不得自己組 `showAppConfirm(isDestructive: true)`；`test/app/destructive_confirm_audit_test.dart` 機器強制（`lib/features` 內帶 `isDestructive: true` 或確認鈕是「刪除」「移除」卻直接用 `showAppConfirm` 即紅）。`source` 參數是必填且有語意：
   - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_app_bar.dart:720`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
   - 同一個動作同時掛在選單與左滑上時，`source` 由呼叫端各自傳，不得在 helper 內寫死（`lib/app/irreversible_action.dart:12`）

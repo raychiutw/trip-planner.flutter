@@ -676,14 +676,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     TripSummary trip,
   ) async {
     if (_deletingTripIds.contains(trip.tripId)) return;
-    final confirmedDelete = await showAppConfirm(
+    final confirmedDelete = await showAppDestructiveConfirm(
+      source: TpDestructiveConfirmSource.direct,
       context,
       title: '刪除行程',
       message:
           '確定要刪除「${trip.displayTitle}」嗎？'
           '這會刪除其中所有行程日與景點。此動作無法復原。',
       confirmLabel: '刪除',
-      isDestructive: true,
     );
     if (!confirmedDelete || !context.mounted) return;
     await _deleteTrip(context, trip);
