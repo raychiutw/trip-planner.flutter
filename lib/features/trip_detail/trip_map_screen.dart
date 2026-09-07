@@ -85,6 +85,10 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
   /// 否則 view 會把 initialDayNum 的變動當成深連結而重新載入路線。
   int? _shownDayNum;
 
+  /// 每次接手別的畫面寫的那一天就 +1:自己點過的那一天不更新 initialDayNum,
+  /// 第二次來回時 initialDayNum 可能已經等於要接手的值,view 看不出變動。
+  int _focusGeneration = 0;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +129,7 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
           !_showingAllDays &&
           sharedDayNum != _shownDayNum) {
         _initialDayNum = sharedDayNum;
+        _focusGeneration++;
       }
     }
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
@@ -170,6 +175,7 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             initialEntryId: widget.initialEntryId,
             initialDayNum: _initialDayNum,
             initialAllDays: _initialAllDays,
+            focusGeneration: _focusGeneration,
             mapBuilder: widget.mapBuilder,
             locationService: widget.locationService,
             locationSettingsOpener: widget.locationSettingsOpener,
@@ -240,6 +246,7 @@ class _TripMapView extends ConsumerStatefulWidget {
     this.initialEntryId,
     this.initialDayNum,
     this.initialAllDays = false,
+    this.focusGeneration = 0,
     this.mapBuilder,
     this.locationService,
     this.locationSettingsOpener,
@@ -254,6 +261,9 @@ class _TripMapView extends ConsumerStatefulWidget {
 
   /// 一開就顯示「全部」(共用值是全部且路由沒指定日期)。
   final bool initialAllDays;
+
+  /// 外部要求重新聚焦到 [initialDayNum] 的世代;值變了就重設,即使 dayNum 相同。
+  final int focusGeneration;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
   final Future<bool> Function(TripMapLocationSettingsTarget)?
@@ -336,13 +346,24 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   @override
   void didUpdateWidget(covariant _TripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tripId != widget.tripId ||
+    final refocus =
+        oldWidget.tripId != widget.tripId ||
         oldWidget.initialEntryId != widget.initialEntryId ||
         oldWidget.initialDayNum != widget.initialDayNum ||
         oldWidget.initialAllDays != widget.initialAllDays ||
-        !identical(oldWidget.days, widget.days)) {
+        oldWidget.focusGeneration != widget.focusGeneration;
+    if (refocus || !identical(oldWidget.days, widget.days)) {
+      // 只有 days 換了(SWR 第二段、編輯後 invalidate):保留使用者正在看的那一天,
+      // 不從 initialDayNum 重算 —— 重算會把剛點的 DAY 3 退回 DAY 1 還寫回共用狀態。
+      // _selectedTabIndex 是對舊 list 的索引,要用 oldWidget.days 換回 dayNum,
+      // 新 list 少了幾天時直接拿新 list 索引會 RangeError。
+      final currentDayNum = _selectedTabIndex == 0
+          ? null
+          : oldWidget.days.elementAtOrNull(_selectedTabIndex - 1)?.dayNum;
       _stopsByDay = _buildStopsByDay();
-      _selectedTabIndex = _initialTabIndex();
+      _selectedTabIndex = refocus
+          ? _initialTabIndex()
+          : _tabIndexForDayNum(currentDayNum) ?? _initialTabIndex();
       final stops = _stopsForTab(_selectedTabIndex);
       final initialPage = _initialStopPage(stops);
       _previewEntryId = stops.isEmpty ? null : stops[initialPage].entry.id;
@@ -433,6 +454,13 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
 
   int? _dayNumForTab(int tabIndex) =>
       tabIndex == 0 ? null : widget.days[tabIndex - 1].dayNum;
+
+  /// null(全部)→ 0;找不到那一天 → null。
+  int? _tabIndexForDayNum(int? dayNum) {
+    if (dayNum == null) return widget.days.isEmpty ? null : 0;
+    final index = widget.days.indexWhere((day) => day.dayNum == dayNum);
+    return index < 0 ? null : index + 1;
+  }
 
   int _initialStopPage(List<_MapStop> stops) {
     final entryId = widget.initialEntryId;

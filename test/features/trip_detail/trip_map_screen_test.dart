@@ -787,8 +787,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 1);
 
-    // SWR 第二段 emit 給出新的 list，同一批切到背景：地圖內部會依 initialDayNum
-    // 退回 DAY 2，但背景分支不得把這個退回寫進共用狀態。
+    // SWR 第二段 emit 給出新的 list，同一批切到背景。#298 之後 days 變動不再
+    // 退回 initialDayNum，這裡守的是「背景分支處理到新 days 也不寫入共用狀態」。
     days.add([_dayOne, _dayTwo]);
     active.value = false;
     await tester.pumpAndSettle();
@@ -973,6 +973,102 @@ void main() {
       _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
       isTrue,
     );
+  });
+
+  testWidgets('days 重新 emit(SWR 第二段)時保留使用者剛點的 DAY,不退回也不寫回', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(
+      _buildScreen(const [], daysStream: days.stream, initialDayNum: 1),
+    );
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+
+    days.add([_dayOne, _dayTwo]); // 新的 list identity,內容相同
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2, reason: '不從 initialDayNum 重算');
+    expect(_sharedDayNum(tester), 2, reason: '不把退回寫進共用狀態');
+  });
+
+  testWidgets('days 重新 emit 少了正在看的那一天 → 退回不炸;順序變了 → 仍跟著 dayNum', (
+    tester,
+  ) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(_buildScreen(const [], daysStream: days.stream));
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+
+    days.add([_dayTwo, _dayOne]); // 順序反了:tab 索引變,dayNum 不變
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('map-pin-21')),
+      findsOneWidget,
+      reason: '仍在 DAY 2',
+    );
+
+    days.add([_dayOne]); // DAY 2 沒了:退回,不能 RangeError
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
+  testWidgets('看「全部」時 days 重新 emit → 仍是「全部」;list 變空也不炸', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(_buildScreen(const [], daysStream: days.stream));
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0, reason: '「全部」不被退回第一天');
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
+
+    days.add(const []);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('地圖與時間軸來回兩次仍一致(第二次共用值相同也要接手)', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    final notifier = _containerOf(tester).read(selectedDayProvider.notifier);
+
+    for (var round = 1; round <= 2; round++) {
+      await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+      await tester.pumpAndSettle();
+      expect(_mapSelectorTabIndex(tester), 2, reason: '第 $round 回合點 DAY 2');
+
+      active.value = false;
+      await tester.pumpAndSettle();
+      notifier.select(tripId: 'trip-1', dayNum: 1); // 時間軸捲到 DAY 1
+      active.value = true;
+      await tester.pumpAndSettle();
+      expect(
+        _mapSelectorTabIndex(tester),
+        1,
+        reason: '第 $round 回合回到地圖要跟上 DAY 1',
+      );
+    }
   });
 
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {

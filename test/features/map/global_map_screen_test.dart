@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
@@ -175,6 +176,102 @@ void main() {
 
     expect(find.byKey(const ValueKey('map-pin-22')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+  });
+
+  group('resolveMapDay:這個行程該開在哪一天', () {
+    const shared = SelectedTripDay(tripId: 'tokyo', dayNum: 1);
+    test('自己在這個行程上看的那一天最優先', () {
+      expect(
+        resolveMapDay(
+          tripId: 'tokyo',
+          activeDayTripId: 'tokyo',
+          activeDayNum: 2,
+          routeTripId: 'tokyo',
+          routeDayNum: 3,
+          shared: shared,
+        ),
+        2,
+      );
+    });
+    test('路由 ?day= 只在路由指的就是這個行程時採用', () {
+      expect(
+        resolveMapDay(
+          tripId: 'tokyo',
+          activeDayTripId: 'okinawa',
+          activeDayNum: 2,
+          routeTripId: 'tokyo',
+          routeDayNum: 3,
+          shared: shared,
+        ),
+        3,
+      );
+      expect(
+        resolveMapDay(
+          tripId: 'tokyo',
+          activeDayTripId: 'okinawa',
+          activeDayNum: 2,
+          routeTripId: 'okinawa',
+          routeDayNum: 3,
+          shared: shared,
+        ),
+        1,
+        reason: '路由是上一個行程的 ?day=,不能帶到東京',
+      );
+    });
+    test('沒有路由就用時間軸為這個行程選的共用值,再沒有才沿用上一個行程的天數', () {
+      expect(
+        resolveMapDay(
+          tripId: 'tokyo',
+          activeDayTripId: 'okinawa',
+          activeDayNum: 2,
+          routeTripId: null,
+          routeDayNum: null,
+          shared: shared,
+        ),
+        1,
+      );
+      expect(
+        resolveMapDay(
+          tripId: 'tokyo',
+          activeDayTripId: 'okinawa',
+          activeDayNum: 2,
+          routeTripId: null,
+          routeDayNum: null,
+          shared: null,
+        ),
+        2,
+      );
+    });
+  });
+
+  testWidgets('切換行程時,時間軸已為新行程選了 DAY → 用它,不帶上一個行程的天數', (tester) async {
+    await tester.pumpWidget(
+      buildApp(
+        daysByTrip: {
+          'okinawa': [_day, _dayTwo],
+          'tokyo': [_day, _dayTwo],
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    // 時間軸在東京看 DAY 1(共用值換成東京的),再切地圖到東京。
+    ProviderScope.containerOf(
+      tester.element(find.byType(GlobalMapScreen)),
+      listen: false,
+    ).read(selectedDayProvider.notifier).select(tripId: 'tokyo', dayNum: 1);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('map-pin-11')),
+      findsOneWidget,
+      reason: '東京用共用值 DAY 1',
+    );
+    expect(find.byKey(const ValueKey('map-pin-22')), findsNothing);
   });
 
   testWidgets('切換行程缺少原 DAY 時回 Day 1 並清除舊 POI', (tester) async {
