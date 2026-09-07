@@ -64,7 +64,23 @@ final _linkPattern = RegExp(r'\[[^\]]*\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)');
 
 final _fencePattern = RegExp(r'^\s{0,3}(?:```|~~~)');
 
-/// 不屬於本 repo 文件的目錄：建置產物、VCS 內部、套件管理器快取。
+/// 只掃 git 追蹤的 markdown:沒進版控的目錄(建置產物、`ios/.symlinks/` 這類
+/// 套件符號連結)裡是第三方套件自己的 README,連結指向它們的 repo,不是本 repo 的
+/// 文件,不該由這條測試守。`git ls-files` 拿不到(不在 git 內)就退回目錄掃描。
+Iterable<File> _markdownFiles(Directory root) {
+  final result = Process.runSync('git', [
+    'ls-files',
+    '-z',
+    '--',
+    '*.md',
+  ], workingDirectory: root.path);
+  if (result.exitCode != 0) return _walk(root);
+  final paths = (result.stdout as String)
+      .split('\u0000')
+      .where((p) => p.isNotEmpty);
+  return [for (final path in paths) File('${root.path}/$path')];
+}
+
 const _skippedDirectories = {
   '.dart_tool',
   '.git',
@@ -75,12 +91,12 @@ const _skippedDirectories = {
   'Pods',
 };
 
-Iterable<File> _markdownFiles(Directory root) sync* {
+Iterable<File> _walk(Directory root) sync* {
   for (final entity in root.listSync()) {
     if (entity is Directory) {
       final name = entity.path.replaceAll('\\', '/').split('/').last;
       if (_skippedDirectories.contains(name)) continue;
-      yield* _markdownFiles(entity);
+      yield* _walk(entity);
     } else if (entity is File && entity.path.endsWith('.md')) {
       yield entity;
     }

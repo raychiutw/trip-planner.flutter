@@ -36,8 +36,8 @@ class MaybeBranch extends StatelessWidget {
 class SeededSelectedDayController extends SelectedDayController {
   SeededSelectedDayController(this.seed);
 
-  final SelectedTripDay? seed;
+  final SelectedDay? seed;
 
   @override
-  SelectedTripDay? build() => seed;
+  SelectedDay? build() => seed;
 }

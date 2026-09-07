@@ -585,6 +585,25 @@ void main() {
     expect(_selectorDayNum(tester), 2);
   });
 
+  testWidgets('共用值是「全部」時時間軸維持原本那一天,不被路由 ?day= 打回', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await _pumpTimeline(tester, initialDayNum: 1, branchActive: active);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    expect(_selectorDayNum(tester), 2);
+
+    final container = _containerOf(tester);
+    active.value = false;
+    await tester.pumpAndSettle();
+    container.read(selectedDayProvider.notifier).selectAll(tripId: _tripId);
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 2);
+  });
+
   testWidgets('切換 Trip 會重設 DAY 1，並拒絕舊行程的移動與複製 sheet', (tester) async {
     const otherTripId = 'tokyo-2026';
     final activeTripId = ValueNotifier(_tripId);
