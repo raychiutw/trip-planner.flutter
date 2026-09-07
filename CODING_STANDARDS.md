@@ -37,7 +37,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 兩個既有例外（不得擴大）
 
-- `lib/app/router.dart` 是唯一允許 import `features/` 的 `app/` 檔（composition root，需要 27 個 screen 建路由表；`lib/app/router.dart:10,21`）。新增其他 `app/` 檔 import `features/` 一律退回。
+- `lib/app/router.dart` 是唯一允許 import `features/` 的 `app/` 檔（composition root，需要 27 個 screen 建路由表）。新增其他 `app/` 檔 import `features/` 一律退回。
 - `ui/` 對 `app/` 的唯一允許依賴是 `app/accessibility_scope.dart`（`lib/ui/tp_glass_surface.dart:4`、`lib/ui/tp_horizontal_selector.dart:7`、`lib/ui/tp_root_scaffold.dart:6`）。`ui/` import 任何其他 `app/` 檔即違反。反向 `lib/app/adaptive.dart:15-17` import `ui/` 則符合鏈方向。
 
 ## Provider 與測試 seam
@@ -213,9 +213,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 路由與測試
 
-- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`）。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId`（`:182`）只是 web 時代留下的 alias,`redirect` 到複數版（`_tripAlias`,`:507`）—— 子頁一律加在複數路徑下，新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
+- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId` 只是 web 時代留下的 alias,由 `lib/app/legacy_aliases.dart` 的 `redirectAliases` 表 `redirect` 到複數版（`tripAlias`）—— 子頁一律加在複數路徑下，新增子頁照 `entries/new`、`notes` 的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。新增 web alias 只加表格一行，並在 `test/app/legacy_aliases_test.dart` 釘住目標。
 - shell 外的整頁（無 root tab bar）加在 `routes` 頂層、`StatefulShellRoute` 之外。
-- 未登入時 shell 內的頁自動被 redirect 到 **`/welcome`**（`lib/app/router.dart:72-74`，經 `_welcomeLocationWithRedirect`），不是 `/login`。原始請求路徑會保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進 `_publicShellOutsideRoutes`（`lib/app/router.dart:495`），否則同樣被踢到 `/welcome`。
+- 未登入時 shell 內的頁自動被 redirect 到 **`/welcome`**（`lib/app/auth_redirect_policy.dart` 的 `authRedirect()`，經 `welcomeLocationWithRedirect`），不是 `/login`。原始請求路徑會保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進 `publicShellOutsideRoutes`，否則同樣被踢到 `/welcome`。
 - widget test 必須 override `authStateProvider`，否則啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗，畫面一進來就被視為未登入。
 - 每個 screen 檔頭加 `///` library doc 說明畫面職責，格式照 `lib/app/router.dart:1-2`。
 
