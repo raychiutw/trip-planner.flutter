@@ -99,6 +99,66 @@ void main() {
       expect(recordedRequests.first.headers['Origin'], kTriplineOrigin);
     });
 
+    test('429 → 丟 ApiError(429) 且不重送(POST 依同一 retry 政策)', () async {
+      dioAdapter.onPost(
+        '/oauth/login',
+        (server) => server.reply(
+          429,
+          {
+            'error': {'code': 'LOGIN_RATE_LIMITED', 'message': 'slow down'},
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'retry-after': ['7'],
+          },
+        ),
+        data: {'email': 'ray@example.com', 'password': 'secret'},
+      );
+
+      await expectLater(
+        authRepository.login(email: 'ray@example.com', password: 'secret'),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.status, 'status', 429)
+              .having((e) => e.retryAfterSeconds, 'retryAfterSeconds', 7),
+        ),
+      );
+      expect(
+        recordedRequests.where((r) => r.path == '/oauth/login'),
+        hasLength(1),
+        reason: 'mutation 不重送',
+      );
+      expect(await sessionStore.read(), isNull);
+    });
+
+    test(
+      'edge block page(200 text/html)→ 丟 SYS_UPSTREAM_UNAVAILABLE,不誤報缺 cookie',
+      () async {
+        dioAdapter.onPost(
+          '/oauth/login',
+          (server) => server.reply(
+            200,
+            '<html>blocked</html>',
+            headers: {
+              Headers.contentTypeHeader: ['text/html; charset=utf-8'],
+            },
+          ),
+          data: {'email': 'ray@example.com', 'password': 'secret'},
+        );
+
+        await expectLater(
+          authRepository.login(email: 'ray@example.com', password: 'secret'),
+          throwsA(
+            isA<ApiError>().having(
+              (e) => e.code,
+              'code',
+              'SYS_UPSTREAM_UNAVAILABLE',
+            ),
+          ),
+        );
+      },
+    );
+
     test('401 LOGIN_INVALID → 丟 ApiError、store 不寫入', () async {
       dioAdapter.onPost(
         '/oauth/login',

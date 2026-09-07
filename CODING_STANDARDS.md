@@ -74,11 +74,11 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### ApiClient 是唯一出口
 
 - 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `postForRedirect` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
-- 只有需要 Dio 原生 request options 的 OAuth PKCE 流程可取 `client.dio`；需要讀 response headers（例如登入解 `set-cookie`）用 `postForResponse`（`lib/api/api_client.dart:106`），不是 raw dio。
+- 只有需要 Dio 原生 request options 的 OAuth PKCE 流程可取 `client.dio`；需要讀 response headers（例如登入解 `set-cookie`）用 `postForResponse`，不是 raw dio。
 
 ### 認證 header：兩種模式互斥
 
-`_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
+`ApiClient._authHeadersFor()`依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
 
 - **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
 - **cookie 模式**（無 token）：`sessionStore` 有值才帶 `Cookie: tripline_session=<token>`；且方法非 `GET`／`HEAD` 時必帶 `Origin: <origin>` —— 缺這個 header 的 mutation 後端回 403。
@@ -93,31 +93,31 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 重試：三條分支共用「同參數重送一次」
 
-`_send()` 的三種重送共用同一個 `retry()`（`lib/api/api_client.dart:795-806`），每條都靠 `isRetryAttempt` 限制**最多一次**：
+重送與否由純函式 `decideRetry()` 決定（`lib/api/retry_policy.dart`），輸出 `NoRetry`／`RetryAfterWait`／`RetryAfterRefresh`；`ApiClient._retryDecision()` 包一層負責等待與 `refresh()`，一般請求 `_send()` 與 SSE `_getTextStream()` 兩個站點共用，每條都靠 `isRetryAttempt` 限制**最多一次**（登入／註冊的 `postForResponse()` 不重送，只走 `_throwIfFailed()` 轉錯誤）：
 
-1. **429** — 僅 `GET`／`HEAD`（`lib/api/api_client.dart:794`、`:807-815`）。讀 `Retry-After` 等待後重送一次。
-2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`lib/api/api_client.dart:723-733`），重試條件與 429 完全相同（同一個 `if`，`:807`）。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx（`lib/api/api_client.dart:735-739`、`:827-829`）。
-3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：`POST`／`PATCH`／`DELETE` 一樣會被重送一次（`lib/api/api_client.dart:816-823`）。`refresh()` 回 false → 直接丟 `ApiError(401)`（`test/api/api_client_bearer_test.dart:87`）。
+1. **429** — 僅 `GET`／`HEAD`。讀 `Retry-After` 等待後重送一次。
+2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`ApiClient._isEdgeBlockPage`），重試條件與 429 完全相同。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx。
+3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：`POST`／`PATCH`／`DELETE` 一樣會被重送一次。`refresh()` 回 false → 直接丟 `ApiError(401)`（`test/api/api_client_bearer_test.dart`）。例外：`postForResponse()`（登入／註冊 raw POST）不進 `decideRetry`，401 就是憑證錯，不 refresh 也不重送。
 
-- SSE 串流版 `_getTextStream()` 走同一組規則（`lib/api/api_client.dart:884-911`），改重試邏輯要兩處一起改。
-- 429／edge block **不重送 mutation**（`test/api/api_client_test.dart:228`、`:358`）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
-- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列（`lib/api/api_client.dart:265-275`），重連後由 `flushQueue` 依序重送。
-- `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/api_client.dart:702-721`）。
-- 動到任何一條重試分支，同一個 PR 必須改 `test/api/api_client_test.dart` 或 `test/api/api_client_bearer_test.dart`。
+- SSE 串流版 `_getTextStream()` 走同一個 `decideRetry`，`retryableMethod` 固定 true；429／edge block 的 body 先 drain 再等待。
+- 429／edge block **不重送 mutation**（`test/api/api_client_test.dart` 規則 3 群組）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
+- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列，重連後由 `flushQueue` 依序重送。
+- `parseRetryAfterSeconds`（`lib/api/retry_policy.dart`）：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1。非 2xx 的 `ApiError.retryAfterSeconds` 是原始秒數，給畫面顯示用，不 cap。
+- 動到重試規則，同一個 PR 必須改 `test/api/retry_policy_test.dart`，並在 `test/api/api_client_test.dart` 或 `test/api/api_client_bearer_test.dart` 補站點層測試。
 
-> **注意常見誤述**:「429 只 retry GET 一次;mutation 絕不 retry」是錯的說法,曾出現在多份舊文件裡。它漏了 edge block page 與 Bearer 401 兩條分支,且與 `lib/api/api_client.dart:816-823` 矛盾。看到這句話出現在註解或 PR 描述裡,以本節為準。
+> **注意常見誤述**:「429 只 retry GET 一次;mutation 絕不 retry」是錯的說法,曾出現在多份舊文件裡。它漏了 edge block page 與 Bearer 401 兩條分支,且與 `decideRetry` 矛盾。看到這句話出現在註解或 PR 描述裡,以本節為準。
 
 ### 錯誤與空 body
 
 - dio 的 `validateStatus` 全收，狀態碼判斷集中在 `_send()`（`lib/api/api_client.dart:79-80`）。不要在別處加 `validateStatus`。
-- 非 2xx 一律 `throw ApiError.fromResponse(...)`（`lib/api/api_client.dart:824-826`）。repository 不得吞掉例外改回 `null`（唯一例外見下方 `currentUser()`）。
+- 非 2xx 一律 `throw ApiError.fromResponse(...)`（`ApiClient._throwIfFailed()`）。repository 不得吞掉例外改回 `null`（唯一例外見下方 `currentUser()`）。
 - `ApiError.fromResponse` 三層 fallback（`lib/api/api_error.dart:27-62`），依序：
   1. `{error: {code, message, detail}}` → 取 `code`／`message`／`detail`
   2. `{error: "字串", error_description: "..."}`（OAuth flat shape）→ `error` 當 code、`error_description` 當 message
   3. 都不符 → `code = 'HTTP_<status>'`、`message = 'HTTP <status>'`
 - `detail` 一律截斷到 200 字（`lib/api/api_error.dart:64-67`）。原始 body 保留在 `payload`，`409` 的 `conflictWith` 等結構化資訊從 `payload` 取（`lib/api/api_error.dart:21-22`）。
-- 204 與空 body（`null` 或空字串）一律回 `null`（`lib/api/api_client.dart:830-861`）。呼叫端回傳型別寫 `Future<void>` 或自行判 null，不得無條件 `as Map<String, dynamic>`。
-- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟（`lib/api/api_client.dart:777-789`）。因此「拿到資料」不代表這次連上了網 —— 需要保證新鮮度的 GET 要傳 `fallbackToCache: false`（例：`lib/api/trip_repository.dart:194-199`）。
+- 204 與空 body（`null` 或空字串）一律回 `null`（`ApiClient._send()` 收尾）。呼叫端回傳型別寫 `Future<void>` 或自行判 null，不得無條件 `as Map<String, dynamic>`。
+- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟（`ApiClient._send()` 的連線層 catch）。因此「拿到資料」不代表這次連上了網 —— 需要保證新鮮度的 GET 要傳 `fallbackToCache: false`（例：`lib/api/trip_repository.dart:194-199`）。
 
 ### repository 方法
 
@@ -153,7 +153,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   - `parseRequestStatus` 未知 → `processing`（`lib/models/trip_request.dart:7-12`），工單續 poll。
   - `parseNoteGenerationType` 未知 → `null`（`lib/models/note_section.dart:15-20`）。
 - 衍生欄位可以在 `fromJson` 內算，但 fallback 鏈要寫成註解可讀：停留點 `title` = `displayTitle` → 正選 POI 名稱 → `（未選擇景點）`（`lib/models/entry.dart:136-139`）。
-- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart:623-636`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `_tryRebase`（`lib/api/api_client.dart:541-575`），`expectedVersion` 在 rebase 時永遠保留並換成新值（`lib/api/api_client.dart:690-700`）。行程本身無 version，見上方後端契約細節。
+- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart:623-636`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `ApiClient._tryRebase()`，`expectedVersion` 在 rebase 時永遠保留並換成新值（`lib/api/api_client.dart:690-700`）。行程本身無 version，見上方後端契約細節。
 - 每個新 model 至少一個 `fromJson` 測試，且必須含 edge case：欄位缺漏、int↔double、0/1 bool。fixture 用後端實際輸出，不要用猜的。
 
 ## 畫面撰寫規範

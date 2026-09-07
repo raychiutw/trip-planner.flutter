@@ -143,4 +143,108 @@ void main() {
       expect(captured.containsKey('Authorization'), isFalse);
     },
   );
+
+  test('Bearer 401 → refresh 成功 → POST 也重送一次(不分 method)', () async {
+    final dio = Dio();
+    var calls = 0;
+    final auths = <String?>[];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          calls++;
+          auths.add(o.headers['Authorization'] as String?);
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: calls == 1 ? 401 : 200,
+              data: calls == 1
+                  ? {
+                      'error': {'code': 'AUTH', 'message': 'x'},
+                    }
+                  : {'ok': true},
+            ),
+          );
+        },
+      ),
+    );
+    final source = _FakeSource('old', refreshResult: true);
+    final client = ApiClient(
+      sessionStore: InMemorySessionStore(),
+      dio: dio,
+      bearerSource: source,
+    );
+
+    expect(await client.post('/x', body: const {}), {'ok': true});
+    expect(calls, 2);
+    expect(source.refreshCalls, 1);
+    expect(auths, ['Bearer old', 'Bearer new']);
+  });
+
+  test('refresh 成功但重送仍 401 → 不再 refresh,丟 ApiError(401)', () async {
+    final dio = Dio();
+    var calls = 0;
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          calls++;
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: 401,
+              data: {
+                'error': {'code': 'AUTH', 'message': 'x'},
+              },
+            ),
+          );
+        },
+      ),
+    );
+    final source = _FakeSource('old', refreshResult: true);
+    final client = ApiClient(
+      sessionStore: InMemorySessionStore(),
+      dio: dio,
+      bearerSource: source,
+    );
+
+    await expectLater(
+      client.get('/x'),
+      throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
+    );
+    expect(calls, 2);
+    expect(source.refreshCalls, 1);
+  });
+
+  test('登入 / 註冊的 raw POST 遇 401 不 refresh 也不重送:密碼錯不該把 OAuth 登出', () async {
+    final dio = Dio();
+    var calls = 0;
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) {
+          calls++;
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: 401,
+              data: {
+                'error': {'code': 'LOGIN_INVALID', 'message': 'x'},
+              },
+            ),
+          );
+        },
+      ),
+    );
+    final source = _FakeSource('old', refreshResult: true);
+    final client = ApiClient(
+      sessionStore: InMemorySessionStore(),
+      dio: dio,
+      bearerSource: source,
+    );
+
+    await expectLater(
+      client.postForResponse('/auth/login', body: const {}),
+      throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
+    );
+    expect(calls, 1);
+    expect(source.refreshCalls, 0);
+  });
 }

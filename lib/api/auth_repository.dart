@@ -104,10 +104,6 @@ class AuthRepository {
     );
 
     final statusCode = loginResponse.statusCode ?? 0;
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(statusCode, loginResponse.data);
-    }
-
     final sessionToken = _sessionTokenFrom(loginResponse.headers);
     if (sessionToken == null || sessionToken.isEmpty) {
       throw ApiError(
@@ -144,16 +140,6 @@ class AuthRepository {
     );
 
     final statusCode = signupResponse.statusCode ?? 0;
-    if (statusCode < 200 || statusCode >= 300) {
-      throw ApiError.fromResponse(
-        statusCode,
-        signupResponse.data,
-        retryAfterSeconds: int.tryParse(
-          signupResponse.headers.value('retry-after') ?? '',
-        ),
-      );
-    }
-
     final sessionToken = _sessionTokenFrom(signupResponse.headers);
     if (sessionToken == null || sessionToken.isEmpty) {
       throw ApiError(
