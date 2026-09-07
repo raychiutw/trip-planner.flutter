@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -384,6 +385,46 @@ void main() {
     expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsNothing);
     expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
     expect(reads, 3, reason: '重試就是再讀一次報告表');
+  });
+
+  testWidgets('報告表重試成功但仍 pending → 這才是停滯', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      if (reads == 2) throw Exception('offline');
+      return pendingReport();
+    });
+    await pumpScreen(tester);
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('重試'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsNothing);
+  });
+
+  testWidgets('工單結束後報告表回 401(session 過期)→ 顯示伺服器的訊息,不是通用讀取失敗', (tester) async {
+    var reads = 0;
+    when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
+      reads++;
+      if (reads >= 2) {
+        throw const ApiError(status: 401, code: 'AUTH', message: '登入已過期，請重新登入');
+      }
+      return pendingReport();
+    });
+    await pumpScreen(tester);
+    sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+
+    expect(find.text('登入已過期，請重新登入'), findsOneWidget);
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsNothing);
   });
 
   testWidgets('報告表重試再失敗 → 仍是讀取失敗,不退回停滯面板', (tester) async {

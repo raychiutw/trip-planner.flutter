@@ -443,6 +443,7 @@ void main() {
       final state = sub.read() as RequestTerminal;
       expect(state.status, RequestStatus.failed);
       expect(state.terminalReason, TerminalReason.error);
+      expect(state.serverConfirmed, isFalse, reason: '伺服器沒有給工單結果,畫面要誠實提示');
       expect(waits, hasLength(1), reason: '不再排下一輪');
     });
   }
@@ -580,5 +581,36 @@ void main() {
     expect(calls, 2, reason: '回前景共用飛行中的補讀,不另外打');
     row.complete(_req(RequestStatus.completed));
     await _flush();
+  });
+
+  test('事件說 completed、補讀卻 404 → 用事件內容終結,不被 404 蓋成 failed', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw const ApiError(status: 404, code: 'NOT_FOUND', message: 'x');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
+  });
+
+  test('事件說 completed、補讀 row 仍 processing(最終一致)→ 仍以事件終結', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
   });
 }

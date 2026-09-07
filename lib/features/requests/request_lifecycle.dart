@@ -48,7 +48,7 @@ final class RequestTerminal extends RequestLifecycleState {
 const kRequestPollInterval = Duration(seconds: 4);
 const kRequestPollCeiling = Duration(seconds: 30);
 
-/// SSE 開著但久無任何訊息就視為半開,收掉改輪詢;測試 override 成 Duration.zero。
+/// SSE 開著但久無任何訊息就視為半開,收掉改輪詢。
 final requestSseIdleTimeoutProvider = Provider<Duration>(
   (_) => const Duration(minutes: 2),
 );
@@ -152,7 +152,15 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     } on ApiError catch (error) {
       if (_stale(run) || state is RequestTerminal) return true;
       if (_definitiveStatuses.contains(error.status)) {
-        _terminate(RequestStatus.failed, TerminalReason.error);
+        // 終結事件已到、這次只是補讀:結果以事件為準,不被 401 / 404 蓋掉。
+        if (_terminalEventSeen) return false;
+        // 伺服器沒有給工單結果(未登入 / 無權 / 不存在):本機終結,
+        // serverConfirmed: false 讓畫面誠實提示,不當成 AI 真的失敗。
+        _terminate(
+          RequestStatus.failed,
+          TerminalReason.error,
+          serverConfirmed: false,
+        );
         return true;
       }
       return false; // 其餘(5xx…)當暫時性錯誤:還在跑
