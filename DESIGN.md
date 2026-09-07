@@ -216,7 +216,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 ### 12.1 入口
 
 - **Tripline 決策**：swipe action、`…` menu、context menu 與詳情頁可提供刪除入口，但全部導向同一確認流程。
-- **HIG 必須**：swipe 只揭露紅色「刪除」；停用 full swipe 直接執行。
+- **HIG 必須**：swipe 只揭露紅色「刪除」；停用 full swipe 直接執行。動作是「移除」(解除可重建的關聯,如取消收藏,見 CONTEXT.md 動作動詞)時標籤寫「移除」,樣式與確認流程同刪除(ADR-0008)。
 - **HIG 必須**：menu 中的刪除放在尾端、與其他動作分隔並標示 destructive role。
 - **HIG 必須**：所有刪除入口使用相同名稱、結果與 accessibility label。
 

@@ -39,7 +39,7 @@ final addToTripFavoriteArgsProvider =
           );
         }
       }
-      throw StateError('找不到該收藏（可能已被刪除）');
+      throw StateError('找不到該收藏（可能已被移除）');
     });
 
 /// 加入行程 route loader：支援 extra、favorite id 深連結與 direct query。

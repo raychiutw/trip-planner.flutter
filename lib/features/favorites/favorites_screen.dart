@@ -528,7 +528,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         source: TpDestructiveConfirmSource.direct,
         context,
         title: '移除 ${ids.length} 個收藏？',
-        message: '將從收藏移除${names.join('、')}。移除後需重新收藏。',
+        message: '將從收藏移除${names.join('、')}。移除後無法復原，只能重新收藏。',
         confirmLabel: '移除',
         cancelLabel: '保留',
       );
@@ -598,7 +598,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         source: TpDestructiveConfirmSource.direct,
         context,
         title: '移除「${favorite.displayName}」？',
-        message: '將從收藏移除「${favorite.displayName}」。移除後需重新收藏。',
+        message: '將從收藏移除「${favorite.displayName}」。移除後無法復原，只能重新收藏。',
         confirmLabel: '移除',
         cancelLabel: '保留',
       );

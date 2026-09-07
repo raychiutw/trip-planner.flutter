@@ -484,7 +484,7 @@ void main() {
 
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('移除「美麗海水族館」？'), findsOneWidget);
-      expect(find.text('將從收藏移除「美麗海水族館」。移除後需重新收藏。'), findsOneWidget);
+      expect(find.text('將從收藏移除「美麗海水族館」。移除後無法復原，只能重新收藏。'), findsOneWidget);
       await tester.tap(find.text('保留'));
       await tester.pumpAndSettle();
 
@@ -690,7 +690,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('移除「美麗海水族館」？'), findsOneWidget);
-      expect(find.text('將從收藏移除「美麗海水族館」。移除後需重新收藏。'), findsOneWidget);
+      expect(find.text('將從收藏移除「美麗海水族館」。移除後無法復原，只能重新收藏。'), findsOneWidget);
       await tester.tap(
         find.descendant(
           of: find.byType(CupertinoAlertDialog),
@@ -882,7 +882,7 @@ void main() {
 
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('移除 2 個收藏？'), findsOneWidget);
-      expect(find.text('將從收藏移除「美麗海水族館」、「暖暮拉麵」。移除後需重新收藏。'), findsOneWidget);
+      expect(find.text('將從收藏移除「美麗海水族館」、「暖暮拉麵」。移除後無法復原，只能重新收藏。'), findsOneWidget);
 
       await tester.tap(
         find.descendant(
@@ -1035,7 +1035,7 @@ void main() {
       await tester.tap(find.text('重試'));
       await tester.pumpAndSettle();
       expect(find.text('移除 1 個收藏？'), findsOneWidget);
-      expect(find.text('將從收藏移除「暖暮拉麵」。移除後需重新收藏。'), findsOneWidget);
+      expect(find.text('將從收藏移除「暖暮拉麵」。移除後無法復原，只能重新收藏。'), findsOneWidget);
       await tester.tap(
         find.descendant(
           of: find.byType(CupertinoAlertDialog),
