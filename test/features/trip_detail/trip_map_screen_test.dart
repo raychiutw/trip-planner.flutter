@@ -995,6 +995,32 @@ void main() {
     expect(_sharedDayNum(tester), 2, reason: '不把退回寫進共用狀態');
   });
 
+  testWidgets('days 重新 emit 少了正在看的那一天 → 退回不炸;順序變了 → 仍跟著 dayNum', (
+    tester,
+  ) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(_buildScreen(const [], daysStream: days.stream));
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+
+    days.add([_dayTwo, _dayOne]); // 順序反了:tab 索引變,dayNum 不變
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('map-pin-21')),
+      findsOneWidget,
+      reason: '仍在 DAY 2',
+    );
+
+    days.add([_dayOne]); // DAY 2 沒了:退回,不能 RangeError
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
   testWidgets('地圖與時間軸來回兩次仍一致(第二次共用值相同也要接手)', (tester) async {
     final active = ValueNotifier(true);
     addTearDown(active.dispose);

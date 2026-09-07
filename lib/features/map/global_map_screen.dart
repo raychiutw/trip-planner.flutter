@@ -70,6 +70,16 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     }
   }
 
+  /// 這個行程該開在哪一天。優先序:自己在這個行程上看的那一天 → 路由 ?day= →
+  /// 時間軸為這個行程選的共用值 → 上一個行程的天數(換行程保留同一天的既有行為)。
+  /// 路由同步與建 TripMapScreen 都走這裡,才不會把上一個行程的天數寫回 URL。
+  int? _dayFor(String tripId) {
+    if (tripId == _activeDayTripId) return _activeDayNum;
+    return widget.initialDayNum ??
+        ref.read(selectedDayProvider).dayNumFor(tripId) ??
+        _activeDayNum;
+  }
+
   void _selectRouteTripAfterBuild(String tripId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _pendingRouteTripId != tripId) return;
@@ -142,7 +152,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
             widget.initialTripId != sharedTrip.tripId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-            final day = _activeDayNum;
+            final day = _dayFor(sharedTrip.tripId);
             GoRouter.maybeOf(context)?.go(
               '/map?tripId=${Uri.encodeQueryComponent(sharedTrip.tripId)}'
               '${day == null ? '' : '&day=$day'}',
@@ -157,11 +167,7 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
               : null,
           // 優先序:自己在這個行程上看的那一天 → 路由 ?day= → 時間軸為這個行程
           // 選的共用值 → 上一個行程的天數(換行程保留同一天的既有行為)。
-          initialDayNum: selected.tripId == _activeDayTripId
-              ? _activeDayNum
-              : widget.initialDayNum ??
-                    ref.read(selectedDayProvider).dayNumFor(selected.tripId) ??
-                    _activeDayNum,
+          initialDayNum: _dayFor(selected.tripId),
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
           onTripSelected: (tripId) => unawaited(

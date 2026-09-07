@@ -355,7 +355,11 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
     if (refocus || !identical(oldWidget.days, widget.days)) {
       // 只有 days 換了(SWR 第二段、編輯後 invalidate):保留使用者正在看的那一天,
       // 不從 initialDayNum 重算 —— 重算會把剛點的 DAY 3 退回 DAY 1 還寫回共用狀態。
-      final currentDayNum = _dayNumForTab(_selectedTabIndex);
+      // _selectedTabIndex 是對舊 list 的索引,要用 oldWidget.days 換回 dayNum,
+      // 新 list 少了幾天時直接拿新 list 索引會 RangeError。
+      final currentDayNum = _selectedTabIndex == 0
+          ? null
+          : oldWidget.days.elementAtOrNull(_selectedTabIndex - 1)?.dayNum;
       _stopsByDay = _buildStopsByDay();
       _selectedTabIndex = refocus
           ? _initialTabIndex()
