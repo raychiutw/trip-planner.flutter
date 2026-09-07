@@ -787,8 +787,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 1);
 
-    // SWR 第二段 emit 給出新的 list，同一批切到背景：地圖內部會依 initialDayNum
-    // 退回 DAY 2，但背景分支不得把這個退回寫進共用狀態。
+    // SWR 第二段 emit 給出新的 list，同一批切到背景。#298 之後 days 變動不再
+    // 退回 initialDayNum，這裡守的是「背景分支處理到新 days 也不寫入共用狀態」。
     days.add([_dayOne, _dayTwo]);
     active.value = false;
     await tester.pumpAndSettle();
@@ -1019,6 +1019,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+  });
+
+  testWidgets('看「全部」時 days 重新 emit → 仍是「全部」;list 變空也不炸', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(_buildScreen(const [], daysStream: days.stream));
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0);
+
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 0, reason: '「全部」不被退回第一天');
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
+
+    days.add(const []);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('地圖與時間軸來回兩次仍一致(第二次共用值相同也要接手)', (tester) async {

@@ -70,15 +70,16 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
     }
   }
 
-  /// 這個行程該開在哪一天。優先序:自己在這個行程上看的那一天 → 路由 ?day= →
-  /// 時間軸為這個行程選的共用值 → 上一個行程的天數(換行程保留同一天的既有行為)。
-  /// 路由同步與建 TripMapScreen 都走這裡,才不會把上一個行程的天數寫回 URL。
-  int? _dayFor(String tripId) {
-    if (tripId == _activeDayTripId) return _activeDayNum;
-    return widget.initialDayNum ??
-        ref.read(selectedDayProvider).dayNumFor(tripId) ??
-        _activeDayNum;
-  }
+  /// 路由同步與建 TripMapScreen 都走 [resolveMapDay],才不會把上一個行程的
+  /// 天數寫回 URL。
+  int? _dayFor(String tripId) => resolveMapDay(
+    tripId: tripId,
+    activeDayTripId: _activeDayTripId,
+    activeDayNum: _activeDayNum,
+    routeTripId: widget.initialTripId,
+    routeDayNum: widget.initialDayNum,
+    shared: ref.read(selectedDayProvider),
+  );
 
   void _selectRouteTripAfterBuild(String tripId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -165,8 +166,6 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
           initialEntryId: selected.tripId == widget.initialTripId
               ? widget.initialEntryId
               : null,
-          // 優先序:自己在這個行程上看的那一天 → 路由 ?day= → 時間軸為這個行程
-          // 選的共用值 → 上一個行程的天數(換行程保留同一天的既有行為)。
           initialDayNum: _dayFor(selected.tripId),
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
@@ -237,4 +236,20 @@ class _MapState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 這個行程該開在哪一天。優先序:自己在這個行程上看的那一天 → 路由 `?day=`
+/// (只在路由指的就是這個行程時)→ 時間軸為這個行程選的共用值 → 上一個行程的
+/// 天數(換行程保留同一天的既有行為)。純函式,直接 unit test。
+int? resolveMapDay({
+  required String tripId,
+  required String? activeDayTripId,
+  required int? activeDayNum,
+  required String? routeTripId,
+  required int? routeDayNum,
+  required SelectedDay? shared,
+}) {
+  if (tripId == activeDayTripId) return activeDayNum;
+  if (routeDayNum != null && routeTripId == tripId) return routeDayNum;
+  return shared.dayNumFor(tripId) ?? activeDayNum;
 }
