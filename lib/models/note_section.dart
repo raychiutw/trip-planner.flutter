@@ -19,8 +19,30 @@ NoteGenerationType? parseNoteGenerationType(String? raw) => switch (raw) {
   _ => null,
 };
 
-/// AI 筆記生成類型的 API path 與顯示文字。
+extension NoteSectionX on NoteSection {
+  /// 這一區底下的 AI 生成類型(依 enum 宣告順序;沒有就是空)。
+  List<NoteGenerationType> get generationTypes => [
+    for (final t in NoteGenerationType.values)
+      if (t.section == this) t,
+  ];
+}
+
+/// AI 筆記生成類型自己擁有的 metadata:所在區、API path、顯示文字、前置條件。
+/// 新增一種生成類型只改這裡。
 extension NoteGenerationTypeX on NoteGenerationType {
+  /// 生成結果寫進哪一區,也是排除清單入口出現的位置。
+  NoteSection get section => switch (this) {
+    NoteGenerationType.tips ||
+    NoteGenerationType.lodgingTips => NoteSection.pretrip,
+    NoteGenerationType.emergency => NoteSection.emergency,
+  };
+
+  /// 現在不能生成的原因;`null` 表示可以。
+  String? disabledReason({required bool hasLodgings}) => switch (this) {
+    NoteGenerationType.lodgingTips when !hasLodgings => '需先新增住宿',
+    _ => null,
+  };
+
   /// API URL path segment.
   String get pathSegment => switch (this) {
     NoteGenerationType.tips => 'tips',
