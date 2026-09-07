@@ -465,7 +465,7 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
-    testWidgets('卡片刪除先顯示具名確認，保留不會呼叫 API', (tester) async {
+    testWidgets('卡片移除先顯示具名確認，保留不會呼叫 API', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
@@ -538,7 +538,7 @@ void main() {
       expect(find.textContaining('Undo'), findsNothing);
     });
 
-    testWidgets('左滑只揭露刪除，VoiceOver 與按鈕都進入同一確認', (tester) async {
+    testWidgets('左滑只揭露移除，VoiceOver 與按鈕都進入同一確認', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
@@ -588,7 +588,7 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
     });
 
-    testWidgets('左滑刪除成功後才移除卡片', (tester) async {
+    testWidgets('左滑移除成功後才移除卡片', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(7)).thenAnswer((_) async {});
@@ -628,7 +628,7 @@ void main() {
       expect(find.text('復原'), findsNothing);
     });
 
-    testWidgets('左滑刪除失敗保留卡片並提供重試', (tester) async {
+    testWidgets('左滑移除失敗保留卡片並提供重試', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(
@@ -670,7 +670,7 @@ void main() {
       expect(find.text('重試'), findsOneWidget);
     });
 
-    testWidgets('長按選單的 destructive 刪除使用相同確認與結果', (tester) async {
+    testWidgets('長按選單的 destructive 移除使用相同確認與結果', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(7)).thenAnswer((_) async {});
@@ -704,7 +704,7 @@ void main() {
       expect(find.text('復原'), findsNothing);
     });
 
-    testWidgets('長按選單取消刪除不會呼叫 API', (tester) async {
+    testWidgets('長按選單取消移除不會呼叫 API', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(() => mockRepo.deleteFavorite(any())).thenAnswer((_) async {});
@@ -728,7 +728,7 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
     });
 
-    testWidgets('長按選單刪除失敗保留卡片並提供重試', (tester) async {
+    testWidgets('長按選單移除失敗保留卡片並提供重試', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
       when(
@@ -760,7 +760,7 @@ void main() {
       expect(find.text('重試'), findsOneWidget);
     });
 
-    testWidgets('刪除失敗保留卡片與選取並提供重試', (tester) async {
+    testWidgets('移除失敗保留卡片與選取並提供重試', (tester) async {
       final mockRepo = MockFavoritesRepository();
       var attempts = 0;
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
@@ -848,7 +848,7 @@ void main() {
       );
     });
 
-    testWidgets('選取多個收藏 → 確認批次刪除 → 逐筆 deleteFavorite + refresh', (
+    testWidgets('選取多個收藏 → 確認批次移除 → 逐筆 deleteFavorite + refresh', (
       tester,
     ) async {
       final mockRepo = MockFavoritesRepository();
@@ -900,7 +900,7 @@ void main() {
       expect(find.text('復原'), findsNothing);
     });
 
-    testWidgets('批次刪除按鈕有可讀語意，取消後保留選取且不呼叫 API', (tester) async {
+    testWidgets('批次移除按鈕有可讀語意，取消後保留選取且不呼叫 API', (tester) async {
       final semantics = tester.ensureSemantics();
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
@@ -939,7 +939,7 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('批次刪除 pending 時所有公開入口共用同一鎖，不會重複送出', (tester) async {
+    testWidgets('批次移除 pending 時所有公開入口共用同一鎖，不會重複送出', (tester) async {
       final mockRepo = MockFavoritesRepository();
       final deletion = Completer<void>();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
@@ -986,7 +986,7 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-7')), findsNothing);
     });
 
-    testWidgets('批次刪除只移除成功項目，失敗項目保留選取與重試', (tester) async {
+    testWidgets('批次移除只移除成功項目，失敗項目保留選取與重試', (tester) async {
       final mockRepo = MockFavoritesRepository();
       var secondAttempts = 0;
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
