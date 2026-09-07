@@ -38,7 +38,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     });
     try {
       await ref
-          .read(tripRepositoryProvider)
+          .read(accountRepositoryProvider)
           .updateProfile(displayName: savedName);
       ref.invalidate(authStateProvider);
       HapticFeedback.lightImpact();

@@ -121,7 +121,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### repository 方法
 
-- 每個 public 方法的 `///` 第一行必須寫出 HTTP method 與路徑，含關鍵約束（例：`lib/api/trip_repository.dart:151`、`:370`、`:385`）。沒有這行的新方法不予通過。
+- 每個 public 方法的 `///` 第一行必須寫出 HTTP method 與路徑，含關鍵約束（例：`TripRepository.updateTrip`、`AccountRepository.updateProfile`）。沒有這行的新方法不予通過。
 - 路徑參數一律 `Uri.encodeComponent`（`lib/api/trip_repository.dart:153`、`:376`、`:395`）；`dayNum`／`rowId`／`entryId` 這類 int 直接插值。
 - `currentUser()` 遇 401 回 `null` 不 throw，其他狀態 rethrow（`lib/api/auth_repository.dart:249-257`）。這是唯一允許把 401 轉成 `null` 的方法，不要複製到別處。
 - repository 不得自帶 `Origin`／`Cookie`／`Authorization`。

@@ -22,7 +22,7 @@ import '../../../ui/tp_settings_group.dart';
 final accountNotificationPreferencesProvider =
     FutureProvider<AccountNotificationPreferences>((ref) {
       return ref
-          .watch(tripRepositoryProvider)
+          .watch(accountRepositoryProvider)
           .fetchAccountNotificationPreferences();
     });
 
@@ -121,7 +121,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
       _mutationError = null;
     });
     try {
-      final repo = ref.read(tripRepositoryProvider);
+      final repo = ref.read(accountRepositoryProvider);
       switch (setting.key) {
         case 'trip-updates':
           await repo.updateAccountNotificationPreferences(tripUpdates: value);

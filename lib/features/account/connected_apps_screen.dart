@@ -19,7 +19,7 @@ import 'ai_authorize_card.dart';
 
 /// 已授權 OAuth app 清單（GET /account/connected-apps）。
 final connectedAppsProvider = FutureProvider<List<ConnectedApp>>((ref) {
-  return ref.watch(tripRepositoryProvider).fetchConnectedApps();
+  return ref.watch(accountRepositoryProvider).fetchConnectedApps();
 });
 
 /// 使用者管理已授權 app。
@@ -143,7 +143,9 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
       _failedApp = null;
     });
     try {
-      await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
+      await ref
+          .read(accountRepositoryProvider)
+          .revokeConnectedApp(app.clientId);
       if (!mounted) return;
       setState(() {
         _revokedClientIds.add(app.clientId);

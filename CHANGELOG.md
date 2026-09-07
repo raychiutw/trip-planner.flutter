@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.25.7] - 2026-09-06
+
+### 內部
+
+- 帳號、通知偏好、登入裝置、已連結 app、developer apps、公開行程 clone 共 14 個方法從 `TripRepository` 拆到 `AccountRepository`;行為不變。
+
 ## [0.23.1] - 2026-08-25
 
 ### 修正

@@ -37,7 +37,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ### Provider 鏈(riverpod 3.x)
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`/`tripRepositoryProvider` → `authStateProvider`(全 app 認證 SoT)→ `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 用 `StreamProvider.family<_, String tripId>`(`lib/features/trip_detail/trip_providers.dart:13,17,24`,entry/segments 同款)— timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch(對應 web 版 TripLayout),SWR 先 emit 本機快取再 emit 網路。
+`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`/`tripRepositoryProvider`/`accountRepositoryProvider`(帳號、裝置、developer apps)→ `authStateProvider`(全 app 認證 SoT)→ `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 用 `StreamProvider.family<_, String tripId>`(`lib/features/trip_detail/trip_providers.dart:13,17,24`,entry/segments 同款)— timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch(對應 web 版 TripLayout),SWR 先 emit 本機快取再 emit 網路。
 
 注意:flutter_riverpod 3.x 未匯出 `Override` 型別,測試的 overrides 直接以 list literal 傳入 `ProviderScope`。
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/notification_permission.dart';
 import 'package:tripline/features/account/settings/notifications_screen.dart';
@@ -11,7 +12,8 @@ import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_settings_group.dart';
 
-class _MockTripRepository extends Mock implements TripRepository {}
+class _MockTripRepository extends Mock
+    implements TripRepository, AccountRepository {}
 
 class _FakeNotificationPermissionService
     implements NotificationPermissionService {
@@ -59,6 +61,7 @@ void main() {
         retry: (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockTripRepository),
           notificationPermissionServiceProvider.overrideWithValue(
             permissionService,
           ),
