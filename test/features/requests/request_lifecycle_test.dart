@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
@@ -421,5 +422,108 @@ void main() {
     await _flush();
     expect(calls, before + 1, reason: '回前景只補讀一次');
     expect(delays.last.inSeconds, 4, reason: '退避從頭算');
+  });
+
+  for (final status in [401, 403, 404]) {
+    test('輪詢讀到 $status → 直接終結(failed / error),不再每 4 秒打空槍', () async {
+      var calls = 0;
+      when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) return _req(RequestStatus.processing);
+        throw ApiError(status: status, code: 'AUTH', message: 'x');
+      });
+      final c = makeContainer();
+      final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+      await _flush();
+      await events.close();
+      await _flush();
+      waits[0].complete();
+      await _flush();
+
+      final state = sub.read() as RequestTerminal;
+      expect(state.status, RequestStatus.failed);
+      expect(state.terminalReason, TerminalReason.error);
+      expect(waits, hasLength(1), reason: '不再排下一輪');
+    });
+  }
+
+  test('輪詢讀到 500 → 仍當暫時性錯誤,繼續輪詢', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw const ApiError(status: 500, code: 'X', message: 'x');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await events.close();
+    await _flush();
+    waits[0].complete();
+    await _flush();
+
+    expect(sub.read(), isA<RequestInFlight>());
+    expect(waits, hasLength(2));
+  });
+
+  test('SSE 開著但久無訊息 → idle timeout 後改輪詢', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = ProviderContainer(
+      overrides: [
+        requestsRepositoryProvider.overrideWithValue(repo),
+        requestPollWaitProvider.overrideWithValue((delay) {
+          final w = Completer<void>();
+          waits.add(w);
+          return w.future;
+        }),
+        requestSseIdleTimeoutProvider.overrideWithValue(Duration.zero),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await _flush();
+
+    expect(waits, hasLength(1), reason: 'SSE 沒訊息就退回輪詢');
+  });
+
+  test('SSE 終結事件後再讀一次 row:terminalReason 與 row 以伺服器為準', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      return calls == 1
+          ? _req(RequestStatus.processing)
+          : _req(RequestStatus.failed, reason: TerminalReason.needsConsent);
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.failed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.failed);
+    expect(state.terminalReason, TerminalReason.needsConsent);
+    expect(state.request?.status, RequestStatus.failed);
+    expect(calls, 2);
+  });
+
+  test('SSE 終結事件後補讀失敗 → 用事件內容終結,不卡住', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw Exception('offline');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
   });
 }

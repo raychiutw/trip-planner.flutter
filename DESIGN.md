@@ -333,6 +333,11 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：一般按鈕、捲動與每次輸入不觸發 haptic。
 - **HIG 必須**：動畫不得阻擋操作，也不得作為唯一狀態提示。
 
+### 17.1 非同步工單的等待與收尾
+
+- **Tripline 決策**:AI 工單(聊天、筆記生成、健檢)的等待流程共用同一份 lifecycle;停止等待只讓畫面脫身、不中止 AI,伺服器沒確認時要誠實提示。
+- **Tripline 決策**:工單終結後畫面補讀結果失敗(離線、逾時)時,顯示「已結束但讀取失敗」加重試鈕,不得標成「停滯」—— 停滯只給「結果表確實仍是 pending」的情況。
+
 ## 18. Accessibility release gate
 
 以下任一失敗都阻擋 release：

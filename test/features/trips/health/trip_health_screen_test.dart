@@ -352,20 +352,38 @@ void main() {
     expect(reads, 2, reason: '終結後只重讀一次,不是輪詢');
   });
 
-  testWidgets('工單終結但報告表讀不到 → 維持現況並標成停滯', (tester) async {
+  testWidgets('工單終結但報告表讀不到 → 顯示讀取失敗與重試,不標成停滯', (tester) async {
     var reads = 0;
     when(() => repository.fetchHealthReport('trip-1')).thenAnswer((_) async {
       reads++;
-      if (reads > 1) throw Exception('offline');
-      return pendingReport();
+      if (reads == 2) throw Exception('offline');
+      return reads == 1
+          ? pendingReport()
+          : const TripHealthReport(
+              tripId: 'trip-1',
+              userId: 'user-1',
+              status: TripHealthStatus.completed,
+              requestId: 43,
+              createdAt: '2026-07-09T10:02:00Z',
+            );
     });
     await pumpScreen(tester);
     sseEvents.add(const TripRequestEvent(status: RequestStatus.completed));
+    // SSE 終結 → lifecycle 補讀 row → 畫面補讀報告表:三段非同步。
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    expect(find.byKey(const ValueKey('trip-health-stalled')), findsNothing);
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
     await tester.pump();
     await tester.pump();
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('trip-health-stalled')), findsOneWidget);
+    expect(find.text('健檢已結束，但報告讀取失敗，請重試'), findsNothing);
+    expect(find.byKey(const ValueKey('trip-health-pending')), findsNothing);
+    expect(reads, 3, reason: '重試就是再讀一次');
   });
 
   testWidgets('停止等待:伺服器沒確認 → 仍換成停滯態,且誠實提示', (tester) async {
