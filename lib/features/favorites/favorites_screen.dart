@@ -316,7 +316,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                   for (final favorite in visibleFavorites)
                     SwipeToDelete(
                       dismissKey: ValueKey('favorite-dismiss-${favorite.id}'),
-                      actionLabel: '刪除',
+                      actionLabel: '移除',
                       onDelete: () => _removeFavorite(context, ref, favorite),
                       child: Stack(
                         children: [
@@ -342,7 +342,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                 ),
                                 container: true,
                                 liveRegion: true,
-                                label: '正在刪除「${favorite.displayName}」',
+                                label: '正在移除「${favorite.displayName}」',
                                 child: ColoredBox(
                                   color: Theme.of(
                                     context,
@@ -447,7 +447,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           icon: CupertinoIcons.check_mark_circled,
         ),
         TpActionItem(
-          label: '刪除',
+          label: '移除',
           value: _FavoriteContextAction.remove,
           icon: CupertinoIcons.heart_slash,
           dividerBefore: true,
@@ -527,9 +527,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       final confirmed = await showAppDestructiveConfirm(
         source: TpDestructiveConfirmSource.direct,
         context,
-        title: '刪除 ${ids.length} 個收藏？',
-        message: '將刪除${names.join('、')}。刪除後無法復原。',
-        confirmLabel: '刪除',
+        title: '移除 ${ids.length} 個收藏？',
+        message: '將從收藏移除${names.join('、')}。移除後無法復原，只能重新收藏。',
+        confirmLabel: '移除',
         cancelLabel: '保留',
       );
       if (!confirmed || !mounted) return;
@@ -567,14 +567,14 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       if (failedIds.isNotEmpty) {
         showAppError(
           context,
-          '${failedIds.length} 個收藏刪除失敗，資料仍保留。',
+          '${failedIds.length} 個收藏移除失敗，資料仍保留。',
           onRetry: () => unawaited(_confirmDeleteSelected()),
         );
         return;
       }
 
       HapticFeedback.mediumImpact();
-      showAppNotice(context, '已刪除 ${succeededIds.length} 個收藏');
+      showAppNotice(context, '已移除 ${succeededIds.length} 個收藏');
     } finally {
       _confirmingSelected = false;
       _pendingFavoriteIds.removeAll(ids);
@@ -597,9 +597,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       final confirmed = await showAppDestructiveConfirm(
         source: TpDestructiveConfirmSource.direct,
         context,
-        title: '刪除「${favorite.displayName}」？',
-        message: '將從收藏移除「${favorite.displayName}」。刪除後無法復原。',
-        confirmLabel: '刪除',
+        title: '移除「${favorite.displayName}」？',
+        message: '將從收藏移除「${favorite.displayName}」。移除後無法復原，只能重新收藏。',
+        confirmLabel: '移除',
         cancelLabel: '保留',
       );
       if (!confirmed || !context.mounted) return;
@@ -614,12 +614,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       ref.invalidate(favoritesProvider);
       HapticFeedback.mediumImpact();
       if (!context.mounted) return;
-      showAppNotice(context, '已刪除「${favorite.displayName}」');
+      showAppNotice(context, '已移除「${favorite.displayName}」');
     } on Exception {
       if (!context.mounted) return;
       showAppError(
         context,
-        '無法刪除「${favorite.displayName}」，收藏仍保留。',
+        '無法移除「${favorite.displayName}」，收藏仍保留。',
         onRetry: () => unawaited(_removeFavorite(context, ref, favorite)),
       );
     } finally {
@@ -933,7 +933,7 @@ class _BulkToolbar extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.delete_outline),
-              label: Text(deleting ? '刪除中' : '刪除'),
+              label: Text(deleting ? '移除中' : '移除'),
             ),
           ],
         ),
