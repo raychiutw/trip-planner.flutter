@@ -258,6 +258,8 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：離線時保留可用快取並顯示持續性離線狀態。無法離線執行的動作仍可被理解，點擊後說明原因。
 - **HIG 必須**：Root tabs 不因離線、空狀態或錯誤消失。
 - **HIG 必須**：載入、錯誤與完成狀態需透過 live region 或等效 semantics 對 assistive technology 宣告。
+- **Tripline 決策**：AI 工單（聊天、筆記生成、健檢）的等待流程共用同一份 lifecycle；停止等待只讓畫面脫身、不中止 AI，伺服器沒確認時要誠實提示。
+- **Tripline 決策**：工單終結後畫面補讀結果失敗（離線、逾時、session 過期）時，顯示「已結束但讀取失敗」加重試鈕，伺服器有訊息就用它的訊息；不得標成「停滯」—— 停滯只給「結果表確實仍是 pending」的情況。
 
 ## 15. 系統權限
 

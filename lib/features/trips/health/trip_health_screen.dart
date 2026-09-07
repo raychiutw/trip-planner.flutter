@@ -50,6 +50,13 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
   /// 不經 PATCH,完成 hook 不跑 —— 這個狀態要同時看兩邊才判斷得出來。
   bool _requestTerminated = false;
 
+  /// 工單終結後那一次報告表補讀失敗:顯示讀取失敗與重試,不是停滯
+  /// (停滯是「報告表確實還 pending」,這裡只是沒讀到)。
+  bool _reportFetchFailed = false;
+
+  /// 補讀失敗時要顯示的訊息:伺服器有繁中訊息(例如 session 過期)就用它。
+  String _reportFetchFailedMessage = _kReportFetchFailed;
+
   /// PATCH 還沒回來,停止鈕先停用,連點不會送第二次。
   bool _stopping = false;
 
@@ -76,13 +83,17 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     final tripId = widget.tripId;
     final terminatedRequestId = _report?.requestId;
     TripHealthReport? next;
+    String? failure;
     try {
       next = await ref.read(tripRepositoryProvider).fetchHealthReport(tripId);
-    } on Object {
-      next = null; // 讀不到就沿用現況
+    } on Object catch (error) {
+      // 讀不到:顯示讀取失敗與重試(D9);401 這類伺服器有話說的用它的話。
+      failure = _healthErrorMessage(error, _kReportFetchFailed);
     }
     if (!_isCurrent(generation, tripId)) return;
     setState(() {
+      _reportFetchFailed = failure != null;
+      _reportFetchFailedMessage = failure ?? _kReportFetchFailed;
       if (next != null) _report = next;
       // 讀回來是另一張新工單的 pending(別的裝置又發了一次)→ 照常訂閱它。
       _requestTerminated =
@@ -122,6 +133,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _reportFetchFailed = false;
     });
     try {
       final repository = ref.read(tripRepositoryProvider);
@@ -159,6 +171,7 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
       _starting = true;
       _error = null;
       _requestTerminated = false;
+      _reportFetchFailed = false;
     });
     try {
       final report = await ref
@@ -215,6 +228,12 @@ class _TripHealthScreenState extends ConsumerState<TripHealthScreen> {
               )
             : _trip == null
             ? _ErrorState(message: _error ?? '載入健檢資料失敗，請稍後重試', onRetry: _load)
+            : _reportFetchFailed
+            // 重試只再讀報告表(不重載整頁):再失敗就還是這個狀態,不退回停滯。
+            ? _ErrorState(
+                message: _reportFetchFailedMessage,
+                onRetry: _onRequestTerminal,
+              )
             : RefreshIndicator(
                 onRefresh: _starting ? () async {} : _load,
                 child: ListView(
@@ -898,6 +917,8 @@ String _formatTimestamp(String value) {
   }
   return value;
 }
+
+const _kReportFetchFailed = '健檢已結束，但報告讀取失敗，請重試';
 
 String _healthErrorMessage(Object error, String fallback) {
   if (error is ApiError) {

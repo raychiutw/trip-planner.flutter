@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/trip_request.dart';
 
@@ -47,6 +48,15 @@ final class RequestTerminal extends RequestLifecycleState {
 const kRequestPollInterval = Duration(seconds: 4);
 const kRequestPollCeiling = Duration(seconds: 30);
 
+/// SSE 開著但久無任何訊息就視為半開,收掉改輪詢。
+final requestSseIdleTimeoutProvider = Provider<Duration>(
+  (_) => const Duration(minutes: 2),
+);
+
+/// 這幾個狀態碼是伺服器的明確答覆(未登入 / 無權 / 工單不存在),不是暫時性錯誤,
+/// 再輪詢也不會變,直接終結。
+const _definitiveStatuses = {401, 403, 404};
+
 /// 輪詢用的等待;測試 override 成可手動放行的 Completer 並記下間隔。
 final requestPollWaitProvider = Provider<Future<void> Function(Duration)>(
   (_) => Future<void>.delayed,
@@ -73,6 +83,10 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   Completer<void>? _resumed;
   Duration _pollDelay = kRequestPollInterval;
 
+  /// SSE 已送來終結事件、正在補讀 row:伺服器已經有結果,stopWaiting 不做本機
+  /// cancelled,等補讀回來以伺服器為準。
+  bool _terminalEventSeen = false;
+
   bool _stale(int run) => run != _run;
 
   @override
@@ -82,6 +96,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     _events = null;
     _inflight = null;
     _resumed = null;
+    _terminalEventSeen = false;
     _pollDelay = kRequestPollInterval;
     ref.onDispose(() {
       if (_run == run) _run++;
@@ -134,8 +149,23 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       }
       state = RequestInFlight(request: row);
       return false;
+    } on ApiError catch (error) {
+      if (_stale(run) || state is RequestTerminal) return true;
+      if (_definitiveStatuses.contains(error.status)) {
+        // 終結事件已到、這次只是補讀:結果以事件為準,不被 401 / 404 蓋掉。
+        if (_terminalEventSeen) return false;
+        // 伺服器沒有給工單結果(未登入 / 無權 / 不存在):本機終結,
+        // serverConfirmed: false 讓畫面誠實提示,不當成 AI 真的失敗。
+        _terminate(
+          RequestStatus.failed,
+          TerminalReason.error,
+          serverConfirmed: false,
+        );
+        return true;
+      }
+      return false; // 其餘(5xx…)當暫時性錯誤:還在跑
     } on Object {
-      return _stale(run); // 暫時性錯誤:當作還在跑
+      return _stale(run); // 連線層錯誤:當作還在跑
     }
   }
 
@@ -145,7 +175,12 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     try {
       stream = ref
           .read(requestsRepositoryProvider)
-          .watchRequestEvents(requestId);
+          .watchRequestEvents(requestId)
+          // 半開的連線不會 onDone;久無訊息就自己收掉,走 onDone → 輪詢。
+          .timeout(
+            ref.read(requestSseIdleTimeoutProvider),
+            onTimeout: (sink) => sink.close(),
+          );
     } on Object {
       // SSE 開不起來不是失敗:改輪詢。
       unawaited(_fallbackToPolling(run));
@@ -154,14 +189,27 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     _events = stream.listen(
       (event) {
         if (!event.isTerminal) return;
-        _terminate(
-          event.status ?? RequestStatus.failed,
-          event.error != null ? TerminalReason.error : null,
-        );
+        unawaited(_terminateFromEvent(run, event));
       },
       onError: (Object _) => _fallbackToPolling(run),
       onDone: () => _fallbackToPolling(run),
       cancelOnError: true,
+    );
+  }
+
+  /// SSE 的終結事件不帶 terminalReason、row 也還是種子那份:再讀一次 row,
+  /// 以伺服器為準(聊天的 needs_consent 靠這個);補讀失敗就用事件內容終結。
+  Future<void> _terminateFromEvent(int run, TripRequestEvent event) async {
+    _events?.cancel();
+    _events = null;
+    _terminalEventSeen = true;
+    // 走 _refetch 共用 in-flight:回前景那一下撞上就共用同一次,不另外打。
+    // 回 true = row 已終結(state 已更新)或已作廢;false = 沒讀到 / 還沒終結。
+    if (await _refetch(run)) return;
+    if (_stale(run) || state is RequestTerminal) return;
+    _terminate(
+      event.status ?? RequestStatus.failed,
+      event.error != null ? TerminalReason.error : null,
     );
   }
 
@@ -217,8 +265,11 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     } on Object {
       confirmed = false;
     }
-    // 等 PATCH 的期間伺服器可能已經先終結:保留伺服器那一份。
-    if (_stale(run) || state is RequestTerminal) return true;
+    // 等 PATCH 的期間伺服器可能已經先終結(或終結事件已到、正在補讀):
+    // 保留伺服器那一份,不做本機 cancelled。
+    if (_stale(run) || state is RequestTerminal || _terminalEventSeen) {
+      return true;
+    }
     _terminate(
       RequestStatus.failed,
       TerminalReason.cancelled,

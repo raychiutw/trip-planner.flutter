@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/features/requests/request_lifecycle.dart';
@@ -421,5 +422,195 @@ void main() {
     await _flush();
     expect(calls, before + 1, reason: '回前景只補讀一次');
     expect(delays.last.inSeconds, 4, reason: '退避從頭算');
+  });
+
+  for (final status in [401, 403, 404]) {
+    test('輪詢讀到 $status → 直接終結(failed / error),不再每 4 秒打空槍', () async {
+      var calls = 0;
+      when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) return _req(RequestStatus.processing);
+        throw ApiError(status: status, code: 'AUTH', message: 'x');
+      });
+      final c = makeContainer();
+      final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+      await _flush();
+      await events.close();
+      await _flush();
+      waits[0].complete();
+      await _flush();
+
+      final state = sub.read() as RequestTerminal;
+      expect(state.status, RequestStatus.failed);
+      expect(state.terminalReason, TerminalReason.error);
+      expect(state.serverConfirmed, isFalse, reason: '伺服器沒有給工單結果,畫面要誠實提示');
+      expect(waits, hasLength(1), reason: '不再排下一輪');
+    });
+  }
+
+  test('輪詢讀到 500 → 仍當暫時性錯誤,繼續輪詢', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw const ApiError(status: 500, code: 'X', message: 'x');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await events.close();
+    await _flush();
+    waits[0].complete();
+    await _flush();
+
+    expect(sub.read(), isA<RequestInFlight>());
+    expect(waits, hasLength(2));
+  });
+
+  test('SSE 開著但久無訊息 → idle timeout 後改輪詢', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = ProviderContainer(
+      overrides: [
+        requestsRepositoryProvider.overrideWithValue(repo),
+        requestPollWaitProvider.overrideWithValue((delay) {
+          final w = Completer<void>();
+          waits.add(w);
+          return w.future;
+        }),
+        requestSseIdleTimeoutProvider.overrideWithValue(Duration.zero),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    await _flush();
+
+    expect(waits, hasLength(1), reason: 'SSE 沒訊息就退回輪詢');
+  });
+
+  test('SSE 終結事件後再讀一次 row:terminalReason 與 row 以伺服器為準', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      return calls == 1
+          ? _req(RequestStatus.processing)
+          : _req(RequestStatus.failed, reason: TerminalReason.needsConsent);
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.failed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.failed);
+    expect(state.terminalReason, TerminalReason.needsConsent);
+    expect(state.request?.status, RequestStatus.failed);
+    expect(calls, 2);
+  });
+
+  test('SSE 終結事件後補讀失敗 → 用事件內容終結,不卡住', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw Exception('offline');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
+  });
+
+  test('SSE 終結事件補讀期間 stopWaiting → 不用 cancelled 蓋掉,等 row 回來以伺服器為準', () async {
+    var calls = 0;
+    final row = Completer<TripRequest>();
+    when(() => repo.fetchRequest(7)).thenAnswer((_) {
+      calls++;
+      return calls == 1
+          ? Future.value(_req(RequestStatus.processing))
+          : row.future;
+    });
+    when(() => repo.stopWaiting(7)).thenAnswer((_) async {});
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.failed));
+    await _flush();
+    expect(sub.read(), isA<RequestInFlight>(), reason: '補讀還在飛');
+
+    final confirmed = await c
+        .read(requestLifecycleProvider(7).notifier)
+        .stopWaiting();
+    expect(confirmed, isTrue);
+    expect(sub.read(), isA<RequestInFlight>(), reason: '伺服器已終結,不做本機 cancelled');
+
+    row.complete(
+      _req(RequestStatus.failed, reason: TerminalReason.needsConsent),
+    );
+    await _flush();
+    final state = sub.read() as RequestTerminal;
+    expect(state.terminalReason, TerminalReason.needsConsent);
+  });
+
+  test('SSE 終結事件的補讀與回前景的補讀共用同一個 in-flight', () async {
+    var calls = 0;
+    final row = Completer<TripRequest>();
+    when(() => repo.fetchRequest(7)).thenAnswer((_) {
+      calls++;
+      return calls == 1
+          ? Future.value(_req(RequestStatus.processing))
+          : row.future;
+    });
+    final c = makeContainer();
+    c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+    for (final s in [AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(s);
+    }
+    await _flush();
+
+    expect(calls, 2, reason: '回前景共用飛行中的補讀,不另外打');
+    row.complete(_req(RequestStatus.completed));
+    await _flush();
+  });
+
+  test('事件說 completed、補讀卻 404 → 用事件內容終結,不被 404 蓋成 failed', () async {
+    var calls = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) return _req(RequestStatus.processing);
+      throw const ApiError(status: 404, code: 'NOT_FOUND', message: 'x');
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
+  });
+
+  test('事件說 completed、補讀 row 仍 processing(最終一致)→ 仍以事件終結', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.processing));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+
+    final state = sub.read() as RequestTerminal;
+    expect(state.status, RequestStatus.completed);
   });
 }
