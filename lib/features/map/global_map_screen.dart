@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/tokens.dart';
 import '../../ui/tp_root_scaffold.dart';
+import '../trip_detail/selected_day_provider.dart';
 import '../trip_detail/trip_map_screen.dart';
 import '../trips/current_trip_provider.dart';
 import '../trips/trips_list_screen.dart';
@@ -38,6 +39,10 @@ class GlobalMapScreen extends ConsumerStatefulWidget {
 
 class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
   int? _activeDayNum;
+
+  /// [_activeDayNum] 是在哪個行程上記的:換行程時若時間軸已為新行程選了某一天,
+  /// 用共用值,不把上一個行程的天數帶過去。
+  String? _activeDayTripId;
   String? _pendingRouteTripId;
   String? _renderedTripId;
 
@@ -150,13 +155,22 @@ class _GlobalMapScreenState extends ConsumerState<GlobalMapScreen> {
           initialEntryId: selected.tripId == widget.initialTripId
               ? widget.initialEntryId
               : null,
-          initialDayNum: _activeDayNum,
+          // 優先序:自己在這個行程上看的那一天 → 路由 ?day= → 時間軸為這個行程
+          // 選的共用值 → 上一個行程的天數(換行程保留同一天的既有行為)。
+          initialDayNum: selected.tripId == _activeDayTripId
+              ? _activeDayNum
+              : widget.initialDayNum ??
+                    ref.read(selectedDayProvider).dayNumFor(selected.tripId) ??
+                    _activeDayNum,
           mapBuilder: widget.mapBuilder,
           locationService: widget.locationService,
           onTripSelected: (tripId) => unawaited(
             ref.read(currentTripIdProvider.notifier).select(tripId),
           ),
-          onActiveDayChanged: (dayNum) => _activeDayNum = dayNum,
+          onActiveDayChanged: (dayNum) {
+            _activeDayNum = dayNum;
+            _activeDayTripId = selected.tripId;
+          },
         );
       },
     );

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/api/cache/cache_store.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/features/map/global_map_screen.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
@@ -175,6 +176,36 @@ void main() {
 
     expect(find.byKey(const ValueKey('map-pin-22')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+  });
+
+  testWidgets('切換行程時,時間軸已為新行程選了 DAY → 用它,不帶上一個行程的天數', (tester) async {
+    await tester.pumpWidget(
+      buildApp(
+        daysByTrip: {
+          'okinawa': [_day, _dayTwo],
+          'tokyo': [_day, _dayTwo],
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    // 時間軸在東京看 DAY 1(共用值換成東京的),再切地圖到東京。
+    ProviderScope.containerOf(
+      tester.element(find.byType(GlobalMapScreen)),
+      listen: false,
+    ).read(selectedDayProvider.notifier).select(tripId: 'tokyo', dayNum: 1);
+
+    await tester.tap(find.byKey(const ValueKey('trip-map-trip-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-tokyo')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('map-pin-11')),
+      findsOneWidget,
+      reason: '東京用共用值 DAY 1',
+    );
+    expect(find.byKey(const ValueKey('map-pin-22')), findsNothing);
   });
 
   testWidgets('切換行程缺少原 DAY 時回 Day 1 並清除舊 POI', (tester) async {

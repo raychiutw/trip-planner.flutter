@@ -975,6 +975,53 @@ void main() {
     );
   });
 
+  testWidgets('days 重新 emit(SWR 第二段)時保留使用者剛點的 DAY,不退回也不寫回', (tester) async {
+    final days = StreamController<List<TripDay>>();
+    addTearDown(days.close);
+    await tester.pumpWidget(
+      _buildScreen(const [], daysStream: days.stream, initialDayNum: 1),
+    );
+    days.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+
+    days.add([_dayOne, _dayTwo]); // 新的 list identity,內容相同
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2, reason: '不從 initialDayNum 重算');
+    expect(_sharedDayNum(tester), 2, reason: '不把退回寫進共用狀態');
+  });
+
+  testWidgets('地圖與時間軸來回兩次仍一致(第二次共用值相同也要接手)', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    final notifier = _containerOf(tester).read(selectedDayProvider.notifier);
+
+    for (var round = 1; round <= 2; round++) {
+      await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+      await tester.pumpAndSettle();
+      expect(_mapSelectorTabIndex(tester), 2, reason: '第 $round 回合點 DAY 2');
+
+      active.value = false;
+      await tester.pumpAndSettle();
+      notifier.select(tripId: 'trip-1', dayNum: 1); // 時間軸捲到 DAY 1
+      active.value = true;
+      await tester.pumpAndSettle();
+      expect(
+        _mapSelectorTabIndex(tester),
+        1,
+        reason: '第 $round 回合回到地圖要跟上 DAY 1',
+      );
+    }
+  });
+
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {
     final repository = _StubMapRepository();
     await tester.pumpWidget(_buildScreen([_dayOne], mapRepository: repository));
