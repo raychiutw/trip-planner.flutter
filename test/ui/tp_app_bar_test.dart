@@ -443,11 +443,12 @@ void main() {
     // flutter test 的 Ahem 不區分字重；使用 SDK 隨附字型驗證真實字寬。
     await tester.runAsync(() async {
       final loader = FontLoader('MenuBoldRegression');
-      for (final weight in ['regular', 'bold']) {
+      // 檔名大小寫須與 SDK 字型壓縮檔一致，Linux 才能正確載入。
+      for (final weight in ['Regular', 'Bold']) {
         final font = File.fromUri(
           Uri.file(
             Platform.resolvedExecutable,
-          ).resolve('../../material_fonts/roboto-$weight.ttf'),
+          ).resolve('../../material_fonts/Roboto-$weight.ttf'),
         );
         loader.addFont(
           Future.value(ByteData.sublistView(font.readAsBytesSync())),
