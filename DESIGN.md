@@ -44,6 +44,9 @@ iPhone 固定四個 root tabs：
 - **HIG 必須**：切換 tab 時保留各 branch 的 Navigation Stack、Day、篩選與捲動位置。
 - **Tripline 決策**：再次點擊目前 tab 時，詳情頁回到該 branch 根畫面；已在根畫面時捲回頂端。不得清除搜尋條件或重新載入資料。
 - **HIG 建議**：成功切換時使用輕量 selection haptic。
+- **Tripline 決策**：root tab 的選取指示、幾何與動畫由 Liquid Glass 1.4.1 公開元件提供；不再限制 70% 膠囊、負 expansion 或自畫 activeIcon。選取表面保持中性，品牌 tint 只用於前景。
+- **HIG 必須**：放大文字仍完整可讀且每個 tab 至少 44×44pt；必要時以公開 barHeight 增加高度，並同步 regular 頂部佔位與 compact 底部內容／accessory 留白。
+- **Tripline 決策**：套件尚未接通的鍵盤與讀屏啟用由薄轉接保留，每次動作只切換一次；轉接區不攔截指標，不取代套件點選或拖曳。
 
 ### 3.2 iPad 與 regular width
 

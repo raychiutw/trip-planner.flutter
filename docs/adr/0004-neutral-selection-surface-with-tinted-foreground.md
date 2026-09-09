@@ -12,8 +12,8 @@ supersedes: 0003-brand-tint-for-root-tab-selection.md
 > 只為舊 shader 邊緣強度而調整 Fresnel、光照、色散、折射率與 blur 的要求。
 > 以下量測與更正史保留供追溯，不是新版的校準目標。一般模式不另畫邊線，提高
 > 對比才補明確邊界；提高對比與降低透明度各自使用不透明、無 shader 降級。
-> 第 3 節的 70% 膠囊與自畫選取層已由 #303 同意解除，實作遷移由 #305 承接；
-> 日期選擇器的自畫膠囊由 #306 承接。本票不宣稱完成這兩項元件遷移。
+> 第 3 節的 root tab 70% 膠囊與自畫選取層已由 #305 移除；套件接手選取繪製與指標互動。
+> 日期選擇器的自畫膠囊仍由 #306 承接，尚未在 #305 遷移。
 
 
 ## 為什麼推翻 ADR-0003
@@ -61,7 +61,27 @@ ADR-0003 關於「HIG 沒有規定選取指示的形狀或配色」的觀察仍�
 裡兩者不一致。Apple 兩者都是近白(`#F7F7F8` / `#F6F6F6`)。統一為近白;未選態靠
 「沒有膠囊」與「不是 tint」區分,不靠變淡。
 
-### 3. 選取膠囊寬度收到約欄寬 70%
+### 3. root tab 選取指示交由套件繪製（#305 取代舊比例決策）
+
+2026-09-09，母規格 #303 已同意採 Liquid Glass 1.4.1 的預設幾何與互動。
+root tab 移除 70% 自畫膠囊、activeIcon 疊層、負 indicatorExpansion、tabPadding
+對齊補償及模擬套件文字高度的 TextPainter。選取填色使用公開 indicatorColor
+指定中性語意色，字符與標籤保留品牌 tint；媒體背景與無障礙降級沿用共用配方。
+
+仍保留兩項薄整合：
+
+- 套件 1.4.1 的 TabBarBottomLayout 對 BottomBarTabItem 傳入 `onTap: null`，
+  使內容的鍵盤啟用沒有回呼。App 提供指標可穿透的鍵盤／讀屏區域，排除套件重複
+  focus／semantics；真正的觸控與拖曳仍由套件處理。branch 換頁後恢復目前 tab 焦點。
+- 套件固定 barHeight 會讓 300% 文字再次縮小；App 明確指定 label typography，
+  只依這份 App 自有字級與間距增加公開 barHeight，並同步 shell、內容與 accessory
+  佔位。不讀取或反推套件內部文字、選取膠囊與裁切幾何。
+
+測試改驗實際選取填色與移動、文字邊界、44pt 觸控區、selected semantics、點選、
+拖曳、讀屏、Tab／Shift-Tab、Enter／Space 及分支狀態；不再把舊比例當作契約。
+以下保留 0.x 時期的量測與選擇，作為歷史脈絡：
+
+#### 舊決定（已被 #305 取代）
 
 `GlassTabBar` 的 `indicatorExpansion` 預設 `horizontal: 12`,我們未曾覆寫,結果膠囊
 比自己的欄位還寬(實測欄寬 275px、膠囊 341px = **124%**),溢出到左右鄰居。

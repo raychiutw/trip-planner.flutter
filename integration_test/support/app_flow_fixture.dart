@@ -484,7 +484,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
 
   // 行程與地圖之間改由 root tab 進出（兩顆重複的 bar button 已移除）。
-  await tester.tap(_rootTab('地圖'));
+  await tester.tapAt(tester.getCenter(_rootTab('地圖')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('trip-map-day-selector')), findsOneWidget);
@@ -505,7 +505,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
   await tester.pumpAndSettle();
-  await tester.tap(_rootTab('行程'));
+  await tester.tapAt(tester.getCenter(_rootTab('行程')));
   await tester.pumpAndSettle();
   expect(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
@@ -569,7 +569,7 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.text('首里城'), findsOneWidget);
 
-  await tester.tap(_rootTab('聊天'));
+  await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
   await typeText(
@@ -645,7 +645,7 @@ Future<void> runAppOwnedReleaseFlow(
   verifyNever(() => fixture.speech.listen(any()));
   await captureState('chat');
 
-  await tester.tap(_rootTab('行程'));
+  await tester.tapAt(tester.getCenter(_rootTab('行程')));
   await tester.pumpAndSettle();
   expect(
     find.byKey(const ValueKey('trip-timeline-view-day-selector')),
@@ -676,7 +676,7 @@ Future<void> runAppOwnedReleaseFlow(
     isTrue,
   );
 
-  await tester.tap(_rootTab('聊天'));
+  await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
   expect(find.text('沖繩家族之旅'), findsWidgets);
   expect(find.text('device smoke draft'), findsOneWidget);
@@ -696,7 +696,7 @@ Future<void> runAppOwnedReleaseFlow(
     isEmpty,
   );
 
-  await tester.tap(_rootTab('地圖'));
+  await tester.tapAt(tester.getCenter(_rootTab('地圖')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
   expect(find.byKey(const ValueKey('global-trip-map-okinawa')), findsOneWidget);
@@ -707,18 +707,18 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('global-trip-map-tokyo')), findsOneWidget);
 
-  await tester.tap(_rootTab('行程'));
+  await tester.tapAt(tester.getCenter(_rootTab('行程')));
   await tester.pumpAndSettle();
   expect(find.text('東京週末旅行'), findsWidgets);
   expect(find.byKey(const ValueKey('day-pill-1')), findsOneWidget);
   expect(find.text('東京車站'), findsOneWidget);
 
-  await tester.tap(_rootTab('聊天'));
+  await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
   expect(find.text('東京週末旅行'), findsWidgets);
   expect(find.text('device smoke draft'), findsNothing);
 
-  await tester.tap(_rootTab('收藏'));
+  await tester.tapAt(tester.getCenter(_rootTab('收藏')));
   await tester.pump();
   fixture.favoritesStream.add(releaseSmokeFavorites);
   await tester.pumpAndSettle();
@@ -732,11 +732,11 @@ Future<void> runAppOwnedReleaseFlow(
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
 
-  await tester.tap(_rootTab('聊天'));
+  await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
   await tester.tap(find.text('從一個指令開始'));
   await tester.pump();
-  await tester.tap(_rootTab('收藏'));
+  await tester.tapAt(tester.getCenter(_rootTab('收藏')));
   await tester.pumpAndSettle();
   final favoritesSearch = find.byKey(const ValueKey('favorites-search-input'));
   expect(

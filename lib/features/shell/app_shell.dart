@@ -92,12 +92,19 @@ class _AppShellState extends State<AppShell> {
             extendBody: showRootTab && !regular,
             appBar: showRootTab && regular
                 ? PreferredSize(
-                    preferredSize: const Size.fromHeight(80),
+                    preferredSize: Size.fromHeight(
+                      TpRootTabGeometry.barHeight(context) + TpSpacing.s2,
+                    ),
                     child: KeyedSubtree(
                       key: const ValueKey('apple-regular-root-tabs'),
                       child: SafeArea(
                         bottom: false,
-                        child: SizedBox(height: 80, child: rootTabs),
+                        child: SizedBox(
+                          height:
+                              TpRootTabGeometry.barHeight(context) +
+                              TpSpacing.s2,
+                          child: rootTabs,
+                        ),
                       ),
                     ),
                   )

@@ -1302,7 +1302,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('root-tab-地圖')));
+    await tester.tapAt(tester.getCenter(find.bySemanticsLabel('地圖')));
     await tester.pumpAndSettle();
 
     expect(find.byType(GlobalMapScreen), findsOneWidget);
@@ -1321,7 +1321,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('root-tab-行程')));
+    await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
     await tester.pumpAndSettle();
 
     expect(find.byType(TripTimelineScreen), findsOneWidget);
@@ -1358,7 +1358,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('day-pill-2')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('root-tab-地圖')));
+    await tester.tapAt(tester.getCenter(find.bySemanticsLabel('地圖')));
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
@@ -1368,7 +1368,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('root-tab-行程')));
+    await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
     await tester.pumpAndSettle();
 
     expect(

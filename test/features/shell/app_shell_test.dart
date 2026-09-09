@@ -164,16 +164,15 @@ GoRouter buildSplitShellRouter() {
   );
 }
 
-/// 靜止態選取膠囊**實際畫出來**的填色。
-///
-/// #179:不要改回讀 `GlassTabBar.indicatorColor` —— 那個參數現在恆為透明,
-/// 靜止態的膠囊是本 app 自畫的(套件靜止時只會畫滿整格欄位,任何參數都收不動)。
-Color _selectedPillColor(WidgetTester tester, String label) {
-  final box = tester.widget<DecoratedBox>(
-    find.byKey(ValueKey('root-tab-pill-$label')),
-  );
-  return (box.decoration as ShapeDecoration).color!;
-}
+/// 中性表面的公開設定；HIG 矩陣另驗實際繪製與操作。
+Color _selectedPillColor(WidgetTester tester, String label) => tester
+    .widget<GlassTabBar>(
+      find.descendant(
+        of: find.byKey(const ValueKey('apple-root-tab-bar')),
+        matching: find.byType(GlassTabBar),
+      ),
+    )
+    .indicatorColor!;
 
 void main() {
   group('AppShell 4-tab 導航', () {
@@ -306,22 +305,27 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('regular-root-tab-地圖')),
+      await tester.tapAt(
+        tester.getCenter(find.bySemanticsLabel('地圖')),
         kind: PointerDeviceKind.mouse,
       );
       await tester.pumpAndSettle();
       expect(find.text('PROBE-MAP'), findsOneWidget);
 
-      final tripsButton = tester.widget<TextButton>(
-        find.byKey(const ValueKey('regular-root-tab-行程')),
-      );
-      tripsButton.focusNode!.requestFocus();
+      // 使用真實 Tab 導覽；不取套件或 App 的 FocusNode。
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
 
-      expect(find.text('PROBE-TRIPS'), findsOneWidget);
+      expect(find.text('PROBE-FAV'), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
     });
 
     testWidgets('regular top tabs 避開頂部 safe area', (tester) async {
@@ -618,9 +622,7 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         _selectedPillColor(tester, '地圖'),
-        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.dark().colorScheme.surfaceContainerHigh,
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
     });
@@ -670,9 +672,7 @@ void main() {
       );
       expect(
         _selectedPillColor(tester, '地圖'),
-        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.light().colorScheme.surfaceContainerHigh,
       );
     });
 
@@ -962,9 +962,7 @@ void main() {
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         _selectedPillColor(tester, '聊天'),
-        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.light().colorScheme.surfaceContainerHigh,
       );
       // 新版材質數值由套件決定；幾何、選取及前景語意維持 App 契約。
     });
@@ -989,67 +987,31 @@ void main() {
       );
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
 
-      // 膠囊本身保留（iOS 26 的系統視覺指示），只換底色為中性語意層。
-      // iOS 26 的 tab bar 拿**強調色**當選取背景、前景反白（參考「電話」app
-      // 的通話記錄分頁）。#118 當初改成中性語意層，前提是「iOS 26 不用強調色
-      // 當選取底」—— 那個前提不成立。
-      //
-      // 選取指示是「中性底 + tint 前景」。iOS 26 電話 app 實測膠囊是
-      // #363636 中性灰、系統藍在字符上 —— 強調色在前景不在背景。
-      // Apple 的藍是「它的」強調色，不是規範色；我們用柔褐。
+      // 中性選取表面與品牌前景各自保留。
       final pillColor = _selectedPillColor(tester, '聊天');
       expect(rgb(pillColor), isNot(rgb(scheme.primary)));
       expect(
         rgb(pillColor),
-        rgb(scheme.surfaceContainerHighest),
+        rgb(scheme.surfaceContainerHigh),
         reason: '選取底是中性語意層',
       );
 
-      // 品牌色只出現在前景：字符、標籤與光暈。
+      // 品牌色只出現在前景：字符與標籤。
       expect(glass.selectedIconColor, scheme.primary);
 
-      // #179:膠囊的寬度守門在 root_tab_alignment_test.dart —— 那裡量的是
-      // **畫出來的方框**。這裡原本斷言 `indicatorExpansion` 是負值,但那個參數
-      // 只在拖曳中生效(`RelativeRect.lerp` 在 thickness == 0 時回
-      // `RelativeRect.fill`),參數對、靜止態的畫面照樣滿版。
-      expect(glass.selectedLabelColor, scheme.primary);
-      expect(glass.unselectedIconColor, scheme.onSurface);
-      expect(
-        glass.unselectedIconColor,
-        glass.unselectedLabelColor,
-        reason: '未選的字符與標籤必須同色',
+      final icons = tester.widgetList<Icon>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(Icon),
+        ),
       );
-      for (final tab in glass.tabs) {
-        expect(tab.glowColor, scheme.primary);
-      }
-
-      // 未選取態也是實心字符，靠 tint 區分而不是 outline↔filled 切換。
-      const filled = [
+      for (final icon in [
         CupertinoIcons.chat_bubble_fill,
         CupertinoIcons.briefcase_fill,
         CupertinoIcons.map_fill,
         CupertinoIcons.heart_fill,
-      ];
-      expect(glass.tabs.length, filled.length);
-      const labels = ['聊天', '行程', '地圖', '收藏'];
-      for (var i = 0; i < filled.length; i++) {
-        // 兩態都量**畫出來的字符**：選取態的字符包在自畫膠囊外層裡（#179），
-        // 型別轉型看不到它。
-        expect(
-          tester
-              .widget<Icon>(find.byKey(ValueKey('root-tab-${labels[i]}')))
-              .icon,
-          filled[i],
-          reason: '第 $i 個 tab 未選取態',
-        );
-        final active = find.byKey(ValueKey('root-tab-active-${labels[i]}'));
-        // 選取層只畫選取態附近的 tab，畫出來的才驗。
-        if (active.evaluate().isEmpty) continue;
-        expect(
-          tester.widget<Icon>(active).icon,
-          filled[i],
-          reason: '第 $i 個 tab 選取態必須是同一個實心字符，不做 outline↔filled 切換',
-        );
+      ]) {
+        expect(icons.any((widget) => widget.icon == icon), isTrue);
       }
     });
 
@@ -1070,9 +1032,7 @@ void main() {
       );
       expect(
         _selectedPillColor(tester, '聊天'),
-        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.dark().colorScheme.surfaceContainerHigh,
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
       expect(glass.settings!.glassColor.a, lessThan(1));

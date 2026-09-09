@@ -95,6 +95,25 @@ abstract final class TpSpacing {
 abstract final class TpRootTabGeometry {
   static const horizontalMargin = 16.0;
   static const expandedBarHeight = 64.0;
+  static const iconSize = 24.0;
+  static const iconLabelSpacing = 4.0;
+  static const labelFontSize = 11.0;
+  static const labelLineHeight = 1.3;
+
+  /// App 指定的字符、行距與文字尺寸；只提供公開 barHeight 所需的佔位。
+  /// 保留上下各 8pt，避免套件為了固定高度再次縮小 Dynamic Type 文字。
+  static double barHeight(BuildContext context) {
+    final contentHeight =
+        iconSize +
+        iconLabelSpacing +
+        MediaQuery.textScalerOf(context).scale(labelFontSize) *
+            labelLineHeight +
+        16;
+    return contentHeight > expandedBarHeight
+        ? contentHeight
+        : expandedBarHeight;
+  }
+
   static const bottomSpacing = 16.0;
   static const safeAreaOverlap = 24.0;
 
@@ -110,7 +129,7 @@ abstract final class TpRootTabGeometry {
       bottomOffsetFor(bottomInset) + expandedBarHeight;
 
   static double expandedHeight(BuildContext context) =>
-      expandedHeightFor(MediaQuery.viewPaddingOf(context).bottom);
+      bottomOffset(context) + barHeight(context);
 
   static double clearance(BuildContext context) {
     final shellInset = MediaQuery.paddingOf(context).bottom;

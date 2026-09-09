@@ -1,6 +1,7 @@
 import 'dart:ui' show Tristate;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -59,22 +60,149 @@ const _states = [
   _HigState(brightness: Brightness.dark, reduceTransparency: true),
 ];
 
-/// 靜止態 root tab 選取膠囊**實際畫出來**的填色。
-///
-/// #179:不要改回讀 `GlassTabBar.indicatorColor` —— 那個參數現在恆為透明,
-/// 靜止態的膠囊是 `AppleRootTabBar` 自畫的。四顆膠囊同色,取畫得出來的第一顆。
-Color _selectedPillColor(WidgetTester tester) {
-  final finder = find.byWidgetPredicate((widget) {
-    final key = widget.key;
-    return widget is DecoratedBox &&
-        key is ValueKey<String> &&
-        key.value.startsWith('root-tab-pill-');
-  });
-  final box = tester.widget<DecoratedBox>(finder.first);
-  return (box.decoration as ShapeDecoration).color!;
-}
+/// 公開中性表面設定；另外以像素確認選取表面確實繪製。
+Color _selectedPillColor(WidgetTester tester) => tester
+    .widget<GlassTabBar>(
+      find.descendant(
+        of: find.byKey(const ValueKey('apple-root-tab-bar')),
+        matching: find.byType(GlassTabBar),
+      ),
+    )
+    .indicatorColor!;
 
 void main() {
+  for (final state in _states) {
+    testWidgets('root tab選取表面實際繪製並隨操作移動 ${state.name}', (tester) async {
+      final boundaryKey = GlobalKey();
+      var selected = 0;
+      var selections = 0;
+      final focusNodes = List.generate(4, (_) => FocusNode());
+      addTearDown(() {
+        for (final node in focusNodes) {
+          node.dispose();
+        }
+      });
+      final theme = state.brightness == Brightness.light
+          ? AppTheme.light()
+          : AppTheme.dark();
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: state.reduceTransparency,
+          child: MaterialApp(
+            theme: theme,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: state.increasedContrast,
+                disableAnimations: state.reduceMotion,
+                textScaler: TextScaler.linear(state.textScale),
+              ),
+              child: GlassAdaptiveScope(
+                maxQuality: GlassQuality.minimal,
+                child: child!,
+              ),
+            ),
+            home: Scaffold(
+              body: Center(
+                child: RepaintBoundary(
+                  key: boundaryKey,
+                  child: SizedBox(
+                    width: 390,
+                    height: 120,
+                    child: StatefulBuilder(
+                      builder: (context, setState) => Align(
+                        alignment: Alignment.bottomCenter,
+                        child: AppleRootTabBar(
+                          selectedIndex: selected,
+                          focusNodes: focusNodes,
+                          onSelected: (value) {
+                            selections++;
+                            setState(() => selected = value);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Future<Color> pixel(String label) async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final rect = tester.getRect(find.bySemanticsLabel(label));
+        final point = boundary.globalToLocal(
+          Offset(rect.center.dx, rect.top + 7),
+        );
+        final image = (await tester.runAsync(
+          () => boundary.toImage(pixelRatio: 1),
+        ))!;
+        final data = (await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        ))!;
+        final offset = (point.dy.floor() * image.width + point.dx.floor()) * 4;
+        final color = Color.fromARGB(
+          data.getUint8(offset + 3),
+          data.getUint8(offset),
+          data.getUint8(offset + 1),
+          data.getUint8(offset + 2),
+        );
+        image.dispose();
+        return color;
+      }
+
+      final selectedLabels = tester.widgetList<Text>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.text('聊天'),
+        ),
+      );
+      expect(
+        selectedLabels.map((text) => text.style?.color),
+        contains(theme.colorScheme.primary),
+      );
+      final firstSelection = await pixel('聊天');
+      final unselected = await pixel('行程');
+      expect(
+        firstSelection,
+        theme.colorScheme.surfaceContainerHigh,
+        reason: '中性選取底必須真正畫出，不只設定參數',
+      );
+      expect(firstSelection, isNot(unselected));
+      await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
+      await tester.pumpAndSettle();
+      expect(await pixel('行程'), firstSelection);
+      expect(await pixel('聊天'), unselected);
+      expect(selections, 1);
+      final mapNode = tester.getSemantics(find.bySemanticsLabel('地圖'));
+      mapNode.owner!.performAction(mapNode.id, ui.SemanticsAction.tap);
+      await tester.pumpAndSettle();
+      expect(selections, 2);
+      expect(selected, 2);
+      focusNodes[3].requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selections, 3);
+      expect(selected, 3);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(selections, 4, reason: '再次啟用目前tab也只呼叫一次');
+
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('收藏'))
+            .getSemanticsData()
+            .flagsCollection
+            .isSelected,
+        Tristate.isTrue,
+      );
+    });
+  }
+
   for (final state in _states) {
     testWidgets('共用可操作玻璃表面採套件預設呈現 ${state.name}', (tester) async {
       final boundaryKey = GlobalKey();
@@ -347,18 +475,22 @@ void main() {
         reason: '未選的字符與標籤必須同色',
       );
 
-      // 未選取態也是實心字符：兩態同字符、靠 tint 區分，不做 outline↔filled 切換。
-      // 量**畫出來的字符**：選取態的字符包在自畫膠囊外層裡（#179），轉型看不到。
-      for (final label in const ['聊天', '行程', '地圖', '收藏']) {
-        final active = find.byKey(ValueKey('root-tab-active-$label'));
-        // 選取層只畫選取態附近的 tab，畫出來的才驗。
-        if (active.evaluate().isEmpty) continue;
-        expect(
-          tester.widget<Icon>(active).icon,
-          tester.widget<Icon>(find.byKey(ValueKey('root-tab-$label'))).icon,
-          reason: 'root tab 的選取態與未選取態必須是同一個字符',
-        );
-      }
+      // 所有真正渲染的root tab字符都採同一組實心圖示，不依賴選取層實作。
+      final icons = tester
+          .widgetList<Icon>(
+            find.descendant(
+              of: find.byKey(const ValueKey('apple-root-tab-bar')),
+              matching: find.byType(Icon),
+            ),
+          )
+          .map((icon) => icon.icon)
+          .toSet();
+      expect(icons, {
+        CupertinoIcons.chat_bubble_fill,
+        CupertinoIcons.briefcase_fill,
+        CupertinoIcons.map_fill,
+        CupertinoIcons.heart_fill,
+      });
 
       // 品牌色改走前景：選取態的標籤是 tint，未選取維持中性次要前景。
       expect(
