@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,6 +15,7 @@ import '../../models/poi_search_result.dart';
 import '../../models/poi_type.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_action_item.dart';
 import '../favorites/favorites_providers.dart';
 import '../favorites/explore/explore_controller.dart'
     show poiRepositoryProvider;
@@ -642,16 +644,25 @@ class _SearchPoiPanel extends StatelessWidget {
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: PopupMenuButton<String>(
+          child: TpMoreMenuButton<String>(
             tooltip: '切換搜尋地區',
             onSelected: onRegionChanged,
-            itemBuilder: (context) => [
+            items: [
               for (final option in _regionOptionsFor(region))
-                PopupMenuItem(value: option, child: Text(option)),
+                TpActionItem(
+                  value: option,
+                  label: option,
+                  icon: CupertinoIcons.location,
+                  selected: option == region,
+                ),
             ],
-            child: Chip(
-              avatar: const Icon(Icons.location_on_outlined, size: 16),
-              label: Text(region),
+            triggerBuilder: (context, onPressed) => Tooltip(
+              message: '切換搜尋地區',
+              child: TextButton.icon(
+                onPressed: onPressed,
+                icon: const Icon(CupertinoIcons.location_solid, size: 16),
+                label: Text(region),
+              ),
             ),
           ),
         ),

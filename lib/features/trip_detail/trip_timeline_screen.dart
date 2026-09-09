@@ -383,7 +383,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   Map<int, GlobalKey> _entryKeys = {};
 
   /// 每個停留點一顆選單控制器：`⋯` 與長按卡片共用同一顆，開的是同一份選單。
-  Map<int, MenuController> _entryMenuControllers = {};
+  Map<int, TpMoreMenuController> _entryMenuControllers = {};
   late _EntriesSnapshot _visibleEntriesByDayId;
   late int _activeDayNum;
   final _scrollController = ScrollController();
@@ -483,7 +483,7 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
     _entryMenuControllers = {
       for (final day in widget.days)
         for (final entry in day.timeline)
-          entry.id: oldEntryMenuControllers[entry.id] ?? MenuController(),
+          entry.id: oldEntryMenuControllers[entry.id] ?? TpMoreMenuController(),
     };
   }
 
@@ -1054,7 +1054,7 @@ class _DaySection extends ConsumerWidget {
   final int dayCount;
   final List<TimelineEntry> timeline;
   final Map<int, GlobalKey> entryKeys;
-  final Map<int, MenuController> entryMenuControllers;
+  final Map<int, TpMoreMenuController> entryMenuControllers;
   final int? focusedEntryId;
   final bool isEditing;
   final bool reorderSubmitting;
@@ -1346,7 +1346,7 @@ class _DaySection extends ConsumerWidget {
     WidgetRef ref,
     TimelineEntry entry,
     int index,
-    MenuController? menuController,
+    TpMoreMenuController? menuController,
   ) {
     final canChangeDay = dayCount > 1;
     return TpMoreMenuButton<_EntryMoreAction>(

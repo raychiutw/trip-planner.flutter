@@ -1,3 +1,4 @@
+import 'dart:ui' show Tristate;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -638,6 +639,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(submittedTitles, ['美麗海水族館', '牧志市場', '牧志市場']);
     expect(find.text('trip trip-1'), findsOneWidget);
+  });
+
+  testWidgets('新增停留點地區選單標示目前選取並更新查詢', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer((_) async => const []);
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        initialMode: EntryAddMode.search,
+        initialRegion: '沖繩',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩'), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    await tester.tap(find.byTooltip('切換搜尋地區'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.text('沖繩').last)
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    await tester.tap(find.text('東京'));
+    await tester.pumpAndSettle();
+    semantics.dispose();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '水族館',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => poiRepo.searchPois(q: '水族館', limit: 20, region: '東京'),
+    ).called(1);
   });
 
   testWidgets('搜尋 POI 時會沿用初始地區', (tester) async {

@@ -1,3 +1,4 @@
+import 'dart:ui' show Tristate;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,6 +50,40 @@ void main() {
     ],
     child: MaterialApp(theme: AppTheme.light(), home: const ExploreScreen()),
   );
+
+  testWidgets('地區選單朗讀目前選取並用新地區搜尋', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部地區 ▾'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .getSemantics(find.text('全部地區'))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    await tester.tap(find.text('沖繩'));
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩 ▾'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('explore-search-field')),
+      '水族館',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    verify(
+      () => poi.searchPois(
+        q: '水族館',
+        limit: any(named: 'limit'),
+        region: '沖繩',
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).called(1);
+    semantics.dispose();
+  });
 
   testWidgets('進頁 auto-search seed → 顯示結果卡', (tester) async {
     await tester.pumpWidget(buildApp());

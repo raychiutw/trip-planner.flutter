@@ -264,7 +264,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     if (region != '全部地區' && !options.contains(region)) {
       options.insert(1, region);
     }
-    return PopupMenuButton<String>(
+    return TpMoreMenuButton<String>(
+      tooltip: '切換搜尋地區',
       onSelected: (selected) {
         if (selected == _kCustomRegion) {
           _openCustomRegion();
@@ -272,13 +273,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ref.read(exploreControllerProvider.notifier).setRegion(selected);
         }
       },
-      itemBuilder: (context) => [
-        for (final opt in options) PopupMenuItem(value: opt, child: Text(opt)),
-        const PopupMenuDivider(),
-        const PopupMenuItem(value: _kCustomRegion, child: Text('+ 自訂地區…')),
+      items: [
+        for (final option in options)
+          TpActionItem(
+            value: option,
+            label: option,
+            icon: CupertinoIcons.location,
+            selected: option == region,
+          ),
+        const TpActionItem(
+          value: _kCustomRegion,
+          label: '+ 自訂地區…',
+          icon: CupertinoIcons.add,
+          dividerBefore: true,
+        ),
       ],
-      child: Chip(
-        avatar: const Icon(CupertinoIcons.location_solid, size: 16),
+      triggerBuilder: (context, onPressed) => TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(CupertinoIcons.location_solid, size: 16),
         label: Text('$region ▾'),
       ),
     );

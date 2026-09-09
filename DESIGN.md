@@ -77,6 +77,7 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：浮動 header 保留返回與任意標題 widget 共用膠囊、帳號另組及 safe area 的薄組裝；各動作採自然寬度，bar button 的手勢、鍵盤與動畫交給公開 `GlassButton`。
 - **Tripline 決策**：上下帶狀遮蔽採 `ProgressiveBlur` 與 `GlassScrollEdgeEffect` 的公開預設，取代六層 filter 與手調淡出遮罩。遮蔽位於內容與控制項之間並穿透觸控；媒體背景保留語意暗化，提高對比／降低透明度各自使用不透明區及套件羽化，不以 blur 歸零冒充降級。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
+- **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／焦點、停用原因與選取語意。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或顯示設定改變時移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
 

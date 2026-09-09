@@ -224,6 +224,43 @@ ProgressiveBlur 在 1.4.1 自行 ClipRect；App 保留 IgnorePointer 與內容�
 再替換通過；另保留內容可讀性、控制項清晰、觸控穿透與不透明降級。headless 的
 ProgressiveBlur 使用 uniform fallback，以上不是 Impeller 真實 shader 或真機材質驗收。
 
+### 選單遷移（2026-09-09，#308）
+
+`GlassMenu` 接手面板、`OverlayPortal`、開關 morph 與螢幕邊界調整。移除
+`RawMenuAnchor`、自畫玻璃面板／動畫、上下翻轉估算、最長標籤面板寬度反推，
+以及舊 shader 專用的 menu settings。入口前景維持品牌 tint，面板採共用新版
+預設與獨立不透明降級。
+
+精確 1.4.1 的普通非捲動 `GlassMenuItem` clone 會忽略讀屏 tap 回呼，已用公開
+語意操作重現「預期 1 次、實際 0 次」。因此保留公開自訂內容
+`GlassMenuLabel(child: GlassMenuItem(...))`：套件仍畫項目與焦點／按壓回饋，
+App 只轉接 selected、停用原因、語意 tap、初始焦點和 Esc。此路徑不使用套件
+滑動選取膠囊，採項目自身的 hover／focus／press 呈現，不重建材質或選取動畫。
+
+自訂內容的公開高度需明確提供，故保留文字量測來容納換行與放大字級；量測
+只決定項目內容高度，不再計算面板位置，亦不設定固定 `menuHeight`。寬度由
+公開 `menuWidth` 約束為可用螢幕內最多 280pt；`autoAdjustToScreen` 與
+`menuPadding` 接手邊界和 safe area。降低動態效果時，除套件 morph 政策外，
+公開設定另停用面板 interactionScale／stretch 與項目 press scale。
+
+`TpMoreMenuController` 只把按鈕與卡片長按統一交給公開 `GlassMenuController`，
+並在每次 open 重置單次選取去重。選取同步啟動關閉與業務回呼，不等待動畫，
+原有破壞性確認流程不變。探索頁與新增停留點的地區選單亦共用此入口，保留
+目前選取語意、地區切換與原搜尋查詢。
+
+精確 1.4.1 的 route listener 在 GoRouter declarative 導航更新期間呼叫
+`OverlayPortal.hide`，會觸發 persistentCallbacks 斷言；既有 JSON 匯入導航測試
+可重現。公開 controller 沒有立即 dismiss 或停用 route listener 的選項，故 App
+以 root `OverlayEntry` 提供無 ModalRoute 的套件 host，透過公開
+`CompositedTransformTarget`／`Follower` 連結原觸發點。App 不手算 popup 位置、
+不重畫面板：普通關閉等待套件 morph 完成，原頁或祖先 route 切換及 dispose
+才移除 host。host 捕捉原頁 theme／MediaQuery，媒體與玻璃設定讀原 scope；
+依賴或業務項目／入口狀態變更先關閉，下次開啟重新捕捉，避免舊字級、
+可及性設定或停用原因殘留。
+
+Bold Text 的實際字重同時套用於量測及呈現。以真實 regular／bold 字型的
+公開文字省略與勾號矩形測試驗證，避免 Ahem 相同字寬造成假綠。
+
 ## 方法論備註
 
 本 ADR 的每一個數字都來自像素量測,而不是目視判斷。這是刻意的 —— 這條線上前後兩份

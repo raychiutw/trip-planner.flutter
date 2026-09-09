@@ -1959,7 +1959,12 @@ void main() {
     for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.byType(Divider), findsNWidgets(2));
+    double gap(String before, String after) =>
+        tester.getRect(find.text(after)).top -
+        tester.getRect(find.text(before)).bottom;
+    final ordinaryGap = gap('重新排序', '換景點');
+    expect(gap('換景點', '編輯景點'), greaterThan(ordinaryGap));
+    expect(gap('移動到其他天', '複製到其他天'), greaterThan(ordinaryGap));
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
     await tester.pumpAndSettle();
@@ -1975,7 +1980,7 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+    expect(find.text('重新排序'), findsOneWidget);
     for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
       expect(find.text(label), findsOneWidget);
     }
@@ -1993,20 +1998,18 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('entry-more-11')));
     await tester.pumpAndSettle();
-    final byMoreButton = tester.getRect(
-      find.byKey(const ValueKey('tp-menu-panel')),
-    );
+    final byMoreButton = tester.getRect(find.text('重新排序'));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    expect(find.text('重新排序'), findsNothing);
 
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(
-      tester.getRect(find.byKey(const ValueKey('tp-menu-panel'))),
-      byMoreButton,
-    );
+    final byLongPress = tester.getRect(find.text('重新排序'));
+    expect((byLongPress.center - byMoreButton.center).distance, lessThan(0.1));
+    expect(byLongPress.width, closeTo(byMoreButton.width, 0.1));
+    expect(byLongPress.height, closeTo(byMoreButton.height, 0.1));
   });
 
   testWidgets('排序編輯模式下長按停留點卡片不叫選單', (tester) async {
@@ -2016,7 +2019,7 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    expect(find.text('重新排序'), findsNothing);
     expect(find.text('編輯景點'), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
   });
@@ -2046,12 +2049,15 @@ void main() {
       final finder = find.byKey(ValueKey('entry-$action-11'));
       expect(
         tester
-            .widget<TextButton>(
-              find.descendant(of: finder, matching: find.byType(TextButton)),
-            )
-            .onPressed,
-        isNull,
+            .getSemantics(finder)
+            .getSemanticsData()
+            .flagsCollection
+            .isEnabled,
+        Tristate.isFalse,
       );
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+      expect(find.text('重新排序'), findsOneWidget);
       final label = action == 'move' ? '移動到其他天' : '複製到其他天';
       expect(find.bySemanticsLabel('$label，目前行程只有一天，無法使用'), findsOneWidget);
     }

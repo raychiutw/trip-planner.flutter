@@ -1,5 +1,6 @@
+import 'dart:io';
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show Tristate, SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,26 +16,22 @@ import 'package:tripline/ui/tp_action_item.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
-/// 選單項目是面板內的 `TextButton` —— 改用 `RawMenuAnchor` 後不再有
-/// Material 的 `MenuItemButton` 可以直接查型別。
-Finder _menuItems() => find.descendant(
-  of: find.byKey(const ValueKey('tp-menu-panel')),
-  matching: find.byType(TextButton),
-);
-
-const _menuPanel = ValueKey('tp-menu-panel');
-
 Widget _menuHost({
   required List<TpActionItem<String>> items,
   required ValueChanged<String> onSelected,
   double textScale = 1,
+  bool reduceMotion = false,
+  bool boldText = false,
+  ThemeData? theme,
   Alignment alignment = Alignment.topRight,
 }) => MaterialApp(
-  theme: AppTheme.light(),
+  theme: theme ?? AppTheme.light(),
   builder: (context, child) => MediaQuery(
-    data: MediaQuery.of(
-      context,
-    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(textScale),
+      disableAnimations: reduceMotion,
+      boldText: boldText,
+    ),
     child: child!,
   ),
   home: Scaffold(
@@ -188,60 +185,284 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  group('選單改以 RawMenuAnchor 承載', () {
+  testWidgets('讀屏選取立即派發一次，不等待關閉動畫', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var calls = 0;
+    await tester.pumpWidget(
+      _menuHost(
+        items: const [TpActionItem(value: 'print', label: '列印')],
+        onSelected: (_) => calls++,
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    final node = tester.getSemantics(find.bySemanticsLabel('列印').first);
+    node.owner!.performAction(node.id, SemanticsAction.tap);
+    expect(calls, 1);
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    expect(find.text('列印'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('外部入口連續開啟同一選單仍立即派發且不重複', (tester) async {
+    final controller = TpMoreMenuController();
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TpMoreMenuButton<String>(
+            controller: controller,
+            items: const [TpActionItem(value: 'print', label: '列印')],
+            onSelected: (_) => calls++,
+          ),
+        ),
+      ),
+    );
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      controller.open();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('列印'));
+      expect(calls, attempt);
+      await tester.tap(find.text('列印'), warnIfMissed: false);
+      expect(calls, attempt);
+      await tester.pumpAndSettle();
+      expect(find.text('列印'), findsNothing);
+    }
+  });
+
+  testWidgets('巢狀路由立即切頁後沒有殘留選單或觸控遮罩', (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    var calls = 0;
+    var destinationTaps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Row(
+          children: [
+            const SizedBox(width: 80),
+            Expanded(
+              child: Navigator(
+                key: navigator,
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (context) => Scaffold(
+                    body: Align(
+                      alignment: Alignment.topRight,
+                      child: TpMoreMenuButton<String>(
+                        items: const [
+                          TpActionItem(value: 'next', label: '開啟明細'),
+                        ],
+                        onSelected: (_) {
+                          calls++;
+                          navigator.currentState!.push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => Scaffold(
+                                body: Center(
+                                  child: TextButton(
+                                    onPressed: () => destinationTaps++,
+                                    child: const Text('明細操作'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TpMoreMenuButton<String>));
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(find.text('開啟明細'));
+    expect(rect.right, lessThanOrEqualTo(800));
+    await tester.tap(find.text('開啟明細'));
+    expect(calls, 1);
+    await tester.pumpAndSettle();
+    expect(find.text('開啟明細'), findsNothing);
+    await tester.tap(find.text('明細操作'));
+    expect(destinationTaps, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('降低動態效果時按住選單項目不縮放文字', (tester) async {
+    await tester.pumpWidget(
+      _menuHost(
+        items: const [TpActionItem(value: 'print', label: '列印')],
+        reduceMotion: true,
+        onSelected: (_) {},
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    final before = tester.getRect(find.text('列印'));
+    final gesture = await tester.startGesture(before.center);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final pressed = tester.getRect(find.text('列印'));
+    expect(pressed.width, closeTo(before.width, 0.01));
+    expect(pressed.height, closeTo(before.height, 0.01));
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('相同controller更新項目與入口狀態不留下舊動作', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final controller = TpMoreMenuController();
+    var calls = 0;
+    var revised = false;
+    var enabled = true;
+    late StateSetter update;
+    void select(String value) => calls++;
+    const oldItems = [TpActionItem(value: 'a', label: '移動')];
+    const updatedItems = [
+      TpActionItem(
+        value: 'a',
+        label: '移動',
+        enabled: false,
+        selected: true,
+        semanticLabel: '移動，目前沒有其他天',
+      ),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return Scaffold(
+              body: Align(
+                alignment: Alignment.topRight,
+                child: TpMoreMenuButton<String>(
+                  key: const ValueKey('host-more-menu'),
+                  items: revised ? updatedItems : [...oldItems],
+                  onSelected: select,
+                  controller: controller,
+                  enabled: enabled,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('移動'), findsOneWidget);
+    update(() {});
+    await tester.pumpAndSettle();
+    expect(find.text('移動'), findsOneWidget);
+    update(() => revised = true);
+    await tester.pumpAndSettle();
+    expect(find.text('移動'), findsNothing);
+    controller.open();
+    await tester.pumpAndSettle();
+    final flags = tester
+        .getSemantics(find.bySemanticsLabel('移動，目前沒有其他天').first)
+        .getSemanticsData()
+        .flagsCollection;
+    expect(flags.isEnabled, Tristate.isFalse);
+    expect(flags.isSelected, Tristate.isTrue);
+    await tester.tap(find.text('移動'));
+    await tester.pumpAndSettle();
+    expect(calls, 0);
+    update(() => enabled = false);
+    await tester.pumpAndSettle();
+    expect(find.text('移動'), findsNothing);
+    controller.open();
+    await tester.pumpAndSettle();
+    expect(find.text('移動'), findsNothing);
+    expect(calls, 0);
+    semantics.dispose();
+  });
+
+  testWidgets('開啟時系統顯示設定改變會關閉並以新設定重開', (tester) async {
+    const items = [TpActionItem(value: 'a', label: '顯示設定選項')];
+    await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('顯示設定選項'), findsOneWidget);
+    await tester.pumpWidget(
+      _menuHost(items: items, onSelected: (_) {}, textScale: 2, boldText: true),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('顯示設定選項'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    final itemContext = tester.element(find.text('顯示設定選項'));
+    expect(MediaQuery.boldTextOf(itemContext), isTrue);
+    expect(MediaQuery.textScalerOf(itemContext).scale(10), 20);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('粗體長標籤依實際字重換行而不省略', (tester) async {
+    // flutter test 的 Ahem 不區分字重；使用 SDK 隨附字型驗證真實字寬。
+    await tester.runAsync(() async {
+      final loader = FontLoader('MenuBoldRegression');
+      for (final weight in ['regular', 'bold']) {
+        final font = File.fromUri(
+          Uri.file(
+            Platform.resolvedExecutable,
+          ).resolve('../../material_fonts/roboto-$weight.ttf'),
+        );
+        loader.addFont(
+          Future.value(ByteData.sublistView(font.readAsBytesSync())),
+        );
+      }
+      await loader.load();
+    });
+    final base = AppTheme.light();
+    final theme = base.copyWith(
+      textTheme: base.textTheme.copyWith(
+        bodyLarge: base.textTheme.bodyLarge!.copyWith(
+          fontFamily: 'MenuBoldRegression',
+          fontSize: 16.6,
+        ),
+      ),
+    );
+    const label = 'Booking maximum capacity';
+    await tester.pumpWidget(
+      _menuHost(
+        items: const [
+          TpActionItem(value: 'booking', label: label, selected: true),
+        ],
+        theme: theme,
+        boldText: true,
+        onSelected: (_) {},
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+    expect(paragraph.didExceedMaxLines, isFalse);
+    final check = tester.getRect(find.byIcon(CupertinoIcons.check_mark));
+    expect(
+      tester.getRect(find.text(label)).right,
+      lessThanOrEqualTo(check.left),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  group('選單公開操作', () {
     const items = [
       TpActionItem(value: 'a', label: '筆記', icon: Icons.description_outlined),
       TpActionItem(value: 'b', label: '列印', icon: Icons.print),
     ];
 
-    testWidgets('開場淡入只包內容，玻璃面板本身不被 opacity 包住', (tester) async {
-      await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
-      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
-      // 動畫進行到一半 —— 這正是問題發生的時段。
-      await tester.pump();
-      await tester.pump(TpMotion.normal ~/ 2);
-
-      // 玻璃被 opacity 包住時，引擎會為它開一層 saveLayer，面板的 backdrop
-      // filter 因此失去直接翻用 onscreen target 的資格 —— 整段開場玻璃讀到的
-      // 是空背景，到最後一幀才突然變成毛玻璃（材質 pop）。淡入要包在玻璃
-      // 「裡面」，只淡內容；套件作者自己的 GlassPopover 也是這個寫法。
-      //
-      // 只看自家子樹：從玻璃往上走到面板最外層的 ScaleTransition 為止。
-      // 用 find.ancestor 會連框架的 route 轉場一起抓進來，那不是我們的事。
-      final between = <String>[];
-      tester.element(find.byKey(_menuPanel)).visitAncestorElements((element) {
-        if (element.widget is ScaleTransition) return false;
-        between.add(element.widget.runtimeType.toString());
-        return true;
-      });
-      expect(
-        between.where((t) => t == 'FadeTransition' || t == 'Opacity'),
-        isEmpty,
-        reason: '玻璃與 ScaleTransition 之間不得有 opacity 層，實際夾了：$between',
-      );
-      // 對照組：淡入本身沒有被拿掉，只是換了位置。
-      expect(
-        find.descendant(
-          of: find.byKey(_menuPanel),
-          matching: find.byType(FadeTransition),
-        ),
-        findsOneWidget,
-        reason: '淡入改由面板內部承擔，開場仍是淡入不是硬切',
-      );
-
-      await tester.pumpAndSettle();
-    });
-
     testWidgets('點選單外面任何地方都可關閉', (tester) async {
       await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
       await tester.pumpAndSettle();
-      expect(find.byKey(_menuPanel), findsOneWidget);
+      expect(find.text('筆記'), findsOneWidget);
 
       // 點在遠離面板的左下角。
       await tester.tapAt(const Offset(20, 560));
       await tester.pumpAndSettle();
-      expect(find.byKey(_menuPanel), findsNothing);
+      expect(find.text('筆記'), findsNothing);
     });
 
     testWidgets('Esc 可關閉，方向鍵可走動', (tester) async {
@@ -266,7 +487,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.byKey(_menuPanel), findsNothing);
+      expect(find.text('筆記'), findsNothing);
     });
 
     testWidgets('項目朗讀為按鈕，停用項目的停用原因仍被朗讀', (tester) async {
@@ -317,59 +538,43 @@ void main() {
       }
     });
 
-    testWidgets('寬度依內容決定，短標籤不撐空白', (tester) async {
-      Future<double> widthFor(List<TpActionItem<String>> menuItems) async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpWidget(
-          _menuHost(items: menuItems, onSelected: (_) {}),
-        );
-        await tester.tap(find.byKey(const ValueKey('host-more-menu')));
-        await tester.pumpAndSettle();
-        return tester.getSize(find.byKey(_menuPanel)).width;
-      }
-
-      final short = await widthFor(items);
-      final long = await widthFor(const [
-        TpActionItem(value: 'a', label: '把這個停留點複製到另一個行程的某一天', icon: Icons.copy),
-      ]);
-      expect(long, greaterThan(short), reason: '長標籤要有更寬的面板');
-      expect(short, lessThan(long), reason: '短標籤不該撐到跟長標籤一樣寬');
-    });
-
-    testWidgets('空間不足往上翻時，scale 原點改為底部對齊', (tester) async {
-      ScaleTransition panelScale() => tester.widget<ScaleTransition>(
-        find.ancestor(
-          of: find.byKey(_menuPanel),
-          matching: find.byType(ScaleTransition),
-        ),
-      );
-
-      // 觸發鈕在頂端 → 往下展開，原點在頂端。
-      await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
-      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
-      await tester.pump();
-      expect(panelScale().alignment, Alignment.topRight);
-
-      // 觸發鈕在底端 → 往上翻，原點必須跟著改成底部，否則面板會從遠離
-      // 觸發鈕的那一端長出來。
-      await tester.pumpWidget(const SizedBox.shrink());
+    testWidgets('長標籤在最窄螢幕與兩倍文字完整可讀可點', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const label = '把這個停留點複製到另一個行程的某一天';
+      String? selected;
       await tester.pumpWidget(
         _menuHost(
-          items: items,
-          onSelected: (_) {},
+          items: const [
+            TpActionItem(value: 'copy', label: label, icon: Icons.copy),
+          ],
+          textScale: 2,
           alignment: Alignment.bottomRight,
+          onSelected: (value) => selected = value,
         ),
       );
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
-      await tester.pump();
-      expect(panelScale().alignment, Alignment.bottomRight);
+      await tester.pumpAndSettle();
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(find.text(label));
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(320));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.bottom, lessThanOrEqualTo(568));
+      await tester.tap(find.text(label));
+      expect(selected, 'copy');
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('選單開啟期間畫面被外部換掉，不殘留攔截層', (tester) async {
       await tester.pumpWidget(_menuHost(items: items, onSelected: (_) {}));
       await tester.tap(find.byKey(const ValueKey('host-more-menu')));
       await tester.pumpAndSettle();
-      expect(find.byKey(_menuPanel), findsOneWidget);
+      expect(find.text('筆記'), findsOneWidget);
 
       // 等同 root tab 在選單開著時被切走。刻意不用 TextButton —— 它會與選單
       // 項目的 element 被重用，`AnimatedDefaultTextStyle` 插值失敗的例外會蓋掉
@@ -389,7 +594,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(_menuPanel), findsNothing);
+      expect(find.text('筆記'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('after-switch')));
       expect(tapped, isTrue, reason: '殘留的 TapRegion 會把這一下點擊吃掉');
     });
@@ -884,48 +1089,44 @@ void main() {
     },
   );
 
-  testWidgets(
-    'TpMoreMenuButton uses a native anchored menu and dispatches once',
-    (tester) async {
-      String? selected;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            appBar: TpAppBar(
-              role: TpAppBarRole.standalone,
-              title: const Text('行程'),
-              actions: [
-                TpMoreMenuButton<String>(
-                  key: const ValueKey('more-menu'),
-                  items: const [
-                    TpActionItem(
-                      key: ValueKey('open-sheet'),
-                      value: 'sheet',
-                      label: '開啟視窗',
-                      icon: Icons.open_in_new,
-                    ),
-                  ],
-                  onSelected: (value) => selected = value,
-                ),
-              ],
-            ),
+  testWidgets('更多選單可選取並重新開啟', (tester) async {
+    String? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.standalone,
+            title: const Text('行程'),
+            actions: [
+              TpMoreMenuButton<String>(
+                key: const ValueKey('more-menu'),
+                items: const [
+                  TpActionItem(
+                    key: ValueKey('open-sheet'),
+                    value: 'sheet',
+                    label: '開啟視窗',
+                    icon: Icons.open_in_new,
+                  ),
+                ],
+                onSelected: (value) => selected = value,
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.byKey(const ValueKey('more-menu')));
-      await tester.pumpAndSettle();
-      expect(find.byType(RawMenuAnchor), findsOneWidget);
-      expect(find.byType(GlassMenu), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('open-sheet')));
-      await tester.pumpAndSettle();
-      expect(selected, 'sheet');
+    await tester.tap(find.byKey(const ValueKey('more-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('開啟視窗'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('open-sheet')));
+    await tester.pumpAndSettle();
+    expect(selected, 'sheet');
 
-      await tester.tap(find.byKey(const ValueKey('more-menu')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('open-sheet')), findsOneWidget);
-    },
-  );
+    await tester.tap(find.byKey(const ValueKey('more-menu')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('open-sheet')), findsOneWidget);
+  });
 
   testWidgets('選單觸發鈕與面板都走中性語意層，不再是品牌褐玻璃', (tester) async {
     await tester.pumpWidget(
@@ -962,126 +1163,74 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('primary-more-menu')));
     await tester.pumpAndSettle();
-    expect(find.byType(TpGlassSurface), findsOneWidget);
-    final menuSurface = tester.widget<TpGlassSurface>(
-      find.byType(TpGlassSurface),
-    );
     final scheme = AppTheme.light().colorScheme;
     (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
-
-    // 觸發鈕本體與按壓高亮走中性導覽玻璃，不再是品牌褐。
     expect(rgb(trigger.settings!.glassColor), isNot(rgb(scheme.primary)));
-    expect(
-      rgb(trigger.settings!.glassColor),
-      isNot(rgb(scheme.primaryContainer)),
-    );
-    // 面板表面也是中性語意層。
-    expect(
-      rgb(menuSurface.glassSettings!.glassColor),
-      rgb(scheme.surfaceContainerHigh),
-    );
-
-    final item = tester.widget<TextButton>(_menuItems());
-    expect(
-      item.style?.foregroundColor?.resolve(<WidgetState>{}),
-      TpSystemColorsLight.label,
-    );
-    expect(
-      find.descendant(
-        of: _menuItems(),
-        matching: find.byIcon(CupertinoIcons.check_mark),
-      ),
-      findsOneWidget,
-    );
+    final text = tester.widget<Text>(find.text('筆記'));
+    expect(text.style?.color, scheme.onSurface);
+    expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
   });
 
-  testWidgets('深色選單的項目文字是標籤色，不再是品牌 tint', (tester) async {
+  testWidgets('深色選單的項目文字走標籤色', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
-          appBar: TpAppBar(
-            role: TpAppBarRole.standalone,
-            title: const Text('行程'),
-            actions: [
-              TpMoreMenuButton<String>(
-                key: const ValueKey('dark-more-menu'),
-                items: const [
-                  TpActionItem(
-                    value: 'notes',
-                    label: '筆記',
-                    icon: Icons.description_outlined,
-                  ),
-                ],
-                onSelected: (_) {},
-              ),
-            ],
+          body: TpMoreMenuButton<String>(
+            items: const [TpActionItem(value: 'notes', label: '筆記')],
+            onSelected: (_) {},
           ),
         ),
       ),
     );
-
-    await tester.tap(find.byKey(const ValueKey('dark-more-menu')));
+    await tester.tap(find.byType(TpMoreMenuButton<String>));
     await tester.pumpAndSettle();
-    final item = tester.widget<TextButton>(_menuItems());
     expect(
-      item.style?.foregroundColor?.resolve(<WidgetState>{}),
-      TpSystemColorsDark.label,
+      tester.widget<Text>(find.text('筆記')).style?.color,
+      AppTheme.dark().colorScheme.onSurface,
     );
   });
 
-  testWidgets(
-    'More menu preserves divider, destructive role, and disabled state',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            appBar: TpAppBar(
-              role: TpAppBarRole.standalone,
-              title: const Text('行程'),
-              actions: [
-                TpMoreMenuButton<String>(
-                  key: const ValueKey('semantic-more-menu'),
-                  items: const [
-                    TpActionItem(
-                      value: 'edit',
-                      label: '行程資料',
-                      icon: CupertinoIcons.pencil,
-                    ),
-                    TpActionItem(
-                      value: 'delete',
-                      label: '刪除行程',
-                      icon: CupertinoIcons.delete,
-                      dividerBefore: true,
-                      role: TpActionRole.destructive,
-                      enabled: false,
-                    ),
-                  ],
-                  onSelected: (_) {},
-                ),
-              ],
-            ),
+  testWidgets('停用刪除保留分組與破壞性提示且不執行', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var calls = 0;
+    await tester.pumpWidget(
+      _menuHost(
+        items: const [
+          TpActionItem(value: 'edit', label: '行程資料'),
+          TpActionItem(
+            value: 'delete',
+            label: '刪除行程',
+            icon: CupertinoIcons.delete,
+            dividerBefore: true,
+            role: TpActionRole.destructive,
+            enabled: false,
           ),
-        ),
-      );
-
-      await tester.tap(find.byKey(const ValueKey('semantic-more-menu')));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(Divider), findsOneWidget);
-      final items = tester.widgetList<TextButton>(_menuItems());
-      expect(items, hasLength(2));
-      expect(
-        items.last.style?.foregroundColor?.resolve(<WidgetState>{}),
-        Theme.of(tester.element(find.byType(RawMenuAnchor))).colorScheme.error,
-      );
-      expect(items.last.onPressed, isNull);
-      expect(
-        items.last.style?.minimumSize?.resolve(<WidgetState>{})?.height,
-        TpSpacing.tapMin,
-      );
-    },
-  );
+        ],
+        onSelected: (_) => calls++,
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.text('刪除行程')).top,
+      greaterThan(tester.getRect(find.text('行程資料')).bottom),
+    );
+    expect(
+      tester.widget<Text>(find.text('刪除行程')).style?.color,
+      AppTheme.light().colorScheme.error,
+    );
+    final flags = tester
+        .getSemantics(find.bySemanticsLabel('刪除行程').first)
+        .getSemanticsData()
+        .flagsCollection;
+    expect(flags.isEnabled, Tristate.isFalse);
+    await tester.tap(find.text('刪除行程'));
+    await tester.pumpAndSettle();
+    expect(calls, 0);
+    expect(find.text('行程資料'), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets(
     'expanded option uses shared glass sheet with centered compact header',
