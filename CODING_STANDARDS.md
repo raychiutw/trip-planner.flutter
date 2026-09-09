@@ -193,7 +193,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
 - **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
 - 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:247`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
-  - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_app_bar.dart:720`）選單選中，確認走 action sheet
+  - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_more_menu.dart`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
   - 同一個動作同時掛在選單與左滑上時，`source` 由呼叫端各自傳，不得在 helper 內寫死（`lib/app/irreversible_action.dart:12`）
 - 不可復原的動作（刪除行程、Day、停留點、筆記、分享連結）用 `confirmAndRunIrreversibleAction`（`lib/app/irreversible_action.dart:14`）或 `confirmAndDelete`（同檔 `:87`），它們一併處理執行中鎖定、成功通知與可重試失敗。
@@ -223,7 +223,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ## 導覽玻璃與鍵盤
 
-適用 `lib/ui/tp_glass_surface.dart`、`lib/ui/tp_app_bar.dart`、`lib/ui/tp_root_scaffold.dart` 與任何會碰到玻璃或輸入欄位的畫面。
+適用 `lib/ui/tp_glass_surface.dart`、`lib/ui/tp_app_bar.dart`、`lib/ui/tp_more_menu.dart`、`lib/ui/tp_root_scaffold.dart` 與任何會碰到玻璃或輸入欄位的畫面。
 
 ### 對比
 
@@ -276,7 +276,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 | 移除 | 帶 `minus` 的範圍專屬符號(`person_badge_minus`) | `destructive` | `scheme.error` |
 | 刪除 | `CupertinoIcons.delete` | `destructive` | `scheme.error` |
 
-- 顏色不手寫,由 `role` 推導 —— `lib/ui/tp_app_bar.dart:1011` 是唯一的映射點(`destructive` → `scheme.error`,否則 `scheme.onSurface`)。diff 裡出現寫死的紅色或 `foregroundColor:` 覆寫選單項目顏色 = 違反。
+- 顏色不手寫,由 `role` 推導 —— `lib/ui/tp_more_menu.dart` 的選單項目是唯一的映射點(`destructive` → `scheme.error`,否則 `scheme.onSurface`)。diff 裡出現寫死的紅色或 `foregroundColor:` 覆寫選單項目顏色 = 違反。
 - 新增／加入用 `add` 系列且 `role` 維持 `normal`;移除／刪除用 `minus`／`delete` 且 `role` 必為 `destructive`。動詞與 role 不匹配(例如「加入」配 `destructive`)= 違反。
 - 選單項目(`TpMoreMenuButton`)一律要 `icon`;action sheet 專用項目一律**不給** `icon`(給了也畫不出來,見 `lib/ui/tp_action_item.dart:22`)。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:642`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。

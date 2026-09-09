@@ -1178,6 +1178,79 @@ void main() {
     expect(find.text('15 分鐘'), findsNothing);
   });
 
+  testWidgets('缺座標時不會嘗試重算,重算 stub 丟例外也照樣顯示缺座標', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenThrow(Exception('recompute failed'));
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              travel: Travel(type: 'car', min: 15),
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+                type: 'attraction',
+              ),
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              startTime: '12:30',
+              title: '海人食堂',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 102,
+                name: '海人食堂',
+                type: 'restaurant',
+              ),
+            ),
+          ],
+        ),
+      ],
+      segments: [
+        TripSegment.fromJson({
+          'id': 50,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'driving',
+          'min': 15,
+          'distanceM': 11000,
+          'version': 1,
+          'computedAt': null,
+        }),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+    expect(find.text('車程待更新'), findsNothing);
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    );
+  });
+
   testWidgets('缺 travel segment 且兩端有座標 → 自動重算該日', (tester) async {
     final repo = _MockTripRepository();
     when(
