@@ -647,7 +647,7 @@ void main() {
 
       final standard = rootBar();
       expect(standard.platformViewBackdrop, isFalse);
-      expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
+      expect(standard.settings?.glassColor.a, lessThan(1));
       expect(standard.settings?.backerColor, isNull);
 
       await tester.tap(find.bySemanticsLabel('地圖'));
@@ -656,18 +656,13 @@ void main() {
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
       expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-      // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
-      // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
+      // 媒體暗化與原生 PlatformView 相容路徑保留，其餘採相同新版材質。
       expect(map.settings?.blur, standard.settings?.blur);
       expect(
-        map.settings?.standardOpacityMultiplier,
-        standard.settings?.standardOpacityMultiplier,
+        map.settings?.chromaticAberration,
+        standard.settings?.chromaticAberration,
       );
-      expect(map.settings?.chromaticAberration, 0);
-      expect(map.settings?.refractiveIndex, 1.06);
-      expect(standard.settings!.chromaticAberration, greaterThan(0));
-      expect(standard.settings!.refractiveIndex, greaterThan(1.06));
-      // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
       expect(map.indicatorSettings?.blur, map.settings?.blur);
       expect(
         map.indicatorSettings?.refractiveIndex,
@@ -938,7 +933,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('root tab 使用套件原生 16/64/32 Liquid Glass 幾何', (tester) async {
+    testWidgets('root tab 保留導覽高度、觸控與選取語意', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -962,7 +957,6 @@ void main() {
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
       expect(glass.barHeight, 64);
-      expect(glass.barBorderRadius, 32);
       expect(glass.iconSize, 24);
       expect(glass.iconLabelSpacing, 4);
       expect(glass.platformViewBackdrop, isFalse);
@@ -972,9 +966,7 @@ void main() {
           alpha: 0.72,
         ),
       );
-      // 導覽配方已與共用玻璃表面收斂為同一組（較高的折射率與色散）。
-      expect(glass.settings?.chromaticAberration, closeTo(0.006, 0.001));
-      expect(glass.settings?.refractiveIndex, 1.15);
+      // 新版材質數值由套件決定；幾何、選取及前景語意維持 App 契約。
     });
 
     testWidgets('root tab bar 選取態是中性膠囊加品牌柔褐字符，兩態同實心字符', (tester) async {
@@ -1015,10 +1007,6 @@ void main() {
 
       // 品牌色只出現在前景：字符、標籤與光暈。
       expect(glass.selectedIconColor, scheme.primary);
-
-      // root tab bar 走 premium。`standard` 的邊緣寫死在 shader 常數裡,
-      // 任何 settings 都調不動 —— 真機連續多版量到 +125~+138(目標 +30)。
-      expect(glass.quality, GlassQuality.premium);
 
       // #179:膠囊的寬度守門在 root_tab_alignment_test.dart —— 那裡量的是
       // **畫出來的方框**。這裡原本斷言 `indicatorExpansion` 是負值,但那個參數
@@ -1087,7 +1075,7 @@ void main() {
         ),
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
-      expect(glass.settings?.chromaticAberration, closeTo(0.004, 0.001));
+      expect(glass.settings!.glassColor.a, lessThan(1));
     });
 
     test('iPhone safe area 與膠囊重疊後，底部至少保留 16pt', () {

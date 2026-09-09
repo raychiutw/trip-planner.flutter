@@ -1,4 +1,6 @@
 import 'dart:ui' show Tristate;
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -74,6 +76,115 @@ Color _selectedPillColor(WidgetTester tester) {
 
 void main() {
   for (final state in _states) {
+    testWidgets('共用可操作玻璃表面採套件預設呈現 ${state.name}', (tester) async {
+      final boundaryKey = GlobalKey();
+      var actions = 0;
+      final opaque = state.increasedContrast || state.reduceTransparency;
+      Widget scene({bool reference = false, Color background = Colors.black}) =>
+          AppAccessibilityScope(
+            reduceTransparency: state.reduceTransparency,
+            child: MaterialApp(
+              theme: state.brightness == Brightness.light
+                  ? AppTheme.light()
+                  : AppTheme.dark(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  highContrast: state.increasedContrast,
+                  disableAnimations: state.reduceMotion,
+                  textScaler: TextScaler.linear(state.textScale),
+                ),
+                child: GlassAdaptiveScope(
+                  // 一般態固定採同一個支援舊裝置的公開降級路徑，避免非同步 shader
+                  // 載入讓兩次像素取樣不同。無障礙態則驗 App 自己選擇的降級。
+                  maxQuality: opaque
+                      ? GlassQuality.premium
+                      : GlassQuality.minimal,
+                  child: child!,
+                ),
+              ),
+              home: Center(
+                child: RepaintBoundary(
+                  key: boundaryKey,
+                  child: SizedBox(
+                    width: 200,
+                    height: 80,
+                    child: ColoredBox(
+                      color: background,
+                      child: Builder(
+                        builder: (context) {
+                          final button = TextButton(
+                            onPressed: () {
+                              actions++;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('已執行')),
+                              );
+                            },
+                            child: const Text('操作'),
+                          );
+                          return Scaffold(
+                            backgroundColor: Colors.transparent,
+                            body: SizedBox.expand(
+                              child: reference
+                                  ? GlassContainer(
+                                      useOwnLayer: true,
+                                      allowElevation: true,
+                                      clipBehavior: Clip.antiAlias,
+                                      shape: const LiquidRoundedSuperellipse(
+                                        borderRadius: 28,
+                                      ),
+                                      child: button,
+                                    )
+                                  : TpGlassSurface(child: button),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      Future<List<int>> sample() async {
+        await tester.pumpAndSettle();
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        late List<int> pixel;
+        await tester.runAsync(() async {
+          final layer = boundary.debugLayer! as OffsetLayer;
+          final image = await layer.toImage(boundary.paintBounds);
+          final data = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          // 左下方遠離按鈕文字與圓角，取實際合成後的背景。
+          final offset = (60 * image.width + 30) * 4;
+          pixel = List.generate(4, (i) => data.getUint8(offset + i));
+          image.dispose();
+        });
+        return pixel;
+      }
+
+      await tester.pumpWidget(scene(reference: !opaque));
+      final referencePixel = await sample();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(
+        scene(background: opaque ? Colors.white : Colors.black),
+      );
+      final actualPixel = await sample();
+      expect(
+        actualPixel,
+        referencePixel,
+        reason: opaque ? '不透明表面不應因後方黑白背景改變' : '共同表面應沿用套件預設材質，不疊加舊版校準填色',
+      );
+      await tester.tap(find.text('操作'));
+      await tester.pump();
+      expect(actions, 1);
+      expect(find.text('已執行'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final state in _states) {
     testWidgets('${state.name} keeps shared HIG geometry and behavior', (
       tester,
     ) async {
@@ -120,38 +231,19 @@ void main() {
           matching: find.byType(GlassContainer),
         ),
       );
-      final fallbackAlpha = headerGlass.settings!.platformViewFallbackColor!.a;
       final expectsOpaqueGlass =
           state.increasedContrast || state.reduceTransparency;
-      expect(
-        fallbackAlpha,
-        expectsOpaqueGlass
-            ? greaterThanOrEqualTo(0.95)
-            : closeTo(state.brightness == Brightness.dark ? 0.48 : 0.40, 0.01),
-      );
       final isDark = state.brightness == Brightness.dark;
-      expect(headerGlass.settings!.blur, expectsOpaqueGlass ? 0 : 16);
-      // 導覽配方與共用玻璃表面已收斂為同一組參數。
       expect(
-        headerGlass.settings!.thickness,
-        expectsOpaqueGlass ? 0 : (isDark ? 28 : 24),
+        headerGlass.settings!.glassColor.a,
+        expectsOpaqueGlass ? 1 : lessThan(1),
       );
-      expect(
-        headerGlass.settings!.refractiveIndex,
-        expectsOpaqueGlass ? 1 : 1.15,
-      );
-
-      // 材質邊緣光不再由 settings 控制:`GlassQuality.standard` 走的 lightweight
-      // shader 沒有 `ambientRim` uniform,那兩個參數是死的(#178)。真正壓 rim 的
-      // 是 `tpGlassBrightnessOverride` —— 讓玻璃層以為背景是亮的,
-      // `rimFade` 從 1.00 降到 0.08。
-      // 一般模式描一條細邊；提高對比才換成明顯的實心邊。真機量到這條細邊
-      // 是 +20~+31（DAY tab 軌只有這一層），恰好落在 Apple 的 +30。
+      // 一般態的邊緣由新版材質處理；提高對比才補可見邊界。
       final headerShape = headerGlass.shape as LiquidRoundedSuperellipse;
       expect(
         headerShape.side.color.a,
         state.increasedContrast ? greaterThan(0.5) : 0,
-        reason: '一般模式要有一條對齊 Apple 強度的細邊',
+        reason: '只有提高對比才補實心邊界',
       );
 
       // 日期選擇器的軌道走同一條規則，而且軌本身也是玻璃（#169 改回）——
@@ -215,13 +307,6 @@ void main() {
         ),
         findsOneWidget,
         reason: '軌是玻璃，模糊與內容透出交給材質，不再自己疊 BackdropFilter',
-      );
-      expect(
-        find.descendant(
-          of: find.byType(TpHorizontalSelector<int>),
-          matching: find.byType(BackdropFilter),
-        ),
-        findsNothing,
       );
 
       if (expectsOpaqueGlass) {

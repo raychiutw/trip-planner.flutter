@@ -30,7 +30,6 @@ class TpBottomAccessory extends StatelessWidget {
         key: const ValueKey('tp-bottom-accessory'),
         height: accessoryHeight,
         child: TpGlassSurface(
-          blurSigma: 28,
           platformViewBackdrop: TpMediaBackdropScope.of(context),
           borderRadius: const BorderRadius.all(Radius.circular(20)),
           child: child,

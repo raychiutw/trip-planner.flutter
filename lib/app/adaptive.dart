@@ -659,10 +659,15 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         initialState: widget.initialState,
         halfSize: widget.mediumSize,
         fullSize: widget.largeSize,
+        // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
+        // 永遠視為尚未展開，阻止內容向上捲動。
+        detents: widget.resizable
+            ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
+            : const {GlassSheetDetent.large},
         settings: settings,
         halfSettings: settings,
         expandedColor: Theme.of(context).colorScheme.surface,
-        quality: GlassQuality.premium,
+        quality: tpGlassQuality(context),
         // 定版近滿版 sheet 是「實色內容畫布＋玻璃控制元件」；只在進場時
         // 保留玻璃過渡，固定於 93% detent 後即使用完整 canvas 色，避免
         // 背後地圖穿透而降低文字與 grouped list 的對比。

@@ -229,7 +229,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 導覽玻璃上的 15–17pt 文字（`titleLarge` 17 / `titleMedium`、`bodyLarge` 15）必須對**實際合成後**的背景達 4.5:1，不是對 token 的名目色。玻璃是半透明的，底下捲什麼過去就合成什麼。
 - 100% 與 200% Dynamic Type 兩種字級都要驗；驗收方式是拿高對比黑白內容捲過浮動 header，確認下層字詞不可辨識且前景仍達 4.5:1。
-- `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃收斂為接近不透明的系統背景：`tpResolveGlassSettings`（`lib/ui/tp_glass_surface.dart:10`）把 `glassColor`、`backerColor`、`platformViewFallbackColor` 全設成 alpha `1` 的 surface，並把 `thickness`／`blur`／`chromaticAberration`／`lightIntensity`／`ambientStrength`／`ambientRim`／`glowIntensity`／`shadowElevation` 歸零。新增材質參數時必須一併歸零，漏一個就是 fallback 仍帶材質。
+- `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃使用不透明系統背景。`tpResolveGlassSettings` 提供 alpha `1` 的語意色，`tpGlassQuality` 明確選擇 `GlassQuality.minimal`，避開 shader、折射與高光；不可只把 blur 歸零，1.x 的 `blur: 0` 仍是光學玻璃。兩個輸入各自以實際背景像素及操作測試驗證。
 - 一般模式不描邊；只有 `Increase Contrast` 才補實心邊（`tpGlassEdgeColor`，`lib/ui/tp_glass_surface.dart:118`）。
 
 ### 材質語意
@@ -237,7 +237,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 導覽材質只有兩種語意，由 `TpNavigationGlassRecipe`（`lib/ui/tp_glass_surface.dart:6`）表達：
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
-- **alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
+- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率、Fresnel 或 blur 校準。**媒體暗化 alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
 - `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。

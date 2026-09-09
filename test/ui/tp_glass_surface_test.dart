@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/theme/app_theme.dart';
-import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 /// 掃三條水平線，回傳「邊緣峰值與內部填色的差」。
@@ -31,14 +30,12 @@ void main() {
       ),
     );
 
-    expect(textBackdrop!.glassColor.a, closeTo(0.40, 0.01));
+    expect(textBackdrop!.glassColor.a, lessThan(1));
     expect(textBackdrop!.backerColor, isNull);
-    // 媒體背景改清透玻璃加暗化層 —— 比一般背景更透，不再更不透明。
-    expect(visualBackdrop!.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
+    // 媒體背景仍需獨立暗化；一般態的透明度交由套件預設。
     expect(
-      visualBackdrop!.glassColor.a,
-      lessThan(textBackdrop!.glassColor.a),
-      reason: '清透玻璃的不透明度必須低於一般背景的玻璃',
+      visualBackdrop!.glassColor,
+      Colors.black.withValues(alpha: tpMediaScrimOpacity),
     );
     expect(visualBackdrop!.backerColor, isNull);
   });
@@ -134,61 +131,34 @@ void main() {
     },
   );
 
-  testWidgets('淺色 glass 使用系統 surface', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: const Scaffold(
-          body: TpGlassSurface(child: SizedBox(width: 120, height: 44)),
+  for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+    testWidgets('${theme.brightness.name} glass 不以品牌 tint 填滿表面，一般態不描邊', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: const Scaffold(
+            body: TpGlassSurface(child: SizedBox(width: 120, height: 44)),
+          ),
         ),
-      ),
-    );
-
-    final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
-    final shape = glass.shape as LiquidRoundedSuperellipse;
-
-    expect(glass.quality, GlassQuality.premium);
-    expect(glass.useOwnLayer, isTrue);
-    expect(
-      glass.settings?.glassColor,
-      TpSystemColorsLight.background.withValues(alpha: 0.58),
-    );
-    expect(glass.settings?.blur, 22);
-    expect(shape.borderRadius, 28);
-    // 一般模式描一條**細邊**。原本相信「移除描邊後由材質接手」,模擬器實測
-    // 材質並沒有接手:不論背後純黑或壓在內容上,邊緣與填色的差都是 0,
-    // 調 ambientRim 從 0.70 到 0.07 五組值也全是 0。Apple 是 +30。
-    expect(shape.side.color.a, 0);
-  });
-
-  testWidgets('dark glass 的邊緣由材質產生，不再描一圈實心線', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark(),
-        home: const Scaffold(
-          body: TpGlassSurface(child: SizedBox(width: 120, height: 44)),
-        ),
-      ),
-    );
-
-    final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
-    final shape = glass.shape as LiquidRoundedSuperellipse;
-
-    expect(
-      glass.settings?.glassColor,
-      TpSystemColorsDark.secondary.withValues(alpha: 0.68),
-    );
-    // 一般模式描一條細邊(見上)。深色由 onSurface(白)導出偏亮的邊,
-    // 淺色由 onSurface(黑)導出偏暗的邊 —— 淺色填色本來就接近白,
-    // 再加白邊等於沒有。
-    expect(shape.side.color.a, 0);
-  });
+      );
+      final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
+      final shape = glass.shape as LiquidRoundedSuperellipse;
+      expect(glass.settings!.glassColor.a, lessThan(1));
+      expect(
+        glass.settings!.glassColor.withValues(alpha: 1),
+        isNot(theme.colorScheme.primary.withValues(alpha: 1)),
+      );
+      expect(shape.side.color.a, 0);
+    });
+  }
 
   // 媒體背景不分明暗模式都套同一層暗化 —— 地圖圖磚恆為亮色，
   // `tripMapColorScheme()` 丟棄了 brightness 參數。
   for (final brightness in [Brightness.light, Brightness.dark]) {
     final expectedTint = Colors.black.withValues(alpha: tpMediaScrimOpacity);
-    testWidgets('PlatformView ${brightness.name} glass 用清透玻璃加暗化層並保留 28pt 配方', (
+    testWidgets('PlatformView ${brightness.name} glass 用清透玻璃加暗化層', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -199,7 +169,6 @@ void main() {
           home: const Scaffold(
             body: TpGlassSurface(
               platformViewBackdrop: true,
-              blurSigma: 28,
               child: SizedBox(width: 120, height: 44),
             ),
           ),
@@ -209,43 +178,14 @@ void main() {
       final settings = tester
           .widget<GlassContainer>(find.byType(GlassContainer))
           .settings!;
-      expect(settings.blur, 28);
       expect(settings.glassColor, expectedTint);
       expect(settings.standardOpacityMultiplier, 1);
       expect(settings.platformViewFallbackColor, expectedTint);
     });
   }
 
-  testWidgets('chrome 走 premium 並關掉 Fresnel 邊緣光', (tester) async {
-    // `GlassQuality.standard` 走 `lightweight_glass.frag`，那裡的 rim 寫死在
-    // `kRimAlphaBase = 0.65` / `kMinRimVisibility = 0.35`，**任何 settings 都
-    // 調不動** —— 真機連續兩版都量到 +125~+138（Apple 與 day tab 是 +30）。
-    //
-    // `premium` 走 `liquid_glass_final_render.frag`，那裡有 `uFresnelStrength`：
-    //   0.0 = pure blur-overlay appearance with no physics-based rim highlight,
-    //         matching iOS 26 system UI glass (Messages, Notification banners)
-    // —— 我們拿來當基準的正是訊息 app。`uAmbientRim` 是**額外再加一圈**，
-    // 方向相反，維持 0。
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark(),
-        home: Scaffold(
-          body: TpGlassSurface(child: const SizedBox(width: 120, height: 44)),
-        ),
-      ),
-    );
-    final glass = tester.widget<GlassContainer>(find.byType(GlassContainer));
-    expect(glass.quality, GlassQuality.premium);
-    expect(glass.settings!.fresnelStrength, 0);
-    // `fresnelStrength` 只關掉 Fresnel 那一條。premium shader 的邊緣還有
-    // 第二個來源 —— specular 高光,`uLightIntensity` 在那裡被乘 3.0:
-    //   directional = totalInfluence^1.5 * uLightIntensity * 3.0
-    //   brightness  = (directional + ambient) * edgeFactor * thicknessScale
-    // 真機 v0.15.0 實測標題膠囊仍有 +100(目標 +30),所以連 lightIntensity
-    // 與 ambientStrength 一起壓。
-    expect(glass.settings!.lightIntensity, lessThanOrEqualTo(0.25));
-    expect(glass.settings!.ambientStrength, lessThanOrEqualTo(0.04));
-  });
+  // 材質預設與真正不透明降級由 HIG 十態的像素及操作測試驗證；
+  // 不再釘住舊 shader 的 Fresnel、lightIntensity 與 ambientStrength 校準值。
 
   group('TpMediaBackdropScope', () {
     testWidgets('缺席時預設非媒體背景;宣告後子樹讀得到', (tester) async {

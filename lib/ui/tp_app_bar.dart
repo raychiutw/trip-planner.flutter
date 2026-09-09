@@ -209,7 +209,7 @@ class TpToolbarGlassButton extends StatelessWidget {
           enabled: onPressed != null,
           onTap: onPressed ?? () {},
           useOwnLayer: true,
-          quality: GlassQuality.premium,
+          quality: tpGlassQuality(context),
           platformViewBackdrop: platformViewBackdrop,
           interactionScale: 1.03,
           stretch: 0.12,
@@ -535,7 +535,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       final sideWidth =
           TpToolbarSlots.actionsWidth(context, sheetActions) + TpSpacing.s4;
       return GlassAppBar(
-        preferredSize: preferredSize,
+        toolbarHeight: preferredSize.height,
         backgroundColor: Colors.transparent,
         centerTitle: true,
         leading: SizedBox(
@@ -578,7 +578,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
       );
     }
     return GlassAppBar(
-      preferredSize: preferredSize,
+      toolbarHeight: preferredSize.height,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       centerTitle: false,
       leading: TpToolbarSlots.leading(

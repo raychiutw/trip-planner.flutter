@@ -210,7 +210,7 @@ class AppleRootTabBar extends StatelessWidget {
       magnification: 1.0,
       blendAmount: 4.0,
       glowOpacity: 0.18,
-      quality: GlassQuality.premium,
+      quality: tpGlassQuality(context),
     );
     final tabBar = inline
         ? GlassTabBar.inline(

@@ -284,6 +284,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 ### 16.2 Liquid Glass
 
 - **HIG 必須**：Liquid Glass 是功能層，不是內容層。
+- **Tripline 決策**：依 #303／#304 固定 liquid_glass_widgets 1.4.1，共用表面沿用套件公開預設材質與品質選擇；保留品牌 tint 前景、媒體暗化與獨立無障礙降級，不重建舊 shader 校準外觀。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
 - **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。
@@ -370,7 +371,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - VoiceOver、Voice Control、Switch Control、Full Keyboard Access、pointer 與外接鍵盤。
 - 鍵盤、safe area、旋轉、sheet、tab state restoration、edge-back。
 - 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、POI、收藏、Account 與全部不可復原刪除流程。
-- 真機或 simulator 驗證 Liquid Glass、PlatformView、效能與 raster jank。
+- Liquid Glass 材質、PlatformView 共存、效能與 raster jank 必須以真機驗證；widget test 與 simulator 只能作幾何、內容及操作證據，不能代替材質驗收（ADR-0001／#303）。
 
 ## 20. 來源階層與實作落差
 

@@ -316,7 +316,14 @@ void main() {
       (appBar.actions!.single as SizedBox).width,
       TpSpacing.tapMin * 2 + TpSpacing.s2,
     );
-    expect(tester.getTopLeft(find.text('行程標題')).dx, closeTo(16, 0.1));
+    expect(
+      tester.getTopLeft(find.text('行程標題')).dx,
+      greaterThanOrEqualTo(tester.getTopLeft(find.byType(GlassAppBar)).dx),
+    );
+    expect(
+      tester.getRect(find.text('行程標題')).right,
+      lessThan(tester.getRect(find.byIcon(Icons.edit)).left),
+    );
   });
 
   testWidgets('TpHorizontalSelector 使用單一玻璃軌 + 一塊選取填色與 13pt DAY 字級', (
@@ -455,11 +462,7 @@ void main() {
             reason: reason,
           );
         } else {
-          expect(
-            glass.settings!.glassColor.a,
-            closeTo(isDark ? 0.48 : 0.40, 0.01),
-            reason: reason,
-          );
+          expect(glass.settings!.glassColor.a, lessThan(1), reason: reason);
         }
 
         // 字符走單色標籤語意色，媒體背景上改亮色 —— 不是依 app 的明暗模式。
@@ -635,7 +638,7 @@ void main() {
     expect(ratio, lessThan(3));
   });
 
-  testWidgets('導覽玻璃的兩種配方同源，媒體背景只做平面化', (tester) async {
+  testWidgets('導覽玻璃的兩種配方同源，媒體背景保留暗化層', (tester) async {
     // 這組斷言原本掛在日期選擇器上，但選擇器已改成實心分段控制項、不再用
     // 玻璃。配方本身仍由頁首與 root tab bar 使用，所以改成直接對配方斷言，
     // 不透過任何 widget。
@@ -656,17 +659,12 @@ void main() {
       ),
     );
 
-    expect(standard.glassColor.a, closeTo(0.40, 0.01));
+    expect(standard.glassColor.a, lessThan(1));
     expect(map.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-    // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
-    // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
+    // 兩種情境共用新版光學預設，媒體背景另外保留可讀暗化層。
     expect(map.blur, standard.blur);
-    expect(map.standardOpacityMultiplier, standard.standardOpacityMultiplier);
-    expect(map.chromaticAberration, 0);
-    expect(map.refractiveIndex, 1.06);
-    expect(standard.chromaticAberration, greaterThan(0));
-    expect(standard.refractiveIndex, greaterThan(1.06));
-    // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+    expect(map.chromaticAberration, standard.chromaticAberration);
+    expect(map.refractiveIndex, standard.refractiveIndex);
   });
 
   testWidgets('選擇器不因所在背景而改變外觀：地圖上與一般頁面同一塊玻璃軌', (tester) async {
@@ -827,7 +825,9 @@ void main() {
     final track = trackGlass(tester, find.byKey(const ValueKey('segmented')));
     expect(
       track.settings!.glassColor,
-      scheme.surface.withValues(alpha: 0.40),
+      tpNavigationGlassSettings(
+        tester.element(find.byKey(const ValueKey('segmented'))),
+      ).glassColor,
       reason: '軌用導覽 chrome 的玻璃 tint，內容要能透出來',
     );
     final pill = selectedPillFill(
@@ -944,7 +944,9 @@ void main() {
     final track = trackGlass(tester, find.byType(TpHorizontalSelector<int>));
     expect(
       track.settings!.glassColor,
-      scheme.surfaceContainerLow.withValues(alpha: 0.48),
+      tpNavigationGlassSettings(
+        tester.element(find.byKey(const ValueKey('dark-day-1'))),
+      ).glassColor,
     );
     expect(find.byType(GlassContainer), findsOneWidget);
   });
@@ -991,7 +993,10 @@ void main() {
       find.descendant(of: accessory, matching: find.byType(GlassContainer)),
     );
     expect(glass.platformViewBackdrop, isTrue);
-    expect(glass.settings?.chromaticAberration, 0);
+    expect(
+      glass.settings?.glassColor,
+      Colors.black.withValues(alpha: tpMediaScrimOpacity),
+    );
     expect(find.byType(AnimatedContainer), findsNothing);
 
     // 對照組:沒有媒體背景時 accessory 要讀到 false,不是寫死 true。
