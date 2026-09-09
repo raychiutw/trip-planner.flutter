@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show Tristate, SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -1478,6 +1479,49 @@ void main() {
     },
   );
 
+  testWidgets('再次點選目前 Day 會從日內中段回到當日開頭', (tester) async {
+    await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
+    await tester.pumpAndSettle();
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final section = find.byKey(const ValueKey('day-section-1'));
+    final initialTop = tester.getTopLeft(section).dy;
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<TpHorizontalSelector<int>>(selector).value, 1);
+    expect(tester.getTopLeft(section).dy, lessThan(initialTop - 100));
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(section).dy,
+      greaterThanOrEqualTo(tester.getRect(selector).bottom - 1),
+    );
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(section).dy, lessThan(initialTop - 100));
+    final dayNode = tester.getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'));
+    dayNode.owner!.performAction(
+      dayNode.id,
+      SemanticsAction.customAction,
+      CustomSemanticsAction.getIdentifier(
+        const CustomSemanticsAction(label: '重新選取目前範圍'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(section).dy,
+      greaterThanOrEqualTo(tester.getRect(selector).bottom - 1),
+    );
+  });
+
   testWidgets('Day selector 支援左右方向鍵切換目前行程日', (tester) async {
     await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
     await tester.pumpAndSettle();
@@ -1504,7 +1548,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final selected = tester
-        .getSemantics(find.byKey(const ValueKey('day-pill-1')))
+        .getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'))
         .getSemanticsData();
 
     expect(selected.label, '第 1 天，共 2 天');
@@ -1599,6 +1643,9 @@ void main() {
           .value,
       2,
     );
+    // 套件置中延遲尚未到期；排空延遲，避免測試結束時留下 timer。
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Reduce Motion 在窄螢幕直接定位遠距 Day selector', (tester) async {
@@ -1627,31 +1674,11 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
-    // 只有選取態才會長出膠囊；它是自己畫的半透明填色，不是玻璃 —— 巢狀玻璃的
-    // `glassColor` 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
-    final pill = tester
-        .widgetList<DecoratedBox>(
-          find.descendant(
-            of: find.byKey(const ValueKey('day-pill-2')),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((box) => box.decoration)
-        .whereType<ShapeDecoration>()
-        .where((deco) => deco.color != null)
-        .single
-        .color!;
-    expect(
-      (pill.r, pill.g, pill.b),
-      isNot((
-        TpSystemColorsLight.tint.r,
-        TpSystemColorsLight.tint.g,
-        TpSystemColorsLight.tint.b,
-      )),
-    );
-    // 半透明但可控：LiquidGlass shader 會把 tint 衰減到約 14%，改用自己畫的
-    // 填色 + `BackdropFilter` 才有確定的色值。
-    expect(pill.a, closeTo(0.92, 0.001));
+    final selected = tester
+        .getSemantics(find.bySemanticsLabel('第 2 天，共 2 天'))
+        .getSemanticsData();
+    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+    expect(selected.label, '第 2 天，共 2 天');
   });
 
   testWidgets('無效 day deep link fallback 後共用選取日為實際 Day 1', (tester) async {

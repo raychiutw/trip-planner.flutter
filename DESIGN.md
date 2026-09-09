@@ -143,10 +143,13 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：行程時間軸顯示 `Day 1…Day N`；地圖顯示 `全部、Day 1…Day N`。
 - **Tripline 決策**：Day selector 固定在 inline Header 下方的內容頂部，不進入 root tab bar 或 bottom accessory。
 - **Tripline 決策**：它是可水平捲動的 Day selector，採 system segmented appearance；不得宣稱為原生可捲動 segmented control。
+- **Tripline 決策**：以 Liquid Glass 1.4.1 公開 `GlassSegmentedControl.scrollable` 提供選取底、自然欄寬與置中；`id` 採選項值、`selectionAlignment` 採 `center`、`dragBehavior` 採 `scroll`，不外包第二層玻璃。
+- **Tripline 決策**：保留 App 水平內容、穩定操作 key、44pt 觸控高度與鍵盤方向鍵薄整合。套件尚未將 Reduce Motion 接入置中捲動，透過公開 `scrollController` 將動畫改為直接定位；不自行計算欄寬、捲動中心或延遲。
 - **HIG 建議**：所有選項維持同一視覺分組，選中項清楚，避免同時混入地圖／行程切換等 action。
 - **HIG 必須**：選中 Day 自動保持可見並盡量置中；邊緣露出部分下一項，提示可捲動。
 - **HIG 必須**：每個選項至少 44pt 高，寬度隨 Dynamic Type 增加，不縮字。
 - **HIG 必須**：水平滑動只瀏覽選項，點擊才切換 Day；內容區不支援左右滑動切 Day，避免和 edge-back 衝突。
+- **Tripline 決策**：再次點選目前 Day 保留原範圍動作（時間軸回到當日開頭）；鍵盤 Enter／Space 重新啟用目前範圍。讀屏普通點按採套件預設，另提供「重新選取目前範圍」具名動作；不增加重複語意節點。
 - **HIG 必須**：VoiceOver 讀出「第 {n} 天，共 {total} 天，已選取」；外接鍵盤可用左右方向鍵移動。
 - **HIG 必須**：Reduce Motion 開啟時取消自動捲動動畫。
 

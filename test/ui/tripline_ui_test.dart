@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -326,9 +328,7 @@ void main() {
     );
   });
 
-  testWidgets('TpHorizontalSelector 使用單一玻璃軌 + 一塊選取填色與 13pt DAY 字級', (
-    tester,
-  ) async {
+  testWidgets('TpHorizontalSelector 保留穩定操作 key、DAY 字級與點選', (tester) async {
     var selected = 0;
     await tester.pumpWidget(
       app(
@@ -351,31 +351,22 @@ void main() {
     );
 
     final selector = find.byKey(const ValueKey('day-selector'));
-    // 軌是玻璃（與其餘 chrome 同一套材質）；選取膠囊維持自己畫的填色 ——
-    // 巢狀在玻璃層裡的子玻璃顏色會被母層吃掉。
-    expect(selectedPillFill(tester, selector).a, closeTo(0.92, 0.001));
     expect(
-      find.descendant(of: selector, matching: find.byType(GlassContainer)),
-      findsOneWidget,
-      reason: '軌要真的是玻璃，模糊與內容透出交給材質',
+      tester.getSize(selector).height,
+      greaterThanOrEqualTo(TpSpacing.tapMin),
     );
-    expect(
-      find.descendant(of: selector, matching: find.byType(BackdropFilter)),
-      findsNothing,
-    );
-    expect(
-      find.descendant(of: selector, matching: find.byType(GlassButton)),
-      findsNothing,
-    );
-    expect(tester.getSize(selector).height, TpSpacing.tapMin);
+    expect(find.byKey(const ValueKey('day-overview')), findsOneWidget);
+    expect(find.byKey(const ValueKey('day-1')), findsOneWidget);
     expect(find.text('DAY 01'), findsOneWidget);
     expect(tester.widget<Text>(find.text('DAY 01')).style?.fontSize, 13);
     expect(find.byKey(const ValueKey('tp-selector-divider-0')), findsNothing);
-    await tester.tap(find.bySemanticsLabel('DAY 01'));
+    await tester.tap(find.byKey(const ValueKey('day-1')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
     expect(selected, 1);
   });
 
-  testWidgets('日期選擇器的軌是玻璃，且與其餘 chrome 用同一組材質參數', (tester) async {
+  testWidgets('日期選擇器以公開套件控制項共用導覽材質', (tester) async {
     // #155 把軌換成 `BackdropFilter` 的理由是「玻璃在純色頁面上等於無色」——
     // 那是**模擬器**的假象（模擬器不渲染 LiquidGlass 的材質邊緣光），真機上
     // 玻璃膠囊清楚可見。#169 改回玻璃，材質參數與頂部膠囊、底部 tab 同源。
@@ -404,14 +395,18 @@ void main() {
     await tester.pumpAndSettle();
 
     final selector = find.byKey(const ValueKey('glass-track'));
-    final glass = tester.widget<GlassContainer>(
-      find.descendant(of: selector, matching: find.byType(GlassContainer)),
+    final glass = tester.widget<GlassSegmentedControl>(
+      find.descendant(
+        of: selector,
+        matching: find.byType(GlassSegmentedControl),
+      ),
     );
-    expect(glass.settings, chrome, reason: '軌不得自帶一套材質參數，必須與導覽 chrome 同源');
+    expect(glass.settings, chrome);
+    expect(glass.selectionAlignment, SegmentSelectionAlignment.center);
+    expect(glass.dragBehavior, SegmentDragBehavior.scroll);
     expect(
-      find.descendant(of: selector, matching: find.byType(BackdropFilter)),
+      find.descendant(of: selector, matching: find.byType(GlassContainer)),
       findsNothing,
-      reason: '模糊交給玻璃材質，不再自己疊一層 BackdropFilter',
     );
   });
 
@@ -559,17 +554,13 @@ void main() {
     );
 
     final scheme = AppTheme.light().colorScheme;
-    final pill = selectedPillFill(
-      tester,
-      find.byKey(const ValueKey('day-selector')),
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<GlassSegmentedControl>(find.byType(GlassSegmentedControl))
+          .indicatorColor,
+      scheme.surfaceContainerHigh,
     );
-
-    // 膠囊底走中性語意層，品牌柔褐不再當背景鋪滿。
-    (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
-    // Apple 分段控制項：選取膠囊比軌更亮（淺色是白），靠浮起表達選取。
-    expect(rgb(pill), rgb(scheme.surface));
-    expect(rgb(pill), isNot(rgb(scheme.primary)));
-
     // 品牌色只出現在前景；未選取維持中性次要前景。
     expect(
       tester.widget<Text>(find.text('DAY 1')).style?.color,
@@ -581,7 +572,7 @@ void main() {
     );
   });
 
-  testWidgets('日期選擇器欄寬改量測，長標籤不截斷且 Dynamic Type 只計一次', (tester) async {
+  testWidgets('日期選擇器長標籤不截斷且 Dynamic Type 只計一次', (tester) async {
     const short = '全';
     const mid = 'DAY 1';
     const long = '2026/07/25（六）';
@@ -691,10 +682,24 @@ void main() {
       ),
     );
 
-    expect(find.byType(GlassContainer), findsNWidgets(2));
+    expect(find.byType(GlassSegmentedControl), findsNWidgets(2));
     expect(
-      trackGlass(tester, find.byKey(const ValueKey('selector-a'))).settings,
-      trackGlass(tester, find.byKey(const ValueKey('selector-b'))).settings,
+      tester
+          .widget<GlassSegmentedControl>(
+            find.descendant(
+              of: find.byKey(const ValueKey('selector-a')),
+              matching: find.byType(GlassSegmentedControl),
+            ),
+          )
+          .settings,
+      tester
+          .widget<GlassSegmentedControl>(
+            find.descendant(
+              of: find.byKey(const ValueKey('selector-b')),
+              matching: find.byType(GlassSegmentedControl),
+            ),
+          )
+          .settings,
     );
   });
 
@@ -719,23 +724,105 @@ void main() {
       ),
     );
 
-    // 選取底色本來就是自己畫的實心填色，Reduce Transparency 下同樣成立 ——
-    // 它不經過玻璃 shader，所以不會被衰減。
-    // 範圍收到選取項：Reduce Transparency 下軌道自己也會退成 ShapeDecoration。
-    final pill = selectedPillFill(
-      tester,
-      find.byKey(const ValueKey('reduce-transparency-day-1')),
+    final control = tester.widget<GlassSegmentedControl>(
+      find.byType(GlassSegmentedControl),
     );
-    expect(pill.a, 1);
-    expect(pill, AppTheme.light().colorScheme.surface);
+    expect(control.quality, GlassQuality.minimal);
     expect(
-      find.descendant(
-        of: find.byType(TpHorizontalSelector<int>),
-        matching: find.byType(GlassButton),
-      ),
-      findsNothing,
-      reason: '巢狀玻璃的顏色會被軌道母層吃掉，選取態不得再用 GlassButton',
+      control.backgroundColor,
+      AppTheme.light().colorScheme.surfaceContainerLow,
     );
+    expect(
+      control.indicatorColor,
+      AppTheme.light().colorScheme.surfaceContainerHigh,
+    );
+  });
+
+  testWidgets('降低動態效果時日期選擇器的置中捲動不經過中間位置', (tester) async {
+    tester.view.physicalSize = const Size(240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var selected = 1;
+    late StateSetter update;
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(disableAnimations: true),
+            child: GlassAccessibilityScope(
+              reduceMotion: true,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  update = setState;
+                  return TpHorizontalSelector<int>(
+                    value: selected,
+                    options: [
+                      for (var day = 1; day <= 12; day++)
+                        TpScopeOption(value: day, label: 'DAY $day'),
+                    ],
+                    onSelected: (value) => setState(() => selected = value),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final first = tester.getTopLeft(find.text('DAY 1')).dx;
+    update(() => selected = 9);
+    await tester.pump();
+    final positions = <double>[];
+    for (var frame = 0; frame < 40; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      positions.add(tester.getTopLeft(find.text('DAY 1')).dx);
+    }
+    final last = positions.last;
+    expect(last, lessThan(first - 100));
+    expect(
+      positions.every((x) => (x - first).abs() < 0.1 || (x - last).abs() < 0.1),
+      isTrue,
+    );
+  });
+
+  testWidgets('日期選擇器同數量選項重排後仍顯示選中 Day', (tester) async {
+    tester.view.physicalSize = const Size(240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Future<void> show(List<int> days) async {
+      await tester.pumpWidget(
+        app(
+          Scaffold(
+            body: TpHorizontalSelector<int>(
+              key: const ValueKey('reordered-selector'),
+              value: 1,
+              options: [
+                for (final day in days)
+                  TpScopeOption(
+                    value: day,
+                    label: 'DAY $day',
+                    key: ValueKey('reordered-$day'),
+                  ),
+              ],
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await show(List.generate(12, (index) => index + 1));
+    await show([for (var day = 2; day <= 12; day++) day, 1]);
+    final viewport = tester.getRect(
+      find.byKey(const ValueKey('reordered-selector')),
+    );
+    final selected = tester.getRect(find.byKey(const ValueKey('reordered-1')));
+    expect(selected.left, greaterThanOrEqualTo(viewport.left));
+    expect(selected.right, lessThanOrEqualTo(viewport.right));
   });
 
   testWidgets('TpHorizontalSelector 讓長列表的初始選項保持可見', (tester) async {
@@ -796,159 +883,215 @@ void main() {
     expect(tester.takeException(), isAssertionError);
   });
 
-  testWidgets('選擇器是 Apple 分段控制項：玻璃軌 + 比軌更不透明的膠囊', (tester) async {
-    // 「玻璃軌在純色頁面上等於無色」是模擬器的假象（#169）：模擬器不渲染
-    // 材質邊緣光，真機上玻璃膠囊清楚可見。軌回到玻璃，膠囊靠「更不透明」
-    // 浮起來 —— 這是 Apple `UISegmentedControl` 的作法。
+  testWidgets('日期選擇器水平拖曳只瀏覽，點選才更新 Day', (tester) async {
+    tester.view.physicalSize = const Size(240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var selected = 1;
+    var calls = 0;
+    await tester.pumpWidget(
+      app(
+        Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => TpHorizontalSelector<int>(
+              value: selected,
+              options: [
+                for (var day = 1; day <= 12; day++)
+                  TpScopeOption(
+                    value: day,
+                    label: 'DAY $day',
+                    key: ValueKey('drag-$day'),
+                  ),
+              ],
+              onSelected: (value) => setState(() {
+                selected = value;
+                calls++;
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final start = tester.getTopLeft(find.text('DAY 1'));
+    await tester.drag(
+      find.byType(TpHorizontalSelector<int>),
+      const Offset(-150, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('DAY 1')).dx, lessThan(start.dx));
+    expect(calls, 0);
+    expect(selected, 1);
+    await tester.ensureVisible(find.byKey(const ValueKey('drag-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('drag-5')));
+    await tester.pumpAndSettle();
+    expect(selected, 5);
+    expect(calls, 1);
+  });
+
+  testWidgets('目前 Day 可再次點選與讀屏啟用，水平拖曳不觸發回呼', (tester) async {
+    tester.view.physicalSize = const Size(240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var calls = 0;
     await tester.pumpWidget(
       app(
         Scaffold(
           body: TpHorizontalSelector<int>(
-            key: const ValueKey('segmented'),
             value: 1,
-            options: const [
-              TpScopeOption(value: 0, label: 'DAY 1'),
-              TpScopeOption(
-                value: 1,
-                label: 'DAY 2',
-                key: ValueKey('segmented-day-2'),
-              ),
+            options: [
+              for (var day = 1; day <= 12; day++)
+                TpScopeOption(
+                  value: day,
+                  label: 'DAY $day',
+                  semanticsLabel: '第 $day 天，共 12 天',
+                  key: ValueKey('reselect-$day'),
+                ),
             ],
-            onSelected: (_) {},
+            onSelected: (_) => calls++,
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('reselect-1')),
+      const Offset(-70, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(calls, 0);
+    await tester.ensureVisible(find.byKey(const ValueKey('reselect-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reselect-1')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    final node = tester.getSemantics(find.bySemanticsLabel('第 1 天，共 12 天'));
+    final actionId = CustomSemanticsAction.getIdentifier(
+      const CustomSemanticsAction(label: '重新選取目前範圍'),
+    );
+    expect(
+      node.getSemanticsData().customSemanticsActionIds,
+      contains(actionId),
+    );
+    node.owner!.performAction(
+      node.id,
+      ui.SemanticsAction.customAction,
+      actionId,
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    final unlabeledActions = <SemanticsNode>[];
+    void collect(SemanticsNode current) {
+      final data = current.getSemanticsData();
+      if (data.flagsCollection.isButton &&
+          data.hasAction(ui.SemanticsAction.tap) &&
+          data.label.isEmpty) {
+        unlabeledActions.add(current);
+      }
+      current.visitChildren((child) {
+        collect(child);
+        return true;
+      });
+    }
 
-    final scheme = AppTheme.light().colorScheme;
-    final track = trackGlass(tester, find.byKey(const ValueKey('segmented')));
-    expect(
-      track.settings!.glassColor,
-      tpNavigationGlassSettings(
-        tester.element(find.byKey(const ValueKey('segmented'))),
-      ).glassColor,
-      reason: '軌用導覽 chrome 的玻璃 tint，內容要能透出來',
-    );
-    final pill = selectedPillFill(
-      tester,
-      find.byKey(const ValueKey('segmented-day-2')),
-    );
-    expect(
-      pill,
-      scheme.surface.withValues(alpha: 0.92),
-      reason: '淺色的選取膠囊比軌更不透明（Apple 是靠浮起表達選取）',
-    );
-    expect(
-      pill.a,
-      greaterThan(track.settings!.glassColor.a),
-      reason: '膠囊要浮在軌之上，不能比軌更透',
-    );
+    collect(tester.getSemantics(find.byType(TpHorizontalSelector<int>)));
+    expect(unlabeledActions, isEmpty, reason: '每個可啟用的 Day 節點都必須有完整標籤，不增加空白按鈕');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(calls, 3);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(calls, 4);
   });
 
-  testWidgets('選取膠囊是實際畫上去的填色，不倚賴會被母層吃掉的玻璃 tint', (tester) async {
-    // 軌道是 `GlassContainer(useOwnLayer: true)`，會建立 LiquidGlassLayer；
-    // 巢狀在裡面的子玻璃會被合併進母層，子層自己的 `glassColor` 不生效。
-    // 模擬器實測：選取態與未選在淺色下都是 #FFFFFF（差 0），深色是
-    // #080808 vs #040404（差 4/255），改子層 alpha 逐位元零差異。
-    // 所以選取指示器必須是真的畫上去的不透明填色。
+  testWidgets('日期選擇器點選後左右鍵可切換且邊界不溢出', (tester) async {
+    var selected = 1;
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: TpHorizontalSelector<int>(
-            value: 1,
-            options: const [
-              TpScopeOption(value: 0, label: 'DAY 1'),
-              TpScopeOption(
-                value: 1,
-                label: 'DAY 2',
-                key: ValueKey('fill-day-2'),
-              ),
-            ],
-            onSelected: (_) {},
+      app(
+        Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => TpHorizontalSelector<int>(
+              value: selected,
+              options: const [
+                TpScopeOption(value: 1, label: 'DAY 1'),
+                TpScopeOption(value: 2, label: 'DAY 2'),
+              ],
+              onSelected: (value) => setState(() => selected = value),
+            ),
           ),
         ),
       ),
     );
+    await tester.tap(find.text('DAY 1'));
     await tester.pumpAndSettle();
-
-    final scheme = AppTheme.light().colorScheme;
-    final decorated = tester.widgetList<DecoratedBox>(
-      find.descendant(
-        of: find.byKey(const ValueKey('fill-day-2')),
-        matching: find.byType(DecoratedBox),
-      ),
-    );
-    final fills = decorated
-        .map((box) => box.decoration)
-        .whereType<ShapeDecoration>()
-        .where((deco) => deco.color != null)
-        .toList();
-    expect(fills, isNotEmpty, reason: '選取態要有一層自己畫的 ShapeDecoration 填色');
-    expect(fills.single.color, scheme.surface.withValues(alpha: 0.92));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(selected, 2);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(selected, 2);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(selected, 1);
   });
 
-  testWidgets('深色日期 selector 的選取膠囊同樣是中性語意層，不鋪品牌柔褐', (tester) async {
+  testWidgets('深色日期選擇器保留完整 Day 語意與讀屏啟用', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    var selected = 1;
+    var calls = 0;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark(),
         home: Scaffold(
-          body: TpHorizontalSelector<int>(
-            value: 1,
-            options: const [
-              TpScopeOption(value: 0, label: '總覽'),
-              TpScopeOption(
-                value: 1,
-                label: 'DAY 1',
-                key: ValueKey('dark-day-1'),
-              ),
-            ],
-            onSelected: (_) {},
+          body: StatefulBuilder(
+            builder: (context, setState) => TpHorizontalSelector<int>(
+              value: selected,
+              options: const [
+                TpScopeOption(
+                  value: 1,
+                  label: 'DAY 1',
+                  semanticsLabel: '第 1 天，共 2 天',
+                ),
+                TpScopeOption(
+                  value: 2,
+                  label: 'DAY 2',
+                  semanticsLabel: '第 2 天，共 2 天',
+                ),
+              ],
+              onSelected: (value) => setState(() {
+                selected = value;
+                calls++;
+              }),
+            ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-
-    final scheme = AppTheme.dark().colorScheme;
-    final pill = tester
-        .widgetList<DecoratedBox>(
-          find.descendant(
-            of: find.byKey(const ValueKey('dark-day-1')),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((box) => box.decoration)
-        .whereType<ShapeDecoration>()
-        .where((deco) => deco.color != null)
-        .single
-        .color!;
+    final node = tester.getSemantics(find.bySemanticsLabel('第 2 天，共 2 天'));
+    node.owner!.performAction(node.id, ui.SemanticsAction.tap);
+    await tester.pumpAndSettle();
+    expect(selected, 2);
+    expect(calls, 1);
     expect(
-      (pill.r, pill.g, pill.b),
-      (
-        scheme.surfaceContainerHighest.r,
-        scheme.surfaceContainerHighest.g,
-        scheme.surfaceContainerHighest.b,
-      ),
+      tester
+          .getSemantics(find.bySemanticsLabel('第 2 天，共 2 天'))
+          .getSemanticsData()
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isTrue,
     );
     expect(
-      (pill.r, pill.g, pill.b),
-      isNot((
-        TpSystemColorsDark.tint.r,
-        TpSystemColorsDark.tint.g,
-        TpSystemColorsDark.tint.b,
-      )),
+      tester.widget<Text>(find.text('DAY 2')).style?.color,
+      AppTheme.dark().colorScheme.primary,
     );
-    // 深色的軌是半透明玻璃（systemGray6 tint），內容要能透出來。
-    final track = trackGlass(tester, find.byType(TpHorizontalSelector<int>));
-    expect(
-      track.settings!.glassColor,
-      tpNavigationGlassSettings(
-        tester.element(find.byKey(const ValueKey('dark-day-1'))),
-      ).glassColor,
-    );
-    expect(find.byType(GlassContainer), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('TpBottomAccessory 自行避讓 root tab 並維持固定高度', (tester) async {
@@ -1024,23 +1167,3 @@ void main() {
     expect(plainGlass.platformViewBackdrop, isFalse);
   });
 }
-
-/// 取選取膠囊自己畫的填色。
-///
-/// 選取態不是玻璃：軌道用 `useOwnLayer: true` 建立 LiquidGlassLayer，巢狀
-/// 在裡面的子玻璃會被合併進母層，子層自己的 `glassColor` 畫不出來。
-Color selectedPillFill(WidgetTester tester, Finder scope) => tester
-    .widgetList<DecoratedBox>(
-      find.descendant(of: scope, matching: find.byType(DecoratedBox)),
-    )
-    .map((box) => box.decoration)
-    .whereType<ShapeDecoration>()
-    .where((deco) => deco.color != null)
-    .last
-    .color!;
-
-/// 取選擇器軌道那層玻璃。
-GlassContainer trackGlass(WidgetTester tester, Finder scope) =>
-    tester.widget<GlassContainer>(
-      find.descendant(of: scope, matching: find.byType(GlassContainer)),
-    );

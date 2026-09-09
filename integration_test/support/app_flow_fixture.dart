@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -670,10 +671,11 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   expect(
     tester
-        .widget<Semantics>(find.byKey(const ValueKey('day-pill-2')))
-        .properties
-        .selected,
-    isTrue,
+        .getSemantics(find.byKey(const ValueKey('day-pill-2')))
+        .getSemanticsData()
+        .flagsCollection
+        .isSelected,
+    Tristate.isTrue,
   );
 
   await tester.tapAt(tester.getCenter(_rootTab('聊天')));

@@ -72,6 +72,110 @@ Color _selectedPillColor(WidgetTester tester) => tester
 
 void main() {
   for (final state in _states) {
+    testWidgets('日期選擇器中性選取底實際移動且可操作 ${state.name}', (tester) async {
+      final boundaryKey = GlobalKey();
+      final theme = state.brightness == Brightness.light
+          ? AppTheme.light()
+          : AppTheme.dark();
+      var selected = 1;
+      var actions = 0;
+      Widget scene(Color background) => MaterialApp(
+        theme: theme,
+        home: MediaQuery(
+          data: MediaQueryData(
+            highContrast: state.increasedContrast,
+            disableAnimations: state.reduceMotion,
+            textScaler: TextScaler.linear(state.textScale),
+          ),
+          child: AppAccessibilityScope(
+            reduceTransparency: state.reduceTransparency,
+            child: GlassAdaptiveScope(
+              maxQuality: GlassQuality.minimal,
+              child: Center(
+                child: RepaintBoundary(
+                  key: boundaryKey,
+                  child: ColoredBox(
+                    color: background,
+                    child: SizedBox(
+                      width: 320,
+                      child: StatefulBuilder(
+                        builder: (context, setState) =>
+                            TpHorizontalSelector<int>(
+                              value: selected,
+                              options: const [
+                                TpScopeOption(
+                                  value: 1,
+                                  label: 'DAY 1',
+                                  key: ValueKey('pixel-day-1'),
+                                ),
+                                TpScopeOption(
+                                  value: 2,
+                                  label: 'DAY 2',
+                                  key: ValueKey('pixel-day-2'),
+                                ),
+                              ],
+                              onSelected: (value) => setState(() {
+                                selected = value;
+                                actions++;
+                              }),
+                            ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      Future<Color> sample(int day) async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final rect = tester.getRect(find.byKey(ValueKey('pixel-day-$day')));
+        final point = boundary.globalToLocal(
+          Offset(rect.center.dx, rect.top + 4),
+        );
+        final image = (await tester.runAsync(
+          () => boundary.toImage(pixelRatio: 1),
+        ))!;
+        final data = (await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        ))!;
+        final offset = (point.dy.floor() * image.width + point.dx.floor()) * 4;
+        final color = Color.fromARGB(
+          data.getUint8(offset + 3),
+          data.getUint8(offset),
+          data.getUint8(offset + 1),
+          data.getUint8(offset + 2),
+        );
+        image.dispose();
+        return color;
+      }
+
+      await tester.pumpWidget(scene(Colors.black));
+      await tester.pumpAndSettle();
+      final fill = await sample(1);
+      final track = await sample(2);
+      expect(fill, theme.colorScheme.surfaceContainerHigh);
+      expect(track, isNot(fill));
+      await tester.tap(find.byKey(const ValueKey('pixel-day-2')));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+      expect(actions, 1);
+      expect(await sample(2), fill);
+      expect(await sample(1), track);
+      if (state.increasedContrast || state.reduceTransparency) {
+        await tester.pumpWidget(scene(Colors.white));
+        await tester.pumpAndSettle();
+        expect(await sample(2), fill);
+        expect(await sample(1), track, reason: '無障礙軌道不可透出後方內容');
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final state in _states) {
     testWidgets('root tab選取表面實際繪製並隨操作移動 ${state.name}', (tester) async {
       final boundaryKey = GlobalKey();
       var selected = 0;
@@ -361,7 +465,6 @@ void main() {
       );
       final expectsOpaqueGlass =
           state.increasedContrast || state.reduceTransparency;
-      final isDark = state.brightness == Brightness.dark;
       expect(
         headerGlass.settings!.glassColor.a,
         expectsOpaqueGlass ? 1 : lessThan(1),
@@ -374,68 +477,27 @@ void main() {
         reason: '只有提高對比才補實心邊界',
       );
 
-      // 日期選擇器的軌道走同一條規則，而且軌本身也是玻璃（#169 改回）——
-      // 先前改成 `BackdropFilter` 的理由「玻璃在純色頁面上等於無色」是
-      // 模擬器的假象，真機上玻璃膠囊清楚可見。
-      final trackDecoration = tester
-          .widgetList<DecoratedBox>(
-            find.descendant(
-              of: find.byType(TpHorizontalSelector<int>),
-              matching: find.byType(DecoratedBox),
-            ),
-          )
-          .map((box) => box.decoration)
-          .whereType<ShapeDecoration>()
-          .first;
-      final trackShape = trackDecoration.shape as LiquidRoundedSuperellipse;
-      (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
-      expect(
-        trackShape.side.color.a,
-        state.increasedContrast ? greaterThan(0.5) : 0,
-        reason: '選擇器軌道的描邊規則應與導覽 chrome 一致',
-      );
-
-      // 品牌柔褐只出現在前景：選取膠囊在一般模式與無障礙 fallback 都是中性語意層。
       final scheme = Theme.of(
         tester.element(find.byType(AppleRootTabBar)),
       ).colorScheme;
-      // 選取膠囊是自己畫的填色，不是巢狀玻璃 —— 巢狀玻璃的 `glassColor` 會被
-      // 軌道的 LiquidGlassLayer 吃掉，模擬器實測改 alpha 逐位元零差異。
-      final selectedDayFill = tester
-          .widgetList<DecoratedBox>(
-            find.descendant(
-              of: find.byKey(const ValueKey('day-2-option')),
-              matching: find.byType(DecoratedBox),
-            ),
-          )
-          .map((box) => box.decoration)
-          .whereType<ShapeDecoration>()
-          .where((deco) => deco.color != null)
-          .single
-          .color!;
-
-      // 對照 iOS 26 電話 app 通話記錄實測：深色膠囊 #363636。
-      final selectedBase = isDark
-          ? scheme.surfaceContainerHighest
-          : scheme.surface;
+      (double, double, double) rgb(Color color) => (color.r, color.g, color.b);
+      final selector = tester.widget<GlassSegmentedControl>(
+        find.byType(GlassSegmentedControl),
+      );
+      final selectedDayFill = selector.indicatorColor!;
+      expect(selectedDayFill, scheme.surfaceContainerHigh);
       expect(
-        rgb(selectedDayFill),
-        rgb(selectedBase),
-        reason: '日期選擇器的選取膠囊是中性語意層，比軌更亮',
+        tester.getSize(find.byKey(const ValueKey('day-2-option'))).height,
+        greaterThanOrEqualTo(44),
       );
       expect(
-        selectedDayFill.a,
-        expectsOpaqueGlass ? 1 : closeTo(isDark ? 0.90 : 0.92, 0.001),
-        reason: '一般模式半透明讓內容透出；無障礙 fallback 收斂為不透明',
+        tester.widget<Text>(find.text('DAY 2')).style?.color,
+        scheme.primary,
       );
-      expect(
-        find.descendant(
-          of: find.byType(TpHorizontalSelector<int>),
-          matching: find.byType(GlassContainer),
-        ),
-        findsOneWidget,
-        reason: '軌是玻璃，模糊與內容透出交給材質，不再自己疊 BackdropFilter',
-      );
+      if (expectsOpaqueGlass) {
+        expect(selector.backgroundColor, scheme.surfaceContainerLow);
+        expect(selector.quality, GlassQuality.minimal);
+      }
 
       if (expectsOpaqueGlass) {
         expect(

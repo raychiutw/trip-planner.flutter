@@ -507,14 +507,16 @@ void main() {
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     final selectedDay = tester
-        .getSemantics(find.byKey(const ValueKey('trip-map-day-1')))
+        .getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'))
         .getSemanticsData();
     expect(selectedDay.label, '第 1 天，共 2 天');
     expect(selectedDay.flagsCollection.isSelected, Tristate.isTrue);
-    // 選擇器的軌是玻璃，與其餘 chrome 同一套材質（#169）——「玻璃在純色頁面
-    // 上等於無色」是模擬器的假象，真機上玻璃膠囊清楚可見。
+    // 套件接手日期列的軌道、選取底與捲動；下方仍驗證畫面幾何與 Day 狀態。
     expect(
-      find.descendant(of: daySelector, matching: find.byType(GlassContainer)),
+      find.descendant(
+        of: daySelector,
+        matching: find.byType(GlassSegmentedControl),
+      ),
       findsOneWidget,
     );
     expect(
@@ -793,6 +795,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_sharedDayNum(tester), 1);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('查詢參數缺席時採用共用選取日', (tester) async {

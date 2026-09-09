@@ -13,7 +13,8 @@ supersedes: 0003-brand-tint-for-root-tab-selection.md
 > 以下量測與更正史保留供追溯，不是新版的校準目標。一般模式不另畫邊線，提高
 > 對比才補明確邊界；提高對比與降低透明度各自使用不透明、無 shader 降級。
 > 第 3 節的 root tab 70% 膠囊與自畫選取層已由 #305 移除；套件接手選取繪製與指標互動。
-> 日期選擇器的自畫膠囊仍由 #306 承接，尚未在 #305 遷移。
+> 日期選擇器已由 #306 改用 `GlassSegmentedControl.scrollable`，移除自畫膠囊及手算欄寬／中心。
+> 下方 #169 的自畫選取填色理由僅保留歷史脈絡，不再是目前實作要求。
 
 
 ## 為什麼推翻 ADR-0003
@@ -172,6 +173,33 @@ LiquidGlass 的材質邊緣光**。
 - 日期選擇器的軌**已於 #169 改回玻璃**,與其餘 chrome 用同一組材質參數(原文寫「不受
   影響:它在 v0.12.0 已改成 `BackdropFilter` + 填色」—— 那次換掉的理由同樣是模擬器
   的假象)。選取膠囊維持自畫的中性填色,巢狀在玻璃層裡的子玻璃顏色會被母層吃掉。
+
+### 日期選擇器遷移（2026-09-09，#306）
+
+新版公開控制項已自行提供軌道與選取底，不再外包 `TpGlassSurface`，也不再維護
+`_optionWidth`、捲動中心與自畫 ShapeDecoration。選取底透過 `indicatorColor`
+指定中性語意色；水平滑動只瀏覽，`selectionAlignment: center` 交由套件置中。
+
+仍保留的薄整合與理由：
+
+- 公開 `GlassSegment.icon` 可接受 widget，但沒有任意 label builder 或 App key 欄位。
+  以此插槽承載水平標籤、圖示／資料圓點及既有操作 key，內容採自然寬度；完整讀屏
+  標籤仍交 `semanticLabel`。不在 App 重建 gesture 或定位 overlay。
+- `preferredHeight` 只量測 App 自有文字行高、44pt 下限及公開 control padding，
+  同步時間軸固定列與地圖內容避讓，不反推套件內部幾何。
+- 外接鍵盤左右鍵沿用 App Focus；被動 pointer listener 只取得焦點，
+  切換選項與拖曳仍由套件處理。套件不回呼同一 index，故目前選項的內容補
+  一個 tap recognizer；它不處理 drag，不疊 overlay，保留時間軸點目前 Day 回到
+  當日開頭。Enter／Space 也可重新啟用目前範圍。
+- 讀屏普通點按仍採套件預設，提供「重新選取目前範圍」具名 action 保留再次
+  選取的功能。App 不重複宣告 selected，讓 custom action 合併到套件原 label
+  節點；重複 selected flag 或兩個 tap handler 會分裂成空白按鈕，測試禁止此情形。
+- 套件 1.4.1 即使在 `GlassAccessibilityScope(reduceMotion: true)` 下仍會以
+  300ms 捲動置中。公開行為測試已重現；只在公開 ScrollController 的 `animateTo`
+  轉為 `jumpTo`，不改套件計算的目標與選取延遲。
+
+十態矩陣以實際像素確認選取底會移動、未選取軌道可區分，以及提高對比／降低
+透明度各自不透出背景；這是本機內容與幾何證據，不代表真機折射材質已驗收。
 
 ## 方法論備註
 
