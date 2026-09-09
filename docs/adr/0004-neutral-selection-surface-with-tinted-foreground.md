@@ -261,6 +261,30 @@ App 只轉接 selected、停用原因、語意 tap、初始焦點和 Esc。此�
 Bold Text 的實際字重同時套用於量測及呈現。以真實 regular／bold 字型的
 公開文字省略與勾號矩形測試驗證，避免 Ahem 相同字寬造成假綠。
 
+### Sheet 遷移（2026-09-09，#309）
+
+移除 `_appLargeSheetSettings` 的舊 shader 校準與 halfSettings 重複覆寫；
+一般態讓 `GlassModalSheetScaffold` 自行解析套件 sheet 預設。
+移除 93%／62% 高度、28／0 圓角與零 margin，保留 fixed `{large}`／
+resizable `{medium, large}`。原先 0.85 fillThreshold 與 gradual 本來就是
+這個公開 scaffold 的預設，刪去是消除重複設定，不宣稱因此改變畫面；
+不可混用 `GlassModalSheet.show` 的另一組預設。
+
+large 的不透明內容色保留系統 surface；提高對比或降低透明度則各自提供
+不透明設定與 minimal 品質，不能只靠 blur 歸零。regular Account 保留
+560×720 置中 form-sheet 幾何，以公開 `GlassContainer` 接手材質與圓角，
+取捨見 ADR-0010。沒有 App 自製的捲動交接控制器可刪，套件公開 controller
+與原有可捲動內容已能完成同一手勢的展開／捲動交接。
+
+App 保留 route、dirty／submitting／關閉去重、內層 Navigator、拒絕後復位、
+child identity 與鍵盤收合。公開 `show` 入口不能取代這些非同步關閉保護；
+薄 route 另尊重 Reduce Motion，進出不位移。共用鍵盤 listener 只做 unfocus，
+不是舊版 sheet 手勢 workaround。
+
+測試以公開參考組裝比較 medium 材質與左上圓角、regular 材質與幾何，並驗證
+獨立不透明降級、真實拖曳、長清單及未儲存保護。這些 headless 像素與操作證據
+不是 Impeller shader、PlatformView 或 iOS／Android 真機材質驗收。
+
 ## 方法論備註
 
 本 ADR 的每一個數字都來自像素量測,而不是目視判斷。這是刻意的 —— 這條線上前後兩份

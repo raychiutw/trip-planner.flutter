@@ -487,6 +487,9 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
     );
     if (!mounted || !discard) return;
     setState(() => _allowPop = true);
+    // 等 PopScope 重建並更新 canPop，再返回真正 push 的內層子頁。
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
     await _popOrCloseSheet();
   }
 
@@ -518,30 +521,10 @@ typedef _AppSheetBuilder<T> =
       Future<void> Function([T? result]) close,
     );
 
-LiquidGlassSettings _appLargeSheetSettings(BuildContext context) {
-  final theme = Theme.of(context);
-  final isDark = theme.brightness == Brightness.dark;
-  final surface = theme.colorScheme.surface;
-  final settings = LiquidGlassSettings(
-    glassColor: surface.withValues(alpha: isDark ? 0.70 : 0.78),
-    thickness: isDark ? 28 : 24,
-    blur: 24,
-    chromaticAberration: isDark ? 0.003 : 0.004,
-    lightIntensity: isDark ? 0.68 : 0.76,
-    ambientStrength: isDark ? 0.08 : 0.14,
-    refractiveIndex: 1.10,
-    saturation: isDark ? 1.04 : 1.06,
-    platformViewFallbackColor: surface.withValues(alpha: 0.95),
-  );
-  return tpResolveGlassSettings(context, settings);
-}
-
 Future<T?> _showAppSheet<T>({
   required BuildContext context,
   required _AppSheetBuilder<T> builder,
   required GlassSheetState initialState,
-  required double mediumSize,
-  required double largeSize,
   required bool resizable,
   Future<bool> Function()? canDismiss,
   Future<bool> Function()? onSystemBack,
@@ -553,7 +536,9 @@ Future<T?> _showAppSheet<T>({
     barrierDismissible: false,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.38),
-    transitionDuration: const Duration(milliseconds: 300),
+    transitionDuration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 300),
     transitionBuilder: (context, animation, secondaryAnimation, child) =>
         SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
@@ -566,8 +551,6 @@ Future<T?> _showAppSheet<T>({
         _ThemeAwareAppSheet<T>(
           controller: controller,
           initialState: initialState,
-          mediumSize: mediumSize,
-          largeSize: largeSize,
           resizable: resizable,
           canDismiss: canDismiss,
           onSystemBack: onSystemBack,
@@ -582,8 +565,6 @@ class _ThemeAwareAppSheet<T> extends StatefulWidget {
   const _ThemeAwareAppSheet({
     required this.controller,
     required this.initialState,
-    required this.mediumSize,
-    required this.largeSize,
     required this.resizable,
     required this.canDismiss,
     required this.onSystemBack,
@@ -593,8 +574,6 @@ class _ThemeAwareAppSheet<T> extends StatefulWidget {
 
   final GlassModalSheetController controller;
   final GlassSheetState initialState;
-  final double mediumSize;
-  final double largeSize;
   final bool resizable;
   final Future<bool> Function()? canDismiss;
   final Future<bool> Function()? onSystemBack;
@@ -646,7 +625,10 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
   @override
   Widget build(BuildContext context) {
     // 必須在 build 內依賴 Theme；系統外觀變更後 sheet 材質與內容才會同幀更新。
-    final settings = _appLargeSheetSettings(context);
+    final quality = tpGlassQuality(context);
+    final settings = quality == GlassQuality.minimal
+        ? tpResolveGlassSettings(context, const LiquidGlassSettings())
+        : null;
     return PopScope<T>(
       canPop: _isClosing,
       onPopInvokedWithResult: (didPop, result) {
@@ -657,34 +639,21 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         body: const SizedBox.expand(),
         sheet: _sheet!,
         initialState: widget.initialState,
-        halfSize: widget.mediumSize,
-        fullSize: widget.largeSize,
         // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
         // 永遠視為尚未展開，阻止內容向上捲動。
         detents: widget.resizable
             ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
             : const {GlassSheetDetent.large},
         settings: settings,
-        halfSettings: settings,
         expandedColor: Theme.of(context).colorScheme.surface,
-        quality: tpGlassQuality(context),
-        // 定版近滿版 sheet 是「實色內容畫布＋玻璃控制元件」；只在進場時
-        // 保留玻璃過渡，固定於 93% detent 後即使用完整 canvas 色，避免
-        // 背後地圖穿透而降低文字與 grouped list 的對比。
-        fillThreshold: 0.85,
-        fillTransition: GlassFillTransition.gradual,
-        topBorderRadius: 28,
-        fullTopBorderRadius: 28,
-        bottomBorderRadius: 0,
-        fullBottomBorderRadius: 0,
-        horizontalMargin: 0,
-        bottomMargin: 0,
+        quality: quality,
         padding: EdgeInsets.zero,
         showDragIndicator: widget.resizable,
         onStateChanged: (state) {
           if (state == GlassSheetState.hidden) {
             widget.controller.snapToState(widget.initialState, animate: false);
-            unawaited(_requestClose());
+            // 拖曳／外點與系統返回共用內層導覽保護；明確 Close 仍關閉整個乾淨 sheet。
+            unawaited(_handleSystemBack());
           }
         },
       ),
@@ -702,8 +671,6 @@ Future<T?> showAppSelectionSheet<T>(
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
-    mediumSize: 0.93,
-    largeSize: 0.93,
     resizable: false,
     canDismiss: dismissalLocked == null && hasUnsavedChanges == null
         ? null
@@ -782,8 +749,6 @@ Future<T?> showAppContentSheet<T>(
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
-    mediumSize: 0.93,
-    largeSize: 0.93,
     resizable: false,
     onSystemBack: () async {
       final navigator = sheetNavigatorKey.currentState;
@@ -849,20 +814,26 @@ class _RegularAppContentSheetState<T>
       },
       child: Dialog(
         insetPadding: const EdgeInsets.all(TpSpacing.s4),
-        clipBehavior: Clip.antiAlias,
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
           child: SizedBox(
             key: const ValueKey('app-regular-content-sheet'),
             width: 560,
             height: 720,
-            child: _AppContentSheet<T>(
-              title: widget.title,
-              contentBuilder: widget.contentBuilder,
-              onClose: _close,
-              navigatorKey: widget.navigatorKey,
-              dismissible: widget.dismissible,
+            child: GlassContainer(
+              useOwnLayer: true,
+              clipBehavior: Clip.antiAlias,
+              settings: tpNavigationGlassSettings(context),
+              quality: tpGlassQuality(context),
+              child: _AppContentSheet<T>(
+                title: widget.title,
+                contentBuilder: widget.contentBuilder,
+                onClose: _close,
+                navigatorKey: widget.navigatorKey,
+                dismissible: widget.dismissible,
+              ),
             ),
           ),
         ),
@@ -879,8 +850,6 @@ Future<T?> showAppScreenSheet<T>(
   return _showAppSheet<T>(
     context: context,
     initialState: GlassSheetState.full,
-    mediumSize: 0.93,
-    largeSize: 0.93,
     resizable: false,
     onSystemBack: () async {
       final navigator = sheetNavigatorKey.currentState;
@@ -908,8 +877,6 @@ Future<bool?> showAppFormSheet(
   return _showAppSheet<bool>(
     context: context,
     initialState: GlassSheetState.full,
-    mediumSize: 0.62,
-    largeSize: 0.93,
     resizable: true,
     canDismiss: () async {
       if (controller.isSubmitting) return false;

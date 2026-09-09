@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -6,6 +8,404 @@ import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
+  for (final dragToReturn in [true, false]) {
+    testWidgets('push 的編輯子頁取消保留草稿，${dragToReturn ? '拖曳' : '返回'}後捨棄一次回上一頁', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final guard = AppUnsavedChangesController();
+      var dirty = false;
+      var submitting = false;
+      final pending = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showAppContentSheet<void>(
+                context,
+                title: '帳號',
+                builder: (sheetContext) => Center(
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(sheetContext).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => StatefulBuilder(
+                          builder: (context, setState) =>
+                              AppUnsavedChangesGuard(
+                                controller: guard,
+                                hasChanges: dirty,
+                                dismissalEnabled: !submitting,
+                                child: Scaffold(
+                                  body: Column(
+                                    children: [
+                                      TextField(
+                                        onChanged: (_) =>
+                                            setState(() => dirty = true),
+                                      ),
+                                      FilledButton(
+                                        onPressed: submitting
+                                            ? null
+                                            : () async {
+                                                setState(
+                                                  () => submitting = true,
+                                                );
+                                                await pending.future;
+                                                setState(
+                                                  () => submitting = false,
+                                                );
+                                              },
+                                        child: const Text('儲存'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: guard.requestPop,
+                                        child: const Text('返回子頁上一層'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                        ),
+                      ),
+                    ),
+                    child: const Text('編輯子頁'),
+                  ),
+                ),
+              ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開啟'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('編輯子頁'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '保留子頁草稿');
+      await tester.pump();
+      await tester.tap(find.text('儲存'));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('捨棄未儲存的變更？'), findsNothing);
+      expect(find.text('保留子頁草稿'), findsOneWidget);
+      pending.complete();
+      await tester.pumpAndSettle();
+      final backPosition = tester.getCenter(find.text('返回子頁上一層'));
+      await tester.tapAt(backPosition);
+      await tester.tapAt(backPosition);
+      await tester.pumpAndSettle();
+      expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('保留子頁草稿'), findsOneWidget);
+      final sheet = find.byKey(const ValueKey('app-large-sheet'));
+      final original = tester.getRect(sheet);
+      if (dragToReturn) {
+        await tester.timedDragFrom(
+          Offset(original.center.dx, original.top + 10),
+          const Offset(0, 650),
+          const Duration(milliseconds: 800),
+        );
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+      await tester.tap(find.text('捨棄'));
+      await tester.pumpAndSettle();
+      expect(find.text('編輯子頁').hitTestable(), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(tester.getRect(sheet), rectMoreOrLessEquals(original));
+    });
+  }
+
+  testWidgets('表單確認去重且送出中拒絕拖曳外點返回，失敗保留輸入', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final form = AppSheetFormController();
+    final pending = Completer<bool>();
+    var submissions = 0;
+    form.attach(() {
+      submissions++;
+      return pending.future;
+    });
+    addTearDown(form.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯',
+              submitLabel: '儲存',
+              controller: form,
+              builder: (_) => TextField(
+                onChanged: (_) => form.update(dirty: true, canSubmit: true),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '不能遺失');
+    await tester.pump();
+    final cancelPosition = tester.getCenter(find.text('取消'));
+    await tester.tapAt(cancelPosition);
+    await tester.tapAt(cancelPosition);
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('取消').last);
+    await tester.pumpAndSettle();
+    expect(find.text('不能遺失'), findsOneWidget);
+    await tester.tap(find.text('儲存'));
+    await tester.tap(find.text('儲存'));
+    await tester.pump();
+    expect(submissions, 1);
+    expect(form.isSubmitting, isTrue);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final scaffold = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    final sheet = find.byWidget(scaffold.sheet);
+    final original = tester.getRect(sheet);
+    await tester.timedDragFrom(
+      Offset(original.center.dx, original.top + 10),
+      const Offset(0, 650),
+      const Duration(milliseconds: 800),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getRect(sheet), rectMoreOrLessEquals(original));
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
+    expect(find.text('不能遺失'), findsOneWidget);
+    pending.complete(false);
+    await tester.pumpAndSettle();
+    expect(form.isSubmitting, isFalse);
+    expect(find.text('不能遺失'), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('捨棄'));
+    await tester.pumpAndSettle();
+    expect(find.text('開啟').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('表單同一次上拖先展開再捲內容，收鍵盤不清草稿', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final form = AppSheetFormController();
+    final draft = TextEditingController(text: '京都草稿');
+    final focus = FocusNode();
+    final scroll = ScrollController();
+    addTearDown(form.dispose);
+    addTearDown(draft.dispose);
+    addTearDown(focus.dispose);
+    addTearDown(scroll.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (_, child) => AppKeyboardDismissRegion(child: child!),
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppFormSheet(
+              context,
+              title: '編輯',
+              submitLabel: '儲存',
+              controller: form,
+              builder: (_) => ListView(
+                controller: scroll,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  TextField(controller: draft, focusNode: focus),
+                  for (var i = 0; i < 40; i++) ListTile(title: Text('欄位 $i')),
+                ],
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '保留京都草稿');
+    await tester.drag(find.byType(ListView), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    expect(focus.hasFocus, isFalse);
+    expect(draft.text, '保留京都草稿');
+    // 捲回頂端，再從 header 收到 medium；後續上拖從內容內開始。
+    await tester.drag(find.byType(ListView), const Offset(0, 200));
+    await tester.pumpAndSettle();
+    final scaffold = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    final sheet = find.byWidget(scaffold.sheet);
+    final fullRect = tester.getRect(sheet);
+    await tester.timedDragFrom(
+      Offset(fullRect.center.dx, fullRect.top + 10),
+      const Offset(0, 320),
+      const Duration(milliseconds: 800),
+    );
+    await tester.pumpAndSettle();
+    final halfRect = tester.getRect(sheet);
+    expect(halfRect.top, greaterThan(fullRect.top));
+    expect(scroll.offset, 0);
+    final gesture = await tester.startGesture(
+      Offset(halfRect.center.dx, halfRect.bottom - 80),
+    );
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(0, -50));
+      await tester.pump(const Duration(milliseconds: 60));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(sheet), rectMoreOrLessEquals(fullRect));
+    expect(scroll.offset, greaterThan(0), reason: '同一手勢到達 large 後必須交接給清單');
+    expect(draft.text, '保留京都草稿');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('降低動態效果時 sheet 進場不位移', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (_) => const Text('內容'),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pump();
+    await tester.pump();
+    final sheet = find.byKey(const ValueKey('app-large-sheet'));
+    final firstFrame = tester.getRect(sheet);
+    await tester.pumpAndSettle();
+    expect(firstFrame, rectMoreOrLessEquals(tester.getRect(sheet)));
+  });
+
+  for (final contentSheet in [false, true]) {
+    testWidgets(
+      '拖曳關閉 ${contentSheet ? 'content' : 'screen'} sheet 仍先確認子頁草稿且拒絕後復位',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final guard = AppUnsavedChangesController();
+        Widget content(BuildContext context) => AppUnsavedChangesGuard(
+          controller: guard,
+          hasChanges: true,
+          child: const Scaffold(body: Text('尚未儲存的草稿')),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => FilledButton(
+                onPressed: () => contentSheet
+                    ? showAppContentSheet<void>(
+                        context,
+                        title: '帳號',
+                        builder: content,
+                      )
+                    : showAppScreenSheet<void>(context, builder: content),
+                child: const Text('開啟'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('開啟'));
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(
+          ValueKey(contentSheet ? 'app-large-sheet' : 'app-large-screen-sheet'),
+        );
+        final original = tester.getRect(sheet);
+        await tester.timedDragFrom(
+          Offset(original.center.dx, original.top + 10),
+          const Offset(0, 650),
+          const Duration(milliseconds: 800),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+        await tester.tap(find.text('取消'));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(sheet), rectMoreOrLessEquals(original));
+        expect(find.text('尚未儲存的草稿').hitTestable(), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('捨棄'));
+        await tester.pumpAndSettle();
+        expect(find.text('開啟').hitTestable(), findsOneWidget);
+      },
+    );
+  }
+
+  testWidgets('固定 sheet 採公開預設幾何且長清單可捲至末項', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassModalSheetScaffold(
+          body: const SizedBox.expand(),
+          sheet: const SizedBox.expand(key: ValueKey('reference-sheet')),
+          initialState: GlassSheetState.full,
+          detents: {GlassSheetDetent.large},
+          showDragIndicator: false,
+          padding: EdgeInsets.zero,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final reference = tester.getRect(
+      find.byKey(const ValueKey('reference-sheet')),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppContentSheet<void>(
+              context,
+              title: '帳號',
+              builder: (_) => ListView.builder(
+                itemCount: 50,
+                itemBuilder: (_, i) => ListTile(title: Text('設定 $i')),
+              ),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byKey(const ValueKey('app-large-sheet'))),
+      reference,
+    );
+    await tester.scrollUntilVisible(find.text('設定 49'), 400);
+    expect(find.text('設定 49').hitTestable(), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('app-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(find.text('開啟').hitTestable(), findsOneWidget);
+  });
+
   testWidgets('large sheet uses the opaque Reduce Transparency fallback', (
     tester,
   ) async {
@@ -128,11 +528,7 @@ void main() {
       find.byType(GlassModalSheetScaffold),
     );
     expect(sheet.initialState, GlassSheetState.full);
-    expect(sheet.halfSize, 0.93);
-    expect(sheet.fullSize, 0.93);
     expect(sheet.showDragIndicator, isFalse);
-    expect(sheet.fillThreshold, 0.85);
-    expect(sheet.fullSettings, isNull);
     expect(
       sheet.expandedColor,
       Theme.of(tester.element(find.text('東京五日行'))).colorScheme.surface,
@@ -168,11 +564,7 @@ void main() {
     final sheet = tester.widget<GlassModalSheetScaffold>(
       find.byType(GlassModalSheetScaffold),
     );
-    expect(sheet.halfSize, 0.93);
-    expect(sheet.fullSize, 0.93);
     expect(sheet.showDragIndicator, isFalse);
-    expect(sheet.fillThreshold, 0.85);
-    expect(sheet.fullSettings, isNull);
     expect(
       sheet.expandedColor,
       Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
@@ -204,8 +596,6 @@ void main() {
     final sheet = tester.widget<GlassModalSheetScaffold>(
       find.byType(GlassModalSheetScaffold),
     );
-    expect(sheet.fillThreshold, 0.85);
-    expect(sheet.fullSettings, isNull);
     expect(
       sheet.expandedColor,
       Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
@@ -332,8 +722,6 @@ void main() {
     final sheet = tester.widget<GlassModalSheetScaffold>(
       find.byType(GlassModalSheetScaffold),
     );
-    expect(sheet.halfSize, 0.62);
-    expect(sheet.fullSize, 0.93);
     expect(sheet.showDragIndicator, isTrue);
     await tester.enterText(find.byType(TextField), '京都');
     await tester.tap(find.text('取消'));

@@ -1440,8 +1440,10 @@ void main() {
     expect(find.text('完成'), findsNothing);
     expect(find.byType(TabBar), findsNothing);
     expect(sheet.initialState, GlassSheetState.full);
-    expect(sheet.halfSize, 0.93);
-    expect(sheet.fullSize, 0.93);
+    expect(
+      find.byKey(const ValueKey('trip-picker-item-trip-2')).hitTestable(),
+      findsOneWidget,
+    );
     expect(sheet.showDragIndicator, isFalse);
 
     nativeController.moves.clear();

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
+import 'package:tripline/app/adaptive.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_action_item.dart';
@@ -72,6 +73,248 @@ Color _selectedPillColor(WidgetTester tester) => tester
 
 void main() {
   for (final state in _states) {
+    testWidgets('regular form sheet 保留置中限寬並採公開材質 ${state.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1024, 768);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final boundaryKey = GlobalKey();
+      final opaque = state.increasedContrast || state.reduceTransparency;
+      Widget scene({bool reference = false, Color background = Colors.black}) =>
+          AppAccessibilityScope(
+            reduceTransparency: state.reduceTransparency,
+            child: MaterialApp(
+              theme: state.brightness == Brightness.light
+                  ? AppTheme.light()
+                  : AppTheme.dark(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  highContrast: state.increasedContrast,
+                  disableAnimations: state.reduceMotion,
+                  textScaler: TextScaler.linear(state.textScale),
+                ),
+                child: GlassAdaptiveScope(
+                  maxQuality: GlassQuality.minimal,
+                  child: RepaintBoundary(key: boundaryKey, child: child!),
+                ),
+              ),
+              home: ColoredBox(
+                color: background,
+                child: Center(
+                  child: Builder(
+                    builder: (context) => FilledButton(
+                      onPressed: () {
+                        if (reference) {
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => const Dialog(
+                              insetPadding: EdgeInsets.all(16),
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              child: SizedBox(
+                                width: 560,
+                                height: 720,
+                                child: GlassContainer(
+                                  useOwnLayer: true,
+                                  clipBehavior: Clip.antiAlias,
+                                  child: SizedBox.expand(),
+                                ),
+                              ),
+                            ),
+                          );
+                        } else {
+                          showAppContentSheet<void>(
+                            context,
+                            title: '帳號',
+                            builder: (_) => const SizedBox.expand(),
+                          );
+                        }
+                      },
+                      child: const Text('開啟'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      Future<List<int>> sample() async {
+        await tester.tap(find.text('開啟'));
+        await tester.pumpAndSettle();
+        late List<int> pixel;
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = await (boundary.debugLayer! as OffsetLayer).toImage(
+            boundary.paintBounds,
+          );
+          final data = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          final offset = (500 * image.width + 512) * 4;
+          pixel = List.generate(4, (i) => data.getUint8(offset + i));
+          image.dispose();
+        });
+        return pixel;
+      }
+
+      await tester.pumpWidget(scene(reference: !opaque));
+      final expected = await sample();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(
+        scene(background: opaque ? Colors.white : Colors.black),
+      );
+      final actual = await sample();
+      expect(
+        actual,
+        expected,
+        reason: opaque ? 'regular 也有獨立不透明降級' : 'regular 不保留舊 Dialog 填色',
+      );
+      final rect = tester.getRect(
+        find.byKey(const ValueKey('app-regular-content-sheet')),
+      );
+      expect(rect.width, lessThanOrEqualTo(560));
+      expect(rect.height, lessThanOrEqualTo(720));
+      expect(rect.center, const Offset(512, 384));
+      await tester.tap(find.byKey(const ValueKey('app-sheet-close')));
+      await tester.pumpAndSettle();
+      expect(find.text('開啟').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('sheet 拖至 medium 採預設材質且獨立不透明降級 ${state.name}', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final boundaryKey = GlobalKey();
+      final form = AppSheetFormController();
+      addTearDown(form.dispose);
+      final opaque = state.increasedContrast || state.reduceTransparency;
+      Widget scene({bool reference = false, Color background = Colors.black}) =>
+          AppAccessibilityScope(
+            reduceTransparency: state.reduceTransparency,
+            child: MaterialApp(
+              theme: state.brightness == Brightness.light
+                  ? AppTheme.light()
+                  : AppTheme.dark(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  highContrast: state.increasedContrast,
+                  disableAnimations: state.reduceMotion,
+                  textScaler: TextScaler.linear(state.textScale),
+                ),
+                child: GlassAdaptiveScope(
+                  maxQuality: GlassQuality.minimal,
+                  child: RepaintBoundary(key: boundaryKey, child: child!),
+                ),
+              ),
+              home: ColoredBox(
+                color: background,
+                child: Center(
+                  child: Builder(
+                    builder: (context) => FilledButton(
+                      onPressed: () {
+                        if (reference) {
+                          showGeneralDialog<void>(
+                            context: context,
+                            barrierColor: Colors.black.withValues(alpha: 0.38),
+                            pageBuilder: (_, _, _) => GlassModalSheetScaffold(
+                              body: const SizedBox.expand(),
+                              sheet: const SizedBox.expand(),
+                              initialState: GlassSheetState.full,
+                              padding: EdgeInsets.zero,
+                            ),
+                          );
+                        } else {
+                          showAppFormSheet(
+                            context,
+                            title: '編輯停留點',
+                            submitLabel: '儲存',
+                            controller: form,
+                            builder: (_) => const SizedBox.expand(),
+                          );
+                        }
+                      },
+                      child: const Text('開啟'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      Future<(Rect, List<int>)> openAndSample() async {
+        await tester.tap(find.text('開啟'));
+        await tester.pumpAndSettle();
+        final scaffold = tester.widget<GlassModalSheetScaffold>(
+          find.byType(GlassModalSheetScaffold),
+        );
+        final sheet = find.byWidget(scaffold.sheet);
+        final start = tester.getRect(sheet);
+        await tester.timedDragFrom(
+          Offset(start.center.dx, start.top + 10),
+          const Offset(0, 320),
+          const Duration(milliseconds: 800),
+        );
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(sheet);
+        expect(
+          rect.top,
+          greaterThan(start.top),
+          reason: '手勢確實將 sheet 收到 medium',
+        );
+        late List<int> pixels;
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          final image = await (boundary.debugLayer! as OffsetLayer).toImage(
+            boundary.paintBounds,
+          );
+          final data = (await image.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          final offset =
+              ((rect.bottom - 60).floor() * image.width +
+                  rect.center.dx.floor()) *
+              4;
+          pixels = List.generate(4, (i) => data.getUint8(offset + i));
+          if (!opaque) {
+            // 同時比較可見的左下圓角，不能只讓中央材質相同。
+            final corner =
+                ((rect.top + 4).floor() * image.width +
+                    (rect.left + 12).floor()) *
+                4;
+            pixels.addAll(List.generate(4, (i) => data.getUint8(corner + i)));
+          }
+          image.dispose();
+        });
+        return (rect, pixels);
+      }
+
+      await tester.pumpWidget(scene(reference: !opaque));
+      final reference = await openAndSample();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(
+        scene(background: opaque ? Colors.white : Colors.black),
+      );
+      final actual = await openAndSample();
+      expect(
+        actual.$2,
+        reference.$2,
+        reason: opaque ? '不透明降級不得穿透黑白背景' : 'medium 使用公開套件預設材質',
+      );
+      expect(actual.$1, rectMoreOrLessEquals(reference.$1));
+      expect(
+        tester.getSize(find.text('取消').hitTestable()).height,
+        greaterThan(0),
+      );
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('開啟').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('日期選擇器中性選取底實際移動且可操作 ${state.name}', (tester) async {
       final boundaryKey = GlobalKey();
       final theme = state.brightness == Brightness.light

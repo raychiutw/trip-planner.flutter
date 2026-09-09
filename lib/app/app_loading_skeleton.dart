@@ -47,16 +47,27 @@ class _ListSkeletonCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SkeletonBar(
-            color: colors.surfaceContainerHighest,
-            width: 96,
-            height: 6,
+          // 橫向 sheet／鍵盤出現時，可用高度可能小於三條裝飾線的總高。
+          // Flexible 只在不足時壓縮骨架，不改載入狀態或真實內容的字級。
+          Flexible(
+            child: _SkeletonBar(
+              color: colors.surfaceContainerHighest,
+              width: 96,
+              height: 6,
+            ),
           ),
-          _SkeletonBar(color: colors.surfaceContainerHighest, height: 6),
-          _SkeletonBar(
-            color: colors.surfaceContainerHighest,
-            width: 180,
-            height: 6,
+          Flexible(
+            child: _SkeletonBar(
+              color: colors.surfaceContainerHighest,
+              height: 6,
+            ),
+          ),
+          Flexible(
+            child: _SkeletonBar(
+              color: colors.surfaceContainerHighest,
+              width: 180,
+              height: 6,
+            ),
           ),
         ],
       ),
