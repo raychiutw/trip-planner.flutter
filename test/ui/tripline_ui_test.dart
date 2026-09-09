@@ -623,9 +623,9 @@ void main() {
   });
 
   testWidgets('導覽玻璃的兩種配方同源，媒體背景保留暗化層', (tester) async {
-    // 這組斷言原本掛在日期選擇器上，但選擇器已改成實心分段控制項、不再用
-    // 玻璃。配方本身仍由頁首與 root tab bar 使用，所以改成直接對配方斷言，
-    // 不透過任何 widget。
+    // 日期選擇器已由公開 GlassSegmentedControl.scrollable 接手玻璃呈現。
+    // 這裡直接驗證頁首與 root tab bar 共用的兩種配方，不依賴選擇器組裝；
+    // 選擇器的材質整合另由上方公開控制項測試驗證。
     late LiquidGlassSettings standard;
     late LiquidGlassSettings map;
     await tester.pumpWidget(

@@ -32,7 +32,7 @@
 | 帶狀遮蔽 | 六層 BackdropFilter、逐層 sigma、55% 比例及手製漸層 | 公開 `ProgressiveBlur`＋`GlassScrollEdgeEffect.soft`。App 只保留內容／控制項層級、裁切、安全區與 `IgnorePointer`；媒體暗化用公開 fadeColor，獨立不透明區保證無障礙 |
 | 選單面板 | RawMenuAnchor、手畫面板、Scale／Fade 動畫、手算定位／flipUp／高度原點、舊 shader recipe | `GlassMenu` 的定位、barrier、morph 與 `GlassMenuItem` 呈現接手。保留 autoAdjustToScreen、立即派發／去重、選取／disabled 原因／destructive、自然換行高度。表單 Dropdown 是內容值編輯，不是玻璃動作選單，繼續 system surface |
 | 選單可及性／生命週期 | 不重建整套玻璃材質或選取動畫 | 1.4.1 非捲動項目 clone 的 semantics／keyboard callback 實測失效，以公開 `GlassMenuLabel` 包 `GlassMenuItem` 補操作；Esc、焦點、大字與 Reduce Motion 用公開轉接。此路徑採 item hover／focus／press，沒有套件滑動選取膠囊 |
-| 選單 route host | 移除 App 舊 popup 定位／動畫 | 原生套件 route listener 在宣告式 Navigator build 更新時呼叫 OverlayPortal.hide，重現 persistentCallbacks 斷言；公開 root `OverlayEntry` 與 CompositedTransform link 隔離來源 route，來源換頁關閉，普通關閉等待套件 morph。items／enabled／theme／文字設定變動使 host 失效，相同項目重建則保留。不延遲業務 callback、不改套件私有 API |
+| 選單 route host | 移除 App 舊 popup 定位／動畫 | 原生套件 route listener 在宣告式 Navigator build 更新時呼叫 OverlayPortal.hide，重現 persistentCallbacks 斷言；公開 root `OverlayEntry` 與 CompositedTransform link 隔離來源 route，來源換頁關閉，普通關閉等待套件 morph。每次 open 增加 generation，使舊 close 等待在重開後失效，避免持續排幀或誤移除新選單；新的 close 仍清除 host。items／enabled／theme／文字設定變動使 host 失效，相同項目重建則保留。不延遲業務 callback、不改套件私有 API |
 | compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲 |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
 | 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；不替換 SDK、不逐幀截圖。原生圖磚、手勢、marker／route 與其資料編碼色保留 |
@@ -44,7 +44,15 @@
 
 [DESIGN §9](../DESIGN.md)與 `tripMapColorScheme()` 的契約是圖磚維持既有日間樣式，App 深淺模式只改 controls／overlay。[媒體 scope 與前景](../lib/ui/tp_glass_surface.dart)不能單看 Theme brightness 決定圖磚前景。1.4.1 的公開 `platformViewBackdrop` 解決背景共存與裁切，並不提供原生圖磚亮度分析或替 App 選前景色；因此保留白色 bar 前景與 35% 黑色暗化，透過公開 `glassColor`／`platformViewFallbackColor`／fadeColor 傳入。35% 是現有產品取值，不宣稱 Apple 規定的通用數值，也不是重建舊 shader 外觀。
 
-精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。現有控制項已經用前者，不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。無障礙時上述半透明語意會被不透明 fallback 取代。
+精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。現有控制項已經用前者，不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。正常媒體表面的 bar 前景為白色；提高對比或降低透明度任一開啟時，不透明 fallback 已遮住媒體，bar 前景改用 `colorScheme.onSurface`，不再沿用白色。品牌選取前景仍使用既有 `primary`；本次新增的 tab 像素對比矩陣只量未選取文字，不代表所有選取文字或實機可讀性均已通過。
+
+## 收尾修正與最新本機驗證
+
+`58f47d8` 以自然失敗測試重現探索自訂地區 sheet 離場時過早釋放 `TextEditingController`，改由表單內容 state 在卸載時釋放；另補移動段 consumer 收到 409／503 後保留輸入及解除送出鎖定的測試。後者刻畫既有錯誤處理，不宣稱新增 OCC 衝突重抓或恢復能力。`b3c54f8` 修正媒體不透明降級前景與 sheet 返回圖示 tint。`7ccbc1e` 補自訂選單入口 Tooltip，並以真正時間軸的 Semantics longPress 重現關閉途中重開後持續排幀，再以 open generation 隔離舊等待。三次修正均完成 fresh implement、red → green、完整測試及提交前 Standards／Spec 兩軸審查。
+
+最新程式基準為 `7ccbc1e46b4efaf9a4c1295b995a793d8ca737b8`／`0.26.3+34`：357 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` **17.7 秒、No issues found**；完整 `flutter test` **1892 項通過、3 分 34 秒**；Android debug APK **39.2 秒建置成功**。整合 worktree 的 `.scratch/liquid-glass-upgrade/final-checks-result.txt` 為 PASS，對應 `final-format.log`、`final-analyze.log`、`final-tests.log`、`final-android-build.log` 及 `final-verified-head.txt`。本次文件收尾不改 production 行為；這批結果不重新標記為文件 commit 上執行。
+
+同次 suite 產生 140 張 PNG，共 2,458,561 bytes，保留於主 worktree 的 `.scratch/liquid-glass-upgrade/after-final-7ccbc1e`；整合 worktree 的 `final-artifacts-manifest.json` 記錄 source SHA 與版本。測試字型方框與 fake map 只提供幾何證據。以下 #310 的 1882 項 suite、`c2d267d`／`0.25.8+33` Android 裝置流程及失敗嘗試保留原始歸屬；最新 APK 建置成功不表示已重新完成裝置操作或材質驗收。
 
 ## #310 整合驗證
 
