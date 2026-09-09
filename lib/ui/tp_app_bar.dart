@@ -428,7 +428,14 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                 key: largeSheetScope != null
                     ? const ValueKey('app-large-sheet-back')
                     : null,
-                child: leadingAction,
+                child: largeSheetScope == null
+                    ? leadingAction
+                    : IconTheme.merge(
+                        data: IconThemeData(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        child: leadingAction,
+                      ),
               ),
             ),
       title: TpHeaderTitle(

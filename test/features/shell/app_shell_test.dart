@@ -1,7 +1,9 @@
 import 'dart:ui' show PointerDeviceKind, Tristate;
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -175,6 +177,114 @@ Color _selectedPillColor(WidgetTester tester, String label) => tester
     .indicatorColor!;
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1024, 768)]) {
+    for (final highContrast in [true, false]) {
+      testWidgets('地圖不透明降級時未選取 tabs 仍清楚可讀 $size highContrast=$highContrast', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final router = buildShellRouter();
+        addTearDown(router.dispose);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          AppAccessibilityScope(
+            reduceTransparency: !highContrast,
+            child: ProviderScope(
+              child: MaterialApp.router(
+                theme: AppTheme.light(),
+                routerConfig: router,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(highContrast: highContrast),
+                  child: RepaintBoundary(key: boundaryKey, child: child!),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tapAt(tester.getCenter(find.bySemanticsLabel('地圖')));
+        await tester.pumpAndSettle();
+        expect(find.text('PROBE-MAP'), findsOneWidget);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('地圖')),
+          matchesSemantics(
+            isButton: true,
+            isSelected: true,
+            hasSelectedState: true,
+            label: '地圖',
+            hasTapAction: true,
+          ),
+        );
+        final selectedLabels = tester.widgetList<Text>(
+          find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.text('地圖'),
+          ),
+        );
+        expect(
+          selectedLabels.map((label) => label.style?.color),
+          contains(AppTheme.light().colorScheme.primary),
+        );
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = (await tester.runAsync(
+          () => boundary.toImage(pixelRatio: 1),
+        ))!;
+        final data = (await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        ))!;
+        Color pixel(Offset point) {
+          final local = boundary.globalToLocal(point);
+          final offset =
+              (local.dy.floor() * image.width + local.dx.floor()) * 4;
+          return Color.fromARGB(
+            data.getUint8(offset + 3),
+            data.getUint8(offset),
+            data.getUint8(offset + 1),
+            data.getUint8(offset + 2),
+          );
+        }
+
+        for (final label in ['聊天', '行程', '收藏']) {
+          final text = find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.text(label),
+          );
+          expect(text, findsWidgets);
+          // 套件可重複繪製標籤層；驗最終畫面墨跡，不依賴層數。
+          final rect = tester.getRect(text.first);
+          final background = pixel(Offset(rect.center.dx, rect.top - 2));
+          var strongestContrast = 1.0;
+          for (var y = rect.top.ceil(); y < rect.bottom.floor(); y++) {
+            for (var x = rect.left.ceil(); x < rect.right.floor(); x++) {
+              final luminance = pixel(
+                Offset(x.toDouble(), y.toDouble()),
+              ).computeLuminance();
+              final backdrop = background.computeLuminance();
+              final ratio = luminance > backdrop
+                  ? (luminance + 0.05) / (backdrop + 0.05)
+                  : (backdrop + 0.05) / (luminance + 0.05);
+              if (ratio > strongestContrast) strongestContrast = ratio;
+            }
+          }
+          expect(
+            strongestContrast,
+            greaterThanOrEqualTo(4.5),
+            reason: '$label 的實際墨跡必須與不透明背景有足夠對比',
+          );
+        }
+        image.dispose();
+        await tester.tapAt(tester.getCenter(find.bySemanticsLabel('聊天')));
+        await tester.pumpAndSettle();
+        expect(find.text('PROBE-CHAT'), findsOneWidget);
+      });
+    }
+  }
   group('AppShell 4-tab 導航', () {
     testWidgets('iOS／Android 尺寸矩陣依可用寬度選擇導覽', (tester) async {
       final cases = [
@@ -657,6 +767,19 @@ void main() {
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
+      final chatGlyphs = tester.widgetList<RichText>(
+        find.descendant(
+          of: find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.byIcon(CupertinoIcons.chat_bubble_fill),
+          ),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(
+        chatGlyphs.map((glyph) => glyph.text.style?.color),
+        contains(Colors.white),
+      );
       expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
       // 媒體暗化與原生 PlatformView 相容路徑保留，其餘採相同新版材質。
       expect(map.settings?.blur, standard.settings?.blur);

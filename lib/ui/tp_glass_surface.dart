@@ -76,8 +76,11 @@ const double tpMediaScrimOpacity = 0.35;
 /// **不能用 app 的明暗模式判斷。** `tripMapColorScheme()` 丟棄了 brightness
 /// 參數、永遠回傳 light，地圖在深色模式下仍是亮圖磚；媒體背景一律先加暗化層
 /// （見 [tpMediaScrimOpacity]），字符再用亮色，深淺兩種模式都可讀。
+/// 不透明無障礙降級已遮住媒體，前景改回 system surface 的對應語意色。
 Color tpBarForeground(BuildContext context, {required bool onMedia}) =>
-    onMedia ? Colors.white : Theme.of(context).colorScheme.onSurface;
+    onMedia && !_usesOpaqueGlass(context)
+    ? Colors.white
+    : Theme.of(context).colorScheme.onSurface;
 
 /// 把 [tpBarForeground] 套給整片 bar 的字符與文字。
 ///

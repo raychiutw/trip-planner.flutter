@@ -47,6 +47,46 @@ Widget _menuHost({
 );
 
 void main() {
+  testWidgets('large sheet 返回與關閉字符保留品牌 tint 且分別可操作', (tester) async {
+    var backs = 0;
+    var closes = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: TpLargeSheetNavigationScope(
+          onClose: () => closes++,
+          child: Scaffold(
+            appBar: TpAppBar(
+              title: const Text('行程詳情'),
+              role: TpAppBarRole.detail,
+              onBack: () => backs++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final symbol in [CupertinoIcons.back, CupertinoIcons.xmark]) {
+      final glyph = tester.widget<RichText>(
+        find.descendant(
+          of: find.byIcon(symbol),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(
+        glyph.text.style?.color,
+        AppTheme.light().colorScheme.primary,
+        reason: 'sheet 的返回與關閉實際字符使用同一品牌前景',
+      );
+    }
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+    expect(backs, 1);
+    expect(closes, 0);
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(closes, 1);
+  });
   testWidgets('群組內的 bar button 可用 Tab 與 Enter 個別啟用', (tester) async {
     final calls = <String>[];
     await tester.pumpWidget(
