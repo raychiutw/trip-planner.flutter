@@ -50,9 +50,13 @@
 
 `58f47d8` 以自然失敗測試重現探索自訂地區 sheet 離場時過早釋放 `TextEditingController`，改由表單內容 state 在卸載時釋放；另補移動段 consumer 收到 409／503 後保留輸入及解除送出鎖定的測試。後者刻畫既有錯誤處理，不宣稱新增 OCC 衝突重抓或恢復能力。`b3c54f8` 修正媒體不透明降級前景與 sheet 返回圖示 tint。`7ccbc1e` 補自訂選單入口 Tooltip，並以真正時間軸的 Semantics longPress 重現關閉途中重開後持續排幀，再以 open generation 隔離舊等待。三次修正均完成 fresh implement、red → green、完整測試及提交前 Standards／Spec 兩軸審查。
 
-最新程式基準為 `7ccbc1e46b4efaf9a4c1295b995a793d8ca737b8`／`0.26.3+34`：357 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` **17.7 秒、No issues found**；完整 `flutter test` **1892 項通過、3 分 34 秒**；Android debug APK **39.2 秒建置成功**。整合 worktree 的 `.scratch/liquid-glass-upgrade/final-checks-result.txt` 為 PASS，對應 `final-format.log`、`final-analyze.log`、`final-tests.log`、`final-android-build.log` 及 `final-verified-head.txt`。本次文件收尾不改 production 行為；這批結果不重新標記為文件 commit 上執行。
+前次本機驗證的程式基準為 `7ccbc1e46b4efaf9a4c1295b995a793d8ca737b8`／`0.26.3+34`：357 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` **17.7 秒、No issues found**；完整 `flutter test` **1892 項通過、3 分 34 秒**；Android debug APK **39.2 秒建置成功**。整合 worktree 的 `.scratch/liquid-glass-upgrade/final-checks-result.txt` 為 PASS，對應 `final-format.log`、`final-analyze.log`、`final-tests.log`、`final-android-build.log` 及 `final-verified-head.txt`。本次文件收尾不改 production 行為；這批結果不重新標記為文件 commit 上執行。
 
 同次 suite 產生 140 張 PNG，共 2,458,561 bytes，保留於主 worktree 的 `.scratch/liquid-glass-upgrade/after-final-7ccbc1e`；整合 worktree 的 `final-artifacts-manifest.json` 記錄 source SHA 與版本。測試字型方框與 fake map 只提供幾何證據。以下 #310 的 1882 項 suite、`c2d267d`／`0.25.8+33` Android 裝置流程及失敗嘗試保留原始歸屬；最新 APK 建置成功不表示已重新完成裝置操作或材質驗收。
+
+`21fffb60b0632e8c9bd746681332113fa3549656` 僅修正 `test/ui/tp_app_bar_test.dart` 載入 SDK 字型時的大小寫，改為壓縮檔內實際的 `Roboto-Regular.ttf`／`Roboto-Bold.ttf`，避免 Linux 區分大小寫時找不到檔案。`release-ci-font-red.log`／`release-ci-font-green.log` 保留修正前後的精確檔名比對；真實字重、長標籤與勾號的公開測試斷言不變，且已完成 Standards／Spec 兩軸審查。
+
+這次字型修正提交前的 **Windows 本機驗證**：357 個追蹤 Dart 檔格式檢查零變更、`git diff --check` 通過；`flutter analyze` **129.3 秒、No issues found**；完整 `flutter test` **1892 項通過、5 分 36 秒**；Android debug APK **58.8 秒建置成功**。證據位於 `.scratch/liquid-glass-upgrade/` 的 `release-ci-font-format-green.log`、`release-ci-font-diff-check.log`、`release-ci-font-analyze.log`、`release-ci-font-full.log` 與 `release-ci-font-android-build.log`。版本仍為 `0.26.3+34`；這批紀錄不代表 Linux CI、真機驗收或正式上架已完成，也不改寫上述舊 SHA 的證據歸屬。
 
 ## #310 整合驗證
 
