@@ -3,6 +3,7 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
@@ -49,6 +50,144 @@ Widget _menuHost({
 );
 
 void main() {
+  testWidgets('群組內的 bar button 可用 Tab 與 Enter 個別啟用', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Center(
+            child: TpToolbarActionGroup(
+              children: [
+                TpToolbarGlassButton(
+                  tooltip: '分享',
+                  onPressed: () => calls.add('分享'),
+                  child: const Icon(CupertinoIcons.share),
+                ),
+                TpToolbarGlassButton(
+                  tooltip: '列印',
+                  onPressed: () => calls.add('列印'),
+                  child: const Icon(CupertinoIcons.printer),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(calls, ['分享']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(calls, ['分享', '列印']);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('固定 bar 依群組自然寬度保留放大文字動作', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          appBar: TpAppBar(
+            role: TpAppBarRole.detail,
+            title: const Text('行程'),
+            actions: [
+              TpToolbarActionGroup(
+                children: [
+                  TpToolbarTextButton(label: '加入行程', onPressed: () => calls++),
+                  TpToolbarTextButton(label: '預覽', onPressed: () => calls++),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    for (final label in ['加入行程', '預覽']) {
+      final rect = tester.getRect(find.text(label));
+      final bar = tester.getRect(find.byType(TpAppBar));
+      expect(bar.contains(rect.topLeft), isTrue);
+      expect(bar.contains(rect.bottomRight - const Offset(0.1, 0.1)), isTrue);
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text(label))
+            .didExceedMaxLines,
+        isFalse,
+      );
+      await tester.tap(find.text(label));
+    }
+    expect(calls, 2);
+  });
+
+  testWidgets('動作群組在放大文字時保留完整標籤與各自可點區域', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: Scaffold(
+            body: Center(
+              child: TpToolbarActionGroup(
+                children: [
+                  TpToolbarTextButton(
+                    label: '加入行程',
+                    onPressed: () => calls.add('加入'),
+                  ),
+                  TpToolbarTextButton(
+                    label: '預覽',
+                    onPressed: () => calls.add('預覽'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final group = tester.getRect(find.byType(TpToolbarActionGroup));
+    final labels = ['加入行程', '預覽'];
+    for (final label in labels) {
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text(label))
+            .didExceedMaxLines,
+        isFalse,
+        reason: '動作標籤不可因固定 icon 寬度而省略',
+      );
+      final text = tester.getRect(find.text(label));
+      final button = tester.getRect(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(TpToolbarTextButton),
+        ),
+      );
+      expect(button.contains(text.topLeft), isTrue);
+      expect(
+        button.contains(text.bottomRight - const Offset(0.1, 0.1)),
+        isTrue,
+      );
+      expect(group.contains(button.center), isTrue);
+      expect(button.height, greaterThanOrEqualTo(44));
+      await tester.tap(find.text(label));
+    }
+    expect(calls, ['加入', '預覽']);
+    expect(tester.takeException(), isNull);
+  });
+
   group('選單改以 RawMenuAnchor 承載', () {
     const items = [
       TpActionItem(value: 'a', label: '筆記', icon: Icons.description_outlined),
@@ -256,7 +395,7 @@ void main() {
     });
   });
 
-  testWidgets('工具列玻璃一般模式描細邊，提高對比才換成明顯實心邊', (tester) async {
+  testWidgets('工具列玻璃一般模式交由材質呈現，提高對比補明顯實心邊', (tester) async {
     for (final highContrast in [false, true]) {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(
@@ -293,34 +432,31 @@ void main() {
         ),
       );
 
-      // 一般模式是對齊 Apple 強度的細邊(+30),不是無邊 —— 實測材質
-      // 不會自己產生邊緣,詳見 `tpGlassEdgeColor` 的註解。
+      // 一般模式不再校準舊材質的邊線；提高對比仍提供明確邊界。
       final matcher = highContrast ? greaterThan(0.5) : 0;
       final reason = 'highContrast=$highContrast';
 
       // 圓鈕的描邊是可覆寫的預設值。
-      final button = tester.widget<GlassButton>(find.byType(GlassButton));
+      final button = tester.widget<GlassButton>(find.byType(GlassButton).first);
       expect(
         (button.shape as LiquidRoundedSuperellipse).side.color.a,
         matcher,
         reason: '$reason：工具列玻璃圓鈕',
       );
 
-      // 群組容器沒有覆寫參數，獨立改過。
-      for (final key in ['tp-toolbar-action-group']) {
-        final container = tester.widget<GlassContainer>(
-          find.descendant(
-            of: find.byKey(ValueKey(key)),
-            matching: find.byType(GlassContainer),
-            matchRoot: true,
-          ),
-        );
-        expect(
-          (container.shape as LiquidRoundedSuperellipse).side.color.a,
-          matcher,
-          reason: '$reason：$key',
-        );
-      }
+      final edge = find.descendant(
+        of: find.byType(TpToolbarActionGroup),
+        matching: find.byType(TpGlassEdge),
+      );
+      final boundary = tester.widget<Container>(
+        find.descendant(of: edge, matching: find.byType(Container)).first,
+      );
+      final decoration = boundary.foregroundDecoration! as ShapeDecoration;
+      expect(
+        (decoration.shape as LiquidRoundedSuperellipse).side.color.a,
+        matcher,
+        reason: '$reason：動作群組的無障礙邊界',
+      );
     }
   });
 
@@ -1064,16 +1200,16 @@ void main() {
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsNothing);
   });
 
-  testWidgets('large sheet 的固定 bar 與一般路徑用同一套動作寬度;關閉鈕視為一般動作', (tester) async {
-    late BuildContext captured;
+  testWidgets('large sheet 的固定 bar 保留分享與關閉操作，標題在非對稱動作間置中', (tester) async {
+    var shares = 0;
+    var closes = 0;
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
         home: TpLargeSheetNavigationScope(
-          onClose: () {},
+          onClose: () => closes++,
           child: Builder(
             builder: (context) {
-              captured = context;
               return Scaffold(
                 appBar: TpAppBar(
                   role: TpAppBarRole.detail,
@@ -1082,7 +1218,7 @@ void main() {
                     TpToolbarIconButton(
                       icon: CupertinoIcons.share,
                       tooltip: '分享',
-                      onPressed: () {},
+                      onPressed: () => shares++,
                     ),
                   ],
                 ),
@@ -1095,35 +1231,20 @@ void main() {
     );
     await tester.pump();
 
-    // 一個 icon 動作 + 關閉鈕 = 兩個 44pt slot + 一個 8pt 間距,再加 16pt 外距
-    // = 112。期望值寫死數字,不用實作常數算(算法改錯會跟著錯)。
-    const expected = 112.0;
-    expect(
-      TpToolbarSlots.actionsWidth(captured, [
-            TpToolbarIconButton(
-              icon: CupertinoIcons.share,
-              tooltip: '分享',
-              onPressed: () {},
-            ),
-            TpToolbarGlassButton(
-              tooltip: '關閉',
-              onPressed: () {},
-              child: const Icon(CupertinoIcons.xmark),
-            ),
-          ]) +
-          TpSpacing.s4,
-      expected,
-      reason: '關閉鈕是一般的玻璃 icon 動作,寬度算法要一致',
+    final title = tester.getRect(
+      find.byKey(const ValueKey('tp-app-bar-title')),
     );
-
-    final actionsBox = tester.widget<SizedBox>(
+    final actions = tester.getRect(
       find.byKey(const ValueKey('tp-app-bar-actions')),
     );
-    expect(actionsBox.width, expected);
-    // 標題置中:左側佔位與右側動作等寬。
-    final leadingBox = tester.widget<SizedBox>(
-      find.byKey(const ValueKey('tp-app-bar-leading')),
-    );
-    expect(leadingBox.width, expected);
+    final bar = tester.getRect(find.byType(TpAppBar));
+    expect(title.center.dx, closeTo(bar.center.dx, 0.5));
+    expect(title.right, lessThanOrEqualTo(actions.left));
+    await tester.tap(find.byTooltip('分享'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(shares, 1);
+    expect(closes, 1);
   });
 }

@@ -73,6 +73,9 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：帳號左側最多直接顯示一個當頁主要動作；其他動作進入 system `…` menu。
 - **HIG 必須**：`完成`、`取消`、`儲存`等動作用文字按鈕；只有語意明確的動作使用 SF Symbol。
 - **HIG 必須**：disabled action 保留位置並降低強調，不造成 toolbar 跳動。
+- **Tripline 決策**：固定 bar 由 `GlassAppBar` 量測 leading／actions 與標題避讓；相關動作採 `GlassButtonGroup(showDividers: false)`，群組內按鈕用透明樣式，不再自算 slot、文字寬度或左右補償。
+- **Tripline 決策**：浮動 header 保留返回與任意標題 widget 共用膠囊、帳號另組及 safe area 的薄組裝；各動作採自然寬度，bar button 的手勢、鍵盤與動畫交給公開 `GlassButton`。
+- **Tripline 決策**：上下帶狀遮蔽採 `ProgressiveBlur` 與 `GlassScrollEdgeEffect` 的公開預設，取代六層 filter 與手調淡出遮罩。遮蔽位於內容與控制項之間並穿透觸控；媒體背景保留語意暗化，提高對比／降低透明度各自使用不透明區及套件羽化，不以 blur 歸零冒充降級。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。

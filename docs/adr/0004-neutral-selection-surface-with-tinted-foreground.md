@@ -201,6 +201,29 @@ LiquidGlass 的材質邊緣光**。
 十態矩陣以實際像素確認選取底會移動、未選取軌道可區分，以及提高對比／降低
 透明度各自不透出背景；這是本機內容與幾何證據，不代表真機折射材質已驗收。
 
+### 導覽外框與帶狀遮蔽遷移（2026-09-09，#307）
+
+`GlassAppBar` 接手固定 bar 的自然寬度與標題置中避讓；移除 `TpToolbarSlots`、
+`TextPainter` 寬度反推、群組固定 slot 與 sheet 左右等寬佔位。相關動作以
+`GlassButtonGroup(showDividers: false)` 共用一片玻璃，子 `GlassButton` 採透明樣式，
+同時接手 pointer、Tab／Enter 和讀屏；不再使用僅支援 pointer 的群組 GestureDetector。
+bar button 不再覆寫舊版 interactionScale／stretch。
+
+上下帶改用公開預設 `ProgressiveBlur` 與 soft `GlassScrollEdgeEffect`，移除六層
+BackdropFilter、每層 sigma、peak／edge alpha、55% 區段比例與手製兩段漸層。
+ProgressiveBlur 在 1.4.1 自行 ClipRect；App 保留 IgnorePointer 與內容／控制項層級。
+公開元件不處理 App 的 Reduce Transparency，也沒有同時滿足固定不透明區及
+獨立羽化的設定；因此提高對比與降低透明度各自保留 ColoredBox 不透明區，羽化
+交給套件 soft effect。媒體背景的 35% 語意暗化透過公開 fadeColor 保留。
+
+浮動 header 的返回與任意標題 widget 共用膠囊、帳號另組及 safe area 屬產品組裝，
+繼續以 Row 和共用 TpGlassSurface 承接；它沒有 slot 反推或材質重寫。TpHeaderTitle
+保留 inline 文字語意與省略規則；route 與 sheet 的 close guard 均保持在 App 層。
+
+像素測試比較獨立公開套件參考組裝，原 renderer 亮度 197、新預設約 162，先失敗
+再替換通過；另保留內容可讀性、控制項清晰、觸控穿透與不透明降級。headless 的
+ProgressiveBlur 使用 uniform fallback，以上不是 Impeller 真實 shader 或真機材質驗收。
+
 ## 方法論備註
 
 本 ADR 的每一個數字都來自像素量測,而不是目視判斷。這是刻意的 —— 這條線上前後兩份

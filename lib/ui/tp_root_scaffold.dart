@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
@@ -87,20 +87,12 @@ class TpRootScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
-            child: Builder(
-              builder: (context) {
-                final bandHeight =
-                    TpRootTabGeometry.clearance(context) + TpSpacing.s4;
-                // 與原本 0.55 / 0.45 的三段漸層等價:前 55% 是膠囊帶,其餘羽化。
-                final solid = bandHeight * _tabBandSolidRatio;
-                return _TpRootBand(
-                  key: const ValueKey('tp-root-tab-band'),
-                  edge: _TpBandEdge.bottom,
-                  onMedia: onMedia,
-                  solidExtent: solid,
-                  featherExtent: bandHeight - solid,
-                );
-              },
+            child: _TpRootBand(
+              key: const ValueKey('tp-root-tab-band'),
+              edge: _TpBandEdge.bottom,
+              onMedia: onMedia,
+              solidExtent: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+              featherExtent: 0,
             ),
           ),
           Positioned(
@@ -209,22 +201,10 @@ class TpRootGlassHeader extends StatelessWidget {
             TpHeaderActionRow(
               children: [
                 for (var index = 0; index < config.actions.length; index++)
-                  if (config.actions[index] is TpToolbarTextButton)
-                    KeyedSubtree(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      child: config.actions[index],
-                    )
-                  else
-                    SizedBox(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
-                      width: TpToolbarSlots.slotWidth(
-                        context,
-                        config.actions[index],
-                      ),
-                      height: TpSpacing.tapMin,
-                      child: config.actions[index],
-                    ),
+                  KeyedSubtree(
+                    key: ValueKey('tp-root-header-action-$index'),
+                    child: config.actions[index],
+                  ),
                 const TpAccountAvatarButton(),
               ],
             ),
@@ -346,28 +326,7 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
 
 enum _TpBandEdge { top, bottom }
 
-/// 底部帶純色區占帶高的比例;其餘羽化。
-const _tabBandSolidRatio = 0.55;
-
-/// 帶狀遮蔽:對膠囊底下捲過去的內容做漸進模糊與淡出。頂部(浮動 header)與
-/// 底部(root tab bar)是同一套參數、方向相反,所以只有這一個 widget。
-///
-/// 顏色漸層沒有模糊，所以 #162 把 header 拆成獨立膠囊之後，內容直接從膠囊之間
-/// 的縫隙穿上來 —— 日期被標題膠囊蓋掉一半、返回鍵旁漏出一個孤零零的「0」。
-/// 依據 iOS 26「電話」app：控制項上方與後方的內容是漸進模糊加淡出，不是硬切。
-///
-/// 為什麼底部也要一條:root tab bar 自己是玻璃，但玻璃只糊它**蓋住的那一塊**，
-/// 而且 shader 的模糊在模擬器上不渲染。實際看到的是內容清晰地穿過 tab bar、
-/// 與「行程」「地圖」的文字疊在一起。帶狀遮蔽是內容側的處理，兩者不互相取代。
-///
-/// 漸進模糊靠**疊層**做，因為 Flutter 沒有「可遮罩的 backdrop filter」。
-/// `BackdropFilter` 取樣的是它底下已經合成的畫面；用 `ShaderMask` 或
-/// `Opacity` 包住它會另開 save layer，backdrop 變成空的，模糊就消失。所以
-/// 這裡疊一組都從帶的外緣出發、往內逐層縮短的 filter：越靠近外緣被越多層蓋到，
-/// 模糊越重，到帶的內緣只剩一層，形成連續的斜坡而不是硬邊。
-///
-/// 這些層彼此重疊，**不能**共用 `BackdropGroup`／`BackdropKey` —— 框架文件
-/// 明講重疊的 backdrop filter 共用 key 時，重疊區會變成只套到其中一層。
+/// 套件接手上下 edge 的漸進模糊與淡出，App 保留內容層級與無障礙整合。
 class _TpRootBand extends StatelessWidget {
   const _TpRootBand({
     super.key,
@@ -378,122 +337,65 @@ class _TpRootBand extends StatelessWidget {
   });
 
   final _TpBandEdge edge;
-
-  /// 底下是 platform view（地圖）時走清透 scrim，與玻璃膠囊同一套暗化語彙。
   final bool onMedia;
-
-  /// 從外緣算起、淡出到 [veilEdgeRatio] 的那一段(膠囊佔的那一條)。
   final double solidExtent;
-
-  /// 再往內羽化歸零的長度。
   final double featherExtent;
-
-  static const int blurLayers = 6;
-
-  /// 單層 sigma。高斯疊加是平方和開根號，外緣的等效 sigma ≈ 5 × √6 ≈ 12。
-  static const double blurSigmaPerLayer = 5;
-
-  /// 外緣的淡出強度；膠囊內緣收到 [veilEdgeRatio] 倍，再到帶的內緣歸零。
-  static const double veilPeakAlpha = 0.62;
-  static const double veilEdgeRatio = 0.78;
 
   bool get _top => edge == _TpBandEdge.top;
 
-  Positioned _anchored({
-    required double offset,
-    required double height,
-    required Widget child,
-  }) => _top
-      ? Positioned(top: offset, left: 0, right: 0, height: height, child: child)
-      : Positioned(
-          bottom: offset,
-          left: 0,
-          right: 0,
-          height: height,
-          child: child,
-        );
-
-  LinearGradient _fade(List<Color> colors) => LinearGradient(
-    begin: _top ? Alignment.topCenter : Alignment.bottomCenter,
-    end: _top ? Alignment.bottomCenter : Alignment.topCenter,
-    colors: colors,
-  );
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // 與玻璃同一組無障礙開關：這兩個狀態下不做模糊，改成不透明帶，
-    // 內容一格都不透出來，對比與可讀性最高。
     final opaqueFallback =
         MediaQuery.highContrastOf(context) ||
         AppAccessibilityScope.reduceTransparencyOf(context);
-    final veil = onMedia && !opaqueFallback
-        ? Colors.black
-        : theme.scaffoldBackgroundColor;
-    // scrim alpha 的唯一出處:媒體背景用 HIG 的 35%,否則用自家的淡出強度。
-    final peak = opaqueFallback
-        ? 1.0
-        : (onMedia ? tpMediaScrimOpacity : veilPeakAlpha);
-    final edgeAlpha = opaqueFallback ? 1.0 : peak * veilEdgeRatio;
-    // fallback 下底部帶整條不透明(膠囊 tab bar 上半段也不能透出),
-    // 頂部帶則維持純色區 + 從不透明淡出的羽化 —— 兩者都是 master 的行為。
-    final solid = opaqueFallback && !_top
-        ? solidExtent + featherExtent
-        : solidExtent;
-    final feather = opaqueFallback && !_top ? 0.0 : featherExtent;
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          if (!opaqueFallback)
-            for (var index = 0; index < blurLayers; index++)
-              _anchored(
-                offset: 0,
-                // 逐層縮短:最外層最厚，越往內越薄，疊出漸進的模糊。
-                height: solid + feather * (blurLayers - index) / blurLayers,
-                child: ClipRect(
-                  // tileMode 用預設的 clamp：畫面邊界外沿用邊緣像素，跟系統
-                  // bar 的模糊一致。decal 會在畫面最頂端淡成透明，露出一條縫。
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: blurSigmaPerLayer,
-                      sigmaY: blurSigmaPerLayer,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-          _anchored(
-            offset: 0,
-            height: solid,
-            // 無障礙 fallback 用純色而不是同色漸層：漸層著色器會 dither，
-            // 帶內就量得到 ±1 的雜訊，「內容一格都不透出」便驗不乾淨。
-            child: opaqueFallback
-                ? ColoredBox(color: veil)
-                : DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: _fade([
-                        veil.withValues(alpha: peak),
-                        veil.withValues(alpha: edgeAlpha),
-                      ]),
-                    ),
-                  ),
-          ),
-          // 羽化區從純色區的內緣起跳淡出到 0,不做同色硬邊。
-          if (feather > 0)
-            _anchored(
-              offset: solid,
-              height: feather,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: _fade([
-                    veil.withValues(alpha: edgeAlpha),
-                    veil.withValues(alpha: 0),
-                  ]),
-                ),
-              ),
+    final background = Theme.of(context).scaffoldBackgroundColor;
+    final height = solidExtent + featherExtent;
+    if (opaqueFallback) {
+      // 套件 blur 與 soft effect 不會自行回應 App 的降低透明度。
+      // 頂部保留狀態列至控制項的不透明區，底部整條遮住 tab 下的內容。
+      return IgnorePointer(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: _top ? solidExtent : height,
+              child: ColoredBox(color: background),
             ),
-        ],
+            if (_top && featherExtent > 0)
+              Positioned(
+                top: solidExtent,
+                left: 0,
+                right: 0,
+                height: featherExtent,
+                child: GlassScrollEdgeEffect(
+                  fadeBottom: false,
+                  topFadeHeight: featherExtent,
+                  fadeColor: background,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    return IgnorePointer(
+      child: GlassScrollEdgeEffect(
+        fadeTop: _top,
+        fadeBottom: !_top,
+        topFadeHeight: height,
+        bottomFadeHeight: height,
+        fadeColor: onMedia
+            ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
+            : background,
+        // ProgressiveBlur 本身裁切 route 邊界；放在淡出之下、控制項之下，
+        // 不讓標題和動作參與 backdrop 取樣。材質參數採套件預設。
+        child: ProgressiveBlur(
+          direction: _top
+              ? ProgressiveBlurDirection.topToBottom
+              : ProgressiveBlurDirection.bottomToTop,
+        ),
       ),
     );
   }

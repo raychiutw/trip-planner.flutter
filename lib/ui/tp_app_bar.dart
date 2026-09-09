@@ -111,32 +111,31 @@ class TpToolbarActionGroup extends StatelessWidget {
   /// 群組內按鈕之間的間距，比群組與群組之間更窄。
   static const innerGap = TpSpacing.s1;
 
-  static double widthFor(int count) =>
-      count * TpSpacing.tapMin + (count - 1) * innerGap;
-
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: widthFor(children.length),
-      height: TpSpacing.tapMin,
-      // 玻璃一律走 TpGlassSurface:邊緣、無障礙 fallback、材質只有一個出處。
-      child: TpGlassSurface(
-        key: const ValueKey('tp-toolbar-action-group'),
-        borderRadius: const BorderRadius.all(Radius.circular(22)),
-        glassSettings: tpNavigationGlassSettings(context),
-        child: _TpToolbarGroupScope(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0) const SizedBox(width: innerGap),
-                SizedBox.square(
-                  dimension: TpSpacing.tapMin,
-                  child: children[index],
-                ),
-              ],
-            ],
+    final onMedia = TpMediaBackdropScope.of(context);
+    return TpGlassEdge(
+      borderRadius: 22,
+      child: _TpToolbarGroupScope(
+        child: GlassButtonGroup(
+          key: const ValueKey('tp-toolbar-action-group'),
+          showDividers: false,
+          useOwnLayer: true,
+          borderRadius: 22,
+          settings: tpNavigationGlassSettings(
+            context,
+            recipe: onMedia
+                ? TpNavigationGlassRecipe.platformView
+                : TpNavigationGlassRecipe.regular,
           ),
+          quality: tpGlassQuality(context),
+          platformViewBackdrop: onMedia,
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              if (index > 0) const SizedBox(width: innerGap),
+              children[index],
+            ],
+          ],
         ),
       ),
     );
@@ -173,26 +172,7 @@ class TpToolbarGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 群組容器已經提供整片玻璃，這裡再畫一片就會玻璃疊玻璃。
-    if (_TpToolbarGroupScope.of(context)) {
-      return SizedBox.square(
-        dimension: TpSpacing.tapMin,
-        child: Tooltip(
-          message: tooltip,
-          excludeFromSemantics: true,
-          child: Semantics(
-            button: true,
-            enabled: onPressed != null,
-            label: tooltip,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onPressed,
-              child: Center(child: child),
-            ),
-          ),
-        ),
-      );
-    }
+    final grouped = _TpToolbarGroupScope.of(context);
     final resolvedSettings = glassSettings == null
         ? tpNavigationGlassSettings(context)
         : tpResolveGlassSettings(context, glassSettings!);
@@ -208,11 +188,13 @@ class TpToolbarGlassButton extends StatelessWidget {
           height: TpSpacing.tapMin,
           enabled: onPressed != null,
           onTap: onPressed ?? () {},
-          useOwnLayer: true,
+          // 群組提供材質，個別按鈕仍由套件處理 pointer、鍵盤與語意。
+          style: grouped
+              ? GlassButtonStyle.transparent
+              : GlassButtonStyle.filled,
+          useOwnLayer: !grouped,
           quality: tpGlassQuality(context),
           platformViewBackdrop: platformViewBackdrop,
-          interactionScale: 1.03,
-          stretch: 0.12,
           shape: LiquidRoundedSuperellipse(
             borderRadius: 22,
             // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
@@ -303,97 +285,6 @@ Future<void> closeAppRouteOrSheet(BuildContext context) async {
   if (await navigator.maybePop()) return;
   if (!context.mounted) return;
   TpLargeSheetNavigationScope.maybeOf(context)?.onClose();
-}
-
-/// slot 寬度的唯一出處;固定 bar 與浮動 header(tp_root_scaffold)共用。
-abstract final class TpToolbarSlots {
-  static double textActionWidth(
-    BuildContext context,
-    TpToolbarTextButton action,
-  ) {
-    final textStyle = Theme.of(context).textTheme.labelLarge;
-    final painter = TextPainter(
-      text: TextSpan(text: action.label, style: textStyle),
-      maxLines: 1,
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout();
-    final intrinsicWidth = painter.width + 20;
-    return intrinsicWidth < TpSpacing.tapMin
-        ? TpSpacing.tapMin
-        : intrinsicWidth;
-  }
-
-  static double sideWidth({
-    required int actionCount,
-    required bool hasLeading,
-  }) {
-    final slotCount = actionCount > (hasLeading ? 1 : 0)
-        ? actionCount
-        : (hasLeading ? 1 : 0);
-    if (slotCount == 0) return 0;
-    return slotCount * TpSpacing.tapMin + (slotCount - 1) * TpSpacing.s2;
-  }
-
-  static Widget? leading({required double width, Widget? action}) {
-    if (width == 0) return null;
-    return SizedBox(
-      key: const ValueKey('tp-app-bar-leading'),
-      width: width,
-      child: Align(alignment: Alignment.centerLeft, child: action),
-    );
-  }
-
-  /// 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
-  static double slotWidth(BuildContext context, Widget child) =>
-      switch (child) {
-        TpToolbarTextButton() => textActionWidth(context, child),
-        TpToolbarActionGroup() => TpToolbarActionGroup.widthFor(
-          child.children.length,
-        ),
-        _ => TpSpacing.tapMin,
-      };
-
-  static double actionsWidth(BuildContext context, List<Widget> children) {
-    if (children.isEmpty) return 0;
-    return children.fold<double>(
-          0,
-          (width, child) => width + slotWidth(context, child),
-        ) +
-        (children.length - 1) * TpSpacing.s2;
-  }
-
-  static List<Widget> actions({
-    required BuildContext context,
-    required double width,
-    required List<Widget> children,
-  }) {
-    if (width == 0) return const [];
-    return [
-      SizedBox(
-        key: const ValueKey('tp-app-bar-actions'),
-        width: width,
-        child: actionRow(context, children),
-      ),
-    ];
-  }
-
-  /// 每個動作各佔自己的 slot 寬;一般路徑與 large sheet 路徑共用。
-  static Widget actionRow(BuildContext context, List<Widget> children) =>
-      TpHeaderActionRow(
-        children: [
-          for (final child in children)
-            if (child is TpToolbarTextButton)
-              SizedBox(width: textActionWidth(context, child), child: child)
-            else if (child is TpToolbarActionGroup)
-              SizedBox(
-                width: TpToolbarActionGroup.widthFor(child.children.length),
-                child: child,
-              )
-            else
-              SizedBox.square(dimension: TpSpacing.tapMin, child: child),
-        ],
-      );
 }
 
 class TpSheetHeader extends StatelessWidget {
@@ -503,99 +394,54 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
     // 帳號入口在額度計算之後才併入，位置固定在最右側。
     final headerActions = <Widget>[...pageActions, ?accountEntry];
-    final leadingWidth = leadingAction == null
-        ? 0.0
-        : role == TpAppBarRole.modalForm
-        ? TpToolbarSlots.textActionWidth(
-            context,
-            leadingAction as TpToolbarTextButton,
-          )
-        : TpSpacing.tapMin;
-    final actionsWidth = TpToolbarSlots.actionsWidth(context, headerActions);
-    if (largeSheetScope != null) {
-      final colors = Theme.of(context).colorScheme;
-      // 關閉鈕就是一般動作:寬度與一般路徑用同一套 slot 計算。
-      final sheetActions = <Widget>[
-        ...headerActions,
-        if (role != TpAppBarRole.modalForm)
-          KeyedSubtree(
-            key: const ValueKey('app-sheet-close'),
-            child: TpToolbarGlassButton(
-              key: const ValueKey('app-large-sheet-close'),
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: () => unawaited(largeSheetScope.requestClose(context)),
-              child: Icon(
-                CupertinoIcons.xmark,
-                size: 19,
-                color: colors.primary,
-              ),
-            ),
-          ),
-      ];
-      final sideWidth =
-          TpToolbarSlots.actionsWidth(context, sheetActions) + TpSpacing.s4;
-      return GlassAppBar(
-        toolbarHeight: preferredSize.height,
-        backgroundColor: Colors.transparent,
-        centerTitle: true,
-        leading: SizedBox(
-          key: const ValueKey('tp-app-bar-leading'),
-          width: sideWidth,
-          child: Padding(
-            padding: const EdgeInsets.only(left: TpSpacing.s4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: leadingAction == null
-                  ? null
-                  : SizedBox(
-                      key: const ValueKey('app-large-sheet-back'),
-                      width: leadingWidth,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconTheme(
-                          data: IconThemeData(color: colors.primary),
-                          child: leadingAction,
-                        ),
-                      ),
-                    ),
+    final barActions = <Widget>[
+      ...headerActions,
+      if (largeSheetScope != null && role != TpAppBarRole.modalForm)
+        KeyedSubtree(
+          key: const ValueKey('app-sheet-close'),
+          child: TpToolbarGlassButton(
+            key: const ValueKey('app-large-sheet-close'),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: () => unawaited(largeSheetScope.requestClose(context)),
+            child: Icon(
+              CupertinoIcons.xmark,
+              size: 19,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ),
-        title: TpHeaderTitle(
-          key: const ValueKey('tp-app-bar-title'),
-          child: title,
-        ),
-        actions: [
-          SizedBox(
-            key: const ValueKey('tp-app-bar-actions'),
-            width: sideWidth,
-            child: Padding(
-              padding: const EdgeInsets.only(right: TpSpacing.s4),
-              child: TpToolbarSlots.actionRow(context, sheetActions),
-            ),
-          ),
-        ],
-      );
-    }
+    ];
+    // 公開 bar 會量測 leading 與 actions 的自然寬度，並替置中標題避讓。
+    // App 只保留角色、sheet 導航和動作順序，不再反推兩側 slot 寬度。
     return GlassAppBar(
       toolbarHeight: preferredSize.height,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      centerTitle: false,
-      leading: TpToolbarSlots.leading(
-        width: leadingWidth,
-        action: leadingAction,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
+      backgroundColor: largeSheetScope != null
+          ? Colors.transparent
+          : Theme.of(context).scaffoldBackgroundColor,
+      centerTitle: largeSheetScope != null,
+      leading: leadingAction == null
+          ? null
+          : KeyedSubtree(
+              key: const ValueKey('tp-app-bar-leading'),
+              child: KeyedSubtree(
+                key: largeSheetScope != null
+                    ? const ValueKey('app-large-sheet-back')
+                    : null,
+                child: leadingAction,
+              ),
+            ),
       title: TpHeaderTitle(
         key: const ValueKey('tp-app-bar-title'),
         child: title,
       ),
-      actions: primaryActionLabel == null
-          ? TpToolbarSlots.actions(
-              context: context,
-              width: actionsWidth,
-              children: headerActions,
-            )
-          : headerActions,
+      actions: [
+        if (barActions.isNotEmpty)
+          KeyedSubtree(
+            key: const ValueKey('tp-app-bar-actions'),
+            child: TpHeaderActionRow(children: barActions),
+          ),
+      ],
     );
   }
 

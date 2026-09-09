@@ -104,14 +104,18 @@ void main() {
         find.descendant(of: group, matching: find.byType(GlassContainer)),
         findsOneWidget,
       );
-      expect(
-        find.descendant(
-          of: group,
-          matching: find.byKey(const ValueKey('tp-toolbar-glass-button')),
-        ),
-        findsNothing,
-        reason: '群組內不該再有各自的玻璃按鈕，否則玻璃疊玻璃',
+      final buttons = tester.widgetList<GlassButton>(
+        find.descendant(of: group, matching: find.byType(GlassButton)),
       );
+      expect(buttons, hasLength(2));
+      for (final button in buttons) {
+        expect(
+          button.style,
+          GlassButtonStyle.transparent,
+          reason: '群組內的公開按鈕保留操作，材質由共同容器提供',
+        );
+        expect(button.useOwnLayer, isFalse);
+      }
 
       // 只以間距分隔 —— HIG Toolbars 不提分隔線。
       expect(

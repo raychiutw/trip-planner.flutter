@@ -314,10 +314,11 @@ void main() {
     expect(appBar.leading, isNull);
     expect(appBar.centerTitle, isFalse);
     expect(appBar.actions, hasLength(1));
-    expect(
-      (appBar.actions!.single as SizedBox).width,
-      TpSpacing.tapMin * 2 + TpSpacing.s2,
-    );
+    final buttons = tester.getRect(find.byType(IconButton).first);
+    final more = tester.getRect(find.byType(IconButton).last);
+    expect(buttons.width, greaterThanOrEqualTo(44));
+    expect(more.width, greaterThanOrEqualTo(44));
+    expect(more.left - buttons.right, greaterThanOrEqualTo(8));
     expect(
       tester.getTopLeft(find.text('行程標題')).dx,
       greaterThanOrEqualTo(tester.getTopLeft(find.byType(GlassAppBar)).dx),
