@@ -60,7 +60,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 
   Future<void> _openCustomRegion() async {
-    final textController = TextEditingController();
+    var regionInput = '';
     final formController = AppSheetFormController()
       ..attach(() async => true)
       ..update(canSubmit: true);
@@ -70,30 +70,18 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         title: '自訂地區',
         submitLabel: '切換',
         controller: formController,
-        builder: (_) => SingleChildScrollView(
-          padding: const EdgeInsets.all(TpSpacing.s4),
-          child: TextField(
-            key: const ValueKey('explore-custom-region-field'),
-            controller: textController,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: '地區名稱',
-              hintText: '例如：大阪、曼谷、巴黎',
-            ),
-            onChanged: (_) => formController.update(dirty: true),
-            onSubmitted: (_) => formController.submit(),
-          ),
+        builder: (_) => _CustomRegionForm(
+          formController: formController,
+          onChanged: (value) => regionInput = value,
         ),
       );
-      if (submitted ?? false) {
-        final region = textController.text.trim();
+      if ((submitted ?? false) && mounted) {
+        final region = regionInput.trim();
         ref
             .read(exploreControllerProvider.notifier)
             .setRegion(region.isEmpty ? '全部地區' : region);
       }
     } finally {
-      textController.dispose();
       formController.dispose();
     }
   }
@@ -365,4 +353,48 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       ),
     );
   }
+}
+
+/// 輸入 controller 跟隨 sheet 內容卸載，避免離場動畫仍使用已釋放的 controller。
+class _CustomRegionForm extends StatefulWidget {
+  const _CustomRegionForm({
+    required this.formController,
+    required this.onChanged,
+  });
+
+  final AppSheetFormController formController;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_CustomRegionForm> createState() => _CustomRegionFormState();
+}
+
+class _CustomRegionFormState extends State<_CustomRegionForm> {
+  final _textController = TextEditingController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: const EdgeInsets.all(TpSpacing.s4),
+    child: TextField(
+      key: const ValueKey('explore-custom-region-field'),
+      controller: _textController,
+      autofocus: true,
+      textInputAction: TextInputAction.done,
+      decoration: const InputDecoration(
+        labelText: '地區名稱',
+        hintText: '例如：大阪、曼谷、巴黎',
+      ),
+      onChanged: (value) {
+        widget.onChanged(value);
+        widget.formController.update(dirty: true);
+      },
+      onSubmitted: (_) => widget.formController.submit(),
+    ),
+  );
 }

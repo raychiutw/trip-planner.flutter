@@ -85,6 +85,85 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('自訂地區直接取消可正常返回探索', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部地區 ▾'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('+ 自訂地區…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('自訂地區'), findsNothing);
+    expect(find.text('全部地區 ▾'), findsOneWidget);
+  });
+
+  testWidgets('自訂地區取消保留篩選，拒絕捨棄後可儲存，空白切回全部', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部地區 ▾'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('沖繩'));
+    await tester.pumpAndSettle();
+
+    Future<void> openCustomRegion(String region) async {
+      await tester.tap(find.text('$region ▾'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+ 自訂地區…'));
+      await tester.pumpAndSettle();
+      expect(find.text('自訂地區'), findsOneWidget);
+    }
+
+    Future<void> searchWithRegion(String region) async {
+      clearInteractions(poi);
+      await tester.enterText(
+        find.byKey(const ValueKey('explore-search-field')),
+        '水族館',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      verify(
+        () => poi.searchPois(
+          q: '水族館',
+          limit: any(named: 'limit'),
+          region: region,
+          cancelToken: any(named: 'cancelToken'),
+        ),
+      ).called(1);
+    }
+
+    await openCustomRegion('沖繩');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('自訂地區'), findsNothing);
+    expect(find.text('沖繩 ▾'), findsOneWidget);
+    await searchWithRegion('沖繩');
+
+    await openCustomRegion('沖繩');
+    final field = find.byKey(const ValueKey('explore-custom-region-field'));
+    await tester.enterText(field, '  大阪  ');
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('自訂地區'), findsOneWidget);
+    expect(tester.widget<TextField>(field).controller?.text, '  大阪  ');
+    await tester.tap(find.text('切換'));
+    await tester.pumpAndSettle();
+    expect(find.text('自訂地區'), findsNothing);
+    expect(find.text('大阪 ▾'), findsOneWidget);
+    await searchWithRegion('大阪');
+
+    await openCustomRegion('大阪');
+    await tester.enterText(field, '   ');
+    await tester.tap(find.text('切換'));
+    await tester.pumpAndSettle();
+    expect(find.text('自訂地區'), findsNothing);
+    expect(find.text('全部地區 ▾'), findsOneWidget);
+    await searchWithRegion('全部地區');
+  });
+
   testWidgets('進頁 auto-search seed → 顯示結果卡', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
