@@ -117,9 +117,11 @@ class AppleRootTabBar extends StatelessWidget {
 
   Widget _buildBar(BuildContext context, BoxConstraints constraints) {
     final theme = Theme.of(context);
+    // 是不是在媒體背景上,由 root shell 依目前分支宣告,這裡只讀。
+    final onMedia = TpMediaBackdropScope.of(context);
     final glassSettings = tpNavigationGlassSettings(
       context,
-      recipe: selectedIndex == 2
+      recipe: onMedia
           ? TpNavigationGlassRecipe.platformView
           : TpNavigationGlassRecipe.regular,
     );
@@ -188,6 +190,28 @@ class AppleRootTabBar extends StatelessWidget {
           glowColor: theme.colorScheme.primary,
         ),
     ];
+    // inline 與 bottom 只差三個幾何值(barHeight / barBorderRadius / iconSize);
+    // 其餘參數與理由只寫在這裡一份。
+    final shared = (
+      // 見 `_tabPadding`：字符／標籤那排與選取膠囊分屬兩個基準。
+      tabPadding: _tabPadding,
+      settings: glassSettings,
+      // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
+      // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
+      // 同一顆 tab 內不一致）。
+      selectedColor: theme.colorScheme.primary,
+      unselectedColor: theme.colorScheme.onSurface,
+      // 套件靜止態的指示器是**整格欄位**，任何參數都收不動它（#179），
+      // 所以讓它不上色、由 `_SelectedTabIcon` 自畫。這裡設透明不會關掉
+      // 拖曳中的玻璃透鏡 —— 透鏡吃的是 `indicatorSettings`。
+      indicatorColor: Colors.transparent,
+      // 見 `_indicatorExpansion`：這條**只管拖曳中**的透鏡幾何。
+      indicatorExpansion: _indicatorExpansion,
+      magnification: 1.0,
+      blendAmount: 4.0,
+      glowOpacity: 0.18,
+      quality: GlassQuality.premium,
+    );
     final tabBar = inline
         ? GlassTabBar.inline(
             tabs: tabs,
@@ -198,30 +222,22 @@ class AppleRootTabBar extends StatelessWidget {
             iconSize: 24,
             horizontalPadding: 0,
             verticalPadding: 0,
-            // 見 `_tabPadding`：字符／標籤那排與選取膠囊分屬兩個基準。
-            tabPadding: _tabPadding,
-            settings: glassSettings,
-            // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
-            // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
-            // 同一顆 tab 內不一致）。
-            selectedIconColor: theme.colorScheme.primary,
-            selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: theme.colorScheme.onSurface,
-            unselectedLabelColor: theme.colorScheme.onSurface,
+            tabPadding: shared.tabPadding,
+            settings: shared.settings,
+            selectedIconColor: shared.selectedColor,
+            selectedLabelColor: shared.selectedColor,
+            unselectedIconColor: shared.unselectedColor,
+            unselectedLabelColor: shared.unselectedColor,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            // 套件靜止態的指示器是**整格欄位**，任何參數都收不動它（#179），
-            // 所以讓它不上色、由 `_SelectedTabIcon` 自畫。這裡設透明不會關掉
-            // 拖曳中的玻璃透鏡 —— 透鏡吃的是 `indicatorSettings`。
-            indicatorColor: Colors.transparent,
+            indicatorColor: shared.indicatorColor,
             indicatorSettings: indicatorSettings,
-            // 見 `_indicatorExpansion`：這條**只管拖曳中**的透鏡幾何。
-            indicatorExpansion: _indicatorExpansion,
-            magnification: 1,
-            blendAmount: 4,
-            glowOpacity: 0.18,
-            quality: GlassQuality.premium,
-            platformViewBackdrop: selectedIndex == 2,
+            indicatorExpansion: shared.indicatorExpansion,
+            magnification: shared.magnification,
+            blendAmount: shared.blendAmount,
+            glowOpacity: shared.glowOpacity,
+            quality: shared.quality,
+            platformViewBackdrop: onMedia,
           )
         : GlassTabBar.bottom(
             tabs: tabs,
@@ -229,30 +245,22 @@ class AppleRootTabBar extends StatelessWidget {
             onTabSelected: onSelected,
             horizontalPadding: 0,
             verticalPadding: 0,
-            // 見 `_tabPadding`：字符／標籤那排與選取膠囊分屬兩個基準。
-            tabPadding: _tabPadding,
-            settings: glassSettings,
-            // 品牌 tint 上在字符與標籤；未選兩者同色，靠「沒有膠囊」與
-            // 「不是 tint」區分，不靠把字符調暗（先前字符中灰、標籤近白，
-            // 同一顆 tab 內不一致）。
-            selectedIconColor: theme.colorScheme.primary,
-            selectedLabelColor: theme.colorScheme.primary,
-            unselectedIconColor: theme.colorScheme.onSurface,
-            unselectedLabelColor: theme.colorScheme.onSurface,
+            tabPadding: shared.tabPadding,
+            settings: shared.settings,
+            selectedIconColor: shared.selectedColor,
+            selectedLabelColor: shared.selectedColor,
+            unselectedIconColor: shared.unselectedColor,
+            unselectedLabelColor: shared.unselectedColor,
             selectedLabelStyle: selectedLabelStyle,
             unselectedLabelStyle: unselectedLabelStyle,
-            // 套件靜止態的指示器是**整格欄位**，任何參數都收不動它（#179），
-            // 所以讓它不上色、由 `_SelectedTabIcon` 自畫。這裡設透明不會關掉
-            // 拖曳中的玻璃透鏡 —— 透鏡吃的是 `indicatorSettings`。
-            indicatorColor: Colors.transparent,
+            indicatorColor: shared.indicatorColor,
             indicatorSettings: indicatorSettings,
-            // 見 `_indicatorExpansion`：這條**只管拖曳中**的透鏡幾何。
-            indicatorExpansion: _indicatorExpansion,
-            magnification: 1,
-            blendAmount: 4,
-            glowOpacity: 0.18,
-            quality: GlassQuality.premium,
-            platformViewBackdrop: selectedIndex == 2,
+            indicatorExpansion: shared.indicatorExpansion,
+            magnification: shared.magnification,
+            blendAmount: shared.blendAmount,
+            glowOpacity: shared.glowOpacity,
+            quality: shared.quality,
+            platformViewBackdrop: onMedia,
           );
     if (!inline) return tabBar;
     return Stack(

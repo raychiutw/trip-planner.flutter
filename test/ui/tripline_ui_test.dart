@@ -417,20 +417,22 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             theme: theme,
-            home: TpRootScaffold(
-              header: TpRootHeaderConfig(
-                title: const Text('地圖'),
-                platformViewBackdrop: onMedia,
-                actions: [
-                  TpToolbarIconButton(
-                    icon: CupertinoIcons.share,
-                    tooltip: '分享',
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-              body: const TpRootScrollView(
-                slivers: [SliverToBoxAdapter(child: Text('內容'))],
+            home: TpMediaBackdropScope(
+              onMedia: onMedia,
+              child: TpRootScaffold(
+                header: TpRootHeaderConfig(
+                  title: const Text('地圖'),
+                  actions: [
+                    TpToolbarIconButton(
+                      icon: CupertinoIcons.share,
+                      tooltip: '分享',
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+                body: const TpRootScrollView(
+                  slivers: [SliverToBoxAdapter(child: Text('內容'))],
+                ),
               ),
             ),
           ),
@@ -479,21 +481,23 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
-          home: TpRootScaffold(
-            header: TpRootHeaderConfig(
-              platformViewBackdrop: onMedia,
-              title: TripTitleButton(
-                currentTripId: 'trip-1',
-                currentTitle: '沖繩四日',
-                trips: const [
-                  TripSummary(tripId: 'trip-1', name: '沖繩四日'),
-                  TripSummary(tripId: 'trip-2', name: '東京三日'),
-                ],
-                onSelected: (_) {},
+          home: TpMediaBackdropScope(
+            onMedia: onMedia,
+            child: TpRootScaffold(
+              header: TpRootHeaderConfig(
+                title: TripTitleButton(
+                  currentTripId: 'trip-1',
+                  currentTitle: '沖繩四日',
+                  trips: const [
+                    TripSummary(tripId: 'trip-1', name: '沖繩四日'),
+                    TripSummary(tripId: 'trip-2', name: '東京三日'),
+                  ],
+                  onSelected: (_) {},
+                ),
               ),
-            ),
-            body: const TpRootScrollView(
-              slivers: [SliverToBoxAdapter(child: Text('內容'))],
+              body: const TpRootScrollView(
+                slivers: [SliverToBoxAdapter(child: Text('內容'))],
+              ),
             ),
           ),
         ),
@@ -958,7 +962,12 @@ void main() {
               viewPadding: const EdgeInsets.only(bottom: bottomInset),
             ),
             child: const Stack(
-              children: [TpBottomAccessory(child: Text('horizontal pages'))],
+              children: [
+                TpMediaBackdropScope(
+                  onMedia: true,
+                  child: TpBottomAccessory(child: Text('horizontal pages')),
+                ),
+              ],
             ),
           ),
         ),
@@ -984,6 +993,30 @@ void main() {
     expect(glass.platformViewBackdrop, isTrue);
     expect(glass.settings?.chromaticAberration, 0);
     expect(find.byType(AnimatedContainer), findsNothing);
+
+    // 對照組:沒有媒體背景時 accessory 要讀到 false,不是寫死 true。
+    await tester.pumpWidget(
+      app(
+        const Scaffold(
+          body: Stack(
+            children: [
+              TpMediaBackdropScope(
+                onMedia: false,
+                child: TpBottomAccessory(child: Text('plain')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final plainGlass = tester.widget<GlassContainer>(
+      find.descendant(
+        of: find.byType(TpBottomAccessory),
+        matching: find.byType(GlassContainer),
+      ),
+    );
+    expect(plainGlass.platformViewBackdrop, isFalse);
   });
 }
 
