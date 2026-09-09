@@ -656,13 +656,10 @@ class _SearchPoiPanel extends StatelessWidget {
                   selected: option == region,
                 ),
             ],
-            triggerBuilder: (context, onPressed) => Tooltip(
-              message: '切換搜尋地區',
-              child: TextButton.icon(
-                onPressed: onPressed,
-                icon: const Icon(CupertinoIcons.location_solid, size: 16),
-                label: Text(region),
-              ),
+            triggerBuilder: (context, onPressed) => TextButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(CupertinoIcons.location_solid, size: 16),
+              label: Text(region),
             ),
           ),
         ),

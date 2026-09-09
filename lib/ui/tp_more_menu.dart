@@ -78,6 +78,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
 
   final _anchorLink = LayerLink();
   OverlayEntry? _host;
+  int _openGeneration = 0;
   final _routes = <ModalRoute<dynamic>>[];
 
   @override
@@ -154,6 +155,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
 
   void _open() {
     if (!mounted || !widget.enabled) return;
+    _openGeneration++;
     if (_host != null) {
       _menuController._glassController.open();
       return;
@@ -195,10 +197,16 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
 
   Future<void> _afterClose() async {
     final entry = _host;
-    while (mounted && identical(_host, entry) && _menuController.isOpen) {
+    final generation = _openGeneration;
+    while (mounted &&
+        identical(_host, entry) &&
+        generation == _openGeneration &&
+        _menuController.isOpen) {
       await WidgetsBinding.instance.endOfFrame;
     }
-    if (mounted && identical(_host, entry)) _removeHost();
+    if (mounted && identical(_host, entry) && generation == _openGeneration) {
+      _removeHost();
+    }
   }
 
   void _removeHost({bool rebuild = true}) {
@@ -257,7 +265,10 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
           }
         : null;
     if (widget.triggerBuilder != null) {
-      return widget.triggerBuilder!(context, onPressed);
+      return Tooltip(
+        message: widget.tooltip,
+        child: widget.triggerBuilder!(context, onPressed),
+      );
     }
     return TpToolbarGlassButton(
       tooltip: widget.tooltip,

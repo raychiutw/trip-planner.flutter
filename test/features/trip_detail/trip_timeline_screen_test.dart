@@ -2012,6 +2012,39 @@ void main() {
     expect(byLongPress.height, closeTo(byMoreButton.height, 0.1));
   });
 
+  testWidgets('讀屏在選單關閉途中長按停留點可重新開啟並停止動畫', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pumpTimeline(tester);
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 16));
+
+    final card = tester.getSemantics(
+      find.byKey(const ValueKey('timeline-entry-content-11')),
+    );
+    expect(
+      card.getSemanticsData().hasAction(SemanticsAction.longPress),
+      isTrue,
+    );
+    var ancestor = card;
+    while (ancestor.parent != null) {
+      ancestor = ancestor.parent!;
+    }
+    expect(ancestor, same(card.owner!.rootSemanticsNode));
+    card.owner!.performAction(card.id, SemanticsAction.longPress);
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 5),
+    );
+    expect(find.text('編輯景點'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯停留點'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('排序編輯模式下長按停留點卡片不叫選單', (tester) async {
     await _pumpTimeline(tester);
     await _enableTimelineEditing(tester);
