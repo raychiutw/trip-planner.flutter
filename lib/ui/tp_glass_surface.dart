@@ -67,7 +67,8 @@ LiquidGlassSettings tpResolveGlassSettings(
   );
 }
 
-/// 媒體背景上的暗化層不透明度 —— HIG 材質指引：底下內容亮時約 35%。
+/// 媒體背景的產品暗化值；搭配亮色圖磚與白色 bar 前景，不是 shader 校準。
+/// 套件不會替 App 判斷原生圖磚亮度，因此透過公開色彩設定保留此語意。
 const double tpMediaScrimOpacity = 0.35;
 
 /// 玻璃上的字符與文字走單色標籤語意色，並依玻璃底下內容的亮度切換深淺。

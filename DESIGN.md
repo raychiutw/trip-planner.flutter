@@ -168,6 +168,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：定位使用獨立 floating control，首次點擊才請求位置權限。
 - **HIG 必須**：地圖控制元件、標記與文字在 App 的 Light／Dark appearance 下維持對比。
 - **Tripline 決策**：App appearance 只切換地圖上的控制元件與 overlay；地圖 provider 圖磚維持既有日間樣式。
+- **Tripline 決策**：地圖玻璃沿用套件公開 `platformViewBackdrop` 共存路徑及媒體暗化／前景語意；這不表示 shader 能折射原生圖磚。全範圍去留與裝置驗收缺口見[1.4.1 遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。
 - **Tripline 決策**：切換 `全部／Day` 同步更新標記、路線與行程 POI accessory。
 - **HIG 必須**：marker、route 不只靠顏色區分；需搭配編號、線型、選取狀態與 semantics。
 

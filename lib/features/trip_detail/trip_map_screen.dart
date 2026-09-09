@@ -959,8 +959,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               : category,
         ) ??
         (stop.point == null ? '尚無位置' : '未分類');
-    // The drawer itself is the single refractive layer. Keeping POI cards
-    // translucent but non-blurred avoids a doubled, cloudy glass edge.
+    // accessory host 是唯一玻璃表面，內容卡只用語意填色，避免巢狀玻璃。
+    // 原生地圖走套件公開共存路徑，不表示 shader 能折射地圖圖磚。
     final cardColor = theme.colorScheme.surface.withValues(
       alpha: isPreview
           ? (theme.brightness == Brightness.dark ? 0.86 : 0.90)
