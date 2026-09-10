@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/tokens.dart';
@@ -589,10 +590,61 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
   bool _checkingDismiss = false;
   bool _handlingSystemBack = false;
   Widget? _sheet;
+  Listenable? _sheetProgress;
+  bool _reduceMotion = false;
+  bool _finishingSnap = false;
+  Size? _sheetSize;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _sheetProgress = widget.controller.progressListenable;
+      _sheetProgress?.addListener(_finishReducedMotionSnap);
+    });
+  }
+
+  void _finishReducedMotionSnap() {
+    // Ticker 在 transientCallbacks 更新；直接拖曳及 Flutter 的 pointer
+    // resampling（timer／post-frame）不在這個階段，不介入套件的手勢判斷。
+    if (!_reduceMotion ||
+        _finishingSnap ||
+        SchedulerBinding.instance.schedulerPhase !=
+            SchedulerPhase.transientCallbacks) {
+      return;
+    }
+    _finishingSnap = true;
+    try {
+      widget.controller.snapToState(
+        widget.controller.currentState,
+        animate: false,
+      );
+    } finally {
+      _finishingSnap = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _sheetProgress?.removeListener(_finishReducedMotionSnap);
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final size = MediaQuery.sizeOf(context);
+    if (_reduceMotion && _sheetSize != null && _sheetSize != size) {
+      // Metrics 通知可能早於 MediaQuery 更新；以新尺寸讓套件重取同一目標，
+      // 避免第一個 Ticker frame 沿用舊尺寸的停留位置。
+      widget.controller.snapToState(
+        widget.controller.currentState,
+        animate: false,
+      );
+    }
+    _sheetSize = size;
     // 保留同一個 child widget identity，避免系統外觀變更時重建 dialog page
     // 而把 sheet 內部 Navigator 的子頁退回帳號首頁。
     _sheet ??= widget.builder(context, _requestClose);
@@ -625,6 +677,10 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
   @override
   Widget build(BuildContext context) {
     // 必須在 build 內依賴 Theme；系統外觀變更後 sheet 材質與內容才會同幀更新。
+    final packageDefaults = GlassModalSheetScaffold(
+      body: const SizedBox.shrink(),
+      sheet: const SizedBox.shrink(),
+    );
     final quality = tpGlassQuality(context);
     final settings = quality == GlassQuality.minimal
         ? tpResolveGlassSettings(context, const LiquidGlassSettings())
@@ -648,6 +704,8 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         expandedColor: Theme.of(context).colorScheme.surface,
         quality: quality,
         padding: EdgeInsets.zero,
+        interactionScale: _reduceMotion ? 1 : packageDefaults.interactionScale,
+        stretch: _reduceMotion ? 0 : packageDefaults.stretch,
         showDragIndicator: widget.resizable,
         onStateChanged: (state) {
           if (state == GlassSheetState.hidden) {
