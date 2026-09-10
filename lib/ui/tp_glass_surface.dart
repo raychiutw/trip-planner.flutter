@@ -71,6 +71,13 @@ LiquidGlassSettings tpResolveGlassSettings(
 /// 套件不會替 App 判斷原生圖磚亮度，因此透過公開色彩設定保留此語意。
 const double tpMediaScrimOpacity = 0.35;
 
+/// 日期選擇器與帳號在媒體上採 70% 中性底，搭配不透明 onSurface 前景。
+/// 這是保留圖磚透出且維持文字對比的產品選擇，不改共用媒體暗化或光學參數。
+Color tpMediaControlBackground(BuildContext context) => Theme.of(context)
+    .colorScheme
+    .surfaceContainerLow
+    .withValues(alpha: _usesOpaqueGlass(context) ? 1 : 0.7);
+
 /// 玻璃上的字符與文字走單色標籤語意色，並依玻璃底下內容的亮度切換深淺。
 ///
 /// **不能用 app 的明暗模式判斷。** `tripMapColorScheme()` 丟棄了 brightness

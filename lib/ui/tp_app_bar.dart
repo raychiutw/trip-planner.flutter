@@ -239,13 +239,31 @@ class TpAccountAvatarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final openAccount = TpAccountActionScope.maybeOpenOf(context);
+    final onMedia = TpMediaBackdropScope.of(context);
+    final background = tpMediaControlBackground(context);
     return TpToolbarGlassButton(
       key: const ValueKey('account-avatar-button'),
       tooltip: '帳號',
       onPressed:
           onPressed ??
           (openAccount == null ? null : () => openAccount(context)),
-      child: const Icon(CupertinoIcons.person_crop_circle, size: 22),
+      platformViewBackdrop: onMedia,
+      glassSettings: onMedia
+          ? tpNavigationGlassSettings(
+              context,
+              recipe: TpNavigationGlassRecipe.platformView,
+            ).copyWith(
+              glassColor: background,
+              platformViewFallbackColor: background,
+            )
+          : null,
+      child: Icon(
+        CupertinoIcons.person_crop_circle,
+        size: 22,
+        color: onMedia
+            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 1)
+            : null,
+      ),
     );
   }
 }
