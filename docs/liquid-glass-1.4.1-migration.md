@@ -33,7 +33,7 @@
 | 選單面板 | RawMenuAnchor、手畫面板、Scale／Fade 動畫、手算定位／flipUp／高度原點、舊 shader recipe | `GlassMenu` 的定位、barrier、morph 與 `GlassMenuItem` 呈現接手。保留 autoAdjustToScreen、立即派發／去重、選取／disabled 原因／destructive、自然換行高度。表單 Dropdown 是內容值編輯，不是玻璃動作選單，繼續 system surface |
 | 選單可及性／生命週期 | 不重建整套玻璃材質或選取動畫 | 1.4.1 非捲動項目 clone 的 semantics／keyboard callback 實測失效，以公開 `GlassMenuLabel` 包 `GlassMenuItem` 補操作；Esc、焦點、大字與 Reduce Motion 用公開轉接。此路徑採 item hover／focus／press，沒有套件滑動選取膠囊 |
 | 選單 route host | 移除 App 舊 popup 定位／動畫 | 原生套件 route listener 在宣告式 Navigator build 更新時呼叫 OverlayPortal.hide，重現 persistentCallbacks 斷言；公開 root `OverlayEntry` 與 CompositedTransform link 隔離來源 route，來源換頁關閉，普通關閉等待套件 morph。每次 open 增加 generation，使舊 close 等待在重開後失效，避免持續排幀或誤移除新選單；新的 close 仍清除 host。items／enabled／theme／文字設定變動使 host 失效，相同項目重建則保留。不延遲業務 callback、不改套件私有 API |
-| compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲 |
+| compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲；Reduce Motion 透過公開 controller 完成套件選定目標，關閉裝飾縮放／伸縮並在新尺寸下重新定位，詳見 [ADR-0010](adr/0010-account-as-sheet-not-fifth-tab.md) |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
 | 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；不替換 SDK、不逐幀截圖。原生圖磚、手勢、marker／route 與其資料編碼色保留 |
 | 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪 | 輸入 1–4 行、附件／語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
@@ -57,6 +57,12 @@
 `21fffb60b0632e8c9bd746681332113fa3549656` 僅修正 `test/ui/tp_app_bar_test.dart` 載入 SDK 字型時的大小寫，改為壓縮檔內實際的 `Roboto-Regular.ttf`／`Roboto-Bold.ttf`，避免 Linux 區分大小寫時找不到檔案。`release-ci-font-red.log`／`release-ci-font-green.log` 保留修正前後的精確檔名比對；真實字重、長標籤與勾號的公開測試斷言不變，且已完成 Standards／Spec 兩軸審查。
 
 這次字型修正提交前的 **Windows 本機驗證**：357 個追蹤 Dart 檔格式檢查零變更、`git diff --check` 通過；`flutter analyze` **129.3 秒、No issues found**；完整 `flutter test` **1892 項通過、5 分 36 秒**；Android debug APK **58.8 秒建置成功**。證據位於 `.scratch/liquid-glass-upgrade/` 的 `release-ci-font-format-green.log`、`release-ci-font-diff-check.log`、`release-ci-font-analyze.log`、`release-ci-font-full.log` 與 `release-ci-font-android-build.log`。版本仍為 `0.26.3+34`；這批紀錄不代表 Linux CI、真機驗收或正式上架已完成，也不改寫上述舊 SHA 的證據歸屬。
+
+`d9d5c42f037d8d55d994c136c857eaf864ed2287` 補齊 Reduce Motion 下慢拖放手後仍吸附彈動、觸碰縮放與上拉伸縮的缺口。App 只在公開 `progressListenable` 的 Ticker frame 以 `currentState`／`snapToState(animate: false)` 完成套件已選定目標；直接拖曳及 pointer resampling 不受介入。旋轉後等 `MediaQuery` 尺寸更新，再由公開 controller 重取目標，不自行計算 detent 或物理。一般態沿用公開建構子預設，草稿、鍵盤與關閉保護保留。
+
+這次修正提交前的 **Windows 本機驗證**：33 項 sheet 測試通過；357 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` **166.7 秒、No issues found**；完整 `flutter test --concurrency=2` **1903 項通過、6 分 9 秒**；Android debug APK **45.2 秒建置成功**。證據位於 `.scratch/liquid-glass-upgrade/` 的 `reduce-motion-fix-targeted-02.log`、`reduce-motion-fix-format-final.log`、`reduce-motion-fix-analyze-final.log`、`reduce-motion-fix-full-concurrency2.log` 與 `reduce-motion-fix-android-debug-final.log`。Standards／Spec 與跨模型增量審查沒有新增確證缺陷，見同目錄的 `reduce-motion-fix-review.md` 與 `motion-delta-claude-triage.md`。
+
+預設並行度的完整 suite 曾有一項畫面產物案例超過原有 45 秒限制，失敗保留於 `reduce-motion-fix-full-final.log`；原案例單跑 **17 秒通過**（`reduce-motion-fix-artifact-timeout-retry.log`），再以並行度 2 完整跑綠，未放寬時間限制或斷言。版本仍為 `0.26.3+34`，以上證據歸屬於 `d9d5c42` 的程式與測試，不重標為後續文件 commit 上執行。動畫中切換設定／尺寸及一般態旋轉並未由此批測試完整驗證；既有 `7ccbc1e`、`21fffb6` 及 #310 的紀錄保持原歸屬，真機義務仍未完成。
 
 ## #310 整合驗證
 

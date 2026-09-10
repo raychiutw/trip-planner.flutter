@@ -20,7 +20,7 @@
 ### 驗證
 
 - 後續修正 `d9d5c42` 完成 33 項 sheet 測試與完整 1,903 項測試，analyze 無問題、Android debug 建置成功；Standards／Spec 與跨模型審查沒有新增確證缺陷。完整測試曾有一項畫面產物案例逾時，原案例單跑通過，再以並行度 2 跑完整套件全綠，未放寬時間限制或斷言。
-- 最終程式 commit `7ccbc1e` 完成 1,892 項自動測試、analyze 與 Android debug 建置，包含移動段儲存回應 409／503 時保留輸入並解除送出鎖定的回歸驗證。原 #310 的 1,882 項測試及 Android 15 模擬器 Skia debug app-owned 流程，仍是 `c2d267d`／`0.25.8+33` 的歷史證據，不代表最新 commit 已通過裝置操作。新／舊 iOS 真機、原生地圖共存、Android 實體材質、真鍵盤／可及性及同裝置前後效能仍待驗收，詳見 [遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。
+- 前次程式 commit `7ccbc1e` 完成 1,892 項自動測試、analyze 與 Android debug 建置，包含移動段儲存回應 409／503 時保留輸入並解除送出鎖定的回歸驗證。原 #310 的 1,882 項測試及 Android 15 模擬器 Skia debug app-owned 流程，仍是 `c2d267d`／`0.25.8+33` 的歷史證據，不代表最新 commit 已通過裝置操作。新／舊 iOS 真機、原生地圖共存、Android 實體材質、真鍵盤／可及性及同裝置前後效能仍待驗收，詳見 [遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。
 
 ## [0.25.8] - 2026-09-06
 

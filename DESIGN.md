@@ -214,7 +214,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin、高度與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。
 - **Tripline 決策**：regular Account 保留置中、最多 560×720 的 form sheet 與同一個 Navigator，表面改用公開 `GlassContainer` 預設材質與圓角。這是 App 的版面契約，不套用手機的底部 detent，也不反推套件內部留白。
-- **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移，提高對比與降低透明度各自保留不透明降級。
+- **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移、放手後的吸附彈性、裝飾縮放與伸縮；旋轉後依新尺寸定位，保留草稿與關閉保護。提高對比與降低透明度各自保留不透明降級。
 - **HIG 建議**：短而單一任務的新增／編輯使用 system sheet；較長、多步驟或需要完整上下文的流程使用 push navigation。
 - **HIG 必須**：sheet 左側使用「取消」，右側使用「完成／儲存」，並使用文字按鈕。
 - **HIG 必須**：沒有變更時可直接關閉；有未儲存內容時，返回、取消或拖曳關閉都先詢問是否捨棄。
