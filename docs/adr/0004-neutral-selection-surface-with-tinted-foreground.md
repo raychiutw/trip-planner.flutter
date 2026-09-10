@@ -285,6 +285,25 @@ child identity 與鍵盤收合。公開 `show` 入口不能取代這些非同步
 獨立不透明降級、真實拖曳、長清單及未儲存保護。這些 headless 像素與操作證據
 不是 Impeller shader、PlatformView 或 iOS／Android 真機材質驗收。
 
+### 媒體日期與帳號可讀性更正（2026-09-10）
+
+1.4.1 的 scrollable 日期軌道不會因 glass settings 改變底色；原本未選日期
+使用半透明 `onSurfaceVariant`，帳號亦未承接媒體合成設定。深色模式的亮色
+地圖背景上，真 App 元件與實際字型的日期對比僅 1.105:1，不能用 token
+名目色或「已指定媒體 recipe」作為可讀性證據。
+
+使用者比較全不透明方案與半透明方案後，選擇後者：僅媒體上的日期軌道與
+帳號採 70% `surfaceContainerLow`，未選日期及帳號符號採不透明 `onSurface`。
+保留圖磚透出的取捨由此處明文限定；共用 35% 媒體暗化值、標題、底部 tab、
+POI 及地圖圖資不變，選取日期仍採中性底與品牌 tint 前景。這是前景與底色
+配對的產品例外，不恢復任何舊 shader 校準。提高對比與降低透明度仍各自
+收斂為不透明系統底；非媒體外觀不變。
+
+新增回歸以真 `TpHorizontalSelector`／`TpAccountAvatarButton`、Roboto 與
+Cupertino 字型驗證 Light／Dark、亮暗背景的合成像素、獨立不透明降級及
+44pt／日期點選捲動／帳號導航。此證據限於 App 自有色彩與操作，不能代替
+原生 PlatformView、Impeller 或真機 Liquid Glass 材質驗收。
+
 ## 方法論備註
 
 ### 2026-09-09 全範圍盤點（#310）

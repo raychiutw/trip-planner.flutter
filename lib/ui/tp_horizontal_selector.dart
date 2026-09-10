@@ -112,6 +112,7 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
       'TpHorizontalSelector only accepts selection options.',
     );
     final scheme = Theme.of(context).colorScheme;
+    final onMedia = TpMediaBackdropScope.of(context);
     final height = TpHorizontalSelector.preferredHeight(context);
     _controller.reduceMotion = MediaQuery.disableAnimationsOf(context);
     if (widget.options.isEmpty) return SizedBox(height: height);
@@ -166,6 +167,8 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
                               option: option,
                               color: option.value == widget.value
                                   ? scheme.primary
+                                  : onMedia
+                                  ? scheme.onSurface.withValues(alpha: 1)
                                   : scheme.onSurfaceVariant,
                             ),
                           ),
@@ -186,7 +189,11 @@ class _TpHorizontalSelectorState<T> extends State<TpHorizontalSelector<T>> {
             selectionAlignment: SegmentSelectionAlignment.center,
             dragBehavior: SegmentDragBehavior.scroll,
             indicatorColor: scheme.surfaceContainerHigh,
-            backgroundColor: opaque ? scheme.surfaceContainerLow : null,
+            backgroundColor: onMedia
+                ? tpMediaControlBackground(context)
+                : opaque
+                ? scheme.surfaceContainerLow
+                : null,
             settings: tpNavigationGlassSettings(context),
             quality: tpGlassQuality(context),
             useOwnLayer: true,
