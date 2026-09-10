@@ -152,15 +152,13 @@ void main() {
         final scheme = Theme.of(tester.element(find.text('Day 1'))).colorScheme;
         // 與同一 raster 的 70% 色票比較，避免浮點公式和預乘像素的量化差異。
         final expectedBacking = raster.pixel(24, 24);
-        for (final rect in [scene.date, scene.account]) {
-          final actualBacking = raster.backing(rect);
-          for (final channel in [
-            (actualBacking.r, expectedBacking.r),
-            (actualBacking.g, expectedBacking.g),
-            (actualBacking.b, expectedBacking.b),
-          ]) {
-            expect(channel.$1, closeTo(channel.$2, 1 / 255));
-          }
+        final actualBacking = raster.backing(scene.date);
+        for (final channel in [
+          (actualBacking.r, expectedBacking.r),
+          (actualBacking.g, expectedBacking.g),
+          (actualBacking.b, expectedBacking.b),
+        ]) {
+          expect(channel.$1, closeTo(channel.$2, 1 / 255));
         }
         expect(
           tester.widget<Text>(find.text('Day 1')).style!.color,

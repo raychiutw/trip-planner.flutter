@@ -68,7 +68,7 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：全 App 不使用 Large Title；標題一律 inline 呈現。標題由 `TpRootScaffold`／`TpAppBar` 自繪，不使用 `CupertinoNavigationBar`（見 [ADR-0001](docs/adr/0001-keep-liquid-glass-over-native-cupertino.md)）。
 - **HIG 必須**：返回、關閉或取消位於 leading；頁面動作與帳號位於 trailing。
 - **Tripline 決策**：每個 App 內容頁右上角固定顯示 `person.crop.circle`，不顯示照片、姓名縮寫或自訂頭像。
-- **Tripline 決策**：媒體背景上的帳號按鈕與日期選擇器採 70% `surfaceContainerLow`，帳號符號與未選日期採不透明 `onSurface`，避免深色模式仍呈現亮色圖磚時吃字；提高對比／降低透明度各自改用不透明系統底。標題及其他媒體控制項沿用既有配方，日期選取仍為中性底與 tint 前景（ADR-0004）。
+- **Tripline 決策**：媒體背景上的帳號與定位按鈕採共用 45% 黑色填色與白色符號，讓背景更通透，圖示對實際合成背景仍達 3:1。日期選擇器維持 70% `surfaceContainerLow`、未選日期採不透明 `onSurface`；日期選取仍為中性底與 tint 前景。提高對比／降低透明度各自改用不透明系統底與對應前景，標題及其他媒體控制項沿用既有配方（ADR-0004）。
 - **Tripline 決策**：Account sheet 本身、登入／註冊流程與系統 modal 不重複顯示帳號 icon。
 - **HIG 必須**：帳號 icon 的可點區至少 44×44pt，VoiceOver label 為「帳號」。
 - **Tripline 決策**：帳號左側最多直接顯示一個當頁主要動作；其他動作進入 system `…` menu。

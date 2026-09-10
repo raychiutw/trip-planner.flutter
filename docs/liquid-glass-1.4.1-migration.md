@@ -35,7 +35,7 @@
 | 選單 route host | 移除 App 舊 popup 定位／動畫 | 原生套件 route listener 在宣告式 Navigator build 更新時呼叫 OverlayPortal.hide，重現 persistentCallbacks 斷言；公開 root `OverlayEntry` 與 CompositedTransform link 隔離來源 route，來源換頁關閉，普通關閉等待套件 morph。每次 open 增加 generation，使舊 close 等待在重開後失效，避免持續排幀或誤移除新選單；新的 close 仍清除 host。items／enabled／theme／文字設定變動使 host 失效，相同項目重建則保留。不延遲業務 callback、不改套件私有 API |
 | compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲；Reduce Motion 透過公開 controller 完成套件選定目標，關閉裝飾縮放／伸縮並在新尺寸下重新定位，詳見 [ADR-0010](adr/0010-account-as-sheet-not-fifth-tab.md) |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
-| 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部光學 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；日期與帳號另依 ADR-0004 採 70% 中性底與不透明 `onSurface`。不替換 SDK、不逐幀截圖；原生圖磚、手勢、marker／route 與其資料編碼色保留 |
+| 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部光學 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；日期依 ADR-0004 維持 70% 中性底與不透明 `onSurface`；帳號與定位依後續確認採共用 45% 黑色填色與白色符號，定位原有實色 Material 已改接公開 GlassButton；定位中改用同配方共用表面與 disabled 語意，避免套件整顆 disabled 淡化破壞不透明降級。不替換 SDK、不逐幀截圖；原生圖磚、手勢、marker／route 與其資料編碼色保留 |
 | 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪 | 輸入 1–4 行、附件／語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
 | 行程／外部 POI accessory | host 的局部 blur 已於 #304 移除；本次清除將 host 誤稱為可折射原生地圖的註解 | 只有 host 一層玻璃；內容卡的語意填色／選取提示不是 shader。PageView 水平瀏覽、marker 雙向同步、外部 POI 關閉復原、動態高度、map padding 與 tab clearance 為產品契約；穩定 `trip-map-poi-drawer` key 保留作既有定位，不表示具有 drawer 手勢 |
 | 無障礙 | 不用 blur=0 冒充完整不透明降級 | 獨立 AppAccessibilityScope 原生 Reduce Transparency channel 保留；套件以 highContrast 近似的訊號不能取代它。任一提高對比／降低透明度都採不透明語意色、minimal 品質；邊界與 Reduce Motion 各自保留公開設定 |
@@ -44,7 +44,7 @@
 
 [DESIGN §9](../DESIGN.md)與 `tripMapColorScheme()` 的契約是圖磚維持既有日間樣式，App 深淺模式只改 controls／overlay。[媒體 scope 與前景](../lib/ui/tp_glass_surface.dart)不能單看 Theme brightness 決定圖磚前景。1.4.1 的公開 `platformViewBackdrop` 解決背景共存與裁切，並不提供原生圖磚亮度分析或替 App 選前景色；因此保留白色 bar 前景與 35% 黑色暗化，透過公開 `glassColor`／`platformViewFallbackColor`／fadeColor 傳入。35% 是現有產品取值，不宣稱 Apple 規定的通用數值，也不是重建舊 shader 外觀。
 
-精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。現有控制項已經用前者，不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。正常媒體表面的 bar 前景預設為白色；日期與帳號依 [ADR-0004 的 2026-09-10 更正](adr/0004-neutral-selection-surface-with-tinted-foreground.md)例外採 70% `surfaceContainerLow`，未選日期及帳號符號採不透明 `onSurface`，兩者不改共用 35% 暗化值。提高對比或降低透明度任一開啟時，不透明 fallback 已遮住媒體，bar 前景改用 `colorScheme.onSurface`，不再沿用白色。品牌選取前景仍使用既有 `primary`；遷移時新增的 tab 像素對比矩陣只量未選取文字，不代表所有選取文字或實機可讀性均已通過。
+精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。原有玻璃控制項使用前者；定位按鈕當時仍是實色 Material，直到 2026-09-10 後續透明度修正才接上公開 GlassButton，現在兩顆獨立圖示均使用前者。其餘控制項也不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。正常媒體表面的 bar 前景預設為白色；日期依 [ADR-0004 的 2026-09-10 更正](adr/0004-neutral-selection-surface-with-tinted-foreground.md)維持 70% `surfaceContainerLow` 與不透明 `onSurface`；後續使用者確認只取代帳號策略，帳號與定位採共用 45% 黑色填色配白色符號，其他媒體表面的 35% 暗化值不變。提高對比或降低透明度任一開啟時，不透明 fallback 已遮住媒體，bar 前景改用 `colorScheme.onSurface`，不再沿用白色。品牌選取前景仍使用既有 `primary`；遷移時新增的 tab 像素對比矩陣只量未選取文字，不代表所有選取文字或實機可讀性均已通過。
 
 ## 收尾修正與最新本機驗證
 
@@ -68,7 +68,7 @@
 
 ## #310 整合驗證
 
-本票以 #309 為 fixed point，重新盤點 composer、POI accessory 與地圖控制項後，確認它們已承接共用預設，沒有為了產生 diff 而新增 production 行為。變動限於失效註解、研究基準標示及整合文件；不為文件製造無用測試。既有 HIG 十態、chat、trip map、shell、menu／sheet 及 app-owned flow 負責公開行為回歸。
+本票以 #309 為 fixed point，重新盤點 composer、POI accessory 與地圖上的既有玻璃控制後，確認這些玻璃表面已承接共用預設，沒有為了產生 diff 而新增 production 行為。變動限於失效註解、研究基準標示及整合文件；不為文件製造無用測試。既有 HIG 十態、chat、trip map、shell、menu／sheet 及 app-owned flow 負責公開行為回歸。
 
 2026-09-09 最終完整 `flutter test` 為 **1882 項通過，4 分 44 秒，exit 0**；suite 結束後獨立執行 `flutter analyze --no-pub`，**30.3 秒、No issues found、exit 0**。三個 Dart 檔格式化後仍只有註解差異；文件與註解沒有新增產品行為。Standards／Spec 最終增量審查已核對 logs、140 張 PNG 與 Android 結果：零新增硬性違規、零新增 smell、零確證 Spec 違反；自動證據待補項已解除，硬體驗收仍未完成。
 
