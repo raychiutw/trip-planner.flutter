@@ -129,11 +129,17 @@ void main() {
   });
   for (final brightness in Brightness.values) {
     testWidgets('$brightness 媒體亮暗背景的日期與帳號均可讀且保留 tint 選取', (tester) async {
+      final theme = brightness == Brightness.dark
+          ? AppTheme.dark()
+          : AppTheme.light();
       for (final background in [Colors.white, Colors.black]) {
         final scene = await _pumpControls(
           tester,
           brightness: brightness,
           background: background,
+          referenceColor: theme.colorScheme.surfaceContainerLow.withValues(
+            alpha: .7,
+          ),
         );
         final raster = await _capture(
           tester,
@@ -144,6 +150,18 @@ void main() {
         expect(raster.contrast(scene.account), greaterThanOrEqualTo(3));
         final selectedRect = tester.getRect(find.text('Day 1'));
         final scheme = Theme.of(tester.element(find.text('Day 1'))).colorScheme;
+        // 與同一 raster 的 70% 色票比較，避免浮點公式和預乘像素的量化差異。
+        final expectedBacking = raster.pixel(24, 24);
+        for (final rect in [scene.date, scene.account]) {
+          final actualBacking = raster.backing(rect);
+          for (final channel in [
+            (actualBacking.r, expectedBacking.r),
+            (actualBacking.g, expectedBacking.g),
+            (actualBacking.b, expectedBacking.b),
+          ]) {
+            expect(channel.$1, closeTo(channel.$2, 1 / 255));
+          }
+        }
         expect(
           tester.widget<Text>(find.text('Day 1')).style!.color,
           scheme.primary,
@@ -249,6 +267,7 @@ Future<({GlobalKey boundary, Rect date, Rect account})> _pumpControls(
   WidgetTester tester, {
   Brightness brightness = Brightness.dark,
   Color background = Colors.white,
+  Color? referenceColor,
   bool onMedia = true,
   bool highContrast = false,
   bool reduceTransparency = false,
@@ -286,6 +305,14 @@ Future<({GlobalKey boundary, Rect date, Rect account})> _pumpControls(
                   color: background,
                   child: Stack(
                     children: [
+                      if (referenceColor != null)
+                        Positioned(
+                          left: 12,
+                          top: 12,
+                          width: 24,
+                          height: 24,
+                          child: ColoredBox(color: referenceColor),
+                        ),
                       Positioned(
                         left: 12,
                         top: 80,
@@ -396,11 +423,11 @@ Future<void> _loadFonts(WidgetTester tester) async {
   await tester.runAsync(() async {
     // Ahem 無法代表文字與符號可讀性；字型取自 SDK 和既有依賴，無主機絕對路徑。
     final loader = FontLoader('MapControlsRegression');
-    for (final weight in ['Regular', 'Bold']) {
+    for (final weight in ['regular', 'bold']) {
       final font = File.fromUri(
         Uri.file(
           Platform.resolvedExecutable,
-        ).resolve('../../material_fonts/Roboto-$weight.ttf'),
+        ).resolve('../../material_fonts/roboto-$weight.ttf'),
       );
       loader.addFont(
         Future.value(ByteData.sublistView(font.readAsBytesSync())),
