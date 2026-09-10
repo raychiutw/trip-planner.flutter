@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../theme/tokens.dart';
+import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_glass_surface.dart';
 import 'map_adapter.dart';
 
 abstract interface class TripMapLocationService {
@@ -75,32 +77,50 @@ class TripMapLocateButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surface,
-      elevation: 2,
-      shadowColor: colorScheme.shadow.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TpRadius.sm),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox.square(
-        dimension: TpSpacing.tapMin,
-        child: IconButton(
-          tooltip: '定位目前位置',
-          onPressed: locating ? null : onPressed,
-          icon: locating
-              ? SizedBox.square(
+    const tooltip = '定位目前位置';
+    final onMedia = TpMediaBackdropScope.of(context);
+    final foreground = tpBarForeground(context, onMedia: onMedia);
+    final settings = onMedia
+        ? tpMediaIconGlassSettings(context)
+        : tpNavigationGlassSettings(context);
+    if (locating) {
+      // 套件 disabled 會淡化整片玻璃；進度改用同一共用表面，
+      // 讓無障礙不透明底不受影響，且此狀態沒有可觸發的回呼。
+      return Semantics(
+        label: tooltip,
+        button: true,
+        enabled: false,
+        child: Tooltip(
+          message: tooltip,
+          excludeFromSemantics: true,
+          child: TpGlassSurface(
+            borderRadius: const BorderRadius.all(Radius.circular(TpRadius.sm)),
+            platformViewBackdrop: onMedia,
+            glassSettings: settings,
+            tintColor: Theme.of(context).colorScheme.surface,
+            child: SizedBox.square(
+              dimension: TpSpacing.tapMin,
+              child: Center(
+                child: SizedBox.square(
                   dimension: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: colorScheme.primary,
+                    color: foreground,
                   ),
-                )
-              : Icon(Icons.my_location, color: colorScheme.primary),
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+      );
+    }
+    return TpToolbarGlassButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      borderRadius: TpRadius.sm,
+      platformViewBackdrop: onMedia,
+      glassSettings: settings,
+      child: Icon(Icons.my_location, color: foreground),
     );
   }
 }

@@ -161,6 +161,7 @@ class TpToolbarGlassButton extends StatelessWidget {
     this.platformViewBackdrop = false,
     this.glassSettings,
     this.rimColor,
+    this.borderRadius = 22,
   });
 
   final String tooltip;
@@ -169,6 +170,7 @@ class TpToolbarGlassButton extends StatelessWidget {
   final bool platformViewBackdrop;
   final LiquidGlassSettings? glassSettings;
   final Color? rimColor;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +198,7 @@ class TpToolbarGlassButton extends StatelessWidget {
           quality: tpGlassQuality(context),
           platformViewBackdrop: platformViewBackdrop,
           shape: LiquidRoundedSuperellipse(
-            borderRadius: 22,
+            borderRadius: borderRadius,
             // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
             side: BorderSide(color: rimColor ?? tpGlassEdgeColor(context)),
           ),
@@ -240,7 +242,6 @@ class TpAccountAvatarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final openAccount = TpAccountActionScope.maybeOpenOf(context);
     final onMedia = TpMediaBackdropScope.of(context);
-    final background = tpMediaControlBackground(context);
     return TpToolbarGlassButton(
       key: const ValueKey('account-avatar-button'),
       tooltip: '帳號',
@@ -248,21 +249,11 @@ class TpAccountAvatarButton extends StatelessWidget {
           onPressed ??
           (openAccount == null ? null : () => openAccount(context)),
       platformViewBackdrop: onMedia,
-      glassSettings: onMedia
-          ? tpNavigationGlassSettings(
-              context,
-              recipe: TpNavigationGlassRecipe.platformView,
-            ).copyWith(
-              glassColor: background,
-              platformViewFallbackColor: background,
-            )
-          : null,
+      glassSettings: onMedia ? tpMediaIconGlassSettings(context) : null,
       child: Icon(
         CupertinoIcons.person_crop_circle,
         size: 22,
-        color: onMedia
-            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 1)
-            : null,
+        color: onMedia ? tpBarForeground(context, onMedia: true) : null,
       ),
     );
   }
