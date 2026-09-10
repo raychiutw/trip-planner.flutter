@@ -35,7 +35,7 @@
 | 選單 route host | 移除 App 舊 popup 定位／動畫 | 原生套件 route listener 在宣告式 Navigator build 更新時呼叫 OverlayPortal.hide，重現 persistentCallbacks 斷言；公開 root `OverlayEntry` 與 CompositedTransform link 隔離來源 route，來源換頁關閉，普通關閉等待套件 morph。每次 open 增加 generation，使舊 close 等待在重開後失效，避免持續排幀或誤移除新選單；新的 close 仍清除 host。items／enabled／theme／文字設定變動使 host 失效，相同項目重建則保留。不延遲業務 callback、不改套件私有 API |
 | compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲；Reduce Motion 透過公開 controller 完成套件選定目標，關閉裝飾縮放／伸縮並在新尺寸下重新定位，詳見 [ADR-0010](adr/0010-account-as-sheet-not-fifth-tab.md) |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
-| 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；不替換 SDK、不逐幀截圖。原生圖磚、手勢、marker／route 與其資料編碼色保留 |
+| 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部光學 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；日期與帳號另依 ADR-0004 採 70% 中性底與不透明 `onSurface`。不替換 SDK、不逐幀截圖；原生圖磚、手勢、marker／route 與其資料編碼色保留 |
 | 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪 | 輸入 1–4 行、附件／語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
 | 行程／外部 POI accessory | host 的局部 blur 已於 #304 移除；本次清除將 host 誤稱為可折射原生地圖的註解 | 只有 host 一層玻璃；內容卡的語意填色／選取提示不是 shader。PageView 水平瀏覽、marker 雙向同步、外部 POI 關閉復原、動態高度、map padding 與 tab clearance 為產品契約；穩定 `trip-map-poi-drawer` key 保留作既有定位，不表示具有 drawer 手勢 |
 | 無障礙 | 不用 blur=0 冒充完整不透明降級 | 獨立 AppAccessibilityScope 原生 Reduce Transparency channel 保留；套件以 highContrast 近似的訊號不能取代它。任一提高對比／降低透明度都採不透明語意色、minimal 品質；邊界與 Reduce Motion 各自保留公開設定 |
@@ -44,7 +44,7 @@
 
 [DESIGN §9](../DESIGN.md)與 `tripMapColorScheme()` 的契約是圖磚維持既有日間樣式，App 深淺模式只改 controls／overlay。[媒體 scope 與前景](../lib/ui/tp_glass_surface.dart)不能單看 Theme brightness 決定圖磚前景。1.4.1 的公開 `platformViewBackdrop` 解決背景共存與裁切，並不提供原生圖磚亮度分析或替 App 選前景色；因此保留白色 bar 前景與 35% 黑色暗化，透過公開 `glassColor`／`platformViewFallbackColor`／fadeColor 傳入。35% 是現有產品取值，不宣稱 Apple 規定的通用數值，也不是重建舊 shader 外觀。
 
-精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。現有控制項已經用前者，不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。正常媒體表面的 bar 前景為白色；提高對比或降低透明度任一開啟時，不透明 fallback 已遮住媒體，bar 前景改用 `colorScheme.onSurface`，不再沿用白色。品牌選取前景仍使用既有 `primary`；本次新增的 tab 像素對比矩陣只量未選取文字，不代表所有選取文字或實機可讀性均已通過。
+精確 1.4.1 中，`AdaptiveGlass` 的 `platformViewBackdrop` 走 live BackdropFilter 相容路徑；`PlatformViewGlassMode.passthrough` 是另一種 renderer 的無取樣區處理，不是讓 shader 取得原生地圖 texture。現有控制項已經用前者，不為採用新 API 名稱而改走後者或疊加截圖。實際圖磚黑塊、雙標籤、邊界與手勢仍必須由裝置證據確認。正常媒體表面的 bar 前景預設為白色；日期與帳號依 [ADR-0004 的 2026-09-10 更正](adr/0004-neutral-selection-surface-with-tinted-foreground.md)例外採 70% `surfaceContainerLow`，未選日期及帳號符號採不透明 `onSurface`，兩者不改共用 35% 暗化值。提高對比或降低透明度任一開啟時，不透明 fallback 已遮住媒體，bar 前景改用 `colorScheme.onSurface`，不再沿用白色。品牌選取前景仍使用既有 `primary`；遷移時新增的 tab 像素對比矩陣只量未選取文字，不代表所有選取文字或實機可讀性均已通過。
 
 ## 收尾修正與最新本機驗證
 
@@ -63,6 +63,8 @@
 這次修正提交前的 **Windows 本機驗證**：33 項 sheet 測試通過；357 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` **166.7 秒、No issues found**；完整 `flutter test --concurrency=2` **1903 項通過、6 分 9 秒**；Android debug APK **45.2 秒建置成功**。證據位於 `.scratch/liquid-glass-upgrade/` 的 `reduce-motion-fix-targeted-02.log`、`reduce-motion-fix-format-final.log`、`reduce-motion-fix-analyze-final.log`、`reduce-motion-fix-full-concurrency2.log` 與 `reduce-motion-fix-android-debug-final.log`。Standards／Spec 與跨模型增量審查沒有新增確證缺陷，見同目錄的 `reduce-motion-fix-review.md` 與 `motion-delta-claude-triage.md`。
 
 預設並行度的完整 suite 曾有一項畫面產物案例超過原有 45 秒限制，失敗保留於 `reduce-motion-fix-full-final.log`；原案例單跑 **17 秒通過**（`reduce-motion-fix-artifact-timeout-retry.log`），再以並行度 2 完整跑綠，未放寬時間限制或斷言。版本仍為 `0.26.3+34`，以上證據歸屬於 `d9d5c42` 的程式與測試，不重標為後續文件 commit 上執行。動畫中切換設定／尺寸及一般態旋轉並未由此批測試完整驗證；既有 `7ccbc1e`、`21fffb6` 及 #310 的紀錄保持原歸屬，真機義務仍未完成。
+
+地圖可讀性修正 `fd26a06` 與測試補強 `ef1e323` 僅調整媒體日期／帳號的底色及前景，並驗證實際元件合成像素、200% 文字、獨立不透明降級、日期操作及帳號導航。`3e04048f6453bd02c5f7386c090e18d8faf8b388`／`0.26.4+35` 發行前的 **Windows 本機驗證**：358 個追蹤 Dart 檔格式檢查零變更；`flutter analyze` 零 error／warning，7 個 info 均在未追蹤的 `build/debug-map-legibility/` 診斷檔；完整 `flutter test` **1916 項通過、9 分 25 秒**；Android debug APK **359.8 秒建置成功**。證據位於 `map-glass-legibility` worktree 的 `build/map-ship-format-batched.log`、`build/map-ship-analyze-final.log`、`build/map-ship-full-test-final.log` 與 `build/map-ship-build-final.log`。此批測試與建置不代表原生 PlatformView、Impeller 或真機材質驗收，也不改寫先前版本的證據歸屬。
 
 ## #310 整合驗證
 
