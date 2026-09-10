@@ -421,14 +421,10 @@ class _Raster {
 
 Future<void> _loadFonts(WidgetTester tester) async {
   await tester.runAsync(() async {
-    // Ahem 無法代表文字與符號可讀性；字型取自 SDK 和既有依賴，無主機絕對路徑。
+    // Ahem 無法代表可讀性；固定測試字型，不依賴各主機的 SDK 快取。
     final loader = FontLoader('MapControlsRegression');
     for (final weight in ['regular', 'bold']) {
-      final font = File.fromUri(
-        Uri.file(
-          Platform.resolvedExecutable,
-        ).resolve('../../material_fonts/roboto-$weight.ttf'),
-      );
+      final font = File('test/fixtures/fonts/roboto-$weight.ttf');
       loader.addFont(
         Future.value(ByteData.sublistView(font.readAsBytesSync())),
       );
