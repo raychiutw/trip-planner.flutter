@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
@@ -14,13 +14,11 @@ class TpRootHeaderConfig {
     required this.title,
     this.leading,
     this.actions = const <Widget>[],
-    this.platformViewBackdrop = false,
   });
 
   final Widget title;
   final Widget? leading;
   final List<Widget> actions;
-  final bool platformViewBackdrop;
 }
 
 abstract final class TpRootGeometry {
@@ -59,6 +57,7 @@ class TpRootScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onMedia = TpMediaBackdropScope.of(context);
     return Scaffold(
       extendBody: true,
       body: Stack(
@@ -71,9 +70,12 @@ class TpRootScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             height: TpRootGeometry.bandBottom(context),
-            child: _TpRootHeaderBand(
+            child: _TpRootBand(
               key: const ValueKey('tp-root-header-band'),
-              onMedia: header.platformViewBackdrop,
+              edge: _TpBandEdge.top,
+              onMedia: onMedia,
+              solidExtent: TpRootGeometry.headerBottom(context),
+              featherExtent: TpRootGeometry.bandFeather,
             ),
           ),
           // 底部同一套。root tab bar 自己是玻璃，但玻璃只糊它蓋住的那一塊，
@@ -85,9 +87,12 @@ class TpRootScaffold extends StatelessWidget {
             left: 0,
             right: 0,
             height: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
-            child: _TpRootTabBand(
+            child: _TpRootBand(
               key: const ValueKey('tp-root-tab-band'),
-              onMedia: header.platformViewBackdrop,
+              edge: _TpBandEdge.bottom,
+              onMedia: onMedia,
+              solidExtent: TpRootTabGeometry.clearance(context) + TpSpacing.s4,
+              featherExtent: 0,
             ),
           ),
           Positioned(
@@ -109,6 +114,7 @@ class TpRootGlassHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onMedia = TpMediaBackdropScope.of(context);
     assert(
       config.actions.length <= 2 &&
           (config.actions.length <= 1 ||
@@ -130,7 +136,7 @@ class TpRootGlassHeader extends StatelessWidget {
       key: const ValueKey('tp-root-glass-header'),
       height: TpRootGeometry.headerHeight,
       child: TpBarForeground(
-        onMedia: config.platformViewBackdrop,
+        onMedia: onMedia,
         child: Row(
           children: [
             // 返回鍵與標題是**同一組**,包在同一顆膠囊裡 —— 對照 iOS 26
@@ -146,10 +152,10 @@ class TpRootGlassHeader extends StatelessWidget {
                 child: KeyedSubtree(
                   key: const ValueKey('tp-glass-surface'),
                   child: TpGlassSurface(
-                    platformViewBackdrop: config.platformViewBackdrop,
+                    platformViewBackdrop: onMedia,
                     glassSettings: tpNavigationGlassSettings(
                       context,
-                      recipe: config.platformViewBackdrop
+                      recipe: onMedia
                           ? TpNavigationGlassRecipe.platformView
                           : TpNavigationGlassRecipe.regular,
                     ),
@@ -195,22 +201,10 @@ class TpRootGlassHeader extends StatelessWidget {
             TpHeaderActionRow(
               children: [
                 for (var index = 0; index < config.actions.length; index++)
-                  if (config.actions[index] is TpToolbarTextButton)
-                    KeyedSubtree(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      child: config.actions[index],
-                    )
-                  else
-                    SizedBox(
-                      key: ValueKey('tp-root-header-action-$index'),
-                      // 群組容器佔一個 slot，但寬度是它包住的按鈕數量。
-                      width: TpToolbarSlots.slotWidth(
-                        context,
-                        config.actions[index],
-                      ),
-                      height: TpSpacing.tapMin,
-                      child: config.actions[index],
-                    ),
+                  KeyedSubtree(
+                    key: ValueKey('tp-root-header-action-$index'),
+                    child: config.actions[index],
+                  ),
                 const TpAccountAvatarButton(),
               ],
             ),
@@ -330,193 +324,78 @@ class _TpRootScrollViewState extends State<TpRootScrollView> {
   }
 }
 
-/// header 佔的那一整條帶，對**底下的內容**做漸進模糊加淡出。
-///
-/// 取代原本的 `_TpRootSoftEdge`：那條只有 16pt、掛在 header **下方**、而且只有
-/// 顏色漸層沒有模糊，所以 #162 把 header 拆成獨立膠囊之後，內容直接從膠囊之間
-/// 的縫隙穿上來 —— 日期被標題膠囊蓋掉一半、返回鍵旁漏出一個孤零零的「0」。
-/// 依據 iOS 26「電話」app：控制項上方與後方的內容是漸進模糊加淡出，不是硬切。
-/// 底部 root tab 帶的遮蔽，與 [_TpRootHeaderBand] 同一組參數，方向相反。
-///
-/// 為什麼底部也要一條:root tab bar 自己是玻璃，但玻璃只糊它**蓋住的那一塊**，
-/// 而且 shader 的模糊在模擬器上不渲染。實際看到的是內容清晰地穿過 tab bar、
-/// 與「行程」「地圖」的文字疊在一起。帶狀遮蔽是內容側的處理，兩者不互相取代。
-class _TpRootTabBand extends StatelessWidget {
-  const _TpRootTabBand({super.key, required this.onMedia});
+enum _TpBandEdge { top, bottom }
 
+/// 套件接手上下 edge 的漸進模糊與淡出，App 保留內容層級與無障礙整合。
+class _TpRootBand extends StatelessWidget {
+  const _TpRootBand({
+    super.key,
+    required this.edge,
+    required this.onMedia,
+    required this.solidExtent,
+    required this.featherExtent,
+  });
+
+  final _TpBandEdge edge;
   final bool onMedia;
+  final double solidExtent;
+  final double featherExtent;
+
+  bool get _top => edge == _TpBandEdge.top;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final opaqueFallback =
         MediaQuery.highContrastOf(context) ||
         AppAccessibilityScope.reduceTransparencyOf(context);
-    final veil = onMedia && !opaqueFallback
-        ? Colors.black
-        : theme.scaffoldBackgroundColor;
-    final peak = opaqueFallback
-        ? 1.0
-        : (onMedia ? tpMediaScrimOpacity : _TpRootHeaderBand.veilPeakAlpha);
-    final edge = opaqueFallback ? 1.0 : peak * _TpRootHeaderBand.veilEdgeRatio;
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          if (!opaqueFallback)
-            for (var index = 0; index < _TpRootHeaderBand.blurLayers; index++)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                // 逐層縮短:最底層最厚，越往上越薄，疊出漸進的模糊。
-                height:
-                    (index + 1) /
-                    _TpRootHeaderBand.blurLayers *
-                    _bandHeight(context),
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: _TpRootHeaderBand.blurSigmaPerLayer,
-                      sigmaY: _TpRootHeaderBand.blurSigmaPerLayer,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-          Positioned.fill(
-            child: opaqueFallback
-                ? ColoredBox(color: veil)
-                : DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          veil.withValues(alpha: peak),
-                          veil.withValues(alpha: edge),
-                          veil.withValues(alpha: 0),
-                        ],
-                        stops: const [0, 0.55, 1],
-                      ),
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static double _bandHeight(BuildContext context) =>
-      TpRootTabGeometry.clearance(context) + TpSpacing.s4;
-}
-
-class _TpRootHeaderBand extends StatelessWidget {
-  const _TpRootHeaderBand({super.key, required this.onMedia});
-
-  /// 底下是 platform view（地圖）時走清透 scrim，與玻璃膠囊同一套暗化語彙。
-  final bool onMedia;
-
-  /// 漸進模糊靠**疊層**做，因為 Flutter 沒有「可遮罩的 backdrop filter」。
-  ///
-  /// `BackdropFilter` 取樣的是它底下已經合成的畫面；用 `ShaderMask` 或
-  /// `Opacity` 包住它會另開 save layer，backdrop 變成空的，模糊就消失。所以
-  /// 這裡疊一組都從帶頂出發、往下逐層縮短的 filter：越靠近帶頂被越多層蓋到，
-  /// 模糊越重，到帶底只剩一層，形成連續的斜坡而不是硬邊。
-  ///
-  /// 這些層彼此重疊，**不能**共用 `BackdropGroup`／`BackdropKey` —— 框架文件
-  /// 明講重疊的 backdrop filter 共用 key 時，重疊區會變成只套到其中一層。
-  static const int blurLayers = 6;
-
-  /// 單層 sigma。高斯疊加是平方和開根號，帶頂的等效 sigma ≈ 5 × √6 ≈ 12。
-  static const double blurSigmaPerLayer = 5;
-
-  /// 帶頂的淡出強度；膠囊下緣收到 [_veilEdgeRatio] 倍，再到帶底歸零。
-  static const double veilPeakAlpha = 0.62;
-  static const double veilEdgeRatio = 0.78;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // 與玻璃同一組無障礙開關：這兩個狀態下不做模糊，改成不透明帶，
-    // 內容一格都不透出來，對比與可讀性最高。
-    final opaqueFallback =
-        MediaQuery.highContrastOf(context) ||
-        AppAccessibilityScope.reduceTransparencyOf(context);
-    final headerBottom = TpRootGeometry.headerBottom(context);
-    final feather = TpRootGeometry.bandFeather;
-    final veil = onMedia && !opaqueFallback
-        ? Colors.black
-        : theme.scaffoldBackgroundColor;
-    final peak = opaqueFallback
-        ? 1.0
-        : (onMedia ? tpMediaScrimOpacity : veilPeakAlpha);
-    final edge = opaqueFallback ? 1.0 : peak * veilEdgeRatio;
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          if (!opaqueFallback)
-            for (var index = 0; index < blurLayers; index++)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height:
-                    headerBottom + feather * (blurLayers - index) / blurLayers,
-                child: ClipRect(
-                  // tileMode 用預設的 clamp：畫面邊界外沿用邊緣像素，跟系統
-                  // bar 的模糊一致。decal 會在畫面最頂端淡成透明，露出一條縫。
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: blurSigmaPerLayer,
-                      sigmaY: blurSigmaPerLayer,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: headerBottom,
-            // 無障礙 fallback 用純色而不是同色漸層：漸層著色器會 dither，
-            // 帶內就量得到 ±1 的雜訊，「內容一格都不透出」便驗不乾淨。
-            child: opaqueFallback
-                ? ColoredBox(color: veil)
-                : DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          veil.withValues(alpha: peak),
-                          veil.withValues(alpha: edge),
-                        ],
-                      ),
-                    ),
-                  ),
-          ),
-          Positioned(
-            top: headerBottom,
-            left: 0,
-            right: 0,
-            height: feather,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    veil.withValues(alpha: edge),
-                    veil.withValues(alpha: 0),
-                  ],
-                ),
-              ),
+    final background = Theme.of(context).scaffoldBackgroundColor;
+    final height = solidExtent + featherExtent;
+    if (opaqueFallback) {
+      // 套件 blur 與 soft effect 不會自行回應 App 的降低透明度。
+      // 頂部保留狀態列至控制項的不透明區，底部整條遮住 tab 下的內容。
+      return IgnorePointer(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: _top ? solidExtent : height,
+              child: ColoredBox(color: background),
             ),
-          ),
-        ],
+            if (_top && featherExtent > 0)
+              Positioned(
+                top: solidExtent,
+                left: 0,
+                right: 0,
+                height: featherExtent,
+                child: GlassScrollEdgeEffect(
+                  fadeBottom: false,
+                  topFadeHeight: featherExtent,
+                  fadeColor: background,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    return IgnorePointer(
+      child: GlassScrollEdgeEffect(
+        fadeTop: _top,
+        fadeBottom: !_top,
+        topFadeHeight: height,
+        bottomFadeHeight: height,
+        fadeColor: onMedia
+            ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
+            : background,
+        // ProgressiveBlur 本身裁切 route 邊界；放在淡出之下、控制項之下，
+        // 不讓標題和動作參與 backdrop 取樣。材質參數採套件預設。
+        child: ProgressiveBlur(
+          direction: _top
+              ? ProgressiveBlurDirection.topToBottom
+              : ProgressiveBlurDirection.bottomToTop,
+        ),
       ),
     );
   }

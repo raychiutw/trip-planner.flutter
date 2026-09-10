@@ -44,6 +44,9 @@ iPhone 固定四個 root tabs：
 - **HIG 必須**：切換 tab 時保留各 branch 的 Navigation Stack、Day、篩選與捲動位置。
 - **Tripline 決策**：再次點擊目前 tab 時，詳情頁回到該 branch 根畫面；已在根畫面時捲回頂端。不得清除搜尋條件或重新載入資料。
 - **HIG 建議**：成功切換時使用輕量 selection haptic。
+- **Tripline 決策**：root tab 的選取指示、幾何與動畫由 Liquid Glass 1.4.1 公開元件提供；不再限制 70% 膠囊、負 expansion 或自畫 activeIcon。選取表面保持中性，品牌 tint 只用於前景。
+- **HIG 必須**：放大文字仍完整可讀且每個 tab 至少 44×44pt；必要時以公開 barHeight 增加高度，並同步 regular 頂部佔位與 compact 底部內容／accessory 留白。
+- **Tripline 決策**：套件尚未接通的鍵盤與讀屏啟用由薄轉接保留，每次動作只切換一次；轉接區不攔截指標，不取代套件點選或拖曳。
 
 ### 3.2 iPad 與 regular width
 
@@ -70,7 +73,11 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：帳號左側最多直接顯示一個當頁主要動作；其他動作進入 system `…` menu。
 - **HIG 必須**：`完成`、`取消`、`儲存`等動作用文字按鈕；只有語意明確的動作使用 SF Symbol。
 - **HIG 必須**：disabled action 保留位置並降低強調，不造成 toolbar 跳動。
+- **Tripline 決策**：固定 bar 由 `GlassAppBar` 量測 leading／actions 與標題避讓；相關動作採 `GlassButtonGroup(showDividers: false)`，群組內按鈕用透明樣式，不再自算 slot、文字寬度或左右補償。
+- **Tripline 決策**：浮動 header 保留返回與任意標題 widget 共用膠囊、帳號另組及 safe area 的薄組裝；各動作採自然寬度，bar button 的手勢、鍵盤與動畫交給公開 `GlassButton`。
+- **Tripline 決策**：上下帶狀遮蔽採 `ProgressiveBlur` 與 `GlassScrollEdgeEffect` 的公開預設，取代六層 filter 與手調淡出遮罩。遮蔽位於內容與控制項之間並穿透觸控；媒體背景保留語意暗化，提高對比／降低透明度各自使用不透明區及套件羽化，不以 blur 歸零冒充降級。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
+- **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／焦點、停用原因與選取語意。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或顯示設定改變時移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
 
@@ -140,10 +147,13 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：行程時間軸顯示 `Day 1…Day N`；地圖顯示 `全部、Day 1…Day N`。
 - **Tripline 決策**：Day selector 固定在 inline Header 下方的內容頂部，不進入 root tab bar 或 bottom accessory。
 - **Tripline 決策**：它是可水平捲動的 Day selector，採 system segmented appearance；不得宣稱為原生可捲動 segmented control。
+- **Tripline 決策**：以 Liquid Glass 1.4.1 公開 `GlassSegmentedControl.scrollable` 提供選取底、自然欄寬與置中；`id` 採選項值、`selectionAlignment` 採 `center`、`dragBehavior` 採 `scroll`，不外包第二層玻璃。
+- **Tripline 決策**：保留 App 水平內容、穩定操作 key、44pt 觸控高度與鍵盤方向鍵薄整合。套件尚未將 Reduce Motion 接入置中捲動，透過公開 `scrollController` 將動畫改為直接定位；不自行計算欄寬、捲動中心或延遲。
 - **HIG 建議**：所有選項維持同一視覺分組，選中項清楚，避免同時混入地圖／行程切換等 action。
 - **HIG 必須**：選中 Day 自動保持可見並盡量置中；邊緣露出部分下一項，提示可捲動。
 - **HIG 必須**：每個選項至少 44pt 高，寬度隨 Dynamic Type 增加，不縮字。
 - **HIG 必須**：水平滑動只瀏覽選項，點擊才切換 Day；內容區不支援左右滑動切 Day，避免和 edge-back 衝突。
+- **Tripline 決策**：再次點選目前 Day 保留原範圍動作（時間軸回到當日開頭）；鍵盤 Enter／Space 重新啟用目前範圍。讀屏普通點按採套件預設，另提供「重新選取目前範圍」具名動作；不增加重複語意節點。
 - **HIG 必須**：VoiceOver 讀出「第 {n} 天，共 {total} 天，已選取」；外接鍵盤可用左右方向鍵移動。
 - **HIG 必須**：Reduce Motion 開啟時取消自動捲動動畫。
 
@@ -158,6 +168,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - **HIG 必須**：定位使用獨立 floating control，首次點擊才請求位置權限。
 - **HIG 必須**：地圖控制元件、標記與文字在 App 的 Light／Dark appearance 下維持對比。
 - **Tripline 決策**：App appearance 只切換地圖上的控制元件與 overlay；地圖 provider 圖磚維持既有日間樣式。
+- **Tripline 決策**：地圖玻璃沿用套件公開 `platformViewBackdrop` 共存路徑及媒體暗化／前景語意；這不表示 shader 能折射原生圖磚。全範圍去留與裝置驗收缺口見[1.4.1 遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。
 - **Tripline 決策**：切換 `全部／Day` 同步更新標記、路線與行程 POI accessory。
 - **HIG 必須**：marker、route 不只靠顏色區分；需搭配編號、線型、選取狀態與 semantics。
 
@@ -201,6 +212,9 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ## 11. 表單與 sheet
 
+- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin、高度與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。
+- **Tripline 決策**：regular Account 保留置中、最多 560×720 的 form sheet 與同一個 Navigator，表面改用公開 `GlassContainer` 預設材質與圓角。這是 App 的版面契約，不套用手機的底部 detent，也不反推套件內部留白。
+- **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移、放手後的吸附彈性、裝飾縮放與伸縮；旋轉後依新尺寸定位，保留草稿與關閉保護。提高對比與降低透明度各自保留不透明降級。
 - **HIG 建議**：短而單一任務的新增／編輯使用 system sheet；較長、多步驟或需要完整上下文的流程使用 push navigation。
 - **HIG 必須**：sheet 左側使用「取消」，右側使用「完成／儲存」，並使用文字按鈕。
 - **HIG 必須**：沒有變更時可直接關閉；有未儲存內容時，返回、取消或拖曳關閉都先詢問是否捨棄。
@@ -284,6 +298,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 ### 16.2 Liquid Glass
 
 - **HIG 必須**：Liquid Glass 是功能層，不是內容層。
+- **Tripline 決策**：依 #303／#304 固定 liquid_glass_widgets 1.4.1，共用表面沿用套件公開預設材質與品質選擇；保留品牌 tint 前景、媒體暗化與獨立無障礙降級，不重建舊 shader 校準外觀。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
 - **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。
@@ -370,7 +385,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - VoiceOver、Voice Control、Switch Control、Full Keyboard Access、pointer 與外接鍵盤。
 - 鍵盤、safe area、旋轉、sheet、tab state restoration、edge-back。
 - 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、POI、收藏、Account 與全部不可復原刪除流程。
-- 真機或 simulator 驗證 Liquid Glass、PlatformView、效能與 raster jank。
+- Liquid Glass 材質、PlatformView 共存、效能與 raster jank 必須以真機驗證；widget test 與 simulator 只能作幾何、內容及操作證據，不能代替材質驗收（ADR-0001／#303）。
 
 ## 20. 來源階層與實作落差
 

@@ -5,6 +5,34 @@ import '../app/accessibility_scope.dart';
 
 enum TpNavigationGlassRecipe { regular, platformView }
 
+/// 「這一段子樹在媒體背景上」(照片或地圖圖磚)的唯一宣告點。
+///
+/// 由地圖 route / root shell 設定一次;浮動 header、root tab bar、bottom
+/// accessory 各自讀它,不再用參數手傳 bool、也不用 tab 索引猜。缺席 = 非媒體。
+///
+/// 已知差異:root tab bar 掛在 shell 那一層,讀到的是 shell 依分支宣告的值;
+/// root 地圖的空 / 載入 / 錯誤狀態把 header 蓋回非媒體,tab bar 仍是媒體樣式
+/// (master 用索引判斷時就如此,依 ADR-0001 要真機目視才決定要不要改)。
+class TpMediaBackdropScope extends InheritedWidget {
+  const TpMediaBackdropScope({
+    super.key,
+    required this.onMedia,
+    required super.child,
+  });
+
+  final bool onMedia;
+
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<TpMediaBackdropScope>()
+          ?.onMedia ??
+      false;
+
+  @override
+  bool updateShouldNotify(TpMediaBackdropScope oldWidget) =>
+      oldWidget.onMedia != onMedia;
+}
+
 /// 依 Increased Contrast 與 Reduce Transparency 的個別系統狀態，
 /// 將任一 glass recipe 收斂為相同的不透明、無 blur accessibility fallback。
 LiquidGlassSettings tpResolveGlassSettings(
@@ -12,11 +40,7 @@ LiquidGlassSettings tpResolveGlassSettings(
   LiquidGlassSettings settings, {
   Color? opaqueColor,
 }) {
-  final increasedContrast = MediaQuery.highContrastOf(context);
-  final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
-    context,
-  );
-  if (!increasedContrast && !reduceTransparency) return settings;
+  if (!_usesOpaqueGlass(context)) return settings;
 
   final fallback = (opaqueColor ?? Theme.of(context).colorScheme.surface)
       .withValues(alpha: 1);
@@ -32,6 +56,9 @@ LiquidGlassSettings tpResolveGlassSettings(
     // `ambientRim` 先前漏在這串之外，fallback 仍帶著材質的邊緣光參數 ——
     // 與「收斂為不透明、無 blur」的意圖不一致，一併歸零。
     ambientRim: 0,
+    fresnelStrength: 0,
+    whitenStrength: 0,
+    edgeAbsorption: 0,
     refractiveIndex: 1,
     saturation: 1,
     glowIntensity: 0,
@@ -40,7 +67,8 @@ LiquidGlassSettings tpResolveGlassSettings(
   );
 }
 
-/// 媒體背景上的暗化層不透明度 —— HIG 材質指引：底下內容亮時約 35%。
+/// 媒體背景的產品暗化值；搭配亮色圖磚與白色 bar 前景，不是 shader 校準。
+/// 套件不會替 App 判斷原生圖磚亮度，因此透過公開色彩設定保留此語意。
 const double tpMediaScrimOpacity = 0.35;
 
 /// 玻璃上的字符與文字走單色標籤語意色，並依玻璃底下內容的亮度切換深淺。
@@ -48,8 +76,11 @@ const double tpMediaScrimOpacity = 0.35;
 /// **不能用 app 的明暗模式判斷。** `tripMapColorScheme()` 丟棄了 brightness
 /// 參數、永遠回傳 light，地圖在深色模式下仍是亮圖磚；媒體背景一律先加暗化層
 /// （見 [tpMediaScrimOpacity]），字符再用亮色，深淺兩種模式都可讀。
+/// 不透明無障礙降級已遮住媒體，前景改回 system surface 的對應語意色。
 Color tpBarForeground(BuildContext context, {required bool onMedia}) =>
-    onMedia ? Colors.white : Theme.of(context).colorScheme.onSurface;
+    onMedia && !_usesOpaqueGlass(context)
+    ? Colors.white
+    : Theme.of(context).colorScheme.onSurface;
 
 /// 把 [tpBarForeground] 套給整片 bar 的字符與文字。
 ///
@@ -80,19 +111,8 @@ class TpBarForeground extends StatelessWidget {
 
 /// 一般模式**不描邊**；「提高對比」才補一條明顯的實心邊。
 ///
-/// PR #163 曾經加過一條 `onSurface @ 0.12` 的細邊，因為當時走
-/// `GlassQuality.standard`，那條路徑的材質完全不產生可見邊緣（模擬器實測
-/// 差值恆為 0）。換到 `premium` 之後材質自己就給得出來 —— 真機 v0.16.0
-/// 量到標題膠囊總共 **+60**，其中我們這條細邊約 **+27**、材質約 **+33**，
-/// 而目標是 +30。**再畫一條等於把量翻倍**，所以拿掉。
-///
-/// 邊緣強度現在由 [tpGlassRecipe] 的 `fresnelStrength`／`lightIntensity`／
-/// `ambientStrength` 控制，全部只在 premium 生效。
-/// 把邊緣畫在玻璃**之上**（只有「提高對比」時才有顏色）。
-///
-/// 不能靠 shape 的 `side`：`AdaptiveGlass` 一般模式只拿 shape 去 clip，
-/// **從不呼叫 `shape.paint`**，`BorderSide` 在有 blur 時畫不出來 —— 只有
-/// 無障礙 fallback 走 `ShapeDecoration` 才現形。
+/// 一般模式的邊緣交給套件預設；只在提高對比時補邊界。
+/// 舊 shader 的邊緣強度校準歷史保留於 ADR-0004。
 class TpGlassEdge extends StatelessWidget {
   const TpGlassEdge({
     super.key,
@@ -122,81 +142,32 @@ Color tpGlassEdgeColor(BuildContext context) {
       : Colors.black.withValues(alpha: 0.72);
 }
 
-/// 導覽 chrome 與共用玻璃表面的**單一參數來源**。
-///
-/// 原本兩處各有一組（共用表面用較高的折射率／色散／飽和度，導覽配方用較低的），
-/// 浮動 header 呼叫導覽配方時又把前者蓋掉。收斂為同一組，以較接近 iOS 26 的
-/// 那一組為準；媒體背景（platform view）維持低色散與低折射率。
-///
-/// ## 材質自身的邊緣光（#169 / #178）
-///
-/// 真機（v0.13.0）量到標題膠囊與頭像圓鈕的邊緣高出內部填色 **+125~+138**，
-/// day tab 是 **+20~+31**，iOS 26 是 **+29~+31**。
-///
-/// 旋鈕是 `fresnelStrength`，它只在 `GlassQuality.premium` 生效 —— 而本檔
-/// 底下傳的正是 `premium`（v0.17.0 起）。
-///
-/// 歷史紀錄:這段註解原本寫「`ambientRim`／`glowIntensity` 是死的，因為我們
-/// 固定傳 `standard`」。前半在 `standard` 那條路徑上仍然成立
-/// （`shaders/lightweight_glass.frag` 沒有 `ambientRim` uniform，
-/// `uData4.w` 取的是 widget 欄位而非 `settings.glowIntensity`），但**後半的
-/// 前提已經不成立**,而基於它推導出來的結論被人沿用過。改成 `premium` 之後
-/// renderer 原生路徑會 `setFloat(settings.ambientRim)`，那兩個參數不再是死的。
-LiquidGlassSettings tpGlassRecipe(
-  BuildContext context, {
-  required Color tint,
-  required bool onMedia,
-  required double blur,
-}) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return LiquidGlassSettings(
-    glassColor: tint,
-    backerColor: null,
-    thickness: onMedia ? 16 : (isDark ? 28 : 24),
-    blur: blur,
-    chromaticAberration: onMedia ? 0 : (isDark ? 0.004 : 0.006),
-    // **邊緣有兩條來源,`fresnelStrength` 只關掉其中一條。** premium shader
-    // 的 specular 高光是另一條,`uLightIntensity` 在那裡被乘 3.0:
-    //
-    //   directional = totalInfluence^1.5 * uLightIntensity * 3.0
-    //   brightness  = (directional + ambient) * edgeFactor * thicknessScale
-    //
-    // 真機 v0.15.0(已關 Fresnel)實測標題膠囊仍有 +100、日期選擇器 +105,
-    // 目標是 +30 —— 剩下的就是這一條。原本 0.72／0.08 壓到 0.20／0.03。
-    lightIntensity: onMedia ? 0.16 : 0.20,
-    ambientStrength: onMedia ? 0.02 : 0.03,
-    specularSharpness: GlassSpecularSharpness.medium,
-    refractiveIndex: onMedia ? 1.06 : 1.15,
-    saturation: onMedia ? 1.02 : (isDark ? 1.08 : 1.10),
-    // **關掉物理 Fresnel 邊緣光。** 套件註解:0.0 = pure blur-overlay
-    // appearance with no physics-based rim highlight, matching iOS 26 system
-    // UI glass (Messages, Notification banners) —— 我們拿來當基準的正是
-    // 訊息 app。`ambientRim` 是**額外再加一圈**,方向相反,維持不設定。
-    fresnelStrength: 0,
-    standardOpacityMultiplier: 1,
-    platformViewFallbackColor: tint,
-  );
-}
-
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
-  final theme = Theme.of(context);
-  final isDark = theme.brightness == Brightness.dark;
-  final baseColor = isDark
-      ? theme.colorScheme.surfaceContainerLow
-      : theme.colorScheme.surface;
-  final platformView = recipe == TpNavigationGlassRecipe.platformView;
-  // 媒體背景走清透玻璃：不透明度比一般背景低，暗化交給 scrim 那層負責。
-  final tint = platformView
-      ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
-      : baseColor.withValues(alpha: isDark ? 0.48 : 0.40);
+  final defaults =
+      GlassThemeData.of(
+        context,
+      ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
+      const LiquidGlassSettings();
+  final onMedia = recipe == TpNavigationGlassRecipe.platformView;
+  final scrim = Colors.black.withValues(alpha: tpMediaScrimOpacity);
   return tpResolveGlassSettings(
     context,
-    tpGlassRecipe(context, tint: tint, onMedia: platformView, blur: 16),
+    onMedia
+        ? defaults.copyWith(glassColor: scrim, platformViewFallbackColor: scrim)
+        : defaults,
   );
 }
+
+/// 無障礙狀態明確走無 shader 材質；1.x 的 blur: 0 仍保留光學效果。
+GlassQuality? tpGlassQuality(BuildContext context) =>
+    _usesOpaqueGlass(context) ? GlassQuality.minimal : null;
+
+bool _usesOpaqueGlass(BuildContext context) =>
+    MediaQuery.highContrastOf(context) ||
+    AppAccessibilityScope.reduceTransparencyOf(context);
 
 class TpGlassSurface extends StatelessWidget {
   const TpGlassSurface({
@@ -205,7 +176,6 @@ class TpGlassSurface extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(28)),
     this.padding = EdgeInsets.zero,
     this.tintColor,
-    this.blurSigma = 22,
     this.platformViewBackdrop = false,
     this.glassSettings,
   });
@@ -214,57 +184,39 @@ class TpGlassSurface extends StatelessWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
   final Color? tintColor;
-  final double blurSigma;
   final bool platformViewBackdrop;
   final LiquidGlassSettings? glassSettings;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final increasedContrast = MediaQuery.highContrastOf(context);
-    final reduceTransparency = AppAccessibilityScope.reduceTransparencyOf(
-      context,
-    );
-    final useOpaqueFallback = increasedContrast || reduceTransparency;
-    final isDark = theme.brightness == Brightness.dark;
-    final neutralTint = isDark
-        ? theme.colorScheme.surfaceContainerLow.withValues(
-            alpha: useOpaqueFallback ? 1 : 0.68,
-          )
-        : theme.colorScheme.surface.withValues(
-            alpha: useOpaqueFallback ? 1 : 0.58,
-          );
-    // 浮在視覺豐富背景上才用清透玻璃，且底下內容亮時要加暗化層。
-    // 地圖圖磚恆為亮色（tripMapColorScheme 丟棄 brightness 參數），所以深淺
-    // 兩種模式都需要暗化，不能靠 app 的明暗模式判斷。
-    final defaultTint = platformViewBackdrop && !useOpaqueFallback
-        ? Colors.black.withValues(alpha: tpMediaScrimOpacity)
-        : neutralTint;
-    final tint = tintColor == null
-        ? defaultTint
-        : tintColor!.withValues(alpha: useOpaqueFallback ? 1 : tintColor!.a);
-    final border = tpGlassEdgeColor(context);
-    final radius = borderRadius.topLeft.x;
+    final fallback = theme.brightness == Brightness.dark
+        ? theme.colorScheme.surfaceContainerLow
+        : theme.colorScheme.surface;
     final baseSettings =
         glassSettings ??
-        tpGlassRecipe(
+        tpNavigationGlassSettings(
           context,
-          tint: tint,
-          onMedia: platformViewBackdrop,
-          blur: blurSigma,
+          recipe: platformViewBackdrop
+              ? TpNavigationGlassRecipe.platformView
+              : TpNavigationGlassRecipe.regular,
         );
     final resolvedSettings = tpResolveGlassSettings(
       context,
-      baseSettings,
-      opaqueColor: tint,
+      glassSettings != null || tintColor == null
+          ? baseSettings
+          : baseSettings.copyWith(glassColor: tintColor),
+      opaqueColor: tintColor ?? fallback,
     );
+    final border = tpGlassEdgeColor(context);
+    final radius = borderRadius.topLeft.x;
 
     return TpGlassEdge(
       borderRadius: radius,
       child: GlassContainer(
         padding: padding,
         useOwnLayer: true,
-        quality: GlassQuality.premium,
+        quality: tpGlassQuality(context),
         platformViewBackdrop: platformViewBackdrop,
         allowElevation: true,
         clipBehavior: Clip.antiAlias,

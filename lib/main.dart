@@ -36,40 +36,12 @@ final appNetworkAvailabilityProvider = Provider<Stream<bool>>(
   ),
 );
 
-const _triplineGlassTheme = GlassThemeData(
-  light: GlassThemeVariant(
-    settings: GlassThemeSettings(
-      glassColor: Color(0x9EFFFFFF),
-      thickness: 24,
-      blur: 22,
-      chromaticAberration: 0.006,
-      lightIntensity: 0.82,
-      ambientStrength: 0.18,
-      refractiveIndex: 1.15,
-      saturation: 1.10,
-    ),
-    quality: GlassQuality.premium,
-    glowColors: GlassGlowColors(
-      primary: TpSystemColorsLight.tint,
-      glowOpacity: 0.30,
-    ),
+final _triplineGlassTheme = GlassThemeData(
+  light: GlassThemeVariant.light.copyWith(
+    glowColors: const GlassGlowColors(primary: TpSystemColorsLight.tint),
   ),
-  dark: GlassThemeVariant(
-    settings: GlassThemeSettings(
-      glassColor: Color(0x611C1C1E),
-      thickness: 28,
-      blur: 22,
-      chromaticAberration: 0.004,
-      lightIntensity: 0.72,
-      ambientStrength: 0.08,
-      refractiveIndex: 1.15,
-      saturation: 1.08,
-    ),
-    quality: GlassQuality.premium,
-    glowColors: GlassGlowColors(
-      primary: TpSystemColorsDark.tint,
-      glowOpacity: 0.24,
-    ),
+  dark: GlassThemeVariant.dark.copyWith(
+    glowColors: const GlassGlowColors(primary: TpSystemColorsDark.tint),
   ),
 );
 

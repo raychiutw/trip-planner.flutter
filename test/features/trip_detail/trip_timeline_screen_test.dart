@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show Tristate, SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -1178,6 +1179,79 @@ void main() {
     expect(find.text('15 分鐘'), findsNothing);
   });
 
+  testWidgets('缺座標時不會嘗試重算,重算 stub 丟例外也照樣顯示缺座標', (tester) async {
+    final repo = _MockTripRepository();
+    when(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenThrow(Exception('recompute failed'));
+    await _pumpTimeline(
+      tester,
+      repo: repo,
+      fetchDays: () => const [
+        TripDay(
+          id: 1,
+          dayNum: 1,
+          title: '北部海岸線',
+          version: 1,
+          timeline: [
+            TimelineEntry(
+              id: 11,
+              sortOrder: 0,
+              startTime: '09:00',
+              title: '美麗海水族館',
+              version: 1,
+              travel: Travel(type: 'car', min: 15),
+              master: EntryPoiInfo(
+                poiId: 101,
+                name: '沖繩美麗海水族館',
+                lat: 26.6942,
+                lng: 127.8778,
+                type: 'attraction',
+              ),
+            ),
+            TimelineEntry(
+              id: 12,
+              sortOrder: 1,
+              startTime: '12:30',
+              title: '海人食堂',
+              version: 1,
+              master: EntryPoiInfo(
+                poiId: 102,
+                name: '海人食堂',
+                type: 'restaurant',
+              ),
+            ),
+          ],
+        ),
+      ],
+      segments: [
+        TripSegment.fromJson({
+          'id': 50,
+          'fromEntryId': 11,
+          'toEntryId': 12,
+          'mode': 'driving',
+          'min': 15,
+          'distanceM': 11000,
+          'version': 1,
+          'computedAt': null,
+        }),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('缺座標，無法計算車程'), findsOneWidget);
+    expect(find.text('車程待更新'), findsNothing);
+    verifyNever(
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    );
+  });
+
   testWidgets('缺 travel segment 且兩端有座標 → 自動重算該日', (tester) async {
     final repo = _MockTripRepository();
     when(
@@ -1405,6 +1479,49 @@ void main() {
     },
   );
 
+  testWidgets('再次點選目前 Day 會從日內中段回到當日開頭', (tester) async {
+    await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
+    await tester.pumpAndSettle();
+    final selector = find.byKey(
+      const ValueKey('trip-timeline-view-day-selector'),
+    );
+    final section = find.byKey(const ValueKey('day-section-1'));
+    final initialTop = tester.getTopLeft(section).dy;
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<TpHorizontalSelector<int>>(selector).value, 1);
+    expect(tester.getTopLeft(section).dy, lessThan(initialTop - 100));
+    await tester.tap(find.byKey(const ValueKey('day-pill-1')));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(section).dy,
+      greaterThanOrEqualTo(tester.getRect(selector).bottom - 1),
+    );
+    await tester.drag(
+      find.byKey(const ValueKey('trip-timeline-scroll')),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(section).dy, lessThan(initialTop - 100));
+    final dayNode = tester.getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'));
+    dayNode.owner!.performAction(
+      dayNode.id,
+      SemanticsAction.customAction,
+      CustomSemanticsAction.getIdentifier(
+        const CustomSemanticsAction(label: '重新選取目前範圍'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(section).dy,
+      greaterThanOrEqualTo(tester.getRect(selector).bottom - 1),
+    );
+  });
+
   testWidgets('Day selector 支援左右方向鍵切換目前行程日', (tester) async {
     await _pumpTimeline(tester, fetchDays: _scrollSpyDays);
     await tester.pumpAndSettle();
@@ -1431,7 +1548,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final selected = tester
-        .getSemantics(find.byKey(const ValueKey('day-pill-1')))
+        .getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'))
         .getSemanticsData();
 
     expect(selected.label, '第 1 天，共 2 天');
@@ -1526,6 +1643,9 @@ void main() {
           .value,
       2,
     );
+    // 套件置中延遲尚未到期；排空延遲，避免測試結束時留下 timer。
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Reduce Motion 在窄螢幕直接定位遠距 Day selector', (tester) async {
@@ -1554,31 +1674,11 @@ void main() {
     await _pumpTimeline(tester, initialDayNum: 2);
     await tester.pumpAndSettle();
 
-    // 只有選取態才會長出膠囊；它是自己畫的半透明填色，不是玻璃 —— 巢狀玻璃的
-    // `glassColor` 會被軌道的 LiquidGlassLayer 吃掉，畫不出顏色。
-    final pill = tester
-        .widgetList<DecoratedBox>(
-          find.descendant(
-            of: find.byKey(const ValueKey('day-pill-2')),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((box) => box.decoration)
-        .whereType<ShapeDecoration>()
-        .where((deco) => deco.color != null)
-        .single
-        .color!;
-    expect(
-      (pill.r, pill.g, pill.b),
-      isNot((
-        TpSystemColorsLight.tint.r,
-        TpSystemColorsLight.tint.g,
-        TpSystemColorsLight.tint.b,
-      )),
-    );
-    // 半透明但可控：LiquidGlass shader 會把 tint 衰減到約 14%，改用自己畫的
-    // 填色 + `BackdropFilter` 才有確定的色值。
-    expect(pill.a, closeTo(0.92, 0.001));
+    final selected = tester
+        .getSemantics(find.bySemanticsLabel('第 2 天，共 2 天'))
+        .getSemanticsData();
+    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+    expect(selected.label, '第 2 天，共 2 天');
   });
 
   testWidgets('無效 day deep link fallback 後共用選取日為實際 Day 1', (tester) async {
@@ -1859,7 +1959,12 @@ void main() {
     for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.byType(Divider), findsNWidgets(2));
+    double gap(String before, String after) =>
+        tester.getRect(find.text(after)).top -
+        tester.getRect(find.text(before)).bottom;
+    final ordinaryGap = gap('重新排序', '換景點');
+    expect(gap('換景點', '編輯景點'), greaterThan(ordinaryGap));
+    expect(gap('移動到其他天', '複製到其他天'), greaterThan(ordinaryGap));
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
     await tester.pumpAndSettle();
@@ -1875,7 +1980,7 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+    expect(find.text('重新排序'), findsOneWidget);
     for (final label in ['重新排序', '換景點', '編輯景點', '移動到其他天', '複製到其他天', '刪除景點']) {
       expect(find.text(label), findsOneWidget);
     }
@@ -1893,20 +1998,51 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('entry-more-11')));
     await tester.pumpAndSettle();
-    final byMoreButton = tester.getRect(
-      find.byKey(const ValueKey('tp-menu-panel')),
-    );
+    final byMoreButton = tester.getRect(find.text('重新排序'));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    expect(find.text('重新排序'), findsNothing);
 
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(
-      tester.getRect(find.byKey(const ValueKey('tp-menu-panel'))),
-      byMoreButton,
+    final byLongPress = tester.getRect(find.text('重新排序'));
+    expect((byLongPress.center - byMoreButton.center).distance, lessThan(0.1));
+    expect(byLongPress.width, closeTo(byMoreButton.width, 0.1));
+    expect(byLongPress.height, closeTo(byMoreButton.height, 0.1));
+  });
+
+  testWidgets('讀屏在選單關閉途中長按停留點可重新開啟並停止動畫', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pumpTimeline(tester);
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 16));
+
+    final card = tester.getSemantics(
+      find.byKey(const ValueKey('timeline-entry-content-11')),
     );
+    expect(
+      card.getSemanticsData().hasAction(SemanticsAction.longPress),
+      isTrue,
+    );
+    var ancestor = card;
+    while (ancestor.parent != null) {
+      ancestor = ancestor.parent!;
+    }
+    expect(ancestor, same(card.owner!.rootSemanticsNode));
+    card.owner!.performAction(card.id, SemanticsAction.longPress);
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 5),
+    );
+    expect(find.text('編輯景點'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
+    await tester.pumpAndSettle();
+    expect(find.text('編輯停留點'), findsOneWidget);
+    semantics.dispose();
   });
 
   testWidgets('排序編輯模式下長按停留點卡片不叫選單', (tester) async {
@@ -1916,7 +2052,7 @@ void main() {
     await tester.longPress(find.text('美麗海水族館'));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+    expect(find.text('重新排序'), findsNothing);
     expect(find.text('編輯景點'), findsNothing);
     expect(find.byKey(const ValueKey('entry-drag-11')), findsOneWidget);
   });
@@ -1946,12 +2082,15 @@ void main() {
       final finder = find.byKey(ValueKey('entry-$action-11'));
       expect(
         tester
-            .widget<TextButton>(
-              find.descendant(of: finder, matching: find.byType(TextButton)),
-            )
-            .onPressed,
-        isNull,
+            .getSemantics(finder)
+            .getSemanticsData()
+            .flagsCollection
+            .isEnabled,
+        Tristate.isFalse,
       );
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+      expect(find.text('重新排序'), findsOneWidget);
       final label = action == 'move' ? '移動到其他天' : '複製到其他天';
       expect(find.bySemanticsLabel('$label，目前行程只有一天，無法使用'), findsOneWidget);
     }

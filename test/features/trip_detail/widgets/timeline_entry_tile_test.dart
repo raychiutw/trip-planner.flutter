@@ -44,7 +44,7 @@ Future<void> pumpTile(
   );
 }
 
-/// 依時間軸畫面的接法組裝停留點卡片：`⋯` 與長按共用同一顆 [MenuController]，
+/// 依時間軸畫面的接法組裝停留點卡片：`⋯` 與長按共用同一顆 [TpMoreMenuController]，
 /// 點卡片則切換展開區塊。
 class _MenuTileHost extends StatefulWidget {
   const _MenuTileHost({this.longPressEnabled = true});
@@ -57,7 +57,7 @@ class _MenuTileHost extends StatefulWidget {
 }
 
 class _MenuTileHostState extends State<_MenuTileHost> {
-  final MenuController _menuController = MenuController();
+  final TpMoreMenuController _menuController = TpMoreMenuController();
   bool _expanded = false;
 
   @override
@@ -1010,7 +1010,7 @@ void main() {
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('編輯景點'), findsOneWidget);
       expect(find.text('編輯景點'), findsOneWidget);
       expect(find.text('刪除景點'), findsOneWidget);
     });
@@ -1020,38 +1020,22 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('entry-more-60')));
       await tester.pumpAndSettle();
-      final byMoreButton = tester.getRect(
-        find.byKey(const ValueKey('tp-menu-panel')),
-      );
-      final labelsByMoreButton = tester
-          .widgetList<Text>(
-            find.descendant(
-              of: find.byKey(const ValueKey('tp-menu-panel')),
-              matching: find.byType(Text),
-            ),
-          )
-          .map((text) => text.data)
-          .toList();
+      final byMoreButton = tester.getRect(find.text('編輯景點'));
+      expect(find.text('刪除景點'), findsOneWidget);
       await dismissMenu(tester);
-      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+      expect(find.text('編輯景點'), findsNothing);
 
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
-      final byLongPress = tester.getRect(
-        find.byKey(const ValueKey('tp-menu-panel')),
+      final byLongPress = tester.getRect(find.text('編輯景點'));
+      expect(find.text('刪除景點'), findsOneWidget);
+      expect(
+        (byLongPress.center - byMoreButton.center).distance,
+        lessThan(0.1),
+        reason: '同一個入口位置，忽略 spring 收斂的浮點誤差',
       );
-      final labelsByLongPress = tester
-          .widgetList<Text>(
-            find.descendant(
-              of: find.byKey(const ValueKey('tp-menu-panel')),
-              matching: find.byType(Text),
-            ),
-          )
-          .map((text) => text.data)
-          .toList();
-
-      expect(labelsByLongPress, labelsByMoreButton);
-      expect(byLongPress, byMoreButton, reason: '同一份選單面板，位置也該一致');
+      expect(byLongPress.width, closeTo(byMoreButton.width, 0.1));
+      expect(byLongPress.height, closeTo(byMoreButton.height, 0.1));
     });
 
     testWidgets('長按不觸發卡片展開，收起選單後點卡片仍會展開', (tester) async {
@@ -1066,7 +1050,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('展開區塊'), findsOneWidget);
-      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+      expect(find.text('編輯景點'), findsNothing);
     });
 
     testWidgets('沒有長按入口時（排序編輯模式）長按不叫選單', (tester) async {
@@ -1075,7 +1059,7 @@ void main() {
       await tester.longPress(find.text('首里城'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('tp-menu-panel')), findsNothing);
+      expect(find.text('編輯景點'), findsNothing);
       expect(find.text('刪除景點'), findsNothing);
     });
 
@@ -1094,7 +1078,7 @@ void main() {
       node.owner!.performAction(node.id, SemanticsAction.longPress);
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('tp-menu-panel')), findsOneWidget);
+      expect(find.text('編輯景點'), findsOneWidget);
       expect(find.text('刪除景點'), findsOneWidget);
       semantics.dispose();
     });

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/theme/tokens.dart';
@@ -45,6 +46,43 @@ TpRootScaffold _root({int actionCount = 0, Widget? body}) {
 }
 
 void main() {
+  testWidgets('浮動 header 群組以自然寬度保留放大文字與帳號操作', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      _app(
+        TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: const Text('行程'),
+            actions: [
+              TpToolbarActionGroup(
+                children: [
+                  TpToolbarTextButton(label: '加入', onPressed: () => taps++),
+                  TpToolbarTextButton(label: '預覽', onPressed: () => taps++),
+                ],
+              ),
+            ],
+          ),
+          body: const SizedBox.expand(),
+        ),
+        mediaQueryData: const MediaQueryData(textScaler: TextScaler.linear(2)),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    for (final label in ['加入', '預覽']) {
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text(label))
+            .didExceedMaxLines,
+        isFalse,
+      );
+      await tester.tap(find.text(label));
+    }
+    final group = tester.getRect(find.byType(TpToolbarActionGroup));
+    final account = tester.getRect(find.byType(TpAccountAvatarButton));
+    expect(group.right, lessThan(account.left));
+    expect(taps, 2);
+  });
+
   testWidgets('root header supports a standard leading navigation action', (
     tester,
   ) async {

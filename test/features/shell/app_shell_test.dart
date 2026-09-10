@@ -1,7 +1,9 @@
 import 'dart:ui' show PointerDeviceKind, Tristate;
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,18 +166,125 @@ GoRouter buildSplitShellRouter() {
   );
 }
 
-/// 靜止態選取膠囊**實際畫出來**的填色。
-///
-/// #179:不要改回讀 `GlassTabBar.indicatorColor` —— 那個參數現在恆為透明,
-/// 靜止態的膠囊是本 app 自畫的(套件靜止時只會畫滿整格欄位,任何參數都收不動)。
-Color _selectedPillColor(WidgetTester tester, String label) {
-  final box = tester.widget<DecoratedBox>(
-    find.byKey(ValueKey('root-tab-pill-$label')),
-  );
-  return (box.decoration as ShapeDecoration).color!;
-}
+/// 中性表面的公開設定；HIG 矩陣另驗實際繪製與操作。
+Color _selectedPillColor(WidgetTester tester, String label) => tester
+    .widget<GlassTabBar>(
+      find.descendant(
+        of: find.byKey(const ValueKey('apple-root-tab-bar')),
+        matching: find.byType(GlassTabBar),
+      ),
+    )
+    .indicatorColor!;
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1024, 768)]) {
+    for (final highContrast in [true, false]) {
+      testWidgets('地圖不透明降級時未選取 tabs 仍清楚可讀 $size highContrast=$highContrast', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final router = buildShellRouter();
+        addTearDown(router.dispose);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          AppAccessibilityScope(
+            reduceTransparency: !highContrast,
+            child: ProviderScope(
+              child: MaterialApp.router(
+                theme: AppTheme.light(),
+                routerConfig: router,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(highContrast: highContrast),
+                  child: RepaintBoundary(key: boundaryKey, child: child!),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tapAt(tester.getCenter(find.bySemanticsLabel('地圖')));
+        await tester.pumpAndSettle();
+        expect(find.text('PROBE-MAP'), findsOneWidget);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('地圖')),
+          matchesSemantics(
+            isButton: true,
+            isSelected: true,
+            hasSelectedState: true,
+            label: '地圖',
+            hasTapAction: true,
+          ),
+        );
+        final selectedLabels = tester.widgetList<Text>(
+          find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.text('地圖'),
+          ),
+        );
+        expect(
+          selectedLabels.map((label) => label.style?.color),
+          contains(AppTheme.light().colorScheme.primary),
+        );
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = (await tester.runAsync(
+          () => boundary.toImage(pixelRatio: 1),
+        ))!;
+        final data = (await tester.runAsync(
+          () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
+        ))!;
+        Color pixel(Offset point) {
+          final local = boundary.globalToLocal(point);
+          final offset =
+              (local.dy.floor() * image.width + local.dx.floor()) * 4;
+          return Color.fromARGB(
+            data.getUint8(offset + 3),
+            data.getUint8(offset),
+            data.getUint8(offset + 1),
+            data.getUint8(offset + 2),
+          );
+        }
+
+        for (final label in ['聊天', '行程', '收藏']) {
+          final text = find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.text(label),
+          );
+          expect(text, findsWidgets);
+          // 套件可重複繪製標籤層；驗最終畫面墨跡，不依賴層數。
+          final rect = tester.getRect(text.first);
+          final background = pixel(Offset(rect.center.dx, rect.top - 2));
+          var strongestContrast = 1.0;
+          for (var y = rect.top.ceil(); y < rect.bottom.floor(); y++) {
+            for (var x = rect.left.ceil(); x < rect.right.floor(); x++) {
+              final luminance = pixel(
+                Offset(x.toDouble(), y.toDouble()),
+              ).computeLuminance();
+              final backdrop = background.computeLuminance();
+              final ratio = luminance > backdrop
+                  ? (luminance + 0.05) / (backdrop + 0.05)
+                  : (backdrop + 0.05) / (luminance + 0.05);
+              if (ratio > strongestContrast) strongestContrast = ratio;
+            }
+          }
+          expect(
+            strongestContrast,
+            greaterThanOrEqualTo(4.5),
+            reason: '$label 的實際墨跡必須與不透明背景有足夠對比',
+          );
+        }
+        image.dispose();
+        await tester.tapAt(tester.getCenter(find.bySemanticsLabel('聊天')));
+        await tester.pumpAndSettle();
+        expect(find.text('PROBE-CHAT'), findsOneWidget);
+      });
+    }
+  }
   group('AppShell 4-tab 導航', () {
     testWidgets('iOS／Android 尺寸矩陣依可用寬度選擇導覽', (tester) async {
       final cases = [
@@ -306,22 +415,27 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('regular-root-tab-地圖')),
+      await tester.tapAt(
+        tester.getCenter(find.bySemanticsLabel('地圖')),
         kind: PointerDeviceKind.mouse,
       );
       await tester.pumpAndSettle();
       expect(find.text('PROBE-MAP'), findsOneWidget);
 
-      final tripsButton = tester.widget<TextButton>(
-        find.byKey(const ValueKey('regular-root-tab-行程')),
-      );
-      tripsButton.focusNode!.requestFocus();
+      // 使用真實 Tab 導覽；不取套件或 App 的 FocusNode。
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
 
-      expect(find.text('PROBE-TRIPS'), findsOneWidget);
+      expect(find.text('PROBE-FAV'), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(find.text('PROBE-MAP'), findsOneWidget);
     });
 
     testWidgets('regular top tabs 避開頂部 safe area', (tester) async {
@@ -618,9 +732,7 @@ void main() {
       expect(glass.platformViewBackdrop, isTrue);
       expect(
         _selectedPillColor(tester, '地圖'),
-        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.dark().colorScheme.surfaceContainerHigh,
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
     });
@@ -647,7 +759,7 @@ void main() {
 
       final standard = rootBar();
       expect(standard.platformViewBackdrop, isFalse);
-      expect(standard.settings?.glassColor.a, closeTo(0.40, 0.01));
+      expect(standard.settings?.glassColor.a, lessThan(1));
       expect(standard.settings?.backerColor, isNull);
 
       await tester.tap(find.bySemanticsLabel('地圖'));
@@ -655,19 +767,27 @@ void main() {
 
       final map = rootBar();
       expect(map.platformViewBackdrop, isTrue);
+      final chatGlyphs = tester.widgetList<RichText>(
+        find.descendant(
+          of: find.descendant(
+            of: find.byKey(const ValueKey('apple-root-tab-bar')),
+            matching: find.byIcon(CupertinoIcons.chat_bubble_fill),
+          ),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(
+        chatGlyphs.map((glyph) => glyph.text.style?.color),
+        contains(Colors.white),
+      );
       expect(map.settings?.glassColor.a, closeTo(tpMediaScrimOpacity, 0.01));
-      // 媒體背景是刻意的清透變體：平面化（無色散、低折射率）避免 platform
-      // view 上出現彩邊與扭曲；其餘光學參數與一般背景同源。
+      // 媒體暗化與原生 PlatformView 相容路徑保留，其餘採相同新版材質。
       expect(map.settings?.blur, standard.settings?.blur);
       expect(
-        map.settings?.standardOpacityMultiplier,
-        standard.settings?.standardOpacityMultiplier,
+        map.settings?.chromaticAberration,
+        standard.settings?.chromaticAberration,
       );
-      expect(map.settings?.chromaticAberration, 0);
-      expect(map.settings?.refractiveIndex, 1.06);
-      expect(standard.settings!.chromaticAberration, greaterThan(0));
-      expect(standard.settings!.refractiveIndex, greaterThan(1.06));
-      // 邊緣光兩邊都要開著，否則又得靠描邊補回來。
+      expect(map.settings?.refractiveIndex, standard.settings?.refractiveIndex);
       expect(map.indicatorSettings?.blur, map.settings?.blur);
       expect(
         map.indicatorSettings?.refractiveIndex,
@@ -675,9 +795,7 @@ void main() {
       );
       expect(
         _selectedPillColor(tester, '地圖'),
-        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.light().colorScheme.surfaceContainerHigh,
       );
     });
 
@@ -938,7 +1056,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('root tab 使用套件原生 16/64/32 Liquid Glass 幾何', (tester) async {
+    testWidgets('root tab 保留導覽高度、觸控與選取語意', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -962,19 +1080,14 @@ void main() {
         find.descendant(of: bar, matching: find.byType(GlassTabBar)),
       );
       expect(glass.barHeight, 64);
-      expect(glass.barBorderRadius, 32);
       expect(glass.iconSize, 24);
       expect(glass.iconLabelSpacing, 4);
       expect(glass.platformViewBackdrop, isFalse);
       expect(
         _selectedPillColor(tester, '聊天'),
-        AppTheme.light().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.light().colorScheme.surfaceContainerHigh,
       );
-      // 導覽配方已與共用玻璃表面收斂為同一組（較高的折射率與色散）。
-      expect(glass.settings?.chromaticAberration, closeTo(0.006, 0.001));
-      expect(glass.settings?.refractiveIndex, 1.15);
+      // 新版材質數值由套件決定；幾何、選取及前景語意維持 App 契約。
     });
 
     testWidgets('root tab bar 選取態是中性膠囊加品牌柔褐字符，兩態同實心字符', (tester) async {
@@ -997,71 +1110,31 @@ void main() {
       );
       (double, double, double) rgb(Color c) => (c.r, c.g, c.b);
 
-      // 膠囊本身保留（iOS 26 的系統視覺指示），只換底色為中性語意層。
-      // iOS 26 的 tab bar 拿**強調色**當選取背景、前景反白（參考「電話」app
-      // 的通話記錄分頁）。#118 當初改成中性語意層，前提是「iOS 26 不用強調色
-      // 當選取底」—— 那個前提不成立。
-      //
-      // 選取指示是「中性底 + tint 前景」。iOS 26 電話 app 實測膠囊是
-      // #363636 中性灰、系統藍在字符上 —— 強調色在前景不在背景。
-      // Apple 的藍是「它的」強調色，不是規範色；我們用柔褐。
+      // 中性選取表面與品牌前景各自保留。
       final pillColor = _selectedPillColor(tester, '聊天');
       expect(rgb(pillColor), isNot(rgb(scheme.primary)));
       expect(
         rgb(pillColor),
-        rgb(scheme.surfaceContainerHighest),
+        rgb(scheme.surfaceContainerHigh),
         reason: '選取底是中性語意層',
       );
 
-      // 品牌色只出現在前景：字符、標籤與光暈。
+      // 品牌色只出現在前景：字符與標籤。
       expect(glass.selectedIconColor, scheme.primary);
 
-      // root tab bar 走 premium。`standard` 的邊緣寫死在 shader 常數裡,
-      // 任何 settings 都調不動 —— 真機連續多版量到 +125~+138(目標 +30)。
-      expect(glass.quality, GlassQuality.premium);
-
-      // #179:膠囊的寬度守門在 root_tab_alignment_test.dart —— 那裡量的是
-      // **畫出來的方框**。這裡原本斷言 `indicatorExpansion` 是負值,但那個參數
-      // 只在拖曳中生效(`RelativeRect.lerp` 在 thickness == 0 時回
-      // `RelativeRect.fill`),參數對、靜止態的畫面照樣滿版。
-      expect(glass.selectedLabelColor, scheme.primary);
-      expect(glass.unselectedIconColor, scheme.onSurface);
-      expect(
-        glass.unselectedIconColor,
-        glass.unselectedLabelColor,
-        reason: '未選的字符與標籤必須同色',
+      final icons = tester.widgetList<Icon>(
+        find.descendant(
+          of: find.byKey(const ValueKey('apple-root-tab-bar')),
+          matching: find.byType(Icon),
+        ),
       );
-      for (final tab in glass.tabs) {
-        expect(tab.glowColor, scheme.primary);
-      }
-
-      // 未選取態也是實心字符，靠 tint 區分而不是 outline↔filled 切換。
-      const filled = [
+      for (final icon in [
         CupertinoIcons.chat_bubble_fill,
         CupertinoIcons.briefcase_fill,
         CupertinoIcons.map_fill,
         CupertinoIcons.heart_fill,
-      ];
-      expect(glass.tabs.length, filled.length);
-      const labels = ['聊天', '行程', '地圖', '收藏'];
-      for (var i = 0; i < filled.length; i++) {
-        // 兩態都量**畫出來的字符**：選取態的字符包在自畫膠囊外層裡（#179），
-        // 型別轉型看不到它。
-        expect(
-          tester
-              .widget<Icon>(find.byKey(ValueKey('root-tab-${labels[i]}')))
-              .icon,
-          filled[i],
-          reason: '第 $i 個 tab 未選取態',
-        );
-        final active = find.byKey(ValueKey('root-tab-active-${labels[i]}'));
-        // 選取層只畫選取態附近的 tab，畫出來的才驗。
-        if (active.evaluate().isEmpty) continue;
-        expect(
-          tester.widget<Icon>(active).icon,
-          filled[i],
-          reason: '第 $i 個 tab 選取態必須是同一個實心字符，不做 outline↔filled 切換',
-        );
+      ]) {
+        expect(icons.any((widget) => widget.icon == icon), isTrue);
       }
     });
 
@@ -1082,12 +1155,10 @@ void main() {
       );
       expect(
         _selectedPillColor(tester, '聊天'),
-        AppTheme.dark().colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.72,
-        ),
+        AppTheme.dark().colorScheme.surfaceContainerHigh,
       );
       expect(glass.selectedIconColor, AppTheme.dark().colorScheme.primary);
-      expect(glass.settings?.chromaticAberration, closeTo(0.004, 0.001));
+      expect(glass.settings!.glassColor.a, lessThan(1));
     });
 
     test('iPhone safe area 與膠囊重疊後，底部至少保留 16pt', () {

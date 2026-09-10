@@ -32,7 +32,7 @@ class TimelineEntryTile extends StatelessWidget {
   final bool expanded;
   final VoidCallback? onTap;
 
-  /// 長按卡片的入口；畫面接的是 `⋯` 那顆選單的 [MenuController]。
+  /// 長按卡片的入口；畫面接的是 `⋯` 那顆選單的 [TpMoreMenuController]。
   final VoidCallback? onLongPress;
   final Widget? trailing;
   final Widget? mapLinks;

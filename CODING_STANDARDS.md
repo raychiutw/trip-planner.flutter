@@ -193,7 +193,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
 - **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
 - 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:247`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
-  - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_app_bar.dart:720`）選單選中，確認走 action sheet
+  - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_more_menu.dart`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
   - 同一個動作同時掛在選單與左滑上時，`source` 由呼叫端各自傳，不得在 helper 內寫死（`lib/app/irreversible_action.dart:12`）
 - 不可復原的動作（刪除行程、Day、停留點、筆記、分享連結）用 `confirmAndRunIrreversibleAction`（`lib/app/irreversible_action.dart:14`）或 `confirmAndDelete`（同檔 `:87`），它們一併處理執行中鎖定、成功通知與可重試失敗。
@@ -223,13 +223,13 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ## 導覽玻璃與鍵盤
 
-適用 `lib/ui/tp_glass_surface.dart`、`lib/ui/tp_app_bar.dart`、`lib/ui/tp_root_scaffold.dart` 與任何會碰到玻璃或輸入欄位的畫面。
+適用 `lib/ui/tp_glass_surface.dart`、`lib/ui/tp_app_bar.dart`、`lib/ui/tp_more_menu.dart`、`lib/ui/tp_root_scaffold.dart` 與任何會碰到玻璃或輸入欄位的畫面。
 
 ### 對比
 
 - 導覽玻璃上的 15–17pt 文字（`titleLarge` 17 / `titleMedium`、`bodyLarge` 15）必須對**實際合成後**的背景達 4.5:1，不是對 token 的名目色。玻璃是半透明的，底下捲什麼過去就合成什麼。
 - 100% 與 200% Dynamic Type 兩種字級都要驗；驗收方式是拿高對比黑白內容捲過浮動 header，確認下層字詞不可辨識且前景仍達 4.5:1。
-- `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃收斂為接近不透明的系統背景：`tpResolveGlassSettings`（`lib/ui/tp_glass_surface.dart:10`）把 `glassColor`、`backerColor`、`platformViewFallbackColor` 全設成 alpha `1` 的 surface，並把 `thickness`／`blur`／`chromaticAberration`／`lightIntensity`／`ambientStrength`／`ambientRim`／`glowIntensity`／`shadowElevation` 歸零。新增材質參數時必須一併歸零，漏一個就是 fallback 仍帶材質。
+- `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃使用不透明系統背景。`tpResolveGlassSettings` 提供 alpha `1` 的語意色，`tpGlassQuality` 明確選擇 `GlassQuality.minimal`，避開 shader、折射與高光；不可只把 blur 歸零，1.x 的 `blur: 0` 仍是光學玻璃。兩個輸入各自以實際背景像素及操作測試驗證。
 - 一般模式不描邊；只有 `Increase Contrast` 才補實心邊（`tpGlassEdgeColor`，`lib/ui/tp_glass_surface.dart:118`）。
 
 ### 材質語意
@@ -237,8 +237,8 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 導覽材質只有兩種語意，由 `TpNavigationGlassRecipe`（`lib/ui/tp_glass_surface.dart:6`）表達：
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
-- **alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
-- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：地圖分頁的 root tab bar 傳 `selectedIndex == 2`（`lib/features/shell/apple_root_tab_bar.dart:224`）、行程地圖傳 `true`（`lib/features/trip_detail/trip_map_screen.dart:142`）、bottom accessory 傳 `true`（`lib/ui/tp_bottom_accessory.dart:34`）。
+- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率、Fresnel 或 blur 校準。**媒體暗化 alpha 只能住在 `tpNavigationGlassSettings`**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
+- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。
 
@@ -276,7 +276,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 | 移除 | 帶 `minus` 的範圍專屬符號(`person_badge_minus`) | `destructive` | `scheme.error` |
 | 刪除 | `CupertinoIcons.delete` | `destructive` | `scheme.error` |
 
-- 顏色不手寫,由 `role` 推導 —— `lib/ui/tp_app_bar.dart:1011` 是唯一的映射點(`destructive` → `scheme.error`,否則 `scheme.onSurface`)。diff 裡出現寫死的紅色或 `foregroundColor:` 覆寫選單項目顏色 = 違反。
+- 顏色不手寫,由 `role` 推導 —— `lib/ui/tp_more_menu.dart` 的選單項目是唯一的映射點(`destructive` → `scheme.error`,否則 `scheme.onSurface`)。diff 裡出現寫死的紅色或 `foregroundColor:` 覆寫選單項目顏色 = 違反。
 - 新增／加入用 `add` 系列且 `role` 維持 `normal`;移除／刪除用 `minus`／`delete` 且 `role` 必為 `destructive`。動詞與 role 不匹配(例如「加入」配 `destructive`)= 違反。
 - 選單項目(`TpMoreMenuButton`)一律要 `icon`;action sheet 專用項目一律**不給** `icon`(給了也畫不出來,見 `lib/ui/tp_action_item.dart:22`)。
 - 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:642`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。

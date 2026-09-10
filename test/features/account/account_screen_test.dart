@@ -180,7 +180,8 @@ void main() {
     );
     final screenHeight =
         tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    expect(tester.getSize(sheet).height, closeTo(screenHeight * 0.93, 1));
+    expect(tester.getSize(sheet).height, lessThan(screenHeight));
+    expect(tester.getSize(sheet).height, greaterThan(screenHeight / 2));
 
     await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
     await tester.pumpAndSettle();

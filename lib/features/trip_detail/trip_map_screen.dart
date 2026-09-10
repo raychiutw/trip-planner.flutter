@@ -13,6 +13,7 @@ import '../../models/poi_type.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_bottom_accessory.dart';
+import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_horizontal_selector.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../map/map_adapter.dart';
@@ -137,45 +138,50 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
       key: const ValueKey('trip-map-status-style'),
       value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
           .copyWith(statusBarColor: Colors.transparent),
-      child: TpRootScaffold(
-        header: TpRootHeaderConfig(
-          platformViewBackdrop: true,
-          title: TripTitleButton(
-            key: const ValueKey('trip-map-trip-picker'),
-            currentTripId: widget.tripId,
-            currentTitle: currentTrip == null ? '行程' : _tripTitle(currentTrip),
-            trips: trips,
-            onSelected: (selectedTripId) {
-              if (widget.onTripSelected != null) {
-                widget.onTripSelected!(selectedTripId);
-                return;
-              }
-              context.go('/trips/${Uri.encodeComponent(selectedTripId)}/map');
-            },
-          ),
-        ),
-        body: daysAsync.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator.adaptive()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s6),
-              child: Text('載入失敗：$error', textAlign: TextAlign.center),
+      // 地圖是媒體背景:整個畫面(header、帶狀遮蔽、POI accessory)在此宣告一次。
+      child: TpMediaBackdropScope(
+        onMedia: true,
+        child: TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: TripTitleButton(
+              key: const ValueKey('trip-map-trip-picker'),
+              currentTripId: widget.tripId,
+              currentTitle: currentTrip == null
+                  ? '行程'
+                  : _tripTitle(currentTrip),
+              trips: trips,
+              onSelected: (selectedTripId) {
+                if (widget.onTripSelected != null) {
+                  widget.onTripSelected!(selectedTripId);
+                  return;
+                }
+                context.go('/trips/${Uri.encodeComponent(selectedTripId)}/map');
+              },
             ),
           ),
-          data: (days) => _TripMapView(
-            tripId: widget.tripId,
-            days: days,
-            initialEntryId: widget.initialEntryId,
-            initialDayNum: _initialDayNum,
-            mapBuilder: widget.mapBuilder,
-            locationService: widget.locationService,
-            locationSettingsOpener: widget.locationSettingsOpener,
-            externalLauncher: widget.externalLauncher,
-            onActiveDayChanged: (dayNum) {
-              _publishSelectedDay(dayNum);
-              widget.onActiveDayChanged?.call(dayNum);
-            },
+          body: daysAsync.when(
+            loading: () =>
+                const Center(child: CircularProgressIndicator.adaptive()),
+            error: (error, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(TpSpacing.s6),
+                child: Text('載入失敗：$error', textAlign: TextAlign.center),
+              ),
+            ),
+            data: (days) => _TripMapView(
+              tripId: widget.tripId,
+              days: days,
+              initialEntryId: widget.initialEntryId,
+              initialDayNum: _initialDayNum,
+              mapBuilder: widget.mapBuilder,
+              locationService: widget.locationService,
+              locationSettingsOpener: widget.locationSettingsOpener,
+              externalLauncher: widget.externalLauncher,
+              onActiveDayChanged: (dayNum) {
+                _publishSelectedDay(dayNum);
+                widget.onActiveDayChanged?.call(dayNum);
+              },
+            ),
           ),
         ),
       ),
@@ -953,8 +959,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               : category,
         ) ??
         (stop.point == null ? '尚無位置' : '未分類');
-    // The drawer itself is the single refractive layer. Keeping POI cards
-    // translucent but non-blurred avoids a doubled, cloudy glass edge.
+    // accessory host 是唯一玻璃表面，內容卡只用語意填色，避免巢狀玻璃。
+    // 原生地圖走套件公開共存路徑，不表示 shader 能折射地圖圖磚。
     final cardColor = theme.colorScheme.surface.withValues(
       alpha: isPreview
           ? (theme.brightness == Brightness.dark ? 0.86 : 0.90)

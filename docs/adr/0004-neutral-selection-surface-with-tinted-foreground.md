@@ -7,6 +7,16 @@ supersedes: 0003-brand-tint-for-root-tab-selection.md
 
 取代 [ADR-0003](0003-brand-tint-for-root-tab-selection.md)。
 
+> **2026-09-09，#303／#304 更新**：中性表面、tint 前景與媒體背景語意仍有效。
+> 共用材質改採 liquid_glass_widgets 1.4.1 公開預設，撤銷第 5 節及其後續實作中
+> 只為舊 shader 邊緣強度而調整 Fresnel、光照、色散、折射率與 blur 的要求。
+> 以下量測與更正史保留供追溯，不是新版的校準目標。一般模式不另畫邊線，提高
+> 對比才補明確邊界；提高對比與降低透明度各自使用不透明、無 shader 降級。
+> 第 3 節的 root tab 70% 膠囊與自畫選取層已由 #305 移除；套件接手選取繪製與指標互動。
+> 日期選擇器已由 #306 改用 `GlassSegmentedControl.scrollable`，移除自畫膠囊及手算欄寬／中心。
+> 下方 #169 的自畫選取填色理由僅保留歷史脈絡，不再是目前實作要求。
+
+
 ## 為什麼推翻 ADR-0003
 
 ADR-0003 主張 root tab bar 的選取膠囊該用品牌柔褐鋪底、字符反白,論據是:
@@ -52,7 +62,27 @@ ADR-0003 關於「HIG 沒有規定選取指示的形狀或配色」的觀察仍�
 裡兩者不一致。Apple 兩者都是近白(`#F7F7F8` / `#F6F6F6`)。統一為近白;未選態靠
 「沒有膠囊」與「不是 tint」區分,不靠變淡。
 
-### 3. 選取膠囊寬度收到約欄寬 70%
+### 3. root tab 選取指示交由套件繪製（#305 取代舊比例決策）
+
+2026-09-09，母規格 #303 已同意採 Liquid Glass 1.4.1 的預設幾何與互動。
+root tab 移除 70% 自畫膠囊、activeIcon 疊層、負 indicatorExpansion、tabPadding
+對齊補償及模擬套件文字高度的 TextPainter。選取填色使用公開 indicatorColor
+指定中性語意色，字符與標籤保留品牌 tint；媒體背景與無障礙降級沿用共用配方。
+
+仍保留兩項薄整合：
+
+- 套件 1.4.1 的 TabBarBottomLayout 對 BottomBarTabItem 傳入 `onTap: null`，
+  使內容的鍵盤啟用沒有回呼。App 提供指標可穿透的鍵盤／讀屏區域，排除套件重複
+  focus／semantics；真正的觸控與拖曳仍由套件處理。branch 換頁後恢復目前 tab 焦點。
+- 套件固定 barHeight 會讓 300% 文字再次縮小；App 明確指定 label typography，
+  只依這份 App 自有字級與間距增加公開 barHeight，並同步 shell、內容與 accessory
+  佔位。不讀取或反推套件內部文字、選取膠囊與裁切幾何。
+
+測試改驗實際選取填色與移動、文字邊界、44pt 觸控區、selected semantics、點選、
+拖曳、讀屏、Tab／Shift-Tab、Enter／Space 及分支狀態；不再把舊比例當作契約。
+以下保留 0.x 時期的量測與選擇，作為歷史脈絡：
+
+#### 舊決定（已被 #305 取代）
 
 `GlassTabBar` 的 `indicatorExpansion` 預設 `horizontal: 12`,我們未曾覆寫,結果膠囊
 比自己的欄位還寬(實測欄寬 275px、膠囊 341px = **124%**),溢出到左右鄰居。
@@ -144,9 +174,132 @@ LiquidGlass 的材質邊緣光**。
   影響:它在 v0.12.0 已改成 `BackdropFilter` + 填色」—— 那次換掉的理由同樣是模擬器
   的假象)。選取膠囊維持自畫的中性填色,巢狀在玻璃層裡的子玻璃顏色會被母層吃掉。
 
+### 日期選擇器遷移（2026-09-09，#306）
+
+新版公開控制項已自行提供軌道與選取底，不再外包 `TpGlassSurface`，也不再維護
+`_optionWidth`、捲動中心與自畫 ShapeDecoration。選取底透過 `indicatorColor`
+指定中性語意色；水平滑動只瀏覽，`selectionAlignment: center` 交由套件置中。
+
+仍保留的薄整合與理由：
+
+- 公開 `GlassSegment.icon` 可接受 widget，但沒有任意 label builder 或 App key 欄位。
+  以此插槽承載水平標籤、圖示／資料圓點及既有操作 key，內容採自然寬度；完整讀屏
+  標籤仍交 `semanticLabel`。不在 App 重建 gesture 或定位 overlay。
+- `preferredHeight` 只量測 App 自有文字行高、44pt 下限及公開 control padding，
+  同步時間軸固定列與地圖內容避讓，不反推套件內部幾何。
+- 外接鍵盤左右鍵沿用 App Focus；被動 pointer listener 只取得焦點，
+  切換選項與拖曳仍由套件處理。套件不回呼同一 index，故目前選項的內容補
+  一個 tap recognizer；它不處理 drag，不疊 overlay，保留時間軸點目前 Day 回到
+  當日開頭。Enter／Space 也可重新啟用目前範圍。
+- 讀屏普通點按仍採套件預設，提供「重新選取目前範圍」具名 action 保留再次
+  選取的功能。App 不重複宣告 selected，讓 custom action 合併到套件原 label
+  節點；重複 selected flag 或兩個 tap handler 會分裂成空白按鈕，測試禁止此情形。
+- 套件 1.4.1 即使在 `GlassAccessibilityScope(reduceMotion: true)` 下仍會以
+  300ms 捲動置中。公開行為測試已重現；只在公開 ScrollController 的 `animateTo`
+  轉為 `jumpTo`，不改套件計算的目標與選取延遲。
+
+十態矩陣以實際像素確認選取底會移動、未選取軌道可區分，以及提高對比／降低
+透明度各自不透出背景；這是本機內容與幾何證據，不代表真機折射材質已驗收。
+
+### 導覽外框與帶狀遮蔽遷移（2026-09-09，#307）
+
+`GlassAppBar` 接手固定 bar 的自然寬度與標題置中避讓；移除 `TpToolbarSlots`、
+`TextPainter` 寬度反推、群組固定 slot 與 sheet 左右等寬佔位。相關動作以
+`GlassButtonGroup(showDividers: false)` 共用一片玻璃，子 `GlassButton` 採透明樣式，
+同時接手 pointer、Tab／Enter 和讀屏；不再使用僅支援 pointer 的群組 GestureDetector。
+bar button 不再覆寫舊版 interactionScale／stretch。
+
+上下帶改用公開預設 `ProgressiveBlur` 與 soft `GlassScrollEdgeEffect`，移除六層
+BackdropFilter、每層 sigma、peak／edge alpha、55% 區段比例與手製兩段漸層。
+ProgressiveBlur 在 1.4.1 自行 ClipRect；App 保留 IgnorePointer 與內容／控制項層級。
+公開元件不處理 App 的 Reduce Transparency，也沒有同時滿足固定不透明區及
+獨立羽化的設定；因此提高對比與降低透明度各自保留 ColoredBox 不透明區，羽化
+交給套件 soft effect。媒體背景的 35% 語意暗化透過公開 fadeColor 保留。
+
+浮動 header 的返回與任意標題 widget 共用膠囊、帳號另組及 safe area 屬產品組裝，
+繼續以 Row 和共用 TpGlassSurface 承接；它沒有 slot 反推或材質重寫。TpHeaderTitle
+保留 inline 文字語意與省略規則；route 與 sheet 的 close guard 均保持在 App 層。
+
+像素測試比較獨立公開套件參考組裝，原 renderer 亮度 197、新預設約 162，先失敗
+再替換通過；另保留內容可讀性、控制項清晰、觸控穿透與不透明降級。headless 的
+ProgressiveBlur 使用 uniform fallback，以上不是 Impeller 真實 shader 或真機材質驗收。
+
+### 選單遷移（2026-09-09，#308）
+
+`GlassMenu` 接手面板、`OverlayPortal`、開關 morph 與螢幕邊界調整。移除
+`RawMenuAnchor`、自畫玻璃面板／動畫、上下翻轉估算、最長標籤面板寬度反推，
+以及舊 shader 專用的 menu settings。入口前景維持品牌 tint，面板採共用新版
+預設與獨立不透明降級。
+
+精確 1.4.1 的普通非捲動 `GlassMenuItem` clone 會忽略讀屏 tap 回呼，已用公開
+語意操作重現「預期 1 次、實際 0 次」。因此保留公開自訂內容
+`GlassMenuLabel(child: GlassMenuItem(...))`：套件仍畫項目與焦點／按壓回饋，
+App 只轉接 selected、停用原因、語意 tap、初始焦點和 Esc。此路徑不使用套件
+滑動選取膠囊，採項目自身的 hover／focus／press 呈現，不重建材質或選取動畫。
+
+自訂內容的公開高度需明確提供，故保留文字量測來容納換行與放大字級；量測
+只決定項目內容高度，不再計算面板位置，亦不設定固定 `menuHeight`。寬度由
+公開 `menuWidth` 約束為可用螢幕內最多 280pt；`autoAdjustToScreen` 與
+`menuPadding` 接手邊界和 safe area。降低動態效果時，除套件 morph 政策外，
+公開設定另停用面板 interactionScale／stretch 與項目 press scale。
+
+`TpMoreMenuController` 只把按鈕與卡片長按統一交給公開 `GlassMenuController`，
+並在每次 open 重置單次選取去重。選取同步啟動關閉與業務回呼，不等待動畫，
+原有破壞性確認流程不變。探索頁與新增停留點的地區選單亦共用此入口，保留
+目前選取語意、地區切換與原搜尋查詢。
+
+精確 1.4.1 的 route listener 在 GoRouter declarative 導航更新期間呼叫
+`OverlayPortal.hide`，會觸發 persistentCallbacks 斷言；既有 JSON 匯入導航測試
+可重現。公開 controller 沒有立即 dismiss 或停用 route listener 的選項，故 App
+以 root `OverlayEntry` 提供無 ModalRoute 的套件 host，透過公開
+`CompositedTransformTarget`／`Follower` 連結原觸發點。App 不手算 popup 位置、
+不重畫面板：普通關閉等待套件 morph 完成，原頁或祖先 route 切換及 dispose
+才移除 host。host 捕捉原頁 theme／MediaQuery，媒體與玻璃設定讀原 scope；
+依賴或業務項目／入口狀態變更先關閉，下次開啟重新捕捉，避免舊字級、
+可及性設定或停用原因殘留。
+
+Bold Text 的實際字重同時套用於量測及呈現。以真實 regular／bold 字型的
+公開文字省略與勾號矩形測試驗證，避免 Ahem 相同字寬造成假綠。
+
+### Sheet 遷移（2026-09-09，#309）
+
+移除 `_appLargeSheetSettings` 的舊 shader 校準與 halfSettings 重複覆寫；
+一般態讓 `GlassModalSheetScaffold` 自行解析套件 sheet 預設。
+移除 93%／62% 高度、28／0 圓角與零 margin，保留 fixed `{large}`／
+resizable `{medium, large}`。原先 0.85 fillThreshold 與 gradual 本來就是
+這個公開 scaffold 的預設，刪去是消除重複設定，不宣稱因此改變畫面；
+不可混用 `GlassModalSheet.show` 的另一組預設。
+
+large 的不透明內容色保留系統 surface；提高對比或降低透明度則各自提供
+不透明設定與 minimal 品質，不能只靠 blur 歸零。regular Account 保留
+560×720 置中 form-sheet 幾何，以公開 `GlassContainer` 接手材質與圓角，
+取捨見 ADR-0010。沒有 App 自製的捲動交接控制器可刪，套件公開 controller
+與原有可捲動內容已能完成同一手勢的展開／捲動交接。
+
+App 保留 route、dirty／submitting／關閉去重、內層 Navigator、拒絕後復位、
+child identity 與鍵盤收合。公開 `show` 入口不能取代這些非同步關閉保護；
+薄 route 另尊重 Reduce Motion，進出不位移。共用鍵盤 listener 只做 unfocus，
+不是舊版 sheet 手勢 workaround。
+
+測試以公開參考組裝比較 medium 材質與左上圓角、regular 材質與幾何，並驗證
+獨立不透明降級、真實拖曳、長清單及未儲存保護。這些 headless 像素與操作證據
+不是 Impeller shader、PlatformView 或 iOS／Android 真機材質驗收。
+
 ## 方法論備註
 
-本 ADR 的每一個數字都來自像素量測,而不是目視判斷。這是刻意的 —— 這條線上前後兩份
+### 2026-09-09 全範圍盤點（#310）
+
+composer、POI accessory 與地圖控制項已承接 #304 的共用預設材質，不再保留
+局部 blur／光學校準。正常模式保留媒體 scope、35% 產品暗化值與白色前景，因圖磚維持
+日間樣式而套件不替 App 判定原生圖磚亮度；它們透過公開色彩設定與
+`platformViewBackdrop` 共存路徑提供，不代表原生地圖能被 shader 折射。
+提高對比或降低透明度時，不透明表面已遮住媒體，bar 前景改為 `onSurface`；
+不將正常模式的白色沿用到淺色不透明表面。品牌選取前景仍維持既有 tint。
+POI 內容卡保持非玻璃，動態高度、分頁／marker 同步、composer 草稿及鍵盤配置
+仍屬產品契約。完整移除／保留清單、切片 commit 與驗證限制見
+[1.4.1 遷移紀錄](../liquid-glass-1.4.1-migration.md)。裝置材質／效能驗收仍未完成。
+
+本 ADR 早期的外觀比較數字來自像素量測,而不是目視判斷。這是刻意的 —— 這條線上前後兩份
 文件(#118 與 ADR-0003)都因為「看起來像」而下了錯誤結論。
 
 **但光是「量」還不夠。** 本 ADR 的初稿在第 5 項就犯了第三次同類錯誤:量了 Apple,

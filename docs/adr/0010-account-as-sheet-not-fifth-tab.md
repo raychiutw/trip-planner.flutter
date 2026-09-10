@@ -50,6 +50,39 @@ Account 的 deep link 有兩層深的(`/settings/developer-apps/new`):沒有共�
 
 ## Consequences
 
+### 2026-09-09 補充：Liquid Glass 1.4.1（#309）
+
+compact sheet 的高度、圓角、margin 與拖曳交接改採公開
+`GlassModalSheetScaffold` 預設，不再維持舊 93% 外觀。固定 sheet 只給
+`{large}`，避免同位置的兩個 detent 阻止內容捲動。regular 仍維持最多
+560×720 的置中 form sheet，透過公開 `GlassContainer` 接手表面與裁切。
+`Dialog` 僅提供置中、鍵盤避讓與 route；不再畫舊填色或陰影。
+
+沒有改用 `GlassSheet.show`：它的內容捲動與固定留白不適合承載目前有界的
+Navigator；為它反推私有高度會重新引入 workaround。regular 也不改為手機
+底部 detent。這是保留既有幾何的薄組裝，不是另一套材質 renderer。
+
+sheet 的 Navigator 與 child identity、來源頁面狀態仍保留。compact 的拖曳／
+外點與系統返回共用既有處理：先詢問內層 Navigator；它處理了返回或未儲存
+確認時，外層 sheet 不關閉。明確 Close 仍能直接關閉整個乾淨的 sheet，
+有未儲存保護時則由既有 navigation scope 先處理確認，不改變深連結回程。
+
+Reduce Motion 另保留薄整合：1.4.1 的 snap spring 未讀取系統設定，
+App 在公開 `progressListenable` 的 Ticker frame 以 `currentState` 與
+`snapToState(animate: false)` 完成套件已選定的目標。直接拖曳與 Flutter
+pointer resampling 的 timer／post-frame 不受影響；不重算 detent、速度或物理。
+公開 `interactionScale`／`stretch` 在降低動態效果時關閉裝飾縮放與伸縮，
+一般態讀取套件公開建構子的預設。此排程整合隨 Flutter／套件升級需重新驗證，
+目前以實際放手座標、medium／large、focus／旋轉與關閉保護測試守住行為。
+旋轉時等 `MediaQuery` 的尺寸更新，再由同一公開 controller 重取目前目標，
+避免 metrics 通知與 inherited data 的更新時差留下舊尺寸的停留位置。
+
+真正 push 的 dirty 子頁同意捨棄後，guard 必須等該 frame 完成，讓
+`PopScope.canPop` 更新，再呼叫 `maybePop()`；否則仍讀到上一個禁止返回
+狀態。這是 widget 更新時序的同步，不使用固定延遲，也不改寫 Close／Back
+分流。公開操作測試涵蓋修改、提交中禁止返回、重複確認去重、取消保留草稿，
+以及拖曳／系統返回後只捨棄一次就回到上一頁、保留外層 sheet。
+
 - **改回第五 tab 不是加一個 branch 而已**,要同時動 shell 結構與所有 deep link ——
   `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 全部建在
   `accountSheetAlias` → `?account=<page>` 這條轉換上(`lib/app/router.dart:131`–`:180`、

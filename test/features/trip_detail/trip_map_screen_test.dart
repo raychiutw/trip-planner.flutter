@@ -17,6 +17,7 @@ import 'package:tripline/features/map/map_location.dart';
 import 'package:tripline/features/shell/apple_root_tab_bar.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
+import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/features/trips/trips_list_screen.dart';
 import 'package:tripline/models/day.dart';
@@ -506,14 +507,16 @@ void main() {
     expect(find.byKey(const ValueKey('trip-map-day-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
     final selectedDay = tester
-        .getSemantics(find.byKey(const ValueKey('trip-map-day-1')))
+        .getSemantics(find.bySemanticsLabel('第 1 天，共 2 天'))
         .getSemanticsData();
     expect(selectedDay.label, '第 1 天，共 2 天');
     expect(selectedDay.flagsCollection.isSelected, Tristate.isTrue);
-    // 選擇器的軌是玻璃，與其餘 chrome 同一套材質（#169）——「玻璃在純色頁面
-    // 上等於無色」是模擬器的假象，真機上玻璃膠囊清楚可見。
+    // 套件接手日期列的軌道、選取底與捲動；下方仍驗證畫面幾何與 Day 狀態。
     expect(
-      find.descendant(of: daySelector, matching: find.byType(GlassContainer)),
+      find.descendant(
+        of: daySelector,
+        matching: find.byType(GlassSegmentedControl),
+      ),
       findsOneWidget,
     );
     expect(
@@ -792,6 +795,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_sharedDayNum(tester), 1);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('查詢參數缺席時採用共用選取日', (tester) async {
@@ -873,6 +878,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
+  });
+
+  testWidgets('行程地圖自己宣告媒體背景 scope,不靠 shell', (tester) async {
+    await tester.pumpWidget(_buildScreen([_dayOne]));
+    await tester.pumpAndSettle();
+
+    expect(
+      TpMediaBackdropScope.of(tester.element(find.byType(TpBottomAccessory))),
+      isTrue,
+    );
   });
 
   testWidgets('相鄰景點使用 /route 幾何繪製 Google polyline', (tester) async {
@@ -1425,8 +1440,10 @@ void main() {
     expect(find.text('完成'), findsNothing);
     expect(find.byType(TabBar), findsNothing);
     expect(sheet.initialState, GlassSheetState.full);
-    expect(sheet.halfSize, 0.93);
-    expect(sheet.fullSize, 0.93);
+    expect(
+      find.byKey(const ValueKey('trip-picker-item-trip-2')).hitTestable(),
+      findsOneWidget,
+    );
     expect(sheet.showDragIndicator, isFalse);
 
     nativeController.moves.clear();
