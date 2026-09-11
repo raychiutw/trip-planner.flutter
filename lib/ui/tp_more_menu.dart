@@ -4,10 +4,12 @@ library;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import '../app/accessibility_scope.dart';
 import '../theme/tokens.dart';
 import 'tp_action_item.dart';
 import 'tp_app_bar.dart';
@@ -18,6 +20,11 @@ class TpMoreMenuController {
   final _glassController = GlassMenuController();
   bool _selectionDispatched = false;
   VoidCallback? _openHost;
+  VoidCallback? _beforeClose;
+
+  /// 目前綁定的選單 state。無 key 的列換序時新 state 先綁、舊 state 後 dispose，
+  /// 解除綁定只能由持有者自己做，否則會清掉別人的入口。
+  Object? _owner;
 
   bool get isOpen => _glassController.isOpen;
 
@@ -26,7 +33,23 @@ class TpMoreMenuController {
     _openHost?.call();
   }
 
-  void close() => _glassController.close();
+  void _attach(Object owner, VoidCallback openHost, VoidCallback beforeClose) {
+    _owner = owner;
+    _openHost = openHost;
+    _beforeClose = beforeClose;
+  }
+
+  void _detach(Object owner) {
+    if (!identical(_owner, owner)) return;
+    _owner = null;
+    _openHost = null;
+    _beforeClose = null;
+  }
+
+  void close() {
+    _beforeClose?.call();
+    _glassController.close();
+  }
 
   void _select(VoidCallback action) {
     if (_selectionDispatched) return;
@@ -89,6 +112,11 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   final _anchorLink = LayerLink();
   OverlayEntry? _host;
 
+  /// 掛在原 route 上的可移除 Back 攔截：系統 Back 先關選單、不離頁。
+  /// 選單自己關閉時先移除，離頁時 Back 才能正常 pop。
+  LocalHistoryEntry? _backEntry;
+  ModalRoute<dynamic>? _backRoute;
+
   /// 開啟當下頁面上觸發鈕的尺寸；overlay 內的複本固定成同一尺寸，
   /// 套件才會貼著同一個矩形展開，不受 overlay 寬鬆約束影響。
   Size _anchorSize = const Size.square(TpSpacing.tapMin);
@@ -98,7 +126,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   @override
   void initState() {
     super.initState();
-    _menuController._openHost = _open;
+    _menuController._attach(this, _open, _releaseBackEntry);
   }
 
   @override
@@ -110,9 +138,9 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       _removeHost();
     }
     if (oldWidget.controller != widget.controller) {
-      (oldWidget.controller ?? _ownMenuController)._openHost = null;
+      (oldWidget.controller ?? _ownMenuController)._detach(this);
       _removeHost();
-      _menuController._openHost = _open;
+      _menuController._attach(this, _open, _releaseBackEntry);
     }
   }
 
@@ -136,11 +164,41 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     return true;
   }
 
+  /// 會改變選單呈現的依賴：顯示設定、主題、尺寸與媒體背景。
+  /// 鍵盤造成的 viewInsets／padding 變化不在內，不能因此拆掉剛開的選單。
+  ({
+    TextScaler textScaler,
+    bool boldText,
+    bool highContrast,
+    bool disableAnimations,
+    bool reduceTransparency,
+    Brightness brightness,
+    Size size,
+    ThemeData theme,
+    bool mediaBackdrop,
+  })
+  _presentationFingerprint() => (
+    textScaler: MediaQuery.textScalerOf(context),
+    boldText: MediaQuery.boldTextOf(context),
+    highContrast: MediaQuery.highContrastOf(context),
+    disableAnimations: MediaQuery.disableAnimationsOf(context),
+    reduceTransparency: AppAccessibilityScope.reduceTransparencyOf(context),
+    brightness: MediaQuery.platformBrightnessOf(context),
+    size: MediaQuery.sizeOf(context),
+    theme: Theme.of(context),
+    mediaBackdrop: TpMediaBackdropScope.of(context),
+  );
+  Object? _lastFingerprint;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // root host 捕捉原頁 scope；設定變動先關閉，下次開啟重新捕捉。
-    _removeHost();
+    // root host 捕捉原頁 scope；會影響呈現的設定變動先關閉，下次開啟重新捕捉。
+    final fingerprint = _presentationFingerprint();
+    if (_lastFingerprint != fingerprint) {
+      _lastFingerprint = fingerprint;
+      _removeHost();
+    }
     _removeRouteListeners();
     var route = ModalRoute.of(context);
     while (route != null && !_routes.contains(route)) {
@@ -172,6 +230,8 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     if (!mounted || !widget.enabled) return;
     _openGeneration++;
     if (_host != null) {
+      // 關閉中重開會重用 host；close() 已釋放 Back 攔截，這裡要重新掛回。
+      _registerBackEntry();
       _menuController._glassController.open();
       return;
     }
@@ -179,7 +239,10 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       from: context,
       to: Overlay.of(context, rootOverlay: true).context,
     );
-    final mediaQuery = MediaQuery.of(context);
+    // 只取當下的值，不對整個 MediaQuery 建立依賴；要不要重開由指紋決定。
+    final mediaQuery = context
+        .getInheritedWidgetOfExactType<MediaQuery>()!
+        .data;
     final anchorBox = context.findRenderObject();
     if (anchorBox is RenderBox && anchorBox.hasSize) {
       _anchorSize = anchorBox.size;
@@ -210,6 +273,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     );
     setState(() => _host = entry);
     Overlay.of(context, rootOverlay: true).insert(entry);
+    _registerBackEntry();
     // Follower 完成 layout/paint 才有真實錨點 transform；不手算螢幕位置。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && identical(_host, entry)) {
@@ -232,7 +296,37 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     }
   }
 
+  void _registerBackEntry() {
+    if (_backEntry != null) return;
+    final route = ModalRoute.of(context);
+    if (route == null) return;
+    final entry = LocalHistoryEntry(
+      onRemove: _onBackEntryRemoved,
+      impliesAppBarDismissal: false,
+    );
+    _backEntry = entry;
+    _backRoute = route;
+    route.addLocalHistoryEntry(entry);
+  }
+
+  /// Navigator 因系統 Back 移除了攔截：關閉選單，頁面留著。
+  void _onBackEntryRemoved() {
+    if (_backEntry == null) return;
+    _backEntry = null;
+    _backRoute = null;
+    if (_host != null) _menuController._glassController.close();
+  }
+
+  void _releaseBackEntry() {
+    final entry = _backEntry;
+    final route = _backRoute;
+    _backEntry = null;
+    _backRoute = null;
+    if (entry != null && route != null) route.removeLocalHistoryEntry(entry);
+  }
+
   void _removeHost({bool rebuild = true}) {
+    _releaseBackEntry();
     final entry = _host;
     if (entry == null) return;
     _host = null;
@@ -252,7 +346,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
 
   @override
   void dispose() {
-    _menuController._openHost = null;
+    _menuController._detach(this);
     _removeRouteListeners();
     _removeHost(rebuild: false);
     super.dispose();
@@ -266,20 +360,27 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
         minWidth: TpSpacing.tapMin,
         minHeight: TpSpacing.tapMin,
       ),
-      child: ExcludeSemantics(
-        excluding: _host != null,
-        child: IgnorePointer(
-          ignoring: _host != null,
-          child: Opacity(
-            opacity: _host == null ? 1 : 0,
-            child: _trigger(context),
-          ),
+      // 開啟時頁面上的觸發鈕只隱藏不移除語意：它是唯一具名節點，負責宣告展開狀態，
+      // 也要留著 tap 讓讀屏能收合；IgnorePointer 會把使用者動作一併封掉，所以只擋指標。
+      child: _TpPointerBlocker(
+        blocking: _host != null,
+        child: Opacity(
+          opacity: _host == null ? 1 : 0,
+          alwaysIncludeSemantics: true,
+          child: _trigger(context, expanded: _host != null),
         ),
       ),
     ),
   );
 
-  Widget _trigger(BuildContext context) {
+  /// 三種入口共用的語意薄轉接：套件與自訂觸發器都不宣告 expanded，
+  /// 合併成單一節點後由 App 補上；overlay 內的複本另行排除語意。
+  Widget _trigger(BuildContext context, {required bool expanded}) =>
+      MergeSemantics(
+        child: Semantics(expanded: expanded, child: _triggerBody(context)),
+      );
+
+  Widget _triggerBody(BuildContext context) {
     final VoidCallback? onPressed = widget.enabled
         ? () {
             _menuController.isOpen
@@ -333,11 +434,19 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   }
 
   Widget _buildMenu(BuildContext context) {
+    // 用 View 的持續硬體 safe area：Scaffold 在鍵盤升起時會把 body 的 MediaQuery
+    // 底部 padding／viewPadding 歸零，而套件只在開啟當下夾位置，鍵盤收起後
+    // 面板會留在 home indicator 上；FlutterView.viewPadding 不受鍵盤影響。
+    final view = View.of(context);
+    final safeArea = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
     final menuWidth =
-        (MediaQuery.sizeOf(context).width -
-                MediaQuery.paddingOf(context).horizontal -
-                16)
-            .clamp(120.0, 280.0);
+        (MediaQuery.sizeOf(context).width - safeArea.horizontal - 16).clamp(
+          120.0,
+          280.0,
+        );
     return ConstrainedBox(
       constraints: const BoxConstraints(
         minWidth: TpSpacing.tapMin,
@@ -360,12 +469,16 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
           interactionScale: MediaQuery.disableAnimationsOf(context) ? 1 : 1.02,
           stretch: MediaQuery.disableAnimationsOf(context) ? 0 : 0.5,
           menuWidth: menuWidth,
-          menuPadding: MediaQuery.paddingOf(context) + const EdgeInsets.all(8),
+          menuPadding: safeArea + const EdgeInsets.all(8),
           settings: tpNavigationGlassSettings(this.context),
           quality: tpGlassQuality(this.context),
           platformViewBackdrop: TpMediaBackdropScope.of(this.context),
-          triggerBuilder: (context, _) =>
-              SizedBox.fromSize(size: _anchorSize, child: _trigger(context)),
+          triggerBuilder: (context, _) => ExcludeSemantics(
+            child: SizedBox.fromSize(
+              size: _anchorSize,
+              child: _trigger(context, expanded: true),
+            ),
+          ),
           items: [
             if (widget.quickActions.isNotEmpty) ...[
               ..._quickActionRow(context, menuWidth),
@@ -551,6 +664,34 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       ),
     );
   }
+}
+
+/// 只擋指標命中、不動語意設定的薄 proxy（`IgnorePointer` 會封鎖語意動作）。
+class _TpPointerBlocker extends SingleChildRenderObjectWidget {
+  const _TpPointerBlocker({required this.blocking, required super.child});
+
+  final bool blocking;
+
+  @override
+  _RenderTpPointerBlocker createRenderObject(BuildContext context) =>
+      _RenderTpPointerBlocker(blocking: blocking);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderTpPointerBlocker renderObject,
+  ) => renderObject.blocking = blocking;
+}
+
+class _RenderTpPointerBlocker extends RenderProxyBox {
+  _RenderTpPointerBlocker({required bool blocking}) : _blocking = blocking;
+
+  bool _blocking;
+  set blocking(bool value) => _blocking = value;
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) =>
+      !_blocking && super.hitTest(result, position: position);
 }
 
 /// 快捷動作格：與套件 GlassMenuItem 同一套按壓／焦點／停用回饋，

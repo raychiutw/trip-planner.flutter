@@ -59,9 +59,11 @@ void main() {
     await tester.longPress(find.text('全部地區 ▾'));
     await tester.pump();
     expect(find.text('切換搜尋地區'), findsOneWidget);
-    final trigger = tester.getSemantics(find.text('全部地區 ▾'));
-    expect(trigger.getSemanticsData().flagsCollection.isButton, isTrue);
+    // 讀屏聽到的是合併後的資料：按鈕、名稱與展開狀態同在一個節點。
+    final trigger = tester.getSemantics(find.text('全部地區 ▾')).getSemanticsData();
+    expect(trigger.flagsCollection.isButton, isTrue);
     expect(trigger.label, contains('全部地區'));
+    expect(trigger.flagsCollection.isExpanded, Tristate.isFalse);
     await tester.tap(find.text('全部地區 ▾'));
     await tester.pumpAndSettle();
     expect(
