@@ -273,7 +273,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 | 動詞 | 圖示 | `TpActionItem.role` | 顏色 |
 |---|---|---|---|
 | 新增 | `CupertinoIcons.add` / `add_circled` | `normal` | `scheme.onSurface` |
-| 加入 | 帶 `plus` 的**範圍專屬**符號(`calendar_badge_plus`、`paperclip`) | `normal` | `scheme.onSurface` |
+| 加入 | 帶 `plus` 的**範圍專屬**符號(`calendar_badge_plus`) | `normal` | `scheme.onSurface` |
 | 移除 | 帶 `minus` 的範圍專屬符號(`person_badge_minus`) | `destructive` | `scheme.error` |
 | 刪除 | `CupertinoIcons.delete` | `destructive` | `scheme.error` |
 

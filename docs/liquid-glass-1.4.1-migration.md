@@ -36,7 +36,7 @@
 | compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲；Reduce Motion 透過公開 controller 完成套件選定目標，關閉裝飾縮放／伸縮並在新尺寸下重新定位，詳見 [ADR-0010](adr/0010-account-as-sheet-not-fifth-tab.md) |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
 | 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部光學 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；日期依 ADR-0004 維持 70% 中性底與不透明 `onSurface`；帳號與定位依後續確認採共用 45% 黑色填色與白色符號，定位原有實色 Material 已改接公開 GlassButton；定位中改用同配方共用表面與 disabled 語意，避免套件整顆 disabled 淡化破壞不透明降級。不替換 SDK、不逐幀截圖；原生圖磚、手勢、marker／route 與其資料編碼色保留 |
-| 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪 | 輸入 1–4 行、附件／語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
+| 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪；「＋」與附件／新增行程項目入口由 #318 移除，輸入框從 leading 起延伸 | 輸入 1–4 行、語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
 | 行程／外部 POI accessory | host 的局部 blur 已於 #304 移除；本次清除將 host 誤稱為可折射原生地圖的註解 | 只有 host 一層玻璃；內容卡的語意填色／選取提示不是 shader。PageView 水平瀏覽、marker 雙向同步、外部 POI 關閉復原、動態高度、map padding 與 tab clearance 為產品契約；穩定 `trip-map-poi-drawer` key 保留作既有定位，不表示具有 drawer 手勢 |
 | 無障礙 | 不用 blur=0 冒充完整不透明降級 | 獨立 AppAccessibilityScope 原生 Reduce Transparency channel 保留；套件以 highContrast 近似的訊號不能取代它。任一提高對比／降低透明度都採不透明語意色、minimal 品質；邊界與 Reduce Motion 各自保留公開設定 |
 

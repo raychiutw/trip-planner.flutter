@@ -62,7 +62,7 @@ attaches the text-input connection required by release-mode tests on physical
 iOS devices; the host-runner integration test keeps the standard Flutter test
 driver through the same shared flow.
 
-The regular PR/push CI runs formatter, analyzer, the root-app smoke test, the host-runner app-owned release flow, and the mobile workflow contract test. Full tests and the complete deterministic visual matrix run in `ship` before landing. Host smoke results are not a substitute for readable platform typography, native map tiles, or manual-device accessibility evidence.
+一般 PR／push 到 `master` 的 CI 是 `.github/workflows/mobile.yml` 的 `ci` job：actionlint、`dart format` 檢查（排除 Patrol 產生的 `patrol_test/test_bundle.dart`）、`flutter analyze --no-fatal-infos`，以及**完整 `flutter test`**（整個 `test/`，含 HIG 十態矩陣、host 端 app-owned release／視覺證據流程與 mobile workflow 契約測試），不再只挑選少數檔案。`integration_test/` 與 `patrol_test/` 不在 `flutter test` 預設範圍：Flutter integration APK 與 Patrol bundle 只在 Firebase Test Lab（`mobile-e2e.yml`）執行。`ship` 在合併前於本機再跑同一套完整測試。host 端結果不能代替平台字型可讀性、原生地圖圖磚或人工真機無障礙證據。
 
 ## 發布證據格式
 
