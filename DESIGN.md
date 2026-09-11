@@ -106,6 +106,7 @@ iPhone 固定四個 root tabs：
 
 - **Tripline 決策**：Account 不是 root tab。每個內容頁的 `person.crop.circle` 開啟帶 Navigation Stack 的 Account sheet。
 - **HIG 建議**：iPhone 使用可展開至全高的 system sheet；iPad 使用 form sheet 或 popover，空間不足時自適應為全高。
+- **Tripline 決策**：compact Account sheet 由下往上進場、向下退場，不做從帳號 icon 放大的 morph；展開後接近全高，頂緣停在狀態列 safe area 之下、與浮動 header 同一道 8pt 溝槽，內容底色是實色語意 `surface`。占比由實際 safe area 推導，不寫死單一機型的像素或比例（#317 對照 Apple Music 帳號影片）。
 - **HIG 必須**：Account 使用 grouped list、inset separator、system controls 與標準 navigation。
 - **HIG 必須**：一般、低頻設定集中在 Account；只影響目前任務的選項留在相關畫面。
 - **HIG 必須**：不得重複實作系統已有的 Dynamic Type、accessibility、鍵盤、捲動或認證偏好。
@@ -215,7 +216,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ## 11. 表單與 sheet
 
-- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin、高度與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。
+- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin 與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。large 停留高度不用套件寫死的 90pt 頂部 inset，改以公開 `fullSize` 由狀態列 safe area 加 8pt 溝槽推導（`appSheetLargeHeight`），旋轉後依新尺寸重取；medium 仍是套件預設。
 - **Tripline 決策**：regular Account 保留置中、最多 560×720 的 form sheet 與同一個 Navigator，表面改用公開 `GlassContainer` 預設材質與圓角。這是 App 的版面契約，不套用手機的底部 detent，也不反推套件內部留白。
 - **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移、放手後的吸附彈性、裝飾縮放與伸縮；旋轉後依新尺寸定位，保留草稿與關閉保護。提高對比與降低透明度各自保留不透明降級。
 - **HIG 建議**：短而單一任務的新增／編輯使用 system sheet；較長、多步驟或需要完整上下文的流程使用 push navigation。
