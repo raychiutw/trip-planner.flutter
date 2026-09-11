@@ -62,7 +62,7 @@ run，放寬只是不讓已確認的執行時間再被同一個上限截斷：
 
 放寬後的第一個 run [34591742975](https://github.com/raychiutw/trip-planner.flutter/actions/runs/34591742975)
 （0.26.8+39，platform=all）已確認每個 case 都完整跑完、XML 寫完：iOS 兩次 attempt 的
-XCTest 分別 302.2s 與約 271s（attempt 2：app-owned 80.5s、visual evidence 134.8s、
+Xcode 測試執行分別 302.2s 與 291.6s（attempt 2：app-owned 80.5s、visual evidence 134.8s、
 native map smoke 55.9s），都在 `7m` 內；Android Patrol 三個 case 都在 `15m` 內結束
 （app-owned 158.35s、visual evidence 230.966s PASS；native map smoke 40.26s FAIL）。
 兩平台的 native map smoke 都是斷言失敗而非外層逾時：iOS `onMapClicked` 9 次但 POI
