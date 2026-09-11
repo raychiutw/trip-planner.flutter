@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoColors;
+import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -18,6 +18,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/theme/tokens.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_root_scaffold.dart';
 
@@ -108,7 +109,6 @@ void main() {
 
   Widget buildApp({
     SpeechService? speech,
-    ChatAttachmentPicker? attachmentPicker,
     String? initialTripId,
     String? initialPrefill,
     UserInfo currentUser = const UserInfo(
@@ -133,8 +133,6 @@ void main() {
         authRepositoryProvider.overrideWithValue(authRepo),
         authStateProvider.overrideWith(() => _StubAuth(currentUser)),
         if (speech != null) speechServiceProvider.overrideWithValue(speech),
-        if (attachmentPicker != null)
-          chatAttachmentPickerProvider.overrideWithValue(attachmentPicker),
       ],
       child: MaterialApp(
         theme: theme ?? AppTheme.light(),
@@ -526,12 +524,32 @@ void main() {
     expect(find.text('ray'), findsOneWidget);
   });
 
-  testWidgets('composer 提供加入入口，並由一行長到四行後停止增高', (tester) async {
+  testWidgets('composer 不再提供「＋」入口，輸入框從 leading 起延伸', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    // 可見、tooltip、讀屏與鍵盤焦點四種入口都不存在。
+    expect(find.byKey(const ValueKey('chat-add-button')), findsNothing);
+    expect(find.byTooltip('加入內容'), findsNothing);
+    expect(find.bySemanticsLabel('加入內容'), findsNothing);
+    expect(find.byIcon(CupertinoIcons.add), findsNothing);
+    expect(find.byKey(const ValueKey('chat-mic-button')), findsOneWidget);
+
+    // 輸入框左緣只隔 composer 自身內距，沒有留下「＋」的占位或看不見的可點區。
+    final composer = tester.getRect(
+      find.byKey(const ValueKey('chat-composer-glass')),
+    );
+    final input = tester.getRect(find.byKey(const ValueKey('chat-input')));
+    expect(input.left - composer.left, closeTo(TpSpacing.s2, 1));
+    semantics.dispose();
+  });
+
+  testWidgets('composer 由一行長到四行後停止增高，並依有無文字切換麥克風／送出', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
     final input = find.byKey(const ValueKey('chat-input'));
-    expect(find.byKey(const ValueKey('chat-add-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-mic-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('chat-send')), findsNothing);
     final oneLineHeight = tester.getSize(input).height;
@@ -546,39 +564,6 @@ void main() {
     await tester.enterText(input, '一\n二\n三\n四\n五');
     await tester.pump();
     expect(tester.getSize(input).height, fourLineHeight);
-
-    await tester.tap(find.byKey(const ValueKey('chat-add-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('加入附件'), findsOneWidget);
-    expect(find.text('新增行程項目'), findsOneWidget);
-  });
-
-  testWidgets('附件選擇器失敗會保留草稿並顯示可理解提示', (tester) async {
-    await tester.pumpWidget(
-      buildApp(
-        attachmentPicker: () async =>
-            throw PlatformException(code: 'picker-unavailable'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('chat-input')),
-      '附件仍要保留這段草稿',
-    );
-
-    await tester.tap(find.byKey(const ValueKey('chat-add-button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('加入附件'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('無法開啟附件選擇器，請稍後再試。'), findsOneWidget);
-    expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('chat-input')))
-          .controller!
-          .text,
-      '附件仍要保留這段草稿',
-    );
   });
 
   testWidgets('Return 保留換行語意，Command-Return 才送出', (tester) async {
@@ -1172,12 +1157,11 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    for (final key in ['chat-add-button', 'chat-mic-button']) {
-      final size = tester.getSize(find.byKey(ValueKey(key)));
-      expect(size.width, greaterThanOrEqualTo(44));
-      expect(size.height, greaterThanOrEqualTo(44));
-    }
-    expect(find.bySemanticsLabel('加入內容'), findsOneWidget);
+    final micSize = tester.getSize(
+      find.byKey(const ValueKey('chat-mic-button')),
+    );
+    expect(micSize.width, greaterThanOrEqualTo(44));
+    expect(micSize.height, greaterThanOrEqualTo(44));
     expect(find.bySemanticsLabel('語音輸入'), findsOneWidget);
 
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '最大字級訊息');

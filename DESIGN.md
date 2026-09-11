@@ -137,7 +137,7 @@ iPhone 固定四個 root tabs：
 ### 7.1 聊天 composer
 
 - **Tripline 決策**：composer 是聊天頁持續存在的 bottom accessory。
-- **Tripline 決策**：左側 `＋` 開啟附件與行程功能；中間輸入框由 1 行長到最多 4 行，之後內部捲動。
+- **Tripline 決策**：composer 沒有左側 `＋`，也沒有附件或新增行程項目入口；輸入框從 leading 起延伸，由 1 行長到最多 4 行，之後內部捲動。新增停留點走時間軸各 Day 的既有入口（#314）。
 - **Tripline 決策**：空白時右側顯示麥克風；有文字時切換為送出。
 - **Tripline 決策**：Return 換行；外接鍵盤使用 Command–Return 送出。
 - **HIG 必須**：切換 tab、開啟 Account 或暫時離開 App 時保留草稿。

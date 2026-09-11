@@ -31,7 +31,7 @@ _避免_: bottom nav、navigation bar
 _避免_: 底部工具列、bottom bar、floating bar
 
 **聊天 composer**:
-聊天頁那條常駐的 bottom accessory:左側 `＋`、中間輸入框、右側麥克風與送出。草稿屬於行程,切走再切回要恢復。
+聊天頁那條常駐的 bottom accessory:輸入框從 leading 起延伸、右側麥克風與送出;沒有 `＋` 或其他加入內容入口。草稿屬於行程,切走再切回要恢復。
 _避免_: 輸入列、input bar、訊息框
 
 ## 內容控制項
