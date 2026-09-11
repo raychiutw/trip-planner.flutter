@@ -669,9 +669,14 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('day-pill-2')));
   await tester.pumpAndSettle();
+  // release build 的 RenderObject.debugSemantics 永遠是 null，tester.getSemantics
+  // 會丟 No Semantics data found；改從公開語意樹以可及性名稱讀 selected。
+  final selectedDayPill = find.semantics.byLabel('第 2 天，共 2 天');
+  expect(selectedDayPill, findsOne);
   expect(
-    tester
-        .getSemantics(find.byKey(const ValueKey('day-pill-2')))
+    selectedDayPill
+        .evaluate()
+        .single
         .getSemanticsData()
         .flagsCollection
         .isSelected,
