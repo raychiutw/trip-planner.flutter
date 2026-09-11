@@ -775,6 +775,15 @@ Future<void> runAppOwnedReleaseFlow(
   await tester.testTextInput.receiveAction(TextInputAction.search);
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
+  // Android IME 收合是平台端非同步動作（會被進行中的 show 延後），pumpAndSettle
+  // 只等 Flutter 幀；鍵盤仍佔住 viewInsets 時 root tab bar 不在樹上。
+  await _pumpUntil(
+    tester,
+    () => _rootTab('聊天').evaluate().isNotEmpty,
+    reason: '收鍵盤後 root tab bar 未回到畫面（IME 仍佔住 viewInsets）',
+    timeout: const Duration(seconds: 10),
+  );
+  await tester.pumpAndSettle();
 
   await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
