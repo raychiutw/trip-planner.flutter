@@ -522,6 +522,12 @@ typedef _AppSheetBuilder<T> =
       Future<void> Function([T? result]) close,
     );
 
+/// compact sheet 的 large 停留高度：狀態列之下留與浮動 header 同一道溝槽，
+/// 而非套件寫死的 90pt；由實際 safe area 推導，旋轉與不同機型自然跟著變。
+double appSheetLargeHeight(BuildContext context) =>
+    MediaQuery.sizeOf(context).height -
+    (MediaQuery.paddingOf(context).top + TpSpacing.s2);
+
 Future<T?> _showAppSheet<T>({
   required BuildContext context,
   required _AppSheetBuilder<T> builder,
@@ -695,6 +701,7 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
         body: const SizedBox.expand(),
         sheet: _sheet!,
         initialState: widget.initialState,
+        fullSize: appSheetLargeHeight(context),
         // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
         // 永遠視為尚未展開，阻止內容向上捲動。
         detents: widget.resizable

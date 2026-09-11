@@ -188,6 +188,55 @@ void main() {
     expect(sheet, findsNothing);
   });
 
+  testWidgets('帳號 sheet 頂緣貼近狀態列、接近全高且觸底', (tester) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.getRect(find.byKey(const ValueKey('app-large-sheet')));
+    // 參考影片：面板停在狀態列正下方，只留一道小溝槽，不再是套件預設的 90pt。
+    expect(sheet.top, greaterThanOrEqualTo(59));
+    expect(sheet.top, lessThanOrEqualTo(59 + 12));
+    expect(sheet.bottom, greaterThanOrEqualTo(844));
+    expect(sheet.left, closeTo(0, 0.01));
+    expect(sheet.right, closeTo(390, 0.01));
+  });
+
+  testWidgets('帳號 sheet 由下往上進場、向下退場，不從帳號 icon 放大', (tester) async {
+    await pumpAccountEntry(tester);
+    final avatar = tester.getRect(
+      find.byKey(const ValueKey('account-avatar-button')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final sheet = find.byKey(const ValueKey('app-large-sheet'));
+    final entering = tester.getRect(sheet);
+    await tester.pumpAndSettle();
+    final settled = tester.getRect(sheet);
+    expect(entering.top, greaterThan(settled.top + 20), reason: '進場時仍在停留位置下方');
+    expect(entering.left, closeTo(settled.left, 0.5));
+    expect(
+      entering.width,
+      closeTo(settled.width, 0.5),
+      reason: '全寬滑入，不是由 icon 放大',
+    );
+    expect(entering.width, greaterThan(avatar.width * 4));
+
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    // Close 先過關閉保護與 endOfFrame 才 pop，退場 route 動畫從第三幀開始。
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    final leaving = tester.getRect(sheet);
+    expect(leaving.top, greaterThan(settled.top + 20), reason: '退場向下移動');
+    expect(leaving.width, closeTo(settled.width, 0.5));
+    await tester.pumpAndSettle();
+    expect(sheet, findsNothing);
+  });
+
   testWidgets('一般寬度使用置中的 form sheet 並保留同一 Navigation Stack', (tester) async {
     await pumpAccountEntry(tester, size: const Size(1024, 768));
 
@@ -292,6 +341,36 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('account-sheet-content')), findsOneWidget);
     expect(find.byKey(const ValueKey('app-large-sheet-close')), findsOneWidget);
+  });
+
+  testWidgets('帳號子頁鍵盤升起時面板高度不變，欄位與儲存仍在鍵盤上方', (tester) async {
+    await pumpAccountEntry(tester);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-sheet-profile')));
+    await tester.pumpAndSettle();
+    final sheet = find.byKey(const ValueKey('app-large-sheet'));
+    final beforeKeyboard = tester.getRect(sheet);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(() => tester.view.viewInsets = FakeViewPadding.zero);
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(sheet), rectMoreOrLessEquals(beforeKeyboard));
+    final field = find.byKey(const ValueKey('profile-display-name'));
+    expect(tester.getRect(field).bottom, lessThanOrEqualTo(844 - 300));
+    expect(field.hitTestable(), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('profile-save')).hitTestable(),
+      findsOneWidget,
+    );
+
+    await tester.enterText(field, 'Ray Chiu');
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(find.text('Ray Chiu'), findsOneWidget);
+    expect(tester.getRect(sheet), rectMoreOrLessEquals(beforeKeyboard));
   });
 
   testWidgets('Account 表單子頁以取消返回，且不重複顯示 Close', (tester) async {

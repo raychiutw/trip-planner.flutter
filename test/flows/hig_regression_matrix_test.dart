@@ -183,6 +183,92 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('compact 固定 sheet 停在狀態列下方、接近全高並保留降級 ${state.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final opaque = state.increasedContrast || state.reduceTransparency;
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: state.reduceTransparency,
+          child: MaterialApp(
+            theme: state.brightness == Brightness.light
+                ? AppTheme.light()
+                : AppTheme.dark(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: state.increasedContrast,
+                disableAnimations: state.reduceMotion,
+                textScaler: TextScaler.linear(state.textScale),
+                padding: const EdgeInsets.only(top: 59, bottom: 34),
+                viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+              ),
+              child: GlassAdaptiveScope(
+                maxQuality: GlassQuality.minimal,
+                child: child!,
+              ),
+            ),
+            home: Center(
+              child: Builder(
+                builder: (context) => FilledButton(
+                  onPressed: () => showAppContentSheet<void>(
+                    context,
+                    title: '帳號',
+                    builder: (_) => ListView(
+                      children: const [ListTile(title: Text('帳號內容'))],
+                    ),
+                  ),
+                  child: const Text('開啟'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開啟'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final sheet = find.byKey(const ValueKey('app-large-sheet'));
+      final firstFrame = tester.getRect(sheet);
+      await tester.pumpAndSettle();
+      final settled = tester.getRect(sheet);
+      expect(settled.top, greaterThanOrEqualTo(59), reason: '保留狀態列');
+      expect(settled.top, lessThanOrEqualTo(59 + 12), reason: '接近全高');
+      expect(settled.bottom, greaterThanOrEqualTo(844));
+      expect(settled.width, closeTo(390, 0.5));
+      if (state.reduceMotion) {
+        expect(firstFrame, rectMoreOrLessEquals(settled), reason: '降低動態效果不位移');
+      } else {
+        expect(firstFrame.top, greaterThan(settled.top), reason: '由下往上進場');
+      }
+      final scaffold = tester.widget<GlassModalSheetScaffold>(
+        find.byType(GlassModalSheetScaffold),
+      );
+      expect(
+        scaffold.expandedColor,
+        Theme.of(tester.element(sheet)).colorScheme.surface,
+        reason: '內容底色偏實，跟隨語意 surface',
+      );
+      if (opaque) {
+        expect(scaffold.settings!.glassColor.a, 1, reason: '不透明降級');
+        expect(scaffold.settings!.blur, 0);
+      } else {
+        expect(scaffold.settings, isNull, reason: '一般態沿用套件公開預設材質');
+      }
+      expect(scaffold.interactionScale, state.reduceMotion ? 1 : isNot(1));
+      expect(scaffold.stretch, state.reduceMotion ? 0 : isNot(0));
+      final close = find.byKey(const ValueKey('app-sheet-close'));
+      expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(close).width, greaterThanOrEqualTo(44));
+      expect(find.text('帳號內容').hitTestable(), findsOneWidget);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(find.text('開啟').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('sheet 拖至 medium 採預設材質且獨立不透明降級 ${state.name}', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;

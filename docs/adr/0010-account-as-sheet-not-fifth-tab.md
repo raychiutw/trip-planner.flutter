@@ -83,6 +83,15 @@ pointer resampling 的 timer／post-frame 不受影響；不重算 detent、速�
 分流。公開操作測試涵蓋修改、提交中禁止返回、重複確認去重、取消保留草稿，
 以及拖曳／系統返回後只捨棄一次就回到上一頁、保留外層 sheet。
 
+### 2026-09-11 更正：large 高度改由 safe area 推導（#317）
+
+上一節「高度採套件預設」只保留到 #317：對照使用者提供的 Apple Music 帳號
+影片，套件寫死的 90pt 頂部 inset 會比參考在狀態列下多留 20pt 以上（依機型狀態列高度而異）。
+現在 compact 的 large 停留高度以公開 `fullSize` 傳入
+`appSheetLargeHeight`（`MediaQuery.sizeOf` 高度減去 `paddingOf.top + 8`），
+與浮動 header 同一道溝槽；圓角、margin、材質與拖曳交接仍是套件預設，
+regular 的 560×720 form sheet 不受影響。
+
 - **改回第五 tab 不是加一個 branch 而已**,要同時動 shell 結構與所有 deep link ——
   `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 全部建在
   `accountSheetAlias` → `?account=<page>` 這條轉換上(`lib/app/router.dart:131`–`:180`、
