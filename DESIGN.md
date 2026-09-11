@@ -2,7 +2,7 @@
 
 > 狀態：Accepted
 >
-> 更新：2026-08-20
+> 更新：2026-09-11
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
 > 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
@@ -78,7 +78,11 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：浮動 header 保留返回與任意標題 widget 共用膠囊、帳號另組及 safe area 的薄組裝；各動作採自然寬度，bar button 的手勢、鍵盤與動畫交給公開 `GlassButton`。
 - **Tripline 決策**：上下帶狀遮蔽採 `ProgressiveBlur` 與 `GlassScrollEdgeEffect` 的公開預設，取代六層 filter 與手調淡出遮罩。遮蔽位於內容與控制項之間並穿透觸控；媒體背景保留語意暗化，提高對比／降低透明度各自使用不透明區及套件羽化，不以 blur 歸零冒充降級。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
-- **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／焦點、停用原因與選取語意。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或顯示設定改變時移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
+- **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／系統 Back／焦點、展開狀態、停用原因與選取語意。觸發鈕是唯一具名節點，開啟時宣告 expanded、關閉即復原；系統 Back 先關選單不離頁。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或影響呈現的顯示設定改變時移除，鍵盤收起不移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
+- **Tripline 決策**：一般動作選單可在清單上方放一排快捷動作（字符在上、短文字在下，最多三格並排，對應 HIG medium 選單）；下方清單以分隔線分組，破壞性項目獨立成組置於尾端。每格短文字要單行放得下才並排；任一格放不下（放大文字或極窄寬度）整排改為同順序直列，文字與動作一個不少。快捷格的焦點／按壓底色取 `onSurface` 透明度，不寫死白色；短文字的完整名稱由可及性 label 補齊（「共編」讀作「共編設定」）。行程卡的三格固定為分享／共編／AI 健檢，其他選單不為湊滿三格加入無權限的動作（#315）。
+- **Tripline 決策**：內容卡上的「⋯」入口不套玻璃、一般態無可見外框（`TpMoreMenuButton(plain: true)`），保留 44×44pt、tooltip 與可及性名稱；提高對比才補實心邊界。點擊「⋯」與長按同一對象開同一份錨定選單，不再使用底部純文字動作表；破壞性動作選取後仍進入既有確認流程。
+- **Tripline 決策**：全 App 一般動作選單只有一套呈現（#316）。入口分三類：內容卡／內容列上的「⋯」一律 plain（行程卡、收藏卡、停留點卡、共編成員列、分享連結列、可交還 AI 的筆記列）；浮動 header 與固定 bar 上的 bar button 走玻璃（行程清單、收藏排序篩選、時間軸、列印）；內容裡的文字入口（探索地區、新增停留點地區、探索「更多」分類 chip）沿內容自然寬度，選單仍從觸發點附近展開。長按與「⋯」開同一份選單；沒有動作的對象（純人工建立的筆記列）不留可聚焦的空按鈕。
+- **Tripline 決策**：值選項（地區、分類、排序、成員角色這類互斥的「目前值」）只以勾選標示目前值，不為每個值配圖示；一般動作配語意明確的 SF Symbol，且同一動作全 App 同一字符：分享 `share`、共編 `person_2`、AI 相關 `sparkles`、匯出 `square_arrow_down`、異動紀錄 `clock`、刪除 `delete`、移除 `person_badge_minus`。刪除／移除獨立成組置於尾端。標籤不重複字符已表達的意思（「自訂地區…」不再前綴「+」）。不強迫每個選單湊三個快捷動作。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
 
@@ -104,6 +108,7 @@ iPhone 固定四個 root tabs：
 
 - **Tripline 決策**：Account 不是 root tab。每個內容頁的 `person.crop.circle` 開啟帶 Navigation Stack 的 Account sheet。
 - **HIG 建議**：iPhone 使用可展開至全高的 system sheet；iPad 使用 form sheet 或 popover，空間不足時自適應為全高。
+- **Tripline 決策**：compact Account sheet 由下往上進場、向下退場，不做從帳號 icon 放大的 morph；展開後接近全高，頂緣停在狀態列 safe area 之下、與浮動 header 同一道 8pt 溝槽，內容底色是實色語意 `surface`。占比由實際 safe area 推導，不寫死單一機型的像素或比例（#317 對照 Apple Music 帳號影片）。
 - **HIG 必須**：Account 使用 grouped list、inset separator、system controls 與標準 navigation。
 - **HIG 必須**：一般、低頻設定集中在 Account；只影響目前任務的選項留在相關畫面。
 - **HIG 必須**：不得重複實作系統已有的 Dynamic Type、accessibility、鍵盤、捲動或認證偏好。
@@ -137,7 +142,7 @@ iPhone 固定四個 root tabs：
 ### 7.1 聊天 composer
 
 - **Tripline 決策**：composer 是聊天頁持續存在的 bottom accessory。
-- **Tripline 決策**：左側 `＋` 開啟附件與行程功能；中間輸入框由 1 行長到最多 4 行，之後內部捲動。
+- **Tripline 決策**：composer 沒有左側 `＋`，也沒有附件或新增行程項目入口；輸入框從 leading 起延伸，由 1 行長到最多 4 行，之後內部捲動。新增停留點走時間軸各 Day 的既有入口（#314）。
 - **Tripline 決策**：空白時右側顯示麥克風；有文字時切換為送出。
 - **Tripline 決策**：Return 換行；外接鍵盤使用 Command–Return 送出。
 - **HIG 必須**：切換 tab、開啟 Account 或暫時離開 App 時保留草稿。
@@ -213,7 +218,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ## 11. 表單與 sheet
 
-- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin、高度與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。
+- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin 與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。large 停留高度不用套件寫死的 90pt 頂部 inset，改以公開 `fullSize` 由狀態列 safe area 加 8pt 溝槽推導（`appSheetLargeHeight`），旋轉後依新尺寸重取；medium 仍是套件預設。
 - **Tripline 決策**：regular Account 保留置中、最多 560×720 的 form sheet 與同一個 Navigator，表面改用公開 `GlassContainer` 預設材質與圓角。這是 App 的版面契約，不套用手機的底部 detent，也不反推套件內部留白。
 - **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移、放手後的吸附彈性、裝飾縮放與伸縮；旋轉後依新尺寸定位，保留草稿與關閉保護。提高對比與降低透明度各自保留不透明降級。
 - **HIG 建議**：短而單一任務的新增／編輯使用 system sheet；較長、多步驟或需要完整上下文的流程使用 push navigation。
@@ -386,6 +391,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - VoiceOver、Voice Control、Switch Control、Full Keyboard Access、pointer 與外接鍵盤。
 - 鍵盤、safe area、旋轉、sheet、tab state restoration、edge-back。
 - 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、POI、收藏、Account 與全部不可復原刪除流程。
+- 一般動作選單逐入口對照使用者參考圖：清單見 [1.4.1 遷移紀錄的選單入口覆蓋清單](docs/liquid-glass-1.4.1-migration.md#選單入口覆蓋清單314316)。
 - Liquid Glass 材質、PlatformView 共存、效能與 raster jank 必須以真機驗證；widget test 與 simulator 只能作幾何、內容及操作證據，不能代替材質驗收（ADR-0001／#303）。
 
 ## 20. 來源階層與實作落差

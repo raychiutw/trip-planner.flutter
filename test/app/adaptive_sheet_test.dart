@@ -472,7 +472,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(disableAnimations: reduced),
+            data: MediaQuery.of(context).copyWith(
+              disableAnimations: reduced,
+              // large 停在狀態列之下；外點要落在狀態列帶才真的在 sheet 外。
+              padding: const EdgeInsets.only(top: 47),
+              viewPadding: const EdgeInsets.only(top: 47),
+            ),
             child: child!,
           ),
           home: Builder(
@@ -508,15 +513,16 @@ void main() {
       await tester.pump();
       expect(submissions, 1);
       expect(form.isSubmitting, isTrue);
-      await tester.tapAt(const Offset(10, 10));
-      await tester.pumpAndSettle();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       final scaffold = tester.widget<GlassModalSheetScaffold>(
         find.byType(GlassModalSheetScaffold),
       );
       final sheet = find.byWidget(scaffold.sheet);
       final original = tester.getRect(sheet);
+      expect(original.top, greaterThan(20), reason: '外點座標必須在 sheet 之外');
+      await tester.tapAt(const Offset(10, 20));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       await tester.timedDragFrom(
         Offset(original.center.dx, original.top + 10),
         const Offset(0, 650),
@@ -703,28 +709,19 @@ void main() {
     );
   }
 
-  testWidgets('固定 sheet 採公開預設幾何且長清單可捲至末項', (tester) async {
+  testWidgets('固定 sheet 頂緣停在狀態列下方溝槽且長清單可捲至末項', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
-        home: GlassModalSheetScaffold(
-          body: const SizedBox.expand(),
-          sheet: const SizedBox.expand(key: ValueKey('reference-sheet')),
-          initialState: GlassSheetState.full,
-          detents: {GlassSheetDetent.large},
-          showDragIndicator: false,
-          padding: EdgeInsets.zero,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            padding: const EdgeInsets.only(top: 47, bottom: 34),
+            viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+          ),
+          child: child!,
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final reference = tester.getRect(
-      find.byKey(const ValueKey('reference-sheet')),
-    );
-    await tester.pumpWidget(
-      MaterialApp(
         home: Builder(
           builder: (context) => FilledButton(
             onPressed: () => showAppContentSheet<void>(
@@ -742,16 +739,160 @@ void main() {
     );
     await tester.tap(find.text('開啟'));
     await tester.pumpAndSettle();
-    expect(
-      tester.getRect(find.byKey(const ValueKey('app-large-sheet'))),
-      reference,
-    );
+    final sheet = tester.getRect(find.byKey(const ValueKey('app-large-sheet')));
+    // 接近全高：保留狀態列，頂緣只留一道小溝槽；不沿用套件寫死的 90pt。
+    expect(sheet.top, greaterThanOrEqualTo(47));
+    expect(sheet.top, lessThanOrEqualTo(47 + 12));
+    expect(sheet.bottom, greaterThanOrEqualTo(844));
     await tester.scrollUntilVisible(find.text('設定 49'), 400);
     expect(find.text('設定 49').hitTestable(), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('app-sheet-close')));
     await tester.pumpAndSettle();
     expect(find.text('開啟').hitTestable(), findsOneWidget);
   });
+
+  for (final reduced in [false, true]) {
+    testWidgets('固定 sheet 旋轉後依新 safe area 重取接近全高（降低動態效果=$reduced）', (
+      tester,
+    ) async {
+      // 先橫向開啟：狀態列收起、safe area 在左右；轉回直向時若沿用橫向算出的
+      // 絕對高度，sheet 會停在畫面中段，才分得出有沒有重取。
+      tester.view.physicalSize = const Size(844, 390);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final safeArea = ValueNotifier(
+        const EdgeInsets.only(left: 47, right: 47, bottom: 21),
+      );
+      addTearDown(safeArea.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => ValueListenableBuilder(
+            valueListenable: safeArea,
+            builder: (context, padding, _) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: padding,
+                viewPadding: padding,
+                disableAnimations: reduced,
+              ),
+              child: child!,
+            ),
+          ),
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showAppContentSheet<void>(
+                context,
+                title: '帳號',
+                builder: (_) => const Text('帳號內容'),
+              ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開啟'));
+      await tester.pumpAndSettle();
+      final sheet = find.byKey(const ValueKey('app-large-sheet'));
+      final landscape = tester.getRect(sheet);
+      expect(landscape.top, greaterThanOrEqualTo(0));
+      expect(landscape.top, lessThanOrEqualTo(12));
+      expect(landscape.bottom, greaterThanOrEqualTo(390));
+
+      tester.view.physicalSize = const Size(390, 844);
+      safeArea.value = const EdgeInsets.only(top: 47, bottom: 34);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final secondFrame = tester.getRect(sheet);
+      await tester.pumpAndSettle();
+      final portrait = tester.getRect(sheet);
+      expect(portrait.top, greaterThanOrEqualTo(47));
+      expect(portrait.top, lessThanOrEqualTo(47 + 12));
+      expect(portrait.bottom, greaterThanOrEqualTo(844));
+      expect(portrait.width, closeTo(390, 0.5));
+      if (reduced) {
+        expect(
+          secondFrame,
+          rectMoreOrLessEquals(portrait),
+          reason: '降低動態效果下一幀即停穩',
+        );
+      }
+      expect(find.text('帳號內容'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final resizable in [false, true]) {
+    testWidgets('${resizable ? '表單' : '選擇'} sheet 的 large 同樣停在狀態列下方，'
+        '${resizable ? 'medium 維持套件預設且可來回' : '關閉仍走取消'}', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final form = AppSheetFormController();
+      addTearDown(form.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.only(top: 47, bottom: 34),
+              viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+            ),
+            child: child!,
+          ),
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => resizable
+                  ? showAppFormSheet(
+                      context,
+                      title: '編輯',
+                      submitLabel: '儲存',
+                      controller: form,
+                      builder: (_) => const Center(child: Text('共用內容')),
+                    )
+                  : showAppSelectionSheet<int>(
+                      context,
+                      title: '選擇',
+                      builder: (_, _) => const Center(child: Text('共用內容')),
+                    ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開啟'));
+      await tester.pumpAndSettle();
+      final scaffold = tester.widget<GlassModalSheetScaffold>(
+        find.byType(GlassModalSheetScaffold),
+      );
+      final sheet = find.byWidget(scaffold.sheet);
+      final large = tester.getRect(sheet);
+      expect(large.top, greaterThanOrEqualTo(47));
+      expect(large.top, lessThanOrEqualTo(47 + 12));
+      expect(large.bottom, greaterThanOrEqualTo(844));
+      expect(find.text('共用內容').hitTestable(), findsOneWidget);
+      if (resizable) {
+        // medium 仍是套件預設的 45%：只有 large 的停留高度換了來源。
+        final title = tester.getRect(find.text('編輯'));
+        await tester.timedDragFrom(
+          Offset(title.center.dx, title.top - 10),
+          const Offset(0, 320),
+          const Duration(milliseconds: 800),
+        );
+        await tester.pumpAndSettle();
+        final medium = tester.getRect(sheet);
+        expect(medium.top, closeTo(844 * (1 - 0.45), 1));
+        await tester.timedDragFrom(
+          Offset(medium.center.dx, medium.top + 10),
+          const Offset(0, -320),
+          const Duration(milliseconds: 800),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(sheet), rectMoreOrLessEquals(large));
+      }
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('開啟').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('large sheet uses the opaque Reduce Transparency fallback', (
     tester,

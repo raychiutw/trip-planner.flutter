@@ -41,7 +41,8 @@ final _regionRules = [
   MapEntry(RegExp('台北', caseSensitive: false), '台北'),
 ];
 
-/// 收藏清單（root「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）。
+/// 收藏清單（root「收藏」分頁）：GET /poi-favorites，heart 取消收藏（確認對話框）；
+/// 「⋯」與長按開同一份錨定選單（加入行程／選取／刪除）。
 class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
 
@@ -62,6 +63,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
   bool _deletingSelected = false;
   int _page = 1;
   _FavoriteSort _sort = _FavoriteSort.newest;
+
+  /// 每張卡一份，讓「⋯」與長按開同一份選單。
+  final Map<int, TpMoreMenuController> _favoriteMenuControllers = {};
 
   @override
   void dispose() {
@@ -148,33 +152,30 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
         size: 20,
         color: Theme.of(context).colorScheme.primary,
       ),
+      // 排序是值選項：只以勾選標示目前排序，不配圖示；篩選／新增是動作才有字符。
       items: [
         TpActionItem(
           key: const ValueKey('favorites-sort-newest'),
           label: '最近加入',
           value: _FavoriteHeaderAction.sortNewest,
-          icon: CupertinoIcons.clock,
           selected: _sort == _FavoriteSort.newest,
         ),
         TpActionItem(
           key: const ValueKey('favorites-sort-oldest'),
           label: '最早加入',
           value: _FavoriteHeaderAction.sortOldest,
-          icon: CupertinoIcons.clock,
           selected: _sort == _FavoriteSort.oldest,
         ),
         TpActionItem(
           key: const ValueKey('favorites-sort-name'),
           label: '名稱',
           value: _FavoriteHeaderAction.sortName,
-          icon: CupertinoIcons.textformat,
           selected: _sort == _FavoriteSort.name,
         ),
         TpActionItem(
           key: const ValueKey('favorites-sort-region'),
           label: '地區',
           value: _FavoriteHeaderAction.sortRegion,
-          icon: CupertinoIcons.location,
           selected: _sort == _FavoriteSort.region,
         ),
         TpActionItem(
@@ -331,8 +332,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                 : (_) => _toggleFavoriteSelection(favorite.id),
                             onRemove: () =>
                                 _removeFavorite(context, ref, favorite),
-                            onLongPress: () =>
-                                _showFavoriteActions(context, ref, favorite),
+                            onLongPress: _favoriteMenuControllerFor(
+                              favorite,
+                            ).open,
+                            moreMenu: _favoriteMenu(context, ref, favorite),
                           ),
                           if (_deletingFavoriteIds.contains(favorite.id))
                             Positioned.fill(
@@ -428,34 +431,56 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     }
   }
 
-  Future<void> _showFavoriteActions(
+  TpMoreMenuController _favoriteMenuControllerFor(PoiFavorite favorite) =>
+      _favoriteMenuControllers.putIfAbsent(
+        favorite.id,
+        TpMoreMenuController.new,
+      );
+
+  /// 卡片「⋯」與長按共用的錨定選單：加入行程／選取，另組刪除。
+  Widget _favoriteMenu(
     BuildContext context,
     WidgetRef ref,
     PoiFavorite favorite,
-  ) async {
-    final action = await showAppActionSheet<_FavoriteContextAction>(
-      context,
-      actions: const [
+  ) {
+    return TpMoreMenuButton<_FavoriteContextAction>(
+      key: ValueKey('favorite-card-more-${favorite.id}'),
+      controller: _favoriteMenuControllerFor(favorite),
+      tooltip: '收藏選項',
+      plain: true,
+      items: [
         TpActionItem(
+          key: ValueKey('favorite-menu-add-${favorite.id}'),
           label: '加入行程',
           value: _FavoriteContextAction.addToTrip,
           icon: CupertinoIcons.calendar_badge_plus,
         ),
         TpActionItem(
+          key: ValueKey('favorite-menu-select-${favorite.id}'),
           label: '選取',
           value: _FavoriteContextAction.select,
           icon: CupertinoIcons.check_mark_circled,
         ),
         TpActionItem(
+          key: ValueKey('favorite-menu-delete-${favorite.id}'),
           label: '刪除',
           value: _FavoriteContextAction.remove,
-          icon: CupertinoIcons.heart_slash,
+          icon: CupertinoIcons.delete,
           dividerBefore: true,
           role: TpActionRole.destructive,
         ),
       ],
+      onSelected: (action) =>
+          unawaited(_handleFavoriteAction(context, ref, favorite, action)),
     );
-    if (!context.mounted) return;
+  }
+
+  Future<void> _handleFavoriteAction(
+    BuildContext context,
+    WidgetRef ref,
+    PoiFavorite favorite,
+    _FavoriteContextAction action,
+  ) async {
     switch (action) {
       case _FavoriteContextAction.addToTrip:
         context.go(
@@ -465,15 +490,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             displayName: favorite.displayName,
           ),
         );
-        return;
       case _FavoriteContextAction.select:
         _toggleFavoriteSelection(favorite.id);
-        return;
       case _FavoriteContextAction.remove:
         await _removeFavorite(context, ref, favorite);
-        return;
-      case null:
-        return;
     }
   }
 

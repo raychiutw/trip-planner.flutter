@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:ui' show Tristate, SemanticsAction;
+import 'dart:math' as math;
+import 'dart:ui' show Tristate, SemanticsAction, SemanticsFlags;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'package:tripline/ui/tp_glass_surface.dart';
 Widget _menuHost({
   required List<TpActionItem<String>> items,
   required ValueChanged<String> onSelected,
+  List<TpActionItem<String>> quickActions = const [],
   double textScale = 1,
   bool reduceMotion = false,
   bool boldText = false,
@@ -40,11 +42,49 @@ Widget _menuHost({
       child: TpMoreMenuButton<String>(
         key: const ValueKey('host-more-menu'),
         items: items,
+        quickActions: quickActions,
         onSelected: onSelected,
       ),
     ),
   ),
 );
+
+/// 行程卡那組 medium 版型：上排三個快捷動作，下方匯出與分組刪除。
+const _quickActions = [
+  TpActionItem(
+    key: ValueKey('quick-share'),
+    value: 'share',
+    label: '分享',
+    icon: CupertinoIcons.share,
+  ),
+  TpActionItem(
+    key: ValueKey('quick-collab'),
+    value: 'collab',
+    label: '共編',
+    semanticLabel: '共編設定',
+    icon: CupertinoIcons.person_2,
+  ),
+  TpActionItem(
+    key: ValueKey('quick-health'),
+    value: 'health',
+    label: 'AI 健檢',
+    icon: CupertinoIcons.sparkles,
+  ),
+];
+const _quickMenuItems = [
+  TpActionItem(
+    value: 'export',
+    label: '匯出 JSON',
+    icon: CupertinoIcons.square_arrow_down,
+  ),
+  TpActionItem(
+    value: 'delete',
+    label: '刪除行程',
+    icon: CupertinoIcons.delete,
+    dividerBefore: true,
+    role: TpActionRole.destructive,
+  ),
+];
 
 void main() {
   testWidgets('large sheet 返回與關閉字符保留品牌 tint 且分別可操作', (tester) async {
@@ -439,6 +479,369 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('鍵盤在選單開啟時收起（viewInsets／padding 變化）不會移除剛開的選單', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    addTearDown(tester.view.resetPadding);
+    // 手機：底部 home indicator 的 safe area。
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+    tester.view.viewInsets = FakeViewPadding.zero;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              const TextField(key: ValueKey('search'), autofocus: true),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TpMoreMenuButton<String>(
+                  key: const ValueKey('host-more-menu'),
+                  tooltip: '更多分類',
+                  items: const [TpActionItem(value: 'a', label: '地鐵站  1')],
+                  onSelected: (_) {},
+                  triggerBuilder: (context, onPressed) => ChoiceChip(
+                    label: const Text('更多'),
+                    selected: false,
+                    onSelected: (_) => onPressed?.call(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 鍵盤升起：viewInsets 有值、底部 safe area 被鍵盤蓋掉。
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 0);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('更多'));
+    await tester.pump();
+    // 開啟把焦點移進選單，鍵盤隨之收起：metrics 回到未升起的值。
+    tester.view.viewInsets = FakeViewPadding.zero;
+    tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+    await tester.pumpAndSettle();
+
+    expect(find.text('地鐵站  1'), findsOneWidget, reason: '鍵盤收起不得把剛開的選單移除');
+    await tester.tap(find.text('地鐵站  1'));
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('系統 Back 先關閉選單並留在原頁，再按一次才離頁', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      body: Column(
+                        children: [
+                          const Text('探索頁'),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TpMoreMenuButton<String>(
+                              key: const ValueKey('host-more-menu'),
+                              tooltip: '更多分類',
+                              items: const [
+                                TpActionItem(value: 'a', label: '地鐵站  1'),
+                              ],
+                              onSelected: (_) {},
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('前往探索'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('前往探索'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsOneWidget);
+
+    // 系統 Back（Android 返回鍵）。
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsNothing, reason: 'Back 先關閉選單');
+    expect(find.text('探索頁'), findsOneWidget, reason: '原頁保留');
+
+    // 選單已正常關閉後，Back 才離頁；不得殘留一次被吃掉的 Back。
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('探索頁'), findsNothing);
+    expect(find.text('前往探索'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('選單動作自己 pop 頁面時，Back 攔截不會吞掉那一次 pop', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (pageContext) => Scaffold(
+                      body: Column(
+                        children: [
+                          const Text('探索頁'),
+                          TpMoreMenuButton<String>(
+                            key: const ValueKey('host-more-menu'),
+                            tooltip: '更多',
+                            items: const [
+                              TpActionItem(value: 'back', label: '返回上一頁'),
+                            ],
+                            onSelected: (_) => Navigator.of(pageContext).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('前往探索'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('前往探索'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('返回上一頁'));
+    await tester.pumpAndSettle();
+    expect(find.text('探索頁'), findsNothing, reason: '選單動作的 pop 要真的離頁');
+    expect(find.text('前往探索'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('關閉動畫未結束就重開（重用 host），系統 Back 仍先關選單並留在原頁', (tester) async {
+    final controller = TpMoreMenuController();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      body: Column(
+                        children: [
+                          const Text('探索頁'),
+                          TpMoreMenuButton<String>(
+                            key: const ValueKey('host-more-menu'),
+                            controller: controller,
+                            tooltip: '更多',
+                            items: const [
+                              TpActionItem(value: 'a', label: '地鐵站  1'),
+                            ],
+                            onSelected: (_) {},
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('前往探索'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('前往探索'));
+    await tester.pumpAndSettle();
+    controller.open();
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsOneWidget);
+
+    // 關到一半（反向動畫進行中）就再開：走的是重用既有 host 的分支。
+    controller.close();
+    await tester.pump(const Duration(milliseconds: 50));
+    controller.open();
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsOneWidget, reason: '重開後選單可用');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsNothing, reason: 'Back 先關閉重開的選單');
+    expect(find.text('探索頁'), findsOneWidget, reason: '原頁保留');
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('探索頁'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('以 Esc 或外點正常關閉後，系統 Back 直接離頁', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      body: Column(
+                        children: [
+                          const Text('探索頁'),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TpMoreMenuButton<String>(
+                              key: const ValueKey('host-more-menu'),
+                              tooltip: '更多分類',
+                              items: const [
+                                TpActionItem(value: 'a', label: '地鐵站  1'),
+                              ],
+                              onSelected: (_) {},
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                child: const Text('前往探索'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('前往探索'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('地鐵站  1'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('探索頁'), findsNothing, reason: '沒有殘留的攔截，Back 直接離頁');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('長清單在鍵盤升起時開啟、鍵盤收起後，面板與末項仍留在持續安全區內（含無鍵盤基線）', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    // 硬體持續 safe area：top 47／bottom 34（home indicator 從 810 起）。
+    tester.view.viewPadding = const FakeViewPadding(top: 47, bottom: 34);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetViewInsets);
+    const homeIndicatorTop = 844.0 - 34;
+    final items = [
+      // 與真實探索「更多」相同：17 個分類扣掉 4 個內嵌 chip，選單 13 項、不捲動。
+      for (var index = 0; index < 13; index++)
+        TpActionItem(
+          key: ValueKey('long-item-$index'),
+          value: 'item-$index',
+          label: '分類 ${index + 1}',
+        ),
+    ];
+
+    for (final withKeyboard in [false, true]) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Column(
+              children: [
+                // 觸發鈕落在與真實探索「更多」相同的高度（約 y 227），面板必須被夾回。
+                const SizedBox(height: 180),
+                const TextField(key: ValueKey('search')),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: TpMoreMenuButton<String>(
+                    key: const ValueKey('host-more-menu'),
+                    tooltip: '更多分類',
+                    items: items,
+                    onSelected: (_) {},
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (withKeyboard) {
+        await tester.showKeyboard(find.byKey(const ValueKey('search')));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        tester.view.padding = const FakeViewPadding(top: 47, bottom: 0);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pump();
+      if (withKeyboard) {
+        // 開啟把焦點移進選單，鍵盤收起：transient padding 回到 34。
+        tester.view.viewInsets = FakeViewPadding.zero;
+        tester.view.padding = const FakeViewPadding(top: 47, bottom: 34);
+      }
+      await tester.pumpAndSettle();
+
+      final mode = withKeyboard ? '鍵盤收起後' : '無鍵盤';
+      final last = find.byKey(const ValueKey('long-item-12'));
+      expect(last, findsOneWidget, reason: mode);
+      final panel = find.ancestor(
+        of: last,
+        matching: find.byType(GlassContainer),
+      );
+      expect(panel, findsOneWidget, reason: mode);
+      expect(
+        tester.getRect(panel).bottom,
+        lessThanOrEqualTo(homeIndicatorTop),
+        reason: '$mode：面板不得蓋到底部持續安全區',
+      );
+      expect(
+        tester.getRect(last).bottom,
+        lessThanOrEqualTo(homeIndicatorTop),
+        reason: '$mode：最後可操作項目留在持續安全區內',
+      );
+      expect(find.text('分類 1'), findsOneWidget, reason: '$mode：選單保持開啟');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('分類 1'), findsNothing);
+      expect(tester.takeException(), isNull, reason: mode);
+    }
+  });
+
   testWidgets('粗體長標籤依實際字重換行而不省略', (tester) async {
     // flutter test 的 Ahem 不區分字重；使用 SDK 隨附字型驗證真實字寬。
     await tester.runAsync(() async {
@@ -638,6 +1041,701 @@ void main() {
       expect(find.text('筆記'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('after-switch')));
       expect(tapped, isTrue, reason: '殘留的 TapRegion 會把這一下點擊吃掉');
+    });
+  });
+
+  testWidgets('自訂觸發器是 Material 元件（chip）時，選單仍從觸發器附近展開且尺寸不失控', (tester) async {
+    final selected = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              const SizedBox(height: 120),
+              SizedBox(
+                height: TpSpacing.tapMin,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    const SizedBox(width: 200),
+                    TpMoreMenuButton<String>(
+                      key: const ValueKey('chip-menu'),
+                      tooltip: '更多分類',
+                      items: const [
+                        TpActionItem(value: 'a', label: '地鐵站  1'),
+                        TpActionItem(value: 'b', label: '百貨公司  2'),
+                      ],
+                      onSelected: selected.add,
+                      triggerBuilder: (context, onPressed) => ChoiceChip(
+                        key: const ValueKey('chip-trigger'),
+                        label: const Text('更多'),
+                        selected: false,
+                        onSelected: (_) => onPressed?.call(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final chip = find.byKey(const ValueKey('chip-trigger'));
+    final chipRect = tester.getRect(chip);
+
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: '觸發器在 overlay 重建不得丟例外');
+
+    // overlay 內的觸發器複本與頁面上的觸發器同尺寸，選單才能貼著它展開。
+    final overlayChip = tester.getRect(chip.last);
+    expect(overlayChip.size.width, closeTo(chipRect.size.width, 0.5));
+    expect(overlayChip.size.height, closeTo(chipRect.size.height, 0.5));
+    final item = tester.getRect(find.text('地鐵站  1'));
+    expect(item.top, greaterThan(chipRect.top - 60));
+    expect(item.top, lessThan(chipRect.bottom + 60));
+    expect(item.left, greaterThanOrEqualTo(0));
+    expect(item.right, lessThanOrEqualTo(800));
+
+    await tester.tap(find.text('地鐵站  1'));
+    await tester.pumpAndSettle();
+    expect(selected, ['a']);
+    expect(find.text('地鐵站  1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  group('選單 controller 生命週期', () {
+    testWidgets('兩張無 key 的列同 frame 換序後，「⋯」與外部 controller 仍開得出各自的選單', (
+      tester,
+    ) async {
+      final controllers = {
+        'a': TpMoreMenuController(),
+        'b': TpMoreMenuController(),
+      };
+      final order = ValueNotifier<List<String>>(['a', 'b']);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: ValueListenableBuilder<List<String>>(
+              valueListenable: order,
+              builder: (context, ids, _) => Column(
+                children: [
+                  // 外層列沒有 key（與行程／收藏清單相同），只有選單鈕帶 key。
+                  for (final id in ids)
+                    SizedBox(
+                      height: 80,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TpMoreMenuButton<String>(
+                          key: ValueKey('row-more-$id'),
+                          controller: controllers[id],
+                          plain: true,
+                          tooltip: '列 $id 選項',
+                          items: [
+                            TpActionItem(
+                              value: id,
+                              label: '選項 ${id.toUpperCase()}',
+                            ),
+                          ],
+                          onSelected: (_) {},
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      order.value = ['b', 'a'];
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const ValueKey('row-more-b')));
+      await tester.pumpAndSettle();
+      expect(find.text('選項 B'), findsOneWidget, reason: '換序後「⋯」仍開得出 B 的選單');
+      expect(find.text('選項 A'), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('選項 B'), findsNothing);
+
+      // 長按走的外部入口：同一份 controller 也要還綁在新的列上。
+      controllers['a']!.open();
+      await tester.pumpAndSettle();
+      expect(
+        find.text('選項 A'),
+        findsOneWidget,
+        reason: '換序後外部 controller 仍開得出 A 的選單',
+      );
+      expect(find.text('選項 B'), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('選項 A'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('選單觸發鈕宣告展開狀態', () {
+    /// 三種入口共用：同名節點唯一、是可用按鈕；關閉時 expanded 為 false，
+    /// 開啟後為 true，Esc 與外點關閉後都回到 false。
+    Future<void> expectExpandedCycle(
+      WidgetTester tester, {
+      required String nodeLabel,
+      required Finder trigger,
+    }) async {
+      final semantics = tester.ensureSemantics();
+      Finder node() => find.bySemanticsLabel(nodeLabel);
+      SemanticsFlags flags() =>
+          tester.getSemantics(node()).getSemanticsData().flagsCollection;
+
+      expect(node(), findsOneWidget, reason: '關閉時同名節點唯一');
+      expect(flags().isButton, isTrue);
+      expect(flags().isEnabled, Tristate.isTrue);
+      expect(flags().isExpanded, Tristate.isFalse, reason: '關閉時宣告未展開');
+
+      await tester.tap(trigger.first);
+      await tester.pump();
+      expect(node(), findsOneWidget, reason: '開啟中同名節點仍唯一');
+      expect(flags().isExpanded, Tristate.isTrue, reason: '開啟當幀即宣告展開');
+      await tester.pumpAndSettle();
+      expect(find.text('匯出 JSON'), findsOneWidget);
+      expect(node(), findsOneWidget);
+      expect(flags().isExpanded, Tristate.isTrue, reason: '開啟後宣告展開');
+      expect(flags().isButton, isTrue);
+      expect(flags().isEnabled, Tristate.isTrue);
+      // 讀屏在已展開的按鈕上點兩下要能收合：平台語意樹必須宣告可用的 tap。
+      final expandedNode = tester.getSemantics(node());
+      expect(
+        expandedNode.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+        reason: '展開中的觸發鈕仍要有 tap 動作',
+      );
+      tester.semantics.tap(find.semantics.byLabel(nodeLabel));
+      await tester.pumpAndSettle();
+      expect(find.text('匯出 JSON'), findsNothing, reason: '語意 tap 收合選單');
+      expect(flags().isExpanded, Tristate.isFalse);
+
+      await tester.tap(trigger.first);
+      await tester.pumpAndSettle();
+      expect(flags().isExpanded, Tristate.isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('匯出 JSON'), findsNothing);
+      expect(node(), findsOneWidget);
+      expect(flags().isExpanded, Tristate.isFalse, reason: 'Esc 關閉後回到未展開');
+
+      await tester.tap(trigger.first);
+      await tester.pumpAndSettle();
+      expect(flags().isExpanded, Tristate.isTrue);
+      await tester.tapAt(const Offset(20, 580));
+      await tester.pumpAndSettle();
+      expect(find.text('匯出 JSON'), findsNothing);
+      expect(node(), findsOneWidget);
+      expect(flags().isExpanded, Tristate.isFalse, reason: '外點關閉後回到未展開');
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    }
+
+    testWidgets('plain 內容卡入口', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topRight,
+              child: TpMoreMenuButton<String>(
+                key: const ValueKey('host-more-menu'),
+                plain: true,
+                tooltip: '行程選項',
+                items: _quickMenuItems,
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await expectExpandedCycle(
+        tester,
+        nodeLabel: '行程選項',
+        trigger: find.byKey(const ValueKey('host-more-menu')),
+      );
+    });
+
+    testWidgets('header 玻璃 bar button 入口', (tester) async {
+      await tester.pumpWidget(
+        _menuHost(items: _quickMenuItems, onSelected: (_) {}),
+      );
+      await expectExpandedCycle(
+        tester,
+        nodeLabel: '更多',
+        trigger: find.byKey(const ValueKey('host-more-menu')),
+      );
+    });
+
+    testWidgets('自訂文字入口（triggerBuilder）', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: TpMoreMenuButton<String>(
+                key: const ValueKey('host-more-menu'),
+                tooltip: '切換搜尋地區',
+                items: _quickMenuItems,
+                onSelected: (_) {},
+                triggerBuilder: (context, onPressed) =>
+                    TextButton(onPressed: onPressed, child: const Text('自訂入口')),
+              ),
+            ),
+          ),
+        ),
+      );
+      await expectExpandedCycle(
+        tester,
+        nodeLabel: '自訂入口',
+        trigger: find.text('自訂入口'),
+      );
+    });
+  });
+
+  group('選單快捷動作', () {
+    testWidgets('上排三格 icon＋短文字並排於清單之上，點選派發一次並關閉', (tester) async {
+      final selected = <String>[];
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          onSelected: selected.add,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      for (final label in ['分享', '共編', 'AI 健檢', '匯出 JSON', '刪除行程']) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      for (final symbol in [
+        CupertinoIcons.share,
+        CupertinoIcons.person_2,
+        CupertinoIcons.sparkles,
+      ]) {
+        expect(find.byIcon(symbol), findsOneWidget, reason: '$symbol');
+      }
+
+      // 三格同一列、依序由左到右，且每格至少 44×44。
+      final share = tester.getRect(find.byKey(const ValueKey('quick-share')));
+      final collab = tester.getRect(find.byKey(const ValueKey('quick-collab')));
+      final health = tester.getRect(find.byKey(const ValueKey('quick-health')));
+      expect(share.top, closeTo(collab.top, 0.5));
+      expect(collab.top, closeTo(health.top, 0.5));
+      expect(share.right, lessThanOrEqualTo(collab.left + 0.5));
+      expect(collab.right, lessThanOrEqualTo(health.left + 0.5));
+      for (final rect in [share, collab, health]) {
+        expect(rect.width, greaterThanOrEqualTo(44));
+        expect(rect.height, greaterThanOrEqualTo(44));
+      }
+      // 字符在文字上方。
+      expect(
+        tester.getRect(find.byIcon(CupertinoIcons.share)).bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('分享')).top + 0.5),
+      );
+      // 清單項目位於快捷列之下。
+      expect(
+        tester.getRect(find.text('匯出 JSON')).top,
+        greaterThanOrEqualTo(share.bottom),
+      );
+
+      await tester.tap(find.text('共編'));
+      expect(selected, ['collab']);
+      await tester.tap(find.text('共編'), warnIfMissed: false);
+      expect(selected, ['collab'], reason: '同一次開啟只派發一次');
+      await tester.pumpAndSettle();
+      expect(find.text('共編'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('兩倍文字放不下時整排改為同順序直列，文字不裁切且全部可點', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final selected = <String>[];
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          textScale: 2,
+          alignment: Alignment.bottomRight,
+          onSelected: selected.add,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      final share = tester.getRect(find.byKey(const ValueKey('quick-share')));
+      final collab = tester.getRect(find.byKey(const ValueKey('quick-collab')));
+      final health = tester.getRect(find.byKey(const ValueKey('quick-health')));
+      expect(share.bottom, lessThanOrEqualTo(collab.top + 0.5));
+      expect(collab.bottom, lessThanOrEqualTo(health.top + 0.5));
+      expect(share.left, closeTo(collab.left, 0.5));
+      expect(
+        tester.getRect(find.text('匯出 JSON')).top,
+        greaterThanOrEqualTo(health.bottom),
+        reason: '直列後仍維持快捷動作在前、清單在後',
+      );
+      for (final label in ['分享', '共編', 'AI 健檢', '匯出 JSON', '刪除行程']) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.text(label),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+        final rect = tester.getRect(find.text(label));
+        expect(rect.left, greaterThanOrEqualTo(0), reason: label);
+        expect(rect.right, lessThanOrEqualTo(320), reason: label);
+        expect(rect.top, greaterThanOrEqualTo(0), reason: label);
+        expect(rect.bottom, lessThanOrEqualTo(568), reason: label);
+      }
+      for (final rect in [share, collab, health]) {
+        expect(rect.height, greaterThanOrEqualTo(44));
+      }
+      expect(find.bySemanticsLabel('共編設定'), findsOneWidget);
+
+      await tester.tap(find.text('AI 健檢'));
+      expect(selected, ['health']);
+      await tester.pumpAndSettle();
+      expect(find.text('AI 健檢'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('中間字級下每格短文字的字形都在可繪範圍內，1× 並排、2× 直列', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      // 並排／直列的門檻落在放大文字之間；逐級掃過，不只驗兩端。
+      for (final scale in [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 2.0]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          _menuHost(
+            items: _quickMenuItems,
+            quickActions: _quickActions,
+            textScale: scale,
+            onSelected: (_) {},
+          ),
+        );
+        await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+        await tester.pumpAndSettle();
+
+        for (final action in _quickActions) {
+          final label = find.descendant(
+            of: find.byKey(action.key!),
+            matching: find.text(action.label),
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(label);
+          final glyphs = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: action.label.length),
+          );
+          final glyphRight = glyphs.fold<double>(
+            0,
+            (right, box) => math.max(right, box.right),
+          );
+          expect(
+            glyphRight,
+            lessThanOrEqualTo(paragraph.size.width + 0.1),
+            reason: '${action.label} 在 $scale 倍的字形超出可繪文字寬度',
+          );
+          expect(
+            paragraph.didExceedMaxLines,
+            isFalse,
+            reason: '${action.label} 在 $scale 倍被省略',
+          );
+          final tile = tester.getRect(find.byKey(action.key!));
+          final text = tester.getRect(label);
+          expect(text.left, greaterThanOrEqualTo(tile.left - 0.1));
+          expect(text.right, lessThanOrEqualTo(tile.right + 0.1));
+        }
+
+        final share = tester.getRect(find.byKey(const ValueKey('quick-share')));
+        final collab = tester.getRect(
+          find.byKey(const ValueKey('quick-collab')),
+        );
+        final health = tester.getRect(
+          find.byKey(const ValueKey('quick-health')),
+        );
+        if (scale == 1.0) {
+          expect(share.top, closeTo(collab.top, 0.5), reason: '一般字級並排');
+          expect(collab.top, closeTo(health.top, 0.5), reason: '一般字級並排');
+        } else if (scale == 2.0) {
+          expect(share.bottom, lessThanOrEqualTo(collab.top + 0.5));
+          expect(collab.bottom, lessThanOrEqualTo(health.top + 0.5));
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'scale=$scale');
+      }
+    });
+
+    testWidgets('降低動態效果時按住快捷動作不縮放，放開取消後仍可正常啟用', (tester) async {
+      final selected = <String>[];
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          reduceMotion: true,
+          onSelected: selected.add,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      final tile = find.byKey(const ValueKey('quick-share'));
+      final label = find.descendant(of: tile, matching: find.text('分享'));
+      final tileBefore = tester.getRect(tile);
+      final labelBefore = tester.getRect(label);
+      final gesture = await tester.startGesture(tileBefore.center);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final labelPressed = tester.getRect(label);
+      expect(labelPressed.width, closeTo(labelBefore.width, 0.01));
+      expect(labelPressed.height, closeTo(labelBefore.height, 0.01));
+      expect(labelPressed.left, closeTo(labelBefore.left, 0.01));
+      expect(tester.getRect(tile), tileBefore);
+
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(selected, isEmpty, reason: '取消按壓不派發');
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      expect(selected, ['share'], reason: '取消後再點仍正常啟用一次');
+      expect(find.text('分享'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('方向鍵可走到快捷動作並以 Enter 啟用，Esc 仍可關閉', (tester) async {
+      final selected = <String>[];
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          onSelected: selected.add,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      // 開啟時焦點在第一格，向右走到第二格。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selected, ['collab'], reason: '方向鍵要能走到第二個快捷動作並以 Enter 啟動');
+      expect(find.text('共編'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+      // 從快捷列往下能走到清單項目。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selected, ['collab', 'export']);
+
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('分享'), findsNothing);
+      expect(selected, ['collab', 'export']);
+    });
+
+    testWidgets('開啟中快捷動作的權限或內容改變，沿用清單項目的關閉／重開清理契約', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final controller = TpMoreMenuController();
+      final selected = <String>[];
+      var revoked = false;
+      late StateSetter update;
+      const grantedActions = [
+        TpActionItem(
+          key: ValueKey('quick-collab'),
+          value: 'collab',
+          label: '共編',
+          semanticLabel: '共編設定',
+          icon: CupertinoIcons.person_2,
+        ),
+      ];
+      const revokedActions = [
+        TpActionItem(
+          key: ValueKey('quick-collab'),
+          value: 'collab',
+          label: '共編',
+          semanticLabel: '共編設定，只有擁有者可以管理',
+          icon: CupertinoIcons.person_2,
+          enabled: false,
+          selected: true,
+        ),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              update = setState;
+              return Scaffold(
+                body: Align(
+                  alignment: Alignment.topRight,
+                  child: TpMoreMenuButton<String>(
+                    key: const ValueKey('host-more-menu'),
+                    controller: controller,
+                    quickActions: revoked ? revokedActions : grantedActions,
+                    items: _quickMenuItems,
+                    onSelected: selected.add,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      controller.open();
+      await tester.pumpAndSettle();
+      expect(find.text('共編'), findsOneWidget);
+
+      update(() => revoked = true);
+      await tester.pumpAndSettle();
+      expect(find.text('共編'), findsNothing, reason: '舊權限的面板必須關閉');
+
+      controller.open();
+      await tester.pumpAndSettle();
+      final flags = tester
+          .getSemantics(find.bySemanticsLabel('共編設定，只有擁有者可以管理').first)
+          .getSemanticsData()
+          .flagsCollection;
+      expect(flags.isEnabled, Tristate.isFalse, reason: '停用原因要朗讀出來');
+      expect(flags.isSelected, Tristate.isTrue, reason: '選取語意要保留');
+      await tester.tap(find.text('共編'));
+      await tester.pumpAndSettle();
+      expect(selected, isEmpty, reason: '停用的快捷動作不得執行');
+      semantics.dispose();
+    });
+
+    testWidgets('plain 觸發鈕以鍵盤開啟快捷選單，Esc 關閉後焦點回到觸發鈕', (tester) async {
+      final selected = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topRight,
+              child: TpMoreMenuButton<String>(
+                key: const ValueKey('host-more-menu'),
+                plain: true,
+                tooltip: '行程選項',
+                quickActions: _quickActions,
+                items: _quickMenuItems,
+                onSelected: selected.add,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byKey(const ValueKey('host-more-menu'))),
+        const Size(44, 44),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      bool triggerHasFocus() {
+        final focusedContext = FocusManager.instance.primaryFocus?.context;
+        if (focusedContext == null) return false;
+        return find
+            .ancestor(
+              of: find.byWidget(focusedContext.widget),
+              matching: find.byKey(const ValueKey('host-more-menu')),
+            )
+            .evaluate()
+            .isNotEmpty;
+      }
+
+      expect(triggerHasFocus(), isTrue, reason: 'Tab 要能停在「⋯」上');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('分享'), findsOneWidget, reason: 'Enter 開啟選單');
+      expect(triggerHasFocus(), isFalse, reason: '開啟後焦點進入選單');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('分享'), findsNothing);
+      expect(triggerHasFocus(), isTrue, reason: '關閉後焦點回到觸發鈕');
+      expect(selected, isEmpty);
+
+      // 選取後同樣回到觸發鈕。
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(selected, ['share']);
+      expect(find.text('分享'), findsNothing);
+      expect(triggerHasFocus(), isTrue, reason: '選取關閉後焦點回到觸發鈕');
+    });
+
+    testWidgets('快捷動作的焦點與按壓底色取自主題前景，深淺色都不是寫死的白', (tester) async {
+      for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          _menuHost(
+            items: _quickMenuItems,
+            quickActions: _quickActions,
+            theme: theme,
+            onSelected: (_) {},
+          ),
+        );
+        await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+        await tester.pumpAndSettle();
+        final onSurface = theme.colorScheme.onSurface;
+        (double, double, double) rgb(Color color) =>
+            (color.r, color.g, color.b);
+
+        Color tileFill() {
+          final box = tester.widget<AnimatedContainer>(
+            find.descendant(
+              of: find.byKey(const ValueKey('quick-share')),
+              matching: find.byType(AnimatedContainer),
+            ),
+          );
+          return (box.decoration! as BoxDecoration).color!;
+        }
+
+        expect(tileFill().a, 0, reason: '靜止時沒有底色');
+        // 鍵盤焦點：開啟時焦點已在第一格，方向鍵回到它會顯示焦點底。
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pumpAndSettle();
+        final focused = tileFill();
+        expect(rgb(focused), rgb(onSurface), reason: '焦點底色跟隨主題前景');
+        expect(focused.a, greaterThan(0));
+        expect(focused.a, lessThan(0.3));
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(const ValueKey('quick-share'))),
+        );
+        await tester.pump();
+        final pressed = tileFill();
+        expect(rgb(pressed), rgb(onSurface), reason: '按壓底色跟隨主題前景');
+        expect(pressed.a, greaterThan(focused.a));
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+      }
     });
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/poi_repository.dart';
@@ -58,9 +59,11 @@ void main() {
     await tester.longPress(find.text('全部地區 ▾'));
     await tester.pump();
     expect(find.text('切換搜尋地區'), findsOneWidget);
-    final trigger = tester.getSemantics(find.text('全部地區 ▾'));
-    expect(trigger.getSemanticsData().flagsCollection.isButton, isTrue);
+    // 讀屏聽到的是合併後的資料：按鈕、名稱與展開狀態同在一個節點。
+    final trigger = tester.getSemantics(find.text('全部地區 ▾')).getSemanticsData();
+    expect(trigger.flagsCollection.isButton, isTrue);
     expect(trigger.label, contains('全部地區'));
+    expect(trigger.flagsCollection.isExpanded, Tristate.isFalse);
     await tester.tap(find.text('全部地區 ▾'));
     await tester.pumpAndSettle();
     expect(
@@ -70,6 +73,33 @@ void main() {
           .flagsCollection
           .isSelected,
       Tristate.isTrue,
+    );
+    // 地區是值選項：目前選取只以勾選標示，其他值不配圖示；自訂地區是動作才有字符。
+    Finder menuItem(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byType(GlassMenuItem),
+    );
+    expect(
+      find.descendant(of: menuItem('全部地區'), matching: find.byType(Icon)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: menuItem('全部地區'),
+        matching: find.byIcon(CupertinoIcons.check_mark),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: menuItem('沖繩'), matching: find.byType(Icon)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: menuItem('自訂地區…'),
+        matching: find.byIcon(CupertinoIcons.add),
+      ),
+      findsOneWidget,
     );
     await tester.tap(find.text('沖繩'));
     await tester.pumpAndSettle();
@@ -96,7 +126,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('全部地區 ▾'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('+ 自訂地區…'));
+    await tester.tap(find.text('自訂地區…'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
@@ -115,7 +145,7 @@ void main() {
     Future<void> openCustomRegion(String region) async {
       await tester.tap(find.text('$region ▾'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+ 自訂地區…'));
+      await tester.tap(find.text('自訂地區…'));
       await tester.pumpAndSettle();
       expect(find.text('自訂地區'), findsOneWidget);
     }
@@ -224,12 +254,31 @@ void main() {
     await tester.tap(more);
     await tester.pumpAndSettle();
 
-    expect(find.byType(CupertinoActionSheet), findsOneWidget);
-    expect(find.text('地鐵站  1'), findsOneWidget);
+    // 由 chip 展開的錨定選單，不再是底部動作表；分類是值選項，不配圖示。
+    expect(find.byType(CupertinoActionSheet), findsNothing);
+    expect(find.text('取消'), findsNothing);
+    final subwayItem = find.byKey(const ValueKey('explore-category-menu-地鐵站'));
+    expect(
+      find.descendant(of: subwayItem, matching: find.text('地鐵站  1')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: subwayItem, matching: find.byType(Icon)),
+      findsNothing,
+      reason: '未選取的分類值沒有圖示，也沒有勾選',
+    );
+    final chipRect = tester.getRect(more.first);
+    final itemRect = tester.getRect(subwayItem);
+    expect(
+      itemRect.top,
+      lessThan(chipRect.bottom + 120),
+      reason: '從 chip 附近展開',
+    );
 
     await tester.tapAt(const Offset(8, 8));
     await tester.pumpAndSettle();
-    expect(find.byType(PoiSearchCard), findsNWidgets(5));
+    expect(subwayItem, findsNothing);
+    expect(find.byType(PoiSearchCard), findsNWidgets(5), reason: '關閉不改篩選');
 
     await tester.tap(more);
     await tester.pumpAndSettle();
@@ -240,6 +289,27 @@ void main() {
     expect(selectedMore.selected, isTrue);
     expect(find.byType(PoiSearchCard), findsOneWidget);
     expect(find.text('車站'), findsOneWidget);
+
+    // 重開：目前選取的分類以勾選標示，其他值仍無圖示。
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: subwayItem,
+        matching: find.byIcon(CupertinoIcons.check_mark),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('explore-category-menu-百貨公司')),
+        matching: find.byType(Icon),
+      ),
+      findsNothing,
+    );
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+    expect(find.byType(PoiSearchCard), findsOneWidget, reason: '關閉不改篩選');
   });
 
   testWidgets('輸入即時搜尋：少於 2 字不送 request，300ms 後只送最新 query', (tester) async {

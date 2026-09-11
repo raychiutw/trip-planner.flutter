@@ -36,7 +36,7 @@
 | compact sheet | 舊 half／large shader recipe、93%／62% 高度、28／0 圓角、零 margin、重複預設參數 | `GlassModalSheetScaffold` 接手材質、幾何、展開與捲動交接；fixed `{large}`／resizable `{medium, large}`。App 保留 dirty／submitting／去重、內層優先返回、拒絕復位、theme child identity。PopScope 同意捨棄後等 frame 更新才返回，不用固定延遲；Reduce Motion 透過公開 controller 完成套件選定目標，關閉裝飾縮放／伸縮並在新尺寸下重新定位，詳見 [ADR-0010](adr/0010-account-as-sheet-not-fifth-tab.md) |
 | regular sheet | 舊 Dialog 材質與陰影 | 公開 `GlassContainer` 接手材質／圓角；Dialog 只管理 route／鍵盤避讓，保留 560×720 上限及有界 Navigator。公開 `GlassSheet.show` 額外捲動與留白不適合此結構，未反推私有高度 |
 | 地圖上的玻璃控制 | 共用舊 media 光學參數已於 #304 移除；不新增局部光學 recipe | 公開 `platformViewBackdrop` 選擇受支援共存路徑，配合媒體 scope 與暗化前景；日期依 ADR-0004 維持 70% 中性底與不透明 `onSurface`；帳號與定位依後續確認採共用 45% 黑色填色與白色符號，定位原有實色 Material 已改接公開 GlassButton；定位中改用同配方共用表面與 disabled 語意，避免套件整顆 disabled 淡化破壞不透明降級。不替換 SDK、不逐幀截圖；原生圖磚、手勢、marker／route 與其資料編碼色保留 |
-| 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪 | 輸入 1–4 行、附件／語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
+| 聊天 composer | 直接承接 #304 共用預設，沒有剩餘局部 shader 可刪；「＋」與附件／新增行程項目入口由 #318 移除，輸入框從 leading 起延伸 | 輸入 1–4 行、語音／送出、每行程草稿、Command–Return、安全區與鍵盤／tab 顯示是業務與配置契約；輸入欄使用語意內容填色，未再包玻璃 |
 | 行程／外部 POI accessory | host 的局部 blur 已於 #304 移除；本次清除將 host 誤稱為可折射原生地圖的註解 | 只有 host 一層玻璃；內容卡的語意填色／選取提示不是 shader。PageView 水平瀏覽、marker 雙向同步、外部 POI 關閉復原、動態高度、map padding 與 tab clearance 為產品契約；穩定 `trip-map-poi-drawer` key 保留作既有定位，不表示具有 drawer 手勢 |
 | 無障礙 | 不用 blur=0 冒充完整不透明降級 | 獨立 AppAccessibilityScope 原生 Reduce Transparency channel 保留；套件以 highContrast 近似的訊號不能取代它。任一提高對比／降低透明度都採不透明語意色、minimal 品質；邊界與 Reduce Motion 各自保留公開設定 |
 
@@ -113,3 +113,25 @@
 | 持續操作效能 | 同裝置升級前／後對照，持續列表／地圖捲動及 menu／sheet 切換 | 記錄實際 raster／frame 表現與可觀察卡頓，不能用 host 測試耗時推論效能 |
 
 本機 Windows 沒有 iOS runner。既有 `mobile-e2e` Test Lab workflow 保持 master-only，不削弱限制來替 feature branch 取證；商店流程不在本次驗證中觸發。取得必要硬體證據前，#303／#310 的相關驗收項維持未完成。
+
+### 選單入口覆蓋清單（#314／#316）
+
+#314 要求以使用者提供的 Apple Music 參考圖對照全 App 一般動作選單。下表是 #315／#316 完成後的全部入口；widget test 只證明幾何、內容、可及性與回呼，**每一列的材質、透明／模糊層級、白框、邊緣高光與展開動畫都尚未以真機比對**。驗收時逐列記錄 build／commit、裝置、OS、明暗與無障礙設定，並保留修改前後畫面。
+
+| 入口 | 觸發器 | 內容 | 真機比對重點 |
+|---|---|---|---|
+| 行程清單 header「⋯」 | 浮動 header bar button（玻璃） | 新增行程、匯入 JSON；排序值選項勾選 | bar button 高光、面板材質、勾選對齊 |
+| 行程卡「⋯」／長按 | 內容卡 plain「⋯」 | 上排分享／共編／AI 健檢，匯出 JSON，分組刪除 | 無白框、三格並排、刪除紅 |
+| 收藏 header 排序篩選 | 浮動 header bar button（玻璃） | 排序值選項勾選，篩選條件，窄寬大字時新增景點 | 同上 |
+| 收藏卡「⋯」／長按 | 內容列 plain「⋯」（heart 之後） | 加入行程、選取，分組刪除 | 無白框、與 heart 並置的間距、刪除紅 |
+| 探索地區 | 內容文字入口（`TextButton.icon`） | 地區值選項勾選，分組「自訂地區…」 | 從文字入口附近展開、勾選對齊 |
+| 探索「更多」分類 | 內容 chip（`ChoiceChip`） | 分類值選項勾選，含數量 | 從 chip 附近展開、選中 chip 狀態 |
+| 新增停留點地區 | 內容文字入口 | 地區值選項勾選 | 同探索地區 |
+| 時間軸 header「⋯」 | 浮動 header bar button（玻璃） | 調整順序、筆記；行程資料、列印、異動紀錄、分享連結、共編設定、AI 健檢 | 圖示與行程卡同字符 |
+| 停留點卡「⋯」／長按 | 內容卡 plain「⋯」 | 重新排序、換景點；編輯、移動；複製；分組刪除 | 無白框、四組分隔線、停用原因 |
+| 筆記列「⋯」／長按 | 內容列 plain「⋯」（只在可交還 AI 的列） | 交還 AI 維護 | 無白框、與拖曳把手並置 |
+| 列印「⋯」 | 固定 bar bar button（玻璃） | 匯出 PDF | bar button 高光、進行中 spinner |
+| 共編成員「⋯」 | 內容列 plain「⋯」 | 角色值選項勾選，分組移除成員 | 無白框、移除紅 |
+| 分享連結「⋯」 | 內容列 plain「⋯」 | 編輯、重新產生；分組撤銷、刪除 | 無白框、破壞性組 |
+
+聊天 composer 的「＋」與加入內容選單由 #318 移除，不在清單內。破壞性確認、表單值欄位、日期／時間 picker 與 OS 分享／檔案介面維持原本的 sheet／alert，不屬於一般動作選單。

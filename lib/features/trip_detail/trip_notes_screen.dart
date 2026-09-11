@@ -1196,7 +1196,8 @@ class _NotesSection extends ConsumerWidget {
 }
 
 /// 可拖曳/點擊/左滑的筆記 row：唯讀 display 卡 + drag handle + 左滑刪除。
-class _NoteRowTile extends StatelessWidget {
+/// 可交還 AI 的列另有「⋯」，與長按開同一份錨定選單。
+class _NoteRowTile extends ConsumerStatefulWidget {
   const _NoteRowTile({
     super.key,
     required this.section,
@@ -1216,21 +1217,22 @@ class _NoteRowTile extends StatelessWidget {
   final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
 
-  /// 交還 AI 維護。**兩個入口並存** —— 這是長按的捷徑,編輯 sheet 內另有一列
+  @override
+  ConsumerState<_NoteRowTile> createState() => _NoteRowTileState();
+}
+
+class _NoteRowTileState extends ConsumerState<_NoteRowTile> {
+  /// 「⋯」與長按共用，讓兩個入口開同一份選單。
+  final _menuController = TpMoreMenuController();
+
+  NoteSection get section => widget.section;
+  String get tripId => widget.tripId;
+  _NoteRowData get row => widget.row;
+
+  /// 交還 AI 維護。**兩個入口並存** —— 這是列上的捷徑,編輯 sheet 內另有一列
   /// 主介面入口。Apple HIG「Context menus」明文:context menu 的動作在主介面
   /// 也必須拿得到。
-  /// 長按的捷徑選單。用 action sheet 而不是自刻選單 —— 這一列右側已經有拖曳
-  /// 把手,塞不下 `⋯`;action sheet 出現在與列不同的位置、需要刻意關閉。
-  Future<void> _showReassignSheet(BuildContext context, WidgetRef ref) async {
-    final picked = await showAppActionSheet<int>(
-      context,
-      actions: const [TpActionItem(value: 0, label: '交還 AI 維護')],
-    );
-    if (picked == null || !context.mounted) return;
-    await _reassign(context, ref);
-  }
-
-  Future<void> _reassign(BuildContext context, WidgetRef ref) async {
+  Future<void> _reassign() async {
     try {
       await ref
           .read(tripRepositoryProvider)
@@ -1241,11 +1243,11 @@ class _NoteRowTile extends StatelessWidget {
             managedBy: NoteMaintainer.ai,
             expectedVersion: row.version,
           );
-      if (!context.mounted) return;
+      if (!mounted) return;
       ref.invalidate(tripNotesProvider(tripId));
       showAppNotice(context, '已交還 AI 維護，下次生成才會更新內容');
     } on ApiError catch (error) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       showAppError(context, _maintenanceErrorMessage(error));
     }
   }
@@ -1259,51 +1261,64 @@ class _NoteRowTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, child) => GestureDetector(
-        // 長按必須掛在 SwipeToDelete **外面** —— flutter_slidable 會先攔下
-        // 手勢,掛在內層的 InkWell.onLongPress 永遠不會觸發。
-        onLongPress: row.canReassignToAi
-            ? () => _showReassignSheet(context, ref)
-            : null,
-        child: child,
-      ),
+    return GestureDetector(
+      // 長按必須掛在 SwipeToDelete **外面** —— flutter_slidable 會先攔下
+      // 手勢,掛在內層的 InkWell.onLongPress 永遠不會觸發。
+      onLongPress: row.canReassignToAi ? _menuController.open : null,
       child: _buildRow(context),
+    );
+  }
+
+  /// 只有可交還的列才有選單；純人工的列不留可聚焦的空按鈕。
+  Widget _reassignMenu() {
+    return TpMoreMenuButton<int>(
+      key: ValueKey('note-more-${section.name}-${row.id}'),
+      controller: _menuController,
+      tooltip: '筆記選項',
+      plain: true,
+      items: [
+        TpActionItem(
+          key: ValueKey('note-menu-reassign-${section.name}-${row.id}'),
+          value: 0,
+          label: '交還 AI 維護',
+          icon: CupertinoIcons.sparkles,
+        ),
+      ],
+      onSelected: (_) => unawaited(_reassign()),
     );
   }
 
   Widget _buildRow(BuildContext context) {
     return SwipeToDelete(
       dismissKey: ValueKey('note-dismiss-${section.name}-${row.id}'),
-      onDelete: onDelete,
+      onDelete: widget.onDelete,
       backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s3),
       child: Row(
         children: [
           Expanded(
-            child: Consumer(
-              builder: (context, ref, _) => InkWell(
-                onTap: () => showNoteEditSheet(
-                  context,
-                  tripId: tripId,
-                  section: section,
-                  initialFields: row.editFields,
-                  rowId: row.id,
-                  version: row.version,
-                ),
-                // 長按掛在這裡沒用 —— 外層 SwipeToDelete(flutter_slidable)
-                // 會先攔下手勢。改掛在 SwipeToDelete 之外(見 build 開頭)。
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(TpRadius.md),
-                ),
-                child: row.display,
+            child: InkWell(
+              onTap: () => showNoteEditSheet(
+                context,
+                tripId: tripId,
+                section: section,
+                initialFields: row.editFields,
+                rowId: row.id,
+                version: row.version,
               ),
+              // 長按掛在這裡沒用 —— 外層 SwipeToDelete(flutter_slidable)
+              // 會先攔下手勢。改掛在 SwipeToDelete 之外(見 build 開頭)。
+              borderRadius: const BorderRadius.all(
+                Radius.circular(TpRadius.md),
+              ),
+              child: row.display,
             ),
           ),
+          if (row.canReassignToAi) _reassignMenu(),
           ReorderDragHandle(
-            index: index,
+            index: widget.index,
             iconKey: ValueKey('note-drag-${section.name}-${row.id}'),
-            onMoveUp: onMoveUp,
-            onMoveDown: onMoveDown,
+            onMoveUp: widget.onMoveUp,
+            onMoveDown: widget.onMoveDown,
           ),
         ],
       ),

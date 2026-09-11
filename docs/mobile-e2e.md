@@ -20,6 +20,34 @@ The Patrol bundle contains two independent evidence suites:
 
 Separating the deterministic product flow from the native map boundary makes failures actionable while keeping both cases in the same external-device matrix.
 
+`app_owned_flow_test.dart` 另含第二個 Patrol test「app-owned visual evidence walks
+production chrome on a real map」（#314／#319 的真機視覺證據，共用
+`runAppOwnedVisualEvidenceFlow`）：同一份 Test Lab artifact 內，production App 的
+行程卡「⋯」／長按選單、帳號面板進出、時間軸 header 選單、聊天 composer 與
+「真實 Google 地圖背景 + header／日期選擇器／root tabs／POI accessory／定位鈕／
+行程切換 sheet」逐一停留錄影。API／認證／聊天／收藏仍是替身；只有地圖 canvas
+改用 production `buildTripMapCanvas`，且每次進地圖都等畫面上那張 canvas 真正回報
+過 `onMapReady`（production 只在 view 建立時回報一次，回到保留中的地圖不強制
+重建）。真機 bootstrap 沿用 `LiquidGlassWidgets.initialize()` 與
+`wrap(adaptiveQuality: true)`，光暈主題以公開值等值重現 `lib/main.dart` 的設定。
+判讀 `syslog.txt`／`xcodebuild_output.log` 裡的 `flutter: Tripline visual evidence |`
+行：`scene=<外觀[+注入設定]>/<畫面>` 是停留點名稱（例如 `light/trip-card-menu`、
+`dark+reduce-motion/account-sheet`），同一行記錄 App 實際觀察到的 `appearance`、
+`App 外觀`（淺色由 fixture 啟動即選定，深色走帳號 → 外觀）、`observed reduceMotion／
+increasedContrast／reduceTransparency` 與 `dwell`；`injected accessibility=` 表示
+該無障礙設定由測試 wrapper 注入，**不是** OS 設定，也不涵蓋 iOS 降低透明度
+channel 橋接與 VoiceOver。`build identity` 行是帳號 footer 讀到的平台版本
+（`PackageInfo.fromPlatform`，不是 release flow 的 `0.9.1（12）` 替身），供對照
+Actions run 的 build metadata。host 端對應 `test/flows/app_owned_visual_evidence_flow_test.dart`
+以假地圖走同一流程，只驗流程與 log 標記，不能代替真機材質證據。
+時間預算：Test Lab 對整個 XCTest bundle 設 `--timeout 5m`。實測基準 run
+34555721287（iPhone 14 Pro／iOS 16.6）：app-owned flow 在流程中段失敗，耗時
+64.626s（不是完整跑完的量測值）；native map smoke 通過，34.399s。以下皆為估算，
+尚無真機實測：app-owned flow 完整跑完估約 75s；視覺情境 34 個停留點 × 1.2s ≈ 41s
+加上約 90 次互動與一次真實 onMapReady 等待，估 105–120s；三者合計估約
+215–230s。實際耗時以該 run 的 `test_result_0.xml` 各 testcase `time` 為準；
+若逼近上限，優先縮短 `dwell`（`runAppOwnedVisualEvidenceFlow` 參數）而不是刪情境。
+
 On iOS, both Patrol suites inspect SpringBoard before their first app
 interaction and dismiss a stale `Edit Home Screen` tutorial by its native alert
 and button labels. The guard confirms that the alert disappears; otherwise the
@@ -34,7 +62,7 @@ attaches the text-input connection required by release-mode tests on physical
 iOS devices; the host-runner integration test keeps the standard Flutter test
 driver through the same shared flow.
 
-The regular PR/push CI runs formatter, analyzer, the root-app smoke test, the host-runner app-owned release flow, and the mobile workflow contract test. Full tests and the complete deterministic visual matrix run in `ship` before landing. Host smoke results are not a substitute for readable platform typography, native map tiles, or manual-device accessibility evidence.
+一般 PR／push 到 `master` 的 CI 是 `.github/workflows/mobile.yml` 的 `ci` job：actionlint、`dart format` 檢查（排除 Patrol 產生的 `patrol_test/test_bundle.dart`）、`flutter analyze --no-fatal-infos`，以及**完整 `flutter test`**（整個 `test/`，含 HIG 十態矩陣、host 端 app-owned release／視覺證據流程與 mobile workflow 契約測試），不再只挑選少數檔案。`integration_test/` 與 `patrol_test/` 不在 `flutter test` 預設範圍：Flutter integration APK 與 Patrol bundle 只在 Firebase Test Lab（`mobile-e2e.yml`）執行。`ship` 在合併前於本機再跑同一套完整測試。host 端結果不能代替平台字型可讀性、原生地圖圖磚或人工真機無障礙證據。
 
 ## 發布證據格式
 
@@ -299,6 +327,7 @@ Run the host flow and regenerate its review artifact locally:
 ```bash
 flutter test test/flows/app_owned_release_flow_test.dart
 flutter test test/flows/app_owned_release_flow_artifacts_test.dart
+flutter test test/flows/app_owned_visual_evidence_flow_test.dart
 ```
 
 To run the same strict native-POI assertion locally, supply a valid platform Maps key and add:

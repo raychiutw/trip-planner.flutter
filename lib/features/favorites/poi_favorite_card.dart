@@ -13,6 +13,7 @@ class PoiFavoriteCard extends StatelessWidget {
     required this.onRemove,
     this.onAddToTrip,
     this.onLongPress,
+    this.moreMenu,
     this.selected = false,
     this.selectionMode = false,
     this.onSelectedChanged,
@@ -23,7 +24,12 @@ class PoiFavoriteCard extends StatelessWidget {
   final PoiFavorite favorite;
   final VoidCallback onRemove;
   final VoidCallback? onAddToTrip;
+
+  /// 長按卡片的入口；畫面接的是 [moreMenu] 那顆選單的 controller。
   final VoidCallback? onLongPress;
+
+  /// 卡片尾端的「⋯」選單入口；省略時只有 heart。
+  final Widget? moreMenu;
   final bool selected;
   final bool selectionMode;
   final ValueChanged<bool>? onSelectedChanged;
@@ -142,6 +148,7 @@ class PoiFavoriteCard extends StatelessWidget {
               ),
               onPressed: onRemove,
             ),
+            ?moreMenu,
           ],
         ),
       ),

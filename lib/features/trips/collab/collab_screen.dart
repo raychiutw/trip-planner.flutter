@@ -205,20 +205,20 @@ class _CollabScreenState extends ConsumerState<CollabScreen> {
           ? TpMoreMenuButton<_MemberAction>(
               key: ValueKey('member-actions-${m.id}'),
               tooltip: '成員動作',
+              plain: true,
               enabled: state.changingId != m.id && state.removingId != m.id,
+              // 角色是值選項：只以勾選標示目前角色，不配圖示；移除是動作才有字符。
               items: [
                 TpActionItem(
                   key: ValueKey('member-role-member-${m.id}'),
                   value: _MemberAction.member,
                   label: '共編成員',
-                  icon: CupertinoIcons.person_2,
                   selected: m.role == 'member',
                 ),
                 TpActionItem(
                   key: ValueKey('member-role-viewer-${m.id}'),
                   value: _MemberAction.viewer,
                   label: '檢視成員',
-                  icon: CupertinoIcons.eye,
                   selected: m.role == 'viewer',
                 ),
                 TpActionItem(

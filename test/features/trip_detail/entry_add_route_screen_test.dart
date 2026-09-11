@@ -1,7 +1,9 @@
 import 'dart:ui' show Tristate;
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/favorites_repository.dart';
@@ -674,6 +676,30 @@ void main() {
           .flagsCollection
           .isSelected,
       Tristate.isTrue,
+    );
+    // 值選項只以勾選標示目前地區，其他值不配圖示。
+    Finder menuItem(Finder text) =>
+        find.ancestor(of: text, matching: find.byType(GlassMenuItem));
+    expect(
+      find.descendant(
+        of: menuItem(find.text('沖繩').last),
+        matching: find.byType(Icon),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: menuItem(find.text('沖繩').last),
+        matching: find.byIcon(CupertinoIcons.check_mark),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: menuItem(find.text('東京')),
+        matching: find.byType(Icon),
+      ),
+      findsNothing,
     );
     await tester.tap(find.text('東京'));
     await tester.pumpAndSettle();

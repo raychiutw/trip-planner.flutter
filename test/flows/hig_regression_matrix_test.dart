@@ -183,6 +183,92 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('compact 固定 sheet 停在狀態列下方、接近全高並保留降級 ${state.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final opaque = state.increasedContrast || state.reduceTransparency;
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: state.reduceTransparency,
+          child: MaterialApp(
+            theme: state.brightness == Brightness.light
+                ? AppTheme.light()
+                : AppTheme.dark(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: state.increasedContrast,
+                disableAnimations: state.reduceMotion,
+                textScaler: TextScaler.linear(state.textScale),
+                padding: const EdgeInsets.only(top: 59, bottom: 34),
+                viewPadding: const EdgeInsets.only(top: 59, bottom: 34),
+              ),
+              child: GlassAdaptiveScope(
+                maxQuality: GlassQuality.minimal,
+                child: child!,
+              ),
+            ),
+            home: Center(
+              child: Builder(
+                builder: (context) => FilledButton(
+                  onPressed: () => showAppContentSheet<void>(
+                    context,
+                    title: '帳號',
+                    builder: (_) => ListView(
+                      children: const [ListTile(title: Text('帳號內容'))],
+                    ),
+                  ),
+                  child: const Text('開啟'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('開啟'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final sheet = find.byKey(const ValueKey('app-large-sheet'));
+      final firstFrame = tester.getRect(sheet);
+      await tester.pumpAndSettle();
+      final settled = tester.getRect(sheet);
+      expect(settled.top, greaterThanOrEqualTo(59), reason: '保留狀態列');
+      expect(settled.top, lessThanOrEqualTo(59 + 12), reason: '接近全高');
+      expect(settled.bottom, greaterThanOrEqualTo(844));
+      expect(settled.width, closeTo(390, 0.5));
+      if (state.reduceMotion) {
+        expect(firstFrame, rectMoreOrLessEquals(settled), reason: '降低動態效果不位移');
+      } else {
+        expect(firstFrame.top, greaterThan(settled.top), reason: '由下往上進場');
+      }
+      final scaffold = tester.widget<GlassModalSheetScaffold>(
+        find.byType(GlassModalSheetScaffold),
+      );
+      expect(
+        scaffold.expandedColor,
+        Theme.of(tester.element(sheet)).colorScheme.surface,
+        reason: '內容底色偏實，跟隨語意 surface',
+      );
+      if (opaque) {
+        expect(scaffold.settings!.glassColor.a, 1, reason: '不透明降級');
+        expect(scaffold.settings!.blur, 0);
+      } else {
+        expect(scaffold.settings, isNull, reason: '一般態沿用套件公開預設材質');
+      }
+      expect(scaffold.interactionScale, state.reduceMotion ? 1 : isNot(1));
+      expect(scaffold.stretch, state.reduceMotion ? 0 : isNot(0));
+      final close = find.byKey(const ValueKey('app-sheet-close'));
+      expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(close).width, greaterThanOrEqualTo(44));
+      expect(find.text('帳號內容').hitTestable(), findsOneWidget);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(find.text('開啟').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('sheet 拖至 medium 採預設材質且獨立不透明降級 ${state.name}', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -843,6 +929,94 @@ void main() {
         reason: '選單應已關閉，避免殘留面板影響後續斷言',
       );
 
+      // 內容卡「⋯」：44×44、可及性名稱、一般態無框、提高對比補邊界。
+      final cardMore = find.byKey(const ValueKey('matrix-card-more'));
+      expect(tester.getSize(cardMore), const Size(44, 44));
+      expect(
+        find.descendant(of: cardMore, matching: find.byType(GlassButton)),
+        findsNothing,
+        reason: '內容卡上的入口不疊玻璃',
+      );
+      final moreButton = tester.widget<IconButton>(
+        find.descendant(of: cardMore, matching: find.byType(IconButton)),
+      );
+      expect(
+        moreButton.style!.side!.resolve(const <WidgetState>{})!.color.a,
+        state.increasedContrast ? greaterThan(0.5) : 0,
+        reason: '一般態無可見外框，提高對比才補實心邊',
+      );
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('行程選項'))
+            .getSemanticsData()
+            .flagsCollection
+            .isButton,
+        isTrue,
+      );
+
+      // 快捷動作：三格皆可見、至少 44×44、文字不裁切、都在畫面內。
+      await tester.tap(cardMore);
+      await tester.pumpAndSettle();
+      final quickRects = <String, Rect>{};
+      for (final entry in {
+        'matrix-quick-share': '分享',
+        'matrix-quick-collab': '共編',
+        'matrix-quick-health': 'AI 健檢',
+      }.entries) {
+        final tile = find.byKey(ValueKey(entry.key));
+        final rect = tester.getRect(tile);
+        quickRects[entry.key] = rect;
+        expect(rect.width, greaterThanOrEqualTo(44), reason: entry.key);
+        expect(rect.height, greaterThanOrEqualTo(44), reason: entry.key);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: entry.key);
+        expect(rect.right, lessThanOrEqualTo(390), reason: entry.key);
+        expect(rect.top, greaterThanOrEqualTo(47), reason: entry.key);
+        expect(rect.bottom, lessThanOrEqualTo(844 - 34), reason: entry.key);
+        final label = find.descendant(
+          of: tile,
+          matching: find.text(entry.value),
+        );
+        expect(label, findsOneWidget, reason: entry.key);
+        expect(
+          tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+          isFalse,
+          reason: '${entry.key} 文字不得裁切',
+        );
+      }
+      expect(find.bySemanticsLabel('共編設定'), findsOneWidget);
+      // 一般字級並排；放大字級放不下時改直列，順序不變。
+      final share = quickRects['matrix-quick-share']!;
+      final collab = quickRects['matrix-quick-collab']!;
+      final health = quickRects['matrix-quick-health']!;
+      if (state.textScale == 1) {
+        expect(share.top, closeTo(collab.top, 0.5));
+        expect(share.right, lessThanOrEqualTo(collab.left + 0.5));
+        expect(collab.right, lessThanOrEqualTo(health.left + 0.5));
+      } else {
+        expect(share.bottom, lessThanOrEqualTo(collab.top + 0.5));
+        expect(collab.bottom, lessThanOrEqualTo(health.top + 0.5));
+      }
+      expect(
+        tester.getRect(find.byKey(const ValueKey('matrix-card-export'))).top,
+        greaterThanOrEqualTo(health.bottom),
+        reason: '快捷動作在上，清單在下',
+      );
+      final deleteLabel = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const ValueKey('matrix-card-delete')),
+          matching: find.text('刪除行程'),
+        ),
+      );
+      expect(
+        deleteLabel.style?.color,
+        scheme.error,
+        reason: '刪除走 destructive role 的語意紅',
+      );
+      await tester.tapAt(const Offset(20, 400));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('matrix-quick-share')), findsNothing);
+      expect(tester.takeException(), isNull);
+
       await tester.fling(
         find.byType(CustomScrollView),
         const Offset(0, -1200),
@@ -1036,6 +1210,52 @@ class _MatrixSceneState extends State<_MatrixScene> {
                         leading: CircleAvatar(child: Text('${index + 1}')),
                         title: Text(index == 0 ? '清水寺' : '行程景點 ${index + 1}'),
                         subtitle: const Text('10:00–11:30 · 景點'),
+                        // 內容卡上的「⋯」：不套玻璃，上排三個快捷動作。
+                        trailing: index == 0
+                            ? TpMoreMenuButton<int>(
+                                key: const ValueKey('matrix-card-more'),
+                                tooltip: '行程選項',
+                                plain: true,
+                                onSelected: (_) {},
+                                quickActions: const <TpActionItem<int>>[
+                                  TpActionItem<int>(
+                                    key: ValueKey('matrix-quick-share'),
+                                    value: 1,
+                                    icon: CupertinoIcons.share,
+                                    label: '分享',
+                                  ),
+                                  TpActionItem<int>(
+                                    key: ValueKey('matrix-quick-collab'),
+                                    value: 2,
+                                    icon: CupertinoIcons.person_2,
+                                    label: '共編',
+                                    semanticLabel: '共編設定',
+                                  ),
+                                  TpActionItem<int>(
+                                    key: ValueKey('matrix-quick-health'),
+                                    value: 3,
+                                    icon: CupertinoIcons.sparkles,
+                                    label: 'AI 健檢',
+                                  ),
+                                ],
+                                items: const <TpActionItem<int>>[
+                                  TpActionItem<int>(
+                                    key: ValueKey('matrix-card-export'),
+                                    value: 4,
+                                    icon: CupertinoIcons.square_arrow_down,
+                                    label: '匯出 JSON',
+                                  ),
+                                  TpActionItem<int>(
+                                    key: ValueKey('matrix-card-delete'),
+                                    value: 5,
+                                    icon: CupertinoIcons.delete,
+                                    label: '刪除行程',
+                                    dividerBefore: true,
+                                    role: TpActionRole.destructive,
+                                  ),
+                                ],
+                              )
+                            : null,
                       ),
                     ),
                 ],

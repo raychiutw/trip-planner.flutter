@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
@@ -1333,8 +1334,31 @@ void main() {
 
     await tester.longPress(find.text('我改過的 AI 項目'));
     await tester.pumpAndSettle();
-    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    // 由列附近展開的錨定選單，不再是底部動作表。
+    expect(find.byType(CupertinoActionSheet), findsNothing);
+    expect(find.text('取消'), findsNothing);
+    final reassign = find.byKey(
+      const ValueKey('note-menu-reassign-pretrip-11'),
+    );
+    expect(
+      find.descendant(of: reassign, matching: find.text('交還 AI 維護')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: reassign,
+        matching: find.byIcon(CupertinoIcons.sparkles),
+      ),
+      findsOneWidget,
+      reason: '一般動作配語意明確的圖示',
+    );
+    final rowRect = tester.getRect(find.text('我改過的 AI 項目'));
+    final itemRect = tester.getRect(reassign);
+    expect(itemRect.top, greaterThan(rowRect.top - 120));
+    expect(itemRect.top, lessThan(rowRect.bottom + 120));
+
     await tester.tap(find.text('交還 AI 維護'));
+    await tester.tap(find.text('交還 AI 維護'), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     verify(
@@ -1346,6 +1370,122 @@ void main() {
         expectedVersion: 4,
       ),
     ).called(1);
+  });
+
+  testWidgets('可交還的列有「⋯」入口，與長按開同一份選單；純人工的列沒有入口', (tester) async {
+    _useTallViewport(tester);
+    final semantics = tester.ensureSemantics();
+    final repo = reassignRepo();
+    await tester.pumpWidget(reassignScreen(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('note-more-pretrip-11'));
+    expect(more, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('note-more-pretrip-12')),
+      findsNothing,
+      reason: '純人工建立的列沒有選單，也不留可聚焦的空按鈕',
+    );
+    final size = tester.getSize(more);
+    expect(size.width, greaterThanOrEqualTo(44));
+    expect(size.height, greaterThanOrEqualTo(44));
+    expect(
+      find.descendant(of: more, matching: find.byType(GlassButton)),
+      findsNothing,
+      reason: '內容列上的入口不疊玻璃',
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('筆記選項').first)
+          .getSemanticsData()
+          .flagsCollection
+          .isButton,
+      isTrue,
+    );
+
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('note-menu-reassign-pretrip-11')),
+    );
+    await tester.pumpAndSettle();
+    verify(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+    semantics.dispose();
+  });
+
+  testWidgets('筆記選單交還維護失敗後持續顯示中文錯誤、保留筆記且可重開選單', (tester) async {
+    _useTallViewport(tester);
+    final repo = reassignRepo();
+    final request = Completer<void>();
+    when(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).thenAnswer((_) => request.future);
+    await tester.pumpWidget(reassignScreen(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('note-more-pretrip-11'));
+    final reassign = find.byKey(
+      const ValueKey('note-menu-reassign-pretrip-11'),
+    );
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(reassign);
+    await tester.tap(reassign, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(reassign, findsNothing, reason: '請求尚未完成時選單已關閉');
+
+    request.completeError(
+      const ApiError(
+        status: 409,
+        code: 'NOTES_AI_JOB_STALE',
+        message: 'note maintainer version changed',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const failure = '這一則已經被更新過，請重新整理後再試。';
+    expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+    expect(find.text(failure), findsOneWidget);
+    expect(find.text('我改過的 AI 項目'), findsOneWidget);
+    expect(find.textContaining('已交還 AI 維護'), findsNothing);
+    expect(find.textContaining('NOTES_AI_JOB_STALE'), findsNothing);
+
+    // 超過短暫通知的顯示時間後，錯誤仍保留；重開選單不會再送一次請求。
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text(failure), findsOneWidget);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(reassign.hitTestable(), findsOneWidget);
+    expect(find.text('我改過的 AI 項目'), findsOneWidget);
+    expect(find.textContaining('已交還 AI 維護'), findsNothing);
+    verify(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('已排除 N 項:N=0 不出現;點開可逐項恢復', (tester) async {
@@ -1434,6 +1574,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CupertinoActionSheet), findsNothing);
     expect(find.text('交還 AI 維護'), findsNothing);
+    expect(find.byKey(const ValueKey('note-more-pretrip-12')), findsNothing);
   });
 
   testWidgets('目前由 AI 維護的列顯示標記,改過的不顯示', (tester) async {

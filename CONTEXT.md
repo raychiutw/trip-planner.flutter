@@ -31,7 +31,7 @@ _避免_: bottom nav、navigation bar
 _避免_: 底部工具列、bottom bar、floating bar
 
 **聊天 composer**:
-聊天頁那條常駐的 bottom accessory:左側 `＋`、中間輸入框、右側麥克風與送出。草稿屬於行程,切走再切回要恢復。
+聊天頁那條常駐的 bottom accessory:輸入框從 leading 起延伸、右側麥克風與送出;沒有 `＋` 或其他加入內容入口。草稿屬於行程,切走再切回要恢復。
 _避免_: 輸入列、input bar、訊息框
 
 ## 內容控制項
@@ -41,8 +41,16 @@ _避免_: 輸入列、input bar、訊息框
 _避免_: day tab、日期 tab、segmented control
 
 **選單**:
-由 bar button 或卡片上的「⋯」觸發、由觸發點展開的下拉動作清單(對應 iOS pull-down menu)。
-_避免_: popup menu、dropdown、context menu(後者專指長按觸發的那一種)
+由 bar button 或卡片上的「⋯」觸發、由觸發點展開的下拉動作清單(對應 iOS pull-down menu)。長按同一對象開的是同一份選單。
+_避免_: popup menu、dropdown、context menu(後者專指長按觸發的那一種)、action sheet(一般動作不再用底部純文字動作表;它只承載破壞性確認)
+
+**快捷動作**:
+選單上排字符在上、短文字在下的動作格,最多三格並排;放不下時改為同順序直列。行程卡的三格是分享／共編／AI 健檢。
+_避免_: quick action、shortcut、icon grid、工具列
+
+**值選項**:
+選單裡互斥的「目前值」—— 地區、分類、排序、成員角色。只以勾選標示目前值,不配字符;選了就換值、不執行動作。
+_避免_: option、radio item、選項值、篩選項
 
 **行程切換鈕**:
 浮動 header 標題位置的按鈕,點擊後開出切換行程的 sheet。

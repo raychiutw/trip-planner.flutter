@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/collab_repository.dart';
@@ -398,5 +399,61 @@ void main() {
       const Size(44, 44),
     );
     expect(find.byKey(const ValueKey('member-remove-2')), findsNothing);
+  });
+
+  testWidgets('成員列上的「⋯」是不疊玻璃的內容列入口，仍有「成員動作」按鈕語意', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('member-actions-2'));
+    expect(
+      find.descendant(of: more, matching: find.byType(GlassButton)),
+      findsNothing,
+      reason: '內容列上的入口不疊玻璃',
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('成員動作').first)
+          .getSemanticsData()
+          .flagsCollection
+          .isButton,
+      isTrue,
+    );
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('member-role-member-2')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('member-role-viewer-2')),
+        matching: find.byIcon(CupertinoIcons.check_mark),
+      ),
+      findsOneWidget,
+      reason: '目前角色（檢視成員）以勾選標示',
+    );
+    // 角色是值選項：目前角色只有勾選，其他角色不配字符；移除成員是動作才有字符。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('member-role-viewer-2')),
+        matching: find.byType(Icon),
+      ),
+      findsOneWidget,
+      reason: '選取值只有勾選，沒有另配字符',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('member-role-member-2')),
+        matching: find.byType(Icon),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('member-remove-2')),
+        matching: find.byIcon(CupertinoIcons.person_badge_minus),
+      ),
+      findsOneWidget,
+    );
+    semantics.dispose();
   });
 }

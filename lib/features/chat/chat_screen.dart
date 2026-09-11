@@ -4,7 +4,6 @@ library;
 
 import 'dart:async';
 
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoColors, CupertinoIcons;
 import 'package:flutter/services.dart';
@@ -17,7 +16,6 @@ import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
-import '../../ui/tp_action_item.dart';
 import '../../ui/tp_glass_surface.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../trips/current_trip_provider.dart';
@@ -29,14 +27,6 @@ import 'chat_controller.dart';
 import 'chat_link.dart';
 import 'chat_message.dart';
 import 'speech_service.dart';
-
-/// 可替換的附件選擇器；測試可注入失敗，不直接觸發 platform channel。
-typedef ChatAttachmentPicker = Future<XFile?> Function();
-
-/// 聊天附件入口使用的系統檔案選擇器。
-final chatAttachmentPickerProvider = Provider<ChatAttachmentPicker>(
-  (ref) => openFile,
-);
 
 /// 空對話時顯示的 4 個示範建議 prompt。
 const List<String> _suggestedPrompts = [
@@ -580,7 +570,6 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
             child: SizeChangedLayoutNotifier(
               key: _composerKey,
               child: _Composer(
-                tripId: widget.tripId,
                 input: _input,
                 sending: state.sending,
                 onSend: _send,
@@ -840,11 +829,8 @@ class _MessageBubble extends StatelessWidget {
 /// SpeechService(請求麥克風/語音辨識權限)→ 成功則 listen，辨識文字回填
 /// 輸入框；init 失敗(權限拒絕/不支援)→ 提供系統設定恢復動線且不 listen。
 /// 聆聽中切換 icon/配色，再點則 stop。
-enum _ComposerAction { attachment, addEntry }
-
 class _Composer extends ConsumerStatefulWidget {
   const _Composer({
-    required this.tripId,
     required this.input,
     required this.sending,
     required this.onSend,
@@ -854,7 +840,6 @@ class _Composer extends ConsumerStatefulWidget {
     required this.onSpeechPurposeAccepted,
   });
 
-  final String tripId;
   final TextEditingController input;
   final bool sending;
   final VoidCallback onSend;
@@ -892,40 +877,6 @@ class _ComposerState extends ConsumerState<_Composer> {
   void dispose() {
     widget.input.removeListener(_inputChanged);
     super.dispose();
-  }
-
-  Future<void> _onAdd() async {
-    final action = await showAppActionSheet<_ComposerAction>(
-      context,
-      title: '加入內容',
-      actions: const [
-        TpActionItem(
-          value: _ComposerAction.attachment,
-          label: '加入附件',
-          icon: CupertinoIcons.paperclip,
-        ),
-        TpActionItem(
-          value: _ComposerAction.addEntry,
-          label: '新增行程項目',
-          icon: CupertinoIcons.add_circled,
-        ),
-      ],
-    );
-    if (!mounted || action == null) return;
-    if (action == _ComposerAction.addEntry) {
-      context.push('/trips/${Uri.encodeComponent(widget.tripId)}/entries/new');
-      return;
-    }
-    try {
-      final file = await ref.read(chatAttachmentPickerProvider)();
-      if (mounted && file != null) {
-        showAppNotice(context, '已選擇 ${file.name}');
-      }
-    } on Exception {
-      if (mounted) {
-        showAppNotice(context, '無法開啟附件選擇器，請稍後再試。');
-      }
-    }
   }
 
   /// lazy init:第一次成功後快取結果,後續沿用不再請求權限。
@@ -1013,13 +964,6 @@ class _ComposerState extends ConsumerState<_Composer> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                IconButton(
-                  key: const ValueKey('chat-add-button'),
-                  tooltip: '加入內容',
-                  onPressed: widget.sending ? null : () => unawaited(_onAdd()),
-                  icon: const Icon(CupertinoIcons.add, semanticLabel: '加入內容'),
-                ),
-                const SizedBox(width: TpSpacing.s1),
                 Expanded(
                   child: CallbackShortcuts(
                     bindings: {

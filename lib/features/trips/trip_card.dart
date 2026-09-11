@@ -23,7 +23,7 @@ class TripCard extends StatelessWidget {
     this.currentUserId,
     this.onTap,
     this.onLongPress,
-    this.onMorePressed,
+    this.moreMenu,
   });
 
   final TripSummary trip;
@@ -32,7 +32,9 @@ class TripCard extends StatelessWidget {
   final String? currentUserId;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
-  final VoidCallback? onMorePressed;
+
+  /// 卡片尾端的「⋯」選單入口；省略時改顯示 chevron。
+  final Widget? moreMenu;
 
   /// eyebrow 文字：「{countries} · {N} 天」，任一缺漏只顯示有值的部分；皆缺則 null。
   String? get _eyebrowText {
@@ -124,13 +126,8 @@ class TripCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: TpSpacing.s2),
-          if (onMorePressed != null)
-            IconButton(
-              key: ValueKey('trip-card-more-${trip.tripId}'),
-              tooltip: '行程選項',
-              onPressed: onMorePressed,
-              icon: const Icon(CupertinoIcons.ellipsis),
-            )
+          if (moreMenu != null)
+            moreMenu!
           else
             Icon(
               CupertinoIcons.chevron_right,
