@@ -20,6 +20,58 @@ import 'package:tripline/ui/tp_glass_surface.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
 
 void main() {
+  testWidgets('淺色真行程地圖的標題文字套用白色媒體前景', (tester) async {
+    await _pumpTripMapHeader(
+      tester,
+      theme: AppTheme.light(),
+      trips: _switchableTrips,
+    );
+    expect(_renderedTitleColor(tester), Colors.white);
+  });
+  testWidgets('單一行程停用切換時媒體上的標題仍是完整白色前景', (tester) async {
+    await _pumpTripMapHeader(
+      tester,
+      theme: AppTheme.light(),
+      trips: [_switchableTrips.first],
+    );
+    expect(
+      tester
+          .widget<TextButton>(
+            find.descendant(
+              of: find.byKey(const ValueKey('trip-map-trip-picker')),
+              matching: find.byType(TextButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+      reason: '單一行程只停用切換',
+    );
+    expect(_renderedTitleColor(tester), Colors.white);
+  });
+  testWidgets('深色真行程地圖的標題文字維持白色媒體前景', (tester) async {
+    await _pumpTripMapHeader(
+      tester,
+      theme: AppTheme.dark(),
+      trips: _switchableTrips,
+    );
+    expect(_renderedTitleColor(tester), Colors.white);
+  });
+  for (final reduceTransparency in [false, true]) {
+    testWidgets(
+      '淺色${reduceTransparency ? '降低透明度' : '提高對比'}不透明降級的標題文字改回 onSurface',
+      (tester) async {
+        final theme = AppTheme.light();
+        await _pumpTripMapHeader(
+          tester,
+          theme: theme,
+          trips: _switchableTrips,
+          reduceTransparency: reduceTransparency,
+          highContrast: !reduceTransparency,
+        );
+        expect(_renderedTitleColor(tester), theme.colorScheme.onSurface);
+      },
+    );
+  }
   testWidgets('真行程地圖把媒體可讀性傳入日期與帳號', (tester) async {
     await _loadFonts(tester);
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -246,6 +298,64 @@ void main() {
     expect(find.text('帳號目的地'), findsOneWidget);
   });
 }
+
+/// 兩個行程才會啟用切換；單一行程時標題停用切換但仍顯示目前行程。
+const _switchableTrips = [
+  TripSummary(tripId: 'legibility', name: 'Okinawa', title: 'Okinawa trip'),
+  TripSummary(tripId: 'legibility-2', name: 'Kyushu', title: 'Kyushu trip'),
+];
+
+/// 真行程地圖：媒體背景宣告、浮動 header 與標題都由真畫面組裝，只替換圖磚。
+Future<void> _pumpTripMapHeader(
+  WidgetTester tester, {
+  required ThemeData theme,
+  required List<TripSummary> trips,
+  bool highContrast = false,
+  bool reduceTransparency = false,
+}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        tripDaysProvider.overrideWith(
+          (ref, tripId) => Stream.value([
+            for (var day = 1; day <= 5; day++)
+              TripDay(id: day, dayNum: day, version: 0),
+          ]),
+        ),
+        myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+      ],
+      child: _routedApp(
+        theme: theme,
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(highContrast: highContrast),
+            child: AppAccessibilityScope(
+              reduceTransparency: reduceTransparency,
+              child: TpAccountActionScope(
+                onOpen: (_) {},
+                child: TripMapScreen(
+                  tripId: 'legibility',
+                  initialDayNum: 1,
+                  mapBuilder: (_) => const ColoredBox(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// 標題最後畫出來的文字色：讀 RenderParagraph 的有效 style，不讀按鈕 style。
+Color? _renderedTitleColor(WidgetTester tester) => tester
+    .renderObject<RenderParagraph>(find.text('Okinawa trip'))
+    .text
+    .style
+    ?.color;
 
 Widget _routedApp({required ThemeData theme, required Widget home}) {
   final router = GoRouter(

@@ -100,7 +100,7 @@ iPhone 固定四個 root tabs：
 - **HIG 建議**：行程清單較長時，selection sheet 提供搜尋；這是選擇器內搜尋，不是地圖或 Day 搜尋。
 - **HIG 必須**：Header 可截斷過長名稱；selection sheet 顯示完整名稱。
 - **HIG 必須**：VoiceOver 讀出「目前行程，{名稱}，按兩下切換行程」與 button／menu 語意。
-- **Tripline 決策**：只有一個行程時隱藏 chevron 並停用切換；沒有行程時顯示「尚無行程」與建立入口。
+- **Tripline 決策**：只有一個行程時隱藏 chevron 並停用切換；標題仍是目前行程資訊，文字維持所在 bar 的完整前景（媒體背景上為白色），不隨停用降淡。沒有行程時顯示「尚無行程」與建立入口。
 - **Tripline 決策**：切換後維持目前 section。原 Day 在新行程存在時保留，否則選 Day 1；舊 POI 選取與 sheet 必須關閉。
 - **Tripline 決策**：聊天草稿屬於行程；切換行程後保存舊草稿，切回時恢復，避免把內容送到錯誤行程。
 

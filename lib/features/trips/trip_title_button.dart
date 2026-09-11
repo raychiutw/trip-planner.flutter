@@ -72,9 +72,12 @@ class TripTitleButton extends StatelessWidget {
                 currentTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                // theme 的 titleLarge 自帶 onSurface，會蓋掉 bar 前景；明確
+                // 改回 bar 前景，單一行程停用切換時文字也不跟著按鈕變淡。
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: foreground,
+                ),
               ),
             ),
             if (canSelect) ...[
