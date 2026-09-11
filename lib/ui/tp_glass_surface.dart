@@ -184,19 +184,35 @@ Color tpGlassEdgeColor(BuildContext context) {
 }
 
 /// 套件預設 1.0 的全周 Fresnel 亮環在深色真機量到 Apple 參考的 1.2～2 倍；
-/// 減半預期降回參考量級、待真機確認，方向性高光仍由套件 lightIntensity 提供（#319）。
+/// 減半後 premium 的環幾乎沒變，主要來源是下面的 lightIntensity（#319）。
 const double tpNavigationFresnelStrength = 0.5;
+
+/// premium 的邊緣高光 ∝ lightIntensity 且反方向也亮（寫死 0.8）；theme 預設的
+/// 0.35 倍讓最強一側落到 Apple 參考頂緣量級，standard 路徑幾乎無感（DESIGN §16.2）。
+const double tpNavigationLightIntensityScale = 0.35;
+
+/// standard 路徑的環由套件常數主導，edgeAbsorption 是其末端唯一公開的 rim 壓低項；
+/// 只在深色套用，premium 在淺色白底會刻出暗框（DESIGN §16.2）。
+const double tpNavigationDarkEdgeAbsorption = 0.3;
 
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
-  final defaults =
-      (GlassThemeData.of(
-                context,
-              ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
-              const LiquidGlassSettings())
-          .copyWith(fresnelStrength: tpNavigationFresnelStrength);
+  final packageDefaults =
+      GlassThemeData.of(
+        context,
+      ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
+      const LiquidGlassSettings();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final defaults = packageDefaults.copyWith(
+    fresnelStrength: tpNavigationFresnelStrength,
+    lightIntensity:
+        packageDefaults.lightIntensity * tpNavigationLightIntensityScale,
+    edgeAbsorption: isDark
+        ? tpNavigationDarkEdgeAbsorption
+        : packageDefaults.edgeAbsorption,
+  );
   final onMedia = recipe == TpNavigationGlassRecipe.platformView;
   final scrim = Colors.black.withValues(alpha: tpMediaScrimOpacity);
   return tpResolveGlassSettings(

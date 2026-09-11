@@ -305,10 +305,12 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **HIG 必須**：Liquid Glass 是功能層，不是內容層。
 - **Tripline 決策**：依 #303／#304 固定 liquid_glass_widgets 1.4.1，共用表面沿用套件公開預設材質與品質選擇；保留品牌 tint 前景、媒體暗化與獨立無障礙降級，不重建舊 shader 校準外觀。
-- **Tripline 決策**：#319 以 iPhone 14 Pro／iOS 16.6 真機（premium）對照 Apple Music 參考圖後，只有兩項明文偏離套件預設，其餘光學參數不動：
-  1. 導覽玻璃 `fresnelStrength` 由 1.0 改 0.5（`tpNavigationFresnelStrength`）。修正前真機在深色四邊量到均一亮環 +73（bar button／標題膠囊）～ +112（root tab bar），Apple 參考只有頂緣 +50～+65、側邊 0。預期效果：亮環約減半、落回參考量級，方向性高光仍由套件 `lightIntensity` 提供；淺色白底修正前只有 +3～+4，預期不受影響。
-  2. 選單面板改走 HIG regular 類材質（`tpMenuGlassSettings`）：白色 veil 淺色 72%／深色 18% 與 blur 24，取代導覽玻璃的 8–12%／4–5。修正前導覽配方的面板最低亮度僅 1–18，後方卡片黑帶、白色標題與「⋯」都穿透；參考面板最低亮度 41–42 且看不出字形。預期效果：面板最低亮度接近參考、字形不再穿透。提高對比／降低透明度改 `surfaceContainerHigh` 不透明底，預期黑面板與黑頁面有邊界。選單目前不開在媒體背景上。
-  以上都是由修正前量測與參考量級推導的**預期效果，待下一輪真機重量測四邊峰值與面板最低亮度後才算驗收**。
+- **Tripline 決策**：#319 以 iPhone 14 Pro／iOS 16.6 真機對照 Apple Music 參考圖後，只有四項明文偏離套件預設，其餘光學參數不動：
+  1. 導覽玻璃 `fresnelStrength` 由 1.0 改 0.5（`tpNavigationFresnelStrength`）。修正前真機在深色四邊量到均一亮環 +73（bar button／標題膠囊）～ +112（root tab bar），Apple 參考只有頂緣 +50～+65、側邊 0。0.26.7 真機重量測：bar button／標題膠囊降到 +57～+65（約 −18%），root tab bar 幾乎沒變（+95～+110）；淺色白底維持 +0～+4。
+  2. 選單面板改走 HIG regular 類材質（`tpMenuGlassSettings`）：白色 veil 淺色 72%／深色 18% 與 blur 24，取代導覽玻璃的 8–12%／4–5。修正前導覽配方的面板最低亮度僅 1–18，後方卡片黑帶、白色標題與「⋯」都穿透；參考面板最低亮度 41–42 且看不出字形。0.26.7 真機重量測：面板最低亮度 38～45、字形不可辨識，提高對比／降低透明度的 `surfaceContainerHigh` 不透明底讓黑面板與黑頁面有邊界（44 對 0）—— 兩項皆已驗收。選單目前不開在媒體背景上。
+  3. 導覽玻璃 `lightIntensity` 取套件 theme 預設的 0.35 倍（`tpNavigationLightIntensityScale`：深 0.7 → 0.245、淺 0.85 → 0.2975）。root tab bar 走 `GlassTabBar.bottom` 的 premium 路徑，其邊緣高光 ∝ `lightIntensity`，且套件把光源反方向的 lobe 寫死為 0.8，所以是全周環而不是只有頂緣；Fresnel 只佔 0.12 權重，減半才拿掉 0.06。以公開公式與 0.26.7 量測反推，0.35 倍預期讓 root tab bar 頂／左由 +110 降到約 +61、右／下由 +92 降到約 +50；側邊 0 是套件公開能力做不到的。淺色白底預期不變。
+  4. 深色導覽玻璃 `edgeAbsorption` 0.3（`tpNavigationDarkEdgeAbsorption`；淺色維持套件預設 0）。浮動 header 的標題膠囊、「⋯」與帳號圓鈕的 `GlassContainer`／`GlassButton` 品質 fallback 是 `standard`，App 沒有提供 premium scope，因此不論 thermal 狀態都走 lightweight shader（同一畫面 standard 窗與 premium 窗都量到 +57～+65，tab bar 則是 +61 對 +110）；該 shader 的環由寫死的 `kRimAlphaBase 0.65`／`kMinRimVisibility 0.35` 主導，第 3 項對它只由 +59 → +57。`edgeAbsorption` 是該路徑末端唯一公開的 rim 壓低參數（`rim × (1 − 0.3 × dirScale)`，對側壓得比主光側多），預期 header 頂／左 +57 → 約 +42、右／下 → 約 +30，並讓 root tab bar 再降到約 +58／+44。0.3 是套件文件「明顯 rim 暗化」的值，也是 Tripline 對照 HIG 參考選的產品取值，不是 Apple 的固定數值；0.12（「輕微」）推估只降 −6～−11，不足以稱為收斂。只在深色套用：premium 的 absorption 先乘在折射體色再 mix 高光，淺色白底若套 0.3 推估相對白底 −40／−78，會刻出暗框。
+  第 3、4 項是由公開公式與修正前量測推導的**預期效果，待 0.26.8 真機重量測 root tab bar 與 header 四邊峰值後才算驗收**。不強制 header 走 premium（同裝置已有 thermalDegradation 紀錄）、不改 shader、不動 `refractiveIndex`、不加各 feature 參數；媒體 frosted 路徑不讀 `edgeAbsorption`，無障礙降級仍歸零。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
 - **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。
