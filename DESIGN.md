@@ -100,7 +100,7 @@ iPhone 固定四個 root tabs：
 - **HIG 建議**：行程清單較長時，selection sheet 提供搜尋；這是選擇器內搜尋，不是地圖或 Day 搜尋。
 - **HIG 必須**：Header 可截斷過長名稱；selection sheet 顯示完整名稱。
 - **HIG 必須**：VoiceOver 讀出「目前行程，{名稱}，按兩下切換行程」與 button／menu 語意。
-- **Tripline 決策**：只有一個行程時隱藏 chevron 並停用切換；沒有行程時顯示「尚無行程」與建立入口。
+- **Tripline 決策**：只有一個行程時隱藏 chevron 並停用切換；標題仍是目前行程資訊，文字維持所在 bar 的完整前景（媒體背景上為白色），不隨停用降淡。沒有行程時顯示「尚無行程」與建立入口。
 - **Tripline 決策**：切換後維持目前 section。原 Day 在新行程存在時保留，否則選 Day 1；舊 POI 選取與 sheet 必須關閉。
 - **Tripline 決策**：聊天草稿屬於行程；切換行程後保存舊草稿，切回時恢復，避免把內容送到錯誤行程。
 
@@ -310,7 +310,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
   2. 選單面板改走 HIG regular 類材質（`tpMenuGlassSettings`）：白色 veil 淺色 72%／深色 18% 與 blur 24，取代導覽玻璃的 8–12%／4–5。修正前導覽配方的面板最低亮度僅 1–18，後方卡片黑帶、白色標題與「⋯」都穿透；參考面板最低亮度 41–42 且看不出字形。0.26.7 真機重量測：面板最低亮度 38～45、字形不可辨識，提高對比／降低透明度的 `surfaceContainerHigh` 不透明底讓黑面板與黑頁面有邊界（44 對 0）—— 兩項皆已驗收。選單目前不開在媒體背景上。
   3. 導覽玻璃 `lightIntensity` 取套件 theme 預設的 0.35 倍（`tpNavigationLightIntensityScale`：深 0.7 → 0.245、淺 0.85 → 0.2975）。root tab bar 走 `GlassTabBar.bottom` 的 premium 路徑，其邊緣高光 ∝ `lightIntensity`，且套件把光源反方向的 lobe 寫死為 0.8，所以是全周環而不是只有頂緣；Fresnel 只佔 0.12 權重，減半才拿掉 0.06。以公開公式與 0.26.7 量測反推，0.35 倍預期讓 root tab bar 頂／左由 +110 降到約 +61、右／下由 +92 降到約 +50；側邊 0 是套件公開能力做不到的。淺色白底預期不變。
   4. 深色導覽玻璃 `edgeAbsorption` 0.3（`tpNavigationDarkEdgeAbsorption`；淺色維持套件預設 0）。浮動 header 的標題膠囊、「⋯」與帳號圓鈕的 `GlassContainer`／`GlassButton` 品質 fallback 是 `standard`，App 沒有提供 premium scope，因此不論 thermal 狀態都走 lightweight shader（同一畫面 standard 窗與 premium 窗都量到 +57～+65，tab bar 則是 +61 對 +110）；該 shader 的環由寫死的 `kRimAlphaBase 0.65`／`kMinRimVisibility 0.35` 主導，第 3 項對它只由 +59 → +57。`edgeAbsorption` 是該路徑末端唯一公開的 rim 壓低參數（`rim × (1 − 0.3 × dirScale)`，對側壓得比主光側多），預期 header 頂／左 +57 → 約 +42、右／下 → 約 +30，並讓 root tab bar 再降到約 +58／+44。0.3 是套件文件「明顯 rim 暗化」的值，也是 Tripline 對照 HIG 參考選的產品取值，不是 Apple 的固定數值；0.12（「輕微」）推估只降 −6～−11，不足以稱為收斂。只在深色套用：premium 的 absorption 先乘在折射體色再 mix 高光，淺色白底若套 0.3 推估相對白底 −40／−78，會刻出暗框。
-  第 3、4 項是由公開公式與修正前量測推導的**預期效果，待 0.26.8 真機重量測 root tab bar 與 header 四邊峰值後才算驗收**。不強制 header 走 premium（同裝置已有 thermalDegradation 紀錄）、不改 shader、不動 `refractiveIndex`、不加各 feature 參數；媒體 frosted 路徑不讀 `edgeAbsorption`，無障礙降級仍歸零。
+  第 3、4 項原為公開公式與修正前量測推導的預期效果；0.26.8（`816ef76`，run 34591742975）同裝置重量測結果如下：header 圓鈕 +47／+33／+43／+32、標題膠囊 +45／+43／+30、root tab bar +71／+68／+52（高於推估的 +58／+44，最亮側已落到參考頂緣量級），全周白光減弱並轉為方向性、無黑框；側邊細環是套件公開能力極限，已接受，不再加光照修正；淺色白底 +1～+4 不變。細節見 [1.4.1 遷移紀錄](docs/liquid-glass-1.4.1-migration.md)。不強制 header 走 premium（同裝置已有 thermalDegradation 紀錄）、不改 shader、不動 `refractiveIndex`、不加各 feature 參數；媒體 frosted 路徑不讀 `edgeAbsorption`，無障礙降級仍歸零。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
 - **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。

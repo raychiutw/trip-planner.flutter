@@ -2,9 +2,12 @@ import 'dart:ui' show Tristate;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tripline/features/trips/trip_title_button.dart';
 import 'package:tripline/models/trip.dart';
+import 'package:tripline/theme/app_theme.dart';
+import 'package:tripline/ui/tp_root_scaffold.dart';
 
 void main() {
   testWidgets('trip picker is a selection sheet', (tester) async {
@@ -92,5 +95,35 @@ void main() {
       ),
     );
     semantics.dispose();
+  });
+
+  testWidgets('非媒體浮動 header 上單一行程的標題仍是完整 onSurface 前景', (tester) async {
+    final theme = AppTheme.light();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: TpRootScaffold(
+          header: TpRootHeaderConfig(
+            title: TripTitleButton(
+              currentTripId: 'trip-1',
+              currentTitle: '東京五日行',
+              trips: const [TripSummary(tripId: 'trip-1', name: '東京五日行')],
+              onSelected: (_) => fail('單一行程不應開啟 selector'),
+            ),
+          ),
+          body: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    // 停用的是切換，不是標題：文字色必須是完整前景，不能跟著按鈕降到 38%。
+    expect(
+      tester
+          .renderObject<RenderParagraph>(find.text('東京五日行'))
+          .text
+          .style
+          ?.color,
+      theme.colorScheme.onSurface,
+    );
   });
 }

@@ -60,6 +60,16 @@ run，放寬只是不讓已確認的執行時間再被同一個上限截斷：
   仍待新 run 驗證，不能據此宣稱整組通過。`15m` 是 gcloud 對 Android 的預設值，涵蓋
   整組三個 case 的餘裕，並保留所有內層限制。
 
+放寬後的第一個 run [34591742975](https://github.com/raychiutw/trip-planner.flutter/actions/runs/34591742975)
+（0.26.8+39，platform=all）已確認每個 case 都完整跑完、XML 寫完：iOS 兩次 attempt 的
+Xcode 測試執行分別 302.2s 與 291.6s（attempt 2：app-owned 80.5s、visual evidence 134.8s、
+native map smoke 55.9s），都在 `7m` 內；Android Patrol 三個 case 都在 `15m` 內結束
+（app-owned 158.35s、visual evidence 230.966s PASS；native map smoke 40.26s FAIL）。
+兩平台的 native map smoke 都是斷言失敗而非外層逾時：iOS `onMapClicked` 9 次但 POI
+callback null；Android `native_map_smoke_test.dart:119` 15 秒內沒有
+`nativeMapDoubleTapObserved`（測試橋接時序，記錄在 #310）。預算有效，失敗紀錄保留，
+不視整組 E2E 為通過。
+
 兩個平台的 per-test 操作 timeout（30s／15s 等）與所有 target、assertion、gcloud 非零
 失敗、branch／environment guard 都不因此調整。新 source 的裝置驗證是必要 gate：預算
 放寬後仍要以新 run 的 XML 與 log 確認每個 case 完整跑完。若某次 run 的 XML 沒有寫完或
