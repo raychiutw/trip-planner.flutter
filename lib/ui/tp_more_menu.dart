@@ -41,17 +41,27 @@ class TpMoreMenuButton<T> extends StatefulWidget {
     super.key,
     required this.items,
     required this.onSelected,
+    this.quickActions = const [],
     this.enabled = true,
     this.tooltip = '更多',
+    this.plain = false,
     this.triggerChild,
     this.triggerBuilder,
     this.controller,
   });
 
   final List<TpActionItem<T>> items;
+
+  /// 上排快捷動作：字符在上、短文字在下，最多三格並排（HIG medium 選單）。
+  /// 空間不足時改為同順序直列。
+  final List<TpActionItem<T>> quickActions;
   final ValueChanged<T> onSelected;
   final bool enabled;
   final String tooltip;
+
+  /// 已坐在內容表面（卡片列）時設 true：「⋯」不套玻璃、一般態無可見外框，
+  /// 只留 44×44、tooltip 與語意；提高對比時補實心邊界。
+  final bool plain;
   final Widget? triggerChild;
 
   /// 文字入口沿內容自然寬度，仍由本元件統一開關與最小點擊範圍。
@@ -91,6 +101,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   void didUpdateWidget(TpMoreMenuButton<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_sameItems(oldWidget.items, widget.items) ||
+        !_sameItems(oldWidget.quickActions, widget.quickActions) ||
         oldWidget.enabled != widget.enabled) {
       _removeHost();
     }
@@ -270,6 +281,31 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
         child: widget.triggerBuilder!(context, onPressed),
       );
     }
+    if (widget.plain) {
+      // 帶 onTap 才不會被卡片的容器語意合併成「卡片名＋行程選項」。
+      return Semantics(
+        button: true,
+        enabled: onPressed != null,
+        label: widget.tooltip,
+        onTap: onPressed,
+        excludeSemantics: true,
+        child: SizedBox.square(
+          dimension: TpSpacing.tapMin,
+          child: IconButton(
+            onPressed: onPressed,
+            tooltip: widget.tooltip,
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              side: BorderSide(color: tpGlassEdgeColor(context)),
+            ),
+            icon:
+                widget.triggerChild ??
+                const Icon(CupertinoIcons.ellipsis, size: 22),
+          ),
+        ),
+      );
+    }
     return TpToolbarGlassButton(
       tooltip: widget.tooltip,
       onPressed: onPressed,
@@ -317,10 +353,125 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
           platformViewBackdrop: TpMediaBackdropScope.of(this.context),
           triggerBuilder: (context, _) => _trigger(context),
           items: [
+            if (widget.quickActions.isNotEmpty) ...[
+              ..._quickActionRow(context, menuWidth),
+              if (widget.items.isNotEmpty) const GlassMenuDivider(),
+            ],
             for (final item in widget.items) ...[
               if (item.dividerBefore) const GlassMenuDivider(),
               _menuItem(context, item, menuWidth),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 唯一的 role → 顏色映射點；清單項目用 bodyLarge，快捷動作短文字用 bodyMedium。
+  TextStyle _itemStyle(
+    BuildContext context,
+    TpActionItem<T> item, {
+    bool quick = false,
+  }) {
+    final theme = Theme.of(context);
+    final base = quick
+        ? theme.textTheme.bodyMedium!
+        : theme.textTheme.bodyLarge!;
+    return base.copyWith(
+      fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
+      color: item.role == TpActionRole.destructive
+          ? theme.colorScheme.error
+          : theme.colorScheme.onSurface,
+    );
+  }
+
+  static const _quickIconSize = 22.0;
+
+  /// 上排快捷動作：每格短文字單行放得下才並排；任一格放不下就整排改直列，
+  /// 沿用一般項目的字符＋文字列，順序與動作不變。
+  List<Widget> _quickActionRow(BuildContext context, double menuWidth) {
+    final actions = widget.quickActions;
+    // 面板左右各 12；格內左右各 4。
+    final tileWidth = (menuWidth - 24) / actions.length;
+    final textWidth = tileWidth - 8;
+    var textHeight = 0.0;
+    var fitsInline = tileWidth >= TpSpacing.tapMin;
+    for (final item in actions) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: item.label,
+          style: _itemStyle(context, item, quick: true),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout(maxWidth: textWidth);
+      if (painter.didExceedMaxLines) fitsInline = false;
+      if (painter.height > textHeight) textHeight = painter.height;
+      painter.dispose();
+    }
+    if (!fitsInline) {
+      return [for (final item in actions) _menuItem(context, item, menuWidth)];
+    }
+    final rowHeight = (_quickIconSize + 4 + textHeight + 16).clamp(
+      TpSpacing.tapMin,
+      double.infinity,
+    );
+    return [
+      GlassMenuLabel(
+        height: rowHeight,
+        horizontalPadding: 0,
+        child: Row(
+          children: [
+            for (final item in actions)
+              Expanded(
+                child: SizedBox(
+                  height: rowHeight,
+                  child: _quickActionTile(context, item),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  /// 開啟時焦點落在整份選單的第一個動作，方向鍵才有起點。
+  bool _isInitialFocus(TpActionItem<T> item) => identical(
+    item,
+    widget.quickActions.isEmpty
+        ? widget.items.firstOrNull
+        : widget.quickActions.first,
+  );
+
+  Widget _quickActionTile(BuildContext context, TpActionItem<T> item) {
+    final style = _itemStyle(context, item, quick: true);
+    return Semantics(
+      key: item.key,
+      button: true,
+      enabled: item.enabled,
+      selected: item.selected,
+      label: item.semanticLabel ?? item.label,
+      excludeSemantics: true,
+      onTap: item.enabled ? () => _select(item) : null,
+      child: _TpQuickActionButton(
+        enabled: item.enabled,
+        autofocus: _isInitialFocus(item),
+        enablePressScale: !MediaQuery.disableAnimationsOf(context),
+        onTap: () => _select(item),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(item.icon, size: _quickIconSize, color: style.color),
+            const SizedBox(height: 4),
+            Text(
+              item.label,
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              softWrap: false,
+            ),
           ],
         ),
       ),
@@ -332,13 +483,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
     TpActionItem<T> item,
     double menuWidth,
   ) {
-    final scheme = Theme.of(context).colorScheme;
-    final style = Theme.of(context).textTheme.bodyLarge!.copyWith(
-      fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
-      color: item.role == TpActionRole.destructive
-          ? scheme.error
-          : scheme.onSurface,
-    );
+    final style = _itemStyle(context, item);
     // 公開自訂內容需明確高度；僅量測文字容納需求，不再計算面板位置或動畫。
     // 面板左右 12、項目左右 16，另保留字符及選取勾號的位置。
     final textWidth =
@@ -364,7 +509,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       height: height,
       horizontalPadding: 0,
       child: Focus(
-        autofocus: identical(item, widget.items.first),
+        autofocus: _isInitialFocus(item),
         skipTraversal: true,
         child: Semantics(
           key: item.key,
@@ -387,6 +532,90 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
                 ? const Icon(CupertinoIcons.check_mark, size: 18)
                 : null,
             onTap: () => _select(item),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 快捷動作格：與套件 GlassMenuItem 同一套按壓／焦點／停用回饋，
+/// 但字符在上、文字在下。Enter／Space 與方向鍵走 Flutter 公開焦點機制。
+class _TpQuickActionButton extends StatefulWidget {
+  const _TpQuickActionButton({
+    required this.enabled,
+    required this.autofocus,
+    required this.enablePressScale,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool enabled;
+  final bool autofocus;
+  final bool enablePressScale;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_TpQuickActionButton> createState() => _TpQuickActionButtonState();
+}
+
+class _TpQuickActionButtonState extends State<_TpQuickActionButton> {
+  var _pressed = false;
+  var _focused = false;
+  var _hovered = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 底色跟隨主題前景，深淺色與提高對比都保有對比；不寫死白色。
+    final foreground = Theme.of(context).colorScheme.onSurface;
+    final highlight = _pressed
+        ? foreground.withValues(alpha: 0.15)
+        : (_hovered || _focused)
+        ? foreground.withValues(alpha: 0.1)
+        : foreground.withValues(alpha: 0);
+    return FocusableActionDetector(
+      enabled: widget.enabled,
+      autofocus: widget.autofocus,
+      onShowFocusHighlight: (value) => setState(() => _focused = value),
+      onShowHoverHighlight: (value) => setState(() => _hovered = value),
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
+        onTapUp: widget.enabled ? (_) => _setPressed(false) : null,
+        onTapCancel: widget.enabled ? () => _setPressed(false) : null,
+        onTap: widget.enabled ? widget.onTap : null,
+        child: AnimatedScale(
+          scale: widget.enablePressScale && _pressed ? 0.98 : 1,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: _pressed
+                ? Duration.zero
+                : const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            decoration: BoxDecoration(
+              color: highlight,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Opacity(
+              opacity: widget.enabled ? 1 : 0.4,
+              child: widget.child,
+            ),
           ),
         ),
       ),

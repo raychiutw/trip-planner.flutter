@@ -41,8 +41,12 @@ _避免_: 輸入列、input bar、訊息框
 _避免_: day tab、日期 tab、segmented control
 
 **選單**:
-由 bar button 或卡片上的「⋯」觸發、由觸發點展開的下拉動作清單(對應 iOS pull-down menu)。
-_避免_: popup menu、dropdown、context menu(後者專指長按觸發的那一種)
+由 bar button 或卡片上的「⋯」觸發、由觸發點展開的下拉動作清單(對應 iOS pull-down menu)。長按同一對象開的是同一份選單。
+_避免_: popup menu、dropdown、context menu(後者專指長按觸發的那一種)、action sheet(一般動作不再用底部純文字動作表;它只承載破壞性確認)
+
+**快捷動作**:
+選單上排字符在上、短文字在下的動作格,最多三格並排;放不下時改為同順序直列。行程卡的三格是分享／共編／AI 健檢。
+_避免_: quick action、shortcut、icon grid、工具列
 
 **行程切換鈕**:
 浮動 header 標題位置的按鈕,點擊後開出切換行程的 sheet。

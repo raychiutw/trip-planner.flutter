@@ -49,11 +49,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    final semantics = tester.ensureSemantics();
     await tester.tap(find.byKey(const ValueKey('trip-card-more-okinawa')));
     await tester.pumpAndSettle();
 
     expect(find.text('分享'), findsOneWidget);
-    expect(find.text('共編設定'), findsOneWidget);
+    // 篩選分頁也有「共編」，以項目 key 定位選單內的那一個。
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-menu-collab-okinawa')),
+        matching: find.text('共編'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('共編設定'), findsOneWidget);
     expect(find.text('AI 健檢'), findsOneWidget);
+    semantics.dispose();
   });
 }

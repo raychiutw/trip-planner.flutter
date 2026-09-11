@@ -2,7 +2,7 @@
 
 > 狀態：Accepted
 >
-> 更新：2026-08-20
+> 更新：2026-09-11
 >
 > 適用：iOS、Android、iPhone、iPad 與 Android tablet
 > 決策背景：[ADR-0009 全平台採用 iOS HIG，導覽配置由可用寬度決定](docs/adr/0009-universal-ios-hig-width-driven-layout.md)
@@ -79,6 +79,8 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：上下帶狀遮蔽採 `ProgressiveBlur` 與 `GlassScrollEdgeEffect` 的公開預設，取代六層 filter 與手調淡出遮罩。遮蔽位於內容與控制項之間並穿透觸控；媒體背景保留語意暗化，提高對比／降低透明度各自使用不透明區及套件羽化，不以 blur 歸零冒充降級。
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
 - **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／焦點、停用原因與選取語意。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或顯示設定改變時移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
+- **Tripline 決策**：一般動作選單可在清單上方放一排快捷動作（字符在上、短文字在下，最多三格並排，對應 HIG medium 選單）；下方清單以分隔線分組，破壞性項目獨立成組置於尾端。每格短文字要單行放得下才並排；任一格放不下（放大文字或極窄寬度）整排改為同順序直列，文字與動作一個不少。快捷格的焦點／按壓底色取 `onSurface` 透明度，不寫死白色；短文字的完整名稱由可及性 label 補齊（「共編」讀作「共編設定」）。行程卡的三格固定為分享／共編／AI 健檢，其他選單不為湊滿三格加入無權限的動作（#315）。
+- **Tripline 決策**：內容卡上的「⋯」入口不套玻璃、一般態無可見外框（`TpMoreMenuButton(plain: true)`），保留 44×44pt、tooltip 與可及性名稱；提高對比才補實心邊界。點擊「⋯」與長按同一對象開同一份錨定選單，不再使用底部純文字動作表；破壞性動作選取後仍進入既有確認流程。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
 

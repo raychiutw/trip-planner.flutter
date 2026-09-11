@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -111,6 +112,16 @@ void main() {
             ),
           ],
         ),
+        GoRoute(
+          path: '/share-trip/:tripId',
+          builder: (context, state) =>
+              Scaffold(body: Text('share:${state.pathParameters['tripId']}')),
+        ),
+        GoRoute(
+          path: '/collab/:tripId',
+          builder: (context, state) =>
+              Scaffold(body: Text('collab:${state.pathParameters['tripId']}')),
+        ),
       ],
     );
     return MaterialApp.router(
@@ -191,8 +202,14 @@ void main() {
       );
       expect(find.byType(SliverAppBar), findsNothing);
       expect(find.byTooltip('更多'), findsOneWidget);
+      // 每張行程卡另有自己的「⋯」選單，這裡只數 header 那一顆。
       expect(
-        find.byWidgetPredicate((widget) => widget is TpMoreMenuButton),
+        find.descendant(
+          of: find.byKey(const ValueKey('tp-root-glass-header')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is TpMoreMenuButton,
+          ),
+        ),
         findsOneWidget,
       );
       final moreGlass = find.descendant(
@@ -702,6 +719,208 @@ void main() {
     });
   });
 
+  group('TripsListScreen 行程卡選單', () {
+    const moreKey = ValueKey('trip-card-more-okinawa-trip-2026');
+    const menuLabels = {
+      'trip-menu-share-okinawa-trip-2026': '分享',
+      'trip-menu-collab-okinawa-trip-2026': '共編',
+      'trip-menu-health-okinawa-trip-2026': 'AI 健檢',
+      'trip-menu-export-okinawa-trip-2026': '匯出 JSON',
+      'trip-menu-delete-okinawa-trip-2026': '刪除行程',
+    };
+
+    /// 篩選分頁也有「共編」二字，選單內文字一律以項目 key 定位。
+    Finder menuText(String key) => find.descendant(
+      of: find.byKey(ValueKey(key)),
+      matching: find.text(menuLabels[key]!),
+    );
+
+    void expectMenuLabels() {
+      for (final entry in menuLabels.entries) {
+        expect(menuText(entry.key), findsOneWidget, reason: entry.value);
+      }
+    }
+
+    Future<void> pumpList(WidgetTester tester) async {
+      await _useWideSurface(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips)),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('點「⋯」在卡片旁展開玻璃選單：上排三個快捷動作、下方匯出與分組刪除', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpList(tester);
+
+      await tester.tap(find.byKey(moreKey));
+      await tester.pumpAndSettle();
+
+      expectMenuLabels();
+      expect(find.text('取消'), findsNothing, reason: '不再是底部動作表');
+      expect(find.byType(CupertinoActionSheet), findsNothing);
+      expect(find.bySemanticsLabel('共編設定'), findsOneWidget);
+
+      final share = tester.getRect(
+        menuText('trip-menu-share-okinawa-trip-2026'),
+      );
+      final collab = tester.getRect(
+        menuText('trip-menu-collab-okinawa-trip-2026'),
+      );
+      final health = tester.getRect(
+        menuText('trip-menu-health-okinawa-trip-2026'),
+      );
+      expect(share.top, closeTo(collab.top, 0.5));
+      expect(collab.top, closeTo(health.top, 0.5));
+      expect(share.right, lessThan(collab.left));
+      expect(collab.right, lessThan(health.left));
+      final export = tester.getRect(
+        menuText('trip-menu-export-okinawa-trip-2026'),
+      );
+      final delete = tester.getRect(
+        menuText('trip-menu-delete-okinawa-trip-2026'),
+      );
+      expect(export.top, greaterThan(share.bottom));
+      expect(delete.top, greaterThan(export.bottom));
+      for (final symbol in [
+        CupertinoIcons.share,
+        CupertinoIcons.person_2,
+        CupertinoIcons.sparkles,
+        CupertinoIcons.square_arrow_down,
+        CupertinoIcons.delete,
+      ]) {
+        expect(find.byIcon(symbol), findsOneWidget, reason: '$symbol');
+      }
+
+      // 選單從卡片附近展開，不是貼在畫面底部。
+      final card = tester.getRect(
+        find.ancestor(of: find.text('沖繩家族之旅'), matching: find.byType(TripCard)),
+      );
+      expect(share.top, lessThan(card.bottom + 120));
+      expect(share.top, greaterThan(card.top - 120));
+      semantics.dispose();
+    });
+
+    testWidgets('「⋯」維持 44×44 與「行程選項」可及性名稱，且不套玻璃外框', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpList(tester);
+
+      final size = tester.getSize(find.byKey(moreKey));
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+      expect(
+        find.descendant(
+          of: find.byKey(moreKey),
+          matching: find.byType(GlassButton),
+        ),
+        findsNothing,
+        reason: '內容卡上的入口不疊玻璃',
+      );
+      final flags = tester
+          .getSemantics(find.bySemanticsLabel('行程選項').first)
+          .getSemanticsData()
+          .flagsCollection;
+      expect(flags.isButton, isTrue);
+      semantics.dispose();
+    });
+
+    testWidgets('長按卡片與「⋯」取得同一組動作；共編走 /collab、分享走 /share-trip', (tester) async {
+      await pumpList(tester);
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      expectMenuLabels();
+      await tester.tap(menuText('trip-menu-collab-okinawa-trip-2026'));
+      await tester.pumpAndSettle();
+      expect(find.text('collab:okinawa-trip-2026'), findsOneWidget);
+    });
+
+    testWidgets('「⋯」→ 分享 → 導航到 share route 且只執行一次', (tester) async {
+      await pumpList(tester);
+
+      await tester.tap(find.byKey(moreKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('分享'));
+      await tester.tap(find.text('分享'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text('share:okinawa-trip-2026'), findsOneWidget);
+    });
+
+    testWidgets('匯出進行中再開選單：匯出 JSON 暫不提供，其餘動作沿用', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      final exportCompleter = Completer<TripJsonExport>();
+      final writer = _FakeTripExportFileWriter();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.exportTripJson(any()),
+      ).thenAnswer((_) => exportCompleter.future);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripExportFileWriterProvider.overrideWithValue(writer),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(moreKey));
+      await tester.pumpAndSettle();
+      await tester.tap(menuText('trip-menu-export-okinawa-trip-2026'));
+      await tester.pumpAndSettle();
+
+      // 匯出尚未完成：同一張與另一張卡的選單都不再提供匯出，快捷動作照舊。
+      for (final tripId in ['okinawa-trip-2026', 'busan-trip-2024']) {
+        await tester.tap(find.byKey(ValueKey('trip-card-more-$tripId')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('trip-menu-export-$tripId')), findsNothing);
+        for (final action in ['share', 'collab', 'health', 'delete']) {
+          expect(
+            find.byKey(ValueKey('trip-menu-$action-$tripId')),
+            findsOneWidget,
+            reason: '$tripId $action',
+          );
+        }
+        await tester.tapAt(const Offset(20, 1500));
+        await tester.pumpAndSettle();
+      }
+
+      exportCompleter.complete(
+        const TripJsonExport(fileName: 'okinawa.json', content: '{}'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('匯出成功'), findsOneWidget);
+      await tester.tap(find.byKey(moreKey));
+      await tester.pumpAndSettle();
+      expect(menuText('trip-menu-export-okinawa-trip-2026'), findsOneWidget);
+      verify(
+        () => mockTripRepository.exportTripJson('okinawa-trip-2026'),
+      ).called(1);
+    });
+
+    testWidgets('點選單外面關閉且不觸發背景卡片導航', (tester) async {
+      await pumpList(tester);
+
+      await tester.tap(find.byKey(moreKey));
+      await tester.pumpAndSettle();
+      expect(find.text('分享'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 1500));
+      await tester.pumpAndSettle();
+      expect(find.text('分享'), findsNothing);
+      expect(find.text('detail:okinawa-trip-2026'), findsNothing);
+      expect(find.byType(TripCard), findsNWidgets(3));
+    });
+  });
+
   group('TripsListScreen 互動', () {
     testWidgets('點卡片 → 導航到 /trips/:tripId', (tester) async {
       await _useWideSurface(tester);
@@ -866,50 +1085,47 @@ void main() {
       ).called(1);
     });
 
-    testWidgets(
-      '長按 → bottom sheet → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh',
-      (tester) async {
-        await _useWideSurface(tester);
-        final mockTripRepository = MockTripRepository();
-        when(
-          () => mockTripRepository.watchMyTrips(),
-        ).thenAnswer((_) => Stream.value(fakeTrips));
-        when(
-          () => mockTripRepository.deleteTrip(any()),
-        ).thenAnswer((_) async {});
+    testWidgets('長按 → 選單 → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh', (
+      tester,
+    ) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(() => mockTripRepository.deleteTrip(any())).thenAnswer((_) async {});
 
-        await tester.pumpWidget(
-          ProviderScope(
-            overrides: [
-              tripRepositoryProvider.overrideWithValue(mockTripRepository),
-            ],
-            child: buildRouterApp(),
-          ),
-        );
-        await tester.pump();
-        expect(find.byType(TripCard), findsNWidgets(3));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(TripCard), findsNWidgets(3));
 
-        // 長按第一張卡 → bottom sheet
-        await tester.longPress(find.text('沖繩家族之旅'));
-        await tester.pumpAndSettle();
-        expect(find.text('刪除行程'), findsOneWidget);
+      // 長按第一張卡 → 錨定選單
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      expect(find.text('刪除行程'), findsOneWidget);
 
-        // 點「刪除行程」→ AlertDialog 確認
-        await tester.tap(find.text('刪除行程'));
-        await tester.pumpAndSettle();
-        expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      // 點「刪除行程」→ AlertDialog 確認
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
 
-        // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
-        await tester.tap(find.text('刪除'));
-        await tester.pumpAndSettle();
+      // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
+      await tester.tap(find.text('刪除'));
+      await tester.pumpAndSettle();
 
-        verify(
-          () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
-        ).called(1);
-        // 初載 + 刪除後 invalidate refresh = 2 次
-        verify(() => mockTripRepository.watchMyTrips()).called(2);
-      },
-    );
+      verify(
+        () => mockTripRepository.deleteTrip('okinawa-trip-2026'),
+      ).called(1);
+      // 初載 + 刪除後 invalidate refresh = 2 次
+      verify(() => mockTripRepository.watchMyTrips()).called(2);
+    });
 
     testWidgets('刪除確認說明影響與不可復原，送出後鎖定卡片直到伺服器成功', (tester) async {
       await _useWideSurface(tester);
@@ -955,7 +1171,7 @@ void main() {
       );
       expect(deletingCard.onTap, isNull);
       expect(deletingCard.onLongPress, isNull);
-      expect(deletingCard.onMorePressed, isNull);
+      expect(deletingCard.moreMenu, isNull);
 
       deleteCompleter.complete();
       await tester.pumpAndSettle();

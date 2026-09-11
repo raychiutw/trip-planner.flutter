@@ -16,6 +16,7 @@ import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_more_menu.dart';
 import '../../ui/tp_root_scaffold.dart';
 import '../../ui/swipe_to_delete.dart';
 import 'current_trip_provider.dart';
@@ -152,7 +153,7 @@ final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
 
 /// 行程清單（4-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選
 /// + 下拉更新 + 單欄卡片清單。搜尋/篩選置於大標題下方,隨內容捲動(Notes/Mail 慣例)。
-/// 點卡片進詳情；長按開 action sheet(分享/共編/匯出/刪除,二次確認)。
+/// 點卡片進詳情；「⋯」與長按開同一份錨定選單（分享/共編/健檢、匯出、刪除須二次確認）。
 class TripsListScreen extends ConsumerStatefulWidget {
   const TripsListScreen({super.key});
 
@@ -169,6 +170,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
   String? _exportingTripId;
   final Set<String> _deletingTripIds = {};
   final Set<String> _hiddenTripIds = {};
+
+  /// 每張卡一份，讓「⋯」與長按開同一份選單。
+  final Map<String, TpMoreMenuController> _tripMenuControllers = {};
 
   @override
   void initState() {
@@ -558,6 +562,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
         itemBuilder: (context, index) {
           final trip = trips[index];
           final isDeleting = _deletingTripIds.contains(trip.tripId);
+          final menuController = _tripMenuControllers.putIfAbsent(
+            trip.tripId,
+            TpMoreMenuController.new,
+          );
           return IgnorePointer(
             ignoring: isDeleting,
             child: SwipeToDelete(
@@ -578,12 +586,10 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
                             );
                             context.go('/trips/${trip.tripId}');
                           },
-                    onLongPress: isDeleting
+                    onLongPress: isDeleting ? null : menuController.open,
+                    moreMenu: isDeleting
                         ? null
-                        : () => _showTripActions(context, trip),
-                    onMorePressed: isDeleting
-                        ? null
-                        : () => _showTripActions(context, trip),
+                        : _tripMenu(context, trip, menuController),
                   ),
                   if (isDeleting)
                     Positioned.fill(
@@ -613,33 +619,48 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     );
   }
 
-  /// 長按卡片 → 自適應 action sheet（分享/共編/健檢/匯出/刪除）。
-  Future<void> _showTripActions(BuildContext context, TripSummary trip) async {
-    final selectedAction = await showAppActionSheet<_TripListAction>(
-      context,
-      actions: [
+  /// 卡片「⋯」與長按共用的錨定選單：上排分享／共編／AI 健檢，下方匯出與分組刪除。
+  Widget _tripMenu(
+    BuildContext context,
+    TripSummary trip,
+    TpMoreMenuController menuController,
+  ) {
+    return TpMoreMenuButton<_TripListAction>(
+      key: ValueKey('trip-card-more-${trip.tripId}'),
+      controller: menuController,
+      tooltip: '行程選項',
+      plain: true,
+      quickActions: [
         TpActionItem(
+          key: ValueKey('trip-menu-share-${trip.tripId}'),
           label: '分享',
           value: _TripListAction.share,
           icon: CupertinoIcons.share,
         ),
         TpActionItem(
-          label: '共編設定',
+          key: ValueKey('trip-menu-collab-${trip.tripId}'),
+          label: '共編',
+          semanticLabel: '共編設定',
           value: _TripListAction.collab,
           icon: CupertinoIcons.person_2,
         ),
         TpActionItem(
+          key: ValueKey('trip-menu-health-${trip.tripId}'),
           label: 'AI 健檢',
           value: _TripListAction.health,
-          icon: CupertinoIcons.heart,
+          icon: CupertinoIcons.sparkles,
         ),
+      ],
+      items: [
         if (_exportingTripId == null)
           TpActionItem(
+            key: ValueKey('trip-menu-export-${trip.tripId}'),
             label: '匯出 JSON',
             value: _TripListAction.exportJson,
-            icon: CupertinoIcons.cloud_download,
+            icon: CupertinoIcons.square_arrow_down,
           ),
         TpActionItem(
+          key: ValueKey('trip-menu-delete-${trip.tripId}'),
           label: '刪除行程',
           value: _TripListAction.delete,
           dividerBefore: true,
@@ -647,26 +668,27 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
           icon: CupertinoIcons.delete,
         ),
       ],
+      onSelected: (action) =>
+          unawaited(_handleTripAction(context, trip, action)),
     );
-    if (!context.mounted) return;
-    switch (selectedAction) {
+  }
+
+  Future<void> _handleTripAction(
+    BuildContext context,
+    TripSummary trip,
+    _TripListAction action,
+  ) async {
+    switch (action) {
       case _TripListAction.share:
         context.push('/share-trip/${trip.tripId}');
-        return;
       case _TripListAction.collab:
         context.push('/collab/${trip.tripId}');
-        return;
       case _TripListAction.health:
         context.push('/trips/${Uri.encodeComponent(trip.tripId)}/health');
-        return;
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
-        return;
       case _TripListAction.delete:
         await _confirmAndDeleteTrip(context, trip);
-        return;
-      case null:
-        return;
     }
   }
 

@@ -280,7 +280,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 顏色不手寫,由 `role` 推導 —— `lib/ui/tp_more_menu.dart` 的選單項目是唯一的映射點(`destructive` → `scheme.error`,否則 `scheme.onSurface`)。diff 裡出現寫死的紅色或 `foregroundColor:` 覆寫選單項目顏色 = 違反。
 - 新增／加入用 `add` 系列且 `role` 維持 `normal`;移除／刪除用 `minus`／`delete` 且 `role` 必為 `destructive`。動詞與 role 不匹配(例如「加入」配 `destructive`)= 違反。
 - 選單項目(`TpMoreMenuButton`)一律要 `icon`;action sheet 專用項目一律**不給** `icon`(給了也畫不出來,見 `lib/ui/tp_action_item.dart:22`)。
-- 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:642`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。
+- 快捷動作(`TpMoreMenuButton.quickActions`)同樣一律要 `icon`,短文字的完整名稱以 `semanticLabel` 補齊(「共編」→「共編設定」);顏色、停用、選取與去重都沿用清單項目的同一套規則,不另寫。
+- 內容卡上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單。
+- 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。
 - 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用。
 
 三處已知 outlier(審查看到不必當新違規,但不要照抄擴散):`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
