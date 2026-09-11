@@ -80,7 +80,7 @@ iPhone 固定四個 root tabs：
 - **HIG 必須**：destructive action 使用 system destructive role，放在 menu 尾端或確認流程。
 - **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／系統 Back／焦點、展開狀態、停用原因與選取語意。觸發鈕是唯一具名節點，開啟時宣告 expanded、關閉即復原；系統 Back 先關選單不離頁。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或影響呈現的顯示設定改變時移除，鍵盤收起不移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
 - **Tripline 決策**：一般動作選單可在清單上方放一排快捷動作（字符在上、短文字在下，最多三格並排，對應 HIG medium 選單）；下方清單以分隔線分組，破壞性項目獨立成組置於尾端。每格短文字要單行放得下才並排；任一格放不下（放大文字或極窄寬度）整排改為同順序直列，文字與動作一個不少。快捷格的焦點／按壓底色取 `onSurface` 透明度，不寫死白色；短文字的完整名稱由可及性 label 補齊（「共編」讀作「共編設定」）。行程卡的三格固定為分享／共編／AI 健檢，其他選單不為湊滿三格加入無權限的動作（#315）。
-- **Tripline 決策**：內容卡上的「⋯」入口不套玻璃、一般態無可見外框（`TpMoreMenuButton(plain: true)`），保留 44×44pt、tooltip 與可及性名稱；提高對比才補實心邊界。點擊「⋯」與長按同一對象開同一份錨定選單，不再使用底部純文字動作表；破壞性動作選取後仍進入既有確認流程。
+- **Tripline 決策**：內容卡上的「⋯」入口不套玻璃、一般態無可見外框（`TpMoreMenuButton(plain: true)`），保留 44×44pt、tooltip 與可及性名稱；提高對比才補實心邊界。點擊「⋯」與長按同一對象開同一份錨定選單，不再使用底部純文字動作表；破壞性動作選取後仍進入既有確認流程。#319 真機已確認一般態無白框；選單面板材質見 §16.2 的 #319 決策。
 - **Tripline 決策**：全 App 一般動作選單只有一套呈現（#316）。入口分三類：內容卡／內容列上的「⋯」一律 plain（行程卡、收藏卡、停留點卡、共編成員列、分享連結列、可交還 AI 的筆記列）；浮動 header 與固定 bar 上的 bar button 走玻璃（行程清單、收藏排序篩選、時間軸、列印）；內容裡的文字入口（探索地區、新增停留點地區、探索「更多」分類 chip）沿內容自然寬度，選單仍從觸發點附近展開。長按與「⋯」開同一份選單；沒有動作的對象（純人工建立的筆記列）不留可聚焦的空按鈕。
 - **Tripline 決策**：值選項（地區、分類、排序、成員角色這類互斥的「目前值」）只以勾選標示目前值，不為每個值配圖示；一般動作配語意明確的 SF Symbol，且同一動作全 App 同一字符：分享 `share`、共編 `person_2`、AI 相關 `sparkles`、匯出 `square_arrow_down`、異動紀錄 `clock`、刪除 `delete`、移除 `person_badge_minus`。刪除／移除獨立成組置於尾端。標籤不重複字符已表達的意思（「自訂地區…」不再前綴「+」）。不強迫每個選單湊三個快捷動作。
 
@@ -108,7 +108,7 @@ iPhone 固定四個 root tabs：
 
 - **Tripline 決策**：Account 不是 root tab。每個內容頁的 `person.crop.circle` 開啟帶 Navigation Stack 的 Account sheet。
 - **HIG 建議**：iPhone 使用可展開至全高的 system sheet；iPad 使用 form sheet 或 popover，空間不足時自適應為全高。
-- **Tripline 決策**：compact Account sheet 由下往上進場、向下退場，不做從帳號 icon 放大的 morph；展開後接近全高，頂緣停在狀態列 safe area 之下、與浮動 header 同一道 8pt 溝槽，內容底色是實色語意 `surface`。占比由實際 safe area 推導，不寫死單一機型的像素或比例（#317 對照 Apple Music 帳號影片）。
+- **Tripline 決策**：compact Account sheet 由下往上進場、向下退場，不做從帳號 icon 放大的 morph；展開後接近全高，頂緣停在狀態列 safe area 之下、與浮動 header 同一道 8pt 溝槽，內容底色是實色語意 `surface` 的 **elevated 層級**（`AppTheme.elevated`：深色由 base 黑上移為 `#1C1C1E`、grouped 卡片同步上移一階；淺色 base 與 elevated 同色）。占比由實際 safe area 推導，不寫死單一機型的像素或比例（#317 對照 Apple Music 帳號影片；#319 真機發現 base 黑在黑頁面上沒有可辨識邊界，參考影片是 elevated 深灰面板，依 iOS Dark Mode 的 base／elevated 語意更正）。
 - **HIG 必須**：Account 使用 grouped list、inset separator、system controls 與標準 navigation。
 - **HIG 必須**：一般、低頻設定集中在 Account；只影響目前任務的選項留在相關畫面。
 - **HIG 必須**：不得重複實作系統已有的 Dynamic Type、accessibility、鍵盤、捲動或認證偏好。
@@ -218,7 +218,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 ## 11. 表單與 sheet
 
-- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin 與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。不再固定 93%／62% 高度或手動 28／0 圓角。large 停留高度不用套件寫死的 90pt 頂部 inset，改以公開 `fullSize` 由狀態列 safe area 加 8pt 溝槽推導（`appSheetLargeHeight`），旋轉後依新尺寸重取；medium 仍是套件預設。
+- **Tripline 決策**：compact Account、編輯與選擇 sheet 採 Liquid Glass 1.4.1 公開 `GlassModalSheetScaffold` 的材質、圓角、margin 與捲動交接；fixed 僅提供 `{large}`，resizable 提供 `{medium, large}`。elevated 只在兩個共用 host 套一次：compact `GlassModalSheetScaffold` host（content／screen／selection／form sheet 共用，含展開底色與提高對比／降低透明度的不透明底）與 regular 置中 form sheet 的 `GlassContainer` 子樹（§5）；畫面程式仍只取 `colorScheme`。不再固定 93%／62% 高度或手動 28／0 圓角。large 停留高度不用套件寫死的 90pt 頂部 inset，改以公開 `fullSize` 由狀態列 safe area 加 8pt 溝槽推導（`appSheetLargeHeight`），旋轉後依新尺寸重取；medium 仍是套件預設。
 - **Tripline 決策**：regular Account 保留置中、最多 560×720 的 form sheet 與同一個 Navigator，表面改用公開 `GlassContainer` 預設材質與圓角。這是 App 的版面契約，不套用手機的底部 detent，也不反推套件內部留白。
 - **HIG 必須**：材質與拖曳交給套件，關閉權限留在 App。外點、拖曳與系統返回都不得繞過送出中鎖定或子頁的未儲存保護；拒絕後 sheet 復位。降低動態效果時取消 route 進出位移、放手後的吸附彈性、裝飾縮放與伸縮；旋轉後依新尺寸定位，保留草稿與關閉保護。提高對比與降低透明度各自保留不透明降級。
 - **HIG 建議**：短而單一任務的新增／編輯使用 system sheet；較長、多步驟或需要完整上下文的流程使用 push navigation。
@@ -305,6 +305,10 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 
 - **HIG 必須**：Liquid Glass 是功能層，不是內容層。
 - **Tripline 決策**：依 #303／#304 固定 liquid_glass_widgets 1.4.1，共用表面沿用套件公開預設材質與品質選擇；保留品牌 tint 前景、媒體暗化與獨立無障礙降級，不重建舊 shader 校準外觀。
+- **Tripline 決策**：#319 以 iPhone 14 Pro／iOS 16.6 真機（premium）對照 Apple Music 參考圖後，只有兩項明文偏離套件預設，其餘光學參數不動：
+  1. 導覽玻璃 `fresnelStrength` 由 1.0 改 0.5（`tpNavigationFresnelStrength`）。修正前真機在深色四邊量到均一亮環 +73（bar button／標題膠囊）～ +112（root tab bar），Apple 參考只有頂緣 +50～+65、側邊 0。預期效果：亮環約減半、落回參考量級，方向性高光仍由套件 `lightIntensity` 提供；淺色白底修正前只有 +3～+4，預期不受影響。
+  2. 選單面板改走 HIG regular 類材質（`tpMenuGlassSettings`）：白色 veil 淺色 72%／深色 18% 與 blur 24，取代導覽玻璃的 8–12%／4–5。修正前導覽配方的面板最低亮度僅 1–18，後方卡片黑帶、白色標題與「⋯」都穿透；參考面板最低亮度 41–42 且看不出字形。預期效果：面板最低亮度接近參考、字形不再穿透。提高對比／降低透明度改 `surfaceContainerHigh` 不透明底，預期黑面板與黑頁面有邊界。選單目前不開在媒體背景上。
+  以上都是由修正前量測與參考量級推導的**預期效果，待下一輪真機重量測四邊峰值與面板最低亮度後才算驗收**。
 - **Tripline 決策**：tab bar、toolbar、menu、sheet、floating controls、composer 與 POI accessory 可使用 Glass；列表、表單、卡片與主要內容使用 system surface。
 - **HIG 必須**：避免 glass 內再巢狀 glass；內容卡不得重複 blur 或 refraction。
 - **HIG 必須**：Reduce Transparency 使用不透明 system fallback；Increase Contrast 提高邊界與文字對比。

@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import '../ui/tp_action_item.dart';
 import '../ui/tp_app_bar.dart';
@@ -688,8 +689,17 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
       sheet: const SizedBox.shrink(),
     );
     final quality = tpGlassQuality(context);
+    // sheet 疊在內容之上，深色走 iOS elevated 層級（#319 真機對照參考影片）；
+    // 只在 host 套一次，content／selection／form sheet 共用同一層級。
+    final theme = Theme.of(context);
+    final elevatedScheme = AppTheme.elevated(theme.colorScheme);
+    final elevatedSurface = elevatedScheme.surface;
     final settings = quality == GlassQuality.minimal
-        ? tpResolveGlassSettings(context, const LiquidGlassSettings())
+        ? tpResolveGlassSettings(
+            context,
+            const LiquidGlassSettings(),
+            opaqueColor: elevatedSurface,
+          )
         : null;
     return PopScope<T>(
       canPop: _isClosing,
@@ -699,7 +709,10 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
       child: GlassModalSheetScaffold(
         controller: widget.controller,
         body: const SizedBox.expand(),
-        sheet: _sheet!,
+        sheet: Theme(
+          data: theme.copyWith(colorScheme: elevatedScheme),
+          child: _sheet!,
+        ),
         initialState: widget.initialState,
         fullSize: appSheetLargeHeight(context),
         // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
@@ -708,7 +721,7 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
             ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
             : const {GlassSheetDetent.large},
         settings: settings,
-        expandedColor: Theme.of(context).colorScheme.surface,
+        expandedColor: elevatedSurface,
         quality: quality,
         padding: EdgeInsets.zero,
         interactionScale: _reduceMotion ? 1 : packageDefaults.interactionScale,
@@ -892,12 +905,17 @@ class _RegularAppContentSheetState<T>
               clipBehavior: Clip.antiAlias,
               settings: tpNavigationGlassSettings(context),
               quality: tpGlassQuality(context),
-              child: _AppContentSheet<T>(
-                title: widget.title,
-                contentBuilder: widget.contentBuilder,
-                onClose: _close,
-                navigatorKey: widget.navigatorKey,
-                dismissible: widget.dismissible,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: AppTheme.elevated(Theme.of(context).colorScheme),
+                ),
+                child: _AppContentSheet<T>(
+                  title: widget.title,
+                  contentBuilder: widget.contentBuilder,
+                  onClose: _close,
+                  navigatorKey: widget.navigatorKey,
+                  dismissible: widget.dismissible,
+                ),
               ),
             ),
           ),

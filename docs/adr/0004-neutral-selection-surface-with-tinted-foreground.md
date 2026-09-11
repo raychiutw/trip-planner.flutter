@@ -323,6 +323,40 @@ Cupertino 字型驗證 Light／Dark、亮暗背景的合成像素、獨立不透
 mapBuilder 取代；這是 App 自有填色、幾何與操作證據，不是原生圖磚、
 Impeller 或真機 Liquid Glass 光學驗收。前述更正史與各次證據保持原歸屬。
 
+### 邊緣光與選單材質更正（2026-09-11，#319）
+
+2026-09-09 的「一般態不另畫邊線、材質沿用 1.4.1 公開預設」仍然成立，但本次以
+本 build（`a5e44f9`／0.26.6+37）的 iPhone 14 Pro／iOS 16.6 真機錄影，用第 5 節
+同一套「邊緣峰值 − 內部填色」量法比對使用者提供的 Apple Music 參考圖後，確認
+兩項差異來自套件材質本身，改動只用公開參數：
+
+| 表面（深色、premium） | 本次真機 | Apple Music 參考 |
+|---|---|---|
+| bar button／標題膠囊 四邊 | +73 ～ +78，四邊均一 | 返回圓鈕：頂 +50、底 +50、左右 0 |
+| root tab bar 左／上／下 | +112／+112／+102 | 迷你播放器：頂 +66、側邊 0 |
+| 選單面板 四邊 | +40 ～ +61 | 頂 +63、側邊 0 |
+| 選單面板內最低亮度 | 1 ～ 18（後方黑帶、白標題穿透） | 41 ～ 42（看不出字形） |
+
+淺色白底上 bar button 四邊只有 +3～+4，沒有白框；plain「⋯」一般態確認無框。
+
+- 全周亮環是 Premium 路徑的 Fresnel 項，與光照方向無關；`fresnelStrength`
+  由 1.0 改 0.5（`tpNavigationFresnelStrength`），預期讓環落回參考的
+  +30～+60 量級，頂緣方向性高光仍由 `lightIntensity` 提供。沒有選 0：套件
+  文件說 0 對應 Messages 按鈕，但第 5 節曾量到 Messages 標題膠囊側邊
+  +28～+33，不是 0。
+- 選單面板改走 regular 類配方 `tpMenuGlassSettings`：白色 veil（淺 72%／深
+  18%）加 blur 24，預期面板最低亮度接近參考、字形不再穿透；提高對比／降低
+  透明度改 `surfaceContainerHigh` 不透明底，因真機提高對比時黑面板落在黑頁面
+  （0 對 0）沒有邊界。導覽 clear 類配方不變。
+
+上表是修正前的量測；兩個新數值只是由此推導的預期目標，尚無修正後真機證據，
+下一輪真機要重新量四邊峰值與面板最低亮度才算驗收。iOS 16.6 走 Impeller
+premium，中途曾因 thermalDegradation 降到 standard 十餘秒，這段畫面不當作
+premium 證據；standard 期間唯一的一般態情境（chat-draft-after-account-close，
+PTS 58.6–58.8）composer 邊緣 246–248、沒有描邊。緊接的 PTS 58.9 起黑色實線
+＋全白底是測試 wrapper 注入 Increase Contrast 後的 minimal 降級（`tpGlassEdgeColor`
+72% 黑），不是 standard renderer 的問題，`glowIntensity` 不動。
+
 ## 方法論備註
 
 ### 2026-09-09 全範圍盤點（#310）

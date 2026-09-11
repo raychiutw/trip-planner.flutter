@@ -92,6 +92,16 @@ pointer resampling 的 timer／post-frame 不受影響；不重算 detent、速�
 與浮動 header 同一道溝槽；圓角、margin、材質與拖曳交接仍是套件預設，
 regular 的 560×720 form sheet 不受影響。
 
+### 2026-09-11 更正：深色 sheet 走 elevated 層級（#319）
+
+#317 對照參考影片後採實色語意 `surface`，但 iPhone 14 Pro／iOS 16.6 真機（`a5e44f9`）
+的深色畫面顯示 base 黑 sheet 落在黑頁面上沒有可辨識邊界；參考影片是 `#1C1C1E`
+的 elevated 深灰面板，grouped 卡片再高一階。iOS Dark Mode 本來就分 base／elevated
+兩組背景給疊在內容之上的層。現在 `_AppContentSheet`／`_AppScreenSheet` 的 Theme 與
+compact `expandedColor`、不透明降級都用 `AppTheme.elevated`（深色 surface 三階整體上移
+一階，淺色不變），畫面程式仍只取 `colorScheme`，導航、尺寸與關閉保護不動。
+修正後真機證據待下一輪重取。
+
 - **改回第五 tab 不是加一個 branch 而已**,要同時動 shell 結構與所有 deep link ——
   `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 全部建在
   `accountSheetAlias` → `?account=<page>` 這條轉換上(`lib/app/router.dart:131`–`:180`、

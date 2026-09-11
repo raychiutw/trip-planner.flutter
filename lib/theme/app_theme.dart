@@ -99,6 +99,17 @@ abstract final class AppTheme {
     );
   }
 
+  /// iOS 深色的 elevated 層級：疊在內容之上的 sheet 把 palette 定義的 surface
+  /// 三階整體上移一階（黑 → `#1C1C1E`），grouped 卡片仍高一階；淺色 base 與 elevated 同色。
+  static ColorScheme elevated(ColorScheme scheme) {
+    if (scheme.brightness == Brightness.light) return scheme;
+    return scheme.copyWith(
+      surface: scheme.surfaceContainerLow,
+      surfaceContainerLow: scheme.surfaceContainerHigh,
+      surfaceContainerHigh: scheme.surfaceContainerHighest,
+    );
+  }
+
   static ThemeData _buildTheme({
     required ColorScheme colorScheme,
     required Color hover,

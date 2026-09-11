@@ -100,6 +100,34 @@
 - headless ProgressiveBlur 是 uniform fallback；140 張 PNG 的部分中文字與符號為測試字型方框，只能判斷幾何，不當作平台字型或 shader 驗收。
 - Android emulator 的 renderer、CPU／GPU 與實機不同；操作結果不能用作 iOS 16／新 iOS 真機材質或持續捲動效能證據。
 
+## #319 真機整合驗收（2026-09-11，iOS）
+
+- source `a5e44f9baeea8b027d9fe02d210eeeb6da76bfe8`（tree 與 PR #320 head `e3ee862` 相同）；App 內帳號頁尾實際讀到 `0.26.6 (37)`；`liquid_glass_widgets 1.4.1`；release 模式。
+- run [34573355723](https://github.com/raychiutw/trip-planner.flutter/actions/runs/34573355723)（platform=all），artifact `mobile-e2e-ios-34573355723-1`（ID 10189228441）；Firebase Test Lab iPhone 14 Pro／iOS 16.6／en_US／portrait。4 tests 全過：app-owned release flow 83.6 秒（release AOT 已通過公開 Day Semantics 讀取）、visual evidence 133.7 秒、native map smoke 33.8 秒。
+- 品質時間線（`syslog.txt` 裝置時鐘）：00:27:41 premium 預熱完成；00:28:43 thermalDegradation 降 standard；00:29:01 thermalRecovery 回 premium。夾在中間的 `light/chat-draft-after-account-close`、`light+increased-contrast/*`、`light+reduce-transparency/*` 不是 premium 證據（後兩組本來就是 App 指定的 minimal）。
+- 影片 1178×2556、10 fps、88 秒，PTS 與 251 秒測試 wall time 不等價；只用來取畫面，不推算動畫時長。量法沿用 ADR-0004：邊緣峰值 − 內部填色，逐像素掃四邊。
+
+| 表面 | 情境 | 結果 |
+|---|---|---|
+| plain「⋯」（行程卡） | light／dark trips-list | 一般態無框、灰字符；提高對比補圓形實心邊 ✔ |
+| 浮動 header 標題膠囊／bar button | light | 白底上四邊 +3～+4，無白框 ✔ |
+| 同上 | dark | 四邊均一亮環 +73～+78；參考頂 +50、側 0 → **確證差異**，已改 Fresnel 0.5，待重驗 |
+| root tab bar | dark | 左／上／下 +112／+112／+102；參考頂 +66、側 0 → **確證差異**，同上待重驗 |
+| 選單面板 | light／dark trip-card-menu、timeline-header-menu | 三格快捷、分組線、刪除紅 ✔；面板最低亮度 1–18，後方卡片黑帶、白標題與「⋯」穿透（參考 41–42）→ **確證差異**，已改 regular 配方，待重驗 |
+| 選單面板 | +increased-contrast | 不透明 ✔ 但黑面板對黑頁面無邊界（0 對 0）→ 已改 `surfaceContainerHigh` 底，待重驗 |
+| 固定 bar（共編設定） | light collab-from-trip-card-menu | 返回＋標題群組、帳號另組 ✔ |
+| 日期選擇器 | light timeline-day-2；light／dark map | 文字底中性選取底；媒體上 70% 底與不透明字 ✔ |
+| 聊天 composer | light／dark chat-composer、draft | 無「＋」、輸入框自 leading 延伸、麥克風／送出切換、草稿保留 ✔；深色 accessory 亮環同 header（已改、待重驗） |
+| 行程 POI accessory | light／dark map-day-1 | 暗化 host、內容卡實色、tint 頁點 ✔ |
+| 地圖控制項（帳號／定位） | light／dark map | 45% 黑底白字符、無亮環（frosted 路徑）✔ |
+| 帳號 sheet | light／dark account-sheet、map-account-sheet | 由下進場、接近全高、頂緣留狀態列溝槽、圓角、實色內容 ✔；深色底為 base `surface` 黑，對黑頁面沒有可辨識邊界，參考影片是 elevated 深灰 `#1C1C1E` → **確證差異**，已改 `AppTheme.elevated`（深色 surface 三階上移一階），待重驗 |
+| 提高對比／降低透明度 | light／dark ×（trip-card-menu、map） | 導覽玻璃、地圖 chrome 皆不透明；提高對比補實心邊 ✔ |
+| Reduce Motion | light／dark ×（trip-card-menu、account-sheet、map） | 畫面內容與狀態正確；動畫是否取消無法由 10 fps 影片 PTS 判定，列未驗證 |
+
+未覆蓋（iOS 沒有畫面，不標 PASS）：列印固定 bar「⋯」、停留點卡／筆記列／共編成員／分享連結的 plain「⋯」、探索地區與分類 chip 入口、regular／橫向、2× 字級、Bold Text；輔助使用 flags 為測試 wrapper 注入，不等於 OS 設定或 VoiceOver。Android `MediumPhone.arm`／API 34 虛擬機本輪 integration 在 fixture:779 失敗、Patrol 未跑，由另一 session 處理 harness；本節不含任何 Android 結果。
+
+修正後的三處（`tpNavigationFresnelStrength`、`tpMenuGlassSettings`、sheet 的 `AppTheme.elevated`）尚無真機證據，上表「已改」都不是驗收通過；下一輪裝置證據要重新記錄四邊峰值、面板最低亮度與深色 sheet 邊界，並補最終票單與驗收證據。standard 品質期間唯一的一般態情境（`light/chat-draft-after-account-close`，PTS 58.6–58.8）composer 邊緣 246–248 無描邊；PTS 58.9 起的黑色實線與全白底是 wrapper 注入 Increase Contrast 後的 minimal 降級（記錄在 00:28:49 的 `light+increased-contrast/*` 之前），不是 standard renderer 問題，`glowIntensity` 未動。
+
 ## 尚未完成的裝置驗收
 
 以下仍需針對同一可追溯 source SHA、版本／build，記錄裝置、OS、設定、步驟、實際觀察與證據位置；不以過往 master build 代替本次 feature build。[完整人工報告格式與必要 case](mobile-e2e.md)維持原契約。

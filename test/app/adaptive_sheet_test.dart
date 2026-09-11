@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:tripline/app/accessibility_scope.dart';
 import 'package:tripline/app/adaptive.dart';
+import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 
 void main() {
@@ -1087,6 +1088,98 @@ void main() {
     expect(
       sheet.expandedColor,
       Theme.of(tester.element(find.text('帳號內容'))).colorScheme.surface,
+    );
+  });
+
+  // #319 真機（iPhone 14 Pro／iOS 16.6）：深色 sheet 沿用 base `surface` 黑，
+  // 落在黑頁面上沒有可辨識邊界；參考影片是 iOS elevated 深灰面板。
+  // 依 iOS base／elevated 語意，sheet 內把深色 surface 三階整體上移一階，
+  // 淺色維持不變；grouped 卡片因此仍比底色高一階。
+  for (final (label, theme) in [
+    ('淺色', AppTheme.light()),
+    ('深色', AppTheme.dark()),
+  ]) {
+    testWidgets('$label content sheet 採 elevated 語意層級並保留 grouped 層次', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showAppContentSheet<void>(
+                context,
+                title: '帳號',
+                builder: (_) => const Text('帳號內容'),
+              ),
+              child: const Text('開啟'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('開啟'));
+      await tester.pumpAndSettle();
+
+      final outer = theme.colorScheme;
+      final inner = Theme.of(tester.element(find.text('帳號內容'))).colorScheme;
+      final sheet = tester.widget<GlassModalSheetScaffold>(
+        find.byType(GlassModalSheetScaffold),
+      );
+      final isDark = theme.brightness == Brightness.dark;
+      expect(sheet.expandedColor, inner.surface, reason: '底色跟隨內容語意 surface');
+      expect(
+        sheet.expandedColor,
+        isDark ? outer.surfaceContainerLow : outer.surface,
+        reason: isDark ? '深色 sheet 是 elevated 深灰，不是 base 黑' : '淺色不變',
+      );
+      expect(
+        inner.surfaceContainerLow,
+        isDark ? outer.surfaceContainerHigh : outer.surfaceContainerLow,
+        reason: 'grouped 卡片仍比 sheet 底色高一階',
+      );
+      expect(
+        inner.surfaceContainerHigh,
+        isDark ? outer.surfaceContainerHighest : outer.surfaceContainerHigh,
+      );
+      expect(inner.onSurface, outer.onSurface, reason: '前景色不變');
+    });
+  }
+
+  testWidgets('selection sheet 與 content sheet 共用同一個 elevated 層級', (
+    tester,
+  ) async {
+    final theme = AppTheme.dark();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Builder(
+          builder: (context) => FilledButton(
+            onPressed: () => showAppSelectionSheet<String>(
+              context,
+              title: '切換行程',
+              builder: (_, _) => const Text('東京五日行'),
+            ),
+            child: const Text('開啟'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('開啟'));
+    await tester.pumpAndSettle();
+
+    final outer = theme.colorScheme;
+    final inner = Theme.of(tester.element(find.text('東京五日行'))).colorScheme;
+    final sheet = tester.widget<GlassModalSheetScaffold>(
+      find.byType(GlassModalSheetScaffold),
+    );
+    expect(sheet.expandedColor, outer.surfaceContainerLow);
+    expect(inner.surface, outer.surfaceContainerLow, reason: '內容與底色同一層級');
+    expect(
+      inner.surfaceContainerLow,
+      outer.surfaceContainerHigh,
+      reason: '只上移一階，不重複套用',
     );
   });
 

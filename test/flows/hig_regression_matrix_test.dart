@@ -246,10 +246,23 @@ void main() {
       final scaffold = tester.widget<GlassModalSheetScaffold>(
         find.byType(GlassModalSheetScaffold),
       );
+      // sheet 子樹的 theme 已由 host 換成 elevated；深色比 App 層 base 高一階（#319）。
       expect(
         scaffold.expandedColor,
         Theme.of(tester.element(sheet)).colorScheme.surface,
         reason: '內容底色偏實，跟隨語意 surface',
+      );
+      final appScheme =
+          (state.brightness == Brightness.dark
+                  ? AppTheme.dark()
+                  : AppTheme.light())
+              .colorScheme;
+      expect(
+        scaffold.expandedColor,
+        state.brightness == Brightness.dark
+            ? appScheme.surfaceContainerLow
+            : appScheme.surface,
+        reason: '深色 sheet 是 elevated 深灰，不是 base 黑；淺色不變',
       );
       if (opaque) {
         expect(scaffold.settings!.glassColor.a, 1, reason: '不透明降級');
