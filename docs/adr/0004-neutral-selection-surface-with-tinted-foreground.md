@@ -357,6 +357,36 @@ PTS 58.6–58.8）composer 邊緣 246–248、沒有描邊。緊接的 PTS 58.9 
 ＋全白底是測試 wrapper 注入 Increase Contrast 後的 minimal 降級（`tpGlassEdgeColor`
 72% 黑），不是 standard renderer 的問題，`glowIntensity` 不動。
 
+### 邊緣光第二次更正：光照強度與深色 rim 暗化（2026-09-11，#319 收尾）
+
+上一節的兩個預期值以 0.26.7（`30f0506`）同裝置、同量法重驗（run 34582660390）：
+選單面板最低亮度 38～45、字形不可辨識，提高對比邊界 44 對 0 —— 成立。
+但 `fresnelStrength` 0.5 只讓 bar button／標題膠囊由 +73～+78 降到 +57～+65，
+root tab bar 幾乎沒變（+95～+110）。讀套件公開 shader 後確認上一節的歸因是錯的：
+
+- premium（`liquid_glass_final_render.frag`）的環主要是 `directional = (main + opposite×0.8)^1.5 × lightIntensity × 3`，
+  反向 lobe 0.8 寫死，所以四邊都亮；Fresnel 只佔 `0.12 × fresnelStrength`，減半只拿掉 0.06。
+- 兩條路徑不是 thermal 決定的：`GlassTabBar.bottom` fallback premium，`GlassContainer`／`GlassButton`／
+  `GlassSegmentedControl`／`GlassMenu` fallback standard，而 App 沒有提供 premium scope。同一畫面在
+  standard 窗與 premium 窗各量一次：tab bar +61 對 +110，header 圓鈕與標題膠囊兩窗都是 +57～+65 ——
+  浮動 header 從未進 premium，其環由 `lightweight_glass.frag` 寫死的 `kRimAlphaBase 0.65`／
+  `kMinRimVisibility 0.35` 主導，`lightIntensity` 幾乎無感。
+
+決定（仍只用公開參數，共用設定函式內）：
+
+1. `lightIntensity` 取 theme 預設的 0.35 倍（`tpNavigationLightIntensityScale`）。以實測反推公式常數後，
+   root tab bar 頂／左預期 +110 → 約 +61、右／下 +92 → 約 +50；側邊 0 做不到。
+2. 深色 `edgeAbsorption` 0.3（`tpNavigationDarkEdgeAbsorption`）。它是 lightweight 路徑末端唯一公開的
+   rim 壓低項（`rim × (1 − a × dirScale)`，對側 dirScale 1.28 > 主光側 0.72，所以壓出方向性），
+   header 預期頂／左 +57 → 約 +42、右／下 → 約 +30；premium 亦在高光 mix 前乘在體色，tab bar 再降到
+   約 +58／+44。0.3 是套件文件「明顯 rim 暗化」值，也是對照 HIG 參考選的產品取值，不是 Apple 固定數值；
+   0.12 推估只降 −6～−11。淺色維持 0：premium 在白底套 0.3 推估 −40／−78，等於刻出暗框。
+
+沒選的方案：把 header 改 premium（同裝置已 thermalDegradation 兩次）、`refractiveIndex` 低於 1（直接乘在
+standard rim alpha，但會改折射語意）、各 feature 自帶參數（違反共用設定函式規則）。媒體 frosted 路徑不讀
+`edgeAbsorption`，無障礙降級仍歸零。兩個新值仍是公式推估，待 0.26.8 真機重量測四邊峰值才算驗收。
+證據與推估腳本在 #319 evidence 的 `specular-final/`。
+
 ## 方法論備註
 
 ### 2026-09-09 全範圍盤點（#310）

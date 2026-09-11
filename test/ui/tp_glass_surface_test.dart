@@ -185,10 +185,11 @@ void main() {
   }
 
   // 材質預設與真正不透明降級由 HIG 十態的像素及操作測試驗證；
-  // 不釘住 lightIntensity 與 ambientStrength 等預設值。Fresnel 是 #319 真機
-  // 量測後唯一明文偏離的公開參數（見 DESIGN §16.2），其餘沿用套件預設。
+  // 不釘住 ambientStrength 等預設值。Fresnel、lightIntensity 與深色 edgeAbsorption
+  // 是 #319 真機量測後明文偏離的公開光學參數（見 DESIGN §16.2），其餘沿用套件預設。
   for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-    testWidgets('${theme.brightness.name} 導覽玻璃把全周 Fresnel 亮環減半，其餘沿用預設', (
+    final isDark = theme.brightness == Brightness.dark;
+    testWidgets('${theme.brightness.name} 導覽玻璃收斂 Fresnel 與主要高光，其餘沿用預設', (
       tester,
     ) async {
       LiquidGlassSettings? regular;
@@ -213,11 +214,25 @@ void main() {
         ),
       );
 
-      // iPhone 14 Pro 實測：套件預設 1.0 在深色四邊量到 +73～+112，
-      // Apple Music 參考只有頂緣 +50～+65、側邊 0。減半預期降回參考量級，待真機確認。
+      // iPhone 14 Pro 實測：Fresnel 減半後深色 premium 的 root tab bar 仍是
+      // +95～+110 全周環，主要來源是套件 shader 的雙向 specular × lightIntensity。
+      // 依公開公式反推，theme 預設（深 0.7／淺 0.85）的 0.35 倍讓最強的一側落到
+      // Apple 參考頂緣 +50～+66 的量級；淺色白底原本 +0～+4，預期不變。
       expect(regular!.fresnelStrength, 0.5);
       expect(media!.fresnelStrength, 0.5);
-      expect(regular!.lightIntensity, packageDefaults!.lightIntensity);
+      final expectedLightIntensity = isDark ? 0.245 : 0.2975;
+      expect(regular!.lightIntensity, closeTo(expectedLightIntensity, 1e-9));
+      expect(media!.lightIntensity, closeTo(expectedLightIntensity, 1e-9));
+      expect(
+        regular!.lightIntensity,
+        lessThan(packageDefaults!.lightIntensity),
+      );
+      // 浮動 header 走 standard 路徑，環由套件常數主導、lightIntensity 幾乎無感；
+      // 公開 edgeAbsorption 在該路徑末端把 rim 乘上 (1 − 0.3 × dirScale)，深色才套：
+      // 淺色白底目前 +0～+4，premium 的 absorption 會在白色上刻出暗框。
+      final expectedEdgeAbsorption = isDark ? 0.3 : 0.0;
+      expect(regular!.edgeAbsorption, closeTo(expectedEdgeAbsorption, 1e-9));
+      expect(media!.edgeAbsorption, closeTo(expectedEdgeAbsorption, 1e-9));
       expect(regular!.ambientStrength, packageDefaults!.ambientStrength);
       expect(regular!.ambientRim, packageDefaults!.ambientRim);
       expect(regular!.refractiveIndex, packageDefaults!.refractiveIndex);

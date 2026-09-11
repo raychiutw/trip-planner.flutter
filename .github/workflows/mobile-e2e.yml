@@ -70,7 +70,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/master' && (github.event_name == 'schedule' || inputs.platform == 'android' || inputs.platform == 'all') }}
     runs-on: ubuntu-24.04
     environment: mobile-e2e
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       FIREBASE_ANDROID_MODEL: ${{ vars.FIREBASE_ANDROID_MODEL || 'MediumPhone.arm' }}
       FIREBASE_ANDROID_VERSION: ${{ vars.FIREBASE_ANDROID_VERSION || '34' }}
@@ -188,7 +188,7 @@ jobs:
             --test build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
             --device "model=${FIREBASE_ANDROID_MODEL},version=${FIREBASE_ANDROID_VERSION},locale=en,orientation=portrait" \
             --environment-variables clearPackageData=true \
-            --timeout 5m \
+            --timeout 15m \
             --record-video \
             --results-history-name tripline-mobile-e2e \
             --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
@@ -388,7 +388,7 @@ jobs:
             --test build/ios_integ/Build/Products/ios_tests.zip \
             --device "model=${FIREBASE_IOS_MODEL},version=${FIREBASE_IOS_VERSION},locale=en_US,orientation=portrait" \
             --xcode-version "$FIREBASE_XCODE_VERSION" \
-            --timeout 5m \
+            --timeout 7m \
             --results-history-name tripline-mobile-e2e \
             --results-bucket "gs://${FIREBASE_TEST_RESULTS_BUCKET}" \
             --results-dir "$TEST_LAB_RESULTS_DIR" \

@@ -40,13 +40,31 @@ channel 橋接與 VoiceOver。`build identity` 行是帳號 footer 讀到的平�
 （`PackageInfo.fromPlatform`，不是 release flow 的 `0.9.1（12）` 替身），供對照
 Actions run 的 build metadata。host 端對應 `test/flows/app_owned_visual_evidence_flow_test.dart`
 以假地圖走同一流程，只驗流程與 log 標記，不能代替真機材質證據。
-時間預算：Test Lab 對整個 XCTest bundle 設 `--timeout 5m`。實測基準 run
-34555721287（iPhone 14 Pro／iOS 16.6）：app-owned flow 在流程中段失敗，耗時
-64.626s（不是完整跑完的量測值）；native map smoke 通過，34.399s。以下皆為估算，
-尚無真機實測：app-owned flow 完整跑完估約 75s；視覺情境 34 個停留點 × 1.2s ≈ 41s
-加上約 90 次互動與一次真實 onMapReady 等待，估 105–120s；三者合計估約
-215–230s。實際耗時以該 run 的 `test_result_0.xml` 各 testcase `time` 為準；
-若逼近上限，優先縮短 `dwell`（`runAppOwnedVisualEvidenceFlow` 參數）而不是刪情境。
+時間預算：gcloud 的 `--timeout` 是整組 execution 的執行上限（官方文件明說不含裝置
+準備與清理）。iOS XCTest bundle 設 `7m`；Android Patrol 矩陣設 `15m`（`android_test_lab`
+job `timeout-minutes` 同步放寬到 60）；Android 標準 integration 矩陣維持 `5m`。三個值都
+由 run 34582660390（0.26.7+38，platform=all）的證據推導；外層逾時的 run 仍算失敗
+run，放寬只是不讓已確認的執行時間再被同一個上限截斷：
+
+- iOS（iPhone 14 Pro／iOS 16.6）：`test_result_0.xml` 4 tests、0 failures／errors／
+  skipped，suite `time` 267.121s（app-owned release flow 77.664s、visual evidence
+  155.224s、native map smoke 34.228s）；`xcodebuild_output.log` 末尾
+  `** TEST EXECUTE SUCCEEDED **`、整體 294.480s，已接近 300s，外層仍回報
+  `Test timed out`。`7m` 給整組 XCTest 執行時間的變動餘裕。
+- Android（MediumPhone.arm／API 34）：integration 矩陣單一 case PASS（XML 的 0.279s
+  不是完整流程耗時，不能拿來推估）。Patrol 矩陣 `test_result_1.xml` 第一個 app-owned
+  flow PASS 208.613s，已占掉 `5m` 的大部分；第二個 visual evidence 在 65.284s 被外層
+  截斷（`instrumentation.results` `ANDROID_INSTRUMENTATION_COMMAND_EXEC_TIMEOUT|100302`），
+  logcat 的 `Tripline visual evidence` 推進到 `light/map-day-1`，當前 log 未定位到產品
+  assertion 失敗；native map smoke 沒有輪到。已確認的是外層 timeout；後續兩個 case
+  仍待新 run 驗證，不能據此宣稱整組通過。`15m` 是 gcloud 對 Android 的預設值，涵蓋
+  整組三個 case 的餘裕，並保留所有內層限制。
+
+兩個平台的 per-test 操作 timeout（30s／15s 等）與所有 target、assertion、gcloud 非零
+失敗、branch／environment guard 都不因此調整。新 source 的裝置驗證是必要 gate：預算
+放寬後仍要以新 run 的 XML 與 log 確認每個 case 完整跑完。若某次 run 的 XML 沒有寫完或
+suite `time` 逼近上限的七成，優先縮短 `dwell`（`runAppOwnedVisualEvidenceFlow` 參數）
+而不是刪情境或再加預算。
 
 On iOS, both Patrol suites inspect SpringBoard before their first app
 interaction and dismiss a stale `Edit Home Screen` tutorial by its native alert
