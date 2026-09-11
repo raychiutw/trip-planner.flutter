@@ -41,6 +41,8 @@ lib/
 docs/
   adr/          # 架構決策與被拒方案（13 份）
   agents/       # agent 用的 issue tracker／triage labels／domain docs 設定
+  research/     # 升級前的套件選擇研究（歷史基準）
+  liquid-glass-1.4.1-migration.md # 1.4.1 遷移去留、真機驗收紀錄與未完成缺口
   mobile-e2e.md # Patrol／Firebase Test Lab 與發布 runbook
 ```
 
@@ -58,6 +60,7 @@ docs/
 | 查 UI／UX 規範（iOS HIG） | [DESIGN.md](DESIGN.md) · [CODING_STANDARDS § UI 規範](CODING_STANDARDS.md#ui-規範) |
 | 查領域詞彙（停留點、正選／備選 POI、工單） | [CONTEXT.md](CONTEXT.md) |
 | 理解架構決策與被拒方案 | [docs/adr/](docs/adr/)（13 份） |
+| 查 Liquid Glass 1.4.1 遷移去留、真機驗收紀錄與未完成缺口 | [docs/liquid-glass-1.4.1-migration.md](docs/liquid-glass-1.4.1-migration.md) |
 | 跑 Patrol／Firebase Test Lab、發布 TestFlight／Google Play | [docs/mobile-e2e.md](docs/mobile-e2e.md) |
 | 設定 agent 的 issue tracker／triage labels／domain docs | [docs/agents/](docs/agents/) |
 | 看變更紀錄 | [CHANGELOG](CHANGELOG.md) |

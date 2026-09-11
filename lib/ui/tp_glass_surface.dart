@@ -91,6 +91,27 @@ LiquidGlassSettings tpMediaIconGlassSettings(BuildContext context) {
   );
 }
 
+/// 選單面板的模糊半徑；導覽玻璃預設 4–5 會讓後方標題字形穿透。
+const double tpMenuGlassBlur = 24;
+
+/// 文字多的選單面板走 HIG regular 類材質：白色煙燻填色加重模糊，
+/// 讓後方卡片邊界與標題不再穿透（#319 真機量測，見 DESIGN §16.2）。
+/// 無障礙降級改用高一階容器色，黑面板才不會落在黑頁面上失去邊界。
+/// 媒體背景的 frosted 路徑同樣以 glassColor 上色；目前沒有選單開在媒體上。
+LiquidGlassSettings tpMenuGlassSettings(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
+  final veil = Colors.white.withValues(
+    alpha: scheme.brightness == Brightness.dark ? 0.18 : 0.72,
+  );
+  return tpResolveGlassSettings(
+    context,
+    tpNavigationGlassSettings(
+      context,
+    ).copyWith(glassColor: veil, blur: tpMenuGlassBlur),
+    opaqueColor: scheme.surfaceContainerHigh,
+  );
+}
+
 /// 玻璃上的字符與文字走單色標籤語意色，並依玻璃底下內容的亮度切換深淺。
 ///
 /// **不能用 app 的明暗模式判斷。** `tripMapColorScheme()` 丟棄了 brightness
@@ -162,15 +183,20 @@ Color tpGlassEdgeColor(BuildContext context) {
       : Colors.black.withValues(alpha: 0.72);
 }
 
+/// 套件預設 1.0 的全周 Fresnel 亮環在深色真機量到 Apple 參考的 1.2～2 倍；
+/// 減半預期降回參考量級、待真機確認，方向性高光仍由套件 lightIntensity 提供（#319）。
+const double tpNavigationFresnelStrength = 0.5;
+
 LiquidGlassSettings tpNavigationGlassSettings(
   BuildContext context, {
   TpNavigationGlassRecipe recipe = TpNavigationGlassRecipe.regular,
 }) {
   final defaults =
-      GlassThemeData.of(
-        context,
-      ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
-      const LiquidGlassSettings();
+      (GlassThemeData.of(
+                context,
+              ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
+              const LiquidGlassSettings())
+          .copyWith(fresnelStrength: tpNavigationFresnelStrength);
   final onMedia = recipe == TpNavigationGlassRecipe.platformView;
   final scrim = Colors.black.withValues(alpha: tpMediaScrimOpacity);
   return tpResolveGlassSettings(

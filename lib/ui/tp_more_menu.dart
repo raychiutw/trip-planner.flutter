@@ -470,7 +470,7 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
           stretch: MediaQuery.disableAnimationsOf(context) ? 0 : 0.5,
           menuWidth: menuWidth,
           menuPadding: safeArea + const EdgeInsets.all(8),
-          settings: tpNavigationGlassSettings(this.context),
+          settings: tpMenuGlassSettings(this.context),
           quality: tpGlassQuality(this.context),
           platformViewBackdrop: TpMediaBackdropScope.of(this.context),
           triggerBuilder: (context, _) => ExcludeSemantics(

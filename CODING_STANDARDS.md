@@ -38,7 +38,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### 兩個既有例外（不得擴大）
 
 - `lib/app/router.dart` 是唯一允許 import `features/` 的 `app/` 檔（composition root，需要 27 個 screen 建路由表；`lib/app/router.dart:10,21`）。新增其他 `app/` 檔 import `features/` 一律退回。
-- `ui/` 對 `app/` 的唯一允許依賴是 `app/accessibility_scope.dart`（`lib/ui/tp_glass_surface.dart:4`、`lib/ui/tp_horizontal_selector.dart:7`、`lib/ui/tp_root_scaffold.dart:6`）。`ui/` import 任何其他 `app/` 檔即違反。反向 `lib/app/adaptive.dart:15-17` import `ui/` 則符合鏈方向。
+- `ui/` 對 `app/` 的唯一允許依賴是 `app/accessibility_scope.dart`（`lib/ui/tp_glass_surface.dart:4`、`lib/ui/tp_horizontal_selector.dart:7`、`lib/ui/tp_root_scaffold.dart:6`）。`ui/` import 任何其他 `app/` 檔即違反。反向 `lib/app/adaptive.dart:17-19` import `ui/` 則符合鏈方向。
 
 ## Provider 與測試 seam
 
@@ -172,6 +172,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - Widget 取色只走 `Theme.of(context).colorScheme`。
 - **不得直接引用 `TpSystemColorsLight` / `TpSystemColorsDark`**（`lib/theme/tokens.dart:4`、`:37`）。這兩組常數只供 `AppTheme` 工廠建立 Light／Dark／High Contrast 三套主題（`lib/theme/app_theme.dart:14-16`）。
 - 柔褐 tint 是唯一品牌強調色，且**只上前景** —— 文字、字符、選取指示。不得把 tint 畫成框線或選取膠囊的底色；膠囊本身走中性語意層，tint 上在字符與標籤。
+- sheet 子樹的 `colorScheme` 由 `lib/app/adaptive.dart` 的兩個共用 host（compact `GlassModalSheetScaffold`、regular `GlassContainer`）各換成一次 `AppTheme.elevated(...)`（深色 palette 三階上移一階、淺色不變，`lib/theme/app_theme.dart`）。sheet 內的畫面照常取 `colorScheme.surface`／`surfaceContainerLow`，**不得**自己再算 elevated 色、再包一層 `AppTheme.elevated` 或寫死 `#1C1C1E`；sheet 以外的畫面不得引用 `AppTheme.elevated`。
 - 唯一的 rainbow 例外是地圖逐日 pin／route 的 `kDayPinPalette`（`lib/features/map/map_style.dart:16`），取色一律經 `dayPinColor(dayNum)`（同檔 `:34`），不得自行 index。這是資料視覺化，不是 UI 分類色 —— 停留點卡片、收藏、設定列都不得靠彩色分類。
 - 顏色不得是唯一資訊來源。階層用字重、留白與 separator 建立。
 - 無 gradient 裝飾、無 emoji icon。
@@ -192,7 +193,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 確認框、action sheet、搜尋列、日期／時間選擇、短暫通知一律重用 `lib/app/adaptive.dart`，不得在 feature 內重寫平台判斷。
 - 標題與動作幾何來自 `TpRootScaffold`（浮動 header）或 `TpAppBar`（固定 bar），不自己建。
 - **以下由 `test/ui/shared_ui_usage_test.dart` 機器強制，Standards 審查不必再看**：`lib/features/**` 不得出現平台 sheet API（`showModalBottomSheet` 等，只有 `lib/app/adaptive.dart` 能碰）、不得出現 `AppBar` 家族、不得讓 `TpRootScrollScaffold` 等已移除符號復活、地圖 SDK 只能從 `lib/features/map/map_canvas_mobile.dart` import。違反會直接紅燈。
-- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:247`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
+- 破壞性確認一律經 `showAppDestructiveConfirm`（`lib/app/adaptive.dart:249`），不得自己組 `showAppConfirm`。`source` 參數是必填且有語意：
   - `TpDestructiveConfirmSource.menu` —— 從 `TpMoreMenuButton`（`lib/ui/tp_more_menu.dart`）選單選中，確認走 action sheet
   - `TpDestructiveConfirmSource.direct` —— 左滑刪除、列上按鈕這類直接觸發，確認走 alert
   - 同一個動作同時掛在選單與左滑上時，`source` 由呼叫端各自傳，不得在 helper 內寫死（`lib/app/irreversible_action.dart:12`）
@@ -201,7 +202,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 通知與錯誤
 
-- 成功／低風險結果用 `showAppNotice`（`lib/app/adaptive.dart:1135`）—— 頂部橫幅，約 2.5 秒自動消失，沒有動作按鈕。
+- 成功／低風險結果用 `showAppNotice`（`lib/app/adaptive.dart:1191`）—— 頂部橫幅，約 2.5 秒自動消失，沒有動作按鈕。
 - 真正的錯誤用 `showAppError`（`lib/app/app_feedback.dart:4`）—— 持續留在畫面上直到使用者關閉或重試。可恢復的錯誤必須傳 `onRetry`。
 - 不得用 `showAppNotice` 或裸 `SnackBar` 報錯誤（一閃就消失）。
 
@@ -230,16 +231,17 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 導覽玻璃上的 15–17pt 文字（`titleLarge` 17 / `titleMedium`、`bodyLarge` 15）必須對**實際合成後**的背景達 4.5:1，不是對 token 的名目色。玻璃是半透明的，底下捲什麼過去就合成什麼。
 - 100% 與 200% Dynamic Type 兩種字級都要驗；驗收方式是拿高對比黑白內容捲過浮動 header，確認下層字詞不可辨識且前景仍達 4.5:1。
 - `Increase Contrast` 或 `Reduce Transparency` 任一開啟時，玻璃使用不透明系統背景。`tpResolveGlassSettings` 提供 alpha `1` 的語意色，`tpGlassQuality` 明確選擇 `GlassQuality.minimal`，避開 shader、折射與高光；不可只把 blur 歸零，1.x 的 `blur: 0` 仍是光學玻璃。兩個輸入各自以實際背景像素及操作測試驗證。
-- 一般模式不描邊；只有 `Increase Contrast` 才補實心邊（`tpGlassEdgeColor`，`lib/ui/tp_glass_surface.dart:118`）。
+- 一般模式不描邊；只有 `Increase Contrast` 才補實心邊（`tpGlassEdgeColor`，`lib/ui/tp_glass_surface.dart:179`）。
 
 ### 材質語意
 
 - 導覽材質只有兩種語意，由 `TpNavigationGlassRecipe`（`lib/ui/tp_glass_surface.dart:6`）表達：
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
-- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率、Fresnel 或 blur 校準。**媒體暗化 alpha 只能住在共用 `tp_glass_surface.dart` 的設定函式**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
-- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
-- 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
+- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率或 blur 校準；唯二明文偏離是 `DESIGN.md` §16.2 記錄的 #319 真機決策 —— 導覽玻璃 `fresnelStrength` 0.5（`tpNavigationFresnelStrength`）與選單面板的 `tpMenuGlassSettings`（veil 與 blur）。**媒體暗化 alpha、Fresnel 與選單配方都只能住在共用 `tp_glass_surface.dart` 的設定函式**（`lib/ui/tp_glass_surface.dart`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
+- 選單面板（`GlassMenu.settings`）一律用 `tpMenuGlassSettings`，不得回用導覽配方 `tpNavigationGlassSettings`：後者是給 bar、tab bar 與 accessory 的 clear 類材質，文字多的面板要走 regular 類（HIG Materials：「Use the regular variant when … components have a significant amount of text, such as alerts, sidebars, or popovers」）。
+- `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:225`、`:246`、`:266`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
+- 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:121`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
   媒體上的日期選擇器依 ADR-0004 可讀性更正，維持 `tpMediaControlBackground` 的 70% 中性底配不透明 `onSurface`。帳號與定位依後續透明度更正，使用共用 `tpMediaIconGlassSettings` 的 45% 黑色填色配 `tpBarForeground`，圖示須對實際合成背景達 3:1；兩者均保留獨立不透明降級。這些是產品色彩策略，不改其他媒體表面的 35% 暗化或 shader 光學參數。
 - 玻璃只用於功能層：root tab bar、浮動 header、bottom accessory、sheet、選單。內容層一律實色 grouped surface。停留點卡、備選 POI 卡、設定 group 不套 glass。不得 glass 內巢狀 glass。
 
@@ -247,11 +249,11 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 單一政策，不建立每頁專屬 helper：
   1. 可捲動的表單與搜尋結果設 `keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag`。
-  2. tap-outside 收合由 app root 的 `AppKeyboardDismissRegion`（`lib/app/adaptive.dart:21`）統一提供，掛在 `MaterialApp.router` 的 `builder`（`lib/main.dart:163`）。
+  2. tap-outside 收合由 app root 的 `AppKeyboardDismissRegion`（`lib/app/adaptive.dart:23`）統一提供，掛在 `MaterialApp.router` 的 `builder`（`lib/main.dart:163`）。
   3. 欄位附屬的清除、麥克風、送出、日期／時間按鈕用 `TextFieldTapRegion` 包住，避免點控制項時先誤收鍵盤（現有唯一實例：聊天 composer，`lib/features/chat/chat_screen.dart:1000`）。
 - **feature 不得再包一層 `AppKeyboardDismissRegion`** —— root 已經包了，重複包會疊出兩層 gesture listener。同理，root 捲動走 `TpRootScrollView` 的畫面不必自己設 `onDrag`，它已經設了（`lib/ui/tp_root_scaffold.dart:310`）；只有不屬於這些共用容器的捲動視圖才在 feature 層自己設（如 `lib/features/trip_detail/widgets/entry_edit_sheet.dart:579`）。
-- 收鍵盤**只准做一件事：`unfocus()`**。不得清空文字、觸發 submit、改 dirty state、關閉 sheet 或取消進行中的 request。實作是 `intent.focusNode.unfocus()`（`lib/app/adaptive.dart:33`）與 `FocusManager.instance.primaryFocus?.unfocus()`（同檔 `:41`），且 `ScrollStartNotification` 回傳 `false` 不吞通知。
-- 拖曳才收，不是任何捲動都收：`notification.dragDetails != null` 才 unfocus（`lib/app/adaptive.dart:39`）—— 程式化捲動（scroll-to-day、scroll-to-top）不得收鍵盤。
+- 收鍵盤**只准做一件事：`unfocus()`**。不得清空文字、觸發 submit、改 dirty state、關閉 sheet 或取消進行中的 request。實作是 `intent.focusNode.unfocus()`（`lib/app/adaptive.dart:35`）與 `FocusManager.instance.primaryFocus?.unfocus()`（同檔 `:43`），且 `ScrollStartNotification` 回傳 `false` 不吞通知。
+- 拖曳才收，不是任何捲動都收：`notification.dragDetails != null` 才 unfocus（`lib/app/adaptive.dart:42`）—— 程式化捲動（scroll-to-day、scroll-to-top）不得收鍵盤。
 - 聊天草稿屬於行程，收鍵盤與切走再切回都要恢復。
 
 ---
@@ -341,7 +343,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 改測試視窗尺寸必須成對還原，兩種寫法擇一，不要混：
   - `tester.view.physicalSize = ...` → 同時設 `tester.view.devicePixelRatio = 1`，並 `addTearDown(tester.view.resetPhysicalSize)` + `addTearDown(tester.view.resetDevicePixelRatio)`（`test/features/shell/app_shell_test.dart:255-258`）。
   - `tester.binding.setSurfaceSize(...)` → `addTearDown(() => tester.binding.setSurfaceSize(null))`（`test/features/trips/trips_list_screen_test.dart:61-64`）。
-- **有 size class 分支的畫面，測試必須覆蓋 compact 與 regular 兩種寬度。** 判定規則只有一條：`appIsRegularSizeClass`（`lib/app/adaptive.dart:752-755`，`width >= 720 && height >= 700`）。既有測試的標準尺寸是 compact `Size(390, 844)`、regular `Size(1024, 768)`（`test/features/shell/app_shell_test.dart:255,278`）。`Size(600, 820)` 仍是 compact（寬度未過 720），不要拿它當 regular。
+- **有 size class 分支的畫面，測試必須覆蓋 compact 與 regular 兩種寬度。** 判定規則只有一條：`appIsRegularSizeClass`（`lib/app/adaptive.dart:802-805`，`width >= 720 && height >= 700`）。既有測試的標準尺寸是 compact `Size(390, 844)`、regular `Size(1024, 768)`（`test/features/shell/app_shell_test.dart:255,278`）。`Size(600, 820)` 仍是 compact（寬度未過 720），不要拿它當 regular。
 
 ### 新增程式碼的測試門檻
 
