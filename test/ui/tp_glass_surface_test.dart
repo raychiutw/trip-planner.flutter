@@ -185,7 +185,45 @@ void main() {
   }
 
   // 材質預設與真正不透明降級由 HIG 十態的像素及操作測試驗證；
-  // 不再釘住舊 shader 的 Fresnel、lightIntensity 與 ambientStrength 校準值。
+  // 不釘住 lightIntensity 與 ambientStrength 等預設值。Fresnel 是 #319 真機
+  // 量測後唯一明文偏離的公開參數（見 DESIGN §16.2），其餘沿用套件預設。
+  for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+    testWidgets('${theme.brightness.name} 導覽玻璃把全周 Fresnel 亮環減半，其餘沿用預設', (
+      tester,
+    ) async {
+      LiquidGlassSettings? regular;
+      LiquidGlassSettings? media;
+      LiquidGlassSettings? packageDefaults;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) {
+              regular = tpNavigationGlassSettings(context);
+              media = tpNavigationGlassSettings(
+                context,
+                recipe: TpNavigationGlassRecipe.platformView,
+              );
+              packageDefaults = GlassThemeData.of(
+                context,
+              ).settingsFor(context)?.applyTo(const LiquidGlassSettings());
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      // iPhone 14 Pro 實測：套件預設 1.0 在深色四邊量到 +73～+112，
+      // Apple Music 參考只有頂緣 +50～+65、側邊 0。減半預期降回參考量級，待真機確認。
+      expect(regular!.fresnelStrength, 0.5);
+      expect(media!.fresnelStrength, 0.5);
+      expect(regular!.lightIntensity, packageDefaults!.lightIntensity);
+      expect(regular!.ambientStrength, packageDefaults!.ambientStrength);
+      expect(regular!.ambientRim, packageDefaults!.ambientRim);
+      expect(regular!.refractiveIndex, packageDefaults!.refractiveIndex);
+      expect(regular!.blur, packageDefaults!.blur);
+    });
+  }
 
   group('TpMediaBackdropScope', () {
     testWidgets('缺席時預設非媒體背景;宣告後子樹讀得到', (tester) async {

@@ -172,6 +172,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - Widget 取色只走 `Theme.of(context).colorScheme`。
 - **不得直接引用 `TpSystemColorsLight` / `TpSystemColorsDark`**（`lib/theme/tokens.dart:4`、`:37`）。這兩組常數只供 `AppTheme` 工廠建立 Light／Dark／High Contrast 三套主題（`lib/theme/app_theme.dart:14-16`）。
 - 柔褐 tint 是唯一品牌強調色，且**只上前景** —— 文字、字符、選取指示。不得把 tint 畫成框線或選取膠囊的底色；膠囊本身走中性語意層，tint 上在字符與標籤。
+- sheet 子樹的 `colorScheme` 由 `lib/app/adaptive.dart` 的兩個共用 host（compact `GlassModalSheetScaffold`、regular `GlassContainer`）各換成一次 `AppTheme.elevated(...)`（深色 palette 三階上移一階、淺色不變，`lib/theme/app_theme.dart`）。sheet 內的畫面照常取 `colorScheme.surface`／`surfaceContainerLow`，**不得**自己再算 elevated 色、再包一層 `AppTheme.elevated` 或寫死 `#1C1C1E`；sheet 以外的畫面不得引用 `AppTheme.elevated`。
 - 唯一的 rainbow 例外是地圖逐日 pin／route 的 `kDayPinPalette`（`lib/features/map/map_style.dart:16`），取色一律經 `dayPinColor(dayNum)`（同檔 `:34`），不得自行 index。這是資料視覺化，不是 UI 分類色 —— 停留點卡片、收藏、設定列都不得靠彩色分類。
 - 顏色不得是唯一資訊來源。階層用字重、留白與 separator 建立。
 - 無 gradient 裝飾、無 emoji icon。
@@ -237,7 +238,8 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 導覽材質只有兩種語意，由 `TpNavigationGlassRecipe`（`lib/ui/tp_glass_surface.dart:6`）表達：
   - `regular` —— 底下是文字內容
   - `platformView` —— 底下是平台視圖（地圖圖磚），走媒體暗化層
-- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率、Fresnel 或 blur 校準。**媒體暗化 alpha 只能住在共用 `tp_glass_surface.dart` 的設定函式**（`lib/ui/tp_glass_surface.dart:181`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
+- 一般態沿用 liquid_glass_widgets 1.4.1 的公開 theme 與材質預設，不保留舊 shader 的光照、色散、折射率或 blur 校準；唯二明文偏離是 `DESIGN.md` §16.2 記錄的 #319 真機決策 —— 導覽玻璃 `fresnelStrength` 0.5（`tpNavigationFresnelStrength`）與選單面板的 `tpMenuGlassSettings`（veil 與 blur）。**媒體暗化 alpha、Fresnel 與選單配方都只能住在共用 `tp_glass_surface.dart` 的設定函式**（`lib/ui/tp_glass_surface.dart`）。feature 與各 chrome 元件不得自己 `LiquidGlassSettings(...)` —— 由 `test/ui/shared_ui_usage_test.dart` 機器強制。
+- 選單面板（`GlassMenu.settings`）一律用 `tpMenuGlassSettings`，不得回用導覽配方 `tpNavigationGlassSettings`：後者是給 bar、tab bar 與 accessory 的 clear 類材質，文字多的面板要走 regular 類（HIG Materials：「Use the regular variant when … components have a significant amount of text, such as alerts, sidebars, or popovers」）。
 - `platformViewBackdrop` 只表示「底下是平台視圖」的相容合成路徑（`lib/ui/tp_glass_surface.dart:209`、`:240`、`:268`），它決定 backdrop 怎麼合成與要不要上暗化層 —— **不代表「內容是不是文字」**，也不是可讀性的開關。判準是底層 widget，不是內容型別：由 `TpMediaBackdropScope`（`lib/ui/tp_glass_surface.dart`）宣告一次 —— root shell 依目前分支是不是 `/map`、行程地圖畫面自己宣告 `true`、root 地圖的空／載入／錯誤狀態蓋回 `false` —— header、帶狀遮蔽、bottom accessory、root tab bar 各自讀 scope，不手傳 bool、不用 tab 索引猜（守門測試在 `test/ui/shared_ui_usage_test.dart`）。
 - 玻璃上的字符與文字走 `tpBarForeground(context, onMedia:)`（`lib/ui/tp_glass_surface.dart:51`），**不得用 app 的明暗模式判斷** —— 地圖圖磚在深色模式下仍是亮的。
   媒體上的日期選擇器依 ADR-0004 可讀性更正，維持 `tpMediaControlBackground` 的 70% 中性底配不透明 `onSurface`。帳號與定位依後續透明度更正，使用共用 `tpMediaIconGlassSettings` 的 45% 黑色填色配 `tpBarForeground`，圖示須對實際合成背景達 3:1；兩者均保留獨立不透明降級。這些是產品色彩策略，不改其他媒體表面的 35% 暗化或 shader 光學參數。

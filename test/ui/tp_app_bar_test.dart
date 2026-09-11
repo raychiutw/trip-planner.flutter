@@ -2330,6 +2330,84 @@ void main() {
     );
   });
 
+  // #319 真機（iPhone 14 Pro／iOS 16.6、premium）：導覽玻璃配方的面板讓後方
+  // 卡片黑帶與白色標題穿透（面板最低亮度 1–18；Apple Music 參考為 41–42）。
+  // 選單是文字多的面板，走 HIG regular 類材質：較密的白色煙燻填色與較重模糊。
+  for (final theme in [AppTheme.light(), AppTheme.dark()]) {
+    testWidgets('${theme.brightness.name} 選單面板採較密的 regular 材質，不沿用導覽玻璃', (
+      tester,
+    ) async {
+      LiquidGlassSettings? navigation;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                navigation = tpNavigationGlassSettings(context);
+                return TpMoreMenuButton<String>(
+                  items: const [TpActionItem(value: 'notes', label: '筆記')],
+                  onSelected: (_) {},
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byType(TpMoreMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      final panel = tester.widget<GlassMenu>(find.byType(GlassMenu)).settings!;
+      final expectedAlpha = theme.brightness == Brightness.dark ? 0.18 : 0.72;
+      expect(panel.blur, 24, reason: '面板模糊要蓋掉後方文字形狀');
+      expect(panel.blur, greaterThan(navigation!.blur));
+      expect(panel.glassColor.a, closeTo(expectedAlpha, 0.01));
+      expect(panel.glassColor.a, greaterThan(navigation!.glassColor.a));
+      expect(
+        panel.glassColor.withValues(alpha: 1),
+        Colors.white,
+        reason: '煙燻填色是白色 veil，與品牌 tint 無關',
+      );
+      expect(panel.glassColor.a, lessThan(1), reason: '一般態仍是半透明玻璃');
+    });
+  }
+
+  for (final (label, highContrast, reduceTransparency) in [
+    ('提高對比', true, false),
+    ('降低透明度', false, true),
+  ]) {
+    testWidgets('$label 的選單面板不透明且以容器色與頁面區隔', (tester) async {
+      await tester.pumpWidget(
+        AppAccessibilityScope(
+          reduceTransparency: reduceTransparency,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(highContrast: highContrast),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: TpMoreMenuButton<String>(
+                items: const [TpActionItem(value: 'notes', label: '筆記')],
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byType(TpMoreMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      final panel = tester.widget<GlassMenu>(find.byType(GlassMenu)).settings!;
+      final scheme = AppTheme.dark().colorScheme;
+      expect(panel.blur, 0);
+      expect(panel.glassColor.a, 1);
+      // 真機提高對比：黑面板落在黑頁面上沒有邊界，改用高一階容器色區隔。
+      expect(panel.glassColor, scheme.surfaceContainerHigh);
+      expect(panel.backerColor, scheme.surfaceContainerHigh);
+    });
+  }
+
   testWidgets('停用刪除保留分組與破壞性提示且不執行', (tester) async {
     final semantics = tester.ensureSemantics();
     var calls = 0;
