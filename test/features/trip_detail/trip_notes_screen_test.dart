@@ -1423,6 +1423,71 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('筆記選單交還維護失敗後持續顯示中文錯誤、保留筆記且可重開選單', (tester) async {
+    _useTallViewport(tester);
+    final repo = reassignRepo();
+    final request = Completer<void>();
+    when(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).thenAnswer((_) => request.future);
+    await tester.pumpWidget(reassignScreen(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('行前須知'));
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('note-more-pretrip-11'));
+    final reassign = find.byKey(
+      const ValueKey('note-menu-reassign-pretrip-11'),
+    );
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    await tester.tap(reassign);
+    await tester.tap(reassign, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(reassign, findsNothing, reason: '請求尚未完成時選單已關閉');
+
+    request.completeError(
+      const ApiError(
+        status: 409,
+        code: 'NOTES_AI_JOB_STALE',
+        message: 'note maintainer version changed',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const failure = '這一則已經被更新過，請重新整理後再試。';
+    expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+    expect(find.text(failure), findsOneWidget);
+    expect(find.text('我改過的 AI 項目'), findsOneWidget);
+    expect(find.textContaining('已交還 AI 維護'), findsNothing);
+    expect(find.textContaining('NOTES_AI_JOB_STALE'), findsNothing);
+
+    // 超過短暫通知的顯示時間後，錯誤仍保留；重開選單不會再送一次請求。
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text(failure), findsOneWidget);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(reassign.hitTestable(), findsOneWidget);
+    expect(find.text('我改過的 AI 項目'), findsOneWidget);
+    expect(find.textContaining('已交還 AI 維護'), findsNothing);
+    verify(
+      () => repo.setNoteMaintainer(
+        NoteSection.pretrip,
+        tripId: 'trip-1',
+        rowId: 11,
+        managedBy: NoteMaintainer.ai,
+        expectedVersion: 4,
+      ),
+    ).called(1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('已排除 N 項:N=0 不出現;點開可逐項恢復', (tester) async {
     _useTallViewport(tester);
     final repo = _MockTripRepository();
