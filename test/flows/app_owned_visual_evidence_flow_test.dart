@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/theme/tokens.dart';
 
 import '../../integration_test/support/app_flow_fixture.dart';
@@ -170,4 +171,37 @@ void main() {
     expect(theme.light.glowColors?.primary, TpSystemColorsLight.tint);
     expect(theme.dark.glowColors?.primary, TpSystemColorsDark.tint);
   });
+
+  testWidgets(
+    'map readiness is false before mount, before the real callback, and after unmount',
+    (tester) async {
+      // 由測試掌控 onMapReady 何時發生的 canvas，不放假 ready 訊號。
+      VoidCallback? mapReady;
+      final evidence = TripMapCanvasEvidence(
+        canvas: (config) {
+          mapReady = config.onMapReady;
+          return const SizedBox.expand();
+        },
+      );
+      final controller = TripMapController();
+      addTearDown(controller.dispose);
+      final config = TripMapCanvasConfig(
+        controller: controller,
+        tilePreset: kTripMapTilePresets.first,
+        initialFitPoints: const [],
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(evidence.isCurrentCanvasReady(tester), isFalse);
+
+      await tester.pumpWidget(evidence.build(config));
+      expect(evidence.isCurrentCanvasReady(tester), isFalse);
+      mapReady!();
+      expect(evidence.isCurrentCanvasReady(tester), isTrue);
+      expect(evidence.readyCount, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(evidence.isCurrentCanvasReady(tester), isFalse);
+    },
+  );
 }

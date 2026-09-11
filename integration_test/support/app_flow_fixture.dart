@@ -894,14 +894,14 @@ class TripMapCanvasEvidence {
   /// 真實 onMapReady 回呼次數；只有 canvas 重新建立才會再加一。
   int get readyCount => _readyCount;
 
-  /// 目前畫面上那張 canvas 是否已收過真正的 onMapReady；同時只允許一張在畫面上。
+  /// 目前畫面上那張 canvas 是否已收過真正的 onMapReady；還沒掛上或已卸載回 false，
+  /// 同時有多張在畫面上則直接失敗。
   bool isCurrentCanvasReady(WidgetTester tester) {
-    final host = tester
-        .widget<_TripMapCanvasEvidenceHost>(
-          find.byType(_TripMapCanvasEvidenceHost),
-        )
-        .controller;
-    return _readyControllers.contains(host);
+    final hosts = find.byType(_TripMapCanvasEvidenceHost).evaluate();
+    if (hosts.isEmpty) return false;
+    if (hosts.length > 1) fail('畫面上同時有 ${hosts.length} 張地圖 canvas');
+    final host = hosts.single.widget as _TripMapCanvasEvidenceHost;
+    return _readyControllers.contains(host.controller);
   }
 
   // TripMapCanvasConfig 沒有 copyWith；新增欄位時要一併轉交。
