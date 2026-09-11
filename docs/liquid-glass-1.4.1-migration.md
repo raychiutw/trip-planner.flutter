@@ -126,7 +126,14 @@
 
 未覆蓋（iOS 沒有畫面，不標 PASS）：列印固定 bar「⋯」、停留點卡／筆記列／共編成員／分享連結的 plain「⋯」、探索地區與分類 chip 入口、regular／橫向、2× 字級、Bold Text；輔助使用 flags 為測試 wrapper 注入，不等於 OS 設定或 VoiceOver。Android `MediumPhone.arm`／API 34 虛擬機本輪 integration 在 fixture:779 失敗、Patrol 未跑，由另一 session 處理 harness；本節不含任何 Android 結果。
 
-修正後的三處（`tpNavigationFresnelStrength`、`tpMenuGlassSettings`、sheet 的 `AppTheme.elevated`）尚無真機證據，上表「已改」都不是驗收通過；下一輪裝置證據要重新記錄四邊峰值、面板最低亮度與深色 sheet 邊界，並補最終票單與驗收證據。standard 品質期間唯一的一般態情境（`light/chat-draft-after-account-close`，PTS 58.6–58.8）composer 邊緣 246–248 無描邊；PTS 58.9 起的黑色實線與全白底是 wrapper 注入 Increase Contrast 後的 minimal 降級（記錄在 00:28:49 的 `light+increased-contrast/*` 之前），不是 standard renderer 問題，`glowIntensity` 未動。
+上表「已改、待重驗」的三處（`tpNavigationFresnelStrength`、`tpMenuGlassSettings`、sheet 的 `AppTheme.elevated`）在本 run 都不是驗收通過，重驗結果見下節。standard 品質期間唯一的一般態情境（`light/chat-draft-after-account-close`，PTS 58.6–58.8）composer 邊緣 246–248 無描邊；PTS 58.9 起的黑色實線與全白底是 wrapper 注入 Increase Contrast 後的 minimal 降級（記錄在 00:28:49 的 `light+increased-contrast/*` 之前），不是 standard renderer 問題，`glowIntensity` 未動。
+
+### 0.26.7 重驗與 0.26.8 待驗（run 34582660390）
+
+- source master `30f05063a913427b1188f45ef453e064a8f45c51`（PR #321 合併）；App 內帳號頁尾實際讀到 `0.26.7 (38)`；run [34582660390](https://github.com/raychiutw/trip-planner.flutter/actions/runs/34582660390)（platform=all），同一 iPhone 14 Pro／iOS 16.6 與同一量法。`test_result_0.xml` 4 tests 全過（267.1 秒），Test Lab 外層 5 分鐘逾時由 0.26.8 的預算放寬處理（見 [mobile-e2e.md](mobile-e2e.md)）。深色一般情境多落在 thermalDegradation 後的 standard 品質窗，premium 對照只來自 reduce-motion 注入的三景。
+- 改善成立：選單面板最低亮度 38～45、字形不可辨識（參考 41–42）；提高對比的選單邊界深 44 對 0、淺 230 對 255；深色帳號 sheet 底 27（`#1C1C1E`）、grouped 卡片 44，對黑頁面有邊界。淺色 header 白底維持 +0～+4。
+- 未達預期：`fresnelStrength` 0.5 只讓 header 圓鈕／標題膠囊由 +73～+78 降到 +57～+65（約 −18%），root tab bar 幾乎沒變（+95～+110），仍是全周環。歸因更正與 0.26.8 新增的兩項偏離（`tpNavigationLightIntensityScale` 0.35、深色 `tpNavigationDarkEdgeAbsorption` 0.3）記錄在 `DESIGN.md` §16.2 與 [ADR-0004](adr/0004-neutral-selection-surface-with-tinted-foreground.md)「邊緣光第二次更正」；兩者仍是公式推估，**待 0.26.8 真機重量測 root tab bar 與 header 四邊峰值才算驗收**，本 run 的影像不能當作新光照通過。
+- 未覆蓋範圍與上一 run 相同（OS 設定／VoiceOver、regular／橫向、2× 字級、Bold Text、未逐入口操作的選單）；同 run 的 Android 結果只用於預算推導（見 [mobile-e2e.md](mobile-e2e.md)），不作材質證據。#303／#310 相關驗收項維持未完成。
 
 ## 尚未完成的裝置驗收
 
