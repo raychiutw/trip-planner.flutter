@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,6 +165,14 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-print-more')));
     await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('trip-print-pdf')),
+        matching: find.byIcon(CupertinoIcons.square_arrow_down),
+      ),
+      findsOneWidget,
+      reason: '匯出 PDF 與匯出 JSON 用同一個匯出字符',
+    );
     await tester.tap(find.byKey(const ValueKey('trip-print-pdf')));
     await tester.pumpAndSettle();
 

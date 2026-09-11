@@ -48,6 +48,10 @@ _避免_: popup menu、dropdown、context menu(後者專指長按觸發的那一
 選單上排字符在上、短文字在下的動作格,最多三格並排;放不下時改為同順序直列。行程卡的三格是分享／共編／AI 健檢。
 _避免_: quick action、shortcut、icon grid、工具列
 
+**值選項**:
+選單裡互斥的「目前值」—— 地區、分類、排序、成員角色。只以勾選標示目前值,不配字符;選了就換值、不執行動作。
+_避免_: option、radio item、選項值、篩選項
+
 **行程切換鈕**:
 浮動 header 標題位置的按鈕,點擊後開出切換行程的 sheet。
 _避免_: title button、trip picker

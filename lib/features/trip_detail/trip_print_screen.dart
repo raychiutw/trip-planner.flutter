@@ -119,7 +119,7 @@ class _TripPrintScreenState extends ConsumerState<TripPrintScreen> {
               TpActionItem(
                 key: ValueKey('trip-print-pdf'),
                 value: _PrintAction.pdf,
-                icon: Icons.picture_as_pdf_outlined,
+                icon: CupertinoIcons.square_arrow_down,
                 label: '匯出 PDF',
               ),
             ],

@@ -81,6 +81,8 @@ iPhone 固定四個 root tabs：
 - **Tripline 決策**：選單採 `GlassMenu` 公開面板、螢幕邊界調整與動畫；App 只轉接共同入口、立即且去重的業務回呼、Esc／焦點、停用原因與選取語意。root host 以公開錨點連結隔離套件 route listener 的 build 階段錯誤；離頁或顯示設定改變時移除。長標籤可換行，項目高度隨文字與粗體設定成長，不以固定大面板高度規避可及性問題（#308）。
 - **Tripline 決策**：一般動作選單可在清單上方放一排快捷動作（字符在上、短文字在下，最多三格並排，對應 HIG medium 選單）；下方清單以分隔線分組，破壞性項目獨立成組置於尾端。每格短文字要單行放得下才並排；任一格放不下（放大文字或極窄寬度）整排改為同順序直列，文字與動作一個不少。快捷格的焦點／按壓底色取 `onSurface` 透明度，不寫死白色；短文字的完整名稱由可及性 label 補齊（「共編」讀作「共編設定」）。行程卡的三格固定為分享／共編／AI 健檢，其他選單不為湊滿三格加入無權限的動作（#315）。
 - **Tripline 決策**：內容卡上的「⋯」入口不套玻璃、一般態無可見外框（`TpMoreMenuButton(plain: true)`），保留 44×44pt、tooltip 與可及性名稱；提高對比才補實心邊界。點擊「⋯」與長按同一對象開同一份錨定選單，不再使用底部純文字動作表；破壞性動作選取後仍進入既有確認流程。
+- **Tripline 決策**：全 App 一般動作選單只有一套呈現（#316）。入口分三類：內容卡／內容列上的「⋯」一律 plain（行程卡、收藏卡、停留點卡、共編成員列、分享連結列、可交還 AI 的筆記列）；浮動 header 與固定 bar 上的 bar button 走玻璃（行程清單、收藏排序篩選、時間軸、列印）；內容裡的文字入口（探索地區、新增停留點地區、探索「更多」分類 chip）沿內容自然寬度，選單仍從觸發點附近展開。長按與「⋯」開同一份選單；沒有動作的對象（純人工建立的筆記列）不留可聚焦的空按鈕。
+- **Tripline 決策**：值選項（地區、分類、排序、成員角色這類互斥的「目前值」）只以勾選標示目前值，不為每個值配圖示；一般動作配語意明確的 SF Symbol，且同一動作全 App 同一字符：分享 `share`、共編 `person_2`、AI 相關 `sparkles`、匯出 `square_arrow_down`、異動紀錄 `clock`、刪除 `delete`、移除 `person_badge_minus`。刪除／移除獨立成組置於尾端。標籤不重複字符已表達的意思（「自訂地區…」不再前綴「+」）。不強迫每個選單湊三個快捷動作。
 
 參考：[Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars)、[Buttons](https://developer.apple.com/design/human-interface-guidelines/buttons)、[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)。
 
@@ -389,6 +391,7 @@ Apple 建議 iPhone segmented control 約不超過五項；Tripline 為了長行
 - VoiceOver、Voice Control、Switch Control、Full Keyboard Access、pointer 與外接鍵盤。
 - 鍵盤、safe area、旋轉、sheet、tab state restoration、edge-back。
 - 聊天、切換行程、Day、日期／時間 picker、拖拉排序、地圖、POI、收藏、Account 與全部不可復原刪除流程。
+- 一般動作選單逐入口對照使用者參考圖：清單見 [1.4.1 遷移紀錄的選單入口覆蓋清單](docs/liquid-glass-1.4.1-migration.md#選單入口覆蓋清單314316)。
 - Liquid Glass 材質、PlatformView 共存、效能與 raster jank 必須以真機驗證；widget test 與 simulator 只能作幾何、內容及操作證據，不能代替材質驗收（ADR-0001／#303）。
 
 ## 20. 來源階層與實作落差

@@ -472,6 +472,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
       trailing: TpMoreMenuButton<_ShareRowAction>(
         key: ValueKey('share-actions-${s.id}'),
         tooltip: '分享連結動作',
+        plain: true,
         enabled: !busy,
         items: [
           if (s.isActive) ...[
@@ -479,13 +480,13 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               key: ValueKey('share-edit-btn-${s.id}'),
               value: _ShareRowAction.edit,
               label: '編輯',
-              icon: Icons.edit_outlined,
+              icon: CupertinoIcons.pencil,
             ),
             TpActionItem(
               key: ValueKey('share-rotate-${s.id}'),
               value: _ShareRowAction.rotate,
               label: '重新產生',
-              icon: Icons.refresh,
+              icon: CupertinoIcons.refresh,
             ),
             TpActionItem(
               key: ValueKey('share-revoke-${s.id}'),
@@ -500,7 +501,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
             key: ValueKey('share-delete-${s.id}'),
             value: _ShareRowAction.delete,
             label: '刪除',
-            icon: Icons.delete_outline,
+            icon: CupertinoIcons.delete,
             dividerBefore: !s.isActive,
             role: TpActionRole.destructive,
           ),

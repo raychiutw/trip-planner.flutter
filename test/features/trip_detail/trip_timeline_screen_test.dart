@@ -9,6 +9,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -490,6 +491,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('trip-edit-mode')), findsOneWidget);
     expect(find.byKey(const ValueKey('trip-action-notes')), findsOneWidget);
+    // 同一個動作全 App 同一個字符：分享／共編／AI 健檢沿用行程卡，異動紀錄用時鐘。
+    for (final entry in {
+      'trip-action-share': CupertinoIcons.share,
+      'trip-action-collab': CupertinoIcons.person_2,
+      'trip-action-health': CupertinoIcons.sparkles,
+      'trip-action-audit': CupertinoIcons.clock,
+    }.entries) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(entry.key)),
+          matching: find.byIcon(entry.value),
+        ),
+        findsOneWidget,
+        reason: entry.key,
+      );
+    }
   });
 
   testWidgets('前景分支：目前 DAY 寫入共用選取日', (tester) async {
@@ -1950,9 +1967,28 @@ void main() {
     verify(() => repo.recomputeTravel(tripId: _tripId, day: '1')).called(1);
   });
 
-  testWidgets('景點更多選單固定六項三組，編輯使用短任務表單 sheet', (tester) async {
+  testWidgets('景點更多選單固定六項四組，刪除獨立成組置於尾端，編輯使用短任務表單 sheet', (tester) async {
+    final semantics = tester.ensureSemantics();
     await _pumpTimeline(tester);
-    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    // 停留點卡上的「⋯」：不套玻璃、44×44、獨立的「景點操作」按鈕語意。
+    final more = find.byKey(const ValueKey('entry-more-11'));
+    final moreSize = tester.getSize(more);
+    expect(moreSize.width, greaterThanOrEqualTo(44));
+    expect(moreSize.height, greaterThanOrEqualTo(44));
+    expect(
+      find.descendant(of: more, matching: find.byType(GlassButton)),
+      findsNothing,
+      reason: '內容卡上的入口不疊玻璃',
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('景點操作').first)
+          .getSemanticsData()
+          .flagsCollection
+          .isButton,
+      isTrue,
+    );
+    await tester.tap(more);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('entry-alternates-11')), findsNothing);
 
@@ -1965,6 +2001,12 @@ void main() {
     final ordinaryGap = gap('重新排序', '換景點');
     expect(gap('換景點', '編輯景點'), greaterThan(ordinaryGap));
     expect(gap('移動到其他天', '複製到其他天'), greaterThan(ordinaryGap));
+    expect(
+      gap('複製到其他天', '刪除景點'),
+      greaterThan(ordinaryGap),
+      reason: '刪除與其他動作分隔、獨立成組置於尾端',
+    );
+    semantics.dispose();
 
     await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
     await tester.pumpAndSettle();

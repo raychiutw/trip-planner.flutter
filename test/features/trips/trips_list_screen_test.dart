@@ -222,6 +222,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('trips-create-button')), findsOneWidget);
       expect(find.text('新增行程'), findsOneWidget);
+      // 動作配字符；排序是值選項，只以勾選標示目前排序。
+      Finder menuItem(String label) => find.ancestor(
+        of: find.text(label),
+        matching: find.byType(GlassMenuItem),
+      );
+      expect(
+        find.descendant(
+          of: menuItem('新增行程'),
+          matching: find.byIcon(CupertinoIcons.add),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: menuItem('預設順序'),
+          matching: find.byIcon(CupertinoIcons.check_mark),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: menuItem('預設順序'), matching: find.byType(Icon)),
+        findsOneWidget,
+        reason: '選取值只有勾選，沒有另配字符',
+      );
+      expect(
+        find.descendant(of: menuItem('名稱 A→Z'), matching: find.byType(Icon)),
+        findsNothing,
+      );
     });
 
     testWidgets('渲染 N 張中性卡：標題與 eyebrow', (tester) async {

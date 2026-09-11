@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show Tristate, SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
@@ -680,6 +681,69 @@ void main() {
     });
   });
 
+  testWidgets('自訂觸發器是 Material 元件（chip）時，選單仍從觸發器附近展開且尺寸不失控', (tester) async {
+    final selected = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Column(
+            children: [
+              const SizedBox(height: 120),
+              SizedBox(
+                height: TpSpacing.tapMin,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    const SizedBox(width: 200),
+                    TpMoreMenuButton<String>(
+                      key: const ValueKey('chip-menu'),
+                      tooltip: '更多分類',
+                      items: const [
+                        TpActionItem(value: 'a', label: '地鐵站  1'),
+                        TpActionItem(value: 'b', label: '百貨公司  2'),
+                      ],
+                      onSelected: selected.add,
+                      triggerBuilder: (context, onPressed) => ChoiceChip(
+                        key: const ValueKey('chip-trigger'),
+                        label: const Text('更多'),
+                        selected: false,
+                        onSelected: (_) => onPressed?.call(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final chip = find.byKey(const ValueKey('chip-trigger'));
+    final chipRect = tester.getRect(chip);
+
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: '觸發器在 overlay 重建不得丟例外');
+
+    // overlay 內的觸發器複本與頁面上的觸發器同尺寸，選單才能貼著它展開。
+    final overlayChip = tester.getRect(chip.last);
+    expect(overlayChip.size.width, closeTo(chipRect.size.width, 0.5));
+    expect(overlayChip.size.height, closeTo(chipRect.size.height, 0.5));
+    final item = tester.getRect(find.text('地鐵站  1'));
+    expect(item.top, greaterThan(chipRect.top - 60));
+    expect(item.top, lessThan(chipRect.bottom + 60));
+    expect(item.left, greaterThanOrEqualTo(0));
+    expect(item.right, lessThanOrEqualTo(800));
+
+    await tester.tap(find.text('地鐵站  1'));
+    await tester.pumpAndSettle();
+    expect(selected, ['a']);
+    expect(find.text('地鐵站  1'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('選單快捷動作', () {
     testWidgets('上排三格 icon＋短文字並排於清單之上，點選派發一次並關閉', (tester) async {
       final selected = <String>[];
@@ -785,6 +849,110 @@ void main() {
       expect(selected, ['health']);
       await tester.pumpAndSettle();
       expect(find.text('AI 健檢'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('中間字級下每格短文字的字形都在可繪範圍內，1× 並排、2× 直列', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      // 並排／直列的門檻落在放大文字之間；逐級掃過，不只驗兩端。
+      for (final scale in [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 2.0]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          _menuHost(
+            items: _quickMenuItems,
+            quickActions: _quickActions,
+            textScale: scale,
+            onSelected: (_) {},
+          ),
+        );
+        await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+        await tester.pumpAndSettle();
+
+        for (final action in _quickActions) {
+          final label = find.descendant(
+            of: find.byKey(action.key!),
+            matching: find.text(action.label),
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(label);
+          final glyphs = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: action.label.length),
+          );
+          final glyphRight = glyphs.fold<double>(
+            0,
+            (right, box) => math.max(right, box.right),
+          );
+          expect(
+            glyphRight,
+            lessThanOrEqualTo(paragraph.size.width + 0.1),
+            reason: '${action.label} 在 $scale 倍的字形超出可繪文字寬度',
+          );
+          expect(
+            paragraph.didExceedMaxLines,
+            isFalse,
+            reason: '${action.label} 在 $scale 倍被省略',
+          );
+          final tile = tester.getRect(find.byKey(action.key!));
+          final text = tester.getRect(label);
+          expect(text.left, greaterThanOrEqualTo(tile.left - 0.1));
+          expect(text.right, lessThanOrEqualTo(tile.right + 0.1));
+        }
+
+        final share = tester.getRect(find.byKey(const ValueKey('quick-share')));
+        final collab = tester.getRect(
+          find.byKey(const ValueKey('quick-collab')),
+        );
+        final health = tester.getRect(
+          find.byKey(const ValueKey('quick-health')),
+        );
+        if (scale == 1.0) {
+          expect(share.top, closeTo(collab.top, 0.5), reason: '一般字級並排');
+          expect(collab.top, closeTo(health.top, 0.5), reason: '一般字級並排');
+        } else if (scale == 2.0) {
+          expect(share.bottom, lessThanOrEqualTo(collab.top + 0.5));
+          expect(collab.bottom, lessThanOrEqualTo(health.top + 0.5));
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'scale=$scale');
+      }
+    });
+
+    testWidgets('降低動態效果時按住快捷動作不縮放，放開取消後仍可正常啟用', (tester) async {
+      final selected = <String>[];
+      await tester.pumpWidget(
+        _menuHost(
+          items: _quickMenuItems,
+          quickActions: _quickActions,
+          reduceMotion: true,
+          onSelected: selected.add,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('host-more-menu')));
+      await tester.pumpAndSettle();
+
+      final tile = find.byKey(const ValueKey('quick-share'));
+      final label = find.descendant(of: tile, matching: find.text('分享'));
+      final tileBefore = tester.getRect(tile);
+      final labelBefore = tester.getRect(label);
+      final gesture = await tester.startGesture(tileBefore.center);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final labelPressed = tester.getRect(label);
+      expect(labelPressed.width, closeTo(labelBefore.width, 0.01));
+      expect(labelPressed.height, closeTo(labelBefore.height, 0.01));
+      expect(labelPressed.left, closeTo(labelBefore.left, 0.01));
+      expect(tester.getRect(tile), tileBefore);
+
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(selected, isEmpty, reason: '取消按壓不派發');
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      expect(selected, ['share'], reason: '取消後再點仍正常啟用一次');
+      expect(find.text('分享'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

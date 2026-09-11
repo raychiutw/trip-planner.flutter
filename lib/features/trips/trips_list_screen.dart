@@ -390,9 +390,9 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     required String label,
     bool dividerBefore = false,
   }) {
+    // 排序是值選項：只以勾選標示目前排序，不配圖示。
     return TpActionItem(
       value: action,
-      icon: CupertinoIcons.arrow_up_arrow_down,
       selected: _sortOrder == order,
       label: label,
       dividerBefore: dividerBefore,

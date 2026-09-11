@@ -88,6 +88,10 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
 
   final _anchorLink = LayerLink();
   OverlayEntry? _host;
+
+  /// 開啟當下頁面上觸發鈕的尺寸；overlay 內的複本固定成同一尺寸，
+  /// 套件才會貼著同一個矩形展開，不受 overlay 寬鬆約束影響。
+  Size _anchorSize = const Size.square(TpSpacing.tapMin);
   int _openGeneration = 0;
   final _routes = <ModalRoute<dynamic>>[];
 
@@ -176,6 +180,10 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       to: Overlay.of(context, rootOverlay: true).context,
     );
     final mediaQuery = MediaQuery.of(context);
+    final anchorBox = context.findRenderObject();
+    if (anchorBox is RenderBox && anchorBox.hasSize) {
+      _anchorSize = anchorBox.size;
+    }
     final entry = OverlayEntry(
       builder: (_) => Positioned.fill(
         child: Align(
@@ -186,9 +194,13 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
             child: themes.wrap(
               MediaQuery(
                 data: mediaQuery,
-                child: FocusScope(
-                  autofocus: true,
-                  child: Builder(builder: _buildMenu),
+                // root overlay 沒有 Material；chip 之類的觸發器需要它才能重建。
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: FocusScope(
+                    autofocus: true,
+                    child: Builder(builder: _buildMenu),
+                  ),
                 ),
               ),
             ),
@@ -282,8 +294,9 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
       );
     }
     if (widget.plain) {
-      // 帶 onTap 才不會被卡片的容器語意合併成「卡片名＋行程選項」。
+      // 獨立語意節點：卡片只有長按時，沒有 container 會被合併成「卡片名＋收藏選項」。
       return Semantics(
+        container: true,
         button: true,
         enabled: onPressed != null,
         label: widget.tooltip,
@@ -351,7 +364,8 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
           settings: tpNavigationGlassSettings(this.context),
           quality: tpGlassQuality(this.context),
           platformViewBackdrop: TpMediaBackdropScope.of(this.context),
-          triggerBuilder: (context, _) => _trigger(context),
+          triggerBuilder: (context, _) =>
+              SizedBox.fromSize(size: _anchorSize, child: _trigger(context)),
           items: [
             if (widget.quickActions.isNotEmpty) ...[
               ..._quickActionRow(context, menuWidth),
@@ -391,9 +405,9 @@ class _TpMoreMenuButtonState<T> extends State<TpMoreMenuButton<T>> {
   /// 沿用一般項目的字符＋文字列，順序與動作不變。
   List<Widget> _quickActionRow(BuildContext context, double menuWidth) {
     final actions = widget.quickActions;
-    // 面板左右各 12；格內左右各 4。
+    // 面板左右各 12；格內可繪文字寬度扣掉格的 margin 與 padding。
     final tileWidth = (menuWidth - 24) / actions.length;
-    final textWidth = tileWidth - 8;
+    final textWidth = tileWidth - _TpQuickActionButton.horizontalInset;
     var textHeight = 0.0;
     var fitsInline = tileWidth >= TpSpacing.tapMin;
     for (final item in actions) {
@@ -556,6 +570,12 @@ class _TpQuickActionButton extends StatefulWidget {
   final VoidCallback onTap;
   final Widget child;
 
+  static const _horizontalMargin = 2.0;
+  static const _horizontalPadding = 4.0;
+
+  /// 每格左右合計吃掉的寬度；量測短文字是否放得下時要扣同一個數。
+  static const horizontalInset = (_horizontalMargin + _horizontalPadding) * 2;
+
   @override
   State<_TpQuickActionButton> createState() => _TpQuickActionButtonState();
 }
@@ -606,8 +626,13 @@ class _TpQuickActionButtonState extends State<_TpQuickActionButton> {
                 ? Duration.zero
                 : const Duration(milliseconds: 150),
             curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            margin: const EdgeInsets.symmetric(
+              horizontal: _TpQuickActionButton._horizontalMargin,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: _TpQuickActionButton._horizontalPadding,
+              vertical: 8,
+            ),
             decoration: BoxDecoration(
               color: highlight,
               borderRadius: BorderRadius.circular(24),

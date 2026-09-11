@@ -183,12 +183,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           .setCategory(category.label),
                     );
                   }
-                  return _categoryChip(
-                    key: const ValueKey('explore-more-categories'),
-                    label: selectedOverflow?.label ?? '更多',
-                    count: selectedOverflow?.count,
-                    selected: selectedOverflow != null,
-                    onSelected: () => _openMoreCategories(overflowCategories),
+                  return _moreCategoriesMenu(
+                    overflowCategories,
+                    selectedOverflow: selectedOverflow,
+                    currentCategory: state.category,
                   );
                 },
               ),
@@ -230,21 +228,33 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     );
   }
 
-  Future<void> _openMoreCategories(List<ExploreCategory> categories) async {
-    final selected = await showAppActionSheet<String>(
-      context,
-      title: '更多分類',
-      actions: [
+  /// 「更多」chip 展開的錨定選單：分類是值選項，只以勾選標示目前分類，不配圖示。
+  Widget _moreCategoriesMenu(
+    List<ExploreCategory> categories, {
+    required ExploreCategory? selectedOverflow,
+    required String currentCategory,
+  }) {
+    return TpMoreMenuButton<String>(
+      tooltip: '更多分類',
+      onSelected: (selected) =>
+          ref.read(exploreControllerProvider.notifier).setCategory(selected),
+      items: [
         for (final category in categories)
           TpActionItem(
+            key: ValueKey('explore-category-menu-${category.label}'),
             label: '${category.label}  ${category.count}',
             value: category.label,
-            icon: CupertinoIcons.tag,
+            selected: category.label == currentCategory,
           ),
       ],
+      triggerBuilder: (context, onPressed) => _categoryChip(
+        key: const ValueKey('explore-more-categories'),
+        label: selectedOverflow?.label ?? '更多',
+        count: selectedOverflow?.count,
+        selected: selectedOverflow != null,
+        onSelected: onPressed ?? () {},
+      ),
     );
-    if (selected == null || !mounted) return;
-    ref.read(exploreControllerProvider.notifier).setCategory(selected);
   }
 
   Widget _regionPill(String region) {
@@ -261,17 +271,17 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ref.read(exploreControllerProvider.notifier).setRegion(selected);
         }
       },
+      // 地區是值選項：只以勾選標示目前地區，不配圖示；自訂地區是動作才有字符。
       items: [
         for (final option in options)
           TpActionItem(
             value: option,
             label: option,
-            icon: CupertinoIcons.location,
             selected: option == region,
           ),
         const TpActionItem(
           value: _kCustomRegion,
-          label: '+ 自訂地區…',
+          label: '自訂地區…',
           icon: CupertinoIcons.add,
           dividerBefore: true,
         ),

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
@@ -771,5 +772,43 @@ void main() {
       const Size(44, 44),
     );
     expect(find.byKey(const ValueKey('share-edit-btn-1')), findsNothing);
+  });
+
+  testWidgets('分享連結列上的「⋯」不疊玻璃，動作配 Cupertino 字符且刪除獨立成組', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+
+    final more = find.byKey(const ValueKey('share-actions-1'));
+    expect(
+      find.descendant(of: more, matching: find.byType(GlassButton)),
+      findsNothing,
+      reason: '內容列上的入口不疊玻璃',
+    );
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('分享連結動作').first)
+          .getSemanticsData()
+          .flagsCollection
+          .isButton,
+      isTrue,
+    );
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    for (final entry in {
+      'share-edit-btn-1': CupertinoIcons.pencil,
+      'share-rotate-1': CupertinoIcons.refresh,
+      'share-delete-1': CupertinoIcons.delete,
+    }.entries) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(entry.key)),
+          matching: find.byIcon(entry.value),
+        ),
+        findsOneWidget,
+        reason: entry.key,
+      );
+    }
+    semantics.dispose();
   });
 }

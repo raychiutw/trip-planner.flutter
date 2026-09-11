@@ -11,6 +11,7 @@ import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/favorites/favorites_screen.dart';
 import 'package:tripline/features/favorites/poi_favorite_card.dart';
+import 'package:tripline/models/add_to_trip.dart';
 import 'package:tripline/models/poi_favorite.dart';
 import 'package:tripline/theme/app_theme.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
@@ -674,6 +675,177 @@ void main() {
       expect(find.text('重試'), findsOneWidget);
     });
 
+    testWidgets('長按收藏卡在卡片旁展開玻璃選單：加入行程／選取／刪除帶圖示，不再是底部動作表', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoActionSheet), findsNothing);
+      expect(find.text('取消'), findsNothing, reason: '不再是底部動作表');
+      const menuLabels = {
+        'favorite-menu-add-7': '加入行程',
+        'favorite-menu-select-7': '選取',
+        'favorite-menu-delete-7': '刪除',
+      };
+      for (final entry in menuLabels.entries) {
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey(entry.key)),
+            matching: find.text(entry.value),
+          ),
+          findsOneWidget,
+          reason: entry.value,
+        );
+      }
+      for (final symbol in [
+        CupertinoIcons.calendar_badge_plus,
+        CupertinoIcons.check_mark_circled,
+        CupertinoIcons.delete,
+      ]) {
+        expect(find.byIcon(symbol), findsOneWidget, reason: '$symbol');
+      }
+      final deleteLabel = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const ValueKey('favorite-menu-delete-7')),
+          matching: find.text('刪除'),
+        ),
+      );
+      expect(deleteLabel.style?.color, AppTheme.light().colorScheme.error);
+
+      // 選單從卡片附近展開，不是貼在畫面底部。
+      final card = tester.getRect(
+        find.byKey(const ValueKey('favorite-card-7')),
+      );
+      final add = tester.getRect(
+        find.byKey(const ValueKey('favorite-menu-add-7')),
+      );
+      expect(add.top, lessThan(card.bottom + 120));
+      expect(add.top, greaterThan(card.top - 120));
+
+      // 點選單外面關閉且不動到卡片。
+      await tester.tapAt(const Offset(20, 590));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('favorite-menu-add-7')), findsNothing);
+      expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
+      expect(find.byKey(const ValueKey('favorite-select-7')), findsNothing);
+    });
+
+    testWidgets('「⋯」維持 44×44 與「收藏選項」名稱、不套玻璃，且與長按開同一組動作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(_favorites)),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      final more = find.byKey(const ValueKey('favorite-card-more-7'));
+      final size = tester.getSize(more);
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+      expect(
+        find.descendant(of: more, matching: find.byType(GlassButton)),
+        findsNothing,
+        reason: '內容卡上的入口不疊玻璃',
+      );
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel('收藏選項').first)
+            .getSemanticsData()
+            .flagsCollection
+            .isButton,
+        isTrue,
+      );
+
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      for (final key in [
+        'favorite-menu-add-7',
+        'favorite-menu-select-7',
+        'favorite-menu-delete-7',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+      await tester.tap(find.byKey(const ValueKey('favorite-menu-select-7')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('favorite-menu-select-7')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<Checkbox>(find.byKey(const ValueKey('favorite-select-7')))
+            .value,
+        isTrue,
+        reason: '「⋯」的選取與長按選單結果相同',
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('「⋯」→ 加入行程 → 帶著該收藏導到 /favorites/add-to-trip，只執行一次', (
+      tester,
+    ) async {
+      final mockRepo = MockFavoritesRepository();
+      when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
+      AddToTripFavorite? routed;
+      var routedCount = 0;
+      final router = GoRouter(
+        initialLocation: '/favorites',
+        routes: [
+          GoRoute(
+            path: '/favorites',
+            builder: (context, state) => const FavoritesScreen(),
+            routes: [
+              GoRoute(
+                path: 'add-to-trip',
+                builder: (context, state) {
+                  routed = state.extra as AddToTripFavorite?;
+                  routedCount++;
+                  return const Scaffold(body: Text('ADD-TO-TRIP-PROBE'));
+                },
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [favoritesRepositoryProvider.overrideWithValue(mockRepo)],
+          child: MaterialApp.router(
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('favorite-card-more-7')));
+      await tester.pumpAndSettle();
+      final add = find.byKey(const ValueKey('favorite-menu-add-7'));
+      await tester.tap(add);
+      await tester.tap(add, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD-TO-TRIP-PROBE'), findsOneWidget);
+      expect(routedCount, 1);
+      expect(routed?.favoriteId, 7);
+      expect(routed?.displayName, '美麗海水族館');
+    });
+
     testWidgets('長按選單的 destructive 刪除使用相同確認與結果', (tester) async {
       final mockRepo = MockFavoritesRepository();
       when(mockRepo.watchFavorites).thenAnswer((_) => Stream.value(_favorites));
@@ -842,6 +1014,28 @@ void main() {
         findsOneWidget,
       );
       expect(find.byIcon(CupertinoIcons.check_mark), findsOneWidget);
+      // 排序是值選項：目前排序只有勾選；其他值不配字符；篩選條件是動作才有字符。
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('favorites-sort-newest')),
+          matching: find.byType(Icon),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('favorites-sort-oldest')),
+          matching: find.byType(Icon),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('favorites-filter-action')),
+          matching: find.byIcon(CupertinoIcons.slider_horizontal_3),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const ValueKey('favorites-sort-oldest')));
       await tester.pumpAndSettle();

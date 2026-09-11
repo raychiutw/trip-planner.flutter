@@ -296,25 +296,25 @@ class _TripTimelineScreenState extends ConsumerState<TripTimelineScreen> {
                 TpActionItem(
                   key: ValueKey('trip-action-audit'),
                   value: _TripMoreAction.audit,
-                  icon: Icons.history_outlined,
+                  icon: CupertinoIcons.clock,
                   label: '異動紀錄',
                 ),
                 TpActionItem(
                   key: ValueKey('trip-action-share'),
                   value: _TripMoreAction.share,
-                  icon: Icons.ios_share_outlined,
+                  icon: CupertinoIcons.share,
                   label: '分享連結',
                 ),
                 TpActionItem(
                   key: ValueKey('trip-action-collab'),
                   value: _TripMoreAction.collab,
-                  icon: Icons.group_outlined,
+                  icon: CupertinoIcons.person_2,
                   label: '共編設定',
                 ),
                 TpActionItem(
                   key: ValueKey('trip-action-health'),
                   value: _TripMoreAction.health,
-                  icon: Icons.health_and_safety_outlined,
+                  icon: CupertinoIcons.sparkles,
                   label: 'AI 健檢',
                 ),
               ],
@@ -1353,6 +1353,7 @@ class _DaySection extends ConsumerWidget {
       key: ValueKey('entry-more-${entry.id}'),
       controller: menuController,
       tooltip: '景點操作',
+      plain: true,
       items: [
         TpActionItem(
           key: ValueKey('entry-reorder-${entry.id}'),
@@ -1395,6 +1396,7 @@ class _DaySection extends ConsumerWidget {
           value: _EntryMoreAction.delete,
           label: '刪除景點',
           icon: CupertinoIcons.delete,
+          dividerBefore: true,
           role: TpActionRole.destructive,
         ),
       ],

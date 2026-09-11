@@ -647,12 +647,12 @@ class _SearchPoiPanel extends StatelessWidget {
           child: TpMoreMenuButton<String>(
             tooltip: '切換搜尋地區',
             onSelected: onRegionChanged,
+            // 地區是值選項：只以勾選標示目前地區，不配圖示。
             items: [
               for (final option in _regionOptionsFor(region))
                 TpActionItem(
                   value: option,
                   label: option,
-                  icon: CupertinoIcons.location,
                   selected: option == region,
                 ),
             ],

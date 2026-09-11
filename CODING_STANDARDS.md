@@ -281,11 +281,11 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - 新增／加入用 `add` 系列且 `role` 維持 `normal`;移除／刪除用 `minus`／`delete` 且 `role` 必為 `destructive`。動詞與 role 不匹配(例如「加入」配 `destructive`)= 違反。
 - 選單項目(`TpMoreMenuButton`)一律要 `icon`;action sheet 專用項目一律**不給** `icon`(給了也畫不出來,見 `lib/ui/tp_action_item.dart:22`)。
 - 快捷動作(`TpMoreMenuButton.quickActions`)同樣一律要 `icon`,短文字的完整名稱以 `semanticLabel` 補齊(「共編」→「共編設定」);顏色、停用、選取與去重都沿用清單項目的同一套規則,不另寫。
-- 內容卡上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單。
-- 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart`、`lib/features/trips/collab/collab_screen.dart:229`、`lib/features/favorites/favorites_screen.dart:453`)。
-- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用。
-
-三處已知 outlier(審查看到不必當新違規,但不要照抄擴散):`lib/features/trips/share/share_screen.dart:503` 的刪除用了 Material `Icons.delete_outline`;`lib/features/favorites/favorites_screen.dart:450` 標「刪除」卻配 `heart_slash`(語彙混用已記在 ADR-0008 第 39 行);`lib/features/trip_detail/trip_timeline_screen.dart:1390` 的刪除項少了 `dividerBefore: true`。
+- **值選項不給 `icon`**:地區、分類、排序、成員角色這類互斥的「目前值」只用 `selected` 勾選標示(`lib/features/favorites/explore/explore_screen.dart` 的 `_regionPill`、`lib/features/trips/trips_list_screen.dart` 的 `_buildSortMenuAction`)。同一組內要一致 —— 不能有的值有字符、有的沒有。動作才配 `icon`,且同一動作全 App 同一字符:分享 `share`、共編 `person_2`、AI 相關 `sparkles`、匯出 `square_arrow_down`、異動紀錄 `clock`。
+- 內容卡與內容列上的「⋯」用 `TpMoreMenuButton(plain: true)`(`lib/ui/tp_more_menu.dart`),長按同一張卡以 `TpMoreMenuController.open` 開同一份選單;適用行程卡、收藏卡、停留點卡、共編成員列、分享連結列與筆記列。feature 不得自組 `IconButton` 開 `showAppActionSheet` 當卡片選單;也不得為了有東西可錨定而放看不見但可聚焦的空按鈕 —— 沒有動作的對象就不放入口。
+- 自訂觸發器(`triggerBuilder`)可以是 chip 等需要 `Material` 的元件;overlay 內的複本由 `TpMoreMenuButton` 固定成頁面觸發器的尺寸並提供透明 `Material`,feature 不必自己包。
+- 破壞性項目放在 `actions` 陣列尾端,且 `dividerBefore: true`(`lib/features/trips/trips_list_screen.dart:666`、`lib/features/trips/collab/collab_screen.dart:230`、`lib/features/favorites/favorites_screen.dart:469`)。
+- 圖示走 `CupertinoIcons`。`Icons.*`(Material)只在沒有對應 Cupertino 符號時使用(現存唯一例:分享連結「撤銷」的 `Icons.link_off_outlined`,Cupertino 沒有 link-off)。
 
 ## 測試規範
 
