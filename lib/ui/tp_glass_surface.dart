@@ -94,20 +94,19 @@ LiquidGlassSettings tpMediaIconGlassSettings(BuildContext context) {
 /// 選單面板的模糊半徑；導覽玻璃預設 4–5 會讓後方標題字形穿透。
 const double tpMenuGlassBlur = 24;
 
-/// 文字多的選單面板走 HIG regular 類材質：白色煙燻填色加重模糊，
-/// 讓後方卡片邊界與標題不再穿透（#319 真機量測，見 DESIGN §16.2）。
+/// 深色選單沿用 root tab bar 的底色，避免額外白膜讓面板泛灰；
+/// 文字多的面板保留加重模糊，淺色維持白色煙燻填色（見 DESIGN §16.2）。
 /// 無障礙降級改用高一階容器色，黑面板才不會落在黑頁面上失去邊界。
 /// 媒體背景的 frosted 路徑同樣以 glassColor 上色；目前沒有選單開在媒體上。
 LiquidGlassSettings tpMenuGlassSettings(BuildContext context) {
   final scheme = Theme.of(context).colorScheme;
-  final veil = Colors.white.withValues(
-    alpha: scheme.brightness == Brightness.dark ? 0.18 : 0.72,
-  );
+  final navigation = tpNavigationGlassSettings(context);
+  final veil = scheme.brightness == Brightness.dark
+      ? navigation.glassColor
+      : Colors.white.withValues(alpha: 0.72);
   return tpResolveGlassSettings(
     context,
-    tpNavigationGlassSettings(
-      context,
-    ).copyWith(glassColor: veil, blur: tpMenuGlassBlur),
+    navigation.copyWith(glassColor: veil, blur: tpMenuGlassBlur),
     opaqueColor: scheme.surfaceContainerHigh,
   );
 }
