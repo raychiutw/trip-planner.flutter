@@ -2330,13 +2330,10 @@ void main() {
     );
   });
 
-  // #319 真機（iPhone 14 Pro／iOS 16.6、premium）：導覽玻璃配方的面板讓後方
-  // 卡片黑帶與白色標題穿透（面板最低亮度 1–18；Apple Music 參考為 41–42）。
-  // 選單是文字多的面板，走 HIG regular 類材質：較密的白色煙燻填色與較重模糊。
+  // 使用者的深色參考圖以 root tab bar 為材質基準：選單不另加偏白的 veil，
+  // 但文字面板仍保留較重模糊，避免卡片標題字形穿透。淺色維持既有配方。
   for (final theme in [AppTheme.light(), AppTheme.dark()]) {
-    testWidgets('${theme.brightness.name} 選單面板採較密的 regular 材質，不沿用導覽玻璃', (
-      tester,
-    ) async {
+    testWidgets('${theme.brightness.name} 選單底色對齊參考並保留文字背景模糊', (tester) async {
       LiquidGlassSettings? navigation;
       await tester.pumpWidget(
         MaterialApp(
@@ -2358,11 +2355,17 @@ void main() {
       await tester.pumpAndSettle();
 
       final panel = tester.widget<GlassMenu>(find.byType(GlassMenu)).settings!;
-      final expectedAlpha = theme.brightness == Brightness.dark ? 0.18 : 0.72;
       expect(panel.blur, 24, reason: '面板模糊要蓋掉後方文字形狀');
       expect(panel.blur, greaterThan(navigation!.blur));
-      expect(panel.glassColor.a, closeTo(expectedAlpha, 0.01));
-      expect(panel.glassColor.a, greaterThan(navigation!.glassColor.a));
+      if (theme.brightness == Brightness.dark) {
+        expect(
+          panel.glassColor,
+          navigation!.glassColor,
+          reason: '深色選單與 root tab bar 使用同一底色，避免額外白膜',
+        );
+      } else {
+        expect(panel.glassColor.a, closeTo(0.72, 0.01));
+      }
       expect(
         panel.glassColor.withValues(alpha: 1),
         Colors.white,
