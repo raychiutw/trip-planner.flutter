@@ -231,6 +231,67 @@ bool _usesOpaqueGlass(BuildContext context) =>
     MediaQuery.highContrastOf(context) ||
     AppAccessibilityScope.reduceTransparencyOf(context);
 
+/// 所有導覽角色共用的配對決策；光學值仍由既有設定函式提供。
+class _TpNavigationGlassAppearance {
+  _TpNavigationGlassAppearance(
+    BuildContext context, {
+    bool mediaIcon = false,
+    bool? onMedia,
+  }) : onMedia = onMedia ?? TpMediaBackdropScope.of(context),
+       quality = tpGlassQuality(context),
+       edgeColor = tpGlassEdgeColor(context) {
+    settings = mediaIcon && this.onMedia
+        ? tpMediaIconGlassSettings(context)
+        : tpNavigationGlassSettings(
+            context,
+            recipe: this.onMedia
+                ? TpNavigationGlassRecipe.platformView
+                : TpNavigationGlassRecipe.regular,
+          );
+    foreground = tpBarForeground(context, onMedia: this.onMedia);
+  }
+
+  final bool onMedia;
+  final GlassQuality? quality;
+  final Color edgeColor;
+  late final LiquidGlassSettings settings;
+  late final Color foreground;
+
+  Widget wrapForeground(Widget child) => IconTheme.merge(
+    data: IconThemeData(color: foreground),
+    child: DefaultTextStyle.merge(
+      style: TextStyle(color: foreground),
+      child: child,
+    ),
+  );
+}
+
+/// 浮動 header 標題與返回共用的玻璃；呼叫端只保留內容與自然寬度留白。
+class TpNavigationGlassTitleSurface extends StatelessWidget {
+  const TpNavigationGlassTitleSurface({
+    super.key,
+    required this.padding,
+    required this.child,
+  });
+
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final appearance = _TpNavigationGlassAppearance(context);
+    return TpGlassSurface(
+      platformViewBackdrop: appearance.onMedia,
+      glassSettings: appearance.settings,
+      borderRadius: const BorderRadius.all(
+        Radius.circular(TpSpacing.tapMin / 2),
+      ),
+      padding: padding,
+      child: appearance.wrapForeground(child),
+    );
+  }
+}
+
 /// 獨立導覽按鈕的 production 角色；兩者保留既有的圓角差異。
 enum TpNavigationGlassButtonRole { barButton, floatingControl }
 
@@ -256,10 +317,7 @@ class TpNavigationGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onMedia = TpMediaBackdropScope.of(context);
-    final settings = onMedia
-        ? tpMediaIconGlassSettings(context)
-        : tpNavigationGlassSettings(context);
+    final appearance = _TpNavigationGlassAppearance(context, mediaIcon: true);
     final radius = switch (role) {
       TpNavigationGlassButtonRole.barButton => 22.0,
       TpNavigationGlassButtonRole.floatingControl => TpRadius.sm,
@@ -273,8 +331,8 @@ class TpNavigationGlassButton extends StatelessWidget {
         enabled: false,
         child: TpGlassSurface(
           borderRadius: BorderRadius.all(Radius.circular(radius)),
-          platformViewBackdrop: onMedia,
-          glassSettings: settings,
+          platformViewBackdrop: appearance.onMedia,
+          glassSettings: appearance.settings,
           tintColor: Theme.of(context).colorScheme.surface,
           child: SizedBox.square(
             dimension: TpSpacing.tapMin,
@@ -283,7 +341,7 @@ class TpNavigationGlassButton extends StatelessWidget {
                 dimension: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: tpBarForeground(context, onMedia: onMedia),
+                  color: appearance.foreground,
                 ),
               ),
             ),
@@ -291,22 +349,13 @@ class TpNavigationGlassButton extends StatelessWidget {
         ),
       );
     } else {
-      control = GlassButton.custom(
-        key: const ValueKey('tp-toolbar-glass-button'),
-        label: tooltip,
-        width: TpSpacing.tapMin,
-        height: TpSpacing.tapMin,
-        enabled: onPressed != null,
-        onTap: onPressed ?? () {},
-        useOwnLayer: true,
-        quality: tpGlassQuality(context),
-        platformViewBackdrop: onMedia,
-        shape: LiquidRoundedSuperellipse(
-          borderRadius: radius,
-          side: BorderSide(color: tpGlassEdgeColor(context)),
-        ),
-        settings: settings,
-        child: TpBarForeground(onMedia: onMedia, child: child),
+      return TpToolbarGlassButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        platformViewBackdrop: appearance.onMedia,
+        borderRadius: radius,
+        glassSettings: appearance.settings,
+        child: child,
       );
     }
 
@@ -316,6 +365,144 @@ class TpNavigationGlassButton extends StatelessWidget {
         message: tooltip,
         excludeFromSemantics: true,
         child: control,
+      ),
+    );
+  }
+}
+
+/// 固定 bar 與浮動 header 共用的標題字階、省略及語意前景。
+class TpHeaderTitle extends StatelessWidget {
+  const TpHeaderTitle({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DefaultTextStyle.merge(
+    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+      color: tpBarForeground(
+        context,
+        onMedia: TpMediaBackdropScope.of(context),
+      ),
+    ),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    child: child,
+  );
+}
+
+/// 標記「目前在群組容器裡」，讓子按鈕不要再各自畫一片玻璃。
+class _TpToolbarGroupScope extends InheritedWidget {
+  const _TpToolbarGroupScope({required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TpToolbarGroupScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_TpToolbarGroupScope oldWidget) => false;
+}
+
+/// 一列上相關的動作收在同一片玻璃裡，彼此只有間距。
+///
+/// **不畫分隔線** —— HIG Toolbars 只提間距（SwiftUI 也只有 `ToolbarSpacer`）；
+/// 分隔線是選單語彙，選單內部的分組分隔線是另一回事，仍然正確。
+/// 不相關的動作各自成一顆容器，一列最多約三組。
+class TpToolbarActionGroup extends StatelessWidget {
+  const TpToolbarActionGroup({super.key, required this.children})
+    : assert(children.length >= 2, '單一動作不需要群組容器');
+
+  final List<Widget> children;
+
+  /// 群組內按鈕之間的間距，比群組與群組之間更窄。
+  static const innerGap = TpSpacing.s1;
+
+  @override
+  Widget build(BuildContext context) {
+    final appearance = _TpNavigationGlassAppearance(context);
+    return appearance.wrapForeground(
+      TpGlassEdge(
+        borderRadius: 22,
+        child: _TpToolbarGroupScope(
+          child: GlassButtonGroup(
+            key: const ValueKey('tp-toolbar-action-group'),
+            showDividers: false,
+            useOwnLayer: true,
+            borderRadius: 22,
+            settings: appearance.settings,
+            quality: appearance.quality,
+            platformViewBackdrop: appearance.onMedia,
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0) const SizedBox(width: innerGap),
+                children[index],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header 共用的 44pt 按鈕；材質與前景沿用媒體 scope，群組內不再畫玻璃。
+/// 舊設定參數保留相容用途，正式呼叫端不必自行配對這些值。
+class TpToolbarGlassButton extends StatelessWidget {
+  const TpToolbarGlassButton({
+    super.key,
+    required this.tooltip,
+    required this.onPressed,
+    required this.child,
+    this.platformViewBackdrop,
+    this.glassSettings,
+    this.rimColor,
+    this.borderRadius = 22,
+  });
+
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Widget child;
+  final bool? platformViewBackdrop;
+  final LiquidGlassSettings? glassSettings;
+  final Color? rimColor;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = _TpToolbarGroupScope.of(context);
+    final appearance = _TpNavigationGlassAppearance(
+      context,
+      onMedia: platformViewBackdrop,
+    );
+    final resolvedSettings = glassSettings == null
+        ? appearance.settings
+        : tpResolveGlassSettings(context, glassSettings!);
+    return SizedBox.square(
+      dimension: TpSpacing.tapMin,
+      child: Tooltip(
+        message: tooltip,
+        excludeFromSemantics: true,
+        child: GlassButton.custom(
+          key: const ValueKey('tp-toolbar-glass-button'),
+          label: tooltip,
+          width: TpSpacing.tapMin,
+          height: TpSpacing.tapMin,
+          enabled: onPressed != null,
+          onTap: onPressed ?? () {},
+          // 群組提供材質，個別按鈕仍由套件處理 pointer、鍵盤與語意。
+          style: grouped
+              ? GlassButtonStyle.transparent
+              : GlassButtonStyle.filled,
+          useOwnLayer: !grouped,
+          quality: appearance.quality,
+          platformViewBackdrop: appearance.onMedia,
+          shape: LiquidRoundedSuperellipse(
+            borderRadius: borderRadius,
+            // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
+            side: BorderSide(color: rimColor ?? appearance.edgeColor),
+          ),
+          settings: resolvedSettings,
+          child: appearance.wrapForeground(child),
+        ),
       ),
     );
   }

@@ -9,24 +9,10 @@ import 'tp_glass_surface.dart';
 import 'tp_more_menu.dart';
 
 export 'tp_more_menu.dart';
+export 'tp_glass_surface.dart'
+    show TpHeaderTitle, TpToolbarActionGroup, TpToolbarGlassButton;
 
 enum TpAppBarRole { standalone, detail, publicDetail, modalContent, modalForm }
-
-/// The single typography owner for titles rendered inside compact headers.
-/// 固定 bar 與浮動 header(tp_root_scaffold)共用的標題幾何;只給這兩個檔用。
-class TpHeaderTitle extends StatelessWidget {
-  const TpHeaderTitle({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => DefaultTextStyle.merge(
-    style: Theme.of(context).textTheme.headlineSmall,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    child: child,
-  );
-}
 
 /// The single spacing owner for one or more compact header actions.
 /// 固定 bar 與浮動 header(tp_root_scaffold)共用的動作列;只給這兩個檔用。
@@ -85,63 +71,6 @@ class TpToolbarTextButton extends StatelessWidget {
   }
 }
 
-/// 標記「目前在群組容器裡」，讓子按鈕不要再各自畫一片玻璃。
-class _TpToolbarGroupScope extends InheritedWidget {
-  const _TpToolbarGroupScope({required super.child});
-
-  static bool of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<_TpToolbarGroupScope>() !=
-      null;
-
-  @override
-  bool updateShouldNotify(_TpToolbarGroupScope oldWidget) => false;
-}
-
-/// 一列上相關的動作收在同一片玻璃裡，彼此只有間距。
-///
-/// **不畫分隔線** —— HIG Toolbars 只提間距（SwiftUI 也只有 `ToolbarSpacer`）；
-/// 分隔線是選單語彙，選單內部的分組分隔線是另一回事，仍然正確。
-/// 不相關的動作各自成一顆容器，一列最多約三組。
-class TpToolbarActionGroup extends StatelessWidget {
-  const TpToolbarActionGroup({super.key, required this.children})
-    : assert(children.length >= 2, '單一動作不需要群組容器');
-
-  final List<Widget> children;
-
-  /// 群組內按鈕之間的間距，比群組與群組之間更窄。
-  static const innerGap = TpSpacing.s1;
-
-  @override
-  Widget build(BuildContext context) {
-    final onMedia = TpMediaBackdropScope.of(context);
-    return TpGlassEdge(
-      borderRadius: 22,
-      child: _TpToolbarGroupScope(
-        child: GlassButtonGroup(
-          key: const ValueKey('tp-toolbar-action-group'),
-          showDividers: false,
-          useOwnLayer: true,
-          borderRadius: 22,
-          settings: tpNavigationGlassSettings(
-            context,
-            recipe: onMedia
-                ? TpNavigationGlassRecipe.platformView
-                : TpNavigationGlassRecipe.regular,
-          ),
-          quality: tpGlassQuality(context),
-          platformViewBackdrop: onMedia,
-          children: [
-            for (var index = 0; index < children.length; index++) ...[
-              if (index > 0) const SizedBox(width: innerGap),
-              children[index],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 群組容器把更多選單包起來後，`action is TpMoreMenuButton` 的直接型別判斷
 /// 就不成立了，改用這個會遞迴進群組的判斷。
 bool tpActionsIncludeMoreMenu(Iterable<Widget> actions) => actions.any(
@@ -150,65 +79,6 @@ bool tpActionsIncludeMoreMenu(Iterable<Widget> actions) => actions.any(
       (action is TpToolbarActionGroup &&
           tpActionsIncludeMoreMenu(action.children)),
 );
-
-/// Header 共用的 44pt 圓形套件 Liquid Glass 按鈕。
-class TpToolbarGlassButton extends StatelessWidget {
-  const TpToolbarGlassButton({
-    super.key,
-    required this.tooltip,
-    required this.onPressed,
-    required this.child,
-    this.platformViewBackdrop = false,
-    this.glassSettings,
-    this.rimColor,
-    this.borderRadius = 22,
-  });
-
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final Widget child;
-  final bool platformViewBackdrop;
-  final LiquidGlassSettings? glassSettings;
-  final Color? rimColor;
-  final double borderRadius;
-
-  @override
-  Widget build(BuildContext context) {
-    final grouped = _TpToolbarGroupScope.of(context);
-    final resolvedSettings = glassSettings == null
-        ? tpNavigationGlassSettings(context)
-        : tpResolveGlassSettings(context, glassSettings!);
-    return SizedBox.square(
-      dimension: TpSpacing.tapMin,
-      child: Tooltip(
-        message: tooltip,
-        excludeFromSemantics: true,
-        child: GlassButton.custom(
-          key: const ValueKey('tp-toolbar-glass-button'),
-          label: tooltip,
-          width: TpSpacing.tapMin,
-          height: TpSpacing.tapMin,
-          enabled: onPressed != null,
-          onTap: onPressed ?? () {},
-          // 群組提供材質，個別按鈕仍由套件處理 pointer、鍵盤與語意。
-          style: grouped
-              ? GlassButtonStyle.transparent
-              : GlassButtonStyle.filled,
-          useOwnLayer: !grouped,
-          quality: tpGlassQuality(context),
-          platformViewBackdrop: platformViewBackdrop,
-          shape: LiquidRoundedSuperellipse(
-            borderRadius: borderRadius,
-            // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
-            side: BorderSide(color: rimColor ?? tpGlassEdgeColor(context)),
-          ),
-          settings: resolvedSettings,
-          child: child,
-        ),
-      ),
-    );
-  }
-}
 
 /// 將開啟帳號 sheet 的動作提供給 App 內容頁 Header。
 class TpAccountActionScope extends InheritedWidget {
@@ -431,14 +301,7 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
                 key: largeSheetScope != null
                     ? const ValueKey('app-large-sheet-back')
                     : null,
-                child: largeSheetScope == null
-                    ? leadingAction
-                    : IconTheme.merge(
-                        data: IconThemeData(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        child: leadingAction,
-                      ),
+                child: leadingAction,
               ),
             ),
       title: TpHeaderTitle(
@@ -468,7 +331,13 @@ class TpAppBar extends StatelessWidget implements PreferredSizeWidget {
           key: const ValueKey('tp-app-bar-back'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
           onPressed: onBack ?? () => closeAppRouteOrSheet(context),
-          child: const Icon(CupertinoIcons.back, size: 22),
+          child: Icon(
+            CupertinoIcons.back,
+            size: 22,
+            color: largeSheetScope == null
+                ? null
+                : Theme.of(context).colorScheme.primary,
+          ),
         );
       case TpAppBarRole.modalContent:
         if (largeSheetScope != null) return null;
