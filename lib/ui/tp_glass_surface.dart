@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../app/accessibility_scope.dart';
+import '../theme/tokens.dart';
 
 enum TpNavigationGlassRecipe { regular, platformView }
 
@@ -229,6 +230,96 @@ GlassQuality? tpGlassQuality(BuildContext context) =>
 bool _usesOpaqueGlass(BuildContext context) =>
     MediaQuery.highContrastOf(context) ||
     AppAccessibilityScope.reduceTransparencyOf(context);
+
+/// 獨立導覽按鈕的 production 角色；兩者保留既有的圓角差異。
+enum TpNavigationGlassButtonRole { barButton, floatingControl }
+
+/// 將獨立圖示按鈕的材質、媒體前景與無障礙降級成套組裝。
+///
+/// 呼叫端只提供角色、內容與操作。媒體情境沿用 [TpMediaBackdropScope]；
+/// 忙碌時保留進度與不透明底，不讓套件的 disabled 淡化整片表面。
+class TpNavigationGlassButton extends StatelessWidget {
+  const TpNavigationGlassButton({
+    super.key,
+    required this.role,
+    required this.tooltip,
+    required this.onPressed,
+    required this.child,
+    this.busy = false,
+  });
+
+  final TpNavigationGlassButtonRole role;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Widget child;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final onMedia = TpMediaBackdropScope.of(context);
+    final settings = onMedia
+        ? tpMediaIconGlassSettings(context)
+        : tpNavigationGlassSettings(context);
+    final radius = switch (role) {
+      TpNavigationGlassButtonRole.barButton => 22.0,
+      TpNavigationGlassButtonRole.floatingControl => TpRadius.sm,
+    };
+
+    final Widget control;
+    if (busy) {
+      control = Semantics(
+        label: tooltip,
+        button: true,
+        enabled: false,
+        child: TpGlassSurface(
+          borderRadius: BorderRadius.all(Radius.circular(radius)),
+          platformViewBackdrop: onMedia,
+          glassSettings: settings,
+          tintColor: Theme.of(context).colorScheme.surface,
+          child: SizedBox.square(
+            dimension: TpSpacing.tapMin,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: tpBarForeground(context, onMedia: onMedia),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      control = GlassButton.custom(
+        key: const ValueKey('tp-toolbar-glass-button'),
+        label: tooltip,
+        width: TpSpacing.tapMin,
+        height: TpSpacing.tapMin,
+        enabled: onPressed != null,
+        onTap: onPressed ?? () {},
+        useOwnLayer: true,
+        quality: tpGlassQuality(context),
+        platformViewBackdrop: onMedia,
+        shape: LiquidRoundedSuperellipse(
+          borderRadius: radius,
+          side: BorderSide(color: tpGlassEdgeColor(context)),
+        ),
+        settings: settings,
+        child: TpBarForeground(onMedia: onMedia, child: child),
+      );
+    }
+
+    return SizedBox.square(
+      dimension: TpSpacing.tapMin,
+      child: Tooltip(
+        message: tooltip,
+        excludeFromSemantics: true,
+        child: control,
+      ),
+    );
+  }
+}
 
 class TpGlassSurface extends StatelessWidget {
   const TpGlassSurface({
