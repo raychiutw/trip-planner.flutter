@@ -123,33 +123,6 @@ Color tpBarForeground(BuildContext context, {required bool onMedia}) =>
     ? Colors.white
     : Theme.of(context).colorScheme.onSurface;
 
-/// 把 [tpBarForeground] 套給整片 bar 的字符與文字。
-///
-/// 用框架既有的 [IconTheme] 與 [DefaultTextStyle] 傳遞，明確指定顏色的呼叫點
-/// （例如選單觸發鈕的品牌 tint）自然覆蓋掉它。
-class TpBarForeground extends StatelessWidget {
-  const TpBarForeground({
-    super.key,
-    required this.onMedia,
-    required this.child,
-  });
-
-  final bool onMedia;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = tpBarForeground(context, onMedia: onMedia);
-    return IconTheme.merge(
-      data: IconThemeData(color: color),
-      child: DefaultTextStyle.merge(
-        style: TextStyle(color: color),
-        child: child,
-      ),
-    );
-  }
-}
-
 /// 一般模式**不描邊**；「提高對比」才補一條明顯的實心邊。
 ///
 /// 一般模式的邊緣交給套件預設；只在提高對比時補邊界。
@@ -238,30 +211,29 @@ class _TpNavigationGlassAppearance {
   _TpNavigationGlassAppearance(
     BuildContext context, {
     _TpNavigationGlassRole role = _TpNavigationGlassRole.bar,
-    bool? onMedia,
-  }) : onMedia = onMedia ?? TpMediaBackdropScope.of(context),
+  }) : onMedia = TpMediaBackdropScope.of(context),
        quality = tpGlassQuality(context),
        edgeColor = tpGlassEdgeColor(context) {
     final scheme = Theme.of(context).colorScheme;
     final dateSelector = role == _TpNavigationGlassRole.dateSelector;
-    settings = role == _TpNavigationGlassRole.mediaIcon && this.onMedia
+    settings = role == _TpNavigationGlassRole.mediaIcon && onMedia
         ? tpMediaIconGlassSettings(context)
         : tpNavigationGlassSettings(
             context,
             // 日期軌道保留 regular 光學；媒體可讀性由中性底與前景成套提供。
-            recipe: this.onMedia && !dateSelector
+            recipe: onMedia && !dateSelector
                 ? TpNavigationGlassRecipe.platformView
                 : TpNavigationGlassRecipe.regular,
           );
     foreground = dateSelector
-        ? this.onMedia
+        ? onMedia
               ? scheme.onSurface.withValues(alpha: 1)
               : scheme.onSurfaceVariant
-        : tpBarForeground(context, onMedia: this.onMedia);
+        : tpBarForeground(context, onMedia: onMedia);
     selectedForeground = scheme.primary;
     indicatorColor = scheme.surfaceContainerHigh;
     backgroundColor = dateSelector
-        ? this.onMedia
+        ? onMedia
               ? tpMediaControlBackground(context)
               : _usesOpaqueGlass(context)
               ? scheme.surfaceContainerLow
@@ -518,12 +490,11 @@ class TpNavigationGlassButton extends StatelessWidget {
         ),
       );
     } else {
-      return TpToolbarGlassButton(
+      return TpToolbarGlassButton._resolved(
         tooltip: tooltip,
         onPressed: onPressed,
-        platformViewBackdrop: appearance.onMedia,
+        appearance: appearance,
         borderRadius: radius,
-        glassSettings: appearance.settings,
         child: child,
       );
     }
@@ -614,37 +585,35 @@ class TpToolbarActionGroup extends StatelessWidget {
 }
 
 /// Header 共用的 44pt 按鈕；材質與前景沿用媒體 scope，群組內不再畫玻璃。
-/// 舊設定參數保留相容用途，正式呼叫端不必自行配對這些值。
+/// 呼叫端只提供內容與操作，獨立圖示的角色配方在 module 內成套傳遞。
 class TpToolbarGlassButton extends StatelessWidget {
   const TpToolbarGlassButton({
     super.key,
     required this.tooltip,
     required this.onPressed,
     required this.child,
-    this.platformViewBackdrop,
-    this.glassSettings,
-    this.rimColor,
-    this.borderRadius = 22,
-  });
+  }) : _appearance = null,
+       _borderRadius = 22;
+
+  const TpToolbarGlassButton._resolved({
+    required this.tooltip,
+    required this.onPressed,
+    required this.child,
+    required _TpNavigationGlassAppearance appearance,
+    required double borderRadius,
+  }) : _appearance = appearance,
+       _borderRadius = borderRadius;
 
   final String tooltip;
   final VoidCallback? onPressed;
   final Widget child;
-  final bool? platformViewBackdrop;
-  final LiquidGlassSettings? glassSettings;
-  final Color? rimColor;
-  final double borderRadius;
+  final _TpNavigationGlassAppearance? _appearance;
+  final double _borderRadius;
 
   @override
   Widget build(BuildContext context) {
     final grouped = _TpToolbarGroupScope.of(context);
-    final appearance = _TpNavigationGlassAppearance(
-      context,
-      onMedia: platformViewBackdrop,
-    );
-    final resolvedSettings = glassSettings == null
-        ? appearance.settings
-        : tpResolveGlassSettings(context, glassSettings!);
+    final appearance = _appearance ?? _TpNavigationGlassAppearance(context);
     return SizedBox.square(
       dimension: TpSpacing.tapMin,
       child: Tooltip(
@@ -665,11 +634,10 @@ class TpToolbarGlassButton extends StatelessWidget {
           quality: appearance.quality,
           platformViewBackdrop: appearance.onMedia,
           shape: LiquidRoundedSuperellipse(
-            borderRadius: borderRadius,
-            // 可覆寫的預設值：改預設運算式即可，呼叫端不需修改。
-            side: BorderSide(color: rimColor ?? appearance.edgeColor),
+            borderRadius: _borderRadius,
+            side: BorderSide(color: appearance.edgeColor),
           ),
-          settings: resolvedSettings,
+          settings: appearance.settings,
           child: appearance.wrapForeground(child),
         ),
       ),

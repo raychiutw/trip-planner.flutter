@@ -3,7 +3,8 @@
 本紀錄對應 [#325](https://github.com/raychiutw/trip-planner.flutter/issues/325)
 的帳號與定位切片 [#327](https://github.com/raychiutw/trip-planner.flutter/issues/327)，
 以及浮動 header／固定 bar 切片 [#328](https://github.com/raychiutw/trip-planner.flutter/issues/328)、
-root tab bar／日期選擇器切片 [#329](https://github.com/raychiutw/trip-planner.flutter/issues/329)。
+root tab bar／日期選擇器切片 [#329](https://github.com/raychiutw/trip-planner.flutter/issues/329)，
+及相容入口與跨畫面驗收 [#330](https://github.com/raychiutw/trip-planner.flutter/issues/330)。
 
 ## 版本與範圍
 
@@ -191,3 +192,80 @@ language server 的 CPU 持續增加，未將等待誤判為停止進展，也�
 
 第三次 `flutter analyze --no-pub` 為 **No issues found**（23.0 秒），
 零 error／warning／info；結果保留於本機 `build/spec-329-analyze-final.log`。
+
+## 相容入口與跨畫面驗收（#330）
+
+固定起點為 `e014fe3f9a9a77014892773ae51717bf064c5274`，已包含 #328／#329。
+本切片不變更光學值、媒體 scope 的宣告位置、套件、shader 或版本號。
+
+### Production caller 盤點
+
+| 入口 | 決定與仍有責任的呼叫端 |
+|---|---|
+| `TpBarForeground` | production 已零使用，移除 wrapper；帳號可讀性測試改直接建立 `TpAccountAvatarButton`，由語意 module 成套提供前景 |
+| `TpToolbarGlassButton` 的材質、媒體、邊界與圓角參數 | module 外的 production 已零使用；移除公開覆寫，module 內獨立圖示改以私有 constructor 傳入已解析的完整 appearance 與角色圓角 |
+| `TpToolbarGlassButton` 與 `tp_app_bar.dart` re-export | 保留；固定 bar 的返回／關閉／icon、選單觸發鈕、sheet、帳號工作階段及列印仍使用；標題與動作群組也仍有 production caller |
+| `TpGlassSurface` | 保留；聊天 composer／行程資訊、`TpBottomAccessory`、標題膠囊及定位忙碌態仍使用 |
+| `tpNavigationGlassSettings`、`tpResolveGlassSettings`、`tpGlassQuality` | 保留；語意 module、compact／regular sheet 與選單仍使用，不把它們誤認為無用相容層 |
+| `tpMenuGlassSettings`、`TpGlassEdge`／`tpGlassEdgeColor` | 保留選單獨立模糊／底色與提高對比邊界；不改選單 module |
+| `TpMediaBackdropScope` | 保留 shell、行程地圖、總覽地圖狀態覆寫；帶狀遮蔽、accessory 與選單 host 繼續讀同一 scope |
+
+root tab 的鍵盤／讀屏、焦點回復，日期方向鍵、再次選取、具名讀屏 action、
+Reduce Motion scroll controller，選單 root route host／錨點／Back／Esc／去重，
+以及 sheet 的 Navigator、dirty／submitting guard、child identity、旋轉與鍵盤
+adapter 全部保留。移除的只有已由語意 module 承接的組裝入口。
+
+### 公開行為與測試接手
+
+- 既有 shared visual flow 新增明暗兩態的地圖 → 時間軸 → 筆記 → 帳號 →
+  地圖流程。選定的 Day 2 在兩種 sheet 關閉後及返回地圖時仍被讀屏語意
+  標為選取；沿用原地圖實例。筆記 AI 狀態透過既有 repository fixture 固定為
+  沒有工作，這段不送出 AI 生成，也不依賴筆記 controller 的完成狀態。
+- host 端從真畫面的 `RenderParagraph` 讀標題及未選 root tab 前景，驗證
+  一般內容、媒體、sheet 與獨立無障礙情境；不是只比對 settings token。
+- 前景 mutation 暫將媒體白色改黑，流程在 `light/map` 得到
+  `Expected white / Actual black`；還原後通過，再移除舊 wrapper。
+- 操作 mutation 暫移除 toolbar callback，既有「帳號與定位的鍵盤及讀屏
+  啟用各派發一次」得到 `Expected 1 / Actual 0`；還原後通過，再收斂參數。
+- 刪除一個只驗自訂 toolbar settings 的測試。相同降級保證由
+  `tp_map_icon_transparency_test.dart` 的「兩顆控制各自支援不透明降級、44pt、
+  語意與操作」、「定位進行中提高對比或降低透明度仍完全隔離底圖」，以及
+  `tp_navigation_bar_semantics_test.dart` 的真標題／動作群組像素案例接手。
+  `TpGlassSurface` 的自訂設定測試、選單、sheet 與全部操作案例保留。
+
+### 本切片自動化結果
+
+- `flutter analyze --no-pub` 為 **No issues found**（15.8 秒），零
+  error／warning／info，日誌為本機 `build/spec-330-analyze-final.log`。
+- 7 檔聚焦驗證 **170 項全數通過**（1 分 30 秒），涵蓋 HIG 十態、
+  compact／regular、放大字級、visual／release flow、root tab、日期選取、
+  shell 與 sheet 公開操作。日誌為本機 `build/spec-330-focused-final.log`。
+- 完整 `flutter test --no-pub --concurrency 1 --reporter expanded` 為
+  **1995 項全數通過**（16 分 26 秒），日誌為本機
+  `build/spec-330-full-final.log`。相較起點少一項是上述已接手保證的舊
+  toolbar settings 測試；40 場景流程及完整 HIG 矩陣都在本次 suite 中通過。
+  畫面證據集的 11 項案例維持原 45 秒時限，沒有跳過或放寬斷言。
+- 5 個 Dart 檔案格式檢查通過，`git diff --check` 通過。以上是目前工作樹
+  的自動化證據，不能取代下列真機後驗或 Standards／Spec 審查。
+
+### 當前版本真機證據尚未取得
+
+本切片在 feature branch 完成自動化後仍須等待合併，沿現有
+`mobile-e2e.yml` 的 master-only 流程取得新證據。不得拿起點 run
+35953925642（`b9729c1`／0.26.10+41）或本機 headless 結果標示後驗完成。
+商店上傳依 ADR-0002 保持獨立，不新增 workflow `needs` gate。
+
+後驗需記錄完整 SHA、版本／build、Actions run／matrix、實體裝置／OS、
+release 或 debug 模式、明暗與實際觀察到的無障礙情境、XML 結果、影片／
+截圖位置與未驗項。新增六個停留點後共 40 場景，原 34 場景基準不改歸屬。
+
+現有 iOS lane 是 release XCTest；Android lane 是 debug，預設
+`MediumPhone.arm` 是虛擬裝置。Android 實體取證須明確選擇可用實體型號，
+並區分其結果與正式版、Play 簽章路徑。圖磚是否顯示要讀影片，不能只依
+`onMapReady`；wrapper 注入的無障礙值不證明 OS channel 或 VoiceOver／TalkBack。
+低幀率錄影與單筆 warmup p75 也不證明 Reduce Motion 動畫或持續 raster 效能。
+
+未驗範圍依 [現有裝置矩陣](liquid-glass-1.4.1-migration.md#尚未完成的裝置驗收)
+及 [人工證據格式](mobile-e2e.md#發布證據格式) 補齊：當前整合版的 iOS／Android
+材質與原生 PlatformView 共存、必要真機無障礙與不同配置、持續操作表現。
+取得並判讀必要證據前，**#330 與母票 #325 不標為完成**。

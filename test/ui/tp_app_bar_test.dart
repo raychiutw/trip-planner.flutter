@@ -1897,43 +1897,6 @@ void main() {
     );
   });
 
-  testWidgets(
-    'TpToolbarGlassButton resolves custom settings for Reduce Transparency',
-    (tester) async {
-      const customSettings = LiquidGlassSettings(
-        glassColor: Color(0x332196F3),
-        blur: 24,
-        thickness: 20,
-        refractiveIndex: 1.2,
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          home: AppAccessibilityScope(
-            reduceTransparency: true,
-            child: Scaffold(
-              body: TpToolbarGlassButton(
-                tooltip: '更多',
-                onPressed: () {},
-                glassSettings: customSettings,
-                child: const Icon(Icons.more_horiz),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      final settings = tester
-          .widget<GlassButton>(find.byType(GlassButton))
-          .settings!;
-      expect(settings.glassColor.a, 1);
-      expect(settings.backerColor?.a, 1);
-      expect(settings.platformViewFallbackColor?.a, 1);
-      expect(settings.blur, 0);
-      expect(settings.thickness, 0);
-      expect(settings.refractiveIndex, 1);
-    },
-  );
-
   testWidgets('standalone app bar never implies a leading action', (
     tester,
   ) async {

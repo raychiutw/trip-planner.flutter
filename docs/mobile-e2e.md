@@ -39,7 +39,11 @@ increasedContrast／reduceTransparency` 與 `dwell`；`injected accessibility=` 
 channel 橋接與 VoiceOver。`build identity` 行是帳號 footer 讀到的平台版本
 （`PackageInfo.fromPlatform`，不是 release flow 的 `0.9.1（12）` 替身），供對照
 Actions run 的 build metadata。host 端對應 `test/flows/app_owned_visual_evidence_flow_test.dart`
-以假地圖走同一流程，只驗流程與 log 標記，不能代替真機材質證據。
+以假地圖走同一流程，驗證操作、log 標記及最終文字前景，不能代替真機材質證據。
+#330 加入明暗兩態各三個停留點：`notes-after-map`、`account-after-notes`、
+`map-after-notes`。流程從地圖回時間軸選 Day 2，開筆記、關閉後開帳號，再回到
+原地圖；公開語意驗證 Day 保留，地圖不為取證而重建。完整視覺流程現在有
+40 個停留點；修改前 run 的 34 個場景仍只歸屬原 SHA，不是本次後驗。
 時間預算：gcloud 的 `--timeout` 是整組 execution 的執行上限（官方文件明說不含裝置
 準備與清理）。iOS XCTest bundle 設 `7m`；Android Patrol 矩陣設 `15m`（`android_test_lab`
 job `timeout-minutes` 同步放寬到 60）；Android 標準 integration 矩陣維持 `5m`。三個值都
