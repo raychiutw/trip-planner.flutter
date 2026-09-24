@@ -231,24 +231,42 @@ bool _usesOpaqueGlass(BuildContext context) =>
     MediaQuery.highContrastOf(context) ||
     AppAccessibilityScope.reduceTransparencyOf(context);
 
+enum _TpNavigationGlassRole { bar, mediaIcon, dateSelector }
+
 /// 所有導覽角色共用的配對決策；光學值仍由既有設定函式提供。
 class _TpNavigationGlassAppearance {
   _TpNavigationGlassAppearance(
     BuildContext context, {
-    bool mediaIcon = false,
+    _TpNavigationGlassRole role = _TpNavigationGlassRole.bar,
     bool? onMedia,
   }) : onMedia = onMedia ?? TpMediaBackdropScope.of(context),
        quality = tpGlassQuality(context),
        edgeColor = tpGlassEdgeColor(context) {
-    settings = mediaIcon && this.onMedia
+    final scheme = Theme.of(context).colorScheme;
+    final dateSelector = role == _TpNavigationGlassRole.dateSelector;
+    settings = role == _TpNavigationGlassRole.mediaIcon && this.onMedia
         ? tpMediaIconGlassSettings(context)
         : tpNavigationGlassSettings(
             context,
-            recipe: this.onMedia
+            // 日期軌道保留 regular 光學；媒體可讀性由中性底與前景成套提供。
+            recipe: this.onMedia && !dateSelector
                 ? TpNavigationGlassRecipe.platformView
                 : TpNavigationGlassRecipe.regular,
           );
-    foreground = tpBarForeground(context, onMedia: this.onMedia);
+    foreground = dateSelector
+        ? this.onMedia
+              ? scheme.onSurface.withValues(alpha: 1)
+              : scheme.onSurfaceVariant
+        : tpBarForeground(context, onMedia: this.onMedia);
+    selectedForeground = scheme.primary;
+    indicatorColor = scheme.surfaceContainerHigh;
+    backgroundColor = dateSelector
+        ? this.onMedia
+              ? tpMediaControlBackground(context)
+              : _usesOpaqueGlass(context)
+              ? scheme.surfaceContainerLow
+              : null
+        : null;
   }
 
   final bool onMedia;
@@ -256,14 +274,162 @@ class _TpNavigationGlassAppearance {
   final Color edgeColor;
   late final LiquidGlassSettings settings;
   late final Color foreground;
+  late final Color selectedForeground;
+  late final Color indicatorColor;
+  late final Color? backgroundColor;
 
-  Widget wrapForeground(Widget child) => IconTheme.merge(
-    data: IconThemeData(color: foreground),
-    child: DefaultTextStyle.merge(
-      style: TextStyle(color: foreground),
-      child: child,
-    ),
-  );
+  Widget wrapForeground(Widget child, {bool selected = false}) =>
+      IconTheme.merge(
+        data: IconThemeData(color: selected ? selectedForeground : foreground),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: selected ? selectedForeground : foreground),
+          child: child,
+        ),
+      );
+}
+
+/// root tab 的材質、選取底與前景成套組裝；套件保留上下兩種配置與指標互動。
+/// 呼叫端只提供分頁內容、選取與操作，鍵盤及讀屏 adapter 仍由 root tab 持有。
+class TpNavigationGlassTabBar extends StatelessWidget {
+  const TpNavigationGlassTabBar({
+    super.key,
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onSelected,
+    this.inline = false,
+  });
+
+  final List<GlassTab> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final bool inline;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appearance = _TpNavigationGlassAppearance(context);
+    final selectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: appearance.selectedForeground,
+      fontWeight: FontWeight.w700,
+      fontSize: TpRootTabGeometry.labelFontSize,
+      height: TpRootTabGeometry.labelLineHeight,
+    );
+    final unselectedLabelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: appearance.foreground,
+      fontWeight: FontWeight.w500,
+      fontSize: TpRootTabGeometry.labelFontSize,
+      height: TpRootTabGeometry.labelLineHeight,
+    );
+    final indicatorSettings = tpResolveGlassSettings(
+      context,
+      appearance.settings,
+      opaqueColor: appearance.indicatorColor,
+    );
+    return inline
+        ? GlassTabBar.inline(
+            tabs: tabs,
+            selectedIndex: selectedIndex,
+            onTabSelected: onSelected,
+            barHeight: TpRootTabGeometry.barHeight(context),
+            barBorderRadius: 32,
+            iconSize: TpRootTabGeometry.iconSize,
+            iconLabelSpacing: TpRootTabGeometry.iconLabelSpacing,
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            settings: appearance.settings,
+            selectedIconColor: appearance.selectedForeground,
+            selectedLabelColor: appearance.selectedForeground,
+            unselectedIconColor: appearance.foreground,
+            unselectedLabelColor: appearance.foreground,
+            selectedLabelStyle: selectedLabelStyle,
+            unselectedLabelStyle: unselectedLabelStyle,
+            indicatorColor: appearance.indicatorColor,
+            indicatorSettings: indicatorSettings,
+            quality: appearance.quality,
+            platformViewBackdrop: appearance.onMedia,
+          )
+        : GlassTabBar.bottom(
+            iconSize: TpRootTabGeometry.iconSize,
+            iconLabelSpacing: TpRootTabGeometry.iconLabelSpacing,
+            barHeight: TpRootTabGeometry.barHeight(context),
+            tabs: tabs,
+            selectedIndex: selectedIndex,
+            onTabSelected: onSelected,
+            horizontalPadding: 0,
+            verticalPadding: 0,
+            settings: appearance.settings,
+            selectedIconColor: appearance.selectedForeground,
+            selectedLabelColor: appearance.selectedForeground,
+            unselectedIconColor: appearance.foreground,
+            unselectedLabelColor: appearance.foreground,
+            selectedLabelStyle: selectedLabelStyle,
+            unselectedLabelStyle: unselectedLabelStyle,
+            indicatorColor: appearance.indicatorColor,
+            indicatorSettings: indicatorSettings,
+            quality: appearance.quality,
+            platformViewBackdrop: appearance.onMedia,
+          );
+  }
+}
+
+/// 日期選擇器的中性軌道、選取底與前景成套組裝，不外包第二層玻璃。
+/// 選項內容與再次選取 adapter 由呼叫端提供；套件負責欄寬、捲動與選取。
+class TpNavigationGlassSelector extends StatelessWidget {
+  const TpNavigationGlassSelector({
+    super.key,
+    required this.segments,
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.height,
+    required this.scrollController,
+  });
+
+  final List<GlassSegment> segments;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final double height;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    final appearance = _TpNavigationGlassAppearance(
+      context,
+      role: _TpNavigationGlassRole.dateSelector,
+    );
+    return TpGlassEdge(
+      borderRadius: height / 2,
+      child: GlassSegmentedControl.scrollable(
+        segments: [
+          for (final (index, segment) in segments.indexed)
+            GlassSegment(
+              id: segment.id,
+              label: segment.label,
+              semanticLabel: segment.semanticLabel,
+              tooltip: segment.tooltip,
+              enabled: segment.enabled,
+              icon: segment.icon == null
+                  ? null
+                  : appearance.wrapForeground(
+                      segment.icon!,
+                      selected: index == selectedIndex,
+                    ),
+            ),
+        ],
+        selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+        onSegmentSelected: onSelected,
+        labelPadding: EdgeInsets.zero,
+        height: height,
+        scrollController: scrollController,
+        selectionAlignment: SegmentSelectionAlignment.center,
+        dragBehavior: SegmentDragBehavior.scroll,
+        indicatorColor: appearance.indicatorColor,
+        backgroundColor: appearance.backgroundColor,
+        settings: appearance.settings,
+        quality: appearance.quality,
+        useOwnLayer: true,
+      ),
+    );
+  }
 }
 
 /// 浮動 header 標題與返回共用的玻璃；呼叫端只保留內容與自然寬度留白。
@@ -317,7 +483,10 @@ class TpNavigationGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appearance = _TpNavigationGlassAppearance(context, mediaIcon: true);
+    final appearance = _TpNavigationGlassAppearance(
+      context,
+      role: _TpNavigationGlassRole.mediaIcon,
+    );
     final radius = switch (role) {
       TpNavigationGlassButtonRole.barButton => 22.0,
       TpNavigationGlassButtonRole.floatingControl => TpRadius.sm,

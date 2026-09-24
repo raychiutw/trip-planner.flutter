@@ -2,7 +2,8 @@
 
 本紀錄對應 [#325](https://github.com/raychiutw/trip-planner.flutter/issues/325)
 的帳號與定位切片 [#327](https://github.com/raychiutw/trip-planner.flutter/issues/327)，
-以及浮動 header／固定 bar 切片 [#328](https://github.com/raychiutw/trip-planner.flutter/issues/328)。
+以及浮動 header／固定 bar 切片 [#328](https://github.com/raychiutw/trip-planner.flutter/issues/328)、
+root tab bar／日期選擇器切片 [#329](https://github.com/raychiutw/trip-planner.flutter/issues/329)。
 
 ## 版本與範圍
 
@@ -128,3 +129,65 @@ Impeller 折射、原生圖磚與玻璃共存、邊緣光、thermal 降級與 ra
 
 這些是 App 自有填色、前景、幾何與操作證據。真機材質後驗仍依上一節
 交給 #330，未將舊 run 或 headless 像素解讀為本票真機驗收。
+
+## Root tab bar 與日期選擇器（#329）
+
+固定起點為 `56daeb3e2ec64e039f07fc4213970f39a5248447`。
+`TpNavigationGlassTabBar` 與 `TpNavigationGlassSelector` 將材質、前景、
+選取底與無障礙降級收進同一導覽玻璃 module；呼叫端只提供分頁／日期
+內容、選取與操作。兩者沿用既有光學設定入口，不共用錯誤的角色配方：
+root tab 的媒體暗化仍為 35%，日期仍為 70% 中性底搭配完整 `onSurface`，
+非媒體日期仍用 `onSurfaceVariant`，品牌 tint 只標示選取內容。
+
+root tab 的 inline／bottom 幾何、分支內容及套件 tap／drag 保留。
+原本補足套件缺口的指標穿透鍵盤／讀屏區域、選取後焦點回復仍在
+`AppleRootTabBar`。日期仍保留方向鍵／Enter／Space、焦點、目前 Day
+再次點選與具名讀屏 action；水平拖曳只瀏覽，不派發選取。Reduce Motion
+仍由原 ScrollController adapter 將動畫改為直接定位；未修改 Day 同步模型。
+舊 helper、scope 與其他導覽入口保持相容。
+
+### 本切片 red → green
+
+- 新 root tab 公開像素案例先記錄原行為，再暫時忽略媒體 scope，得到
+  `Expected white / Actual black`；還原後通過，再遷移語意組裝。
+  案例涵蓋 inline／bottom、明暗主題、白黑媒體背景，以及提高對比與
+  降低透明度各自生效；檢查最終文字色與實際背景像素。
+- 日期沿用真實 `TpHorizontalSelector` 的對比案例。暫將中性底從
+  70% 改成 35%，得到 `Expected >= 4.5 / Actual 2.16873306642071`；
+  還原後通過，再將中性底與前景配對收進共用 module。
+- 操作 mutation 暫時移除目前 Day 的 tap callback，既有公開案例得到
+  `Expected 1 / Actual 0`；還原後同一案例通過。它也守住拖曳不回呼、
+  具名讀屏啟用、沒有空白按鈕節點，以及 Enter／Space 再次選取。
+- root tab 與 shell 聚焦驗證 40 項通過；日期、真地圖可讀性與新 root tab
+  案例合計 47 項通過。這些測試直接操作 App 控制項與既有畫面 seam，
+  沒有新增測試專用介面；原始碼守門只檢查呼叫端未重新拼接設定。
+- 最終 12 檔聚焦驗證 **321 項全數通過**（2 分 23 秒），包含完整
+  HIG 十態矩陣、shell、timeline／map、日期操作、帳號／定位與共用玻璃。
+  日誌保留於本機 `build/spec-329-focused-final.log`。
+- 完整 `flutter test --no-pub --concurrency 1 --reporter expanded`
+  為 **1996 項全數通過**（13 分 46 秒），包含畫面證據集的原 11 項案例
+  及 HIG 十態矩陣。畫面案例仍使用原 45 秒時限，沒有跳過測試或放寬
+  斷言；完整日誌保留於本機 `build/spec-329-full-final.log`。格式檢查
+  與 `git diff --check` 通過。這些結果只代表 headless 驗證，真機材質
+  後驗仍交由 #330，不以像素測試或歷史 build 代替。
+
+### 隔離環境診斷
+
+首次 `flutter analyze --no-pub` 在 492.2 秒後回報 18,496 個診斷；實際
+路徑落在工作樹內 `build/spec-328-pub-cache/hosted` 的套件原始碼、測試
+及 example，例如 `win32` 的 `package:checks/checks.dart` 缺失。過程中
+language server 的 CPU 持續增加，未將等待誤判為停止進展，也未終止程序。
+
+保留原始日誌後，將同一份 195 個 hosted 套件的隔離 cache 搬到工作樹外
+專用 Temp 路徑，再以程序專用 helper 更新 `PUB_CACHE`，執行
+`flutter pub get --enforce-lockfile`。`pubspec.yaml` 與 `pubspec.lock`
+雜湊皆不變，生成的 package config 指向新 cache。沒有刪除舊驗證證據、
+改全域環境、放寬測試時限或新增 analyzer 排除規則。
+
+搬移後第二次 analyze 在 162.2 秒收尾，只剩 #328 忽略的計時診斷副本
+`build/spec-328-diagnostics/app_owned_release_flow_artifacts_test.dart`
+一個 `avoid_print` info。再將該診斷資料夾的兩份原件完整搬出工作樹到
+專用 Temp 路徑保存，沒有修改副本內容或正式測試。
+
+第三次 `flutter analyze --no-pub` 為 **No issues found**（23.0 秒），
+零 error／warning／info；結果保留於本機 `build/spec-329-analyze-final.log`。
