@@ -425,6 +425,79 @@ void main() {
       expect(find.byType(PoiFavoriteCard), findsNWidgets(2));
     });
 
+    testWidgets('大量地區與大字時可捲到底部，取消後保留原篩選', (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const regions = ['沖繩', '京都', '大阪', '東京', '釜山', '首爾', '台北', '其他'];
+      final favorites = [
+        for (var i = 0; i < regions.length; i++)
+          PoiFavorite(
+            id: i + 1,
+            userId: 'u-1',
+            poiId: 500 + i,
+            favoritedAt: '2026-06-01T10:00:00Z',
+            poiName: '地點 ${regions[i]}',
+            poiAddress: regions[i],
+            poiType: 'attraction',
+          ),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith((ref) => Stream.value(favorites)),
+          ],
+          child: buildApp(textScaler: const TextScaler.linear(2)),
+        ),
+      );
+      await tester.pump();
+
+      await _openFavoritesFilter(tester);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('favorites-filter-reset')),
+        250,
+        scrollable: find.descendant(
+          of: find.byType(ListView).last,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-filter-reset')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('favorites-filter-apply')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('favorites-region-東京')),
+      );
+      await tester.tap(find.byKey(const ValueKey('favorites-region-東京')));
+      await tester.tap(find.byKey(const ValueKey('favorites-filter-apply')));
+      await tester.pumpAndSettle();
+      expect(find.text('已篩選：東京'), findsOneWidget);
+      expect(find.text('地點 東京'), findsOneWidget);
+
+      await _openFavoritesFilter(tester);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('favorites-region-京都')),
+      );
+      await tester.tap(find.byKey(const ValueKey('favorites-region-京都')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('捨棄'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('已篩選：東京'), findsOneWidget);
+      expect(find.text('地點 東京'), findsOneWidget);
+      expect(find.text('地點 京都'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('empty → 還沒有收藏 hero', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
