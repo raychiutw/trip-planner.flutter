@@ -277,6 +277,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Day 延遲重試保留草稿與等待狀態，連點只讀取一次', (tester) async {
+    final repo = _MockTripRepository();
+    final initial = StreamController<List<TripDay>>();
+    final retry = StreamController<List<TripDay>>();
+    addTearDown(() => unawaited(initial.close()));
+    addTearDown(() => unawaited(retry.close()));
+    var reads = 0;
+    when(() => repo.watchDays('trip-1')).thenAnswer((_) {
+      reads++;
+      return reads == 1 ? initial.stream : retry.stream;
+    });
+    await tester.pumpWidget(_buildScreen(repo, useRepositoryDays: true));
+    initial.add(_days);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '等待日期更新的草稿',
+    );
+    initial.addError(Exception('day-refresh-failed'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('重試'));
+    await tester.tap(find.text('重試'));
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(reads, 2);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('等待日期更新的草稿'), findsOneWidget);
+    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.byKey(const ValueKey('entry-add-loading')), findsNothing);
+
+    retry.add(const [
+      TripDay(id: 2, dayNum: 2, date: '2026-10-02', version: 0),
+    ]);
+    unawaited(retry.close());
+    await tester.pumpAndSettle();
+
+    expect(reads, 2);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('等待日期更新的草稿'), findsOneWidget);
+    expect(find.text('DAY 2 · 2026-10-02'), findsOneWidget);
+    expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('加入收藏仍在處理時連點只新增一次', (tester) async {
     final repo = _MockTripRepository();
     final favoritesRepo = _MockFavoritesRepository();
