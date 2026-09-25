@@ -6,7 +6,7 @@
 
 - 後端本機 `master`／`origin/master`：`a26590a4cf4a00f6ac991cf783e7b263244aae60`，工作目錄乾淨。
 - 後端開發 agent 回覆目前分支為 `feat/1307-reliability-uat`，commit `b749b0062ea5772d87a492500aaf19b61f6105ba`。
-- 已用 GitHub 核實 [PR #1346](https://github.com/raychiutw/trip-planner/pull/1346) 的 head 與上述 commit 相同，base 為 `uat`，查證時仍開啟。這不是正式環境部署證據。
+- 已用 GitHub 核實 [PR #1346](https://github.com/raychiutw/trip-planner/pull/1346) 的 head 與上述 commit 相同，base 為 `uat`；初次查證時開啟，後續於 2026-09-25 16:36 UTC 合併為 `e6e31e391ba0a89b2c7b80bb7293a897e5030c9b`。這不是正式環境部署證據，且該批不含下述三項新契約。
 
 ## 契約結果
 
@@ -27,7 +27,13 @@
 
 ## 驗證界線
 
-後續協調：後端 agent 已回覆收到使用者明確指示，三項缺口將由後端方整理 spec、開票並開發；Flutter 方不重複開票或修改後端，繼續其他工作。待對方同步票號、正式契約與部署證據後，再更新上述依賴。本次尚未取得新票號，不能將此承接承諾視為 API 已完成。
+後續協調：後端 agent 已依使用者明確指示開出三張 `ready-for-agent` 規格票，Flutter 方不重複開票或修改後端，繼續其他工作：
+
+- [後端 #1347：無密碼帳號刪除的近期身分驗證契約](https://github.com/raychiutw/trip-planner/issues/1347) 對應 Flutter #380／#389。
+- [後端 #1348：版本化 AI 資料同意與授權狀態契約](https://github.com/raychiutw/trip-planner/issues/1348) 對應 Flutter #382／#390。
+- [後端 #1349：正式 Mobile OAuth callback 與環境契約](https://github.com/raychiutw/trip-planner/issues/1349) 對應 Flutter #334，下游 #335／#341。
+
+已以 GitHub Issues 核對三票均開啟且有 `ready-for-agent`；這是工作承接，不是 API、正式契約或部署完成證據。正式 callback URI、AI 說明文案與版本、fresh-auth challenge 流程尚待後端落定。三組 Flutter 依賴維持未解除。
 
 後端 agent 確認本批只有 Cloudflare preview，沒有可提供的正式部署證據。本次另以瀏覽器讀取正式公開 `client-info` 時遇到 `net::ERR_BLOCKED_BY_CLIENT`，沒有取得 JSON；不能據此推論 endpoint 不存在或 client 已停用。
 
