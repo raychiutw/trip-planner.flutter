@@ -236,4 +236,30 @@ void main() {
       expect(tester.takeException(), isNull, reason: '$size');
     }
   });
+
+  testWidgets('橫向最大字級可捲到頁尾登入入口並啟動登入', (tester) async {
+    var loginCount = 0;
+    await pumpWelcome(
+      tester,
+      onLogin: () => loginCount++,
+      size: const Size(844, 390),
+      textScale: 3.2,
+    );
+
+    final bottom = find.byKey(const ValueKey('welcome-login-bottom'));
+    await tester.scrollUntilVisible(
+      bottom,
+      800,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('welcome-scroll')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(bottom).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+    await tester.tap(bottom);
+    expect(loginCount, 1);
+  });
 }
