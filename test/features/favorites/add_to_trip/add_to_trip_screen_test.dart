@@ -103,6 +103,28 @@ void main() {
   Widget buildApp(AddToTripArgs args) =>
       buildScoped(AddToTripScreen(args: args));
 
+  testWidgets('加入行程讀取失敗會宣告可重試狀態', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      when(
+        tripRepo.watchMyTrips,
+      ).thenAnswer((_) => Stream.error(Exception('network unavailable')));
+      await tester.pumpWidget(
+        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+      );
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+
+      final error = tester.getSemantics(find.text('無法載入行程清單'));
+      expect(error.label, contains('無法載入行程清單'));
+      expect(error.flagsCollection.isLiveRegion, isTrue);
+      expect(find.text('重試'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('行程初載手動重試跨 frame 連按只讀取一次且失敗後可再試', (tester) async {
     final pending = StreamController<List<TripSummary>>.broadcast();
     addTearDown(() {

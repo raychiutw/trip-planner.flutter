@@ -267,12 +267,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
               key: ValueKey('add-to-trip-loading'),
             ),
             error: (e, _) => SingleChildScrollView(
-              child: Semantics(
-                liveRegion: true,
-                child: _RetryState(
-                  title: '無法載入行程清單',
-                  onRetry: () => ref.read(myTripsRetryProvider).retry(),
-                ),
+              child: _RetryState(
+                title: '無法載入行程清單',
+                onRetry: () => ref.read(myTripsRetryProvider).retry(),
               ),
             ),
             data: (trips) => _form(
@@ -303,12 +300,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
         if (tripsError)
-          Semantics(
-            liveRegion: true,
-            child: _RetryState(
-              title: '無法載入行程清單',
-              onRetry: () => ref.read(myTripsRetryProvider).retry(),
-            ),
+          _RetryState(
+            title: '無法載入行程清單',
+            onRetry: () => ref.read(myTripsRetryProvider).retry(),
           ),
         _SelectionField<String>(
           key: const ValueKey('add-to-trip-trip'),
@@ -329,25 +323,19 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             skipLoadingOnReload: daysAsync.retrying,
             skipError: daysAsync.hasValue,
             loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Semantics(
-              liveRegion: true,
-              child: _RetryState(
-                key: ValueKey(tripId),
-                title: '無法載入日期',
-                onRetry: () => ref.read(tripDaysRetryProvider(tripId!)).retry(),
-              ),
+            error: (e, _) => _RetryState(
+              key: ValueKey(tripId),
+              title: '無法載入日期',
+              onRetry: () => ref.read(tripDaysRetryProvider(tripId!)).retry(),
             ),
             data: (_) => Column(
               children: [
                 if (daysAsync.hasError)
-                  Semantics(
-                    liveRegion: true,
-                    child: _RetryState(
-                      key: ValueKey(tripId),
-                      title: '無法載入日期',
-                      onRetry: () =>
-                          ref.read(tripDaysRetryProvider(tripId!)).retry(),
-                    ),
+                  _RetryState(
+                    key: ValueKey(tripId),
+                    title: '無法載入日期',
+                    onRetry: () =>
+                        ref.read(tripDaysRetryProvider(tripId!)).retry(),
                   ),
                 _SelectionField<int>(
                   key: const ValueKey('add-to-trip-day'),
@@ -430,12 +418,15 @@ class _RetryStateState extends State<_RetryState> {
   }
 
   @override
-  Widget build(BuildContext context) => TpStateView(
-    kind: TpStateKind.error,
-    title: widget.title,
-    message: _pending ? '重試中…' : null,
-    actionLabel: _pending ? null : '重試',
-    onAction: _pending ? null : _retry,
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    child: TpStateView(
+      kind: TpStateKind.error,
+      title: widget.title,
+      message: _pending ? '重試中…' : null,
+      actionLabel: _pending ? null : '重試',
+      onAction: _pending ? null : _retry,
+    ),
   );
 }
 
