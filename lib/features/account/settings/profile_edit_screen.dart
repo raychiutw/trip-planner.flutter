@@ -121,6 +121,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             ),
           ),
         TpSettingsGroup(
+          key: const ValueKey('profile-fields'),
           title: '個人資料',
           children: [
             Padding(

@@ -318,6 +318,42 @@ void main() {
     expect(find.text('B'), findsOneWidget);
   });
 
+  for (final succeeds in [true, false]) {
+    testWidgets('儲存${succeeds ? '成功' : '失敗'}後保留新草稿的游標與中文組字', (tester) async {
+      final pending = Completer<UserInfo>();
+      when(
+        () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      ).thenAnswer((_) => pending.future);
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('profile-display-name'));
+      await tester.enterText(field, 'A');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('profile-save')));
+      await tester.pump();
+      const editing = TextEditingValue(
+        text: '新名字',
+        selection: TextSelection.collapsed(offset: 1),
+        composing: TextRange(start: 0, end: 2),
+      );
+      tester.testTextInput.updateEditingValue(editing);
+      await tester.pump();
+      if (succeeds) {
+        pending.complete(
+          const UserInfo(id: '1', email: 'me@x.com', displayName: 'A'),
+        );
+      } else {
+        pending.completeError(Exception('offline'));
+      }
+      await tester.pumpAndSettle();
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editable.controller.value, editing);
+      expect(editable.focusNode.hasFocus, isTrue);
+    });
+  }
+
   testWidgets('改名後取消會確認捨棄未儲存變更', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

@@ -9,6 +9,7 @@ class DraftSnapshot<D> {
   final D draft;
 }
 
+/// repository 接受的草稿及呼叫端需要的結果。
 @immutable
 class DraftAccepted<D, R> {
   const DraftAccepted({required this.draft, required this.result});
@@ -53,6 +54,7 @@ class DraftSession<D, R> extends ChangeNotifier {
   bool get canSubmit => !_disposed && !_submitting && dirty;
   String? get error => _error;
 
+  /// 更新目前輸入，不改變已儲存的 baseline。
   void edit(D next) {
     if (_disposed) return;
     _draft = next;
@@ -60,6 +62,7 @@ class DraftSession<D, R> extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 送出當下快照；未送出、失敗或 session 已結束時回傳 null。
   Future<DraftSaved<R>?> submit() async {
     if (!canSubmit) return null;
     final revision = _revision;
@@ -83,6 +86,7 @@ class DraftSession<D, R> extends ChangeNotifier {
     }
   }
 
+  /// 在真正返回前確認憑證仍對應目前乾淨的草稿。
   bool canFinish(DraftSaved<R> saved) =>
       !_disposed &&
       !_submitting &&
