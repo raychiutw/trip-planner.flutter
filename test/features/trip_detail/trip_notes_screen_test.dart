@@ -12,6 +12,7 @@ import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
+import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/note_section.dart';
 import 'package:tripline/models/notes.dart';
@@ -265,6 +266,10 @@ Widget _buildScreen(
   return ProviderScope(
     retry: (retryCount, error) => null,
     overrides: [
+      for (final id in [99, 100, 101, 102, 200, 201])
+        requestLifecycleProvider(id).overrideWith(
+          () => RequestLifecycle(id, wait: (_) => Completer<void>().future),
+        ),
       tripNotesProvider.overrideWith(
         notesBuilder ?? (ref, tripId) => Stream.value(notes),
       ),
@@ -964,15 +969,23 @@ void main() {
     expect(find.textContaining('模型逾時，請稍後再試一次'), findsOneWidget);
   });
 
-  testWidgets('訂閱 SSE 就丟例外時錯誤面板單獨出現,重試真的會再送一次', (tester) async {
+  testWidgets('SSE 開不起來不是失敗:工單 lifecycle 改輪詢,生成仍顯示進行中', (tester) async {
     _useTallViewport(tester);
     final repo = _MockTripRepository();
     final requestsRepo = _MockRequestsRepository();
     when(
       () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
     ).thenAnswer((_) async => const TripNoteAiJob(jobId: 7, requestId: 99));
-    // 失敗發生在 `_aiJob` 已經設值之後。若 catch 只設錯誤不清 `_aiJob`,
-    // 進行中面板與錯誤面板會同時在、三顆按鈕仍卡死,連重試都被開頭的守衛擋掉。
+    when(() => requestsRepo.fetchRequest(99)).thenAnswer(
+      (_) async => const TripRequest(
+        id: 99,
+        tripId: 'trip-1',
+        message: 'notes',
+        status: RequestStatus.processing,
+      ),
+    );
+    // 以前這裡會把 job 當失敗、清掉進行中;現在等待交給 lifecycle,SSE 開不起來
+    // 就改輪詢(見 request_lifecycle_test),job 還在跑就不該說它失敗。
     when(() => requestsRepo.watchRequestEvents(99)).thenThrow(
       const ApiError(status: 500, code: 'SSE_OPEN_FAILED', message: 'boom'),
     );
@@ -987,29 +1000,17 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('notes-ai-error')), findsOneWidget);
-    expect(find.byKey(const ValueKey('notes-ai-pending')), findsNothing);
-    for (final buttonKey in const [
-      'note-ai-tips',
-      'note-ai-lodging-tips',
-      'note-ai-emergency',
-    ]) {
-      expect(
-        tester
-            .widget<OutlinedButton>(find.byKey(ValueKey(buttonKey)))
-            .onPressed,
-        isNotNull,
-        reason: '$buttonKey 應恢復可按',
-      );
-    }
-
-    await tester.tap(find.byKey(const ValueKey('notes-ai-retry')));
-    await tester.pump();
-    await tester.pump();
-
-    verify(
-      () => repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
-    ).called(2);
+    expect(find.byKey(const ValueKey('notes-ai-error')), findsNothing);
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey('note-ai-emergency')),
+          )
+          .onPressed,
+      isNotNull,
+      reason: '別種生成不被連坐',
+    );
   });
 
   testWidgets('AI 錯誤面板出現時,展開中的筆記區不被收合', (tester) async {
@@ -1533,10 +1534,7 @@ void main() {
     await tester.pump();
 
     // 行前須知有 2 項被排除 → 入口出現;緊急聯絡 0 項 → 不出現。
-    expect(
-      find.byKey(const ValueKey('notes-exclusions-pretrip')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('notes-exclusions-tips')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('notes-exclusions-emergency')),
       findsNothing,
@@ -1544,7 +1542,7 @@ void main() {
     );
     expect(find.textContaining('已排除 2 項'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('notes-exclusions-pretrip')));
+    await tester.tap(find.byKey(const ValueKey('notes-exclusions-tips')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -1558,6 +1556,143 @@ void main() {
         NoteGenerationType.tips,
         tripId: 'trip-1',
         exclusionId: 3,
+      ),
+    ).called(1);
+  });
+
+  testWidgets('窄螢幕大字級仍能分別開啟一般與住宿排除清單', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.completed,
+            exclusionCount: 2,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.lodgingTips,
+            status: TripNoteAiJobStatus.completed,
+            exclusionCount: 1,
+          ),
+        ],
+      ),
+    );
+    when(
+      () => repo.fetchNoteExclusions(any(), tripId: 'trip-1'),
+    ).thenAnswer((_) async => const []);
+    await tester.pumpWidget(
+      _buildScreen(
+        const TripNotes(),
+        repo: repo,
+        stubAiState: false,
+        textScaler: const TextScaler.linear(3.2),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (final type in [
+      NoteGenerationType.tips,
+      NoteGenerationType.lodgingTips,
+    ]) {
+      final button = find.byKey(
+        ValueKey('notes-exclusions-${type.pathSegment}'),
+      );
+      for (var i = 0; i < 15 && button.hitTestable().evaluate().isEmpty; i++) {
+        await tester.drag(
+          find.byKey(const ValueKey('trip-notes-list')),
+          const Offset(0, -160),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(button.hitTestable(), findsOneWidget);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      verify(() => repo.fetchNoteExclusions(type, tripId: 'trip-1')).called(1);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('住宿生成的排除清單也看得到、能恢復,且與一般生成互不干擾', (tester) async {
+    _useTallViewport(tester);
+    final repo = _MockTripRepository();
+    when(() => repo.fetchNotesAiState(any())).thenAnswer(
+      (_) async => const TripNoteAiState(
+        jobs: [
+          TripNoteAiJob(
+            docType: NoteGenerationType.tips,
+            status: TripNoteAiJobStatus.idle,
+          ),
+          TripNoteAiJob(
+            docType: NoteGenerationType.lodgingTips,
+            status: TripNoteAiJobStatus.completed,
+            exclusionCount: 1,
+          ),
+        ],
+      ),
+    );
+    when(
+      () => repo.fetchNoteExclusions(
+        NoteGenerationType.lodgingTips,
+        tripId: 'trip-1',
+      ),
+    ).thenAnswer(
+      (_) async => const [
+        TripNoteExclusion(
+          id: 9,
+          docType: NoteGenerationType.lodgingTips,
+          label: '飯店早餐時間',
+          deletedAt: '2026-07-28T09:00:00Z',
+        ),
+      ],
+    );
+    when(
+      () => repo.restoreNoteExclusion(
+        any(),
+        tripId: any(named: 'tripId'),
+        exclusionId: any(named: 'exclusionId'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      _buildScreen(_sampleNotes(), repo: repo, stubAiState: false),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+      findsOneWidget,
+      reason: '住宿生成的排除清單以前在 UI 永遠不可達',
+    );
+    expect(
+      find.byKey(const ValueKey('notes-exclusions-tips')),
+      findsNothing,
+      reason: '一般生成 0 項,不連坐',
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('notes-exclusions-lodging-tips')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('飯店早餐時間'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('notes-exclusion-restore-9')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    verify(
+      () => repo.restoreNoteExclusion(
+        NoteGenerationType.lodgingTips,
+        tripId: 'trip-1',
+        exclusionId: 9,
       ),
     ).called(1);
   });
@@ -1655,6 +1790,25 @@ void main() {
       reason: '停一種不能連坐另一種正在跑的',
     );
     expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
+  });
+
+  testWidgets('停止等待未獲伺服器確認時顯示中文提示並保留其他生成', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    when(
+      () => mocks.requestsRepo.stopWaiting(any()),
+    ).thenThrow(Exception('offline'));
+    await _pumpAiScreen(tester, mocks);
+    await _startTipsThenEmergency(tester);
+    await tester.tap(find.byKey(const ValueKey('notes-ai-stop-tips')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text(kStopWaitingUnconfirmedMessage), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
@@ -1863,32 +2017,6 @@ void main() {
       find.byKey(const ValueKey('notes-ai-pending-emergency')),
       findsNothing,
     );
-  });
-
-  testWidgets('同一顆生成按鈕連按兩下只送出一次', (tester) async {
-    _useTallViewport(tester);
-    final mocks = _parallelAiMocks();
-
-    await tester.pumpWidget(
-      _buildScreen(
-        _sampleNotes(),
-        repo: mocks.repo,
-        requestsRepo: mocks.requestsRepo,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _expandAiSections(tester);
-
-    final button = find.byKey(const ValueKey('note-ai-tips'));
-    await tester.tap(button);
-    await tester.tap(button);
-    await tester.pump();
-    await tester.pump();
-
-    verify(
-      () => mocks.repo.generateNotes(NoteGenerationType.tips, tripId: 'trip-1'),
-    ).called(1);
-    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsOneWidget);
   });
 
   testWidgets('server 回 NOTES_AI_JOB_ACTIVE 時視為接上既有 job,不呈現為錯誤', (

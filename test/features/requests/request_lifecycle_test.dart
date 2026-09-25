@@ -62,6 +62,30 @@ void main() {
     return c;
   }
 
+  test('工單公開狀態保留排隊、處理進度與終態原始錯誤', () async {
+    when(
+      () => repo.fetchRequest(7),
+    ).thenAnswer((_) async => _req(RequestStatus.open));
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+    expect((sub.read() as RequestInFlight).status, RequestStatus.open);
+    events.add(const TripRequestEvent(status: RequestStatus.processing));
+    await _flush();
+    expect((sub.read() as RequestInFlight).status, RequestStatus.processing);
+    events.add(
+      const TripRequestEvent(
+        status: RequestStatus.failed,
+        error: 'NOTES_AI_NO_VALID_ITEMS',
+      ),
+    );
+    await _flush();
+    expect(
+      (sub.read() as RequestTerminal).errorMessage,
+      'NOTES_AI_NO_VALID_ITEMS',
+    );
+  });
+
   test('種子讀取已終結 → 直接 terminal,不開 SSE', () async {
     when(
       () => repo.fetchRequest(7),
