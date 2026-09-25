@@ -282,6 +282,15 @@ class _NotificationsList extends StatelessWidget {
             child: _InlineErrorPanel(message: mutationError!, onRetry: onRetry),
           ),
         ],
+        Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Text(
+            '這些選項是通知偏好；手機系統若關閉 Tripline 通知，仍不會收到通知。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
         TpSettingsGroup(
           children: [
             for (final setting in _settings)
