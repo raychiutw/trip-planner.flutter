@@ -1319,6 +1319,36 @@ void main() {
       expect(find.byKey(const ValueKey('favorite-card-8')), findsNothing);
     });
 
+    testWidgets('分頁清單篩選後以讀屏即時宣告結果數', (tester) async {
+      final semantics = tester.ensureSemantics();
+      addTearDown(semantics.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesProvider.overrideWith(
+              (ref) => Stream.value(_manyFavorites()),
+            ),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('200 個地點'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('favorites-search-input')),
+        '收藏地點 200',
+      );
+      await tester.pump();
+
+      final resultCount = find.text('1 個地點');
+      expect(resultCount, findsOneWidget);
+      expect(
+        tester.getSemantics(resultCount).flagsCollection.isLiveRegion,
+        isTrue,
+      );
+    });
+
     testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {
       final favorites = _manyFavorites();
       await tester.pumpWidget(
