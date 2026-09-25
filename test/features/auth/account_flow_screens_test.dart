@@ -787,6 +787,92 @@ void main() {
     );
   });
 
+  testWidgets('驗證信等待頁缺少或留白 Email 時仍可返回登入', (tester) async {
+    final router = await pumpAuthRoutes(
+      tester,
+      initialLocation: '/signup/check-email',
+    );
+
+    for (final location in [
+      '/signup/check-email',
+      '/signup/check-email?email=%20%20',
+    ]) {
+      router.go(location);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.descendant(
+                of: find.byKey(const ValueKey('verify-pending-resend-button')),
+                matching: find.byType(TextButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('verify-pending-resend-button')),
+      );
+      await tester.pump();
+      verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+
+      await tester.tap(find.text('回登入'));
+      await tester.pumpAndSettle();
+      expect(find.text('login-destination'), findsOneWidget);
+    }
+  });
+
+  testWidgets('驗證信重寄限流後保留易懂訊息，仍可重試並返回登入', (tester) async {
+    var attempts = 0;
+    when(() => mockAuthRepository.sendVerificationEmail(any())).thenAnswer((
+      _,
+    ) async {
+      attempts++;
+      if (attempts == 1) {
+        throw const ApiError(
+          status: 429,
+          code: 'VERIFY_EMAIL_RATE_LIMITED',
+          message: 'too many requests',
+        );
+      }
+      return '驗證信已重新寄出';
+    });
+    await pumpAuthRoutes(
+      tester,
+      initialLocation: '/signup/check-email?email=traveler@example.com',
+    );
+
+    final resend = find.byKey(const ValueKey('verify-pending-resend-button'));
+    await tester.tap(resend);
+    await tester.pumpAndSettle();
+
+    expect(find.text('驗證信請求過多，請稍後再試'), findsOneWidget);
+    expect(find.text('too many requests'), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('verify-pending-message')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('驗證信請求過多，請稍後再試'), findsOneWidget);
+
+    await tester.tap(resend);
+    await tester.pumpAndSettle();
+    expect(find.text('驗證信已重新寄出'), findsOneWidget);
+    verify(
+      () => mockAuthRepository.sendVerificationEmail('traveler@example.com'),
+    ).called(2);
+
+    await tester.tap(find.text('回登入'));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+  });
+
   testWidgets('重寄驗證信時防止重複送出', (tester) async {
     final pending = Completer<String?>();
     when(
