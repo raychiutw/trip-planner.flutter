@@ -71,6 +71,8 @@ void main() {
       ],
     );
 
+    addTearDown(router.dispose);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -666,6 +668,23 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('忘記密碼提供系統 email AutoFill 並停用文字修正', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/login/forgot');
+    await tester.showKeyboard(
+      find.byKey(const ValueKey('forgot-password-email-field')),
+    );
+
+    final configuration = tester.testTextInput.setClientArgs!;
+    expect(configuration['inputType'], TextInputType.emailAddress.toJson());
+    expect(configuration['autocorrect'], isFalse);
+    expect(configuration['enableSuggestions'], isFalse);
+    expect(configuration['textCapitalization'], 'TextCapitalization.none');
+    expect(
+      (configuration['autofill'] as Map<String, dynamic>)['hints'],
+      contains('email'),
+    );
+  });
+
   testWidgets('忘記密碼會送出 reset request 並顯示成功狀態', (tester) async {
     when(
       () => mockAuthRepository.requestPasswordReset(any()),
@@ -688,6 +707,41 @@ void main() {
       find.byKey(const ValueKey('forgot-password-success')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('忘記密碼成功後在 320pt 最大字級可回讀 email 並回登入', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    when(
+      () => mockAuthRepository.requestPasswordReset(any()),
+    ).thenAnswer((_) async => null);
+    await pumpAuthRoutes(tester, initialLocation: '/login/forgot');
+
+    final email = find.byKey(const ValueKey('forgot-password-email-field'));
+    await tester.ensureVisible(email);
+    await tester.enterText(email, ' traveler@example.com ');
+    await tester.tap(
+      find.byKey(const ValueKey('forgot-password-submit-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('若 traveler@example.com 已註冊，重設連結已寄出'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final login = find.widgetWithText(FilledButton, '回登入');
+    await tester.scrollUntilVisible(
+      login,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(login);
+    await tester.pumpAndSettle();
+
+    expect(find.text('login-destination'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('忘記密碼 submitting 時防止重複送出', (tester) async {
