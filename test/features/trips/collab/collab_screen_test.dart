@@ -88,6 +88,103 @@ void main() {
     expect(content.center.dx, 600);
   });
 
+  testWidgets('長 email 在窄螢幕與 200% 字級仍可操作角色與撤銷邀請', (tester) async {
+    const longEmail =
+        'traveler.with.a.very.long.address@example-travel-domain.com';
+    when(() => repo.fetchMembers(any())).thenAnswer(
+      (_) async => const [
+        TripMember(id: 1, email: 'owner@x.com', role: 'owner'),
+        TripMember(id: 2, email: longEmail, role: 'viewer'),
+      ],
+    );
+    when(() => repo.fetchInvites(any())).thenAnswer(
+      (_) async => const [
+        TripInvite(id: 'long-invite', invitedEmail: longEmail),
+      ],
+    );
+    when(() => repo.changeRole(2, 'member')).thenAnswer((_) async {});
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [collabRepositoryProvider.overrideWithValue(repo)],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: const CollabScreen(tripId: 'okinawa'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final memberAction = find.byKey(const ValueKey('member-actions-2'));
+    await tester.ensureVisible(memberAction);
+    await tester.tap(memberAction);
+    await tester.pumpAndSettle();
+    expect(find.text('共編成員'), findsWidgets);
+    expect(find.text('移除成員'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('member-role-member-2')));
+    await tester.pumpAndSettle();
+    verify(() => repo.changeRole(2, 'member')).called(1);
+    final revoke = find.widgetWithText(TextButton, '撤銷');
+    final contentScroll = find.descendant(
+      of: find.byKey(const ValueKey('collab-content')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.drag(contentScroll, const Offset(0, -400));
+    await tester.pumpAndSettle();
+    await tester.tap(revoke);
+    await tester.pumpAndSettle();
+    expect(find.text('撤銷「$longEmail」的邀請？'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('撤銷一封邀請失敗後重試只重做該封邀請', (tester) async {
+    var attempts = 0;
+    when(() => repo.fetchInvites(any())).thenAnswer(
+      (_) async => [
+        if (attempts < 2)
+          const TripInvite(id: 'invite-a', invitedEmail: 'a@x.com'),
+        const TripInvite(id: 'invite-b', invitedEmail: 'b@x.com'),
+      ],
+    );
+    when(
+      () => repo.revokeInvite(tripId: 'okinawa', email: 'a@x.com'),
+    ).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw Exception('offline');
+    });
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '撤銷').first);
+    await tester.pumpAndSettle();
+    expect(find.text('撤銷「a@x.com」的邀請？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
+    await tester.pumpAndSettle();
+    expect(find.text('撤銷失敗，原邀請已保留'), findsOneWidget);
+    expect(find.text('a@x.com'), findsOneWidget);
+    expect(find.text('b@x.com'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, '重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('a@x.com'), findsNothing);
+    expect(find.text('b@x.com'), findsOneWidget);
+    expect(attempts, 2);
+    verifyNever(() => repo.revokeInvite(tripId: 'okinawa', email: 'b@x.com'));
+  });
+
   testWidgets('新增成員 → 輸入 email + 點新增 → invite', (tester) async {
     when(
       () => repo.invite(
