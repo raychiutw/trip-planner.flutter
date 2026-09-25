@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -151,6 +152,20 @@ void main() {
     expect(find.byKey(const ValueKey('add-alternate')), findsOneWidget);
   });
 
+  testWidgets('單獨讀取正選 POI 名稱時可辨識正選角色', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      await _pump(tester, _MockTripRepository());
+
+      expect(
+        tester.getSemantics(find.text('首里城公園')).label,
+        '正選地點，首里城公園\n景點  ·  ★ 4.4\n世界遺產',
+      );
+    } finally {
+      semantics.dispose();
+    }
+  });
+
   testWidgets('訂位資訊有連結時可外開 reservationUrl', (tester) async {
     final opened = <Uri>[];
     await _pump(
@@ -172,6 +187,40 @@ void main() {
     await tester.pump();
 
     expect(opened.single.toString(), 'https://book.example/abc');
+  });
+
+  testWidgets('訂位連結外開失敗持續顯示易懂錯誤且可重新開啟', (tester) async {
+    final opened = <Uri>[];
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      reservationUrlLauncher: (url) async {
+        opened.add(url);
+        if (opened.length == 1) throw Exception('platform launch failed');
+      },
+    );
+
+    final link = find.byKey(const ValueKey('poi-reservation-link-502'));
+    await tester.tap(link);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.text('無法開啟訂位連結'), findsOneWidget);
+    expect(find.textContaining('platform launch failed'), findsNothing);
+    expect(find.text('玉陵'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(TextButton, '關閉'));
+    await tester.pumpAndSettle();
+    await tester.tap(link);
+    await tester.pumpAndSettle();
+
+    expect(opened, [
+      Uri.parse('https://book.example/abc'),
+      Uri.parse('https://book.example/abc'),
+    ]);
+    expect(find.text('無法開啟訂位連結'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('設為正選 → 確認後 setEntryMaster(poiId, entryPoisVersion)', (
@@ -415,6 +464,71 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
+  });
+
+  testWidgets('備選下移並重新載入後維持同一 POI 的語意節點', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      final repo = _MockTripRepository();
+      var currentEntry = _entry;
+      when(
+        () => repo.watchEntry(tripId: 't1', entryId: 11),
+      ).thenAnswer((_) => Stream.value(currentEntry));
+      when(
+        () => repo.reorderEntryAlternates(
+          tripId: 't1',
+          entryId: 11,
+          order: [503, 502],
+          entryPoisVersion: '4',
+        ),
+      ).thenAnswer((_) async {
+        currentEntry = TimelineEntry(
+          id: 11,
+          sortOrder: 0,
+          title: '首里城',
+          version: 2,
+          entryPoisVersion: '5',
+          master: _entry.master,
+          alternates: [_entry.alternates[1], _entry.alternates[0]],
+        );
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(repo),
+            tripDaysProvider('t1').overrideWith((ref) => Stream.value([])),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const EntryPoiScreen(tripId: 't1', entryId: 11),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final nameNodeId = tester.getSemantics(find.text('玉陵')).id;
+      final up = find.byKey(const ValueKey('alt-move-up-502'));
+      final upNodeId = tester.getSemantics(up).id;
+
+      await tester.tap(find.byKey(const ValueKey('alt-move-down-502')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('玉陵')).dy,
+        greaterThan(tester.getTopLeft(find.text('識名園')).dy),
+      );
+      expect(tester.getSemantics(find.text('玉陵')).label, contains('備選地點，玉陵'));
+      expect(tester.getSemantics(find.text('玉陵')).id, nameNodeId);
+      expect(tester.getSemantics(up).id, upNodeId);
+      expect(
+        tester
+            .getSemantics(up)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets('編輯資訊 → 改備註 → 儲存呼叫 updateEntryPoi', (tester) async {
