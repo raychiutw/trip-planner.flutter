@@ -187,6 +187,7 @@ class EntryPoiScreen extends ConsumerWidget {
         else
           for (final (index, alt) in entry.alternates.indexed)
             SwipeToDelete(
+              key: ValueKey(alt.poiId),
               dismissKey: ValueKey('alt-swipe-${alt.poiId}'),
               backgroundMargin: const EdgeInsets.only(bottom: TpSpacing.s2),
               onDelete: () => _confirmRemoveAlternate(context, ref, entry, alt),
@@ -532,6 +533,8 @@ class _PoiCard extends StatelessWidget {
               children: [
                 Text(
                   poi.name ?? '未命名地點',
+                  semanticsLabel:
+                      '${isMaster ? '正選地點' : '備選地點'}，${poi.name ?? '未命名地點'}',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
