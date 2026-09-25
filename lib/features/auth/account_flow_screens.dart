@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -75,6 +76,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         // Verification resend is best-effort, matching the web flow.
       }
       if (!mounted) return;
+      TextInput.finishAutofillContext();
       ref.invalidate(authStateProvider);
       if (result.joinedTrip != null) {
         context.go(
@@ -138,127 +140,136 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null) ...[
-              _InlineAuthMessage(
-                key: const ValueKey('signup-error-banner'),
-                message: _error!,
+        child: AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                _InlineAuthMessage(
+                  key: const ValueKey('signup-error-banner'),
+                  message: _error!,
+                ),
+                const SizedBox(height: TpSpacing.s4),
+              ],
+              TextFormField(
+                key: const ValueKey('signup-email-field'),
+                controller: _emailController,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                forceErrorText: _emailServerError,
+                onChanged: (_) {
+                  if (_emailServerError != null) {
+                    setState(() => _emailServerError = null);
+                  }
+                },
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? '請輸入 Email' : null,
               ),
               const SizedBox(height: TpSpacing.s4),
-            ],
-            TextFormField(
-              key: const ValueKey('signup-email-field'),
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              forceErrorText: _emailServerError,
-              onChanged: (_) {
-                if (_emailServerError != null) {
-                  setState(() => _emailServerError = null);
-                }
-              },
-              decoration: const InputDecoration(labelText: 'Email'),
-              validator: (value) =>
-                  value == null || value.trim().isEmpty ? '請輸入 Email' : null,
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('signup-display-name-field'),
-              controller: _displayNameController,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('signup-password-field'),
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.done,
-              enabled: !_submitting,
-              forceErrorText: _passwordServerError,
-              onChanged: (_) {
-                if (_passwordServerError != null) {
-                  setState(() => _passwordServerError = null);
-                }
-              },
-              onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: '密碼',
-                helperText: '至少 8 個字元',
-                suffixIcon: IconButton(
-                  key: const ValueKey('signup-password-visibility-toggle'),
-                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  icon: Icon(
-                    _obscurePassword
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
+              TextFormField(
+                key: const ValueKey('signup-display-name-field'),
+                controller: _displayNameController,
+                autofillHints: const [AutofillHints.name],
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
+              ),
+              const SizedBox(height: TpSpacing.s4),
+              TextFormField(
+                key: const ValueKey('signup-password-field'),
+                controller: _passwordController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                enabled: !_submitting,
+                forceErrorText: _passwordServerError,
+                onChanged: (_) {
+                  if (_passwordServerError != null) {
+                    setState(() => _passwordServerError = null);
+                  }
+                },
+                onFieldSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: '密碼',
+                  helperText: '至少 8 個字元',
+                  suffixIcon: IconButton(
+                    key: const ValueKey('signup-password-visibility-toggle'),
+                    tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
                   ),
                 ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return '請輸入密碼';
+                  if (value.length < 8) return '密碼至少 8 字元';
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '請輸入密碼';
-                if (value.length < 8) return '密碼至少 8 字元';
-                return null;
-              },
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            FormField<bool>(
-              key: const ValueKey('signup-privacy-consent-field'),
-              initialValue: false,
-              validator: (value) => value == true ? null : '請先閱讀並同意個資條款',
-              builder: (field) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CheckboxListTile(
-                    key: const ValueKey('signup-privacy-consent-checkbox'),
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: field.value ?? false,
-                    onChanged: _submitting
-                        ? null
-                        : (value) {
-                            field.didChange(value);
-                            setState(() {
-                              _privacyConsent = value ?? false;
-                              _privacyConsentError = null;
-                            });
-                          },
-                    title: const Text('我已閱讀並同意個資條款'),
-                  ),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton(
-                      key: const ValueKey('signup-privacy-policy-link'),
-                      onPressed: openPrivacyPolicy,
-                      child: const Text('查看個資條款'),
+              const SizedBox(height: TpSpacing.s3),
+              FormField<bool>(
+                key: const ValueKey('signup-privacy-consent-field'),
+                initialValue: false,
+                validator: (value) => value == true ? null : '請先閱讀並同意個資條款',
+                builder: (field) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      key: const ValueKey('signup-privacy-consent-checkbox'),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: field.value ?? false,
+                      onChanged: _submitting
+                          ? null
+                          : (value) {
+                              field.didChange(value);
+                              setState(() {
+                                _privacyConsent = value ?? false;
+                                _privacyConsentError = null;
+                              });
+                            },
+                      title: const Text('我已閱讀並同意個資條款'),
                     ),
-                  ),
-                  if (field.errorText != null || _privacyConsentError != null)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 12),
-                      child: Text(
-                        field.errorText ?? _privacyConsentError!,
-                        key: const ValueKey('signup-privacy-consent-error'),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        key: const ValueKey('signup-privacy-policy-link'),
+                        onPressed: openPrivacyPolicy,
+                        child: const Text('查看個資條款'),
                       ),
                     ),
-                ],
+                    if (field.errorText != null || _privacyConsentError != null)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 12),
+                        child: Text(
+                          field.errorText ?? _privacyConsentError!,
+                          key: const ValueKey('signup-privacy-consent-error'),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            TextButton(
-              onPressed: _submitting ? null : () => context.go('/login'),
-              child: const Text('已有帳號，改用登入'),
-            ),
-          ],
+              const SizedBox(height: TpSpacing.s3),
+              TextButton(
+                onPressed: _submitting ? null : () => context.go('/login'),
+                child: const Text('已有帳號，改用登入'),
+              ),
+            ],
+          ),
         ),
       ),
     );

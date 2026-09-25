@@ -85,6 +85,60 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    final groups = <AutofillGroupState?>[];
+    for (final (key, hint) in [
+      ('signup-email-field', AutofillHints.email),
+      ('signup-display-name-field', AutofillHints.name),
+      ('signup-password-field', AutofillHints.newPassword),
+    ]) {
+      final field = find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(field).autofillHints, contains(hint));
+      groups.add(AutofillGroup.maybeOf(tester.element(field)));
+    }
+    expect(groups.first, isNotNull);
+    expect(groups.every((group) => identical(group, groups.first)), isTrue);
+
+    final password = find.descendant(
+      of: find.byKey(const ValueKey('signup-password-field')),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(password).autocorrect, isFalse);
+    await tester.tap(
+      find.byKey(const ValueKey('signup-password-visibility-toggle')),
+    );
+    await tester.pump();
+    expect(tester.widget<TextField>(password).autocorrect, isFalse);
+    expect(
+      tester.widget<TextField>(password).autofillHints,
+      contains(AutofillHints.newPassword),
+    );
+  });
+
+  testWidgets('離開未完成的註冊時不儲存 AutoFill 憑證', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'unfinished-password',
+    );
+    tester.testTextInput.log.clear();
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('login-destination'), findsOneWidget);
+    final finishes = tester.testTextInput.log.where(
+      (call) => call.method == 'TextInput.finishAutofillContext',
+    );
+    expect(finishes, isNotEmpty);
+    expect(finishes.every((call) => call.arguments == false), isTrue);
+  });
+
   testWidgets('註冊會帶 invitation token 並導向驗證信等待頁', (tester) async {
     when(
       () => mockAuthRepository.signup(
@@ -121,6 +175,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -138,6 +193,14 @@ void main() {
     ).called(1);
     expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
     expect(find.text('ray@example.com'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
   });
 
   testWidgets('Auth 流程使用 inline Header、返回鍵且不顯示 Account', (tester) async {
@@ -345,10 +408,15 @@ void main() {
       find.byKey(const ValueKey('signup-password-field')),
       'password123',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-display-name-field')),
+      '旅人',
+    );
     final consent = find.byKey(
       const ValueKey('signup-privacy-consent-checkbox'),
     );
     await tester.tap(consent);
+    tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -376,6 +444,13 @@ void main() {
           .controller
           ?.text,
       'password123',
+    );
+    expect(find.text('旅人'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) => call.method == 'TextInput.finishAutofillContext',
+      ),
+      isEmpty,
     );
     final error = find.byKey(const ValueKey('signup-error-banner'));
     expect(error, findsOneWidget);
