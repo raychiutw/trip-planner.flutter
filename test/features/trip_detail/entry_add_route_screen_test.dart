@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show Tristate;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
@@ -74,6 +75,7 @@ Widget _buildScreen(
   int initialDayNum = 2,
   EntryAddMode initialMode = EntryAddMode.custom,
   String? initialRegion,
+  bool useRepositoryDays = false,
 }) {
   final router = GoRouter(
     routes: [
@@ -93,13 +95,16 @@ Widget _buildScreen(
       ),
     ],
   );
+  addTearDown(router.dispose);
   return ProviderScope(
+    retry: (retryCount, error) => null,
     overrides: [
       tripRepositoryProvider.overrideWithValue(repo),
       if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
       if (favoritesRepo != null)
         favoritesRepositoryProvider.overrideWithValue(favoritesRepo),
-      tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
+      if (!useRepositoryDays)
+        tripDaysProvider('trip-1').overrideWith((ref) => Stream.value(_days)),
     ],
     child: MaterialApp.router(theme: AppTheme.light(), routerConfig: router),
   );
@@ -119,6 +124,285 @@ void main() {
   setUpAll(
     () => registerFallbackValue(const PoiSearchResult(placeId: 'x', name: 'x')),
   );
+
+  testWidgets('Day 初載失敗顯示友善錯誤，原地重試後取得日期', (tester) async {
+    final repo = _MockTripRepository();
+    var reads = 0;
+    when(() => repo.watchDays('trip-1')).thenAnswer((_) {
+      reads++;
+      return reads == 1
+          ? Stream<List<TripDay>>.error(Exception('internal-day-error'))
+          : Stream.value(const [
+              TripDay(id: 3, dayNum: 3, date: '2026-10-03', version: 0),
+            ]);
+    });
+
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        initialMode: EntryAddMode.search,
+        useRepositoryDays: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(reads, 1);
+    expect(find.text('日期載入失敗，請檢查網路後再試'), findsOneWidget);
+    expect(find.textContaining('internal-day-error'), findsNothing);
+    expect(find.text('重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(reads, 2);
+    expect(find.text('DAY 3 · 2026-10-03'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      findsOneWidget,
+    );
+    expect(find.text('重試'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('自訂停留點草稿切換搜尋與收藏後仍保留', (tester) async {
+    final favoritesRepo = _MockFavoritesRepository();
+    when(
+      () => favoritesRepo.fetchFavorites(),
+    ).thenAnswer((_) async => _favorites);
+    await tester.pumpWidget(
+      _buildScreen(_MockTripRepository(), favoritesRepo: favoritesRepo),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '未送出的自訂停留點',
+    );
+    await tester.pump();
+    expect(find.text('未送出的自訂停留點'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('搜尋'));
+    await tester.tap(find.text('搜尋'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('收藏'));
+    await tester.pumpAndSettle();
+    expect(find.text('首里城'), findsOneWidget);
+
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+    expect(find.text('未送出的自訂停留點'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Day 更新失敗與重試保留三模式草稿及選取日期', (tester) async {
+    final repo = _MockTripRepository();
+    final poiRepo = _MockPoiRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    var reads = 0;
+    when(() => repo.watchDays('trip-1')).thenAnswer((_) {
+      reads++;
+      return reads == 1 ? source.stream : Stream.value(_days);
+    });
+    when(
+      () => favoritesRepo.fetchFavorites(),
+    ).thenAnswer((_) async => _favorites);
+    when(
+      () => poiRepo.searchPois(
+        q: any(named: 'q'),
+        limit: any(named: 'limit'),
+        region: any(named: 'region'),
+        cancelToken: any(named: 'cancelToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const [PoiSearchResult(placeId: 'p1', name: '沖繩公園')],
+    );
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        poiRepo: poiRepo,
+        favoritesRepo: favoritesRepo,
+        initialMode: EntryAddMode.search,
+        useRepositoryDays: true,
+      ),
+    );
+    source.add(_days);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-add-search-field')),
+      '沖繩',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-poi-p1')));
+    await tester.pump();
+    expect(find.text('已選 1 個'), findsOneWidget);
+    await tester.tap(find.text('收藏'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
+    await tester.pump();
+    expect(find.text('已選 1 個'), findsOneWidget);
+    await tester.tap(find.text('自訂'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-title')),
+      '保留自訂草稿',
+    );
+    await tester.pump();
+    source.addError(Exception('day-refresh-internal-error'));
+    await tester.pumpAndSettle();
+    expect(find.text('日期載入失敗，請檢查網路後再試'), findsOneWidget);
+    expect(find.text('保留自訂草稿'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('重試'));
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(reads, 2);
+    expect(find.text('保留自訂草稿'), findsOneWidget);
+    expect(find.text('DAY 2'), findsOneWidget);
+    await tester.ensureVisible(find.text('收藏'));
+    await tester.tap(find.text('收藏'));
+    await tester.pumpAndSettle();
+    expect(find.text('已選 1 個'), findsOneWidget);
+    await tester.tap(find.text('搜尋'));
+    await tester.pumpAndSettle();
+    expect(find.text('已選 1 個'), findsOneWidget);
+    expect(find.text('沖繩'), findsWidgets);
+    expect(find.text('沖繩公園'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('加入收藏仍在處理時連點只新增一次', (tester) async {
+    final repo = _MockTripRepository();
+    final favoritesRepo = _MockFavoritesRepository();
+    final pending = Completer<void>();
+    final submittedTitles = <String>[];
+    when(
+      () => favoritesRepo.fetchFavorites(),
+    ).thenAnswer((_) async => _favorites);
+    when(
+      () => repo.addEntryToDay(
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        title: any(named: 'title'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        lat: any(named: 'lat'),
+        lng: any(named: 'lng'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((invocation) {
+      submittedTitles.add(invocation.namedArguments[#title]! as String);
+      return pending.future;
+    });
+    await tester.pumpWidget(
+      _buildScreen(
+        repo,
+        favoritesRepo: favoritesRepo,
+        initialMode: EntryAddMode.favorites,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
+    await tester.pump();
+
+    final confirm = find.byKey(const ValueKey('entry-add-confirm'));
+    await tester.tap(confirm);
+    await tester.tap(confirm);
+    await tester.pump();
+    expect(submittedTitles, ['首里城']);
+    expect(find.text('trip trip-1'), findsNothing);
+
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(submittedTitles, ['首里城']);
+    expect(find.text('trip trip-1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final firstSource in ['custom', 'favorite']) {
+    testWidgets(
+      firstSource == 'custom' ? '自訂仍在處理時切換收藏不會再送出新增' : '收藏仍在處理時切換自訂不會再送出新增',
+      (tester) async {
+        final repo = _MockTripRepository();
+        final favoritesRepo = _MockFavoritesRepository();
+        final pending = Completer<void>();
+        final submittedSources = <String>[];
+        when(
+          () => favoritesRepo.fetchFavorites(),
+        ).thenAnswer((_) async => _favorites);
+        when(
+          () => repo.addEntryToDay(
+            tripId: any(named: 'tripId'),
+            dayNum: any(named: 'dayNum'),
+            title: any(named: 'title'),
+            description: any(named: 'description'),
+            note: any(named: 'note'),
+            poiType: any(named: 'poiType'),
+            lat: any(named: 'lat'),
+            lng: any(named: 'lng'),
+            startTime: any(named: 'startTime'),
+            endTime: any(named: 'endTime'),
+            source: any(named: 'source'),
+          ),
+        ).thenAnswer((invocation) {
+          submittedSources.add(invocation.namedArguments[#source]! as String);
+          return pending.future;
+        });
+        await tester.pumpWidget(
+          _buildScreen(
+            repo,
+            favoritesRepo: favoritesRepo,
+            initialMode: EntryAddMode.favorites,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('entry-add-favorite-9')));
+        await tester.tap(find.text('自訂'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('entry-edit-title')),
+          '自訂等待完成',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('entry-edit-lat')),
+          '26.21',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('entry-edit-lng')),
+          '127.68',
+        );
+        await tester.pump();
+        if (firstSource == 'favorite') {
+          await tester.ensureVisible(find.text('收藏'));
+          await tester.tap(find.text('收藏'));
+          await tester.pump();
+        }
+        await tester.tap(find.text('加入'));
+        await tester.pump();
+        expect(submittedSources, [firstSource]);
+
+        final nextMode = firstSource == 'custom' ? '收藏' : '自訂';
+        await tester.ensureVisible(find.text(nextMode));
+        await tester.tap(find.text(nextMode));
+        await tester.pump();
+        await tester.tap(find.text('加入'));
+        await tester.pump();
+        expect(submittedSources, [firstSource]);
+
+        pending.complete();
+        await tester.pumpAndSettle();
+        expect(submittedSources, [firstSource]);
+        expect(find.text('trip trip-1'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('320pt / 200% 字級仍完整顯示取消', (tester) async {
     tester.view.physicalSize = const Size(320, 568);

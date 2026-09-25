@@ -80,6 +80,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   late String _region;
   _EntryAddCategory _category = _EntryAddCategory.all;
 
+  bool get _isSubmitting =>
+      _submittingSelected || _customFormController.isSubmitting;
+
   @override
   void initState() {
     super.initState();
@@ -274,6 +277,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   }
 
   Future<void> _submitCurrent(int dayNum) async {
+    if (_isSubmitting) return;
     if (_mode == EntryAddMode.custom) {
       if (await _customFormController.submit() && mounted) {
         _customFormController.update(dirty: false);
@@ -320,10 +324,9 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
   @override
   Widget build(BuildContext context) {
     final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
-    final days = switch (daysAsync) {
-      AsyncData<List<TripDay>>(:final value) => value,
-      _ => const <TripDay>[],
-    };
+    final days = daysAsync.hasValue
+        ? daysAsync.requireValue
+        : const <TripDay>[];
     final dayNum = days.isEmpty ? null : _dayNumFor(days);
     final primaryKey = _mode == EntryAddMode.custom
         ? const ValueKey('entry-edit-submit')
@@ -334,7 +337,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       builder: (context, _) {
         final primaryEnabled =
             dayNum != null &&
-            !_submittingSelected &&
+            !_isSubmitting &&
             switch (_mode) {
               EntryAddMode.search ||
               EntryAddMode.favorites => _selectedCount > 0,
@@ -343,8 +346,7 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
         return AppUnsavedChangesGuard(
           controller: _dismissController,
           hasChanges: _dirty || _customFormController.isDirty,
-          dismissalEnabled:
-              !_submittingSelected && !_customFormController.isSubmitting,
+          dismissalEnabled: !_isSubmitting,
           child: Scaffold(
             appBar: TpAppBar(
               role: TpAppBarRole.modalForm,
@@ -361,10 +363,13 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
               loading: () => const AppListLoadingSkeleton(
                 key: ValueKey('entry-add-loading'),
               ),
+              skipError: true,
+              skipLoadingOnReload: true,
               error: (error, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(TpSpacing.s6),
-                  child: Text('載入失敗：$error', textAlign: TextAlign.center),
+                child: _DayLoadError(
+                  onRetry: () => unawaited(
+                    ref.read(tripDaysRetryProvider(widget.tripId)).retry(),
+                  ),
                 ),
               ),
               data: (days) {
@@ -402,6 +407,18 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (daysAsync.hasError)
+                              _DayLoadError(
+                                onRetry: () => unawaited(
+                                  ref
+                                      .read(
+                                        tripDaysRetryProvider(widget.tripId),
+                                      )
+                                      .retry(),
+                                ),
+                              ),
+                            if (daysAsync.isLoading)
+                              const LinearProgressIndicator(),
                             _DayPicker(
                               days: days,
                               selectedDayNum: dayNum,
@@ -486,13 +503,17 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                                     : '還沒有收藏的地點',
                                 onRetry: () => _loadFavorites(force: true),
                                 onToggle: _toggleFavoriteSelection,
-                              )
-                            else
-                              EntryEditSheet(
+                              ),
+                            Visibility(
+                              key: const ValueKey('entry-add-custom-form'),
+                              visible: _mode == EntryAddMode.custom,
+                              maintainState: true,
+                              child: EntryEditSheet(
                                 tripId: widget.tripId,
                                 args: EntryEditNew(dayNum),
                                 formController: _customFormController,
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -506,6 +527,28 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
       },
     );
   }
+}
+
+class _DayLoadError extends StatelessWidget {
+  const _DayLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(TpSpacing.s6),
+    child: Semantics(
+      liveRegion: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('日期載入失敗，請檢查網路後再試', textAlign: TextAlign.center),
+          const SizedBox(height: TpSpacing.s4),
+          TextButton(onPressed: onRetry, child: const Text('重試')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _FavoritePoiPanel extends StatelessWidget {
