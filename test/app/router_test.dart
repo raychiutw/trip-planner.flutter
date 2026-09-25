@@ -19,7 +19,6 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
 import 'package:tripline/features/auth/login_screen.dart';
-import 'package:tripline/features/auth/oauth_consent_screen.dart';
 import 'package:tripline/features/auth/welcome_screen.dart';
 import 'package:tripline/features/favorites/favorites_providers.dart';
 import 'package:tripline/features/account/account_sessions_screen.dart';
@@ -817,7 +816,7 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('未登入可進入 OAuth consent shell route', (tester) async {
+  testWidgets('OAuth 同意連結只提示回原瀏覽器，不顯示授權參數', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
 
@@ -835,33 +834,16 @@ void main() {
           '/oauth/consent?client_id=tp_alpha'
           '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
           '&scope=openid%20email'
-          '&state=abc123'
+          '&state=secret-state'
           '&response_type=code',
         );
     await tester.pumpAndSettle();
 
-    expect(find.byType(OAuthConsentScreen), findsOneWidget);
+    expect(find.text('請返回原本的瀏覽器，從該處重新完成授權。'), findsOneWidget);
+    expect(find.text('返回行程列表'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
-
-    final first = tester.widget<OAuthConsentScreen>(
-      find.byType(OAuthConsentScreen),
-    );
-    container
-        .read(appRouterProvider)
-        .go(
-          '/oauth/consent?client_id=tp_beta'
-          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
-          '&scope=openid'
-          '&state=next'
-          '&response_type=code',
-        );
-    await tester.pumpAndSettle();
-
-    final second = tester.widget<OAuthConsentScreen>(
-      find.byType(OAuthConsentScreen),
-    );
-    expect(second.request.clientId, 'tp_beta');
-    expect(second.key, isNot(first.key));
+    expect(find.textContaining('secret-state'), findsNothing);
+    expect(find.textContaining('app.example.com'), findsNothing);
   });
 
   testWidgets('已登入可進入 /trips/:tripId/print', (tester) async {

@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import '../api/providers.dart';
 import '../features/auth/account_flow_screens.dart';
 import '../features/auth/login_screen.dart';
-import '../features/auth/oauth_consent_screen.dart';
 import '../features/auth/welcome_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/add_to_trip/add_to_trip_screen.dart';
@@ -35,7 +34,6 @@ import '../features/trips/health/trip_health_screen.dart';
 import '../features/trips/share/share_screen.dart';
 import '../features/trips/trips_list_screen.dart';
 import '../models/add_to_trip.dart';
-import '../models/oauth.dart';
 
 final tripMapCanvasBuilderProvider = Provider<TripMapCanvasBuilder?>((ref) {
   return null;
@@ -313,10 +311,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/oauth/consent',
-        builder: (context, state) => OAuthConsentScreen(
-          key: ValueKey(state.uri.toString()),
-          request: OAuthConsentRequest.fromUri(state.uri),
-        ),
+        builder: (context, state) =>
+            const InvalidLinkScreen(message: '請返回原本的瀏覽器，從該處重新完成授權。'),
       ),
       GoRoute(
         path: '/invite',

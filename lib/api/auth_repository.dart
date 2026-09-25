@@ -4,7 +4,6 @@ library;
 import 'package:dio/dio.dart';
 
 import '../models/user.dart';
-import '../models/oauth.dart';
 import '../models/public_config.dart';
 import 'api_client.dart';
 import 'api_error.dart';
@@ -256,19 +255,6 @@ class AuthRepository {
     }
   }
 
-  /// GET /oauth/client-info；只回傳後端驗證過的應用程式名稱。
-  Future<String?> fetchOAuthClientName(String clientId) async {
-    final body = await _client.get(
-      '/oauth/client-info',
-      query: {'client_id': clientId.trim()},
-      writeCache: false,
-      fallbackToCache: false,
-    );
-    if (body is! Map) return null;
-    final name = body['app_name']?.toString().trim();
-    return name == null || name.isEmpty ? null : name;
-  }
-
   /// GET /account/ai-authorization。
   Future<bool> fetchAiAuthorization() async {
     final body = await _client.get(
@@ -283,21 +269,6 @@ class AuthRepository {
   Future<bool> authorizeAi() async {
     final body = await _client.post('/account/ai-authorization');
     return body is Map && body['authorized'] == true;
-  }
-
-  /// POST /oauth/consent；後端以 302 Location 表示後續 authorize/deny 目的地。
-  Future<OAuthConsentResult> submitOAuthConsent(
-    OAuthConsentRequest request, {
-    required String decision,
-  }) async {
-    final response = await _client.postForRedirect(
-      '/oauth/consent',
-      body: request.toBody(decision),
-    );
-    return OAuthConsentResult(
-      statusCode: response.statusCode,
-      redirectLocation: response.location,
-    );
   }
 
   String? _sessionTokenFrom(Headers headers) {

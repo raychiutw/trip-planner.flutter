@@ -61,3 +61,9 @@ curl --silent --show-error --max-time 12 --dump-header - 'https://uat.trip-plann
 - `gh pr view 1351 --repo raychiutw/trip-planner --json state,mergedAt,mergeCommit,headRefOid,baseRefName,url` 顯示 PR 已於 2026-09-25 18:15:07 UTC **合併至 `uat`**，merge commit `7c59a998c7306fed7ea2155435bd966032040459`。上方「open」是較早快照，不代表目前狀態；合併 UAT 也不等於正式環境部署。
 - 重新執行上方 UAT `client-info` GET 得 `HTTP/2 200`、`Content-Type: application/json`，`app_name` 為 **Tripline Mobile UAT**（回應日期 2026-09-25 18:22:05 UTC）。上方 `404` 是 18:06:43 UTC 的歷史結果；這次讀取證明 UAT 公開 client-info 在新時間點可用，不證明 authorize／consent／token 完整流程或裝置 callback 已驗收。
 - 主代理已直接在 Play Console 的 app-signing 憑證核對 SHA-256 指紋為 `28:06:F8:E5:6F:D8:D5:1A:30:50:F5:40:0D:83:36:A5:11:78:FF:41:9A:9C:B2:1C:27:88:DC:21:E5:4B:39:B5`，與後端 `assetlinks.json` 相同，且不同於 upload 憑證。本分支沒有登入 Play Console 重查；這項證據由主代理直接查核提供。仍需裝置 OS association 與 Flutter URI handler 驗證，亦不能據此宣稱正式 OAuth 已上線。
+
+### #341：同意流程由瀏覽器持有
+
+後端 `POST /api/oauth/consent` 以 `getSessionUser` 讀取瀏覽器 cookie；`allow` 首次回應是導回同一 issuer 的 `/api/oauth/authorize`，由它再核發 code 並導向已註冊的第三方 callback；`deny` 只在驗證 exact redirect allowlist 後導向該 callback，帶 `error=access_denied` 與原 `state`。React `ConsentPage` 使用同一瀏覽器 session 的 HTML form 提交，讓瀏覽器完成後續 302。這兩條路徑的完成狀態屬於瀏覽器與原第三方 client，不是 Flutter 畫面的單次 POST 回應。
+
+Flutter `/oauth/consent` 沒有 app 內呼叫端，也沒有能保留原瀏覽器 session 的入口或接收任意第三方 callback 的 handler。#341 因此移除無法完成交易的原生同意畫面與 POST，保留該路由作安全退路：若連結被 OS 交給 Flutter，只提示返回原瀏覽器重試或返回行程列表，不顯示 query／`Location`，也不開啟使用者提供的 URI。Flutter 退路不宣稱同意或拒絕完成；兩者仍在原瀏覽器流程完成。

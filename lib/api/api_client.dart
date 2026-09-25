@@ -35,14 +35,6 @@ const Map<String, int> kCacheCapacityByPathPrefix = {
   '/route': 100,
 };
 
-/// Redirect-style API response where callers need the `Location` header.
-class ApiRedirectResponse {
-  const ApiRedirectResponse({required this.statusCode, required this.location});
-
-  final int statusCode;
-  final String? location;
-}
-
 /// 提供 Bearer access token 與 refresh 能力(OAuth 模式)。
 /// 注入 ApiClient 後,有 token 即走 Bearer(不送 Cookie/Origin);null/無 token → cookie 模式。
 abstract class BearerTokenSource {
@@ -107,18 +99,13 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, dynamic>? query,
-    bool followRedirects = true,
   }) async {
     final auth = await _authHeadersFor('POST');
     return _dio.request<dynamic>(
       path,
       queryParameters: query,
       data: body,
-      options: Options(
-        method: 'POST',
-        headers: auth.headers,
-        followRedirects: followRedirects,
-      ),
+      options: Options(method: 'POST', headers: auth.headers),
     );
   }
 
@@ -160,31 +147,6 @@ class ApiClient {
     Object? body,
     Map<String, dynamic>? query,
   }) => _send('DELETE', path, body: body, query: query);
-
-  /// POST that preserves 3xx redirect response instead of following it.
-  Future<ApiRedirectResponse> postForRedirect(
-    String path, {
-    Object? body,
-    Map<String, dynamic>? query,
-  }) async {
-    final response = await postForResponse(
-      path,
-      body: body,
-      query: query,
-      followRedirects: false,
-    );
-    final statusCode = response.statusCode ?? 0;
-    if (_isEdgeBlockPage(response)) {
-      throw _upstreamUnavailable(statusCode);
-    }
-    if (statusCode < 200 || statusCode >= 400) {
-      throw ApiError.fromResponse(statusCode, response.data);
-    }
-    return ApiRedirectResponse(
-      statusCode: statusCode,
-      location: response.headers.value('location'),
-    );
-  }
 
   /// SWR 讀取:先 emit 本機快取(stale),再抓網路;fresh 到達後套用尚未 flush 的
   /// 樂觀 patch(維持「快取 = server 真相 + pending patch」不變式)再 emit。

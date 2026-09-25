@@ -5,7 +5,6 @@ import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/session_store.dart';
-import 'package:tripline/models/oauth.dart';
 
 void main() {
   late Dio dio;
@@ -501,20 +500,7 @@ void main() {
     });
   });
 
-  group('OAuth client branding and AI authorization', () {
-    test('fetchOAuthClientName 使用 client_id query 並回 app_name', () async {
-      dioAdapter.onGet(
-        '/oauth/client-info',
-        (server) => server.reply(200, {'app_name': 'Tokyo Planner'}),
-        queryParameters: {'client_id': 'tp_alpha'},
-      );
-
-      expect(
-        await authRepository.fetchOAuthClientName(' tp_alpha '),
-        'Tokyo Planner',
-      );
-    });
-
+  group('AI authorization', () {
     test('AI authorization GET/POST 回 authorized 狀態', () async {
       dioAdapter.onGet(
         '/account/ai-authorization',
@@ -527,51 +513,6 @@ void main() {
 
       expect(await authRepository.fetchAiAuthorization(), isFalse);
       expect(await authRepository.authorizeAi(), isTrue);
-    });
-  });
-
-  group('oauth consent', () {
-    test('submitOAuthConsent 打 POST /oauth/consent 並保留 302 Location', () async {
-      final request = OAuthConsentRequest.fromUri(
-        Uri.parse(
-          'https://trip.example/oauth/consent?client_id=tp_alpha'
-          '&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback'
-          '&scope=openid%20email'
-          '&state=abc123'
-          '&response_type=code',
-        ),
-      );
-      dioAdapter.onPost(
-        '/oauth/consent',
-        (server) => server.reply(
-          302,
-          '',
-          headers: {
-            'location': [
-              '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
-            ],
-          },
-        ),
-        data: {
-          'client_id': 'tp_alpha',
-          'redirect_uri': 'https://app.example.com/callback',
-          'scope': 'openid email',
-          'state': 'abc123',
-          'response_type': 'code',
-          'decision': 'allow',
-        },
-      );
-
-      final result = await authRepository.submitOAuthConsent(
-        request,
-        decision: 'allow',
-      );
-
-      expect(result.statusCode, 302);
-      expect(
-        result.redirectLocation,
-        '/api/oauth/authorize?client_id=tp_alpha&state=abc123',
-      );
     });
   });
 
