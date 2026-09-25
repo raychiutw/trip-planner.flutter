@@ -441,10 +441,7 @@ Future<({GlobalKey boundary, Rect date, Rect account})> _pumpControls(
                       Positioned(
                         right: 12,
                         top: 12,
-                        child: TpBarForeground(
-                          onMedia: onMedia,
-                          child: const TpAccountAvatarButton(),
-                        ),
+                        child: const TpAccountAvatarButton(),
                       ),
                     ],
                   ),

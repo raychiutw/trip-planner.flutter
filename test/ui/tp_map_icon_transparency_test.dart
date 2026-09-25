@@ -20,6 +20,69 @@ import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_glass_surface.dart';
 
 void main() {
+  testWidgets('非媒體上的帳號與定位使用中性前景，明暗主題皆可讀', (tester) async {
+    for (final brightness in Brightness.values) {
+      final scheme =
+          (brightness == Brightness.dark ? AppTheme.dark() : AppTheme.light())
+              .colorScheme;
+      final raster = await _pump(
+        tester,
+        brightness,
+        scheme.surface,
+        onMedia: false,
+      );
+      for (final icon in [
+        CupertinoIcons.person_crop_circle,
+        Icons.my_location,
+      ]) {
+        final finder = find.byIcon(icon);
+        final text = tester.renderObject<RenderParagraph>(
+          find.descendant(of: finder, matching: find.byType(RichText)),
+        );
+        expect(text.text.style!.color, scheme.onSurface);
+        expect(
+          raster.contrast(tester.getRect(finder)),
+          greaterThanOrEqualTo(3),
+        );
+      }
+    }
+  });
+  testWidgets('帳號與定位的鍵盤及讀屏啟用各派發一次', (tester) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      for (final onMedia in [false, true]) {
+        var accounts = 0;
+        var locations = 0;
+        await _pump(
+          tester,
+          Brightness.light,
+          Colors.white,
+          onMedia: onMedia,
+          onAccount: () => accounts++,
+          onLocate: () => locations++,
+        );
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(accounts, 1);
+        expect(locations, 0);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        await tester.pumpAndSettle();
+        expect(accounts, 1);
+        expect(locations, 1);
+        for (final label in ['帳號', '定位目前位置']) {
+          final node = tester.getSemantics(find.bySemanticsLabel(label));
+          node.owner!.performAction(node.id, ui.SemanticsAction.tap);
+          await tester.pumpAndSettle();
+        }
+        expect(accounts, 2);
+        expect(locations, 2);
+      }
+    } finally {
+      semantics.dispose();
+    }
+  });
   for (final control in [
     (name: '帳號', icon: CupertinoIcons.person_crop_circle),
     (name: '定位', icon: Icons.my_location),
@@ -192,6 +255,7 @@ Future<_Raster> _pump(
   Brightness brightness,
   Color background, {
   bool fullScreen = false,
+  bool onMedia = true,
   bool highContrast = false,
   bool reduceTransparency = false,
   bool locating = false,
@@ -254,7 +318,7 @@ Future<_Raster> _pump(
     child: AppAccessibilityScope(
       reduceTransparency: reduceTransparency,
       child: TpMediaBackdropScope(
-        onMedia: true,
+        onMedia: onMedia,
         child: TpAccountActionScope(
           onOpen: (_) {},
           child: RepaintBoundary(key: boundary, child: content),

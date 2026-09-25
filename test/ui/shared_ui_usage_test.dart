@@ -95,34 +95,30 @@ void main() {
   });
 
   test('compact navigation glass has one settings source', () {
-    final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
-    const consumers = [
-      'lib/features/shell/apple_root_tab_bar.dart',
+    // 導覽角色由共用 module 成套提供材質、前景與無障礙降級；
+    // 呼叫端只保留內容及操作。公開 widget／畫面測試另驗實際呈現。
+    for (final path in [
+      'lib/ui/tp_app_bar.dart',
       'lib/ui/tp_root_scaffold.dart',
-    ];
-
-    expect(appBar, contains('tpNavigationGlassSettings('));
-    expect(appBar, isNot(contains('tpToolbarGlassSettings')));
-    for (final path in consumers) {
+      'lib/features/shell/apple_root_tab_bar.dart',
+      'lib/ui/tp_horizontal_selector.dart',
+    ]) {
       final source = File(path).readAsStringSync();
-      expect(source, contains('tpNavigationGlassSettings('));
+      expect(source, isNot(contains('tpNavigationGlassSettings(')));
+      expect(source, isNot(contains('tpBarForeground(')));
+      expect(source, isNot(contains('tpMediaControlBackground(')));
+      expect(source, isNot(contains('tpGlassQuality(')));
       expect(source, isNot(contains('LiquidGlassSettings(')));
     }
-
-    // 日期選擇器的軌也是導覽玻璃的消費者（#169 改回玻璃）。先前排除它的理由
-    // 「玻璃在純色頁面上等於無色」是模擬器的假象。一樣不得自行組裝 settings。
-    final selector = File(
-      'lib/ui/tp_horizontal_selector.dart',
-    ).readAsStringSync();
-    expect(selector, contains('tpNavigationGlassSettings('));
-    expect(selector, isNot(contains('LiquidGlassSettings(')));
   });
 
   test('root and routed headers share title and action geometry owners', () {
     final appBar = File('lib/ui/tp_app_bar.dart').readAsStringSync();
     final rootHeader = File('lib/ui/tp_root_scaffold.dart').readAsStringSync();
+    final glass = File('lib/ui/tp_glass_surface.dart').readAsStringSync();
 
-    expect(appBar, contains('class TpHeaderTitle'));
+    expect(glass, contains('class TpHeaderTitle'));
+    expect(appBar, contains('TpHeaderTitle('));
     expect(appBar, contains('class TpHeaderActionRow'));
     expect(rootHeader, contains('TpHeaderTitle('));
     expect(rootHeader, contains('TpHeaderActionRow('));

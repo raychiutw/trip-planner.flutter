@@ -240,6 +240,9 @@ class AppFlowFixture {
 
     when(trips.watchMyTrips).thenAnswer((_) => Stream.value(releaseSmokeTrips));
     when(
+      () => trips.fetchNotesAiState(any()),
+    ).thenAnswer((_) async => const TripNoteAiState());
+    when(
       () => trips.watchTrip('okinawa'),
     ).thenAnswer((_) => Stream.value(releaseSmokeTrip));
     when(
@@ -1032,6 +1035,35 @@ Future<void> runAppOwnedVisualEvidenceFlow(
     await _closeAccountSheet(tester);
   }
 
+  /// 從媒體回到文字內容，開筆記與帳號後再回地圖；Day 與 branch 狀態不能遺失。
+  Future<void> notesAndAccountScenes(String appearance) async {
+    await tester.tapAt(tester.getCenter(_rootTab('行程')));
+    await tester.pumpAndSettle();
+    if (find.byType(TripsListScreen).evaluate().isNotEmpty) {
+      await tester.tap(find.text('沖繩家族之旅').first);
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.byKey(const ValueKey('day-pill-2')));
+    await tester.tap(find.byKey(const ValueKey('day-pill-2')));
+    await tester.pumpAndSettle();
+    _expectSelectedDaySemantics('第 2 天，共 2 天');
+    await tester.tap(find.byKey(const ValueKey('trip-actions-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-action-notes')));
+    await tester.pumpAndSettle();
+    expect(find.text('行程筆記'), findsOneWidget);
+    await scene('$appearance/notes-after-map');
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    _expectSelectedDaySemantics('第 2 天，共 2 天');
+    expect(find.text('首里城'), findsOneWidget);
+    await accountSheetScene('$appearance/account-after-notes');
+    _expectSelectedDaySemantics('第 2 天，共 2 天');
+    await _openMapTab(tester, mapEvidence);
+    _expectSelectedDaySemantics('第 2 天，共 2 天');
+    await scene('$appearance/map-after-notes');
+  }
+
   // 淺色情境不依賴 Test Lab 裝置的系統外觀：啟動就明確選 App 淺色，深色稍後走帳號 UI。
   final fixture = AppFlowFixture.loggedOut(
     mapCanvasBuilder: mapEvidence.build,
@@ -1149,6 +1181,8 @@ Future<void> runAppOwnedVisualEvidenceFlow(
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('trip-picker-sheet')), findsNothing);
 
+  await notesAndAccountScenes('light');
+
   // 聊天 composer：沒有「＋」入口，空白時麥克風、有字時送出；草稿跨帳號開關保留。
   await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
@@ -1217,6 +1251,7 @@ Future<void> runAppOwnedVisualEvidenceFlow(
   await accountSheetScene('dark/account-sheet');
   await _openMapTab(tester, mapEvidence);
   await scene('dark/map');
+  await notesAndAccountScenes('dark');
   await tester.tapAt(tester.getCenter(_rootTab('聊天')));
   await tester.pumpAndSettle();
   expect(find.byKey(const ValueKey('chat-composer-glass')), findsOneWidget);
