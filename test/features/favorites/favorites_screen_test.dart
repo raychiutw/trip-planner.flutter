@@ -1321,32 +1321,122 @@ void main() {
 
     testWidgets('分頁清單篩選後以讀屏即時宣告結果數', (tester) async {
       final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            favoritesProvider.overrideWith(
-              (ref) => Stream.value(_manyFavorites()),
-            ),
-          ],
-          child: buildApp(),
-        ),
-      );
-      await tester.pump();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
 
-      expect(find.text('200 個地點'), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const ValueKey('favorites-search-input')),
-        '收藏地點 200',
-      );
-      await tester.pump();
+        expect(find.text('200 個地點'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '收藏地點 200',
+        );
+        await tester.pump();
 
-      final resultCount = find.text('1 個地點');
-      expect(resultCount, findsOneWidget);
-      expect(
-        tester.getSemantics(resultCount).flagsCollection.isLiveRegion,
-        isTrue,
-      );
+        final resultCount = find.text('1 個地點');
+        expect(resultCount, findsOneWidget);
+        expect(
+          tester.getSemantics(resultCount).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '',
+        );
+        await tester.pump();
+        expect(find.text('200 個地點'), findsOneWidget);
+        expect(
+          tester
+              .getSemantics(
+                find.byKey(const ValueKey('favorites-result-summary')),
+              )
+              .label,
+          contains('200 個地點'),
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('換頁時由分頁控制宣告目前頁碼與範圍', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
+
+        final pagination = find.byKey(const ValueKey('favorites-pagination'));
+        final scrollView = find.byType(CustomScrollView);
+        for (var i = 0; i < 8 && pagination.evaluate().isEmpty; i++) {
+          await tester.drag(scrollView, const Offset(0, -500));
+          await tester.pump();
+        }
+        final summary = find.byKey(const ValueKey('favorites-page-summary'));
+        expect(tester.getSemantics(summary).label, contains('第 1 / 9 頁'));
+        await tester.tap(find.byKey(const ValueKey('favorites-page-next')));
+        await tester.pump();
+
+        expect(tester.getSemantics(summary).label, contains('第 2 / 9 頁'));
+        expect(tester.getSemantics(summary).label, contains('顯示第 25 至 48 個'));
+        expect(tester.getSemantics(summary).label, isNot(contains('個地點')));
+        expect(
+          tester.getSemantics(summary).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('篩選零筆時宣告結果數並保留清除操作', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              favoritesProvider.overrideWith(
+                (ref) => Stream.value(_manyFavorites()),
+              ),
+            ],
+            child: buildApp(),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(
+          find.byKey(const ValueKey('favorites-search-input')),
+          '不存在的收藏',
+        );
+        await tester.pump();
+
+        final summary = find.byKey(const ValueKey('favorites-result-summary'));
+        expect(tester.getSemantics(summary).label, contains('0 個地點'));
+        expect(
+          tester.getSemantics(summary).flagsCollection.isLiveRegion,
+          isTrue,
+        );
+        expect(
+          find.byKey(const ValueKey('favorites-search-no-match-clear')),
+          findsOneWidget,
+        );
+      } finally {
+        semantics.dispose();
+      }
     });
 
     testWidgets('收藏達 200 筆時分頁，每頁 24 筆且篩選重置頁碼', (tester) async {

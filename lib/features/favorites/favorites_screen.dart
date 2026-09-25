@@ -883,17 +883,24 @@ class _FavoritesSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s1),
-      child: Row(
-        children: [
-          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
-          const SizedBox(width: TpSpacing.s3),
-          Text(
-            '$count 個地點',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Semantics(
+        key: const ValueKey('favorites-result-summary'),
+        container: true,
+        liveRegion: true,
+        label: '$title，$count 個地點',
+        excludeSemantics: true,
+        child: Row(
+          children: [
+            Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+            const SizedBox(width: TpSpacing.s3),
+            Text(
+              '$count 個地點',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -995,12 +1002,19 @@ class _PaginationControls extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
           ),
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$start-$end / $total'),
-                Text('第 $page / $totalPages 頁'),
-              ],
+            child: Semantics(
+              key: const ValueKey('favorites-page-summary'),
+              container: true,
+              liveRegion: true,
+              label: '第 $page / $totalPages 頁，顯示第 $start 至 $end 個',
+              excludeSemantics: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$start-$end / $total'),
+                  Text('第 $page / $totalPages 頁'),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -1029,7 +1043,14 @@ class _NoSearchResult extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('目前的篩選沒有符合的收藏', style: theme.textTheme.titleMedium),
+            Semantics(
+              key: const ValueKey('favorites-result-summary'),
+              container: true,
+              liveRegion: true,
+              label: '搜尋結果，0 個地點，目前的篩選沒有符合的收藏',
+              excludeSemantics: true,
+              child: Text('目前的篩選沒有符合的收藏', style: theme.textTheme.titleMedium),
+            ),
             const SizedBox(height: TpSpacing.s3),
             TextButton(
               key: const ValueKey('favorites-search-no-match-clear'),
