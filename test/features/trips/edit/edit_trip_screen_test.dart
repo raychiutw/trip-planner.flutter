@@ -389,6 +389,68 @@ void main() {
     expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
   });
 
+  testWidgets('描述語言發布送出精確差異，後續清空描述仍可儲存', (tester) async {
+    final pending = Completer<void>();
+    when(
+      () => tripRepo.updateTrip(
+        'okinawa',
+        description: '新描述',
+        lang: 'en',
+        published: 0,
+      ),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildSheetApp());
+    await tester.tap(find.text('開啟編輯'));
+    await tester.pumpAndSettle();
+    final description = find.byKey(const ValueKey('edit-desc'));
+    await tester.scrollUntilVisible(
+      description,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(description, '新描述');
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-lang')),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-lang')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English').last);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit-published')),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-published')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pump();
+    verify(
+      () => tripRepo.updateTrip(
+        'okinawa',
+        description: '新描述',
+        lang: 'en',
+        published: 0,
+      ),
+    ).called(1);
+    await tester.scrollUntilVisible(
+      description,
+      -150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(description, '');
+    await tester.pump();
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(EditTripScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-save')));
+    await tester.pumpAndSettle();
+    verify(() => tripRepo.updateTrip('okinawa', description: '')).called(1);
+    expect(find.byType(EditTripScreen), findsNothing);
+  });
+
   testWidgets('移除目的地 + 儲存 → updateTrip(destinations)', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -398,16 +460,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('edit-save')));
     await tester.pumpAndSettle();
 
-    verify(
-      () => tripRepo.updateTrip(
-        'okinawa',
-        title: any(named: 'title'),
-        description: any(named: 'description'),
-        lang: any(named: 'lang'),
-        published: any(named: 'published'),
-        destinations: any(named: 'destinations'),
-      ),
-    ).called(1);
+    verify(() => tripRepo.updateTrip('okinawa', destinations: [])).called(1);
   });
 
   testWidgets('平移出發日期 → shiftDays 並更新日期摘要', (tester) async {

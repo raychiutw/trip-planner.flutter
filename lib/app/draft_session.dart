@@ -56,6 +56,8 @@ class DraftSession<D, R> extends ChangeNotifier {
   bool get submitting => _submitting;
   bool get canSubmit => !_disposed && !_submitting && dirty;
   String? get error => _error;
+
+  /// 最近的儲存憑證仍對應目前乾淨草稿，且當下允許離頁。
   bool get isSaved => _lastSaved != null && canFinish(_lastSaved!);
 
   /// 更新目前輸入，不改變已儲存的 baseline。

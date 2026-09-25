@@ -132,6 +132,30 @@ void main() {
     verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
   });
 
+  testWidgets('名稱只差空白不需儲存，送出時去除首尾空白', (tester) async {
+    when(() => tripRepo.updateProfile(displayName: '新名字')).thenAnswer(
+      (_) async =>
+          const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'),
+    );
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    final field = find.byKey(const ValueKey('profile-display-name'));
+    final save = find.byKey(const ValueKey('profile-save'));
+    await tester.enterText(field, '  舊名字  ');
+    await tester.pump();
+    expect(tester.widget<TpToolbarTextButton>(save).onPressed, isNull);
+    verifyNever(
+      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+    );
+    await tester.enterText(field, '  新名字  ');
+    await tester.pump();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
+    expect(find.byType(ProfileEditScreen), findsNothing);
+    expect(find.text('帳號首頁'), findsOneWidget);
+  });
+
   testWidgets('送出 A 後繼續輸入 B，成功只確認 A 並保留 B 的離頁保護', (tester) async {
     final pending = Completer<UserInfo>();
     when(

@@ -127,10 +127,20 @@ class CreateTripController extends Notifier<CreateTripState> {
       true;
 
   bool get hasChanges => _session.dirty;
+
+  /// 目前是否正在送出新增行程請求。
   bool get submitting => _session.submitting;
+
+  /// 最近新增成功的憑證是否仍對應目前草稿。
   bool get isSaved => _session.isSaved;
+
+  /// 送出中或新增成功尚未離頁時，都暫停編輯以避免重複新增。
   bool get editingEnabled => !submitting && !isSaved;
+
+  /// 最近一次新增失敗的說明，由草稿 session 管理。
   String? get error => _session.error;
+
+  /// 草稿符合新增條件，且 session 目前允許送出。
   bool get canSubmit => state.canSubmit && _session.canSubmit;
 
   void _edit(CreateTripState next) {
