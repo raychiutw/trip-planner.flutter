@@ -200,6 +200,44 @@ void main() {
     await searchWithRegion('全部地區');
   });
 
+  testWidgets('自訂地區的鍵盤 Done 與下拉關閉遵守提交及捨棄 guard', (tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部地區 ▾'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂地區…'));
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const ValueKey('explore-custom-region-field'));
+    await tester.enterText(field, '  大阪  ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('大阪 ▾'), findsOneWidget);
+    expect(find.text('自訂地區'), findsNothing);
+
+    await tester.tap(find.text('大阪 ▾'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自訂地區…'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field, '京都');
+
+    final sheet = find.byType(GlassModalSheetScaffold);
+    final rect = tester.getRect(sheet);
+    await tester.timedDragFrom(
+      Offset(rect.center.dx, rect.top + 10),
+      const Offset(0, 650),
+      const Duration(milliseconds: 800),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    expect(find.text('大阪 ▾'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '取消'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, '京都');
+    expect(find.text('自訂地區'), findsOneWidget);
+  });
+
   testWidgets('進頁 auto-search seed → 顯示結果卡', (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();

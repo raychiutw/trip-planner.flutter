@@ -405,7 +405,7 @@ class _CustomRegionFormState extends State<_CustomRegionForm> {
         widget.onChanged(value);
         widget.formController.update(dirty: true);
       },
-      onSubmitted: (_) => widget.formController.submit(),
+      onSubmitted: (_) => widget.formController.requestSubmit(),
     ),
   );
 }

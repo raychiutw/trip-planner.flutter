@@ -388,6 +388,7 @@ Future<T?> showAppActionSheet<T>(
 
 class AppSheetFormController extends ChangeNotifier {
   Future<bool> Function()? _submit;
+  Future<void> Function()? _requestSubmit;
   bool _dirty = false;
   bool _canSubmit = false;
   bool _submitting = false;
@@ -418,6 +419,10 @@ class AppSheetFormController extends ChangeNotifier {
       update(submitting: false);
     }
   }
+
+  /// 讓鍵盤提交與 toolbar 按鈕走同一條完成流程。
+  Future<void> requestSubmit() =>
+      _requestSubmit?.call() ?? Future<void>.value();
 }
 
 /// Connects a routed form's explicit Cancel action to the shared dirty guard.
@@ -972,42 +977,45 @@ Future<bool?> showAppFormSheet(
         isDestructive: true,
       );
     },
-    builder: (sheetContext, close) => Material(
-      color: Colors.transparent,
-      child: AnimatedBuilder(
-        animation: controller,
-        builder: (_, child) => Column(
-          children: [
-            TpSheetHeader(
-              title: title,
-              titleKey: titleKey,
-              leading: TpToolbarTextButton(
-                key: cancelKey,
-                label: '取消',
-                onPressed: controller.isSubmitting
-                    ? null
-                    : () => unawaited(close()),
+    builder: (sheetContext, close) {
+      controller._requestSubmit = () async {
+        if (await controller.submit()) {
+          controller.update(dirty: false);
+          await close(true);
+        }
+      };
+      return Material(
+        color: Colors.transparent,
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (_, child) => Column(
+            children: [
+              TpSheetHeader(
+                title: title,
+                titleKey: titleKey,
+                leading: TpToolbarTextButton(
+                  key: cancelKey,
+                  label: '取消',
+                  onPressed: controller.isSubmitting
+                      ? null
+                      : () => unawaited(close()),
+                ),
+                trailing: TpToolbarTextButton(
+                  key: submitKey,
+                  label: submitLabel,
+                  onPressed: controller.canSubmit
+                      ? controller.requestSubmit
+                      : null,
+                ),
               ),
-              trailing: TpToolbarTextButton(
-                key: submitKey,
-                label: submitLabel,
-                onPressed: controller.canSubmit
-                    ? () async {
-                        if (await controller.submit()) {
-                          controller.update(dirty: false);
-                          await close(true);
-                        }
-                      }
-                    : null,
-              ),
-            ),
-            Expanded(child: child!),
-          ],
+              Expanded(child: child!),
+            ],
+          ),
+          child: builder(sheetContext),
         ),
-        child: builder(sheetContext),
-      ),
-    ),
-  );
+      );
+    },
+  ).whenComplete(() => controller._requestSubmit = null);
 }
 
 class _AppContentSheet<T> extends StatelessWidget {
