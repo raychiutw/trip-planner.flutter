@@ -580,6 +580,12 @@ void main() {
           .isLiveRegion,
       isTrue,
     );
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('public-share-load-error')))
+          .label,
+      contains('暫時無法載入行程'),
+    );
   });
 
   testWidgets('錯誤文字包含 404 不會冒充失效連結', (tester) async {
@@ -604,7 +610,7 @@ void main() {
     verify(() => repository.fetchPublicTripShare('s1')).called(1);
   });
 
-  testWidgets('原地重試處理中不重送且保留同一分享連結', (tester) async {
+  testWidgets('原地重試顯示載入狀態且保留同一分享連結', (tester) async {
     final pending = Completer<PublicTripShare>();
     var requests = 0;
     when(() => repository.fetchPublicTripShare('s1')).thenAnswer((_) {
@@ -616,11 +622,13 @@ void main() {
 
     await tester.tapAt(retryPosition);
     await tester.pump();
-    await tester.tapAt(retryPosition);
-    await tester.pump();
 
     verify(() => repository.fetchPublicTripShare('s1')).called(2);
     expect(find.byKey(const ValueKey('public-share-loading')), findsOneWidget);
+    expect(find.text('重試'), findsNothing);
+    await tester.tapAt(retryPosition);
+    await tester.pump();
+    expect(requests, 2);
     pending.complete(sharedTrip);
     await tester.pumpAndSettle();
     expect(find.text('沖繩家族旅行'), findsOneWidget);
@@ -661,6 +669,12 @@ void main() {
           .flagsCollection
           .isLiveRegion,
       isTrue,
+    );
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('public-share-notfound')))
+          .label,
+      contains('連結已失效'),
     );
   });
 }

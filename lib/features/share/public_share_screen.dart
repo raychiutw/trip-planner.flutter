@@ -68,11 +68,7 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
           ),
           error: (error, stackTrace) => _PublicShareFailure(
             error: error,
-            onRetry: () {
-              final provider = publicTripShareProvider(_token);
-              if (ref.read(provider).isLoading) return;
-              ref.invalidate(provider);
-            },
+            onRetry: () => ref.invalidate(publicTripShareProvider(_token)),
           ),
           data: (share) => _ShareContent(
             share: share,
