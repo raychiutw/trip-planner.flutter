@@ -26,12 +26,14 @@ flutter analyze
 flutter run        # 連 prod API（注意：請用測試帳號）
 ```
 
+完整測試包含真正 PDF 內容驗證；平台工具需求見 [CONTRIBUTING 的環境說明](CONTRIBUTING.md#環境)。
+
 ## 架構
 
 ```
 lib/
   theme/        # iOS 系統語意色 tokens + Light／Dark／High Contrast ThemeData
-  models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson
+  models/       # Trip/Day/Entry/Notes/User —— camelCase wire fromJson + 純 Dart 唯讀筆記內容投影
   api/          # dio 封裝（Bearer／cookie、Origin CSRF、429 retry、204）+ repositories + riverpod providers
     cache/      # drift 永續快取、離線佇列、樂觀更新與 rebase 合併
   ui/           # Tp* 共用 widget（TpAppBar／TpGlassSurface／TpStateView…）

@@ -170,7 +170,12 @@ Iterable<({String label, Uri uri})> _links(Iterable<md.Node> nodes) sync* {
           (uri.scheme == 'https' || uri.scheme == 'http') &&
           uri.host.isNotEmpty &&
           uri.userInfo.isEmpty) {
-        yield (label: node.textContent, uri: uri);
+        yield (
+          label: node.textContent.trim().isEmpty
+              ? uri.toString()
+              : node.textContent,
+          uri: uri,
+        );
       }
     } else {
       yield* _links(node.children ?? const []);

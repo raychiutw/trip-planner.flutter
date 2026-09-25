@@ -145,6 +145,36 @@ void main() {
     }
     expect(pages.last, contains('最後一段驗收完成'));
   });
+  test('真實 PDF 的多個具名與參考連結保留文字及真正annotation', () async {
+    const content =
+        '[入境文件](https://example.com/a_(b)?x=1&y=2) [參考文件][guide] [拒絕帳密](https://user:pass@example.com/private) [](https://example.com/empty) [   ](https://example.com/blank)\n\n[guide]: https://example.com/guide';
+    final document = await readPdf(
+      const TripPrintData(
+        trip: Trip(id: 'trip-1', name: '連結驗收'),
+        days: [],
+        notes: TripNotes(
+          pretripNotes: [
+            TripPretripNote(id: 1, sortOrder: 0, version: 0, content: content),
+          ],
+        ),
+      ),
+      'named-links',
+    );
+    final text = (document['pages'] as List).join('\n');
+    expect(text, contains('入境文件'));
+    expect(text, contains('參考文件'));
+    expect(text, contains('拒絕帳密'));
+    expect(text, contains('開啟連結'));
+    expect(
+      document['links'],
+      unorderedEquals([
+        'https://example.com/a_(b)?x=1&y=2',
+        'https://example.com/guide',
+        'https://example.com/empty',
+        'https://example.com/blank',
+      ]),
+    );
+  });
   test('公開分享的真實 PDF 僅包含授權視圖', () async {
     final document = await readPdf(
       TripPrintData.fromPublicShare(
