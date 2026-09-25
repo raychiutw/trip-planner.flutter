@@ -301,6 +301,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       if (state.searching) {
         return const AppListLoadingSkeleton(key: ValueKey('explore-loading'));
       }
+      if (state.errorMessage != null) return const SizedBox.shrink();
       if (state.query.trim().length >= 2 && state.hasSearched) {
         return Center(
           child: Text(
