@@ -19,12 +19,14 @@ const _maxRecentDestinations = 6;
 class DestinationPicker extends ConsumerStatefulWidget {
   const DestinationPicker({
     super.key,
+    this.enabled = true,
     required this.destinations,
     required this.onAdd,
     required this.onRemove,
     required this.onReorder,
   });
 
+  final bool enabled;
   final List<DestinationInput> destinations;
   final void Function(DestinationInput) onAdd;
   final void Function(int) onRemove;
@@ -47,6 +49,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   }
 
   Future<void> _run() async {
+    if (!widget.enabled) return;
     final q = _search.text.trim();
     if (q.length < 2) return;
     setState(() => _searching = true);
@@ -63,6 +66,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
   }
 
   void _pick(PoiSearchResult p) {
+    if (!widget.enabled) return;
     final destination = DestinationInput.fromPoi(p);
     widget.onAdd(destination);
     _search.clear();
@@ -86,6 +90,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             Expanded(
               child: AppSearchField(
                 fieldKey: const ValueKey('dest-poi-search'),
+                enabled: widget.enabled,
                 controller: _search,
                 placeholder: '搜尋地點（城市、景點）',
                 onSubmitted: (_) => _run(),
@@ -94,7 +99,7 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
             const SizedBox(width: TpSpacing.s2),
             IconButton.filled(
               key: const ValueKey('dest-poi-search-btn'),
-              onPressed: _run,
+              onPressed: widget.enabled ? _run : null,
               icon: _searching
                   ? const SizedBox(
                       width: 18,
@@ -117,7 +122,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   for (final h in _hotDestinations)
                     ActionChip(
                       label: Text(h),
-                      onPressed: () => widget.onAdd(DestinationInput(name: h)),
+                      onPressed: widget.enabled
+                          ? () => widget.onAdd(DestinationInput(name: h))
+                          : null,
                     ),
                 ],
               ),
@@ -139,7 +146,9 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                       ActionChip(
                         key: ValueKey('dest-recent-${destination.name}'),
                         label: Text(destination.name),
-                        onPressed: () => widget.onAdd(destination),
+                        onPressed: widget.enabled
+                            ? () => widget.onAdd(destination)
+                            : null,
                       ),
                   ],
                 ),
@@ -157,26 +166,32 @@ class _DestinationPickerState extends ConsumerState<DestinationPicker> {
                   title: Text(r.name),
                   subtitle: r.address == null ? null : Text(r.address!),
                   trailing: const Icon(CupertinoIcons.add),
-                  onTap: () => _pick(r),
+                  onTap: widget.enabled ? () => _pick(r) : null,
                 ),
               ),
         if (dests.isNotEmpty)
-          ReorderableListView(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            onReorderItem: widget.onReorder, // newIndex 已調整
-            children: [
-              for (var i = 0; i < dests.length; i++)
-                ListTile(
-                  key: ValueKey('dest-$i-${dests[i].name}'),
-                  leading: const Icon(CupertinoIcons.location_solid),
-                  title: Text(dests[i].name),
-                  trailing: IconButton(
-                    icon: const Icon(CupertinoIcons.xmark),
-                    onPressed: () => widget.onRemove(i),
+          IgnorePointer(
+            ignoring: !widget.enabled,
+            child: ReorderableListView(
+              buildDefaultDragHandles: widget.enabled,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onReorderItem: widget.onReorder, // newIndex 已調整
+              children: [
+                for (var i = 0; i < dests.length; i++)
+                  ListTile(
+                    key: ValueKey('dest-$i-${dests[i].name}'),
+                    leading: const Icon(CupertinoIcons.location_solid),
+                    title: Text(dests[i].name),
+                    trailing: IconButton(
+                      icon: const Icon(CupertinoIcons.xmark),
+                      onPressed: widget.enabled
+                          ? () => widget.onRemove(i)
+                          : null,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           )
         else
           Padding(
