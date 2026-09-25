@@ -159,29 +159,59 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
               },
             ),
           ),
-          body: daysAsync.when(
-            loading: () =>
-                const Center(child: CircularProgressIndicator.adaptive()),
-            error: (error, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(TpSpacing.s6),
-                child: Text('載入失敗：$error', textAlign: TextAlign.center),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: daysAsync.when(
+                  skipError: true,
+                  skipLoadingOnReload: true,
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator.adaptive()),
+                  error: (error, stackTrace) => const SizedBox.shrink(),
+                  data: (days) => _TripMapView(
+                    tripId: widget.tripId,
+                    days: days,
+                    initialEntryId: widget.initialEntryId,
+                    initialDayNum: _initialDayNum,
+                    mapBuilder: widget.mapBuilder,
+                    locationService: widget.locationService,
+                    locationSettingsOpener: widget.locationSettingsOpener,
+                    externalLauncher: widget.externalLauncher,
+                    onActiveDayChanged: (dayNum) {
+                      _publishSelectedDay(dayNum);
+                      widget.onActiveDayChanged?.call(dayNum);
+                    },
+                  ),
+                ),
               ),
-            ),
-            data: (days) => _TripMapView(
-              tripId: widget.tripId,
-              days: days,
-              initialEntryId: widget.initialEntryId,
-              initialDayNum: _initialDayNum,
-              mapBuilder: widget.mapBuilder,
-              locationService: widget.locationService,
-              locationSettingsOpener: widget.locationSettingsOpener,
-              externalLauncher: widget.externalLauncher,
-              onActiveDayChanged: (dayNum) {
-                _publishSelectedDay(dayNum);
-                widget.onActiveDayChanged?.call(dayNum);
-              },
-            ),
+              if (daysAsync.hasError)
+                Center(
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(TpSpacing.s3),
+                    child: Padding(
+                      padding: const EdgeInsets.all(TpSpacing.s6),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('無法載入日期', textAlign: TextAlign.center),
+                            TextButton(
+                              onPressed: () => unawaited(
+                                ref
+                                    .read(tripDaysRetryProvider(widget.tripId))
+                                    .retry(),
+                              ),
+                              child: const Text('重試'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -335,25 +365,49 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   @override
   void didUpdateWidget(covariant _TripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tripId != widget.tripId ||
+    final refocus =
+        oldWidget.tripId != widget.tripId ||
         oldWidget.initialEntryId != widget.initialEntryId ||
-        oldWidget.initialDayNum != widget.initialDayNum ||
-        !identical(oldWidget.days, widget.days)) {
-      _selectedTabIndex = _initialTabIndex();
-      final stops = _stopsForTab(_selectedTabIndex);
-      final initialPage = _initialStopPage(stops);
-      _previewEntryId = stops.isEmpty ? null : stops[initialPage].entry.id;
-      _activeEntryId = widget.initialEntryId == _previewEntryId
-          ? _previewEntryId
-          : null;
-      _selectedGooglePoi = null;
-      _initialFocusApplied = false;
+        oldWidget.initialDayNum != widget.initialDayNum;
+    if (refocus || !identical(oldWidget.days, widget.days)) {
+      var page = 0;
+      if (refocus) {
+        _selectedTabIndex = _initialTabIndex();
+        final stops = _stopsForTab(_selectedTabIndex);
+        page = _initialStopPage(stops);
+        _previewEntryId = stops.isEmpty ? null : stops[page].entry.id;
+        _activeEntryId = widget.initialEntryId == _previewEntryId
+            ? _previewEntryId
+            : null;
+        _selectedGooglePoi = null;
+        _initialFocusApplied = false;
+      } else {
+        // 索引屬於舊清單；fresh 重排時以 dayNum 與 entryId 保留有效選取。
+        final dayNum = _selectedTabIndex == 0
+            ? null
+            : oldWidget.days.elementAtOrNull(_selectedTabIndex - 1)?.dayNum;
+        final dayIndex = widget.days.indexWhere((day) => day.dayNum == dayNum);
+        _selectedTabIndex = dayNum == null
+            ? 0
+            : dayIndex < 0
+            ? _initialTabIndex()
+            : dayIndex + 1;
+        final stops = _stopsForTab(_selectedTabIndex);
+        final previewIndex = stops.indexWhere(
+          (stop) => stop.entry.id == _previewEntryId,
+        );
+        page = previewIndex < 0 ? 0 : previewIndex;
+        _previewEntryId = stops.isEmpty ? null : stops[page].entry.id;
+        if (!stops.any((stop) => stop.entry.id == _activeEntryId)) {
+          _activeEntryId = null;
+        }
+      }
       unawaited(_loadRoutes());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         widget.onActiveDayChanged(_dayNumForTab(_selectedTabIndex));
-        if (_pageController.hasClients) _pageController.jumpToPage(initialPage);
-        if (_mapIsReady) _applyInitialFocus();
+        if (_pageController.hasClients) _pageController.jumpToPage(page);
+        if (refocus && _mapIsReady) _applyInitialFocus();
       });
     }
   }
@@ -601,9 +655,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   void _previewStop(_MapStop stop) {
-    if (_activeEntryId == stop.entry.id &&
-        _previewEntryId == stop.entry.id &&
-        _selectedGooglePoi == null) {
+    if (_previewEntryId == stop.entry.id && _selectedGooglePoi == null) {
       return;
     }
     setState(() {
