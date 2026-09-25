@@ -37,9 +37,11 @@ Flutter [外部連結](../../lib/app/external_links.dart) 以 `url_launcher` 開
 
 ## 部署界線與尚待驗證
 
-[後端 PR #1351](https://github.com/raychiutw/trip-planner/pull/1351) 於 2026-09-25 18:15:07 UTC 合併到 **`uat`**，merge SHA `7c59a998c7306fed7ea2155435bd966032040459`。[Cloudflare check](https://github.com/raychiutw/trip-planner/runs/108194583724) 顯示該 SHA 的 preview 與 `uat.trip-planner-dby.pages.dev` 部署成功；[migration run](https://github.com/raychiutw/trip-planner/actions/runs/36172227242) 記錄 D1 `0096_mobile_oauth_callbacks.sql` 套用成功。這些只支持 UAT，**沒有正式 alias 的部署 SHA 或正式 D1 migration 證據**。`GET /api/account` 未登入回 401，也不能讀出正式帳號組成、provider 設定或 fresh-auth 能力。
+[後端 PR #1351](https://github.com/raychiutw/trip-planner/pull/1351) 於 2026-09-25 18:15:07 UTC 合併到 **`uat`**，merge SHA `7c59a998c7306fed7ea2155435bd966032040459`。[Cloudflare check](https://github.com/raychiutw/trip-planner/runs/108194583724) 顯示該 SHA 的 preview 與 `uat.trip-planner-dby.pages.dev` 部署成功；[migration run](https://github.com/raychiutw/trip-planner/actions/runs/36172227242) 記錄 D1 `0096_mobile_oauth_callbacks.sql` 套用成功。後端維護者另確認 PR 尚未合併 `master`／production，沒有已驗證的正式 deployment SHA、fresh-auth 刪除 smoke 或核准上線日；正式密碼與 Google-only 刪除行為均未驗證。這些證據只支持 UAT，**沒有正式 alias 的部署 SHA 或正式 D1 migration 證據**。`GET /api/account` 未登入回 401，也不能讀出正式帳號組成、provider 設定或 fresh-auth 能力。
 
 #389 在宣稱可用前仍需取得：正式部署 SHA 與 D1 狀態、正式 Google provider 能力、受控測試帳號的密碼／Google-only／混合身分交易證據，以及允許、拒絕、過期、重播、跨帳號／grant、失敗回滾的驗證。Mobile 路徑另需 HTTPS app link、iOS／Android OS association、背景與冷啟動、發布 build flags、同 grant token refresh 和真機驗收；無對應 provider 的帳號須先有後端重新驗證契約，否則保留人工申請或阻擋。#380 的調查完成不代表 #389 的產品功能完成。
+
+**#380 狀態：research partial，等待外部正式環境證據。** 目前只能交付已釘版本的 UAT 能力契約及正式環境待驗項目，不能勾選「正式帳號種類、reauth／刪除能力與部署證據」已全部核實。
 
 ## 可重現的唯讀查核
 
