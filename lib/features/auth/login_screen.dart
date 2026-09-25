@@ -77,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on OAuthLoginException catch (e) {
       if (mounted) setState(() => _oauthError = e.message);
     } on Exception {
-      if (mounted) setState(() => _oauthError = 'OAuth 登入失敗,請稍後再試');
+      if (mounted) setState(() => _oauthError = 'Tripline 登入失敗，請稍後再試');
     } finally {
       if (mounted) setState(() => _oauthLoading = false);
     }
@@ -311,10 +311,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       child: CupertinoActivityIndicator(),
                                     ),
                                     SizedBox(width: TpSpacing.s2),
-                                    Text('OAuth 登入中'),
+                                    Text('Tripline 登入中'),
                                   ],
                                 )
-                              : const Text('用 OAuth 登入'),
+                              : const Text('使用 Tripline 帳號登入'),
                         ),
                       ],
                       const SizedBox(height: TpSpacing.s3),
