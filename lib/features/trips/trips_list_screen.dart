@@ -12,6 +12,7 @@ import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_feedback.dart';
+import '../../app/stream_retry_coordinator.dart';
 import '../../models/trip.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
@@ -146,9 +147,16 @@ enum _TripsToolbarAction {
   startDateAsc,
 }
 
+final Provider<StreamRetryCoordinator> myTripsRetryProvider = Provider((ref) {
+  final retry = StreamRetryCoordinator(() => ref.invalidate(myTripsProvider));
+  ref.onDispose(retry.dispose);
+  return retry;
+});
+
 /// `GET /my-trips` 清單（SWR:stale→fresh;刪除後 invalidate refresh）。
 final myTripsProvider = StreamProvider<List<TripSummary>>((ref) {
-  return ref.watch(tripRepositoryProvider).watchMyTrips();
+  final repository = ref.watch(tripRepositoryProvider);
+  return ref.read(myTripsRetryProvider).track(repository.watchMyTrips);
 });
 
 /// 行程清單（4-tab「行程」分頁）：inline 頁首「我的行程」+ 搜尋框 + 分段篩選

@@ -59,6 +59,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _drafts = <String, String>{};
   bool? _speechAvailable;
   bool _speechPurposeAccepted = false;
+  bool _retryingTrips = false;
 
   @override
   void initState() {
@@ -96,6 +97,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _consumePrefill() {
     if (_pendingPrefill == null || !mounted) return;
     setState(() => _pendingPrefill = null);
+  }
+
+  Future<void> _retryTrips() async {
+    if (_retryingTrips) return;
+    setState(() => _retryingTrips = true);
+    try {
+      await ref.read(myTripsRetryProvider).retry();
+    } finally {
+      if (mounted) setState(() => _retryingTrips = false);
+    }
   }
 
   void _setSpeechAvailable(bool? value) {
@@ -166,11 +177,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: const [],
       ),
       body: tripsAsync.when(
+        // 自動重試仍保留錯誤出口；已有清單時讓對話與草稿繼續留在原處。
+        skipLoadingOnReload: tripsAsync.retrying,
+        skipError: trips.isNotEmpty,
         loading: () => initiallyBelowHeader(
           const Center(child: CircularProgressIndicator.adaptive()),
         ),
         error: (e, _) => initiallyBelowHeader(
-          const _CenteredHint(title: '載入失敗', body: '無法取得行程清單,請稍後再試。'),
+          Semantics(
+            liveRegion: true,
+            child: _CenteredHint(
+              title: '載入失敗',
+              body: '無法取得行程清單,請稍後再試。',
+              onRetry: _retryTrips,
+              retryInProgress: _retryingTrips,
+            ),
+          ),
         ),
         data: (trips) {
           if (trips.isEmpty) {
@@ -205,6 +227,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             speechPurposeAccepted: _speechPurposeAccepted,
             onSpeechAvailableChanged: _setSpeechAvailable,
             onSpeechPurposeAccepted: _acceptSpeechPurpose,
+            onTripsRetry: tripsAsync.hasError ? _retryTrips : null,
+            tripsRetryInProgress: _retryingTrips,
           );
         },
       ),
@@ -224,6 +248,8 @@ class _ChatBody extends ConsumerStatefulWidget {
     required this.onSpeechAvailableChanged,
     required this.onSpeechPurposeAccepted,
     this.initialPrefill,
+    this.onTripsRetry,
+    this.tripsRetryInProgress = false,
   });
 
   final String tripId;
@@ -234,6 +260,8 @@ class _ChatBody extends ConsumerStatefulWidget {
   final bool speechPurposeAccepted;
   final ValueChanged<bool?> onSpeechAvailableChanged;
   final VoidCallback onSpeechPurposeAccepted;
+  final VoidCallback? onTripsRetry;
+  final bool tripsRetryInProgress;
 
   @override
   ConsumerState<_ChatBody> createState() => _ChatBodyState();
@@ -284,10 +312,12 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
     super.didUpdateWidget(oldWidget);
     final prefill = widget.initialPrefill;
     if (prefill == null || prefill == oldWidget.initialPrefill) return;
-    _input.value = TextEditingValue(
-      text: prefill,
-      selection: TextSelection.collapsed(offset: prefill.length),
-    );
+    if (prefill != _input.text) {
+      _input.value = TextEditingValue(
+        text: prefill,
+        selection: TextSelection.collapsed(offset: prefill.length),
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.onInitialPrefillConsumed();
     });
@@ -458,7 +488,9 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
               ),
           ];
     final hasBanner =
-        state.authExpired || (state.error != null && msgs.isNotEmpty);
+        widget.onTripsRetry != null ||
+        state.authExpired ||
+        (state.error != null && msgs.isNotEmpty);
     final contentTop = hasBanner
         ? TpSpacing.s4
         : TpRootGeometry.initialContentTop(context);
@@ -484,6 +516,15 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
               children: [
                 if (hasBanner)
                   SizedBox(height: TpRootGeometry.initialContentTop(context)),
+                if (widget.onTripsRetry != null)
+                  Semantics(
+                    liveRegion: true,
+                    child: _Banner(
+                      text: '無法取得行程清單,請稍後再試。',
+                      onRetry: widget.onTripsRetry,
+                      retryInProgress: widget.tripsRetryInProgress,
+                    ),
+                  ),
                 if (state.authExpired) const _Banner(text: '登入已過期,請重新登入後再試。'),
                 // 有訊息時錯誤走非阻擋橫幅;空清單(初次載入失敗)走置中錯誤 + 重試。
                 if (state.error != null && msgs.isNotEmpty)
@@ -1094,6 +1135,7 @@ class _CenteredHint extends StatelessWidget {
     required this.title,
     required this.body,
     this.onRetry,
+    this.retryInProgress = false,
     this.actionLabel,
     this.onAction,
   });
@@ -1101,6 +1143,7 @@ class _CenteredHint extends StatelessWidget {
   final String title;
   final String body;
   final VoidCallback? onRetry;
+  final bool retryInProgress;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -1126,7 +1169,7 @@ class _CenteredHint extends StatelessWidget {
               const SizedBox(height: TpSpacing.s4),
               FilledButton(
                 key: const ValueKey('chat-retry'),
-                onPressed: onRetry,
+                onPressed: retryInProgress ? null : onRetry,
                 child: const Text('重試'),
               ),
             ] else if (onAction != null && actionLabel != null) ...[
@@ -1142,9 +1185,15 @@ class _CenteredHint extends StatelessWidget {
 
 /// 頂端橫幅(authExpired / error)。
 class _Banner extends StatelessWidget {
-  const _Banner({required this.text});
+  const _Banner({
+    required this.text,
+    this.onRetry,
+    this.retryInProgress = false,
+  });
 
   final String text;
+  final VoidCallback? onRetry;
+  final bool retryInProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -1167,6 +1216,11 @@ class _Banner extends StatelessWidget {
                 style: TextStyle(color: scheme.onErrorContainer),
               ),
             ),
+            if (onRetry != null)
+              TextButton(
+                onPressed: retryInProgress ? null : onRetry,
+                child: const Text('重試'),
+              ),
           ],
         ),
       ),

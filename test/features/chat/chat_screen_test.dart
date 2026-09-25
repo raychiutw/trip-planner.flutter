@@ -119,6 +119,7 @@ void main() {
     ThemeData? theme,
     ValueNotifier<int>? reselects,
     Widget? home,
+    Duration? Function(int, Object)? retry,
   }) {
     final screen =
         home ??
@@ -127,6 +128,7 @@ void main() {
           initialPrefill: initialPrefill,
         );
     return ProviderScope(
+      retry: retry,
       overrides: [
         requestsRepositoryProvider.overrideWithValue(reqRepo),
         tripRepositoryProvider.overrideWithValue(tripRepo),
@@ -1172,6 +1174,432 @@ void main() {
     expect(find.bySemanticsLabel('送出訊息'), findsOneWidget);
     expect(tester.takeException(), isNull);
     semantics.dispose();
+  });
+
+  testWidgets('預設重試期間仍可原地重試行程清單並恢復 composer', (tester) async {
+    final recoveredTrips = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      if (loads == 1) return Stream.error(Exception('network unavailable'));
+      return recoveredTrips.stream;
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await recoveredTrips.close();
+    });
+
+    // 使用 production 預設 retry，在自動重試的 200ms 前驗證恢復入口。
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    expect(loads, 1);
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-input')), findsNothing);
+
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(loads, 2);
+    recoveredTrips.add(_trips);
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('沖繩'), findsWidgets);
+    expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(loads, 2);
+  });
+
+  for (final hasStaleTrips in [false, true]) {
+    testWidgets('行程清單${hasStaleTrips ? '既有資料' : '初載'}重試進行中不重複請求，失敗後可再試', (
+      tester,
+    ) async {
+      final initial = StreamController<List<TripSummary>>.broadcast();
+      final retry = StreamController<List<TripSummary>>.broadcast();
+      final recovered = StreamController<List<TripSummary>>.broadcast();
+      final failure = Exception('network unavailable');
+      final stack = StackTrace.current;
+      var loads = 0;
+      when(tripRepo.watchMyTrips).thenAnswer((_) {
+        loads++;
+        return switch (loads) {
+          1 => initial.stream,
+          2 => retry.stream,
+          _ => recovered.stream,
+        };
+      });
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await initial.close();
+        await retry.close();
+        await recovered.close();
+      });
+      await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+      if (hasStaleTrips) {
+        initial.add(_trips);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('chat-input')),
+          '保留草稿',
+        );
+      }
+      initial.addError(failure, stack);
+      for (var i = 0; i < 5; i++) {
+        await tester.pump();
+      }
+      await tester.tap(find.text('重試'));
+      await tester.pump();
+      expect(loads, 2);
+      await tester.tap(find.text('重試'));
+      await tester.pump();
+      expect(loads, 2);
+
+      retry.addError(failure, stack);
+      for (var i = 0; i < 5; i++) {
+        await tester.pump();
+      }
+      expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+      await tester.tap(find.text('重試'));
+      await tester.pump();
+      expect(loads, 3);
+      recovered.add(_trips);
+      await tester.pumpAndSettle();
+      expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+      final input = find.byKey(const ValueKey('chat-input'));
+      expect(input, findsOneWidget);
+      if (hasStaleTrips) {
+        expect(tester.widget<TextField>(input).controller!.text, '保留草稿');
+      }
+    });
+  }
+
+  testWidgets('自動讀取進行中手動重試會合併，SWR 失敗可再試且離頁安全', (tester) async {
+    final automatic = StreamController<List<TripSummary>>.broadcast();
+    final manual = StreamController<List<TripSummary>>.broadcast();
+    final failure = Exception('network unavailable');
+    final stack = StackTrace.current;
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return switch (loads) {
+        1 => Stream.error(failure, stack),
+        2 => automatic.stream,
+        _ => manual.stream,
+      };
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await automatic.close();
+      if (!manual.isClosed) await manual.close();
+    });
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(loads, 2);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(loads, 2);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(loads, 2);
+
+    automatic.add(_trips);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '快取草稿');
+    automatic.addError(failure, stack);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(loads, 3);
+    expect(find.text('快取草稿'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    manual.add(_trips);
+    await manual.close();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('行程清單手動重試再次失敗後仍能重試成功', (tester) async {
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads < 3
+          ? Stream.error(Exception('network unavailable'))
+          : Stream.value(_trips);
+    });
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    expect(find.text('重試'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    expect(loads, 2);
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-input')), findsNothing);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(loads, 3);
+    expect(find.text('沖繩'), findsWidgets);
+    expect(find.text('載入失敗'), findsNothing);
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '恢復後的草稿');
+    expect(find.text('恢復後的草稿'), findsOneWidget);
+  });
+
+  testWidgets('行程清單失敗後仍保留預設自動恢復', (tester) async {
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1
+          ? Stream.error(Exception('network unavailable'))
+          : Stream.value(_trips);
+    });
+    await tester.pumpWidget(buildApp());
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
+    expect(find.text('載入失敗'), findsNothing);
+    expect(loads, 2);
+  });
+
+  testWidgets('行程清單更新失敗與重試保留 composer 和各行程草稿', (tester) async {
+    const trips = [
+      TripSummary(tripId: 'okinawa', name: 'okinawa', title: '沖繩'),
+      TripSummary(tripId: 'kyoto', name: 'kyoto', title: '京都'),
+    ];
+    final initial = StreamController<List<TripSummary>>.broadcast();
+    final recovered = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1 ? initial.stream : recovered.stream;
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await initial.close();
+      await recovered.close();
+    });
+    await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+    initial.add(trips);
+    await tester.pumpAndSettle();
+    final input = find.byKey(const ValueKey('chat-input'));
+    await tester.enterText(input, '沖繩早餐草稿');
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-kyoto')));
+    await tester.pumpAndSettle();
+    await tester.enterText(input, '京都晚餐草稿');
+
+    initial.addError(Exception('network unavailable'));
+    await tester.pump();
+    await tester.pump();
+    expect(input, findsOneWidget);
+    expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
+    recovered.add(trips);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(input).controller!.text, '京都晚餐草稿');
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('chat-trip-dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-picker-item-okinawa')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(input).controller!.text, '沖繩早餐草稿');
+    expect(loads, 2);
+  });
+
+  testWidgets('行程清單錯誤與重試保留游標和組字，新的外部預填仍會套用', (tester) async {
+    final initial = StreamController<List<TripSummary>>.broadcast();
+    final recovered = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1 ? initial.stream : recovered.stream;
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await initial.close();
+      await recovered.close();
+    });
+    final harnessKey = GlobalKey<_ChatQueryHarnessState>();
+    await tester.pumpWidget(
+      buildApp(
+        home: _ChatQueryHarness(key: harnessKey),
+        retry: (retryCount, error) => null,
+      ),
+    );
+    initial.add(_trips);
+    await tester.pumpAndSettle();
+
+    final input = find.byKey(const ValueKey('chat-input'));
+    await tester.showKeyboard(input);
+    const editing = TextEditingValue(
+      text: '沖繩早餐草稿',
+      selection: TextSelection.collapsed(offset: 4),
+      composing: TextRange(start: 2, end: 4),
+    );
+    tester.testTextInput.updateEditingValue(editing);
+    await tester.pump();
+    expect(tester.widget<TextField>(input).controller!.value, editing);
+
+    initial.addError(Exception('network unavailable'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(tester.widget<TextField>(input).controller!.value, editing);
+
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    // 點欄位外結束組字是平台行為；重試本身不可移動游標或改文字。
+    final committedEditing = editing.copyWith(composing: TextRange.empty);
+    expect(tester.widget<TextField>(input).controller!.value, committedEditing);
+    recovered.add(_trips);
+    await tester.pumpAndSettle();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(tester.widget<TextField>(input).controller!.value, committedEditing);
+
+    harnessKey.currentState!.showTrip('okinawa', prefill: '新的深連結指令');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(input).controller!.value,
+      const TextEditingValue(
+        text: '新的深連結指令',
+        selection: TextSelection.collapsed(offset: 7),
+      ),
+    );
+  });
+
+  testWidgets('320pt 大字級行程清單錯誤可宣告並操作重試', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1
+          ? Stream.error(Exception('network unavailable'))
+          : Stream.value(_trips);
+    });
+    await tester.pumpWidget(
+      buildApp(
+        home: const MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: ChatScreen(),
+        ),
+      ),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+    expect(tester.takeException(), isNull);
+    final errorAnnouncement = find.byWidgetPredicate(
+      (widget) => widget is Semantics && widget.properties.liveRegion == true,
+    );
+    expect(errorAnnouncement, findsWidgets);
+    expect(
+      find.descendant(
+        of: errorAnnouncement,
+        matching: find.text('無法取得行程清單,請稍後再試。'),
+      ),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('重試'));
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(loads, 2);
+    expect(find.byKey(const ValueKey('chat-input')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
+  testWidgets('320pt 大字級既有行程錯誤橫幅可重試並保留草稿', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final initial = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1 ? initial.stream : Stream.value(_trips);
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await initial.close();
+    });
+    await tester.pumpWidget(
+      buildApp(
+        home: const MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(3.2)),
+          child: ChatScreen(initialTripId: 'okinawa'),
+        ),
+      ),
+    );
+    initial.add(_trips);
+    await tester.pumpAndSettle();
+    final input = find.byKey(const ValueKey('chat-input'));
+    await tester.enterText(input, '沖繩早餐草稿');
+    initial.addError(Exception('network unavailable'));
+    await tester.pump();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    expect(tester.widget<TextField>(input).controller!.text, '沖繩早餐草稿');
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    await tester.pump();
+    expect(loads, 2);
+    await tester.pumpAndSettle();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(tester.widget<TextField>(input).controller!.text, '沖繩早餐草稿');
+    await tester.enterText(input, '繼續編輯早餐草稿');
+    expect(find.text('繼續編輯早餐草稿'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('空的快取行程清單更新失敗仍可重試', (tester) async {
+    final initial = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1 ? initial.stream : Stream.value(<TripSummary>[]);
+    });
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await initial.close();
+    });
+    await tester.pumpWidget(buildApp());
+    initial.add([]);
+    await tester.pumpAndSettle();
+    expect(find.text('新增行程'), findsOneWidget);
+    initial.addError(Exception('network unavailable'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('新增行程'), findsOneWidget);
+    expect(loads, 2);
   });
 
   testWidgets('初次載入失敗 → 顯示重試 → 重試成功', (tester) async {

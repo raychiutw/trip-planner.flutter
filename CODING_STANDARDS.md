@@ -164,7 +164,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 無本地 state 的畫面用 `ConsumerWidget`；有表單、`TextEditingController`、`ScrollController`、動畫或任何 `dispose` 需求的用 `ConsumerStatefulWidget`。目前 `lib/features/` 有 13 個 `ConsumerWidget`、46 個 `ConsumerStatefulWidget`，兩者都是常態，判準是「有沒有需要釋放的物件」，不是畫面大小。
 - 所有 async 資料一律 `ref.watch(xxxProvider).when(data:, error:, loading:)`，三態都要有實體 UI，不得省略任一分支或用 `.value ?? fallback` 繞過。
-- error 態必須提供 retry 入口，且 retry 動作要真的重抓資料。參考 `lib/features/trips/trips_list_screen.dart:452` 的 `_ErrorState(onRetry: () => ref.invalidate(myTripsProvider))`，元件本體在同檔 `:752`。只印錯誤字串沒有按鈕視為違反。
+- error 態必須提供 retry 入口，且 retry 動作要真的重抓資料。參考 `lib/features/trips/trips_list_screen.dart:464` 的 `_ErrorState(onRetry: () => ref.invalidate(myTripsProvider))`，元件本體在同檔 `:782`。只印錯誤字串沒有按鈕視為違反。
 - loading 態用 `AppListLoadingSkeleton`（`lib/app/app_loading_skeleton.dart:6`）保留版型；不得只留空白或在頁面中央放單一 spinner。
 
 ### 取色與視覺階層
@@ -311,8 +311,9 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 ### Provider override
 
 - 資料 provider 是 **`StreamProvider`**，override 要回 `Stream`，不是 `Future`：
-  - `myTripsProvider`（`lib/features/trips/trips_list_screen.dart:149`）→ `myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips))`（用例：`test/features/trips/trips_list_screen_test.dart:150`）。
+  - `myTripsProvider`（`lib/features/trips/trips_list_screen.dart:157`）→ `myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips))`（用例：`test/features/trips/trips_list_screen_test.dart:150`）。
   - `tripProvider` / `tripDaysProvider` / `tripNotesProvider` 是 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24`）→ `tripDaysProvider.overrideWith((ref, tripId) => Stream.value(fakeDays))` 一次覆寫所有 key。
+- 驗證聊天行程清單重試時，override `tripRepositoryProvider` 並控制 `watchMyTrips()` 的串流，保留正式 `myTripsProvider` → `myTripsRetryProvider` 追蹤鏈。直接 override 資料 provider 會繞過 `StreamRetryCoordinator.track()`，使重試 Future 無法隨來源 error／done／取消完成；一般只驗證資料呈現的測試仍可直接 override 資料 provider。
 - flutter_riverpod 3.x 未匯出 `Override` 型別 —— overrides 直接在 `ProviderScope` / `ProviderContainer` 建構處以 list literal 傳入，不要宣告 `List<Override>` 變數。
 - 需要登入狀態的畫面：override `authStateProvider`，用一個 `extends AuthNotifier` 且只覆寫 `build()` 的假 notifier：
 
