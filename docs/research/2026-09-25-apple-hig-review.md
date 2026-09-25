@@ -60,7 +60,7 @@ HIG 網頁正文由 JavaScript 載入，本次另讀取 Apple 官方 DocC JSON�
 3. **共用 chrome**：tab state restoration、Account 子導覽、選單焦點、sheet 關閉保護；先修共用入口再驗證所有 caller，避免每頁補丁。
 4. **真機材質與地圖**：Light／Dark、Reduce Motion、Increase Contrast、Reduce Transparency，實際 PlatformView／shader 的可讀性與效能。widget PNG 能證明內容和幾何，不能證明 native 地圖、GPU 材質、VoiceOver 或實際權限對話正常。
 
-本報告只新增研究文件；未修改 production、未發布 Issues／PR、未改寫現行 DESIGN／ADR。逐頁缺陷判定必須與目前程式碼及畫面證據合併閱讀。
+原始研究稿階段只新增研究文件，未修改 production、發布 Issues／PR 或改寫 DESIGN／ADR。後續 #388 核對另於 DESIGN 加入本研究連結，既有產品規則與 ADR 維持不變。逐頁缺陷判定必須與目前程式碼及畫面證據合併閱讀。
 
 
 ## #388／T56 引用歸屬核對（2026-09-25）
@@ -118,7 +118,7 @@ HIG 網頁正文由 JavaScript 載入，本次另讀取 Apple 官方 DocC JSON�
 | §9 地圖／POI | A：[Maps](https://developer.apple.com/design/human-interface-guidelines/maps) 的熟悉地圖操作與可讀性。T：定位獨立控制、日間底圖、POI accessory、雙向同步、卡片資訊欄位、無 detent；V：PlatformView 手勢與遮擋。 |
 | §10 日期時間 | A：[Pickers](https://developer.apple.com/design/human-interface-guidelines/pickers) 的模式與在地化。T：五分鐘、picker 類型、取消與寫回時機。 |
 | §11 sheet／表單 | A：[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets) 的 leading Cancel／trailing Done、dirty swipe、一次一張。T：所有出口 guard、提交去重、成功才關、文字按鈕、套件分工；Apple 也允許先關第一張再開第二張，不只內層 push。 |
-| §12 刪除 | A：[Alerts](https://developer.apple.com/design/human-interface-guidelines/alerts) 的明確動詞及危險提示。T：無 full swipe、所有刪除紅色、安全選項預設焦點、全部重新驗證；Alerts 並未要求 Cancel 為 default button，甚至建議不要如此。焦點與 default activation 是不同概念，後續驗收需分辨。 |
+| §12 刪除 | A：[Alerts](https://developer.apple.com/design/human-interface-guidelines/alerts) 的明確動詞及危險提示。T：無 full swipe、所有刪除紅色、安全選項預設焦點、高影響操作重新驗證；Alerts 並未要求 Cancel 為 default button，甚至建議不要如此。焦點與 default activation 是不同概念，後續驗收需分辨。 |
 | §12 帳號重新驗證 | Apple [刪除帳號 FAQ](https://developer.apple.com/support/offering-account-deletion-in-your-app/) 允許驗身分與確認，但反對不必要阻礙；「刪除帳號／登出全部一律 reauth」是 T，不是該頁的 S。 |
 | §13 拖拉／swipe | A：可及性要求替代輸入、清楚狀態及減少動態。T：只用 drag handle、卡片不得多用途、跨 Day 完整還原、具體上下移 action 與手勢區域。 |
 | §14 回饋／離線 | A：[Loading](https://developer.apple.com/design/human-interface-guidelines/loading) 及 Alerts 支持及早呈現、背景操作、避免濫用警告。T：SWR、離線佇列行為、持續離線列與指定 semantics 實作方式。 |
