@@ -112,7 +112,13 @@ class _EntryEditRouteScreenState extends ConsumerState<EntryEditRouteScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('載入失敗：$error', textAlign: TextAlign.center),
+                          Semantics(
+                            liveRegion: true,
+                            child: const Text(
+                              '目前無法載入停留點，請稍後重試。',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                           const SizedBox(height: TpSpacing.s3),
                           TextButton(
                             onPressed: _retryEntry,
