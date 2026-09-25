@@ -9,7 +9,9 @@ import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
 
 class InvalidLinkScreen extends ConsumerWidget {
-  const InvalidLinkScreen({super.key});
+  const InvalidLinkScreen({super.key, this.message = '連結不完整或格式不正確，請重新確認連結。'});
+
+  final String message;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
@@ -26,10 +28,7 @@ class InvalidLinkScreen extends ConsumerWidget {
             children: [
               Semantics(
                 liveRegion: true,
-                child: const Text(
-                  '連結不完整或格式不正確，請重新確認連結。',
-                  textAlign: TextAlign.center,
-                ),
+                child: Text(message, textAlign: TextAlign.center),
               ),
               const SizedBox(height: TpSpacing.s4),
               TextButton(

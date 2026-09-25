@@ -46,9 +46,6 @@ const _screenManifest = <String, Map<String, _HeaderContract>>{
   'lib/features/auth/login_screen.dart': {
     'LoginScreen': _HeaderContract.authException,
   },
-  'lib/features/auth/oauth_consent_screen.dart': {
-    'OAuthConsentScreen': _HeaderContract.authException,
-  },
   'lib/features/auth/welcome_screen.dart': {
     'WelcomeScreen': _HeaderContract.authException,
   },
