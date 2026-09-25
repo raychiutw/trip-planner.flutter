@@ -19,6 +19,7 @@ import '../features/map/global_map_screen.dart';
 import '../features/map/map_adapter.dart';
 import '../features/share/public_share_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/shell/invalid_link_screen.dart';
 import '../features/trip_detail/entry_action_route_screen.dart';
 import '../features/trip_detail/entry_add_route_screen.dart';
 import '../features/trip_detail/entry_edit_route_screen.dart';
@@ -55,6 +56,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   final router = GoRouter(
     initialLocation: '/trips',
+    errorBuilder: (context, state) => const InvalidLinkScreen(),
     refreshListenable: authChangeNotifier,
     redirect: (context, state) {
       if (_isShellContentLocation(state.uri.path) &&
@@ -185,7 +187,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/trip/:tripId/map',
-        redirect: (context, state) => _tripAlias(state, '/map'),
+        redirect: (context, state) => _rootMapAlias(state),
       ),
       GoRoute(
         path: '/trip/:tripId/add-entry',
@@ -404,32 +406,42 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: 'entries/:eid/edit',
-                        builder: (context, state) => EntryEditRouteScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          entryId: int.parse(state.pathParameters['eid']!),
+                        builder: (context, state) => _entryRoute(
+                          state,
+                          (tripId, entryId) => EntryEditRouteScreen(
+                            tripId: tripId,
+                            entryId: entryId,
+                          ),
                         ),
                       ),
                       GoRoute(
                         path: 'entries/:eid/copy',
-                        builder: (context, state) => EntryActionRouteScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          entryId: int.parse(state.pathParameters['eid']!),
-                          action: EntryRouteAction.copy,
+                        builder: (context, state) => _entryRoute(
+                          state,
+                          (tripId, entryId) => EntryActionRouteScreen(
+                            tripId: tripId,
+                            entryId: entryId,
+                            action: EntryRouteAction.copy,
+                          ),
                         ),
                       ),
                       GoRoute(
                         path: 'entries/:eid/move',
-                        builder: (context, state) => EntryActionRouteScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          entryId: int.parse(state.pathParameters['eid']!),
-                          action: EntryRouteAction.move,
+                        builder: (context, state) => _entryRoute(
+                          state,
+                          (tripId, entryId) => EntryActionRouteScreen(
+                            tripId: tripId,
+                            entryId: entryId,
+                            action: EntryRouteAction.move,
+                          ),
                         ),
                       ),
                       GoRoute(
                         path: 'entries/:eid/pois',
-                        builder: (context, state) => EntryPoiScreen(
-                          tripId: state.pathParameters['tripId']!,
-                          entryId: int.parse(state.pathParameters['eid']!),
+                        builder: (context, state) => _entryRoute(
+                          state,
+                          (tripId, entryId) =>
+                              EntryPoiScreen(tripId: tripId, entryId: entryId),
                         ),
                       ),
                     ],
@@ -650,3 +662,16 @@ bool _isShellContentLocation(String path) =>
     path == '/favorites' ||
     (path.startsWith('/trips/') && path != '/trips/new') ||
     path.startsWith('/favorites/');
+
+/// 所有停留點操作共用的外部 ID 解析；無效值不進入資料畫面。
+Widget _entryRoute(
+  GoRouterState state,
+  Widget Function(String tripId, int entryId) build,
+) {
+  final rawId = state.pathParameters['eid'];
+  final entryId = rawId != null && RegExp(r'^[0-9]+$').hasMatch(rawId)
+      ? int.tryParse(rawId)
+      : null;
+  if (entryId == null || entryId <= 0) return const InvalidLinkScreen();
+  return build(state.pathParameters['tripId']!, entryId);
+}

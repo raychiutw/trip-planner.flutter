@@ -214,7 +214,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 路由與測試
 
-- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`）。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId`（`:182`）只是 web 時代留下的 alias,`redirect` 到複數版（`_tripAlias`,`:507`）—— 子頁一律加在複數路徑下，新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
+- 掛路由改 `lib/app/router.dart`。行程子頁掛在 `/trips` branch 的 `:tripId` 底下（`lib/app/router.dart:354`）。**複數 `/trips/:tripId` 才是真正建畫面的路由**,單數 `/trip/:tripId`（`:182`）只是 web 時代留下的 alias，通常由 `_tripAlias` redirect 到複數版；地圖 alias 則由 `_rootMapAlias` 導到 root `/map`，保留 trip／day／entry，不建立行程地圖子頁。一般行程子頁一律加在複數路徑下，新增子頁照 `entries/new`（`:393`）、`notes`（`:369`）的寫法，path 參數從 `state.pathParameters` 取並以 `Uri.encodeComponent` 編碼。
 - shell 外的整頁（無 root tab bar）加在 `routes` 頂層、`StatefulShellRoute` 之外。
 - 未登入時 shell 內的頁自動被 redirect 到 **`/welcome`**（`lib/app/router.dart:72-74`，經 `_welcomeLocationWithRedirect`），不是 `/login`。原始請求路徑會保存在 `redirect_after` query。shell 外的新頁若要公開，必須加進 `_publicShellOutsideRoutes`（`lib/app/router.dart:495`），否則同樣被踢到 `/welcome`。
 - widget test 必須 override `authStateProvider`，否則啟動時 `currentUser()` 走真 `SecureSessionStore` 失敗，畫面一進來就被視為未登入。

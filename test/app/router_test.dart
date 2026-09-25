@@ -172,6 +172,105 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  testWidgets('無效停留點 deep link 顯示可返回畫面且不讀取停留點', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final repository = container.read(tripRepositoryProvider);
+    for (final id in [
+      'nope',
+      '',
+      '0',
+      '-1',
+      '9223372036854775808',
+      '0x10',
+      '%20',
+      '1.5',
+    ]) {
+      for (final paths in [
+        ['/trips/trip-1/entries/$id/edit', '/trip/trip-1/stop/$id/edit'],
+        ['/trips/trip-1/entries/$id/copy', '/trip/trip-1/stop/$id/copy'],
+        ['/trips/trip-1/entries/$id/move', '/trip/trip-1/stop/$id/move'],
+        ['/trips/trip-1/entries/$id/pois', '/trip/trip-1/stop/$id/change-poi'],
+      ]) {
+        for (final path in paths) {
+          container.read(appRouterProvider).go(path);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: path);
+          expect(find.text('無法開啟連結'), findsOneWidget, reason: path);
+          verifyNever(
+            () => repository.watchEntry(
+              tripId: any(named: 'tripId'),
+              entryId: any(named: 'entryId'),
+            ),
+          );
+        }
+      }
+    }
+    await tester.tap(find.text('返回行程列表'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripsListScreen), findsOneWidget);
+  });
+
+  testWidgets('有效停留點 ID 原值傳入 canonical 與 alias 畫面', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    for (final prefix in ['/trips/trip-1/entries', '/trip/trip-1/stop']) {
+      for (final action in ['edit', 'copy', 'move', 'pois']) {
+        final suffix = prefix.startsWith('/trip/') && action == 'pois'
+            ? 'change-poi'
+            : action;
+        router.go('$prefix/11/$suffix');
+        await tester.pumpAndSettle();
+        final int entryId;
+        if (action == 'edit') {
+          entryId = tester
+              .widget<EntryEditRouteScreen>(find.byType(EntryEditRouteScreen))
+              .entryId;
+        } else if (action == 'pois') {
+          entryId = tester
+              .widget<EntryPoiScreen>(find.byType(EntryPoiScreen))
+              .entryId;
+        } else {
+          entryId = tester
+              .widget<EntryActionRouteScreen>(
+                find.byType(EntryActionRouteScreen),
+              )
+              .entryId;
+        }
+        expect(entryId, 11);
+        expect(find.text('無法開啟連結'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    }
+    router.go('/trips/trip-1/entries/9223372036854775807/edit');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<EntryEditRouteScreen>(find.byType(EntryEditRouteScreen))
+          .entryId,
+      9223372036854775807,
+    );
+  });
+
   testWidgets('未登入時 redirect 到 /welcome', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
@@ -659,6 +758,49 @@ void main() {
 
     expect(find.byType(TripAuditScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('舊行程 map alias 保留行程與 Day 及停留點並選中 root 地圖', (tester) async {
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      days: const [
+        TripDay(id: 1, dayNum: 1, version: 0),
+        TripDay(id: 2, dayNum: 2, version: 0),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/trip/trip-1/map?day=2&entry=11');
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/map?day=2&entry=11&tripId=trip-1',
+    );
+    final screen = tester.widget<GlobalMapScreen>(find.byType(GlobalMapScreen));
+    expect(screen.initialTripId, 'trip-1');
+    expect(screen.initialDayNum, 2);
+    expect(
+      tester
+          .widget<TpHorizontalSelector<int>>(
+            find.byKey(const ValueKey('trip-map-day-selector')),
+          )
+          .value,
+      2,
+    );
+    expect(screen.initialEntryId, 11);
+    expect(
+      tester
+          .widget<AppleRootTabBar>(find.byType(AppleRootTabBar))
+          .selectedIndex,
+      2,
+    );
   });
 
   testWidgets('已登入可從 stop map web alias 聚焦地圖 entry', (tester) async {
