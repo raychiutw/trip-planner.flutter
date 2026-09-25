@@ -9,8 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/map_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/map/google_maps_external_launcher.dart';
 import 'package:tripline/features/map/map_adapter.dart';
 import 'package:tripline/features/map/map_location.dart';
@@ -47,6 +49,8 @@ int _mapSelectorTabIndex(WidgetTester tester) => tester
       find.byKey(const ValueKey('trip-map-day-selector')),
     )
     .value;
+
+class _MockTripRepository extends Mock implements TripRepository {}
 
 class _FakeLocationService implements TripMapLocationService {
   int calls = 0;
@@ -232,6 +236,7 @@ const _googlePoi = GoogleMapPoiSelection(
 Widget _buildScreen(
   List<TripDay> days, {
   Stream<List<TripDay>>? daysStream,
+  TripRepository? tripRepository,
   int? initialEntryId,
   int? initialDayNum,
   TripMapLocationService? locationService,
@@ -258,9 +263,13 @@ Widget _buildScreen(
         builder: (context, state) => MaybeBranch(
           active: branchActive,
           child: TripMapScreen(
-            tripId: 'trip-1',
-            initialEntryId: initialEntryId,
-            initialDayNum: initialDayNum,
+            tripId: state.uri.queryParameters['trip'] ?? 'trip-1',
+            initialEntryId:
+                int.tryParse(state.uri.queryParameters['entry'] ?? '') ??
+                initialEntryId,
+            initialDayNum:
+                int.tryParse(state.uri.queryParameters['day'] ?? '') ??
+                initialDayNum,
             mapBuilder: (config) {
               onMapConfig?.call(config);
               return fakeTripMapBuilder(config);
@@ -300,11 +309,16 @@ Widget _buildScreen(
       ),
     ],
   );
+  addTearDown(router.dispose);
   return ProviderScope(
+    retry: (_, _) => null,
     overrides: [
-      tripDaysProvider.overrideWith(
-        (ref, tripId) => daysStream ?? Stream.value(days),
-      ),
+      if (tripRepository != null)
+        tripRepositoryProvider.overrideWithValue(tripRepository)
+      else
+        tripDaysProvider.overrideWith(
+          (ref, tripId) => daysStream ?? Stream.value(days),
+        ),
       myTripsProvider.overrideWith((ref) => Stream.value(trips)),
       mapRepositoryProvider.overrideWithValue(
         mapRepository ?? _StubMapRepository(),
@@ -343,6 +357,490 @@ Widget _buildScreen(
 }
 
 void main() {
+  testWidgets('日期載入失敗可原地重試並重新取得地圖資料', (tester) async {
+    final repository = _MockTripRepository();
+    var attempts = 0;
+    when(() => repository.watchDays('trip-1')).thenAnswer((_) {
+      attempts++;
+      return attempts == 1
+          ? Stream.error(StateError('private days endpoint failed'))
+          : Stream.value([_dayOne, _dayTwo]);
+    });
+    await tester.pumpWidget(_buildScreen(const [], tripRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法載入日期'), findsOneWidget);
+    expect(find.textContaining('private days endpoint'), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('無法載入日期'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('trip-map-day-2')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.text('無法載入日期'), findsNothing);
+    verify(() => repository.watchDays('trip-1')).called(2);
+  });
+
+  testWidgets('日期更新失敗保留地圖與仍有效的 Day 和 marker 選取', (tester) async {
+    final repository = _MockTripRepository();
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    when(() => repository.watchDays('trip-1')).thenAnswer((_) => source.stream);
+    final secondDay = TripDay(
+      id: 2,
+      dayNum: 2,
+      date: '2026-04-02',
+      version: 1,
+      timeline: [
+        ..._dayTwo.timeline,
+        _entry(id: 22, title: '古宇利島', lat: 26.7, lng: 128.0),
+      ],
+    );
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        tripRepository: repository,
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    source.add([_dayOne, secondDay]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-22')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsOneWidget);
+    final canvas = tester.element(
+      find.byKey(const ValueKey('fake-trip-map-canvas')),
+    );
+    final controller = mapConfig!.controller;
+
+    source.addError(StateError('private days endpoint failed'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('無法載入日期'), findsOneWidget);
+    expect(find.text('重試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('fake-trip-map-canvas')), findsOneWidget);
+    expect(
+      tester.element(find.byKey(const ValueKey('fake-trip-map-canvas'))),
+      same(canvas),
+    );
+    expect(mapConfig!.controller, same(controller));
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsOneWidget);
+    expect(
+      mapConfig!.markers
+          .singleWhere((marker) => marker.id == 'map-pin-22')
+          .zIndex,
+      1000,
+    );
+    expect(find.textContaining('private days endpoint'), findsNothing);
+  });
+
+  testWidgets('fresh 日期與停留點重排仍保留有效 Day 和 marker', (tester) async {
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        daysStream: source.stream,
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    source.add([
+      _dayOne,
+      TripDay(
+        id: 2,
+        dayNum: 2,
+        version: 1,
+        timeline: [
+          ..._dayTwo.timeline,
+          _entry(id: 22, title: '古宇利島', lat: 26.7, lng: 128.0),
+        ],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-22')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsOneWidget);
+
+    source.add([
+      TripDay(
+        id: 2,
+        dayNum: 2,
+        version: 2,
+        timeline: [
+          _entry(id: 22, title: '古宇利島更新', lat: 26.7, lng: 128.0),
+          _entry(id: 21, title: '美麗海水族館', lat: 26.694, lng: 127.878),
+        ],
+      ),
+      _dayOne,
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester), 2);
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsOneWidget);
+    expect(find.text('古宇利島更新'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsNothing);
+    expect(
+      mapConfig!.markers
+          .singleWhere((marker) => marker.id == 'map-pin-22')
+          .zIndex,
+      1000,
+    );
+  });
+
+  testWidgets('fresh 移除選取日期後回到有效日期且不殘留 marker', (tester) async {
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        daysStream: source.stream,
+        initialDayNum: 2,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    source.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-21')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+
+    source.add([_dayOne]);
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester), 1);
+    expect(find.byKey(const ValueKey('trip-map-day-2')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-21')), findsNothing);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsNothing);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-11')), findsOneWidget);
+    expect(mapConfig!.markers.any((marker) => marker.zIndex == 1000), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('同一畫面收到明確 deep link 更新時依新 Day 和 entry 聚焦', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialDayNum: 1,
+        initialEntryId: 11,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final screenElement = tester.element(find.byType(TripMapScreen));
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-21')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+
+    GoRouter.of(screenElement).go('/?day=1&entry=12');
+    await tester.pumpAndSettle();
+
+    expect(tester.element(find.byType(TripMapScreen)), same(screenElement));
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester), 1);
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-21')), findsNothing);
+    expect(
+      mapConfig!.markers
+          .singleWhere((marker) => marker.id == 'map-pin-12')
+          .zIndex,
+      1000,
+    );
+  });
+
+  testWidgets('同一地圖切換行程時不沿用舊行程的 Day 和 marker', (tester) async {
+    final repository = _MockTripRepository();
+    when(
+      () => repository.watchDays('trip-1'),
+    ).thenAnswer((_) => Stream.value([_dayOne, _dayTwo]));
+    when(() => repository.watchDays('trip-2')).thenAnswer(
+      (_) => Stream.value([
+        TripDay(
+          id: 101,
+          dayNum: 1,
+          version: 1,
+          timeline: [_entry(id: 11, title: '東京車站', lat: 35.68, lng: 139.76)],
+        ),
+        TripDay(
+          id: 102,
+          dayNum: 2,
+          version: 1,
+          timeline: [_entry(id: 21, title: '淺草寺', lat: 35.71, lng: 139.8)],
+        ),
+      ]),
+    );
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        tripRepository: repository,
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-21')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+    final screenElement = tester.element(find.byType(TripMapScreen));
+    final canvas = tester.element(
+      find.byKey(const ValueKey('fake-trip-map-canvas')),
+    );
+    // 新行程資料先就緒，確保不是載入畫面重建地圖才清掉舊選取。
+    final nextTripDays = _containerOf(
+      tester,
+    ).listen(tripDaysProvider('trip-2'), (_, _) {}, fireImmediately: true);
+    addTearDown(nextTripDays.close);
+    await tester.pumpAndSettle();
+    expect(nextTripDays.read().hasValue, isTrue, reason: '新行程預載必須完成才能驗證同一地圖切換');
+    GoRouter.of(screenElement).go('/?trip=trip-2');
+    await tester.pumpAndSettle();
+
+    expect(tester.element(find.byType(TripMapScreen)), same(screenElement));
+    expect(
+      tester.element(find.byKey(const ValueKey('fake-trip-map-canvas'))),
+      same(canvas),
+    );
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester, 'trip-2'), 1);
+    expect(find.text('東京車站'), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-21')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    expect(find.text('淺草寺'), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsNothing);
+  });
+
+  testWidgets('fresh 移除選取停留點後保留 Day 並顯示有效卡片', (tester) async {
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        daysStream: source.stream,
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    source.add([
+      _dayOne,
+      TripDay(
+        id: 2,
+        dayNum: 2,
+        version: 1,
+        timeline: [
+          ..._dayTwo.timeline,
+          _entry(id: 22, title: '古宇利島', lat: 26.7, lng: 128.0),
+        ],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-22')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsOneWidget);
+
+    source.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-pin-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-22')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-22')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('日期重試的 stale 與 fresh 都保留有效選取和同一地圖', (tester) async {
+    final repository = _MockTripRepository();
+    final first = StreamController<List<TripDay>>();
+    final retry = StreamController<List<TripDay>>();
+    addTearDown(first.close);
+    addTearDown(() {
+      unawaited(retry.close());
+    });
+    var attempts = 0;
+    when(
+      () => repository.watchDays('trip-1'),
+    ).thenAnswer((_) => ++attempts == 1 ? first.stream : retry.stream);
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        tripRepository: repository,
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    first.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('trip-map-day-2')));
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-21')
+        .onTap!();
+    await tester.pumpAndSettle();
+    final canvas = tester.element(
+      find.byKey(const ValueKey('fake-trip-map-canvas')),
+    );
+    first.addError(StateError('days unavailable'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    await tester.pump();
+    verify(() => repository.watchDays('trip-1')).called(2);
+    expect(
+      tester.element(find.byKey(const ValueKey('fake-trip-map-canvas'))),
+      same(canvas),
+    );
+
+    retry.add([_dayOne, _dayTwo]);
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+    expect(find.text('無法載入日期'), findsNothing);
+
+    retry.add([
+      TripDay(
+        id: 2,
+        dayNum: 2,
+        version: 2,
+        timeline: [
+          _entry(id: 21, title: '美麗海水族館更新', lat: 26.694, lng: 127.878),
+        ],
+      ),
+      _dayOne,
+    ]);
+    await tester.pumpAndSettle();
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(_sharedDayNum(tester), 2);
+    expect(find.byKey(const ValueKey('active-entry-card-21')), findsOneWidget);
+    expect(find.text('美麗海水族館更新'), findsOneWidget);
+    expect(
+      tester.element(find.byKey(const ValueKey('fake-trip-map-canvas'))),
+      same(canvas),
+    );
+    expect(
+      mapConfig!.markers
+          .singleWhere((marker) => marker.id == 'map-pin-21')
+          .zIndex,
+      1000,
+    );
+  });
+
+  testWidgets('同一畫面只更新 deep link Day 時重新聚焦日期', (tester) async {
+    TripMapCanvasConfig? mapConfig;
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialDayNum: 1,
+        onMapConfig: (config) => mapConfig = config,
+      ),
+    );
+    await tester.pumpAndSettle();
+    mapConfig!.markers
+        .singleWhere((marker) => marker.id == 'map-pin-12')
+        .onTap!();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsOneWidget);
+    final screenElement = tester.element(find.byType(TripMapScreen));
+    GoRouter.of(screenElement).go('/?day=2');
+    await tester.pumpAndSettle();
+
+    expect(tester.element(find.byType(TripMapScreen)), same(screenElement));
+    expect(_mapSelectorTabIndex(tester), 2);
+    expect(_sharedDayNum(tester), 2);
+    expect(find.text('美麗海水族館'), findsOneWidget);
+    expect(find.byKey(const ValueKey('preview-entry-card-21')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-12')), findsNothing);
+    expect(find.byKey(const ValueKey('map-pin-12')), findsNothing);
+  });
+
+  testWidgets('fresh 重排預覽卡片不選取 marker 或移動鏡頭', (tester) async {
+    final source = StreamController<List<TripDay>>();
+    addTearDown(source.close);
+    final nativeController = _FakeTripMapPlatformController();
+    var attached = false;
+    await tester.pumpWidget(
+      _buildScreen(
+        const [],
+        daysStream: source.stream,
+        onMapConfig: (config) {
+          if (attached) return;
+          attached = true;
+          config.controller.attach(nativeController);
+        },
+      ),
+    );
+    source.add([_dayOne]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsNothing);
+    expect(nativeController.moves, isNotEmpty);
+    nativeController.moves.clear();
+
+    source.add([
+      TripDay(
+        id: 1,
+        dayNum: 1,
+        version: 2,
+        timeline: [
+          _dayOne.timeline[1],
+          _dayOne.timeline[0],
+          _dayOne.timeline[2],
+        ],
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(nativeController.moves, isEmpty);
+    expect(find.byKey(const ValueKey('preview-entry-card-11')), findsOneWidget);
+    expect(find.byKey(const ValueKey('active-entry-card-11')), findsNothing);
+    await tester.drag(find.byType(PageView), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('active-entry-card-13')), findsOneWidget);
+  });
+
   testWidgets('Google POI 關閉後還原 Day、卡片索引與 marker 聚焦', (tester) async {
     TripMapCanvasConfig? mapConfig;
     await tester.pumpWidget(
@@ -788,8 +1286,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(_sharedDayNum(tester), 1);
 
-    // SWR 第二段 emit 給出新的 list，同一批切到背景：地圖內部會依 initialDayNum
-    // 退回 DAY 2，但背景分支不得把這個退回寫進共用狀態。
+    // SWR 第二段 emit 給出新的 list，同一批切到背景：保留仍有效的 DAY 1，
+    // 背景分支也不得把這次資料更新寫進共用狀態。
     days.add([_dayOne, _dayTwo]);
     active.value = false;
     await tester.pumpAndSettle();
