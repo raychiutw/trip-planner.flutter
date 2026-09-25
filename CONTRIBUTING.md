@@ -12,6 +12,8 @@ flutter pub get
 flutter test         # 全綠才算環境就緒;數量以當次輸出為準
 ```
 
+PDF 測試會讀取真正的輸出檔案：macOS 使用 Xcode Command Line Tools 的 Swift 與 PDFKit；Linux／Ubuntu 需先安裝 `poppler-utils`（`sudo apt-get install poppler-utils`），提供 `pdftotext` 與 `pdfinfo`。測試使用 repository 的固定中文字型，不連線下載；來源、授權及解析器說明見 [PDF 字型驗證素材](test/fixtures/fonts/noto-sans-tc/README.md)。
+
 ### 指向本機後端
 
 預設連正式站 `https://trip-planner-dby.pages.dev`。**連 prod 時破壞性操作(刪除等)會真的打到正式資料** —— 測破壞性流程一律先改指本機後端,或使用測試帳號。

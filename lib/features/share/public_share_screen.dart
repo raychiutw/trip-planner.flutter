@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../app/app_loading_skeleton.dart';
@@ -16,19 +17,21 @@ import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
+import '../../models/note_content.dart';
+import '../trip_detail/note_content_field.dart';
 import '../../models/share.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
+import '../../ui/tp_state_view.dart';
 import '../trip_detail/trip_pdf_service.dart';
 import '../trip_detail/trip_print_data.dart';
 
 /// 公開分享頁資料 provider。
-final publicTripShareProvider = FutureProvider.family<PublicTripShare, String>((
-  ref,
-  token,
-) {
-  return ref.watch(tripRepositoryProvider).fetchPublicTripShare(token);
-});
+final publicTripShareProvider = FutureProvider.family<PublicTripShare, String>(
+  (ref, token) => ref.watch(tripRepositoryProvider).fetchPublicTripShare(token),
+  // 保留 ApiClient 的有限重送；最終失敗交給使用者原地重試。
+  retry: (retryCount, error) => null,
+);
 
 class PublicShareScreen extends ConsumerStatefulWidget {
   const PublicShareScreen({super.key, required this.token});
@@ -59,11 +62,17 @@ class _PublicShareScreenState extends ConsumerState<PublicShareScreen> {
       ),
       body: SafeArea(
         child: shareAsync.when(
+          skipLoadingOnRefresh: !shareAsync.hasError,
           loading: () => const AppListLoadingSkeleton(
             key: ValueKey('public-share-loading'),
           ),
-          error: (error, stackTrace) => _NotFoundState(
-            onRetry: () => ref.invalidate(publicTripShareProvider(_token)),
+          error: (error, stackTrace) => _PublicShareFailure(
+            error: error,
+            onRetry: () {
+              final provider = publicTripShareProvider(_token);
+              if (ref.read(provider).isLoading) return;
+              ref.invalidate(provider);
+            },
           ),
           data: (share) => _ShareContent(
             share: share,
@@ -462,97 +471,11 @@ class _NotesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sections = <Widget>[
-      if (notes.flights.isNotEmpty)
+      for (final section in projectTripNotes(notes))
         _NoteCard(
-          title: '航班',
-          icon: CupertinoIcons.airplane,
-          rows: notes.flights
-              .map(
-                (flight) => _NoteRowData(
-                  title: [
-                    flight.airline,
-                    flight.flightNo,
-                  ].where((part) => part.isNotEmpty).join(' '),
-                  body: [
-                    flight.departAirport,
-                    flight.departAt,
-                    flight.arriveAirport.isEmpty
-                        ? ''
-                        : '→ ${flight.arriveAirport}',
-                    flight.arriveAt,
-                    flight.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.lodgings.isNotEmpty)
-        _NoteCard(
-          title: '住宿',
-          icon: CupertinoIcons.bed_double,
-          rows: notes.lodgings
-              .map(
-                (lodging) => _NoteRowData(
-                  title: lodging.name,
-                  body: [
-                    lodging.checkInAt,
-                    lodging.checkOutAt,
-                    lodging.address,
-                    lodging.phone,
-                    lodging.bookingNo,
-                    lodging.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.reservations.isNotEmpty)
-        _NoteCard(
-          title: '預訂',
-          icon: CupertinoIcons.checkmark_circle,
-          rows: notes.reservations
-              .map(
-                (reservation) => _NoteRowData(
-                  title: reservation.title,
-                  body: [
-                    reservation.reservedAt,
-                    reservation.partySize > 0
-                        ? '${reservation.partySize} 位'
-                        : '',
-                    reservation.reservationNo,
-                    reservation.phone,
-                    reservation.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.pretripNotes.isNotEmpty)
-        _NoteCard(
-          title: '行前須知',
-          icon: CupertinoIcons.doc_text,
-          rows: notes.pretripNotes
-              .map(
-                (note) => _NoteRowData(title: note.title, body: note.content),
-              )
-              .toList(),
-        ),
-      if (notes.emergencyContacts.isNotEmpty)
-        _NoteCard(
-          title: '緊急聯絡',
-          icon: CupertinoIcons.phone,
-          rows: notes.emergencyContacts
-              .map(
-                (contact) => _NoteRowData(
-                  title: contact.name,
-                  body: [
-                    contact.relationship,
-                    contact.phone,
-                    contact.email,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
+          title: section.label,
+          icon: noteContentSectionIcon(section.kind),
+          contentRows: section.rows,
         ),
     ];
     if (sections.isEmpty) return const SizedBox.shrink();
@@ -571,58 +494,62 @@ class _NoteCard extends StatelessWidget {
   const _NoteCard({
     required this.title,
     required this.icon,
-    required this.rows,
+    this.contentRows = const [],
   });
 
   final String title;
   final IconData icon;
-  final List<_NoteRowData> rows;
+  final List<NoteContentRow> contentRows;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: TpSpacing.s2),
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            for (final row in rows)
-              if (row.title.trim().isNotEmpty || row.body.trim().isNotEmpty)
+    return SelectionArea(
+      child: Card(
+        margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 18),
+                  const SizedBox(width: TpSpacing.s2),
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                ],
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              for (final row in contentRows)
                 Padding(
                   padding: const EdgeInsets.only(top: TpSpacing.s2),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (row.title.trim().isNotEmpty)
+                      if (row.title.isNotEmpty)
                         Text(
-                          row.title.trim(),
+                          row.title,
+                          semanticsLabel: row.heading
+                              .map((field) => field.semanticsLabel)
+                              .join('，'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                      if (row.body.trim().isNotEmpty) Text(row.body.trim()),
+                      Wrap(
+                        spacing: TpSpacing.s2,
+                        runSpacing: TpSpacing.s1,
+                        children: [
+                          for (final field in row.details)
+                            NoteContentFieldView(field: field),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-class _NoteRowData {
-  const _NoteRowData({required this.title, required this.body});
-
-  final String title;
-  final String body;
 }
 
 class _EmptyDocument extends StatelessWidget {
@@ -637,39 +564,39 @@ class _EmptyDocument extends StatelessWidget {
   }
 }
 
-class _NotFoundState extends StatelessWidget {
-  const _NotFoundState({required this.onRetry});
+/// 公開分享的錯誤 adapter：HTTP 分類、說明與原地重試共用同一入口。
+class _PublicShareFailure extends StatelessWidget {
+  const _PublicShareFailure({required this.error, required this.onRetry});
 
+  final Object error;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      key: const ValueKey('public-share-notfound'),
-      container: true,
-      liveRegion: true,
-      label: '連結已失效',
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(TpSpacing.s5),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.link_off_outlined,
-                size: 40,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: TpSpacing.s3),
-              Text('連結已失效', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: TpSpacing.s2),
-              const Text(
-                '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: TpSpacing.s4),
-              FilledButton(onPressed: onRetry, child: const Text('重試')),
-            ],
+    final isInvalidLink =
+        error is ApiError && (error as ApiError).status == 404;
+    final title = isInvalidLink ? '連結已失效' : '暫時無法載入行程';
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Semantics(
+            key: ValueKey(
+              isInvalidLink
+                  ? 'public-share-notfound'
+                  : 'public-share-load-error',
+            ),
+            container: true,
+            liveRegion: true,
+            child: TpStateView(
+              kind: TpStateKind.error,
+              title: title,
+              message: isInvalidLink
+                  ? '這個分享連結不存在、已被關閉或已過期。請向分享者索取新的連結。'
+                  : '請確認網路連線後重試。',
+              actionLabel: '重試',
+              onAction: onRetry,
+            ),
           ),
         ),
       ),

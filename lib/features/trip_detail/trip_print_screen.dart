@@ -15,6 +15,8 @@ import '../../app/app_feedback.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
+import '../../models/note_content.dart';
+import 'note_content_field.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_action_item.dart';
 import '../../ui/tp_app_bar.dart';
@@ -392,97 +394,11 @@ class _PrintNotesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sections = <Widget>[
-      if (notes.flights.isNotEmpty)
+      for (final section in projectTripNotes(notes))
         _NoteCard(
-          title: '航班',
-          icon: CupertinoIcons.airplane,
-          rows: notes.flights
-              .map(
-                (flight) => _NoteRowData(
-                  title: [
-                    flight.airline,
-                    flight.flightNo,
-                  ].where((part) => part.isNotEmpty).join(' '),
-                  body: [
-                    flight.departAirport,
-                    flight.departAt,
-                    flight.arriveAirport.isEmpty
-                        ? ''
-                        : '→ ${flight.arriveAirport}',
-                    flight.arriveAt,
-                    flight.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.lodgings.isNotEmpty)
-        _NoteCard(
-          title: '住宿',
-          icon: CupertinoIcons.bed_double,
-          rows: notes.lodgings
-              .map(
-                (lodging) => _NoteRowData(
-                  title: lodging.name,
-                  body: [
-                    lodging.checkInAt,
-                    lodging.checkOutAt,
-                    lodging.address,
-                    lodging.phone,
-                    lodging.bookingNo,
-                    lodging.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.reservations.isNotEmpty)
-        _NoteCard(
-          title: '預訂',
-          icon: CupertinoIcons.checkmark_circle,
-          rows: notes.reservations
-              .map(
-                (reservation) => _NoteRowData(
-                  title: reservation.title,
-                  body: [
-                    reservation.reservedAt,
-                    reservation.partySize > 0
-                        ? '${reservation.partySize} 位'
-                        : '',
-                    reservation.reservationNo,
-                    reservation.phone,
-                    reservation.note,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
-        ),
-      if (notes.pretripNotes.isNotEmpty)
-        _NoteCard(
-          title: '行前須知',
-          icon: CupertinoIcons.doc_text,
-          rows: notes.pretripNotes
-              .map(
-                (note) => _NoteRowData(title: note.title, body: note.content),
-              )
-              .toList(),
-        ),
-      if (notes.emergencyContacts.isNotEmpty)
-        _NoteCard(
-          title: '緊急聯絡',
-          icon: CupertinoIcons.phone,
-          rows: notes.emergencyContacts
-              .map(
-                (contact) => _NoteRowData(
-                  title: contact.name,
-                  body: [
-                    contact.relationship,
-                    contact.phone,
-                    contact.email,
-                  ].where((part) => part.isNotEmpty).join(' · '),
-                ),
-              )
-              .toList(),
+          title: section.label,
+          icon: noteContentSectionIcon(section.kind),
+          contentRows: section.rows,
         ),
     ];
     if (sections.isEmpty) return const SizedBox.shrink();
@@ -501,58 +417,62 @@ class _NoteCard extends StatelessWidget {
   const _NoteCard({
     required this.title,
     required this.icon,
-    required this.rows,
+    this.contentRows = const [],
   });
 
   final String title;
   final IconData icon;
-  final List<_NoteRowData> rows;
+  final List<NoteContentRow> contentRows;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: TpSpacing.s3),
-      child: Padding(
-        padding: const EdgeInsets.all(TpSpacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: TpSpacing.s2),
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-              ],
-            ),
-            const SizedBox(height: TpSpacing.s2),
-            for (final row in rows)
-              if (row.title.trim().isNotEmpty || row.body.trim().isNotEmpty)
+    return SelectionArea(
+      child: Card(
+        margin: const EdgeInsets.only(bottom: TpSpacing.s3),
+        child: Padding(
+          padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 18),
+                  const SizedBox(width: TpSpacing.s2),
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                ],
+              ),
+              const SizedBox(height: TpSpacing.s2),
+              for (final row in contentRows)
                 Padding(
                   padding: const EdgeInsets.only(top: TpSpacing.s2),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (row.title.trim().isNotEmpty)
+                      if (row.title.isNotEmpty)
                         Text(
-                          row.title.trim(),
+                          row.title,
+                          semanticsLabel: row.heading
+                              .map((field) => field.semanticsLabel)
+                              .join('，'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                      if (row.body.trim().isNotEmpty) Text(row.body.trim()),
+                      Wrap(
+                        spacing: TpSpacing.s2,
+                        runSpacing: TpSpacing.s1,
+                        children: [
+                          for (final field in row.details)
+                            NoteContentFieldView(field: field),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-class _NoteRowData {
-  const _NoteRowData({required this.title, required this.body});
-
-  final String title;
-  final String body;
 }
 
 class _EmptyPrintDocument extends StatelessWidget {

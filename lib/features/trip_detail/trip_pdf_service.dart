@@ -10,7 +10,7 @@ import 'package:printing/printing.dart';
 
 import '../../models/day.dart';
 import '../../models/entry.dart';
-import '../../models/notes.dart';
+import '../../models/note_content.dart';
 import 'trip_print_data.dart';
 
 /// Print/PDF action implementation used by [TripPrintScreen].
@@ -53,6 +53,7 @@ Future<Uint8List> buildTripPdf(
   TripPrintData data, {
   PdfPageFormat pageFormat = PdfPageFormat.a4,
 }) async {
+  final notes = projectTripNotes(data.notes);
   final baseFont = await PdfGoogleFonts.notoSansTCRegular();
   final boldFont = await PdfGoogleFonts.notoSansTCBold();
   final document = pw.Document();
@@ -68,9 +69,9 @@ Future<Uint8List> buildTripPdf(
           pw.Center(child: pw.Text('尚無行程'))
         else
           for (final day in data.days) _PdfDaySection(day: day),
-        if (_hasNotes(data.notes)) ...[
+        if (notes.isNotEmpty) ...[
           pw.SizedBox(height: 14),
-          _PdfNotesSection(notes: data.notes),
+          ..._noteWidgets(notes),
         ],
       ],
     ),
@@ -185,108 +186,6 @@ class _PdfDaySection extends pw.StatelessWidget {
   }
 }
 
-class _PdfNotesSection extends pw.StatelessWidget {
-  _PdfNotesSection({required this.notes});
-
-  final TripNotes notes;
-
-  @override
-  pw.Widget build(pw.Context context) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          '行程筆記',
-          style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-        ),
-        pw.SizedBox(height: 6),
-        if (notes.flights.isNotEmpty)
-          _noteBlock(
-            '航班',
-            notes.flights.map((flight) {
-              return _NoteLine(
-                title: [
-                  flight.airline,
-                  flight.flightNo,
-                ].where((part) => part.isNotEmpty).join(' '),
-                body: [
-                  flight.departAirport,
-                  flight.departAt,
-                  flight.arriveAirport.isEmpty
-                      ? ''
-                      : '→ ${flight.arriveAirport}',
-                  flight.arriveAt,
-                  flight.note,
-                ].where((part) => part.isNotEmpty).join(' · '),
-              );
-            }).toList(),
-          ),
-        if (notes.lodgings.isNotEmpty)
-          _noteBlock(
-            '住宿',
-            notes.lodgings.map((lodging) {
-              return _NoteLine(
-                title: lodging.name,
-                body: [
-                  lodging.checkInAt,
-                  lodging.checkOutAt,
-                  lodging.address,
-                  lodging.phone,
-                  lodging.bookingNo,
-                  lodging.note,
-                ].where((part) => part.isNotEmpty).join(' · '),
-              );
-            }).toList(),
-          ),
-        if (notes.reservations.isNotEmpty)
-          _noteBlock(
-            '預訂',
-            notes.reservations.map((reservation) {
-              return _NoteLine(
-                title: reservation.title,
-                body: [
-                  reservation.reservedAt,
-                  reservation.partySize > 0 ? '${reservation.partySize} 位' : '',
-                  reservation.reservationNo,
-                  reservation.phone,
-                  reservation.note,
-                ].where((part) => part.isNotEmpty).join(' · '),
-              );
-            }).toList(),
-          ),
-        if (notes.pretripNotes.isNotEmpty)
-          _noteBlock(
-            '行前須知',
-            notes.pretripNotes
-                .map((note) => _NoteLine(title: note.title, body: note.content))
-                .toList(),
-          ),
-        if (notes.emergencyContacts.isNotEmpty)
-          _noteBlock(
-            '緊急聯絡',
-            notes.emergencyContacts.map((contact) {
-              return _NoteLine(
-                title: contact.name,
-                body: [
-                  contact.relationship,
-                  contact.phone,
-                  contact.email,
-                ].where((part) => part.isNotEmpty).join(' · '),
-              );
-            }).toList(),
-          ),
-      ],
-    );
-  }
-}
-
-class _NoteLine {
-  const _NoteLine({required this.title, required this.body});
-
-  final String title;
-  final String body;
-}
-
 pw.Widget _entryCell(TimelineEntry entry) {
   final alternates = entry.alternates
       .map((poi) => poi.name ?? '')
@@ -331,56 +230,76 @@ pw.Widget _cell(String text, {bool bold = false}) {
   );
 }
 
-pw.Widget _noteBlock(String title, List<_NoteLine> rows) {
-  final visibleRows = rows
-      .where((row) => row.title.trim().isNotEmpty || row.body.trim().isNotEmpty)
-      .toList();
-  if (visibleRows.isEmpty) return pw.SizedBox.shrink();
-  return pw.Container(
-    margin: const pw.EdgeInsets.only(bottom: 8),
-    padding: const pw.EdgeInsets.all(8),
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(title, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 4),
-        for (final row in visibleRows)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 3),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                if (row.title.trim().isNotEmpty)
-                  pw.Text(
-                    row.title.trim(),
-                    style: const pw.TextStyle(fontSize: 9),
-                  ),
-                if (row.body.trim().isNotEmpty)
-                  pw.Text(
-                    row.body.trim(),
-                    style: const pw.TextStyle(
-                      fontSize: 8,
-                      color: PdfColors.grey700,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-      ],
-    ),
+/// 長文字直接交給 MultiPage 的 spanning Text，避免整張筆記卡被鎖在單頁。
+Iterable<pw.Widget> _noteWidgets(List<NoteContentSection> sections) sync* {
+  yield pw.Text(
+    '行程筆記',
+    style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
   );
-}
-
-bool _hasNotes(TripNotes notes) {
-  return notes.flights.isNotEmpty ||
-      notes.lodgings.isNotEmpty ||
-      notes.reservations.isNotEmpty ||
-      notes.pretripNotes.isNotEmpty ||
-      notes.emergencyContacts.isNotEmpty;
+  yield pw.SizedBox(height: 6);
+  for (final section in sections) {
+    yield pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300)),
+      ),
+      child: pw.Text(
+        section.label,
+        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+      ),
+    );
+    for (final row in section.rows) {
+      if (row.title.isNotEmpty) {
+        yield pw.Text(
+          row.title,
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+        );
+      }
+      yield pw.RichText(
+        overflow: pw.TextOverflow.span,
+        text: pw.TextSpan(
+          style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+          children: [
+            for (var index = 0; index < row.details.length; index++) ...[
+              if (index > 0) const pw.TextSpan(text: ' · '),
+              pw.TextSpan(
+                text: row.details[index].text,
+                annotation:
+                    row.details[index].links.length == 1 &&
+                        row.details[index].links.single.label ==
+                            row.details[index].value
+                    ? pw.AnnotationUrl(
+                        row.details[index].links.single.uri.toString(),
+                      )
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      );
+      for (final field in row.details) {
+        if (field.links.length == 1 &&
+            field.links.single.label == field.value) {
+          continue;
+        }
+        for (final link in field.links) {
+          yield pw.RichText(
+            overflow: pw.TextOverflow.span,
+            text: pw.TextSpan(
+              text: link.label == link.uri.toString() ? '開啟連結' : link.label,
+              annotation: pw.AnnotationUrl(link.uri.toString()),
+              style: const pw.TextStyle(
+                fontSize: 8,
+                decoration: pw.TextDecoration.underline,
+              ),
+            ),
+          );
+        }
+      }
+      yield pw.SizedBox(height: 6);
+    }
+    yield pw.SizedBox(height: 8);
+  }
 }
 
 String _timeLine(TimelineEntry entry) {
