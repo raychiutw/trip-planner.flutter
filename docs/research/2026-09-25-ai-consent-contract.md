@@ -2,9 +2,9 @@
 
 ## 2026-09-26 後續：後端 staged 契約草案
 
-[後端 PR #1353](https://github.com/raychiutw/trip-planner/pull/1353) 在 `uat` 目標分支提出[版本化資料同意契約](https://github.com/raychiutw/trip-planner/blob/5766571ea794b691288a7ff4f8ddd439bc15ade6/docs/api/ai-data-consent.md)：`GET /api/account/ai-data-consent` 回傳 server-owned 告知版本、文字、`unconfigured／not_accepted／current／outdated／revoked／declined` 狀態及接受／決定時間；`POST` 接受或拒絕、`DELETE` 撤銷皆帶所顯示版本及 UUID `requestId`。同一 `requestId` 的同一決定可冪等重送；版本失效或同一 ID 對應不同決定回 409。三個 AI 建工單入口與排隊後的 token mint 都檢查送出者及行程 owner；未符合回 `AI_DATA_CONSENT_REQUIRED`，排隊失效記 `terminalReason: needs_consent`。
+[後端 PR #1353](https://github.com/raychiutw/trip-planner/pull/1353) 在 `uat` 目標分支提出[版本化資料同意契約](https://github.com/raychiutw/trip-planner/blob/1c0ff79d82a8c365d6ff98e5fcbb777b854e6050/docs/api/ai-data-consent.md)：`GET /api/account/ai-data-consent` 回傳 server-owned 告知版本、文字、`unconfigured／not_accepted／current／outdated／revoked／declined` 狀態及接受／決定時間；`POST` 接受或拒絕、`DELETE` 撤銷皆帶所顯示版本及 UUID `requestId`。同一 `requestId` 的同一決定可冪等重送；版本失效或同一 ID 對應不同決定回 409。三個 AI 建工單入口與排隊後的 token mint 都檢查送出者及行程 owner：送出者缺同意回 `AI_DATA_CONSENT_REQUIRED`，只有 owner 缺同意回 `AI_DATA_CONSENT_OWNER_REQUIRED`；排隊後的失效仍只記通用的 `terminalReason: needs_consent`。
 
-這是尚未啟用的契約草案：migration 0097 **不**建立 active disclosure，正式處理方、資料類別、目的、撤銷文案、版本與 production rollout 都待核准。既有 OAuth grant 與 AI 資料同意仍分開。Flutter 已向後端提出待釐清項目：共編者自身同意為 `current`、owner 未同意時，目前兩者皆回同一 403 code，畫面無法可靠判斷應提示誰完成同意；需穩定的 actor 原因或明確可驗的判讀規則。本節只更新研究依據，不代表 #390 已解除阻擋或做過正式環境測試。
+這是尚未啟用的契約草案：migration 0097 **不**建立 active disclosure，正式處理方、資料類別、目的、撤銷文案、版本與 production rollout 都待核准。既有 OAuth grant 與 AI 資料同意仍分開。Flutter 現有 `TripRequest.fromJson` 已能解析 `terminalReason: needs_consent`；但聊天文案仍將它誤稱為舊 OAuth 授權。排隊中的通用原因無法辨別哪一方狀態改變，恢復時應重新讀登入者的 consent：本人未達 `current` 才提示本人同意；本人已達 `current` 則提示聯絡行程 owner。這是 #390 的後續實作範圍，本節不代表已解除正式契約 blocker 或做過正式環境測試。
 
 日期：2026-09-25。追蹤：[T49／#382](https://github.com/raychiutw/trip-planner.flutter/issues/382)，交付對象：[T58／#390](https://github.com/raychiutw/trip-planner.flutter/issues/390)。
 
