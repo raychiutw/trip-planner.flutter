@@ -237,13 +237,13 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     if (_needsConflictConfirmation) {
       setState(() => _submitting = true);
       _syncFormState();
-      final overwrite = await showAppConfirm(
+      final overwrite = await showAppDestructiveConfirm(
         context,
+        source: TpDestructiveConfirmSource.direct,
         title: '保留你的版本？',
         message: '協作者也更新了交通設定。繼續會以你目前的交通方式與分鐘數覆蓋對方版本。',
         confirmLabel: '保留我的版本',
         cancelLabel: '繼續編輯',
-        isDestructive: true,
       );
       if (!mounted) return false;
       setState(() => _submitting = false);
