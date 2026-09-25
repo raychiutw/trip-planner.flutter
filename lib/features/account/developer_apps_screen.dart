@@ -760,37 +760,40 @@ class _DeveloperAppTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListTile(
-      key: Key('developer-app-row-${app.clientId}'),
-      onTap: onTap,
-      leading: const Icon(
-        CupertinoIcons.chevron_left_slash_chevron_right,
-        size: 22,
-      ),
-      title: Text(app.appName),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: TpSpacing.s1),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(app.clientId),
-            const SizedBox(height: TpSpacing.s1),
-            Text(
-              '${app.clientTypeLabel} · ${app.redirectUris.join(', ')}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return Semantics(
+      hint: '編輯應用',
+      child: ListTile(
+        key: Key('developer-app-row-${app.clientId}'),
+        onTap: onTap,
+        leading: const Icon(
+          CupertinoIcons.chevron_left_slash_chevron_right,
+          size: 22,
+        ),
+        title: Text(app.appName),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: TpSpacing.s1),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(app.clientId),
+              const SizedBox(height: TpSpacing.s1),
+              Text(
+                '${app.clientTypeLabel} · ${app.redirectUris.join(', ')}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StatusChip(label: app.statusLabel),
+            const SizedBox(width: TpSpacing.s2),
+            const Icon(CupertinoIcons.chevron_forward, size: 18),
           ],
         ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _StatusChip(label: app.statusLabel),
-          const SizedBox(width: TpSpacing.s2),
-          const Icon(CupertinoIcons.chevron_forward, size: 18),
-        ],
       ),
     );
   }
