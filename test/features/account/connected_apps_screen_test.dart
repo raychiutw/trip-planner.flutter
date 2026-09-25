@@ -138,6 +138,38 @@ void main() {
     ).called(greaterThanOrEqualTo(3));
   });
 
+  testWidgets('同一應用程式重新授權後，重新整理顯示新的授權', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('connected-app-revoke-tp_alpha')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
+
+    when(() => mockTripRepository.fetchConnectedApps()).thenAnswer(
+      (_) async => const [
+        ConnectedApp(
+          clientId: 'tp_alpha',
+          appName: 'Alpha App',
+          appDescription: '行程同步工具',
+          homepageUrl: 'https://alpha.example.com',
+          status: 'active',
+          scopes: ['openid', 'email'],
+          grantedAt: 1783500001000,
+        ),
+      ],
+    );
+
+    await tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsOneWidget);
+  });
+
   testWidgets('撤銷 pending 期間鎖定操作，失敗時保留 app 與重試入口', (tester) async {
     final revokeCompleter = Completer<void>();
     when(

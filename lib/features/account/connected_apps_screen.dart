@@ -35,7 +35,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   String? _busyClientId;
   String? _mutationError;
   ConnectedApp? _failedApp;
-  final Set<String> _revokedClientIds = {};
+  final Map<String, int> _revokedGrantTimes = {};
   int _aiAuthorizationRevision = 0;
 
   @override
@@ -56,7 +56,10 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
         ),
         data: (apps) {
           final visibleApps = apps
-              .where((app) => !_revokedClientIds.contains(app.clientId))
+              .where(
+                (app) =>
+                    app.grantedAt > (_revokedGrantTimes[app.clientId] ?? -1),
+              )
               .toList();
           return RefreshIndicator.adaptive(
             onRefresh: _refreshAll,
@@ -67,7 +70,6 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
                 AiAuthorizeCard(
                   key: ValueKey(_aiAuthorizationRevision),
                   onAuthorized: () {
-                    setState(_revokedClientIds.clear);
                     ref.invalidate(connectedAppsProvider);
                   },
                 ),
@@ -127,13 +129,13 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
   }
 
   Future<void> _confirmRevoke(ConnectedApp app) async {
-    final shouldRevoke = await showAppConfirm(
+    final shouldRevoke = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '撤銷 ${app.appName}？',
       message:
           '這會立即撤銷 ${app.appName} 的存取權與既有授權，應用程式將無法再讀取你的 Tripline 資料。這項操作無法復原；之後必須重新授權。',
       confirmLabel: '撤銷',
-      isDestructive: true,
     );
     if (!shouldRevoke || !mounted) return;
 
@@ -146,7 +148,7 @@ class _ConnectedAppsScreenState extends ConsumerState<ConnectedAppsScreen> {
       await ref.read(tripRepositoryProvider).revokeConnectedApp(app.clientId);
       if (!mounted) return;
       setState(() {
-        _revokedClientIds.add(app.clientId);
+        _revokedGrantTimes[app.clientId] = app.grantedAt;
         _aiAuthorizationRevision++;
       });
       ref.invalidate(connectedAppsProvider);
