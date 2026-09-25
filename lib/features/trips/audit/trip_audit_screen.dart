@@ -14,6 +14,8 @@ import '../../../models/trip_audit.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
 
+const _auditLimit = 50;
+
 /// Shows the latest audit rows for a trip as a read-only history.
 class TripAuditScreen extends ConsumerStatefulWidget {
   const TripAuditScreen({super.key, required this.tripId});
@@ -60,7 +62,7 @@ class _TripAuditScreenState extends ConsumerState<TripAuditScreen> {
       final repository = ref.read(tripRepositoryProvider);
       final results = await Future.wait<Object?>([
         repository.fetchTrip(tripId),
-        repository.fetchAuditLog(tripId, limit: 50),
+        repository.fetchAuditLog(tripId, limit: _auditLimit),
       ]);
       if (!_isCurrent(generation, tripId)) return;
       setState(() {
@@ -183,6 +185,8 @@ class _Header extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: TpSpacing.s2),
+        Text('顯示最近最多 $_auditLimit 筆異動', style: textTheme.bodyMedium),
       ],
     );
   }
