@@ -25,7 +25,10 @@ sealed class RequestLifecycleState {
 
 /// 還在等(open / processing)。
 final class RequestInFlight extends RequestLifecycleState {
-  const RequestInFlight({super.request});
+  const RequestInFlight({super.request, this.status = RequestStatus.open});
+
+  /// 種子工單與 SSE 事件共同提供的目前進度。
+  final RequestStatus status;
 }
 
 /// 已終結。[serverConfirmed] 為 false 表示是本機先終結(停止等待沒送到)。
@@ -34,12 +37,16 @@ final class RequestTerminal extends RequestLifecycleState {
     required this.status,
     this.terminalReason,
     this.serverConfirmed = true,
+    this.errorMessage,
     super.request,
   });
 
   final RequestStatus status;
   final TerminalReason? terminalReason;
   final bool serverConfirmed;
+
+  /// 終態事件的原始錯誤，交由各領域翻譯。
+  final String? errorMessage;
 }
 
 /// SSE 收不到時的輪詢起始間隔;每輪加倍到 [kRequestPollCeiling] 封頂,
@@ -145,6 +152,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
             status: current.status,
             terminalReason: row.terminalReason,
             serverConfirmed: current.serverConfirmed,
+            errorMessage: current.errorMessage,
             request: row,
           );
         }
@@ -154,7 +162,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
         _terminate(row.status, row.terminalReason, request: row);
         return row;
       }
-      state = RequestInFlight(request: row);
+      state = RequestInFlight(request: row, status: row.status);
       return row;
     } on Object {
       // 補讀失敗不推翻已知終態；進行中的暫時性錯誤則繼續等待。
@@ -176,12 +184,17 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     }
     _events = stream.listen(
       (event) {
-        if (!event.isTerminal || _stale(run) || state is RequestTerminal) {
+        if (_stale(run) || state is RequestTerminal) return;
+        if (!event.isTerminal) {
+          if (event.status case final status?) {
+            state = RequestInFlight(request: state.request, status: status);
+          }
           return;
         }
         _terminate(
           event.status ?? RequestStatus.failed,
           event.error != null ? TerminalReason.error : null,
+          errorMessage: event.error,
         );
         if (event.status == RequestStatus.failed && event.error == null) {
           unawaited(_completeTerminalReason(run));
@@ -236,6 +249,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     RequestStatus status,
     TerminalReason? reason, {
     bool serverConfirmed = true,
+    String? errorMessage,
     TripRequest? request,
   }) {
     if (state is RequestTerminal) return; // 不改寫已確認的終態；原因另由補讀補齊。
@@ -245,6 +259,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       status: status,
       terminalReason: reason,
       serverConfirmed: serverConfirmed,
+      errorMessage: errorMessage,
       request: request ?? state.request,
     );
   }
