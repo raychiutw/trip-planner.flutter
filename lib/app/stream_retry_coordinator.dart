@@ -11,6 +11,8 @@ class StreamRetryCoordinator {
 
   /// 合併進行中的讀取，閒置時才預留下一次讀取並要求刷新。
   /// Future 在來源 error、done 或取消時完成；資料錯誤仍由原串流傳遞。
+  /// 呼叫端須維持資料 consumer，讓刷新後的有限來源串流仍經 [track] 訂閱；
+  /// 若沒有訂閱認領重試，Future 會等待到 [dispose]。
   Future<void> retry() {
     if (_disposed) return Future.value();
     if (_active case final active?) return active.future;

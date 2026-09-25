@@ -39,6 +39,7 @@ Future<void> _open(
   TargetPlatform platform = TargetPlatform.android,
   Stream<TimelineEntry>? entryStream,
   bool alwaysUse24HourFormat = false,
+  double textScale = 1,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -56,9 +57,10 @@ Future<void> _open(
       child: MaterialApp(
         theme: AppTheme.light().copyWith(platform: platform),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(alwaysUse24HourFormat: alwaysUse24HourFormat),
+          data: MediaQuery.of(context).copyWith(
+            alwaysUse24HourFormat: alwaysUse24HourFormat,
+            textScaler: TextScaler.linear(textScale),
+          ),
           child: child!,
         ),
         home: Scaffold(
@@ -334,6 +336,66 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('窄版最大字級仍可捲動清除與選擇時間後儲存', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        expectedVersion: any(named: 'expectedVersion'),
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => repo.recomputeTravel(tripId: 't1')).thenAnswer((_) async {});
+    await _open(
+      tester,
+      repo,
+      const EntryEditExisting(_entry),
+      textScale: 3.2,
+      alwaysUse24HourFormat: true,
+    );
+    expect(tester.takeException(), isNull);
+    final clear = find.byKey(const ValueKey('entry-edit-start-clear'));
+    await tester.ensureVisible(clear);
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    expect(clear, findsNothing);
+    final start = find.byKey(const ValueKey('entry-edit-start'));
+    await tester.ensureVisible(start);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    final picker = find.byType(CupertinoDatePicker);
+    await tester.ensureVisible(picker);
+    tester
+        .widget<CupertinoDatePicker>(picker)
+        .onDateTimeChanged(DateTime(2026, 9, 25, 8, 17));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(start);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    expect(find.text('08:17'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => repo.updateEntry(
+        tripId: 't1',
+        entryId: 11,
+        expectedVersion: 2,
+        description: '世界遺產',
+        startTime: '08:17',
+        endTime: '10:00',
+      ),
+    ).called(1);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('展開再收合不得把 09:07 靜默量化成 09:05', (tester) async {
