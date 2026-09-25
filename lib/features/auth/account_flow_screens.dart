@@ -679,13 +679,19 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   bool _verifying = false;
   bool _success = false;
   String? _error;
+  bool _tokenInvalid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.token.trim().isEmpty) {
+      _tokenInvalid = true;
+      _error = '驗證連結不完整';
+    }
+  }
 
   Future<void> _verify() async {
-    if (_verifying) return;
-    if (widget.token.trim().isEmpty) {
-      setState(() => _error = '驗證連結缺少 token');
-      return;
-    }
+    if (_verifying || _tokenInvalid) return;
     setState(() {
       _verifying = true;
       _error = null;
@@ -697,17 +703,21 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       if (mounted) {
         setState(() {
           _success = ok;
-          _error = ok ? null : '驗證失敗，請重新開啟信中的連結';
+          _error = ok ? null : '暫時無法確認驗證結果，請再試一次';
         });
       }
     } on Exception catch (error) {
       if (mounted) {
-        setState(
-          () => _error = _authErrorMessage(error, const {
-            'VERIFY_TOKEN_INVALID': '驗證連結無效或已過期',
-            'VERIFY_TOKEN_MISSING': '驗證連結缺少 token',
-          }, '驗證失敗，請稍後再試'),
-        );
+        setState(() {
+          _tokenInvalid =
+              error is ApiError &&
+              const {'missing_token', 'expired', 'used'}.contains(error.code);
+          _error = _authErrorMessage(error, const {
+            'expired': '驗證連結無效或已過期',
+            'missing_token': '驗證連結不完整',
+            'used': '驗證連結已使用，請開啟最新的驗證信',
+          }, '驗證失敗，請稍後再試');
+        });
       }
     } finally {
       if (mounted) setState(() => _verifying = false);
@@ -718,12 +728,18 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Widget build(BuildContext context) {
     return _AuthScaffold(
       title: _success ? '信箱已驗證' : '確認信箱驗證',
-      subtitle: _success ? '可以回到登入頁繼續使用 Tripline' : '點擊下方按鈕完成驗證',
-      primaryActionLabel: _success ? null : (_verifying ? '驗證中…' : '驗證'),
-      primaryActionKey: _success
+      subtitle: _success
+          ? '可以回到登入頁繼續使用 Tripline'
+          : _tokenInvalid
+          ? '請重新開啟最新的驗證信，或重新開始使用 Tripline'
+          : '點擊下方按鈕完成驗證',
+      primaryActionLabel: _success || _tokenInvalid
+          ? null
+          : (_verifying ? '驗證中…' : (_error != null ? '重試' : '驗證')),
+      primaryActionKey: _success || _tokenInvalid
           ? null
           : const ValueKey('verify-email-confirm-button'),
-      onPrimaryAction: _success ? null : _verify,
+      onPrimaryAction: _success || _tokenInvalid ? null : _verify,
       primaryActionEnabled: !_verifying,
       child: Column(
         key: const ValueKey('verify-email-page'),
@@ -736,6 +752,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
             ),
             const SizedBox(height: TpSpacing.s4),
           ],
+          if (_tokenInvalid)
+            FilledButton(
+              onPressed: () => context.go('/login'),
+              child: const Text('重新開始'),
+            ),
           if (_success)
             FilledButton(
               key: const ValueKey('verify-email-success'),

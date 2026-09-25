@@ -1137,6 +1137,126 @@ void main() {
     );
   });
 
+  testWidgets('驗證連結過期後可重新開始且不猜測收件者', (tester) async {
+    when(() => mockAuthRepository.verifyEmail(any())).thenThrow(
+      const ApiError(status: 400, code: 'expired', message: 'expired'),
+    );
+    await pumpAuthRoutes(
+      tester,
+      initialLocation:
+          '/auth/verify-email?token=expired-token&email=other%40example.com',
+    );
+    await tester.tap(find.byKey(const ValueKey('verify-email-confirm-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('驗證連結無效或已過期'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsNothing,
+    );
+    await tester.tap(find.text('重新開始'));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    verify(() => mockAuthRepository.verifyEmail('expired-token')).called(1);
+    verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+  });
+
+  for (final (code, message) in [
+    ('missing_token', '驗證連結不完整'),
+    ('used', '驗證連結已使用，請開啟最新的驗證信'),
+  ]) {
+    testWidgets('驗證連結 $code 提供重新開始而非重送失效連結', (tester) async {
+      when(
+        () => mockAuthRepository.verifyEmail(any()),
+      ).thenThrow(ApiError(status: 400, code: code, message: code));
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/verify-email?token=unusable-token',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('verify-email-success')), findsNothing);
+      await tester.tap(find.text('重新開始'));
+      await tester.pumpAndSettle();
+      expect(find.text('login-destination'), findsOneWidget);
+    });
+  }
+
+  testWidgets('空白驗證 token 在小螢幕大字級直接提供重新開始', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/verify-email?token=%20%20',
+    );
+    expect(find.text('驗證連結不完整'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsNothing,
+    );
+    await tester.ensureVisible(find.text('重新開始'));
+    await tester.tap(find.text('重新開始'));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    verifyNever(() => mockAuthRepository.verifyEmail(any()));
+    verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+  });
+
+  for (final (reason, failure) in <(String, Exception?)>[
+    ('連線失敗', Exception('offline')),
+    (
+      '伺服器失敗',
+      const ApiError(
+        status: 500,
+        code: 'server_error',
+        message: 'server_error',
+      ),
+    ),
+    ('未知錯誤', const ApiError(status: 400, code: 'unknown', message: 'unknown')),
+    ('未確認成功', null),
+  ]) {
+    testWidgets('驗證 $reason 可用原 token 重試', (tester) async {
+      var attempts = 0;
+      when(() => mockAuthRepository.verifyEmail(any())).thenAnswer((_) async {
+        if (attempts++ == 0) {
+          if (failure != null) throw failure;
+          return false;
+        }
+        return true;
+      });
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/verify-email?token=retry-token',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('verify-email-error')), findsOneWidget);
+      expect(find.text('重新開始'), findsNothing);
+      await tester.tap(find.text('重試'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('verify-email-success')),
+        findsOneWidget,
+      );
+      verify(() => mockAuthRepository.verifyEmail('retry-token')).called(2);
+      verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+    });
+  }
+
   testWidgets('email 驗證需使用者按鈕觸發並顯示成功狀態', (tester) async {
     when(
       () => mockAuthRepository.verifyEmail(any()),

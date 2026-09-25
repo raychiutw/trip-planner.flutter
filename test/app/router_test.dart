@@ -172,6 +172,59 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  for (final user in [null, _loggedInUser]) {
+    testWidgets('驗證重新開始依登入狀態前往有效目的地：${user?.id ?? "未登入"}', (tester) async {
+      final container = _buildContainer(currentUser: user);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TriplineApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final router = container.read(appRouterProvider);
+      router.go('/auth/verify-email');
+      await tester.pumpAndSettle();
+      expect(find.byType(VerifyEmailScreen), findsOneWidget);
+      await tester.tap(find.text('重新開始'));
+      await tester.pumpAndSettle();
+      expect(find.byType(VerifyEmailScreen), findsNothing);
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        user == null ? '/login' : '/trips',
+      );
+      expect(
+        find.byType(user == null ? LoginScreen : TripsListScreen),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('開啟新的驗證連結會離開舊 token 的失效狀態', (tester) async {
+    final container = _buildContainer(currentUser: null);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/verify-email');
+    await tester.pumpAndSettle();
+    expect(find.text('重新開始'), findsOneWidget);
+    router.go('/auth/verify-email?token=new-token');
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsOneWidget,
+    );
+    expect(find.text('重新開始'), findsNothing);
+  });
+
   testWidgets('未登入時 redirect 到 /welcome', (tester) async {
     final container = _buildContainer(currentUser: null);
     addTearDown(container.dispose);
