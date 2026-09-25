@@ -41,7 +41,7 @@ lib/
 docs/
   adr/          # 架構決策與被拒方案（13 份）
   agents/       # agent 用的 issue tracker／triage labels／domain docs 設定
-  research/     # 升級前的套件選擇研究（歷史基準）
+  research/     # 升級前的套件選擇研究（歷史基準）與 Apple HIG 引用歸屬研究
   liquid-glass-1.4.1-migration.md # 1.4.1 遷移去留、真機驗收紀錄與未完成缺口
   mobile-e2e.md # Patrol／Firebase Test Lab 與發布 runbook
 ```
