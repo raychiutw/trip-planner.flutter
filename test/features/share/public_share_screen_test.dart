@@ -176,6 +176,79 @@ void main() {
     ).thenAnswer((_) async => 'cln-trip-1');
   });
 
+  testWidgets('長中文筆記在窄寬大字級可捲到底並開啟與複製', (tester) async {
+    final launched = <String>[];
+    String? copied;
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        launched.add((call.arguments as Map)['url'] as String);
+      }
+      return true;
+    });
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
+      (_) async =>
+          PublicTripShare(name: '長篇公開旅行', notes: longNoteContentFixture),
+    );
+    await pumpScreen(
+      tester,
+      locale: const Locale('en', 'US'),
+      size: const Size(320, 844),
+      textScale: 2,
+    );
+    expect(find.text('最後一段驗收完成').hitTestable(), findsNothing);
+    for (
+      var drag = 0;
+      drag < 80 && find.text('最後一段驗收完成').hitTestable().evaluate().isEmpty;
+      drag++
+    ) {
+      await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('最後一段驗收完成').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.text('長連結閱讀'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('長連結閱讀'));
+    await tester.pumpAndSettle();
+    expect(launched, [
+      'https://example.com/travel/very-long-readable-destination?document=travel-guide&language=zh-TW',
+    ]);
+    await Scrollable.ensureVisible(
+      tester.element(find.text('COPYEND385')),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.longPressAt(
+      tester.getTopLeft(find.text('COPYEND385')) + const Offset(15, 15),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+    expect(copied, 'COPYEND385');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('公開分享保留五區語意內容且不讀私人筆記', (tester) async {
     when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
       (_) async =>

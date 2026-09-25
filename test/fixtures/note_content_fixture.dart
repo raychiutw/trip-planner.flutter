@@ -144,3 +144,36 @@ const emptyNoteContentFixture = TripNotes(
     TripEmergencyContact(id: 5, sortOrder: 0, version: 0, phone: ' '),
   ],
 );
+
+final longNoteContentFixture = TripNotes(
+  flights: noteContentFixture.flights,
+  lodgings: noteContentFixture.lodgings,
+  reservations: noteContentFixture.reservations,
+  pretripNotes: [
+    TripPretripNote(
+      id: 30,
+      sortOrder: 0,
+      version: 0,
+      title: '長篇閱讀',
+      content: List.generate(
+        45,
+        (index) => '第${index + 1}段：旅途中請攜帶護照與雨具，確認交通時間。',
+      ).join('\n'),
+    ),
+    const TripPretripNote(
+      id: 31,
+      sortOrder: 1,
+      version: 0,
+      title: '最後一段驗收完成',
+      content:
+          '[長連結閱讀](https://example.com/travel/very-long-readable-destination?document=travel-guide&language=zh-TW)',
+    ),
+    const TripPretripNote(
+      id: 32,
+      sortOrder: 2,
+      version: 0,
+      content: 'COPYEND385',
+    ),
+  ],
+  emergencyContacts: noteContentFixture.emergencyContacts,
+);
