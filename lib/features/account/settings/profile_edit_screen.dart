@@ -4,11 +4,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
 import '../../../app/app_loading_skeleton.dart';
+import '../../../app/draft_session.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../../ui/tp_settings_group.dart';
@@ -22,42 +22,26 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final _dismissController = AppUnsavedChangesController();
-  String? _draft; // 首次有 user 資料時 seed
-  String? _initialName;
-  bool _saving = false;
-  String? _error;
+  DraftSession<String, void>? _session;
 
-  bool get _hasChanges =>
-      _initialName != null && (_draft ?? '').trim() != _initialName!.trim();
+  @override
+  void dispose() {
+    _session?.dispose();
+    super.dispose();
+  }
 
   Future<void> _save() async {
-    final savedName = (_draft ?? '').trim();
-    setState(() {
-      _saving = true;
-      _error = null;
+    final session = _session;
+    if (session == null) return;
+    final saved = await session.submit();
+    if (!mounted || saved == null) return;
+    HapticFeedback.lightImpact();
+    showAppNotice(context, session.dirty ? '已儲存先前的名稱，目前修改尚未儲存' : '已更新個人資料');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !session.canFinish(saved)) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
     });
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .updateProfile(displayName: savedName);
-      ref.invalidate(authStateProvider);
-      HapticFeedback.lightImpact();
-      if (mounted) {
-        setState(() {
-          _initialName = savedName;
-          _draft = savedName;
-          _saving = false;
-        });
-        showAppNotice(context, '已更新個人資料');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && context.canPop()) context.pop();
-        });
-      }
-    } on Exception {
-      if (mounted) setState(() => _error = '儲存失敗,請稍後再試');
-    } finally {
-      if (mounted && _saving) setState(() => _saving = false);
-    }
   }
 
   @override
@@ -66,8 +50,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     return AppUnsavedChangesGuard(
       controller: _dismissController,
-      hasChanges: _hasChanges,
-      dismissalEnabled: !_saving,
+      hasChanges: _session?.dirty ?? false,
+      dismissalEnabled: !(_session?.submitting ?? false),
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,
@@ -75,26 +59,67 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           onCancel: _dismissController.requestPop,
           primaryActionLabel: '儲存',
           primaryActionKey: const ValueKey('profile-save'),
-          primaryActionEnabled: _hasChanges && !_saving,
+          primaryActionEnabled: _session?.canSubmit ?? false,
           onPrimaryAction: _save,
         ),
-        body: switch (authState) {
-          AsyncData(:final value?) => _form(context, value.displayName ?? ''),
-          AsyncError() => const Center(child: Text('無法載入個人資料')),
-          _ => const AppListLoadingSkeleton(
-            key: ValueKey('profile-edit-loading'),
-            itemCount: 2,
-          ),
-        },
+        body: authState.when(
+          data: (user) => _form(context, user?.displayName ?? ''),
+          error: (_, _) => _session == null
+              ? Center(child: _loadError())
+              : _form(context, _session!.draft, loadFailed: true),
+          loading: () => _session == null
+              ? const AppListLoadingSkeleton(
+                  key: ValueKey('profile-edit-loading'),
+                  itemCount: 2,
+                )
+              : _form(context, _session!.draft),
+        ),
       ),
     );
   }
 
-  Widget _form(BuildContext context, String currentName) {
-    _initialName ??= currentName;
-    _draft ??= currentName;
+  Widget _loadError() => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Semantics(liveRegion: true, child: const Text('無法載入個人資料')),
+      TextButton(
+        onPressed: () => ref.invalidate(authStateProvider),
+        child: const Text('重試'),
+      ),
+    ],
+  );
+
+  Widget _form(
+    BuildContext context,
+    String currentName, {
+    bool loadFailed = false,
+  }) {
+    final session = _session ??=
+        DraftSession<String, void>(
+          initial: currentName,
+          equivalent: (a, b) => a.trim() == b.trim(),
+          write: (snapshot) async {
+            final name = snapshot.draft.trim();
+            await ref
+                .read(authStateProvider.notifier)
+                .updateProfile(displayName: name);
+            return DraftAccepted(draft: name, result: null);
+          },
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
+        if (loadFailed) _loadError(),
+        if (session.submitting)
+          Semantics(
+            liveRegion: true,
+            child: const Padding(
+              padding: EdgeInsets.all(TpSpacing.s4),
+              child: Text('儲存中…'),
+            ),
+          ),
         TpSettingsGroup(
           title: '個人資料',
           children: [
@@ -105,27 +130,30 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ),
               child: TextFormField(
                 key: const ValueKey('profile-display-name'),
-                initialValue: _draft,
+                initialValue: session.draft,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
                 decoration: const InputDecoration(
                   labelText: '顯示名稱',
                   border: InputBorder.none,
                 ),
-                onChanged: (value) => setState(() => _draft = value),
+                onChanged: session.edit,
                 onFieldSubmitted: (_) {
-                  if (_hasChanges && !_saving) _save();
+                  _save();
                 },
               ),
             ),
           ],
         ),
-        if (_error != null)
+        if (session.error != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-            child: Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                session.error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ),
           ),
       ],

@@ -135,6 +135,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     });
   }
 
+  /// PATCH /account/profile；畫面離開後仍由認證 owner 刷新帳號資料。
+  Future<UserInfo> updateProfile({required String displayName}) async {
+    final user = await ref
+        .read(tripRepositoryProvider)
+        .updateProfile(displayName: displayName);
+    if (ref.mounted) ref.invalidateSelf();
+    return user;
+  }
+
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     await _clearLocalAuth();
