@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/share/public_share_screen.dart';
@@ -98,6 +100,7 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     bool settle = true,
+    bool useDefaultRetry = false,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -111,7 +114,14 @@ void main() {
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => const Scaffold(body: Text('login')),
+          builder: (context, state) => Scaffold(
+            body: Column(
+              children: [
+                const Text('login'),
+                Text(state.uri.queryParameters['redirect_after'] ?? ''),
+              ],
+            ),
+          ),
         ),
         GoRoute(
           path: '/trips/:tripId',
@@ -124,7 +134,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        retry: (retryCount, error) => null,
+        retry: useDefaultRetry ? null : (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
           tripPrintActionsProvider.overrideWithValue(printActions),
@@ -194,21 +204,47 @@ void main() {
     expect(find.text('9:00 AM–10:30 AM'), findsOneWidget);
   });
 
-  testWidgets('公開分享在 compact Accessibility Size 可捲動完成主要操作', (tester) async {
-    await pumpScreen(tester, size: const Size(320, 568), textScale: 3.2);
+  for (final user in [
+    null,
+    const UserInfo(id: 'user-1', email: 'ray@example.com'),
+  ]) {
+    testWidgets('最大測試字級三動作皆可操作：${user == null ? '未登入' : '已登入'}', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        user: user,
+        size: const Size(320, 568),
+        textScale: 3.2,
+      );
+      expect(tester.takeException(), isNull);
 
-    expect(tester.takeException(), isNull);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('public-share-clone')),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.byKey(const ValueKey('public-share-clone')), findsOneWidget);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('public-share-clone'))).height,
-      greaterThanOrEqualTo(44),
-    );
-  });
+      for (final action in ['print', 'pdf', 'clone']) {
+        final button = find.byKey(ValueKey('public-share-$action'));
+        await tester.scrollUntilVisible(
+          button,
+          100,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(button.hitTestable(), findsOneWidget);
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+      expect(printActions.printed, hasLength(1));
+      expect(printActions.shared, hasLength(1));
+      if (user == null) {
+        expect(find.text('login'), findsOneWidget);
+        expect(find.text('/s/s1'), findsOneWidget);
+        verifyNever(() => repository.clonePublicTripShare(any()));
+      } else {
+        expect(find.text('trip cln-trip-1'), findsOneWidget);
+        verify(() => repository.clonePublicTripShare('s1')).called(1);
+      }
+    });
+  }
 
   testWidgets('未登入點複製會前往 login', (tester) async {
     await pumpScreen(tester);
@@ -297,12 +333,120 @@ void main() {
     expect(printActions.shared.single.destinationsLabel, '那霸');
   });
 
-  testWidgets('分享連結失效時顯示 notfound 狀態', (tester) async {
+  testWidgets('公開分享逾時可原地重試', (tester) async {
+    var requests = 0;
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer((_) async {
+      if (requests++ == 0) {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/share/s1'),
+          type: DioExceptionType.receiveTimeout,
+        );
+      }
+      return sharedTrip;
+    });
+
+    await pumpScreen(tester);
+
+    expect(find.text('暫時無法載入行程'), findsOneWidget);
+    expect(find.text('連結已失效'), findsNothing);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+    expect(find.text('暫時無法載入行程'), findsNothing);
+    verify(() => repository.fetchPublicTripShare('s1')).called(2);
+  });
+
+  testWidgets('離線保留暫時失敗與可操作的重試', (tester) async {
+    when(() => repository.fetchPublicTripShare(any())).thenThrow(
+      DioException(
+        requestOptions: RequestOptions(path: '/share/s1'),
+        type: DioExceptionType.connectionError,
+      ),
+    );
+    await pumpScreen(tester);
+    expect(find.text('暫時無法載入行程'), findsOneWidget);
+    expect(find.text('連結已失效'), findsNothing);
+    expect(find.text('重試').hitTestable(), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('public-share-load-error')))
+          .getSemanticsData()
+          .flagsCollection
+          .isLiveRegion,
+      isTrue,
+    );
+  });
+
+  testWidgets('錯誤文字包含 404 不會冒充失效連結', (tester) async {
     when(
       () => repository.fetchPublicTripShare(any()),
     ).thenThrow(Exception('404'));
-
     await pumpScreen(tester);
+    expect(find.text('暫時無法載入行程'), findsOneWidget);
+    expect(find.text('連結已失效'), findsNothing);
+  });
+
+  testWidgets('正式預設 Scope 立即顯示錯誤並等待使用者重試', (tester) async {
+    when(() => repository.fetchPublicTripShare(any())).thenThrow(
+      const ApiError(status: 503, code: 'HTTP_503', message: 'unavailable'),
+    );
+    await pumpScreen(tester, useDefaultRetry: true, settle: false);
+    await tester.pump();
+
+    expect(find.text('暫時無法載入行程'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('暫時無法載入行程'), findsOneWidget);
+    verify(() => repository.fetchPublicTripShare('s1')).called(1);
+  });
+
+  testWidgets('原地重試處理中不重送且保留同一分享連結', (tester) async {
+    final pending = Completer<PublicTripShare>();
+    var requests = 0;
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer((_) {
+      if (requests++ == 0) return Future.error(Exception('offline'));
+      return pending.future;
+    });
+    await pumpScreen(tester);
+    final retryPosition = tester.getCenter(find.text('重試'));
+
+    await tester.tapAt(retryPosition);
+    await tester.pump();
+    await tester.tapAt(retryPosition);
+    await tester.pump();
+
+    verify(() => repository.fetchPublicTripShare('s1')).called(2);
+    expect(find.byKey(const ValueKey('public-share-loading')), findsOneWidget);
+    pending.complete(sharedTrip);
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+  });
+
+  testWidgets('大字級失效說明可捲動到重試並恢復內容', (tester) async {
+    when(() => repository.fetchPublicTripShare(any())).thenThrow(
+      const ApiError(status: 404, code: 'NOT_FOUND', message: 'NOT_FOUND'),
+    );
+    await pumpScreen(tester, size: const Size(320, 568), textScale: 3.2);
+
+    expect(tester.takeException(), isNull);
+    when(
+      () => repository.fetchPublicTripShare(any()),
+    ).thenAnswer((_) async => sharedTrip);
+    await tester.ensureVisible(find.text('重試'));
+    expect(find.text('重試').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩家族旅行'), findsOneWidget);
+  });
+
+  testWidgets('分享連結失效時顯示 notfound 狀態', (tester) async {
+    when(() => repository.fetchPublicTripShare(any())).thenThrow(
+      const ApiError(status: 404, code: 'NOT_FOUND', message: 'NOT_FOUND'),
+    );
+
+    await pumpScreen(tester, useDefaultRetry: true);
+    await tester.pump(const Duration(seconds: 1));
+    verify(() => repository.fetchPublicTripShare('s1')).called(1);
 
     expect(find.byKey(const ValueKey('public-share-notfound')), findsOneWidget);
     expect(find.text('連結已失效'), findsOneWidget);
