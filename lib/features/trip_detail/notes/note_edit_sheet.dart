@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
+import '../../../api/trip_repository.dart';
 import '../../../app/adaptive.dart';
-import '../../../app/app_feedback.dart';
 import '../../../models/note_section.dart';
 import '../../../theme/tokens.dart';
 import '../trip_providers.dart';
@@ -78,6 +78,13 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
   final Map<String, String> _dts = {};
   bool _submitting = false;
   bool _dirty = false;
+  late final Map<String, dynamic> _baseFields;
+  ({int version, Map<String, dynamic> fields})? _freshRow;
+  int? _failedVersion;
+  bool _needsRefresh = false;
+  bool _deletedRow = false;
+  bool _saveAsNew = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -99,6 +106,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
           _ctrls[spec.key] = controller;
       }
     }
+    _baseFields = _collect();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       widget.formController?.attach(_submitForSheet);
@@ -122,7 +130,7 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
 
   /// 各區主要識別欄位（required）需非空才可送出,避免建立全空 row。
   bool get _canSubmit {
-    if (_submitting) return false;
+    if (_submitting || _needsRefresh) return false;
     for (final spec in _specs) {
       if (spec.required && (_ctrls[spec.key]?.text.trim().isEmpty ?? true)) {
         return false;
@@ -189,18 +197,47 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
   }
 
   Future<bool> _save() async {
+    if (!_canSubmit) return false;
+    final isEdit = widget.isEdit && !_saveAsNew;
     final fields = _collect();
-    setState(() => _submitting = true);
+    final freshRow = _freshRow;
+    final changedFields = freshRow == null
+        ? fields
+        : Map<String, dynamic>.fromEntries(
+            fields.entries.where(
+              (entry) => entry.value != _baseFields[entry.key],
+            ),
+          );
+    if (freshRow != null &&
+        changedFields.keys.any(
+          (key) =>
+              freshRow.fields[key] != _baseFields[key] &&
+              freshRow.fields[key] != fields[key],
+        )) {
+      final overwrite = await showAppConfirm(
+        context,
+        title: '保留你的修改？',
+        message: '協作者也修改了相同欄位。繼續會以你的草稿覆蓋那些欄位。',
+        confirmLabel: '保留我的修改',
+        cancelLabel: '繼續編輯',
+        isDestructive: true,
+      );
+      if (!mounted || !overwrite) return false;
+    }
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
     _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
     try {
-      if (widget.isEdit) {
+      if (isEdit) {
         await repo.updateNote(
           widget.section,
           tripId: widget.tripId,
           rowId: widget.rowId!,
-          fields: fields,
-          expectedVersion: widget.version,
+          fields: changedFields,
+          expectedVersion: freshRow?.version ?? widget.version,
         );
       } else {
         await repo.createNote(
@@ -215,27 +252,66 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
       _dirty = false;
       _submitting = false;
       _syncFormState();
-      showAppNotice(context, widget.isEdit ? '已儲存' : '已新增');
+      showAppNotice(context, isEdit ? '已儲存' : '已新增');
       return true;
     } on ApiError catch (error) {
       if (!mounted) return false;
-      if (error.status == 409) {
-        ref.invalidate(tripNotesProvider(widget.tripId));
-        showAppError(context, '此筆記已更新，請重新編輯');
-        setState(() => _submitting = false);
-        _syncFormState();
+      if (error.status == 409 && isEdit) {
+        _failedVersion = freshRow?.version ?? widget.version;
+        await _refreshAfterConflict(repo);
         return false;
       }
-      setState(() => _submitting = false);
+      setState(() {
+        _submitting = false;
+        _errorMessage = '儲存失敗，請稍後再試';
+      });
       _syncFormState();
-      showAppError(context, '儲存失敗，請稍後再試');
       return false;
     } on Exception {
       if (!mounted) return false;
-      setState(() => _submitting = false);
+      setState(() {
+        _submitting = false;
+        _errorMessage = '儲存失敗，請稍後再試';
+      });
       _syncFormState();
-      showAppError(context, '儲存失敗，請稍後再試');
       return false;
+    }
+  }
+
+  Future<void> _refreshAfterConflict(TripRepository repo) async {
+    setState(() {
+      _submitting = false;
+      _needsRefresh = true;
+      _errorMessage = '筆記已被更新。你的草稿已保留，正在載入最新版本。';
+    });
+    _syncFormState();
+    try {
+      final latest = (await repo.fetchFreshNotes(
+        widget.tripId,
+      )).editableRow(widget.section, widget.rowId!);
+      if (!mounted) return;
+      if (latest == null) {
+        setState(() {
+          _deletedRow = true;
+          _errorMessage = '這筆筆記已被刪除。你的草稿仍在表單中。';
+        });
+        return;
+      }
+      if (latest.version <= (_failedVersion ?? -1)) {
+        setState(() => _errorMessage = '尚未取得最新版本。你的草稿已保留，請重試。');
+        return;
+      }
+      setState(() {
+        _freshRow = latest;
+        _deletedRow = false;
+        _needsRefresh = false;
+        _errorMessage = '已載入最新版本。你的草稿已保留，請再次儲存。';
+      });
+      _syncFormState();
+      ref.invalidate(tripNotesProvider(widget.tripId));
+    } on Exception {
+      if (!mounted) return;
+      setState(() => _errorMessage = '無法載入最新版本。你的草稿已保留，請重試。');
     }
   }
 
@@ -256,6 +332,59 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: TpSpacing.s4),
+              ],
+              if (_errorMessage != null) ...[
+                Semantics(
+                  key: const ValueKey('note-edit-error'),
+                  liveRegion: true,
+                  child: Container(
+                    padding: const EdgeInsets.all(TpSpacing.s3),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(TpSpacing.s3),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
+                          ),
+                        ),
+                        if (_deletedRow)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _saveAsNew = true;
+                                  _needsRefresh = false;
+                                  _deletedRow = false;
+                                  _errorMessage = '草稿可另存為新筆記。按「儲存」後會建立新的一筆。';
+                                });
+                                _syncFormState();
+                              },
+                              child: const Text('另存為新筆記'),
+                            ),
+                          )
+                        else if (_needsRefresh)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: () => _refreshAfterConflict(
+                                ref.read(tripRepositoryProvider),
+                              ),
+                              child: const Text('重試'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: TpSpacing.s3),
               ],
               for (final spec in _specs) ...[
                 _field(spec),
