@@ -87,7 +87,7 @@ flutter run                                           # 連 prod API；一律使
 
 `sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`tripRepositoryProvider` → `authStateProvider`（全 app 認證 SoT）→ `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
 
-行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:13,17,24,33,43`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
+行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:14,30,40,48,59`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
 
 Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 list literal 傳入 `ProviderScope`。
 
@@ -130,7 +130,7 @@ Models 帶 `version` 欄位；後端 PATCH 要傳 `expectedVersion`，收到 409
 - API：`http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 - Screens：widget test + `ProviderScope` override、mocktail mock repository、假 `GoRouter` 作為導航探針。
 
-具體手法（provider override、關掉 error 態自動重試、假綠燈防線）見 `CODING_STANDARDS.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
+具體手法（provider override、依測試目的控制 error 態自動重試、假綠燈防線）見 `CODING_STANDARDS.md`「測試規範」與「測試不可假綠」兩節。只在已與使用者確認的公開 seam 測試；一次寫一個 failing test，再補最少 production code 使其通過。
 
 ## Agent skills
 

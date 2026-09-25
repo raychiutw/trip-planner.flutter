@@ -37,7 +37,7 @@ class TpTimeFieldGroup extends ValueNotifier<Object?> {
   TpTimeFieldGroup() : super(null);
 }
 
-/// HIG compact 時間選擇:一列標籤 + 值膠囊,點膠囊在原地展開輪盤。
+/// HIG compact 時間選擇：標籤與值膠囊隨可用寬度換列，點膠囊在原地展開輪盤。
 ///
 /// HIG `pickers`:「Avoid switching views to show a picker. A picker works well
 /// when displayed in context, below or in proximity to the field people are
