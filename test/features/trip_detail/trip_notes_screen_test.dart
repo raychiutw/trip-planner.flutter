@@ -1792,6 +1792,25 @@ void main() {
     expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
   });
 
+  testWidgets('停止等待未獲伺服器確認時顯示中文提示並保留其他生成', (tester) async {
+    _useTallViewport(tester);
+    final mocks = _parallelAiMocks();
+    when(
+      () => mocks.requestsRepo.stopWaiting(any()),
+    ).thenThrow(Exception('offline'));
+    await _pumpAiScreen(tester, mocks);
+    await _startTipsThenEmergency(tester);
+    await tester.tap(find.byKey(const ValueKey('notes-ai-stop-tips')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text(kStopWaitingUnconfirmedMessage), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-ai-pending-tips')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('notes-ai-pending-emergency')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('AI 狀態讀取失敗只壞 AI 區塊,五區筆記照常增刪改與排序', (tester) async {
     _useTallViewport(tester);
     final mocks = _parallelAiMocks();
