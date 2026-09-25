@@ -38,11 +38,13 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
       ref.read(createTripControllerProvider.notifier);
 
   Future<void> _submit() async {
-    final id = await _ctrl.submit();
-    if (id != null && mounted) {
+    final controller = _ctrl;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final saved = await controller.submit();
+    if (saved != null && mounted && controller.canFinish(saved)) {
       HapticFeedback.lightImpact();
       ref.invalidate(myTripsProvider);
-      context.go('/trips/$id');
+      context.go('/trips/${Uri.encodeComponent(saved.result)}');
     }
   }
 
@@ -54,85 +56,107 @@ class _CreateTripScreenState extends ConsumerState<CreateTripScreen> {
     return AppUnsavedChangesGuard(
       controller: _dismissController,
       hasChanges: _ctrl.hasChanges,
-      dismissalEnabled: !state.submitting,
+      dismissalEnabled: _ctrl.editingEnabled,
       child: Scaffold(
         appBar: TpAppBar(
           role: TpAppBarRole.modalForm,
-          title: const Text('建立行程'),
+          title: const Text('新增行程'),
           onCancel: _dismissController.requestPop,
-          primaryActionLabel: '建立',
+          primaryActionLabel: '新增',
           primaryActionKey: const ValueKey('create-submit'),
-          primaryActionEnabled: state.canSubmit,
+          primaryActionEnabled: _ctrl.canSubmit,
           onPrimaryAction: _submit,
         ),
         body: AppAdaptiveContent(
           maxWidth: AppContentWidth.form,
           contentKey: const ValueKey('create-trip-content'),
-          child: ListView(
-            padding: const EdgeInsets.all(TpSpacing.s4),
+          child: Column(
             children: [
-              _sectionTitle(context, '目的地'),
-              DestinationPicker(
-                destinations: state.destinations,
-                onAdd: _ctrl.addDestination,
-                onRemove: _ctrl.removeDestination,
-                onReorder: _ctrl.reorderDestination,
-              ),
-              const SizedBox(height: TpSpacing.s5),
-              _sectionTitle(context, '日期'),
-              _DateModeSection(state: state, ctrl: _ctrl),
-              if (state.destinations.length >= 2) ...[
-                const SizedBox(height: TpSpacing.s5),
-                _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
-                _DayQuotaSection(state: state, ctrl: _ctrl),
-              ],
-              if (!basicsReady) ...[
-                const SizedBox(height: TpSpacing.s4),
-                Text(
-                  '先選好目的地與日期，接著可補充偏好並設定 AI。',
-                  key: const ValueKey('create-next-step-hint'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              if (_ctrl.submitting)
+                Semantics(liveRegion: true, child: const Text('新增中…')),
+              if (_ctrl.isSaved)
+                Semantics(liveRegion: true, child: const Text('已新增，正在開啟行程…')),
+              if (_ctrl.error != null)
+                Semantics(
+                  liveRegion: true,
+                  child: Column(
+                    children: [
+                      Text(
+                        _ctrl.error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                      TextButton(onPressed: _submit, child: const Text('重試')),
+                    ],
                   ),
                 ),
-              ],
-              if (basicsReady) ...[
-                const SizedBox(height: TpSpacing.s5),
-                ExpansionTile(
-                  key: const ValueKey('create-more-needs'),
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: TpSpacing.s2),
-                  title: Text(
-                    '更多需求（選填）',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(TpSpacing.s4),
                   children: [
-                    TextField(
-                      key: const ValueKey('create-desc'),
-                      controller: _desc,
-                      minLines: 2,
-                      maxLines: 5,
-                      maxLength: 2000,
-                      decoration: const InputDecoration(
-                        hintText: '例如：想吃道地拉麵、逛二手書店…',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: _ctrl.setDescription,
+                    _sectionTitle(context, '目的地'),
+                    DestinationPicker(
+                      enabled: _ctrl.editingEnabled,
+                      destinations: state.destinations,
+                      onAdd: _ctrl.addDestination,
+                      onRemove: _ctrl.removeDestination,
+                      onReorder: _ctrl.reorderDestination,
                     ),
+                    const SizedBox(height: TpSpacing.s5),
+                    _sectionTitle(context, '日期'),
+                    _DateModeSection(state: state, ctrl: _ctrl),
+                    if (state.destinations.length >= 2) ...[
+                      const SizedBox(height: TpSpacing.s5),
+                      _sectionTitle(context, '每地天數（共 ${state.totalDays} 天）'),
+                      _DayQuotaSection(state: state, ctrl: _ctrl),
+                    ],
+                    if (!basicsReady) ...[
+                      const SizedBox(height: TpSpacing.s4),
+                      Text(
+                        '先選好目的地與日期，接著可補充偏好並設定 AI。',
+                        key: const ValueKey('create-next-step-hint'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    if (basicsReady) ...[
+                      const SizedBox(height: TpSpacing.s5),
+                      ExpansionTile(
+                        key: const ValueKey('create-more-needs'),
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: const EdgeInsets.only(
+                          bottom: TpSpacing.s2,
+                        ),
+                        title: Text(
+                          '更多需求（選填）',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        subtitle: const Text('餐飲、購物或旅行節奏等偏好'),
+                        children: [
+                          TextField(
+                            key: const ValueKey('create-desc'),
+                            enabled: _ctrl.editingEnabled,
+                            controller: _desc,
+                            minLines: 2,
+                            maxLines: 5,
+                            maxLength: 2000,
+                            decoration: const InputDecoration(
+                              hintText: '例如：想吃道地拉麵、逛二手書店…',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: _ctrl.setDescription,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: TpSpacing.s3),
+                      const AiAuthorizeCard(),
+                    ],
+                    const SizedBox(height: TpSpacing.s4),
                   ],
                 ),
-                const SizedBox(height: TpSpacing.s3),
-                const AiAuthorizeCard(),
-              ],
-              if (state.error != null) ...[
-                const SizedBox(height: TpSpacing.s3),
-                Text(
-                  state.error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ],
-              const SizedBox(height: TpSpacing.s4),
+              ),
             ],
           ),
         ),
@@ -190,7 +214,9 @@ class _DateModeSection extends StatelessWidget {
             ButtonSegment(value: TripDateMode.flexible, label: Text('大概時間')),
           ],
           selected: {state.dateMode},
-          onSelectionChanged: (s) => ctrl.setDateMode(s.first),
+          onSelectionChanged: !ctrl.editingEnabled
+              ? null
+              : (s) => ctrl.setDateMode(s.first),
         ),
         const SizedBox(height: TpSpacing.s3),
         if (state.dateMode == TripDateMode.fixed)
@@ -199,7 +225,9 @@ class _DateModeSection extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   key: const ValueKey('create-date-start'),
-                  onPressed: () => _pickFixed(context, isStart: true),
+                  onPressed: !ctrl.editingEnabled
+                      ? null
+                      : () => _pickFixed(context, isStart: true),
                   child: Text(_dateLabel(context, state.fixedStart, '開始日期')),
                 ),
               ),
@@ -207,7 +235,9 @@ class _DateModeSection extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   key: const ValueKey('create-date-end'),
-                  onPressed: () => _pickFixed(context, isStart: false),
+                  onPressed: !ctrl.editingEnabled
+                      ? null
+                      : () => _pickFixed(context, isStart: false),
                   child: Text(_dateLabel(context, state.fixedEnd, '結束日期')),
                 ),
               ),
@@ -241,7 +271,9 @@ class _FlexibleDate extends StatelessWidget {
             const Spacer(),
             IconButton(
               key: const ValueKey('create-flex-minus'),
-              onPressed: () => ctrl.setFlexDayCount(state.flexDayCount - 1),
+              onPressed: !ctrl.editingEnabled
+                  ? null
+                  : () => ctrl.setFlexDayCount(state.flexDayCount - 1),
               icon: const Icon(CupertinoIcons.minus_circle),
             ),
             Text(
@@ -251,7 +283,9 @@ class _FlexibleDate extends StatelessWidget {
             ),
             IconButton(
               key: const ValueKey('create-flex-plus'),
-              onPressed: () => ctrl.setFlexDayCount(state.flexDayCount + 1),
+              onPressed: !ctrl.editingEnabled
+                  ? null
+                  : () => ctrl.setFlexDayCount(state.flexDayCount + 1),
               icon: const Icon(CupertinoIcons.add_circled),
             ),
           ],
@@ -264,7 +298,9 @@ class _FlexibleDate extends StatelessWidget {
                 label: Text('${m.year}/${m.month}'),
                 selected:
                     state.flexYear == m.year && state.flexMonth == m.month,
-                onSelected: (_) => ctrl.setFlexMonth(m.year, m.month),
+                onSelected: !ctrl.editingEnabled
+                    ? null
+                    : (_) => ctrl.setFlexMonth(m.year, m.month),
               ),
           ],
         ),
@@ -288,14 +324,22 @@ class _DayQuotaSection extends StatelessWidget {
             children: [
               Expanded(child: Text(state.destinations[i].name)),
               IconButton(
-                onPressed: () =>
-                    ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) - 1),
+                onPressed: !ctrl.editingEnabled
+                    ? null
+                    : () => ctrl.setQuota(
+                        i,
+                        (state.destinations[i].dayQuota ?? 1) - 1,
+                      ),
                 icon: const Icon(CupertinoIcons.minus_circle),
               ),
               Text('${state.destinations[i].dayQuota ?? 1}'),
               IconButton(
-                onPressed: () =>
-                    ctrl.setQuota(i, (state.destinations[i].dayQuota ?? 1) + 1),
+                onPressed: !ctrl.editingEnabled
+                    ? null
+                    : () => ctrl.setQuota(
+                        i,
+                        (state.destinations[i].dayQuota ?? 1) + 1,
+                      ),
                 icon: const Icon(CupertinoIcons.add_circled),
               ),
             ],

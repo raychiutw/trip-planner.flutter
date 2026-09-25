@@ -33,15 +33,18 @@ class DraftSession<D, R> extends ChangeNotifier {
     required D initial,
     required bool Function(D, D) equivalent,
     required Future<DraftAccepted<D, R>> Function(DraftSnapshot<D>) write,
+    String Function(Exception)? describeError,
   }) : _draft = initial,
        _baseline = initial,
        _equivalent = equivalent,
-       _write = write;
+       _write = write,
+       _describeError = describeError;
 
   D _draft;
   D _baseline;
   final bool Function(D, D) _equivalent;
   final Future<DraftAccepted<D, R>> Function(DraftSnapshot<D>) _write;
+  final String Function(Exception)? _describeError;
   int _revision = 0;
   bool _submitting = false;
   bool _disposed = false;
@@ -53,6 +56,8 @@ class DraftSession<D, R> extends ChangeNotifier {
   bool get submitting => _submitting;
   bool get canSubmit => !_disposed && !_submitting && dirty;
   String? get error => _error;
+  /// 最近的儲存憑證仍對應目前乾淨草稿，且當下允許離頁。
+  bool get isSaved => _lastSaved != null && canFinish(_lastSaved!);
 
   /// 更新目前輸入，不改變已儲存的 baseline。
   void edit(D next) {
@@ -77,8 +82,10 @@ class DraftSession<D, R> extends ChangeNotifier {
       _baseline = accepted.draft;
       if (_revision == revision) _draft = accepted.draft;
       return _lastSaved = DraftSaved._(accepted.result, revision);
-    } on Exception {
-      if (!_disposed) _error = '儲存失敗,請稍後再試';
+    } on Exception catch (error) {
+      if (!_disposed) {
+        _error = _describeError?.call(error) ?? '儲存失敗,請稍後再試';
+      }
       return null;
     } finally {
       _submitting = false;

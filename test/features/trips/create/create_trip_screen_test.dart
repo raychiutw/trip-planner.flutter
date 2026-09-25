@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoSearchTextField;
+import 'package:tripline/api/api_error.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -52,11 +55,16 @@ void main() {
     when(() => authRepo.authorizeAi()).thenAnswer((_) async => true);
   });
 
-  Widget buildApp() {
+  Widget buildApp({Future<bool> Function()? beforeExit}) {
     final router = GoRouter(
       initialLocation: '/new-trip',
       routes: [
-        GoRoute(path: '/new-trip', builder: (_, _) => const CreateTripScreen()),
+        GoRoute(
+          path: '/new-trip',
+          builder: (_, _) => const CreateTripScreen(),
+          onExit: (_, _) async =>
+              beforeExit == null ? true : await beforeExit(),
+        ),
         GoRoute(
           path: '/trips/:id',
           builder: (_, s) =>
@@ -64,6 +72,7 @@ void main() {
         ),
       ],
     );
+    addTearDown(router.dispose);
     return ProviderScope(
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
@@ -92,7 +101,7 @@ void main() {
     );
     expect(btn.onPressed, isNull);
     expect(find.text('取消'), findsOneWidget);
-    expect(find.text('建立'), findsOneWidget);
+    expect(find.text('新增'), findsOneWidget);
     expect(find.byKey(const ValueKey('tp-app-bar-back')), findsNothing);
   });
 
@@ -221,6 +230,407 @@ void main() {
           .onPressed,
       isNotNull,
     );
+  });
+
+  testWidgets('新增送出中暫停日期編輯並宣告進度', (tester) async {
+    final pending =
+        Completer<
+          ({String tripId, int daysCreated, int destinationsCreated})
+        >();
+    when(
+      () => tripRepo.createTrip(
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((_) => pending.future);
+
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await completeBasics(tester);
+    final count = find.byKey(const ValueKey('create-flex-count'));
+    expect(tester.widget<Text>(count).data, '5');
+
+    await tester.tap(find.byKey(const ValueKey('create-submit')));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const ValueKey('create-flex-plus')));
+    await tester.tap(find.byKey(const ValueKey('create-flex-plus')));
+    await tester.pump();
+
+    expect(tester.widget<Text>(count).data, '5');
+    final progress = find.text('新增中…');
+    expect(progress, findsOneWidget);
+    expect(
+      find.ancestor(
+        of: progress,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.liveRegion == true,
+        ),
+      ),
+      findsWidgets,
+    );
+    expect(
+      tester
+          .widget<TpToolbarTextButton>(
+            find.byKey(const ValueKey('create-submit')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    pending.complete((
+      tripId: 'accepted-trip',
+      daysCreated: 5,
+      destinationsCreated: 1,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('TRIP accepted-trip'), findsOneWidget);
+  });
+
+  testWidgets('新增失敗保留完整草稿，送出期間停用輸入並可原樣重試', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final pending =
+        Completer<
+          ({String tripId, int daysCreated, int destinationsCreated})
+        >();
+    final requests = <Map<Symbol, dynamic>>[];
+    when(
+      () => tripRepo.createTrip(
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((invocation) {
+      requests.add(invocation.namedArguments);
+      return requests.length == 1
+          ? pending.future
+          : Future.value((
+              tripId: 'retry-trip',
+              daysCreated: 6,
+              destinationsCreated: 2,
+            ));
+    });
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await completeBasics(tester);
+    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('create-flex-plus')));
+    await tester.pump();
+    await tester.tap(find.byIcon(CupertinoIcons.add_circled).at(1));
+    await tester.tap(find.byKey(const ValueKey('create-more-needs')));
+    await tester.pumpAndSettle();
+    final description = find.byKey(const ValueKey('create-desc'));
+    await tester.enterText(description, '拉麵與二手書店');
+    await tester.tap(find.byKey(const ValueKey('create-submit')));
+    await tester.pump();
+
+    expect(tester.widget<TextField>(description).enabled, isFalse);
+    expect(
+      tester
+          .widget<CupertinoSearchTextField>(
+            find.byKey(const ValueKey('dest-poi-search')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<ActionChip>(find.widgetWithText(ActionChip, '京都'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.text('取消'));
+    await tester.pump();
+    expect(find.text('捨棄未儲存的變更？'), findsNothing);
+    expect(requests, hasLength(1));
+    expect(requests.single[#name], '東京、京都');
+    expect(requests.single[#description], '拉麵與二手書店');
+    expect(
+      (requests.single[#destinations] as List<DestinationInput>).first.dayQuota,
+      2,
+    );
+
+    pending.completeError(
+      const ApiError(status: 409, code: 'CONFLICT', message: 'conflict'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('行程新增衝突，請再試一次'), findsOneWidget);
+    expect(find.text('新增中…'), findsNothing);
+    expect(tester.widget<TextField>(description).controller!.text, '拉麵與二手書店');
+    expect(tester.widget<TextField>(description).enabled, isTrue);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('create-flex-count'))).data,
+      '6',
+    );
+    expect(find.byKey(const ValueKey('dest-0-東京')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dest-1-京都')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('create-submit')));
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(2));
+    expect(requests.last, requests.first);
+    expect(find.text('TRIP retry-trip'), findsOneWidget);
+  });
+
+  testWidgets('固定日期新增中停用日期與目的地，晚到搜尋結果不能加入', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final pending =
+        Completer<
+          ({String tripId, int daysCreated, int destinationsCreated})
+        >();
+    when(
+      () => tripRepo.createTrip(
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await completeBasics(tester);
+    await tester.tap(find.widgetWithText(ActionChip, '京都'));
+    await tester.pumpAndSettle();
+    Future<void> moveFirstAfterSecond(
+      String firstName,
+      String secondName,
+    ) async {
+      final firstRow = find.byKey(ValueKey('dest-0-$firstName'));
+      final secondRow = find.byKey(ValueKey('dest-1-$secondName'));
+      final gesture = await tester.startGesture(tester.getCenter(firstRow));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveBy(const Offset(0, 10));
+      await tester.pump();
+      await gesture.moveTo(
+        tester.getBottomLeft(secondRow) + const Offset(200, 40),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    await moveFirstAfterSecond('東京', '京都');
+    expect(find.byKey(const ValueKey('dest-0-京都')), findsOneWidget);
+    await moveFirstAfterSecond('京都', '東京');
+    expect(find.byKey(const ValueKey('dest-0-東京')), findsOneWidget);
+    await tester.tap(find.text('固定日期'));
+    await tester.pumpAndSettle();
+    for (final key in ['create-date-start', 'create-date-end']) {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('完成'));
+      await tester.pumpAndSettle();
+    }
+    final search = Completer<List<PoiSearchResult>>();
+    when(
+      () => poiRepo.searchPois(q: '首爾', region: '全部地區'),
+    ).thenAnswer((_) => search.future);
+    await tester.enterText(find.byKey(const ValueKey('dest-poi-search')), '首爾');
+    await tester.tap(find.byKey(const ValueKey('dest-poi-search-btn')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('create-submit')));
+    await tester.pump();
+    search.complete(const [
+      PoiSearchResult(placeId: 'seoul', name: '首爾', lat: 37.5, lng: 127),
+    ]);
+    await tester.pumpAndSettle();
+    for (final key in ['create-date-start', 'create-date-end']) {
+      expect(
+        tester.widget<OutlinedButton>(find.byKey(ValueKey(key))).onPressed,
+        isNull,
+      );
+    }
+    await tester.tap(find.text('大概時間'));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('create-flex-count')), findsNothing);
+    expect(
+      tester
+          .widget<ActionChip>(find.byKey(const ValueKey('dest-recent-東京')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<ListTile>(find.byKey(const ValueKey('poi-result-seoul')))
+          .onTap,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('dest-poi-search-btn')))
+          .onPressed,
+      isNull,
+    );
+    final first = find.byKey(const ValueKey('dest-0-東京'));
+    expect(
+      tester
+          .widget<IconButton>(
+            find.descendant(of: first, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNull,
+    );
+    // 與可編輯狀態相同的長按排序手勢，送出期間不得改變順序。
+    await moveFirstAfterSecond('東京', '京都');
+    expect(find.byKey(const ValueKey('dest-0-東京')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dest-1-京都')), findsOneWidget);
+    expect(find.byKey(const ValueKey('dest-2-首爾')), findsNothing);
+    pending.complete((
+      tripId: 'fixed-trip',
+      daysCreated: 1,
+      destinationsCreated: 2,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('TRIP fixed-trip'), findsOneWidget);
+  });
+
+  testWidgets('一般新增失敗保留草稿並能從錯誤區重試', (tester) async {
+    final requests = <Map<Symbol, dynamic>>[];
+    when(
+      () => tripRepo.createTrip(
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((invocation) async {
+      requests.add(invocation.namedArguments);
+      if (requests.length == 1) throw Exception('offline');
+      return (tripId: 'recovered-trip', daysCreated: 5, destinationsCreated: 1);
+    });
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
+    await completeBasics(tester);
+    await tester.tap(find.byKey(const ValueKey('create-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('新增失敗，請稍後再試'), findsOneWidget);
+    expect(find.byKey(const ValueKey('dest-0-東京')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('create-flex-count'))).data,
+      '5',
+    );
+    await tester.tap(find.widgetWithText(TextButton, '重試'));
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(2));
+    expect(requests.last, requests.first);
+    expect(find.text('TRIP recovered-trip'), findsOneWidget);
+  });
+
+  for (final fail in [false, true]) {
+    testWidgets('離開新增頁後晚到的${fail ? '失敗' : '成功'}不影響目前頁面', (tester) async {
+      final pending =
+          Completer<
+            ({String tripId, int daysCreated, int destinationsCreated})
+          >();
+      when(
+        () => tripRepo.createTrip(
+          name: any(named: 'name'),
+          startDate: any(named: 'startDate'),
+          endDate: any(named: 'endDate'),
+          description: any(named: 'description'),
+          countries: any(named: 'countries'),
+          destinations: any(named: 'destinations'),
+        ),
+      ).thenAnswer((_) => pending.future);
+      await tester.pumpWidget(buildApp());
+      await tester.pumpAndSettle();
+      await completeBasics(tester);
+      final router = GoRouter.of(tester.element(find.byType(CreateTripScreen)));
+      await tester.tap(find.byKey(const ValueKey('create-submit')));
+      await tester.pump();
+      router.go('/trips/elsewhere');
+      await tester.pumpAndSettle();
+      expect(find.byType(CreateTripScreen), findsNothing);
+      if (fail) {
+        pending.completeError(Exception('offline'));
+      } else {
+        pending.complete((
+          tripId: 'late-trip',
+          daysCreated: 5,
+          destinationsCreated: 1,
+        ));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('TRIP elsewhere'), findsOneWidget);
+      expect(find.text('TRIP late-trip'), findsNothing);
+      expect(find.text('新增失敗，請稍後再試'), findsNothing);
+    });
+  }
+
+  testWidgets('連點只新增一次，成功等待離頁時不能把新輸入變成第二筆行程', (tester) async {
+    final pending =
+        Completer<
+          ({String tripId, int daysCreated, int destinationsCreated})
+        >();
+    final exit = Completer<bool>();
+    var requests = 0;
+    var exits = 0;
+    when(
+      () => tripRepo.createTrip(
+        name: any(named: 'name'),
+        startDate: any(named: 'startDate'),
+        endDate: any(named: 'endDate'),
+        description: any(named: 'description'),
+        countries: any(named: 'countries'),
+        destinations: any(named: 'destinations'),
+      ),
+    ).thenAnswer((_) {
+      requests++;
+      return pending.future;
+    });
+    await tester.pumpWidget(
+      buildApp(
+        beforeExit: () {
+          exits++;
+          return exit.future;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await completeBasics(tester);
+    final submit = find.byKey(const ValueKey('create-submit'));
+    await tester.tap(submit);
+    await tester.tap(submit);
+    await tester.pump();
+    expect(requests, 1);
+    pending.complete((
+      tripId: 'only-trip',
+      daysCreated: 5,
+      destinationsCreated: 1,
+    ));
+    await tester.pumpAndSettle();
+    expect(exits, 1);
+    expect(find.byType(CreateTripScreen), findsOneWidget);
+    final plus = find.byKey(const ValueKey('create-flex-plus'));
+    await tester.ensureVisible(plus);
+    await tester.tap(plus);
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('create-flex-count'))).data,
+      '5',
+    );
+    await tester.tap(submit);
+    await tester.pump();
+    expect(requests, 1);
+    exit.complete(true);
+    await tester.pumpAndSettle();
+    expect(exits, 1);
+    expect(find.text('TRIP only-trip'), findsOneWidget);
   });
 
   testWidgets('加目的地 + 彈性日期 → 送出呼叫 createTrip + 導頁', (tester) async {

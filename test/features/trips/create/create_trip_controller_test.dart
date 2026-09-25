@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/features/trips/create/create_trip_controller.dart';
@@ -84,94 +83,6 @@ void main() {
     expect(c.read(createTripControllerProvider).canSubmit, isFalse); // 無目的地
     t.addDestination(const DestinationInput(name: 'A'));
     expect(c.read(createTripControllerProvider).canSubmit, isTrue);
-  });
-
-  test('hasChanges 反映編輯且 reset 復原初始狀態', () {
-    final c = makeC();
-    final t = ctrl(c);
-
-    expect(t.hasChanges, isFalse);
-    t.setDescription('家族旅行');
-    expect(t.hasChanges, isTrue);
-
-    t.reset();
-
-    expect(t.hasChanges, isFalse);
-    expect(c.read(createTripControllerProvider).submitting, isFalse);
-    expect(c.read(createTripControllerProvider).description, isEmpty);
-    expect(c.read(createTripControllerProvider).destinations, isEmpty);
-  });
-
-  test('submit：衍生 name/countries + 呼叫 createTrip → 回 tripId', () async {
-    when(
-      () => repo.createTrip(
-        name: any(named: 'name'),
-        startDate: any(named: 'startDate'),
-        endDate: any(named: 'endDate'),
-        title: any(named: 'title'),
-        description: any(named: 'description'),
-        countries: any(named: 'countries'),
-        published: any(named: 'published'),
-        dataSource: any(named: 'dataSource'),
-        lang: any(named: 'lang'),
-        destinations: any(named: 'destinations'),
-      ),
-    ).thenAnswer(
-      (_) async => (tripId: 'a-b-x', daysCreated: 5, destinationsCreated: 2),
-    );
-
-    final c = makeC();
-    final t = ctrl(c);
-    t.setDateMode(TripDateMode.flexible);
-    t.setFlexMonth(2026, 7);
-    t.addDestination(const DestinationInput(name: 'A', country: 'JP'));
-    t.addDestination(const DestinationInput(name: 'B', country: 'KR'));
-
-    final id = await t.submit();
-    expect(id, 'a-b-x');
-    expect(t.hasChanges, isFalse);
-    expect(c.read(createTripControllerProvider).submitting, isFalse);
-    expect(c.read(createTripControllerProvider).destinations, isEmpty);
-    verify(
-      () => repo.createTrip(
-        name: 'A、B',
-        startDate: '2026-07-01',
-        endDate: '2026-07-05',
-        description: any(named: 'description'),
-        countries: 'JP,KR',
-        destinations: any(named: 'destinations'),
-      ),
-    ).called(1);
-  });
-
-  test('submit 409 → error,submitting false', () async {
-    when(
-      () => repo.createTrip(
-        name: any(named: 'name'),
-        startDate: any(named: 'startDate'),
-        endDate: any(named: 'endDate'),
-        title: any(named: 'title'),
-        description: any(named: 'description'),
-        countries: any(named: 'countries'),
-        published: any(named: 'published'),
-        dataSource: any(named: 'dataSource'),
-        lang: any(named: 'lang'),
-        destinations: any(named: 'destinations'),
-      ),
-    ).thenThrow(
-      const ApiError(status: 409, code: 'DATA_CONFLICT', message: 'exists'),
-    );
-
-    final c = makeC();
-    final t = ctrl(c);
-    t.setDateMode(TripDateMode.flexible);
-    t.setFlexMonth(2026, 7);
-    t.addDestination(const DestinationInput(name: 'A'));
-
-    final id = await t.submit();
-    expect(id, isNull);
-    expect(c.read(createTripControllerProvider).error, isNotNull);
-    expect(c.read(createTripControllerProvider).submitting, isFalse);
   });
 
   test('autoDispose：無 listener 後重建 → state 重置（不殘留上次輸入）', () async {

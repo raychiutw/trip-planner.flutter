@@ -2,19 +2,20 @@
 /// 送出時衍生 name/id/countries(見 trip_form_logic)。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
-import '../../../api/trip_repository.dart';
+import '../../../app/draft_session.dart';
 import '../../../models/destination_input.dart';
 import '../trip_form_logic.dart';
 
 enum TripDateMode { fixed, flexible }
 
 class CreateTripState {
-  const CreateTripState({
-    this.destinations = const [],
+  CreateTripState({
+    List<DestinationInput> destinations = const [],
     this.dateMode = TripDateMode.fixed,
     this.fixedStart,
     this.fixedEnd,
@@ -22,9 +23,7 @@ class CreateTripState {
     required this.flexMonth,
     this.flexDayCount = 5,
     this.description = '',
-    this.submitting = false,
-    this.error,
-  });
+  }) : destinations = List.unmodifiable(destinations);
 
   final List<DestinationInput> destinations;
   final TripDateMode dateMode;
@@ -34,8 +33,6 @@ class CreateTripState {
   final int flexMonth;
   final int flexDayCount;
   final String description;
-  final bool submitting;
-  final String? error;
 
   String? get startDate => dateMode == TripDateMode.fixed
       ? fixedStart
@@ -56,8 +53,7 @@ class CreateTripState {
       destinations.length <= 30 &&
       startDate != null &&
       endDate != null &&
-      isTripDatesValid(startDate!, endDate!) &&
-      !submitting;
+      isTripDatesValid(startDate!, endDate!);
 
   CreateTripState copyWith({
     List<DestinationInput>? destinations,
@@ -68,8 +64,6 @@ class CreateTripState {
     int? flexMonth,
     int? flexDayCount,
     String? description,
-    bool? submitting,
-    Object? error = _sentinel,
   }) {
     return CreateTripState(
       destinations: destinations ?? this.destinations,
@@ -80,106 +74,116 @@ class CreateTripState {
       flexMonth: flexMonth ?? this.flexMonth,
       flexDayCount: flexDayCount ?? this.flexDayCount,
       description: description ?? this.description,
-      submitting: submitting ?? this.submitting,
-      error: error == _sentinel ? this.error : error as String?,
     );
   }
 
-  static const _sentinel = Object();
+  /// 比較目的地、日期與描述，判斷是否仍為同一份行程草稿。
+  bool equivalent(CreateTripState other) =>
+      listEquals(destinations, other.destinations) &&
+      dateMode == other.dateMode &&
+      fixedStart == other.fixedStart &&
+      fixedEnd == other.fixedEnd &&
+      flexYear == other.flexYear &&
+      flexMonth == other.flexMonth &&
+      flexDayCount == other.flexDayCount &&
+      description == other.description;
 }
 
 class CreateTripController extends Notifier<CreateTripState> {
-  bool _disposed = false;
-  late int _initialFlexYear;
-  late int _initialFlexMonth;
+  late DraftSession<CreateTripState, String> _session;
 
   @override
   CreateTripState build() {
-    ref.onDispose(() => _disposed = true);
     final now = DateTime.now();
-    _initialFlexYear = now.year;
-    _initialFlexMonth = now.month;
-    return CreateTripState(flexYear: now.year, flexMonth: now.month);
+    _session = DraftSession<CreateTripState, String>(
+      initial: CreateTripState(flexYear: now.year, flexMonth: now.month),
+      equivalent: (a, b) => a.equivalent(b),
+      write: (snapshot) async {
+        final draft = snapshot.draft;
+        final result = await ref
+            .read(tripRepositoryProvider)
+            .createTrip(
+              name: deriveTripName(draft.destinations),
+              startDate: draft.startDate!,
+              endDate: draft.endDate!,
+              description: draft.description.isEmpty ? null : draft.description,
+              countries: deriveCountries(draft.destinations),
+              destinations: draft.destinations,
+            );
+        return DraftAccepted(draft: draft, result: result.tripId);
+      },
+      describeError: (error) => error is ApiError && error.status == 409
+          ? '行程新增衝突，請再試一次'
+          : '新增失敗，請稍後再試',
+    );
+    // Riverpod 只呈現 session 的草稿，提交與錯誤也由同一 owner 發出通知。
+    _session.addListener(() => state = _session.draft);
+    ref.onDispose(_session.dispose);
+    return _session.draft;
   }
 
-  TripRepository get _repo => ref.read(tripRepositoryProvider);
+  @override
+  bool updateShouldNotify(CreateTripState previous, CreateTripState next) =>
+      true;
 
-  bool get hasChanges =>
-      state.destinations.isNotEmpty ||
-      state.dateMode != TripDateMode.fixed ||
-      state.fixedStart != null ||
-      state.fixedEnd != null ||
-      state.flexYear != _initialFlexYear ||
-      state.flexMonth != _initialFlexMonth ||
-      state.flexDayCount != 5 ||
-      state.description.isNotEmpty;
+  bool get hasChanges => _session.dirty;
 
-  void reset() {
-    state = CreateTripState(
-      flexYear: _initialFlexYear,
-      flexMonth: _initialFlexMonth,
-    );
+  /// 目前是否正在送出新增行程請求。
+  bool get submitting => _session.submitting;
+
+  /// 最近新增成功的憑證是否仍對應目前草稿。
+  bool get isSaved => _session.isSaved;
+
+  /// 送出中或新增成功尚未離頁時，都暫停編輯以避免重複新增。
+  bool get editingEnabled => !submitting && !isSaved;
+
+  /// 最近一次新增失敗的說明，由草稿 session 管理。
+  String? get error => _session.error;
+
+  /// 草稿符合新增條件，且 session 目前允許送出。
+  bool get canSubmit => state.canSubmit && _session.canSubmit;
+
+  void _edit(CreateTripState next) {
+    if (editingEnabled) _session.edit(next);
   }
 
   void addDestination(DestinationInput d) =>
-      state = state.copyWith(destinations: [...state.destinations, d]);
+      _edit(state.copyWith(destinations: [...state.destinations, d]));
 
-  void removeDestination(int index) => state = state.copyWith(
-    destinations: [...state.destinations]..removeAt(index),
+  void removeDestination(int index) => _edit(
+    state.copyWith(destinations: [...state.destinations]..removeAt(index)),
   );
 
   void reorderDestination(int oldIndex, int newIndex) {
     final list = [...state.destinations];
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
-    state = state.copyWith(destinations: list);
+    _edit(state.copyWith(destinations: list));
   }
 
-  void setDateMode(TripDateMode m) => state = state.copyWith(dateMode: m);
-  void setFixedStart(String d) => state = state.copyWith(fixedStart: d);
-  void setFixedEnd(String d) => state = state.copyWith(fixedEnd: d);
+  void setDateMode(TripDateMode m) => _edit(state.copyWith(dateMode: m));
+  void setFixedStart(String d) => _edit(state.copyWith(fixedStart: d));
+  void setFixedEnd(String d) => _edit(state.copyWith(fixedEnd: d));
   void setFlexMonth(int year, int month) =>
-      state = state.copyWith(flexYear: year, flexMonth: month);
+      _edit(state.copyWith(flexYear: year, flexMonth: month));
   void setFlexDayCount(int n) =>
-      state = state.copyWith(flexDayCount: n.clamp(1, 30));
-  void setDescription(String s) => state = state.copyWith(description: s);
+      _edit(state.copyWith(flexDayCount: n.clamp(1, 30)));
+  void setDescription(String s) => _edit(state.copyWith(description: s));
 
   void setQuota(int index, int n) {
     final list = [...state.destinations];
     list[index] = list[index].copyWith(dayQuota: n);
-    state = state.copyWith(destinations: list);
+    _edit(state.copyWith(destinations: list));
   }
 
-  /// 送出;成功回 tripId,失敗回 null(error 設於 state)。
-  Future<String?> submit() async {
-    if (!state.canSubmit) return null;
-    final dests = state.destinations;
-    final name = deriveTripName(dests);
-    state = state.copyWith(submitting: true, error: null);
-    try {
-      final r = await _repo.createTrip(
-        name: name,
-        startDate: state.startDate!,
-        endDate: state.endDate!,
-        description: state.description.isEmpty ? null : state.description,
-        countries: deriveCountries(dests),
-        destinations: dests,
-      );
-      if (!_disposed) reset();
-      return r.tripId;
-    } on ApiError catch (e) {
-      if (_disposed) return null;
-      state = state.copyWith(
-        submitting: false,
-        error: e.status == 409 ? '行程建立衝突,請再試一次' : '建立失敗,請稍後再試',
-      );
-      return null;
-    } on Exception {
-      if (_disposed) return null;
-      state = state.copyWith(submitting: false, error: '建立失敗,請稍後再試');
-      return null;
-    }
+  /// 送出當下草稿；只有仍有效的 session 憑證能完成導頁。
+  Future<DraftSaved<String>?> submit() async {
+    if (!canSubmit) return null;
+    return _session.submit();
   }
+
+  /// 憑證必須仍屬於目前 session 的已接受草稿，才能導航。
+  bool canFinish(DraftSaved<String> saved) => _session.canFinish(saved);
 }
 
 final createTripControllerProvider =
