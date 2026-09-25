@@ -1,0 +1,20 @@
+[
+  {
+    "file": "NotoSansTC-Regular.ttf",
+    "source": "https://fonts.gstatic.com/s/notosanstc/v36/-nFuOG829Oofr2wohFbTp9ifNAn722rq0MXz76Cy_CpOtma3uNQ.ttf",
+    "bytes": 7110796,
+    "sha256": "f78e4152bf5364f8b7f503bd339a18f3eca55300587e105e5fe5e267acd125f4"
+  },
+  {
+    "file": "NotoSansTC-Bold.ttf",
+    "source": "https://fonts.gstatic.com/s/notosanstc/v36/-nFuOG829Oofr2wohFbTp9ifNAn722rq0MXz70e1_CpOtma3uNQ.ttf",
+    "bytes": 7105548,
+    "sha256": "d6748bf86e76740d592ff143af61d0c80b453f5f8544c2c71cdfc52ea0dc0f30"
+  },
+  {
+    "file": "OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/OFL.txt",
+    "bytes": 4388,
+    "sha256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9"
+  }
+]
