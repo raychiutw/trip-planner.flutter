@@ -30,24 +30,32 @@ class _FakeAuthNotifier extends AuthNotifier {
 }
 
 class _FakeTripImportFilePicker implements TripImportFilePicker {
-  const _FakeTripImportFilePicker(this.file);
+  _FakeTripImportFilePicker(this.file);
 
-  final TripImportFile? file;
+  TripImportFile? file;
+  int pickCalls = 0;
 
   @override
-  Future<TripImportFile?> pick() async => file;
+  Future<TripImportFile?> pick() async {
+    pickCalls++;
+    return file;
+  }
 }
 
 class _FakeTripExportFileWriter implements TripExportFileWriter {
   String? suggestedName;
   String? content;
   bool saved = true;
+  Object? error;
+  int saveCalls = 0;
 
   @override
   Future<bool> save({
     required String suggestedName,
     required String content,
   }) async {
+    saveCalls++;
+    if (error case final failure?) throw failure;
     this.suggestedName = suggestedName;
     this.content = content;
     return saved;
@@ -983,8 +991,8 @@ void main() {
           overrides: [
             tripRepositoryProvider.overrideWithValue(mockTripRepository),
             tripImportFilePickerProvider.overrideWithValue(
-              const _FakeTripImportFilePicker(
-                TripImportFile(
+              _FakeTripImportFilePicker(
+                const TripImportFile(
                   name: 'trip.json',
                   length: 31,
                   content: '{"schemaVersion":1,"meta":{}}',
@@ -1002,6 +1010,57 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
       await tester.pumpAndSettle();
 
+      verify(
+        () =>
+            mockTripRepository.importTripJson('{"schemaVersion":1,"meta":{}}'),
+      ).called(1);
+      expect(find.text('detail:imported-trip'), findsOneWidget);
+    });
+
+    testWidgets('匯入無效 JSON 時錯誤持續可見並可重新選檔', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      final picker = _FakeTripImportFilePicker(
+        const TripImportFile(name: 'bad.json', length: 8, content: 'not json'),
+      );
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(
+        () => mockTripRepository.importTripJson(any()),
+      ).thenAnswer((_) async => 'imported-trip');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(picker),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+      expect(find.text('不是有效的 JSON 檔'), findsOneWidget);
+      expect(find.text('重試'), findsOneWidget);
+      verifyNever(() => mockTripRepository.importTripJson(any()));
+
+      picker.file = const TripImportFile(
+        name: 'fixed.json',
+        length: 31,
+        content: '{"schemaVersion":1,"meta":{}}',
+      );
+      await tester.tap(find.text('重試'));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCalls, 2);
       verify(
         () =>
             mockTripRepository.importTripJson('{"schemaVersion":1,"meta":{}}'),
@@ -1044,6 +1103,52 @@ void main() {
       ).called(1);
       expect(writer.suggestedName, 'okinawa.json');
       expect(writer.content, '{"schemaVersion":1}');
+      expect(find.text('匯出成功'), findsOneWidget);
+    });
+
+    testWidgets('匯出寫檔失敗時錯誤持續可見並可重試', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      final writer = _FakeTripExportFileWriter()..error = Exception('磁碟錯誤');
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(() => mockTripRepository.exportTripJson(any())).thenAnswer(
+        (_) async => const TripJsonExport(
+          fileName: 'okinawa.json',
+          content: '{"schemaVersion":1}',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripExportFileWriterProvider.overrideWithValue(writer),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('匯出 JSON'));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('app-error-banner')), findsOneWidget);
+      expect(find.text('匯出失敗，請稍後再試'), findsOneWidget);
+      expect(find.text('匯出成功'), findsNothing);
+
+      writer.error = null;
+      await tester.tap(find.text('重試'));
+      await tester.pumpAndSettle();
+
+      expect(writer.saveCalls, 2);
+      verify(
+        () => mockTripRepository.exportTripJson('okinawa-trip-2026'),
+      ).called(2);
       expect(find.text('匯出成功'), findsOneWidget);
     });
 

@@ -484,13 +484,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       final file = await ref.read(tripImportFilePickerProvider).pick();
       if (!mounted || file == null) return;
       if (file.length > _maxTripImportBytes) {
-        _showActionMessage('檔案過大（上限 512KB）');
+        _showImportError('檔案過大（上限 512KB）');
         return;
       }
 
       final decodedJson = jsonDecode(file.content);
       if (decodedJson is! Map || decodedJson['schemaVersion'] != 1) {
-        _showActionMessage('不支援的匯出格式（需 schemaVersion 1）');
+        _showImportError('不支援的匯出格式（需 schemaVersion 1）');
         return;
       }
 
@@ -504,13 +504,13 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       context.go('/trips/$tripId');
     } on FormatException {
       if (!mounted) return;
-      _showActionMessage('不是有效的 JSON 檔');
+      _showImportError('不是有效的 JSON 檔');
     } on ApiError catch (error) {
       if (!mounted) return;
-      _showActionMessage(error.detail ?? error.message);
+      _showImportError(error.detail ?? error.message);
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯入失敗，請稍後再試');
+      _showImportError('匯入失敗，請稍後再試');
     } finally {
       if (mounted) {
         setState(() => _isImporting = false);
@@ -532,7 +532,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       _showActionMessage(saved ? '匯出成功' : '已取消匯出');
     } on Exception {
       if (!mounted) return;
-      _showActionMessage('匯出失敗，請稍後再試');
+      showAppError(
+        context,
+        '匯出失敗，請稍後再試',
+        onRetry: () => unawaited(_exportTripToJson(trip)),
+      );
     } finally {
       if (mounted) {
         setState(() => _exportingTripId = null);
@@ -542,6 +546,14 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
 
   void _showActionMessage(String message) {
     showAppNotice(context, message);
+  }
+
+  void _showImportError(String message) {
+    showAppError(
+      context,
+      message,
+      onRetry: () => unawaited(_importTripFromJson()),
+    );
   }
 
   Widget _buildNoResults(ThemeData theme) {
