@@ -1,5 +1,5 @@
 /// 編輯行程:標題 + 目的地 + 日期/天數 + 描述 + 語言 + 發布 + 明確儲存。
-/// 儲存成功 → pop。
+/// 儲存成功且沒有後續輸入時才返回。
 library;
 
 import 'dart:async';
@@ -36,19 +36,9 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
     final state = ref.watch(editTripControllerProvider(widget.tripId));
     final ctrl = ref.read(editTripControllerProvider(widget.tripId).notifier);
 
-    // 儲存成功 → 返回。
-    ref.listen(editTripControllerProvider(widget.tripId), (prev, next) {
-      if (next.saved && !(prev?.saved ?? false)) {
-        HapticFeedback.lightImpact();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) closeAppRouteOrSheet(context);
-        });
-      }
-    });
-
     return AppUnsavedChangesGuard(
       controller: _dismissController,
-      hasChanges: !state.saved && ctrl.hasChanges,
+      hasChanges: ctrl.hasChanges,
       dismissalEnabled: !state.saving,
       child: Scaffold(
         appBar: TpAppBar(
@@ -58,13 +48,41 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
           primaryActionLabel: '儲存',
           primaryActionKey: const ValueKey('edit-save'),
           primaryActionEnabled: ctrl.hasChanges && !state.saving,
-          onPrimaryAction: ctrl.save,
+          onPrimaryAction: () async {
+            final saved = await ctrl.save();
+            if (!mounted || saved == null) return;
+            HapticFeedback.lightImpact();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && ctrl.canFinish(saved)) {
+                closeAppRouteOrSheet(context);
+              }
+            });
+          },
         ),
+        bottomNavigationBar: state.saving
+            ? Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(TpSpacing.s3),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: const Text('儲存中…', textAlign: TextAlign.center),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         body: state.loading
             ? const AppListLoadingSkeleton(key: ValueKey('edit-trip-loading'))
             : ListView(
                 padding: const EdgeInsets.all(TpSpacing.s4),
                 children: [
+                  const Text('標題、目的地、描述、語言與發布狀態需按「儲存」才會生效。'),
+                  const SizedBox(height: TpSpacing.s3),
                   _title(context, '行程標題'),
                   TextFormField(
                     key: const ValueKey('edit-title'),
@@ -84,6 +102,8 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     onReorder: ctrl.reorderDestination,
                   ),
                   const SizedBox(height: TpSpacing.s5),
+                  const Text('日期平移與天數新增、刪除會立即生效，取消不會還原。'),
+                  const SizedBox(height: TpSpacing.s3),
                   _title(context, '出發日期'),
                   _ShiftDateSection(
                     startDate: state.startDate,
@@ -163,12 +183,18 @@ class _EditTripScreenState extends ConsumerState<EditTripScreen> {
                     value: state.published,
                     onChanged: ctrl.setPublished,
                   ),
-                  if (state.error != null) ...[
+                  for (final error in [
+                    ctrl.saveError,
+                    state.error,
+                  ].nonNulls) ...[
                     const SizedBox(height: TpSpacing.s2),
-                    Text(
-                      state.error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ],

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../api/providers.dart';
 import '../../../api/trip_repository.dart';
+import '../../../app/draft_session.dart';
 import '../../../models/day.dart';
 import '../../../models/destination_input.dart';
 import '../../trip_detail/trip_providers.dart';
@@ -45,43 +46,103 @@ class EditTripState {
   final bool shifting;
   final bool daysMutating;
   final String? error;
+
+  /// 目前欄位已與 baseline 一致，不是允許關閉的提交憑證。
   final bool saved;
 
   EditTripState copyWith({
     bool? loading,
-    String? title,
-    String? description,
-    String? lang,
-    bool? published,
     Object? startDate = _sentinel,
     Object? endDate = _sentinel,
     List<TripDay>? days,
-    List<DestinationInput>? destinations,
-    bool? saving,
     bool? shifting,
     bool? daysMutating,
     Object? error = _sentinel,
-    bool? saved,
   }) {
     return EditTripState(
       loading: loading ?? this.loading,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      lang: lang ?? this.lang,
-      published: published ?? this.published,
+      title: title,
+      description: description,
+      lang: lang,
+      published: published,
       startDate: startDate == _sentinel ? this.startDate : startDate as String?,
       endDate: endDate == _sentinel ? this.endDate : endDate as String?,
       days: days ?? this.days,
-      destinations: destinations ?? this.destinations,
-      saving: saving ?? this.saving,
+      destinations: destinations,
+      saving: saving,
       shifting: shifting ?? this.shifting,
       daysMutating: daysMutating ?? this.daysMutating,
       error: error == _sentinel ? this.error : error as String?,
-      saved: saved ?? this.saved,
+      saved: saved,
+    );
+  }
+
+  // metadata 與提交狀態只從 session 單向投影，Day 操作不寫入草稿。
+  EditTripState _withSession(DraftSession<_TripMetadata, void> session) {
+    final draft = session.draft;
+    return EditTripState(
+      loading: loading,
+      title: draft.title,
+      description: draft.description,
+      lang: draft.lang,
+      published: draft.published,
+      destinations: draft.destinations,
+      saving: session.submitting,
+      saved: !session.dirty && !session.submitting,
+      startDate: startDate,
+      endDate: endDate,
+      days: days,
+      shifting: shifting,
+      daysMutating: daysMutating,
+      error: error,
     );
   }
 
   static const _sentinel = Object();
+}
+
+/// 只含需按儲存的欄位；日期與 Day 結構另由即時操作管理。
+class _TripMetadata {
+  _TripMetadata({
+    required this.title,
+    required this.description,
+    required this.lang,
+    required this.published,
+    required List<DestinationInput> destinations,
+  }) : destinations = List.unmodifiable(destinations);
+
+  final String title;
+  final String description;
+  final String lang;
+  final bool published;
+  final List<DestinationInput> destinations;
+
+  _TripMetadata copyWith({
+    String? title,
+    String? description,
+    String? lang,
+    bool? published,
+    List<DestinationInput>? destinations,
+  }) => _TripMetadata(
+    title: title ?? this.title,
+    description: description ?? this.description,
+    lang: lang ?? this.lang,
+    published: published ?? this.published,
+    destinations: destinations ?? this.destinations,
+  );
+
+  // GET 不提供 country，沿用目的地名稱與順序的 diff 契約。
+  bool sameDestinations(_TripMetadata other) => listEquals(
+    [for (final destination in destinations) destination.name],
+    [for (final destination in other.destinations) destination.name],
+  );
+
+  bool equivalent(_TripMetadata other) =>
+      title == other.title &&
+      description == other.description &&
+      lang == other.lang &&
+      published == other.published &&
+      sameDestinations(other);
 }
 
 enum DayDeletionResolution {
@@ -115,16 +176,14 @@ class EditTripController extends Notifier<EditTripState> {
   bool _disposed = false;
   _PendingDayDeletion? _pendingDayDeletion;
   bool _dayDeletionResolutionInFlight = false;
-  // 原始值(算 diff)。
-  String _origTitle = '';
-  String _origDescription = '';
-  String _origLang = 'zh-TW';
-  bool _origPublished = false;
-  List<String> _origDestNames = const [];
+  DraftSession<_TripMetadata, void>? _session;
 
   @override
   EditTripState build() {
-    ref.onDispose(() => _disposed = true);
+    ref.onDispose(() {
+      _disposed = true;
+      _session?.dispose();
+    });
     unawaited(_load());
     return const EditTripState(loading: true);
   }
@@ -139,90 +198,94 @@ class EditTripController extends Notifier<EditTripState> {
       final trip = await _repo.fetchTrip(tripId);
       final days = await _repo.fetchDaySummaries(tripId);
       if (_disposed) return;
-      _origTitle = trip.title ?? '';
-      _origDescription = trip.description ?? '';
-      _origLang = trip.lang ?? 'zh-TW';
-      _origPublished = trip.published;
-      final dests = [
-        for (final d in trip.destinations)
-          DestinationInput(name: d.name, lat: d.lat, lng: d.lng),
-      ];
-      _origDestNames = [for (final d in dests) d.name];
+      final session = DraftSession<_TripMetadata, void>(
+        initial: _TripMetadata(
+          title: trip.title ?? '',
+          description: trip.description ?? '',
+          lang: trip.lang ?? 'zh-TW',
+          published: trip.published,
+          destinations: [
+            for (final d in trip.destinations)
+              DestinationInput(name: d.name, lat: d.lat, lng: d.lng),
+          ],
+        ),
+        equivalent: (a, b) => a.equivalent(b),
+        write: _writeMetadata,
+      );
+      _session = session;
+      session.addListener(() => state = state._withSession(session));
       state = EditTripState(
         loading: false,
-        title: _origTitle,
-        description: _origDescription,
-        lang: _origLang,
-        published: _origPublished,
         startDate: trip.startDate ?? _firstDate(days),
         endDate: trip.endDate ?? _lastDate(days),
         days: days,
-        destinations: dests,
-      );
+      )._withSession(session);
     } on Exception {
       if (_disposed) return;
       state = state.copyWith(loading: false, error: '載入失敗,請稍後再試');
     }
   }
 
-  void setTitle(String v) => state = state.copyWith(title: v);
-  void setDescription(String v) => state = state.copyWith(description: v);
-  void setLang(String v) => state = state.copyWith(lang: v);
-  void setPublished(bool v) => state = state.copyWith(published: v);
+  void setTitle(String v) => _session?.edit(_session!.draft.copyWith(title: v));
+  void setDescription(String v) =>
+      _session?.edit(_session!.draft.copyWith(description: v));
+  void setLang(String v) => _session?.edit(_session!.draft.copyWith(lang: v));
+  void setPublished(bool v) =>
+      _session?.edit(_session!.draft.copyWith(published: v));
 
-  void addDestination(DestinationInput d) =>
-      state = state.copyWith(destinations: [...state.destinations, d]);
-  void removeDestination(int index) => state = state.copyWith(
-    destinations: [...state.destinations]..removeAt(index),
+  void addDestination(DestinationInput d) => _session?.edit(
+    _session!.draft.copyWith(destinations: [...state.destinations, d]),
+  );
+  void removeDestination(int index) => _session?.edit(
+    _session!.draft.copyWith(
+      destinations: [...state.destinations]..removeAt(index),
+    ),
   );
   void reorderDestination(int oldIndex, int newIndex) {
     final list = [...state.destinations];
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
-    state = state.copyWith(destinations: list);
+    _session?.edit(_session!.draft.copyWith(destinations: list));
   }
 
-  bool get _destChanged =>
-      !listEquals([for (final d in state.destinations) d.name], _origDestNames);
+  /// 需明確儲存的欄位是否仍有變更，不含已生效的 Day 操作。
+  bool get hasChanges => _session?.dirty ?? false;
 
-  /// 有任何欄位變更。
-  bool get hasChanges =>
-      state.title != _origTitle ||
-      state.description != _origDescription ||
-      state.lang != _origLang ||
-      state.published != _origPublished ||
-      _destChanged;
+  /// 欄位提交失敗的持續性訊息，與 Day 操作錯誤分開呈現。
+  String? get saveError => _session?.error;
 
-  /// diff-only PUT;無變更則直接視為已存(不打空 body 觸發 400)。
-  Future<void> save() async {
-    if (state.loading || state.saving) return;
-    if (!hasChanges) {
-      state = state.copyWith(saved: true);
-      return;
-    }
-    state = state.copyWith(saving: true, error: null);
-    try {
-      await _repo.updateTrip(
-        tripId,
-        title: state.title != _origTitle ? state.title : null,
-        description: state.description != _origDescription
-            ? state.description
-            : null,
-        lang: state.lang != _origLang ? state.lang : null,
-        published: state.published != _origPublished
-            ? (state.published ? 1 : 0)
-            : null,
-        destinations: _destChanged ? state.destinations : null,
-      );
-      if (_disposed) return;
+  /// diff-only PUT 使用送出快照，成功只更新該快照的 baseline。
+  Future<DraftAccepted<_TripMetadata, void>> _writeMetadata(
+    DraftSnapshot<_TripMetadata> snapshot,
+  ) async {
+    final draft = snapshot.draft;
+    final baseline = snapshot.baseline;
+    await _repo.updateTrip(
+      tripId,
+      title: draft.title != baseline.title ? draft.title : null,
+      description: draft.description != baseline.description
+          ? draft.description
+          : null,
+      lang: draft.lang != baseline.lang ? draft.lang : null,
+      published: draft.published != baseline.published
+          ? (draft.published ? 1 : 0)
+          : null,
+      destinations: !draft.sameDestinations(baseline)
+          ? draft.destinations
+          : null,
+    );
+    if (!_disposed) {
       ref.invalidate(myTripsProvider);
       ref.invalidate(tripDetailProvider(tripId));
-      state = state.copyWith(saving: false, saved: true);
-    } on Exception {
-      if (_disposed) return;
-      state = state.copyWith(saving: false, error: '儲存失敗,請稍後再試');
     }
+    return DraftAccepted(draft: draft, result: null);
   }
+
+  /// 無變更不送空 body；提交中的再次操作交由 session 擋下。
+  Future<DraftSaved<void>?> save() async => _session?.submit();
+
+  /// 關閉當下重新檢查，較新的輸入不能被舊成功結果帶離畫面。
+  bool canFinish(DraftSaved<void> saved) => _session?.canFinish(saved) ?? false;
 
   /// POST /trips/:id/days/shift，整體平移所有 day/date。
   Future<bool> shiftStartDate(String startDate) async {
