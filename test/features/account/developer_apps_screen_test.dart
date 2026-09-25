@@ -135,6 +135,61 @@ void main() {
     expect(find.byKey(const Key('developer-apps-new')), findsOneWidget);
   });
 
+  testWidgets('長應用名稱在窄螢幕大字級仍可辨識編輯入口', (tester) async {
+    final semantics = tester.ensureSemantics();
+    const longName = '跨地區行程整合與資料同步測試應用程式';
+    const longApp = DeveloperApp(
+      clientId: 'tp_long_app',
+      clientType: 'confidential',
+      appName: longName,
+      redirectUris: ['https://example.com/oauth/callback'],
+      allowedScopes: [
+        'openid',
+        'profile',
+        'email',
+        'trips:read',
+        'trips:write',
+      ],
+      status: 'pending_review',
+      createdAt: '2026-07-08T10:00:00Z',
+      updatedAt: '2026-07-08T10:00:00Z',
+    );
+    when(
+      () => mockTripRepository.fetchDeveloperApps(),
+    ).thenAnswer((_) async => const [longApp]);
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: const DeveloperAppsScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(const Key('developer-app-row-tp_long_app'));
+    expect(row, findsOneWidget);
+    final data = tester.getSemantics(row);
+    expect(data.label, contains(longName));
+    expect(data.getSemanticsData().hint, contains('編輯'));
+    expect(data.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
   testWidgets('點選 developer app 會在同一個 Navigation Stack 開啟編輯表單', (tester) async {
     await pumpList(tester);
 
