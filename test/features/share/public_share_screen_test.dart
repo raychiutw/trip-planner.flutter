@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,8 @@ import 'package:tripline/models/notes.dart';
 import 'package:tripline/models/share.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
+
+import '../../fixtures/note_content_fixture.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
 
@@ -171,6 +174,134 @@ void main() {
     when(
       () => repository.clonePublicTripShare(any()),
     ).thenAnswer((_) async => 'cln-trip-1');
+  });
+
+  testWidgets('公開分享保留五區語意內容且不讀私人筆記', (tester) async {
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
+      (_) async =>
+          const PublicTripShare(name: '公開旅行', notes: noteContentFixture),
+    );
+    final semantics = tester.ensureSemantics();
+    try {
+      await pumpScreen(tester, size: const Size(800, 1800));
+      expect(find.text('商務艙'), findsOneWidget);
+      expect(find.bySemanticsLabel('電子郵件：family@example.com'), findsOneWidget);
+      final text = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(const ValueKey('public-share-page')),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? '')
+          .join('\n');
+      var cursor = 0;
+      for (final value in noteContentExpectedOrder) {
+        final next = text.indexOf(value, cursor);
+        expect(next, greaterThanOrEqualTo(0), reason: '缺少或順序錯誤：$value');
+        cursor = next + value.length;
+      }
+      expect(text, isNot(contains('0 位')));
+      await tester.pumpWidget(const SizedBox());
+      when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
+        (_) async =>
+            const PublicTripShare(name: '公開旅行', notes: emptyNoteContentFixture),
+      );
+      await pumpScreen(tester, size: const Size(800, 1800));
+      expect(find.text('行程筆記'), findsNothing);
+      verifyNever(() => repository.fetchNotes(any()));
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
+  });
+
+  testWidgets('公開授權視圖及列印輸出不回補私有區塊', (tester) async {
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
+      (_) async =>
+          const PublicTripShare(name: '公開旅行', notes: publicNoteFixture),
+    );
+    when(
+      () => repository.fetchNotes(any()),
+    ).thenAnswer((_) async => privateNoteFixture);
+    await pumpScreen(tester);
+    expect(find.text('PUBLIC-BR112'), findsOneWidget);
+    expect(find.text('公開提醒'), findsOneWidget);
+    expect(find.text('PRIVATE-SECRET-385'), findsNothing);
+    expect(find.text('住宿'), findsNothing);
+    expect(find.text('緊急聯絡'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(printActions.printed.single.notes.emergencyContacts, isEmpty);
+    expect(
+      printActions.printed.single.notes.flights.single.cabinClass,
+      isEmpty,
+    );
+    verifyNever(() => repository.fetchNotes(any()));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('公開分享可開啟電話並將筆記原文複製到剪貼簿', (tester) async {
+    final launched = <String>[];
+    String? copied;
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      if (call.method == 'launch') {
+        launched.add((call.arguments as Map)['url'] as String);
+      }
+      return true;
+    });
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    when(() => repository.fetchPublicTripShare('s1')).thenAnswer(
+      (_) async => PublicTripShare(
+        name: '公開旅行',
+        notes: TripNotes(
+          pretripNotes: const [
+            TripPretripNote(
+              id: 1,
+              sortOrder: 0,
+              version: 0,
+              content: 'PASSPORT2026',
+            ),
+          ],
+          emergencyContacts: noteContentFixture.emergencyContacts,
+        ),
+      ),
+    );
+    await pumpScreen(
+      tester,
+      locale: const Locale('en', 'US'),
+      size: const Size(800, 1200),
+    );
+    await tester.tap(find.text('+886 912 345 678'));
+    await tester.pumpAndSettle();
+    expect(launched, ['tel:+886912345678']);
+    await tester.longPress(find.text('PASSPORT2026'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+    expect(copied, 'PASSPORT2026');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('顯示公開分享 hero、日程與允許公開的 notes', (tester) async {

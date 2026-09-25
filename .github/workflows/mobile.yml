@@ -60,6 +60,11 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
+      - name: 安裝 PDF 內容驗證工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y poppler-utils
+
       - name: Run test suite
         # 跑整個 test/ 目錄。先前只挑三個檔，1643 條裡絕大多數從未在 CI 執行 ——
         # PR #151 因此帶著一支紅測試合進 master（改了 `buildEntryUri` 的行為，
