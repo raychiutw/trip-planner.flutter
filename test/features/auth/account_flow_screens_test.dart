@@ -21,7 +21,7 @@ void main() {
     mockAuthRepository = MockAuthRepository();
   });
 
-  Future<void> pumpAuthRoutes(
+  Future<GoRouter> pumpAuthRoutes(
     WidgetTester tester, {
     required String initialLocation,
   }) async {
@@ -85,6 +85,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return router;
   }
 
   testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
@@ -195,6 +196,146 @@ void main() {
     ).called(1);
     expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
     expect(find.text('ray@example.com'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
+  });
+
+  for (final waitForEmail in [false, true]) {
+    testWidgets('註冊送出後離頁，晚到成功不保存新表單或改變目的地：寄信等待=$waitForEmail', (tester) async {
+      final pending = Completer<SignupResult>();
+      final sending = Completer<String?>();
+      const result = SignupResult(
+        userId: 'user-1',
+        email: 'ray@example.com',
+        requiresVerification: true,
+      );
+      when(
+        () => mockAuthRepository.signup(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          privacyConsent: any(named: 'privacyConsent'),
+          displayName: any(named: 'displayName'),
+          invitationToken: any(named: 'invitationToken'),
+        ),
+      ).thenAnswer((_) => waitForEmail ? Future.value(result) : pending.future);
+      when(
+        () => mockAuthRepository.sendVerificationEmail(any()),
+      ).thenAnswer((_) => sending.future);
+      final router = await pumpAuthRoutes(tester, initialLocation: '/signup');
+      await tester.enterText(
+        find.byKey(const ValueKey('signup-email-field')),
+        'ray@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('signup-password-field')),
+        'password123',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+      );
+      await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+      await tester.pump();
+      router.go('/auth/password/reset?token=new-token');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final newField = find.byKey(const ValueKey('reset-password-field'));
+      expect(newField, findsOneWidget);
+      await tester.enterText(newField, 'new-password');
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: newField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      tester.testTextInput.log.clear();
+
+      if (waitForEmail) {
+        sending.complete('sent');
+      } else {
+        pending.complete(result);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/auth/password/reset',
+      );
+      expect(newField, findsOneWidget);
+      expect(find.text('new-password'), findsOneWidget);
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('帳號建立成功立即保存 AutoFill，不等待驗證信寄送', (tester) async {
+    final sending = Completer<String?>();
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const SignupResult(
+        userId: 'user-1',
+        email: 'ray@example.com',
+        requiresVerification: true,
+      ),
+    );
+    when(
+      () => mockAuthRepository.sendVerificationEmail(any()),
+    ).thenAnswer((_) => sending.future);
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'ray@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    tester.testTextInput.log.clear();
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pump();
+
+    verify(
+      () => mockAuthRepository.sendVerificationEmail('ray@example.com'),
+    ).called(1);
+    expect(sending.isCompleted, isFalse);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
+    sending.complete('sent');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
     expect(
       tester.testTextInput.log.where(
         (call) =>
@@ -1046,6 +1187,61 @@ void main() {
       find.byKey(const ValueKey('reset-password-success')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('重設送出後離頁，晚到成功不保存新表單或改變目的地', (tester) async {
+    final pending = Completer<String?>();
+    when(
+      () => mockAuthRepository.resetPassword(
+        token: 'old-token',
+        password: 'password123',
+      ),
+    ).thenAnswer((_) => pending.future);
+    final router = await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/password/reset?token=old-token',
+    );
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('reset-password-submit-button')),
+    );
+    await tester.pump();
+    router.go('/signup');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    final newField = find.byKey(const ValueKey('signup-password-field'));
+    expect(newField, findsOneWidget);
+    await tester.enterText(newField, 'new-password');
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(of: newField, matching: find.byType(EditableText)),
+          )
+          .focusNode
+          .hasFocus,
+      isTrue,
+    );
+    tester.testTextInput.log.clear();
+
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/signup');
+    expect(newField, findsOneWidget);
+    expect(find.text('new-password'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('重設密碼 submitting 時防止重複送出', (tester) async {

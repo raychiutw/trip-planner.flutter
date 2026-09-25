@@ -68,6 +68,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             displayName: _displayNameController.text,
             invitationToken: widget.invitationToken,
           );
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      TextInput.finishAutofillContext();
       try {
         await ref
             .read(authRepositoryProvider)
@@ -75,8 +77,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       } catch (_) {
         // Verification resend is best-effort, matching the web flow.
       }
-      if (!mounted) return;
-      TextInput.finishAutofillContext();
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       ref.invalidate(authStateProvider);
       if (result.joinedTrip != null) {
         context.go(
@@ -523,7 +524,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             token: widget.token,
             password: _passwordController.text,
           );
-      if (!mounted) return;
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       TextInput.finishAutofillContext();
       setState(() => _success = true);
     } on Exception catch (error) {

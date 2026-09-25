@@ -106,6 +106,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth/password/reset',
         builder: (context, state) => ResetPasswordScreen(
+          key: ValueKey(state.uri.queryParameters['token'] ?? ''),
           token: state.uri.queryParameters['token'] ?? '',
         ),
       ),

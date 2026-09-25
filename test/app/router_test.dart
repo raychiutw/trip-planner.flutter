@@ -3,10 +3,14 @@
 /// 2. 已登入在 /login → redirect 到 /trips
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
+import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/providers.dart';
@@ -69,6 +73,8 @@ class _FakeAuthNotifier extends AuthNotifier {
   Future<UserInfo?> build() async => _fixedUser;
 }
 
+class _MockAuthRepository extends Mock implements AuthRepository {}
+
 class _MockTripRepository extends Mock implements TripRepository {}
 
 class _MockCollabRepository extends Mock implements CollabRepository {}
@@ -88,6 +94,7 @@ ProviderContainer _buildContainer({
   required UserInfo? currentUser,
   List<TripSummary>? trips,
   List<TripDay>? days,
+  AuthRepository? authRepository,
 }) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
@@ -160,6 +167,8 @@ ProviderContainer _buildContainer({
 
   final container = ProviderContainer(
     overrides: [
+      if (authRepository != null)
+        authRepositoryProvider.overrideWithValue(authRepository),
       authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
@@ -172,6 +181,207 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  testWidgets('重設新 token 隔離舊請求與成功狀態', (tester) async {
+    final auth = _MockAuthRepository();
+    final pending = Completer<String?>();
+    when(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).thenAnswer((_) => pending.future);
+    when(
+      () => auth.resetPassword(token: 'new-token', password: 'new-password'),
+    ).thenAnswer((_) async => null);
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/password/reset?token=old-token');
+    await tester.pumpAndSettle();
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    final submit = find.byKey(const ValueKey('reset-password-submit-button'));
+    await tester.tap(submit);
+    await tester.pump();
+    verify(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).called(1);
+    router.go('/auth/password/reset?token=new-token');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('更新中…'), findsNothing);
+    final field = find.byKey(const ValueKey('reset-password-field'));
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'new-password');
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(of: field, matching: find.byType(EditableText)),
+          )
+          .focusNode
+          .hasFocus,
+      isTrue,
+    );
+    tester.testTextInput.log.clear();
+
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reset-password-success')), findsNothing);
+    expect(find.text('new-password'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('reset-password-confirm-field')),
+      'new-password',
+    );
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('reset-password-success')),
+      findsOneWidget,
+    );
+    verify(
+      () => auth.resetPassword(token: 'new-token', password: 'new-password'),
+    ).called(1);
+    router.go('/auth/password/reset?token=third-token');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reset-password-success')), findsNothing);
+    expect(field, findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(of: field, matching: find.byType(TextField)),
+          )
+          .controller!
+          .text,
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('驗證中的舊 token 回應不污染新連結', (tester) async {
+    final auth = _MockAuthRepository();
+    final pending = Completer<bool>();
+    when(() => auth.verifyEmail('old-token')).thenAnswer((_) => pending.future);
+    when(() => auth.verifyEmail('new-token')).thenAnswer((_) async => true);
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/verify-email?token=old-token');
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('verify-email-confirm-button'));
+    await tester.tap(submit);
+    await tester.pump();
+    verify(() => auth.verifyEmail('old-token')).called(1);
+    router.go('/auth/verify-email?token=new-token');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('確認信箱驗證'), findsOneWidget);
+    expect(find.text('驗證中…'), findsNothing);
+    expect(submit, findsOneWidget);
+
+    pending.complete(true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('verify-email-success')), findsNothing);
+    expect(find.byKey(const ValueKey('verify-email-error')), findsNothing);
+    expect(submit, findsOneWidget);
+    verifyNever(() => auth.verifyEmail('new-token'));
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    verify(() => auth.verifyEmail('new-token')).called(1);
+    expect(find.byKey(const ValueKey('verify-email-success')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('新的重設連結不保留舊 token 錯誤與密碼', (tester) async {
+    final auth = _MockAuthRepository();
+    when(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).thenThrow(
+      const ApiError(
+        status: 400,
+        code: 'RESET_TOKEN_INVALID',
+        message: 'invalid',
+      ),
+    );
+    final container = _buildContainer(currentUser: null, authRepository: auth);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/auth/password/reset?token=old-token');
+    await tester.pumpAndSettle();
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('reset-password-submit-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('重設連結無效或已過期'), findsOneWidget);
+    expect(find.text('重新申請'), findsOneWidget);
+
+    router.go('/auth/password/reset?token=new-token');
+    await tester.pumpAndSettle();
+    expect(find.text('重設連結無效或已過期'), findsNothing);
+    expect(find.text('重新申請'), findsNothing);
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byKey(ValueKey(key)),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+    }
+    verify(
+      () => auth.resetPassword(token: 'old-token', password: 'password123'),
+    ).called(1);
+    verifyNever(
+      () => auth.resetPassword(
+        token: 'new-token',
+        password: any(named: 'password'),
+      ),
+    );
+  });
+
   for (final user in [null, _loggedInUser]) {
     testWidgets('驗證重新開始依登入狀態前往有效目的地：${user?.id ?? "未登入"}', (tester) async {
       final container = _buildContainer(currentUser: user);
