@@ -253,7 +253,20 @@ void main() {
     expect(tester.widget<FilledButton>(revokeFinder).onPressed, isNotNull);
   });
 
-  testWidgets('登出其他裝置缺少 server-bound reauth 時安全阻擋且不呼叫 API', (tester) async {
+  testWidgets('批次登出受限時說明逐一登出路徑，確認後失敗仍可重試', (tester) async {
+    var attempts = 0;
+    when(() => mockTripRepository.revokeAccountSession('sid-phone')).thenAnswer(
+      (_) async {
+        attempts++;
+        if (attempts == 1) throw Exception('offline');
+      },
+    );
+    when(() => mockTripRepository.fetchAccountSessions()).thenAnswer(
+      (_) async => AccountSessionsPage(
+        currentSid: 'sid-current',
+        sessions: [currentSession, if (attempts < 2) phoneSession],
+      ),
+    );
     await pumpScreen(tester);
 
     await tester.tap(find.byKey(const Key('account-sessions-revoke-others')));
@@ -263,10 +276,43 @@ void main() {
       find.byKey(const ValueKey('revoke-other-sessions-blocked-dialog')),
       findsOneWidget,
     );
-    expect(find.text('需要重新驗證才能登出其他裝置'), findsOneWidget);
-    expect(find.textContaining('缺少可綁定伺服器操作'), findsOneWidget);
-    expect(find.textContaining('逐一登出'), findsOneWidget);
+    expect(find.text('目前無法一次登出其他裝置'), findsOneWidget);
+    expect(
+      find.text('目前無法驗證身分以一次登出其他裝置。請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('伺服器'), findsNothing);
+    expect(find.textContaining('綁定'), findsNothing);
     verifyNever(() => mockTripRepository.revokeOtherAccountSessions());
+    verifyNever(() => mockTripRepository.revokeAccountSession(any()));
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '返回裝置清單'));
+    await tester.pumpAndSettle();
+    expect(find.text('目前裝置'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('account-session-row-sid-phone')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('登出此裝置'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出 Safari on iPhone？'), findsOneWidget);
+    verifyNever(() => mockTripRepository.revokeAccountSession(any()));
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出裝置失敗，請稍後再試'), findsOneWidget);
+    expect(find.text('Safari on iPhone'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, '重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('登出 Safari on iPhone？'), findsOneWidget);
+    expect(attempts, 1);
+
+    await tester.tap(find.widgetWithText(CupertinoDialogAction, '登出'));
+    await tester.pumpAndSettle();
+    expect(find.text('已登出該裝置'), findsOneWidget);
+    expect(find.text('Safari on iPhone'), findsNothing);
+    expect(find.text('目前裝置'), findsOneWidget);
+    expect(attempts, 2);
+    verifyNever(() => mockTripRepository.revokeOtherAccountSessions());
+    verifyNever(() => mockTripRepository.revokeAccountSession('sid-current'));
   });
 
   testWidgets('顯示帳號 email、OAuth 提醒與頁尾登出', (tester) async {
