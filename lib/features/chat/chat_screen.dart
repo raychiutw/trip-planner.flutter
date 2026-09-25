@@ -186,6 +186,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         error: (e, _) => initiallyBelowHeader(
           Semantics(
             liveRegion: true,
+            label: _retryingTrips ? '行程清單重試中…' : null,
             child: _CenteredHint(
               title: '載入失敗',
               body: '無法取得行程清單,請稍後再試。',
@@ -519,6 +520,7 @@ class _ChatBodyState extends ConsumerState<_ChatBody> {
                 if (widget.onTripsRetry != null)
                   Semantics(
                     liveRegion: true,
+                    label: widget.tripsRetryInProgress ? '行程清單重試中…' : null,
                     child: _Banner(
                       text: '無法取得行程清單,請稍後再試。',
                       onRetry: widget.onTripsRetry,
@@ -1170,7 +1172,7 @@ class _CenteredHint extends StatelessWidget {
               FilledButton(
                 key: const ValueKey('chat-retry'),
                 onPressed: retryInProgress ? null : onRetry,
-                child: const Text('重試'),
+                child: Text(retryInProgress ? '重試中…' : '重試'),
               ),
             ] else if (onAction != null && actionLabel != null) ...[
               const SizedBox(height: TpSpacing.s4),
@@ -1217,9 +1219,11 @@ class _Banner extends StatelessWidget {
               ),
             ),
             if (onRetry != null)
-              TextButton(
-                onPressed: retryInProgress ? null : onRetry,
-                child: const Text('重試'),
+              Flexible(
+                child: TextButton(
+                  onPressed: retryInProgress ? null : onRetry,
+                  child: Text(retryInProgress ? '重試中…' : '重試'),
+                ),
               ),
           ],
         ),

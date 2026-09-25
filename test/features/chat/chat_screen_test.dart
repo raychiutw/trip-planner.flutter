@@ -1216,9 +1216,14 @@ void main() {
   });
 
   for (final hasStaleTrips in [false, true]) {
-    testWidgets('行程清單${hasStaleTrips ? '既有資料' : '初載'}重試進行中不重複請求，失敗後可再試', (
+    testWidgets('行程清單${hasStaleTrips ? '既有資料' : '初載'}重試進度可見且宣告，不重複請求並保留草稿', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
       final initial = StreamController<List<TripSummary>>.broadcast();
       final retry = StreamController<List<TripSummary>>.broadcast();
       final recovered = StreamController<List<TripSummary>>.broadcast();
@@ -1239,7 +1244,16 @@ void main() {
         await retry.close();
         await recovered.close();
       });
-      await tester.pumpWidget(buildApp(initialTripId: 'okinawa'));
+      await tester.pumpWidget(
+        buildApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              textScaler: TextScaler.linear(hasStaleTrips ? 3.2 : 2),
+            ),
+            child: const ChatScreen(initialTripId: 'okinawa'),
+          ),
+        ),
+      );
       if (hasStaleTrips) {
         initial.add(_trips);
         await tester.pumpAndSettle();
@@ -1255,7 +1269,20 @@ void main() {
       await tester.tap(find.text('重試'));
       await tester.pump();
       expect(loads, 2);
-      await tester.tap(find.text('重試'));
+      expect(tester.takeException(), isNull);
+      expect(find.text('重試中…'), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(RegExp('行程清單重試中…')))
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
+      if (hasStaleTrips) {
+        expect(find.text('保留草稿'), findsOneWidget);
+      }
+      await tester.tap(find.text('重試中…'));
       await tester.pump();
       expect(loads, 2);
 
@@ -1264,6 +1291,8 @@ void main() {
         await tester.pump();
       }
       expect(find.text('無法取得行程清單,請稍後再試。'), findsOneWidget);
+      expect(find.text('重試中…'), findsNothing);
+      expect(find.text('重試'), findsOneWidget);
       await tester.tap(find.text('重試'));
       await tester.pump();
       expect(loads, 3);
@@ -1275,6 +1304,7 @@ void main() {
       if (hasStaleTrips) {
         expect(tester.widget<TextField>(input).controller!.text, '保留草稿');
       }
+      semantics.dispose();
     });
   }
 
@@ -1306,7 +1336,7 @@ void main() {
     await tester.tap(find.text('重試'));
     await tester.pump();
     expect(loads, 2);
-    await tester.tap(find.text('重試'));
+    await tester.tap(find.text('重試中…'));
     await tester.pump();
     expect(loads, 2);
 
