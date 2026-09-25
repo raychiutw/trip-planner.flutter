@@ -54,7 +54,7 @@ void main() {
     expect(find.byKey(const ValueKey('login-oauth-button')), findsNothing);
   });
 
-  testWidgets('啟用 OAuth → 顯示按鈕,點擊呼叫 login()', (tester) async {
+  testWidgets('啟用 OAuth → 顯示 Tripline 帳號登入並可登入', (tester) async {
     when(() => oauthLogin.login()).thenAnswer(
       (_) async => OAuthTokens(
         accessToken: 'AT',
@@ -64,13 +64,15 @@ void main() {
 
     await pump(tester, oauthEnabled: true);
     expect(find.byKey(const ValueKey('login-oauth-button')), findsOneWidget);
+    expect(find.text('使用 Tripline 帳號登入'), findsOneWidget);
+    expect(find.text('用 OAuth 登入'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
     await tester.pumpAndSettle();
     verify(() => oauthLogin.login()).called(1);
   });
 
-  testWidgets('OAuth 登入中顯示 iOS progress、文字並禁止重複送出', (tester) async {
+  testWidgets('Tripline 登入中顯示 iOS progress、文字並禁止重複送出', (tester) async {
     final pending = Completer<OAuthTokens>();
     when(() => oauthLogin.login()).thenAnswer((_) => pending.future);
 
@@ -86,7 +88,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('OAuth 登入中'), findsOneWidget);
+    expect(find.text('Tripline 登入中'), findsOneWidget);
     expect(
       tester.widget<OutlinedButton>(find.byKey(buttonKey)).onPressed,
       isNull,
@@ -166,5 +168,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
     await tester.pumpAndSettle();
     expect(find.text('登入逾時'), findsOneWidget);
+  });
+
+  testWidgets('Tripline 登入發生未預期錯誤時顯示易懂訊息', (tester) async {
+    when(() => oauthLogin.login()).thenThrow(Exception('unexpected'));
+
+    await pump(tester, oauthEnabled: true);
+    await tester.tap(find.byKey(const ValueKey('login-oauth-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tripline 登入失敗，請稍後再試'), findsOneWidget);
   });
 }
