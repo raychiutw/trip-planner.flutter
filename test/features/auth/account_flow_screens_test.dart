@@ -21,7 +21,7 @@ void main() {
     mockAuthRepository = MockAuthRepository();
   });
 
-  Future<void> pumpAuthRoutes(
+  Future<GoRouter> pumpAuthRoutes(
     WidgetTester tester, {
     required String initialLocation,
   }) async {
@@ -71,6 +71,8 @@ void main() {
       ],
     );
 
+    addTearDown(router.dispose);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -83,7 +85,62 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return router;
   }
+
+  testWidgets('註冊欄位提供同組姓名、Email 與新密碼 AutoFill 語意', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+
+    final groups = <AutofillGroupState?>[];
+    for (final (key, hint) in [
+      ('signup-email-field', AutofillHints.email),
+      ('signup-display-name-field', AutofillHints.name),
+      ('signup-password-field', AutofillHints.newPassword),
+    ]) {
+      final field = find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(field).autofillHints, contains(hint));
+      groups.add(AutofillGroup.maybeOf(tester.element(field)));
+    }
+    expect(groups.first, isNotNull);
+    expect(groups.every((group) => identical(group, groups.first)), isTrue);
+
+    final password = find.descendant(
+      of: find.byKey(const ValueKey('signup-password-field')),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(password).autocorrect, isFalse);
+    await tester.tap(
+      find.byKey(const ValueKey('signup-password-visibility-toggle')),
+    );
+    await tester.pump();
+    expect(tester.widget<TextField>(password).autocorrect, isFalse);
+    expect(
+      tester.widget<TextField>(password).autofillHints,
+      contains(AutofillHints.newPassword),
+    );
+  });
+
+  testWidgets('離開未完成的註冊時不儲存 AutoFill 憑證', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'unfinished-password',
+    );
+    tester.testTextInput.log.clear();
+
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('login-destination'), findsOneWidget);
+    final finishes = tester.testTextInput.log.where(
+      (call) => call.method == 'TextInput.finishAutofillContext',
+    );
+    expect(finishes, isNotEmpty);
+    expect(finishes.every((call) => call.arguments == false), isTrue);
+  });
 
   testWidgets('註冊會帶 invitation token 並導向驗證信等待頁', (tester) async {
     when(
@@ -121,6 +178,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
     );
+    tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -138,6 +196,154 @@ void main() {
     ).called(1);
     expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
     expect(find.text('ray@example.com'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
+  });
+
+  for (final waitForEmail in [false, true]) {
+    testWidgets('註冊送出後離頁，晚到成功不保存新表單或改變目的地：寄信等待=$waitForEmail', (tester) async {
+      final pending = Completer<SignupResult>();
+      final sending = Completer<String?>();
+      const result = SignupResult(
+        userId: 'user-1',
+        email: 'ray@example.com',
+        requiresVerification: true,
+      );
+      when(
+        () => mockAuthRepository.signup(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+          privacyConsent: any(named: 'privacyConsent'),
+          displayName: any(named: 'displayName'),
+          invitationToken: any(named: 'invitationToken'),
+        ),
+      ).thenAnswer((_) => waitForEmail ? Future.value(result) : pending.future);
+      when(
+        () => mockAuthRepository.sendVerificationEmail(any()),
+      ).thenAnswer((_) => sending.future);
+      final router = await pumpAuthRoutes(tester, initialLocation: '/signup');
+      await tester.enterText(
+        find.byKey(const ValueKey('signup-email-field')),
+        'ray@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('signup-password-field')),
+        'password123',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+      );
+      await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+      await tester.pump();
+      router.go('/auth/password/reset?token=new-token');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final newField = find.byKey(const ValueKey('reset-password-field'));
+      expect(newField, findsOneWidget);
+      await tester.enterText(newField, 'new-password');
+      expect(
+        tester
+            .widget<EditableText>(
+              find.descendant(
+                of: newField,
+                matching: find.byType(EditableText),
+              ),
+            )
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+      tester.testTextInput.log.clear();
+
+      if (waitForEmail) {
+        sending.complete('sent');
+      } else {
+        pending.complete(result);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        '/auth/password/reset',
+      );
+      expect(newField, findsOneWidget);
+      expect(find.text('new-password'), findsOneWidget);
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('帳號建立成功立即保存 AutoFill，不等待驗證信寄送', (tester) async {
+    final sending = Completer<String?>();
+    when(
+      () => mockAuthRepository.signup(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+        privacyConsent: any(named: 'privacyConsent'),
+        displayName: any(named: 'displayName'),
+        invitationToken: any(named: 'invitationToken'),
+      ),
+    ).thenAnswer(
+      (_) async => const SignupResult(
+        userId: 'user-1',
+        email: 'ray@example.com',
+        requiresVerification: true,
+      ),
+    );
+    when(
+      () => mockAuthRepository.sendVerificationEmail(any()),
+    ).thenAnswer((_) => sending.future);
+    await pumpAuthRoutes(tester, initialLocation: '/signup');
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-email-field')),
+      'ray@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-password-field')),
+      'password123',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('signup-privacy-consent-checkbox')),
+    );
+    tester.testTextInput.log.clear();
+    await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
+    await tester.pump();
+
+    verify(
+      () => mockAuthRepository.sendVerificationEmail('ray@example.com'),
+    ).called(1);
+    expect(sending.isCompleted, isFalse);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
+    sending.complete('sent');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('verify-pending-page')), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
   });
 
   testWidgets('Auth 流程使用 inline Header、返回鍵且不顯示 Account', (tester) async {
@@ -345,10 +551,15 @@ void main() {
       find.byKey(const ValueKey('signup-password-field')),
       'password123',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('signup-display-name-field')),
+      '旅人',
+    );
     final consent = find.byKey(
       const ValueKey('signup-privacy-consent-checkbox'),
     );
     await tester.tap(consent);
+    tester.testTextInput.log.clear();
     await tester.tap(find.byKey(const ValueKey('signup-submit-button')));
     await tester.pumpAndSettle();
 
@@ -376,6 +587,13 @@ void main() {
           .controller
           ?.text,
       'password123',
+    );
+    expect(find.text('旅人'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) => call.method == 'TextInput.finishAutofillContext',
+      ),
+      isEmpty,
     );
     final error = find.byKey(const ValueKey('signup-error-banner'));
     expect(error, findsOneWidget);
@@ -591,6 +809,23 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('忘記密碼提供系統 email AutoFill 並停用文字修正', (tester) async {
+    await pumpAuthRoutes(tester, initialLocation: '/login/forgot');
+    await tester.showKeyboard(
+      find.byKey(const ValueKey('forgot-password-email-field')),
+    );
+
+    final configuration = tester.testTextInput.setClientArgs!;
+    expect(configuration['inputType'], TextInputType.emailAddress.toJson());
+    expect(configuration['autocorrect'], isFalse);
+    expect(configuration['enableSuggestions'], isFalse);
+    expect(configuration['textCapitalization'], 'TextCapitalization.none');
+    expect(
+      (configuration['autofill'] as Map<String, dynamic>)['hints'],
+      contains('email'),
+    );
+  });
+
   testWidgets('忘記密碼會送出 reset request 並顯示成功狀態', (tester) async {
     when(
       () => mockAuthRepository.requestPasswordReset(any()),
@@ -613,6 +848,41 @@ void main() {
       find.byKey(const ValueKey('forgot-password-success')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('忘記密碼成功後在 320pt 最大字級可回讀 email 並回登入', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    when(
+      () => mockAuthRepository.requestPasswordReset(any()),
+    ).thenAnswer((_) async => null);
+    await pumpAuthRoutes(tester, initialLocation: '/login/forgot');
+
+    final email = find.byKey(const ValueKey('forgot-password-email-field'));
+    await tester.ensureVisible(email);
+    await tester.enterText(email, ' traveler@example.com ');
+    await tester.tap(
+      find.byKey(const ValueKey('forgot-password-submit-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('若 traveler@example.com 已註冊，重設連結已寄出'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final login = find.widgetWithText(FilledButton, '回登入');
+    await tester.scrollUntilVisible(
+      login,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(login);
+    await tester.pumpAndSettle();
+
+    expect(find.text('login-destination'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('忘記密碼 submitting 時防止重複送出', (tester) async {
@@ -677,6 +947,201 @@ void main() {
     );
   });
 
+  testWidgets('重設密碼與確認欄位共用新密碼 AutoFill 且取消不保存', (tester) async {
+    await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/password/reset?token=reset-token',
+    );
+    final groups = <AutofillGroupState?>[];
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      final field = find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(TextField),
+      );
+      expect(
+        tester.widget<TextField>(field).autofillHints,
+        contains(AutofillHints.newPassword),
+      );
+      expect(tester.widget<TextField>(field).autocorrect, isFalse);
+      groups.add(AutofillGroup.maybeOf(tester.element(field)));
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    expect(groups.first, isNotNull);
+    expect(identical(groups.first, groups.last), isTrue);
+    tester.testTextInput.log.clear();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    final finishes = tester.testTextInput.log.where(
+      (call) => call.method == 'TextInput.finishAutofillContext',
+    );
+    expect(finishes, isNotEmpty);
+    expect(finishes.every((call) => call.arguments == false), isTrue);
+  });
+
+  for (final (code, message) in [
+    ('RESET_TOKEN_INVALID', '重設連結無效或已過期'),
+    ('RESET_TOKEN_MISSING', '重設連結缺少 token'),
+  ]) {
+    testWidgets('$code 保留輸入並可重新申請，不重送也不返回失效頁', (tester) async {
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: any(named: 'token'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(ApiError(status: 400, code: code, message: 'invalid token'));
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/password/reset?token=expired-token',
+      );
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+      }
+      tester.testTextInput.log.clear();
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: find.byKey(ValueKey(key)),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller
+              ?.text,
+          'password123',
+        );
+      }
+      final retry = find.text('重新申請');
+      expect(retry, findsOneWidget);
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('forgot-password-email-field')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('login-destination'), findsOneWidget);
+      expect(find.byKey(const ValueKey('reset-password-field')), findsNothing);
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'expired-token',
+          password: 'password123',
+        ),
+      ).called(1);
+      verifyNever(() => mockAuthRepository.requestPasswordReset(any()));
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+    });
+  }
+
+  for (final error in <Exception>[
+    Exception('RESET_TOKEN_INVALID'),
+    const ApiError(status: 500, code: 'INTERNAL_ERROR', message: '重設連結無效或已過期'),
+  ]) {
+    testWidgets('一般錯誤不誤判 token 失效並保留輸入供手動重試：$error', (tester) async {
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: any(named: 'token'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(error);
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/password/reset?token=reset-token',
+      );
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+      }
+      tester.testTextInput.log.clear();
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reset-password-error')),
+        findsOneWidget,
+      );
+      expect(find.text('重新申請'), findsNothing);
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: find.byKey(ValueKey(key)),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller
+              ?.text,
+          'password123',
+        );
+      }
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).called(1);
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).thenAnswer((_) async => null);
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reset-password-success')),
+        findsOneWidget,
+      );
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).called(1);
+    });
+  }
+
   testWidgets('重設密碼會驗證兩次輸入並呼叫 resetPassword', (tester) async {
     when(
       () => mockAuthRepository.resetPassword(
@@ -697,10 +1162,20 @@ void main() {
       find.byKey(const ValueKey('reset-password-confirm-field')),
       'password123',
     );
+    tester.testTextInput.log.clear();
     await tester.tap(
       find.byKey(const ValueKey('reset-password-submit-button')),
     );
     await tester.pumpAndSettle();
+
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
 
     verify(
       () => mockAuthRepository.resetPassword(
@@ -712,6 +1187,61 @@ void main() {
       find.byKey(const ValueKey('reset-password-success')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('重設送出後離頁，晚到成功不保存新表單或改變目的地', (tester) async {
+    final pending = Completer<String?>();
+    when(
+      () => mockAuthRepository.resetPassword(
+        token: 'old-token',
+        password: 'password123',
+      ),
+    ).thenAnswer((_) => pending.future);
+    final router = await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/password/reset?token=old-token',
+    );
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('reset-password-submit-button')),
+    );
+    await tester.pump();
+    router.go('/signup');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    final newField = find.byKey(const ValueKey('signup-password-field'));
+    expect(newField, findsOneWidget);
+    await tester.enterText(newField, 'new-password');
+    expect(
+      tester
+          .widget<EditableText>(
+            find.descendant(of: newField, matching: find.byType(EditableText)),
+          )
+          .focusNode
+          .hasFocus,
+      isTrue,
+    );
+    tester.testTextInput.log.clear();
+
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/signup');
+    expect(newField, findsOneWidget);
+    expect(find.text('new-password'), findsOneWidget);
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('重設密碼 submitting 時防止重複送出', (tester) async {
@@ -802,6 +1332,126 @@ void main() {
       'password123',
     );
   });
+
+  testWidgets('驗證連結過期後可重新開始且不猜測收件者', (tester) async {
+    when(() => mockAuthRepository.verifyEmail(any())).thenThrow(
+      const ApiError(status: 400, code: 'expired', message: 'expired'),
+    );
+    await pumpAuthRoutes(
+      tester,
+      initialLocation:
+          '/auth/verify-email?token=expired-token&email=other%40example.com',
+    );
+    await tester.tap(find.byKey(const ValueKey('verify-email-confirm-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('驗證連結無效或已過期'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsNothing,
+    );
+    await tester.tap(find.text('重新開始'));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    verify(() => mockAuthRepository.verifyEmail('expired-token')).called(1);
+    verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+  });
+
+  for (final (code, message) in [
+    ('missing_token', '驗證連結不完整'),
+    ('used', '驗證連結已使用，請開啟最新的驗證信'),
+  ]) {
+    testWidgets('驗證連結 $code 提供重新開始而非重送失效連結', (tester) async {
+      when(
+        () => mockAuthRepository.verifyEmail(any()),
+      ).thenThrow(ApiError(status: 400, code: code, message: code));
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/verify-email?token=unusable-token',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('verify-email-success')), findsNothing);
+      await tester.tap(find.text('重新開始'));
+      await tester.pumpAndSettle();
+      expect(find.text('login-destination'), findsOneWidget);
+    });
+  }
+
+  testWidgets('空白驗證 token 在小螢幕大字級直接提供重新開始', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/verify-email?token=%20%20',
+    );
+    expect(find.text('驗證連結不完整'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('verify-email-confirm-button')),
+      findsNothing,
+    );
+    await tester.ensureVisible(find.text('重新開始'));
+    await tester.tap(find.text('重新開始'));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    verifyNever(() => mockAuthRepository.verifyEmail(any()));
+    verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+  });
+
+  for (final (reason, failure) in <(String, Exception?)>[
+    ('連線失敗', Exception('offline')),
+    (
+      '伺服器失敗',
+      const ApiError(
+        status: 500,
+        code: 'server_error',
+        message: 'server_error',
+      ),
+    ),
+    ('未知錯誤', const ApiError(status: 400, code: 'unknown', message: 'unknown')),
+    ('未確認成功', null),
+  ]) {
+    testWidgets('驗證 $reason 可用原 token 重試', (tester) async {
+      var attempts = 0;
+      when(() => mockAuthRepository.verifyEmail(any())).thenAnswer((_) async {
+        if (attempts++ == 0) {
+          if (failure != null) throw failure;
+          return false;
+        }
+        return true;
+      });
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/verify-email?token=retry-token',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('verify-email-confirm-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('verify-email-error')), findsOneWidget);
+      expect(find.text('重新開始'), findsNothing);
+      await tester.tap(find.text('重試'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('verify-email-success')),
+        findsOneWidget,
+      );
+      verify(() => mockAuthRepository.verifyEmail('retry-token')).called(2);
+      verifyNever(() => mockAuthRepository.sendVerificationEmail(any()));
+    });
+  }
 
   testWidgets('email 驗證需使用者按鈕觸發並顯示成功狀態', (tester) async {
     when(

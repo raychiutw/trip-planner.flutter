@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,6 +68,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             displayName: _displayNameController.text,
             invitationToken: widget.invitationToken,
           );
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      TextInput.finishAutofillContext();
       try {
         await ref
             .read(authRepositoryProvider)
@@ -74,7 +77,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       } catch (_) {
         // Verification resend is best-effort, matching the web flow.
       }
-      if (!mounted) return;
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
       ref.invalidate(authStateProvider);
       if (result.joinedTrip != null) {
         context.go(
@@ -138,127 +141,136 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null) ...[
-              _InlineAuthMessage(
-                key: const ValueKey('signup-error-banner'),
-                message: _error!,
+        child: AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                _InlineAuthMessage(
+                  key: const ValueKey('signup-error-banner'),
+                  message: _error!,
+                ),
+                const SizedBox(height: TpSpacing.s4),
+              ],
+              TextFormField(
+                key: const ValueKey('signup-email-field'),
+                controller: _emailController,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                forceErrorText: _emailServerError,
+                onChanged: (_) {
+                  if (_emailServerError != null) {
+                    setState(() => _emailServerError = null);
+                  }
+                },
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? '請輸入 Email' : null,
               ),
               const SizedBox(height: TpSpacing.s4),
-            ],
-            TextFormField(
-              key: const ValueKey('signup-email-field'),
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              forceErrorText: _emailServerError,
-              onChanged: (_) {
-                if (_emailServerError != null) {
-                  setState(() => _emailServerError = null);
-                }
-              },
-              decoration: const InputDecoration(labelText: 'Email'),
-              validator: (value) =>
-                  value == null || value.trim().isEmpty ? '請輸入 Email' : null,
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('signup-display-name-field'),
-              controller: _displayNameController,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('signup-password-field'),
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.done,
-              enabled: !_submitting,
-              forceErrorText: _passwordServerError,
-              onChanged: (_) {
-                if (_passwordServerError != null) {
-                  setState(() => _passwordServerError = null);
-                }
-              },
-              onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: '密碼',
-                helperText: '至少 8 個字元',
-                suffixIcon: IconButton(
-                  key: const ValueKey('signup-password-visibility-toggle'),
-                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  icon: Icon(
-                    _obscurePassword
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
+              TextFormField(
+                key: const ValueKey('signup-display-name-field'),
+                controller: _displayNameController,
+                autofillHints: const [AutofillHints.name],
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                decoration: const InputDecoration(labelText: '顯示名稱（選填）'),
+              ),
+              const SizedBox(height: TpSpacing.s4),
+              TextFormField(
+                key: const ValueKey('signup-password-field'),
+                controller: _passwordController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                enabled: !_submitting,
+                forceErrorText: _passwordServerError,
+                onChanged: (_) {
+                  if (_passwordServerError != null) {
+                    setState(() => _passwordServerError = null);
+                  }
+                },
+                onFieldSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: '密碼',
+                  helperText: '至少 8 個字元',
+                  suffixIcon: IconButton(
+                    key: const ValueKey('signup-password-visibility-toggle'),
+                    tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
                   ),
                 ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return '請輸入密碼';
+                  if (value.length < 8) return '密碼至少 8 字元';
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '請輸入密碼';
-                if (value.length < 8) return '密碼至少 8 字元';
-                return null;
-              },
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            FormField<bool>(
-              key: const ValueKey('signup-privacy-consent-field'),
-              initialValue: false,
-              validator: (value) => value == true ? null : '請先閱讀並同意個資條款',
-              builder: (field) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CheckboxListTile(
-                    key: const ValueKey('signup-privacy-consent-checkbox'),
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: field.value ?? false,
-                    onChanged: _submitting
-                        ? null
-                        : (value) {
-                            field.didChange(value);
-                            setState(() {
-                              _privacyConsent = value ?? false;
-                              _privacyConsentError = null;
-                            });
-                          },
-                    title: const Text('我已閱讀並同意個資條款'),
-                  ),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton(
-                      key: const ValueKey('signup-privacy-policy-link'),
-                      onPressed: openPrivacyPolicy,
-                      child: const Text('查看個資條款'),
+              const SizedBox(height: TpSpacing.s3),
+              FormField<bool>(
+                key: const ValueKey('signup-privacy-consent-field'),
+                initialValue: false,
+                validator: (value) => value == true ? null : '請先閱讀並同意個資條款',
+                builder: (field) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      key: const ValueKey('signup-privacy-consent-checkbox'),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: field.value ?? false,
+                      onChanged: _submitting
+                          ? null
+                          : (value) {
+                              field.didChange(value);
+                              setState(() {
+                                _privacyConsent = value ?? false;
+                                _privacyConsentError = null;
+                              });
+                            },
+                      title: const Text('我已閱讀並同意個資條款'),
                     ),
-                  ),
-                  if (field.errorText != null || _privacyConsentError != null)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 12),
-                      child: Text(
-                        field.errorText ?? _privacyConsentError!,
-                        key: const ValueKey('signup-privacy-consent-error'),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        key: const ValueKey('signup-privacy-policy-link'),
+                        onPressed: openPrivacyPolicy,
+                        child: const Text('查看個資條款'),
                       ),
                     ),
-                ],
+                    if (field.errorText != null || _privacyConsentError != null)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 12),
+                        child: Text(
+                          field.errorText ?? _privacyConsentError!,
+                          key: const ValueKey('signup-privacy-consent-error'),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: TpSpacing.s3),
-            TextButton(
-              onPressed: _submitting ? null : () => context.go('/login'),
-              child: const Text('已有帳號，改用登入'),
-            ),
-          ],
+              const SizedBox(height: TpSpacing.s3),
+              TextButton(
+                onPressed: _submitting ? null : () => context.go('/login'),
+                child: const Text('已有帳號，改用登入'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -443,6 +455,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               key: const ValueKey('forgot-password-email-field'),
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              autocorrect: false,
+              enableSuggestions: false,
               textInputAction: TextInputAction.done,
               enabled: !_submitting,
               onFieldSubmitted: (_) => _submit(),
@@ -483,6 +498,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _obscureConfirm = true;
   String? _passwordServerError;
   String? _error;
+  bool _tokenInvalid = false;
 
   @override
   void dispose() {
@@ -499,6 +515,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       _submitting = true;
       _passwordServerError = null;
       _error = null;
+      _tokenInvalid = false;
     });
     try {
       await ref
@@ -507,19 +524,25 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             token: widget.token,
             password: _passwordController.text,
           );
-      if (mounted) setState(() => _success = true);
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      TextInput.finishAutofillContext();
+      setState(() => _success = true);
     } on Exception catch (error) {
       if (mounted) {
         if (error is ApiError && error.code == 'RESET_INVALID_PASSWORD') {
           setState(() => _passwordServerError = '密碼至少 8 字元');
           return;
         }
-        setState(
-          () => _error = _authErrorMessage(error, const {
+        setState(() {
+          _tokenInvalid =
+              error is ApiError &&
+              (error.code == 'RESET_TOKEN_INVALID' ||
+                  error.code == 'RESET_TOKEN_MISSING');
+          _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
             'RESET_TOKEN_MISSING': '重設連結缺少 token',
-          }, '暫時無法處理，請稍後再試'),
-        );
+          }, '暫時無法處理，請稍後再試');
+        });
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -558,73 +581,85 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null) ...[
-              _InlineAuthMessage(
-                key: const ValueKey('reset-password-error'),
-                message: _error!,
+        child: AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                _InlineAuthMessage(
+                  key: const ValueKey('reset-password-error'),
+                  message: _error!,
+                ),
+                if (_tokenInvalid)
+                  TextButton(
+                    onPressed: () => context.go('/login/forgot'),
+                    child: const Text('重新申請'),
+                  ),
+                const SizedBox(height: TpSpacing.s4),
+              ],
+              TextFormField(
+                key: const ValueKey('reset-password-field'),
+                controller: _passwordController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                forceErrorText: _passwordServerError,
+                onChanged: (_) {
+                  if (_passwordServerError != null) {
+                    setState(() => _passwordServerError = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: '新密碼',
+                  helperText: '至少 8 個字元',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return '請輸入新密碼';
+                  if (value.length < 8) return '密碼至少 8 字元';
+                  return null;
+                },
               ),
               const SizedBox(height: TpSpacing.s4),
+              TextFormField(
+                key: const ValueKey('reset-password-confirm-field'),
+                controller: _confirmController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscureConfirm,
+                textInputAction: TextInputAction.done,
+                enabled: !_submitting,
+                onFieldSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: '再次輸入新密碼',
+                  suffixIcon: IconButton(
+                    tooltip: _obscureConfirm ? '顯示確認密碼' : '隱藏確認密碼',
+                    onPressed: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                    icon: Icon(
+                      _obscureConfirm
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
+                  ),
+                ),
+                validator: (value) =>
+                    value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
+              ),
             ],
-            TextFormField(
-              key: const ValueKey('reset-password-field'),
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              forceErrorText: _passwordServerError,
-              onChanged: (_) {
-                if (_passwordServerError != null) {
-                  setState(() => _passwordServerError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: '新密碼',
-                helperText: '至少 8 個字元',
-                suffixIcon: IconButton(
-                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  icon: Icon(
-                    _obscurePassword
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
-                  ),
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '請輸入新密碼';
-                if (value.length < 8) return '密碼至少 8 字元';
-                return null;
-              },
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('reset-password-confirm-field'),
-              controller: _confirmController,
-              obscureText: _obscureConfirm,
-              textInputAction: TextInputAction.done,
-              enabled: !_submitting,
-              onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: '再次輸入新密碼',
-                suffixIcon: IconButton(
-                  tooltip: _obscureConfirm ? '顯示確認密碼' : '隱藏確認密碼',
-                  onPressed: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
-                  icon: Icon(
-                    _obscureConfirm
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
-                  ),
-                ),
-              ),
-              validator: (value) =>
-                  value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -645,13 +680,19 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   bool _verifying = false;
   bool _success = false;
   String? _error;
+  bool _tokenInvalid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.token.trim().isEmpty) {
+      _tokenInvalid = true;
+      _error = '驗證連結不完整';
+    }
+  }
 
   Future<void> _verify() async {
-    if (_verifying) return;
-    if (widget.token.trim().isEmpty) {
-      setState(() => _error = '驗證連結缺少 token');
-      return;
-    }
+    if (_verifying || _tokenInvalid) return;
     setState(() {
       _verifying = true;
       _error = null;
@@ -663,17 +704,21 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       if (mounted) {
         setState(() {
           _success = ok;
-          _error = ok ? null : '驗證失敗，請重新開啟信中的連結';
+          _error = ok ? null : '暫時無法確認驗證結果，請再試一次';
         });
       }
     } on Exception catch (error) {
       if (mounted) {
-        setState(
-          () => _error = _authErrorMessage(error, const {
-            'VERIFY_TOKEN_INVALID': '驗證連結無效或已過期',
-            'VERIFY_TOKEN_MISSING': '驗證連結缺少 token',
-          }, '驗證失敗，請稍後再試'),
-        );
+        setState(() {
+          _tokenInvalid =
+              error is ApiError &&
+              const {'missing_token', 'expired', 'used'}.contains(error.code);
+          _error = _authErrorMessage(error, const {
+            'expired': '驗證連結無效或已過期',
+            'missing_token': '驗證連結不完整',
+            'used': '驗證連結已使用，請開啟最新的驗證信',
+          }, '驗證失敗，請稍後再試');
+        });
       }
     } finally {
       if (mounted) setState(() => _verifying = false);
@@ -684,12 +729,18 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Widget build(BuildContext context) {
     return _AuthScaffold(
       title: _success ? '信箱已驗證' : '確認信箱驗證',
-      subtitle: _success ? '可以回到登入頁繼續使用 Tripline' : '點擊下方按鈕完成驗證',
-      primaryActionLabel: _success ? null : (_verifying ? '驗證中…' : '驗證'),
-      primaryActionKey: _success
+      subtitle: _success
+          ? '可以回到登入頁繼續使用 Tripline'
+          : _tokenInvalid
+          ? '請重新開啟最新的驗證信，或重新開始使用 Tripline'
+          : '點擊下方按鈕完成驗證',
+      primaryActionLabel: _success || _tokenInvalid
+          ? null
+          : (_verifying ? '驗證中…' : (_error != null ? '重試' : '驗證')),
+      primaryActionKey: _success || _tokenInvalid
           ? null
           : const ValueKey('verify-email-confirm-button'),
-      onPrimaryAction: _success ? null : _verify,
+      onPrimaryAction: _success || _tokenInvalid ? null : _verify,
       primaryActionEnabled: !_verifying,
       child: Column(
         key: const ValueKey('verify-email-page'),
@@ -702,6 +753,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
             ),
             const SizedBox(height: TpSpacing.s4),
           ],
+          if (_tokenInvalid)
+            FilledButton(
+              onPressed: () => context.go('/login'),
+              child: const Text('重新開始'),
+            ),
           if (_success)
             FilledButton(
               key: const ValueKey('verify-email-success'),
