@@ -59,36 +59,47 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
         maxWidth: AppContentWidth.feed,
         contentKey: const ValueKey('trip-notes-content'),
         child: notesAsync.when(
+          skipError: true,
           loading: () =>
               const AppListLoadingSkeleton(key: ValueKey('trip-notes-loading')),
-          error: (error, _) => Center(
-            child: Semantics(
-              key: const ValueKey('trip-notes-error'),
-              liveRegion: true,
-              child: Padding(
-                padding: const EdgeInsets.all(TpSpacing.s6),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('載入失敗：$error', textAlign: TextAlign.center),
-                    const SizedBox(height: TpSpacing.s2),
-                    TextButton(
-                      onPressed: () =>
-                          ref.invalidate(tripNotesProvider(widget.tripId)),
-                      child: const Text('重試'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          error: (error, _) => Center(child: _buildLoadError()),
+          data: (notes) => _buildSections(
+            context,
+            notes,
+            showRefreshError: notesAsync.hasError,
           ),
-          data: (notes) => _buildSections(context, notes),
         ),
       ),
     );
   }
 
-  Widget _buildSections(BuildContext context, TripNotes notes) {
+  Widget _buildLoadError({bool showingPreviousNotes = false}) => Semantics(
+    key: const ValueKey('trip-notes-error'),
+    liveRegion: true,
+    child: Padding(
+      padding: const EdgeInsets.all(TpSpacing.s6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            showingPreviousNotes ? '無法更新行程筆記，顯示先前內容。' : '無法載入行程筆記，請重試。',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: TpSpacing.s2),
+          TextButton(
+            onPressed: () => ref.invalidate(tripNotesProvider(widget.tripId)),
+            child: const Text('重試'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _buildSections(
+    BuildContext context,
+    TripNotes notes, {
+    bool showRefreshError = false,
+  }) {
     final ai = ref.watch(notesAiControllerProvider(widget.tripId));
     final controller = ref.read(
       notesAiControllerProvider(widget.tripId).notifier,
@@ -110,81 +121,96 @@ class _TripNotesScreenState extends ConsumerState<TripNotesScreen> {
       for (final t in NoteGenerationType.values)
         if (ai.of(t).phase == NotesAiPhase.pending) t,
     ];
-    return ListView(
-      key: const ValueKey('trip-notes-list'),
-      padding: const EdgeInsets.all(TpSpacing.s4),
+    return Column(
       children: [
-        // 固定佔一個 slot:ListView 的 children 一旦增減,後面每個 slot 的 widget
-        // 都會換位而重建,展開中的 section 會被收合。狀態面板永遠在這個 Column 裡進出。
-        Column(
-          key: const ValueKey('notes-ai-status'),
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (summaryType case final type?)
-              _NotesAiSummaryPanel(
-                key: const ValueKey('notes-ai-summary'),
-                job: ai.of(type).summary!,
-                onDismiss: () => controller.dismiss(type),
-              ),
-            if (timedOutType case final type?)
-              _NotesAiErrorPanel(
-                key: const ValueKey('notes-ai-timeout'),
-                panelKey: const ValueKey('notes-ai-timeout-panel'),
-                retryKey: const ValueKey('notes-ai-timeout-retry'),
-                title: '生成逾時',
-                message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
-                onRetry: () {
-                  controller.dismiss(type);
-                  unawaited(controller.generate(type));
-                },
-                onDismiss: () => controller.dismiss(type),
-              ),
-            if (ai.stateError case final message?)
-              _NotesAiErrorPanel(
-                key: const ValueKey('notes-ai-state-error'),
-                panelKey: const ValueKey('notes-ai-state-error-panel'),
-                retryKey: const ValueKey('notes-ai-state-retry'),
-                message: message,
-                onRetry: () => unawaited(controller.load()),
-                onDismiss: () => controller.clearStateError(),
-              ),
-            if (failedType case final type?)
-              _NotesAiErrorPanel(
-                message: ai.of(type).failureMessage ?? notesAiFallbackMessage,
-                onRetry: () {
-                  controller.dismiss(type);
-                  unawaited(controller.generate(type));
-                },
-                onDismiss: () => controller.dismiss(type),
-              ),
-            // 進行中的每一種各佔一列,並固定用 enum 的宣告順序,避免先後啟動
-            // 造成面板上下跳動。
-            if (pendingTypes.isNotEmpty)
+        if (showRefreshError)
+          _buildLoadError(showingPreviousNotes: true)
+        else
+          const SizedBox.shrink(),
+        Expanded(
+          child: ListView(
+            key: const ValueKey('trip-notes-list'),
+            padding: const EdgeInsets.all(TpSpacing.s4),
+            children: [
+              // 固定佔一個 slot:ListView 的 children 一旦增減,後面每個 slot 的 widget
+              // 都會換位而重建,展開中的 section 會被收合。狀態面板永遠在這個 Column 裡進出。
               Column(
-                key: const ValueKey('notes-ai-pending'),
+                key: const ValueKey('notes-ai-status'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final type in pendingTypes)
-                    _NotesAiPendingPanel(
-                      key: ValueKey('notes-ai-pending-${type.pathSegment}'),
-                      label: type.pendingLabel,
-                      stage: ai.of(type).stage,
-                      stopKey: ValueKey('notes-ai-stop-${type.pathSegment}'),
-                      onStopWaiting: () => _stopWaitingFor(type),
+                  if (summaryType case final type?)
+                    _NotesAiSummaryPanel(
+                      key: const ValueKey('notes-ai-summary'),
+                      job: ai.of(type).summary!,
+                      onDismiss: () => controller.dismiss(type),
+                    ),
+                  if (timedOutType case final type?)
+                    _NotesAiErrorPanel(
+                      key: const ValueKey('notes-ai-timeout'),
+                      panelKey: const ValueKey('notes-ai-timeout-panel'),
+                      retryKey: const ValueKey('notes-ai-timeout-retry'),
+                      title: '生成逾時',
+                      message: '這次生成超過 10 分鐘沒有完成，已經停止。可以再試一次。',
+                      onRetry: () {
+                        controller.dismiss(type);
+                        unawaited(controller.generate(type));
+                      },
+                      onDismiss: () => controller.dismiss(type),
+                    ),
+                  if (ai.stateError case final message?)
+                    _NotesAiErrorPanel(
+                      key: const ValueKey('notes-ai-state-error'),
+                      panelKey: const ValueKey('notes-ai-state-error-panel'),
+                      retryKey: const ValueKey('notes-ai-state-retry'),
+                      message: message,
+                      onRetry: () => unawaited(controller.load()),
+                      onDismiss: () => controller.clearStateError(),
+                    ),
+                  if (failedType case final type?)
+                    _NotesAiErrorPanel(
+                      message:
+                          ai.of(type).failureMessage ?? notesAiFallbackMessage,
+                      onRetry: () {
+                        controller.dismiss(type);
+                        unawaited(controller.generate(type));
+                      },
+                      onDismiss: () => controller.dismiss(type),
+                    ),
+                  // 進行中的每一種各佔一列,並固定用 enum 的宣告順序,避免先後啟動
+                  // 造成面板上下跳動。
+                  if (pendingTypes.isNotEmpty)
+                    Column(
+                      key: const ValueKey('notes-ai-pending'),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final type in pendingTypes)
+                          _NotesAiPendingPanel(
+                            key: ValueKey(
+                              'notes-ai-pending-${type.pathSegment}',
+                            ),
+                            label: type.pendingLabel,
+                            stage: ai.of(type).stage,
+                            stopKey: ValueKey(
+                              'notes-ai-stop-${type.pathSegment}',
+                            ),
+                            onStopWaiting: () => _stopWaitingFor(type),
+                          ),
+                      ],
                     ),
                 ],
               ),
-          ],
-        ),
-        for (final section in NoteSection.values)
-          _NotesSection(
-            tripId: widget.tripId,
-            section: section,
-            // mobile 預設展開航班(對齊 web TripNotesPage 行為)
-            initiallyExpanded: section == NoteSection.flights,
-            hasLodgings: notes.lodgings.isNotEmpty,
-            rows: _rowsFor(section, notes),
+              for (final section in NoteSection.values)
+                _NotesSection(
+                  tripId: widget.tripId,
+                  section: section,
+                  // mobile 預設展開航班(對齊 web TripNotesPage 行為)
+                  initiallyExpanded: section == NoteSection.flights,
+                  hasLodgings: notes.lodgings.isNotEmpty,
+                  rows: _rowsFor(section, notes),
+                ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -364,7 +390,7 @@ class _NotesAiPendingPanel extends StatelessWidget {
           ),
           Semantics(
             button: true,
-            label: '停止等待',
+            label: '停止等待$label',
             hint: '停止等待這次生成。AI 若仍在處理，完成後的結果還是會寫進筆記。',
             excludeSemantics: true,
             child: TextButton(
