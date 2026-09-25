@@ -90,10 +90,11 @@ class _AccountSessionsScreenState extends ConsumerState<AccountSessionsScreen> {
     await showAppAlert(
       context,
       key: const ValueKey('revoke-other-sessions-blocked-dialog'),
-      title: '需要重新驗證才能登出其他裝置',
+      title: '目前無法一次登出其他裝置',
       message:
-          '目前缺少可綁定伺服器操作的重新驗證機制，因此不會送出批次登出要求。'
-          '你仍可返回裝置清單，逐一登出不再使用的裝置。',
+          '目前無法驗證身分以一次登出其他裝置。'
+          '請返回裝置清單，選擇要登出的裝置，再點「登出此裝置」逐一登出。',
+      actionLabel: '返回裝置清單',
     );
   }
 
