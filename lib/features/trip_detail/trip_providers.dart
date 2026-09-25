@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/providers.dart';
+import '../../app/stream_retry_coordinator.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/notes.dart';
@@ -14,11 +15,26 @@ final tripDetailProvider = StreamProvider.family<Trip, String>((ref, tripId) {
   return ref.watch(tripRepositoryProvider).watchTrip(tripId);
 });
 
+final tripDaysRetryProvider = Provider.family<StreamRetryCoordinator, String>(
+  _daysRetry,
+);
+
+StreamRetryCoordinator _daysRetry(Ref ref, String tripId) {
+  final retry = StreamRetryCoordinator(
+    () => ref.invalidate(tripDaysProvider(tripId)),
+  );
+  ref.onDispose(retry.dispose);
+  return retry;
+}
+
 final tripDaysProvider = StreamProvider.family<List<TripDay>, String>((
   ref,
   tripId,
 ) {
-  return ref.watch(tripRepositoryProvider).watchDays(tripId);
+  final repository = ref.watch(tripRepositoryProvider);
+  return ref
+      .read(tripDaysRetryProvider(tripId))
+      .track(() => repository.watchDays(tripId));
 });
 
 final tripNotesProvider = StreamProvider.family<TripNotes, String>((

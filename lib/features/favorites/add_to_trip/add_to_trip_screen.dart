@@ -269,11 +269,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             error: (e, _) => SingleChildScrollView(
               child: Semantics(
                 liveRegion: true,
-                child: TpStateView(
-                  kind: TpStateKind.error,
+                child: _RetryState(
                   title: '無法載入行程清單',
-                  actionLabel: '重試',
-                  onAction: () => ref.invalidate(myTripsProvider),
+                  onRetry: () => ref.read(myTripsRetryProvider).retry(),
                 ),
               ),
             ),
@@ -307,11 +305,9 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
         if (tripsError)
           Semantics(
             liveRegion: true,
-            child: TpStateView(
-              kind: TpStateKind.error,
+            child: _RetryState(
               title: '無法載入行程清單',
-              actionLabel: '重試',
-              onAction: () => ref.invalidate(myTripsProvider),
+              onRetry: () => ref.read(myTripsRetryProvider).retry(),
             ),
           ),
         _SelectionField<String>(
@@ -335,11 +331,10 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Semantics(
               liveRegion: true,
-              child: TpStateView(
-                kind: TpStateKind.error,
+              child: _RetryState(
+                key: ValueKey(tripId),
                 title: '無法載入日期',
-                actionLabel: '重試',
-                onAction: () => ref.invalidate(tripDaysProvider(tripId!)),
+                onRetry: () => ref.read(tripDaysRetryProvider(tripId!)).retry(),
               ),
             ),
             data: (_) => Column(
@@ -347,11 +342,11 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
                 if (daysAsync.hasError)
                   Semantics(
                     liveRegion: true,
-                    child: TpStateView(
-                      kind: TpStateKind.error,
+                    child: _RetryState(
+                      key: ValueKey(tripId),
                       title: '無法載入日期',
-                      actionLabel: '重試',
-                      onAction: () => ref.invalidate(tripDaysProvider(tripId!)),
+                      onRetry: () =>
+                          ref.read(tripDaysRetryProvider(tripId!)).retry(),
                     ),
                   ),
                 _SelectionField<int>(
@@ -408,6 +403,40 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
       ],
     );
   }
+}
+
+/// 僅呈現此錯誤入口的操作進度；資料與請求去重仍由原 provider 負責。
+class _RetryState extends StatefulWidget {
+  const _RetryState({super.key, required this.title, required this.onRetry});
+
+  final String title;
+  final Future<void> Function() onRetry;
+
+  @override
+  State<_RetryState> createState() => _RetryStateState();
+}
+
+class _RetryStateState extends State<_RetryState> {
+  bool _pending = false;
+
+  Future<void> _retry() async {
+    if (_pending) return;
+    setState(() => _pending = true);
+    try {
+      await widget.onRetry();
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => TpStateView(
+    kind: TpStateKind.error,
+    title: widget.title,
+    message: _pending ? '重試中…' : null,
+    actionLabel: _pending ? null : '重試',
+    onAction: _pending ? null : _retry,
+  );
 }
 
 /// 行程與日期共用選擇呈現，資料和目前值仍由表單持有。
