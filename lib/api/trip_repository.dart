@@ -327,6 +327,16 @@ class TripRepository {
     TripNotes.fromJson,
   );
 
+  /// GET /trips/:id/notes（衝突恢復時讀取 server 真相，不以本機快取替代）。
+  Future<TripNotes> fetchFreshNotes(String id) async => _one(
+    await _client.get(
+      '/trips/${Uri.encodeComponent(id)}/notes',
+      writeCache: false,
+      fallbackToCache: false,
+    ),
+    TripNotes.fromJson,
+  );
+
   /// GET /trips/:id/notes（SWR stream）。
   Stream<TripNotes> watchNotes(String id) => _client
       .getStream('/trips/${Uri.encodeComponent(id)}/notes')
