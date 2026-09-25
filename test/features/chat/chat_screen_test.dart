@@ -14,6 +14,9 @@ import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/features/chat/chat_screen.dart';
 import 'package:tripline/features/chat/speech_service.dart';
+import 'package:tripline/features/favorites/add_to_trip/add_to_trip_screen.dart';
+import 'package:tripline/models/add_to_trip.dart';
+import 'package:tripline/models/day.dart';
 import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
@@ -1322,6 +1325,82 @@ void main() {
     manual.add(_trips);
     await manual.close();
     await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('加入行程與保留的聊天共用進行中重試，返回後草稿仍在', (tester) async {
+    final initial = StreamController<List<TripSummary>>.broadcast();
+    final pending = StreamController<List<TripSummary>>.broadcast();
+    var loads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      loads++;
+      return loads == 1 ? initial.stream : pending.stream;
+    });
+    when(() => tripRepo.watchDays('okinawa')).thenAnswer(
+      (_) => Stream.value(const [TripDay(id: 1, dayNum: 1, version: 0)]),
+    );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await initial.close();
+      if (!pending.isClosed) await pending.close();
+    });
+    await tester.pumpWidget(
+      buildApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AddToTripScreen(
+                        args: AddToTripFavorite(
+                          favoriteId: 7,
+                          displayName: '首里城',
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: const Text('開啟加入行程'),
+                ),
+              ),
+              const Expanded(child: ChatScreen(initialTripId: 'okinawa')),
+            ],
+          ),
+        ),
+      ),
+    );
+    initial.add(_trips);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '跨畫面草稿');
+    await tester.tap(find.text('開啟加入行程'));
+    await tester.pumpAndSettle();
+    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(loads, 1);
+
+    initial.addError(Exception('shared failure'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(find.text('重試中…'), findsOneWidget);
+    expect(loads, 2);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AddToTripScreen), findsNothing);
+    expect(find.text('跨畫面草稿'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(loads, 2);
+    expect(find.text('跨畫面草稿'), findsOneWidget);
+
+    pending.add(_trips);
+    await pending.close();
+    await tester.pumpAndSettle();
+    expect(find.text('無法取得行程清單,請稍後再試。'), findsNothing);
+    expect(find.text('跨畫面草稿'), findsOneWidget);
+    expect(loads, 2);
     expect(tester.takeException(), isNull);
   });
 

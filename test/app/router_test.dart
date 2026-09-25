@@ -14,6 +14,7 @@ import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
 import 'package:tripline/api/favorites_repository.dart';
 import 'package:tripline/api/providers.dart';
+import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/router.dart';
 import 'package:tripline/features/auth/account_flow_screens.dart';
@@ -57,6 +58,7 @@ import 'package:tripline/models/trip.dart';
 import 'package:tripline/models/trip_audit.dart';
 import 'package:tripline/models/trip_poi_health.dart';
 import 'package:tripline/models/trip_member.dart';
+import 'package:tripline/models/trip_request.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/ui/tp_app_bar.dart';
 import 'package:tripline/ui/tp_horizontal_selector.dart';
@@ -81,6 +83,8 @@ class _MockCollabRepository extends Mock implements CollabRepository {}
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
+class _MockRequestsRepository extends Mock implements RequestsRepository {}
+
 const _loggedInUser = UserInfo(
   id: 'user-1',
   email: 'traveler@example.com',
@@ -95,6 +99,9 @@ ProviderContainer _buildContainer({
   List<TripSummary>? trips,
   List<TripDay>? days,
   AuthRepository? authRepository,
+  RequestsRepository? requestsRepository,
+  bool resolveAuthFromRepository = false,
+  bool disableAutomaticRetry = false,
 }) {
   final mockTripRepository = _MockTripRepository();
   final mockCollabRepository = _MockCollabRepository();
@@ -166,10 +173,14 @@ ProviderContainer _buildContainer({
   ).thenAnswer((_) async => const []);
 
   final container = ProviderContainer(
+    retry: disableAutomaticRetry ? (_, _) => null : null,
     overrides: [
       if (authRepository != null)
         authRepositoryProvider.overrideWithValue(authRepository),
-      authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+      if (!resolveAuthFromRepository)
+        authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
+      if (requestsRepository != null)
+        requestsRepositoryProvider.overrideWithValue(requestsRepository),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
@@ -1326,6 +1337,104 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
       await tester.pumpAndSettle();
     }
+  });
+
+  testWidgets('Account 儲存後認證刷新失敗仍保留新草稿，重試與關閉返回原聊天', (tester) async {
+    final auth = _MockAuthRepository();
+    final requests = _MockRequestsRepository();
+    when(auth.currentUser).thenAnswer((_) async => _loggedInUser);
+    when(auth.fetchAiAuthorization).thenAnswer((_) async => true);
+    when(
+      () => requests.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
+    final container = _buildContainer(
+      currentUser: _loggedInUser,
+      authRepository: auth,
+      requestsRepository: requests,
+      resolveAuthFromRepository: true,
+      // 此測試驗證最終 error 的導航與草稿；自動 retry 不屬於此 seam。
+      disableAutomaticRetry: true,
+    );
+    addTearDown(container.dispose);
+    final pending = Completer<UserInfo>();
+    final repository = container.read(tripRepositoryProvider);
+    when(
+      () => repository.updateProfile(displayName: 'A'),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/chat');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), '原聊天草稿');
+    router.go('/settings/profile');
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/chat?account=profile',
+    );
+    final field = find.byKey(const ValueKey('profile-display-name'));
+    await tester.enterText(field, 'A');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('profile-save')));
+    await tester.pump();
+    await tester.enterText(field, 'B');
+    when(auth.currentUser).thenThrow(Exception('refresh offline'));
+    pending.complete(
+      const UserInfo(
+        id: 'user-1',
+        email: 'traveler@example.com',
+        displayName: 'A',
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法載入個人資料'), findsOneWidget);
+    expect(find.text('B'), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(
+      router.routeInformationProvider.value.uri.toString(),
+      '/chat?account=profile',
+    );
+    verify(() => repository.updateProfile(displayName: 'A')).called(1);
+    verify(auth.currentUser).called(2);
+    when(auth.currentUser).thenAnswer(
+      (_) async => const UserInfo(
+        id: 'user-1',
+        email: 'traveler@example.com',
+        displayName: 'A',
+      ),
+    );
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    verify(auth.currentUser).called(1);
+    expect(find.text('無法載入個人資料'), findsNothing);
+    expect(find.text('B'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
+    await tester.tap(find.text('捨棄'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileEditScreen), findsNothing);
+    expect(find.byType(AccountScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.toString(), '/chat');
+    expect(find.text('原聊天草稿'), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('帳號安全與開發者 deep link 依序返回 Account 再關閉至原 branch', (tester) async {
