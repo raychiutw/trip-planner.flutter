@@ -147,14 +147,11 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: TpSpacing.s4),
-          child: TextField(
-            key: const ValueKey('trip-picker-search'),
+          child: AppSearchField(
+            fieldKey: const ValueKey('trip-picker-search'),
             controller: _searchController,
+            placeholder: '搜尋行程',
             onChanged: (value) => setState(() => _query = value),
-            decoration: const InputDecoration(
-              hintText: '搜尋行程',
-              prefixIcon: Icon(CupertinoIcons.search),
-            ),
           ),
         ),
         const SizedBox(height: TpSpacing.s4),
@@ -171,10 +168,13 @@ class _TripPickerSheetState extends State<_TripPickerSheet> {
         Expanded(
           child: trips.isEmpty
               ? Center(
-                  child: Text(
-                    '找不到行程',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: colors.onSurfaceVariant,
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      '找不到行程',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 )

@@ -1178,6 +1178,9 @@ class _AppSearchFieldState extends State<AppSearchField> {
       key: widget.fieldKey,
       controller: widget.controller,
       placeholder: widget.placeholder,
+      suffixIcon: _SearchClearIcon(
+        semanticLabel: CupertinoLocalizations.of(context).clearButtonLabel,
+      ),
       onChanged: _changed,
       onSubmitted: _submitted,
       autofocus: widget.autofocus,
@@ -1185,6 +1188,21 @@ class _AppSearchFieldState extends State<AppSearchField> {
       backgroundColor: widget.embedded ? Colors.transparent : null,
     );
   }
+}
+
+// SDK 的 suffixIcon 只接受 Icon；擴大原生按鈕的點擊區，保留原生清除與焦點行為。
+class _SearchClearIcon extends Icon {
+  const _SearchClearIcon({required super.semanticLabel})
+    : super(CupertinoIcons.xmark_circle_fill);
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(
+      minWidth: TpSpacing.tapMin,
+      minHeight: TpSpacing.tapMin,
+    ),
+    child: Center(widthFactor: 1, heightFactor: 1, child: super.build(context)),
+  );
 }
 
 /// 顯示頂部滑入橫幅（安全區內、約 2.5 秒後消失）。
