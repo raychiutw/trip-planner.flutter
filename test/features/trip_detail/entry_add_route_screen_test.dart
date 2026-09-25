@@ -164,6 +164,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('空日期快取後載入失敗可原地重試，不誤報行程尚無日期', (tester) async {
+    final repo = _MockTripRepository();
+    final initial = StreamController<List<TripDay>>();
+    addTearDown(initial.close);
+    var reads = 0;
+    when(() => repo.watchDays('trip-1')).thenAnswer((_) {
+      reads++;
+      return reads == 1 ? initial.stream : Stream.value(_days);
+    });
+
+    await tester.pumpWidget(_buildScreen(repo, useRepositoryDays: true));
+    initial.add(const <TripDay>[]);
+    await tester.pumpAndSettle();
+    expect(find.text('此行程尚無日期，請先回行程頁建立日期。'), findsOneWidget);
+
+    initial.addError(Exception('private-day-load-error'));
+    await tester.pumpAndSettle();
+    expect(find.text('日期載入失敗，請檢查網路後再試'), findsOneWidget);
+    expect(find.text('此行程尚無日期，請先回行程頁建立日期。'), findsNothing);
+    expect(find.textContaining('private-day-load-error'), findsNothing);
+    expect(find.text('重試'), findsOneWidget);
+
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(reads, 2);
+    expect(find.text('DAY 2'), findsOneWidget);
+    expect(find.text('日期載入失敗，請檢查網路後再試'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('自訂停留點草稿切換搜尋與收藏後仍保留', (tester) async {
     final favoritesRepo = _MockFavoritesRepository();
     when(

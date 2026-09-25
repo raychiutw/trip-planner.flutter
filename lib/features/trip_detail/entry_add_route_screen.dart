@@ -373,6 +373,15 @@ class _EntryAddRouteScreenState extends ConsumerState<EntryAddRouteScreen> {
                 ),
               ),
               data: (days) {
+                if (days.isEmpty && daysAsync.hasError) {
+                  return Center(
+                    child: _DayLoadError(
+                      onRetry: () => unawaited(
+                        ref.read(tripDaysRetryProvider(widget.tripId)).retry(),
+                      ),
+                    ),
+                  );
+                }
                 if (days.isEmpty) {
                   return const Center(
                     child: Padding(
