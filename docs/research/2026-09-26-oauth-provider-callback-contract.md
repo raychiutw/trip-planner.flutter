@@ -55,3 +55,9 @@ curl --silent --show-error --max-time 12 --dump-header - 'https://uat.trip-plann
 ```
 
 本次兩個 association URL 都回 `HTTP/2 200`、`Content-Type: application/json`，沒有 HTTP redirect，body 分別含上述 AASA／assetlinks 資料；只能證明查核當下公開靜態檔可讀，不能證明 issuer 已部署 PR、D1 allowlist 已套用、OS 已認領網域或 app 能處理 callback。`curl` 的回應日期為 2026-09-25 18:05 UTC（台灣時間 2026-09-26 02:05）。另讀取正式 `GET /api/oauth/client-info?client_id=tripline-mobile` 得 `200`，名稱 **Tripline Mobile**；UAT 的 `tripline-mobile-uat` 得 `404 DATA_NOT_FOUND`（client 不存在或未啟用）。這是各環境當下的公開讀取結果，不能推出 redirect allowlist、migration 或完整 OAuth 交易已生效。未驗證正式/UAT OAuth transaction、Google provider 實際可用性、Play app-signing 指紋、Apple／Android 真機冷啟動與背景返回、商店 binary 的 build flags。下游必須以部署 SHA、設定與實機證據補齊；本票不可代替那些驗收。
+
+### 後續查核：2026-09-26 02:22（台灣時間）
+
+- `gh pr view 1351 --repo raychiutw/trip-planner --json state,mergedAt,mergeCommit,headRefOid,baseRefName,url` 顯示 PR 已於 2026-09-25 18:15:07 UTC **合併至 `uat`**，merge commit `7c59a998c7306fed7ea2155435bd966032040459`。上方「open」是較早快照，不代表目前狀態；合併 UAT 也不等於正式環境部署。
+- 重新執行上方 UAT `client-info` GET 得 `HTTP/2 200`、`Content-Type: application/json`，`app_name` 為 **Tripline Mobile UAT**（回應日期 2026-09-25 18:22:05 UTC）。上方 `404` 是 18:06:43 UTC 的歷史結果；這次讀取證明 UAT 公開 client-info 在新時間點可用，不證明 authorize／consent／token 完整流程或裝置 callback 已驗收。
+- 主代理已直接在 Play Console 的 app-signing 憑證核對 SHA-256 指紋為 `28:06:F8:E5:6F:D8:D5:1A:30:50:F5:40:0D:83:36:A5:11:78:FF:41:9A:9C:B2:1C:27:88:DC:21:E5:4B:39:B5`，與後端 `assetlinks.json` 相同，且不同於 upload 憑證。本分支沒有登入 Play Console 重查；這項證據由主代理直接查核提供。仍需裝置 OS association 與 Flutter URI handler 驗證，亦不能據此宣稱正式 OAuth 已上線。
