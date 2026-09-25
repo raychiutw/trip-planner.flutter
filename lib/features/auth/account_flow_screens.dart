@@ -497,6 +497,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _obscureConfirm = true;
   String? _passwordServerError;
   String? _error;
+  bool _tokenInvalid = false;
 
   @override
   void dispose() {
@@ -513,6 +514,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       _submitting = true;
       _passwordServerError = null;
       _error = null;
+      _tokenInvalid = false;
     });
     try {
       await ref
@@ -521,19 +523,25 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             token: widget.token,
             password: _passwordController.text,
           );
-      if (mounted) setState(() => _success = true);
+      if (!mounted) return;
+      TextInput.finishAutofillContext();
+      setState(() => _success = true);
     } on Exception catch (error) {
       if (mounted) {
         if (error is ApiError && error.code == 'RESET_INVALID_PASSWORD') {
           setState(() => _passwordServerError = '密碼至少 8 字元');
           return;
         }
-        setState(
-          () => _error = _authErrorMessage(error, const {
+        setState(() {
+          _tokenInvalid =
+              error is ApiError &&
+              (error.code == 'RESET_TOKEN_INVALID' ||
+                  error.code == 'RESET_TOKEN_MISSING');
+          _error = _authErrorMessage(error, const {
             'RESET_TOKEN_INVALID': '重設連結無效或已過期',
             'RESET_TOKEN_MISSING': '重設連結缺少 token',
-          }, '暫時無法處理，請稍後再試'),
-        );
+          }, '暫時無法處理，請稍後再試');
+        });
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -572,73 +580,85 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       primaryActionEnabled: !_submitting,
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_error != null) ...[
-              _InlineAuthMessage(
-                key: const ValueKey('reset-password-error'),
-                message: _error!,
+        child: AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                _InlineAuthMessage(
+                  key: const ValueKey('reset-password-error'),
+                  message: _error!,
+                ),
+                if (_tokenInvalid)
+                  TextButton(
+                    onPressed: () => context.go('/login/forgot'),
+                    child: const Text('重新申請'),
+                  ),
+                const SizedBox(height: TpSpacing.s4),
+              ],
+              TextFormField(
+                key: const ValueKey('reset-password-field'),
+                controller: _passwordController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.next,
+                enabled: !_submitting,
+                forceErrorText: _passwordServerError,
+                onChanged: (_) {
+                  if (_passwordServerError != null) {
+                    setState(() => _passwordServerError = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: '新密碼',
+                  helperText: '至少 8 個字元',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return '請輸入新密碼';
+                  if (value.length < 8) return '密碼至少 8 字元';
+                  return null;
+                },
               ),
               const SizedBox(height: TpSpacing.s4),
+              TextFormField(
+                key: const ValueKey('reset-password-confirm-field'),
+                controller: _confirmController,
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                obscureText: _obscureConfirm,
+                textInputAction: TextInputAction.done,
+                enabled: !_submitting,
+                onFieldSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: '再次輸入新密碼',
+                  suffixIcon: IconButton(
+                    tooltip: _obscureConfirm ? '顯示確認密碼' : '隱藏確認密碼',
+                    onPressed: () =>
+                        setState(() => _obscureConfirm = !_obscureConfirm),
+                    icon: Icon(
+                      _obscureConfirm
+                          ? CupertinoIcons.eye
+                          : CupertinoIcons.eye_slash,
+                    ),
+                  ),
+                ),
+                validator: (value) =>
+                    value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
+              ),
             ],
-            TextFormField(
-              key: const ValueKey('reset-password-field'),
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.next,
-              enabled: !_submitting,
-              forceErrorText: _passwordServerError,
-              onChanged: (_) {
-                if (_passwordServerError != null) {
-                  setState(() => _passwordServerError = null);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: '新密碼',
-                helperText: '至少 8 個字元',
-                suffixIcon: IconButton(
-                  tooltip: _obscurePassword ? '顯示密碼' : '隱藏密碼',
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                  icon: Icon(
-                    _obscurePassword
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
-                  ),
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '請輸入新密碼';
-                if (value.length < 8) return '密碼至少 8 字元';
-                return null;
-              },
-            ),
-            const SizedBox(height: TpSpacing.s4),
-            TextFormField(
-              key: const ValueKey('reset-password-confirm-field'),
-              controller: _confirmController,
-              obscureText: _obscureConfirm,
-              textInputAction: TextInputAction.done,
-              enabled: !_submitting,
-              onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: '再次輸入新密碼',
-                suffixIcon: IconButton(
-                  tooltip: _obscureConfirm ? '顯示確認密碼' : '隱藏確認密碼',
-                  onPressed: () =>
-                      setState(() => _obscureConfirm = !_obscureConfirm),
-                  icon: Icon(
-                    _obscureConfirm
-                        ? CupertinoIcons.eye
-                        : CupertinoIcons.eye_slash,
-                  ),
-                ),
-              ),
-              validator: (value) =>
-                  value != _passwordController.text ? '兩次輸入的密碼不一致' : null,
-            ),
-          ],
+          ),
         ),
       ),
     );

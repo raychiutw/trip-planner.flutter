@@ -806,6 +806,201 @@ void main() {
     );
   });
 
+  testWidgets('重設密碼與確認欄位共用新密碼 AutoFill 且取消不保存', (tester) async {
+    await pumpAuthRoutes(
+      tester,
+      initialLocation: '/auth/password/reset?token=reset-token',
+    );
+    final groups = <AutofillGroupState?>[];
+    for (final key in [
+      'reset-password-field',
+      'reset-password-confirm-field',
+    ]) {
+      final field = find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.byType(TextField),
+      );
+      expect(
+        tester.widget<TextField>(field).autofillHints,
+        contains(AutofillHints.newPassword),
+      );
+      expect(tester.widget<TextField>(field).autocorrect, isFalse);
+      groups.add(AutofillGroup.maybeOf(tester.element(field)));
+      await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+    }
+    expect(groups.first, isNotNull);
+    expect(identical(groups.first, groups.last), isTrue);
+    tester.testTextInput.log.clear();
+    await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('login-destination'), findsOneWidget);
+    final finishes = tester.testTextInput.log.where(
+      (call) => call.method == 'TextInput.finishAutofillContext',
+    );
+    expect(finishes, isNotEmpty);
+    expect(finishes.every((call) => call.arguments == false), isTrue);
+  });
+
+  for (final (code, message) in [
+    ('RESET_TOKEN_INVALID', '重設連結無效或已過期'),
+    ('RESET_TOKEN_MISSING', '重設連結缺少 token'),
+  ]) {
+    testWidgets('$code 保留輸入並可重新申請，不重送也不返回失效頁', (tester) async {
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: any(named: 'token'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(ApiError(status: 400, code: code, message: 'invalid token'));
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/password/reset?token=expired-token',
+      );
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+      }
+      tester.testTextInput.log.clear();
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: find.byKey(ValueKey(key)),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller
+              ?.text,
+          'password123',
+        );
+      }
+      final retry = find.text('重新申請');
+      expect(retry, findsOneWidget);
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('forgot-password-email-field')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('tp-app-bar-back')));
+      await tester.pumpAndSettle();
+      expect(find.text('login-destination'), findsOneWidget);
+      expect(find.byKey(const ValueKey('reset-password-field')), findsNothing);
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'expired-token',
+          password: 'password123',
+        ),
+      ).called(1);
+      verifyNever(() => mockAuthRepository.requestPasswordReset(any()));
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+    });
+  }
+
+  for (final error in <Exception>[
+    Exception('RESET_TOKEN_INVALID'),
+    const ApiError(status: 500, code: 'INTERNAL_ERROR', message: '重設連結無效或已過期'),
+  ]) {
+    testWidgets('一般錯誤不誤判 token 失效並保留輸入供手動重試：$error', (tester) async {
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: any(named: 'token'),
+          password: any(named: 'password'),
+        ),
+      ).thenThrow(error);
+      await pumpAuthRoutes(
+        tester,
+        initialLocation: '/auth/password/reset?token=reset-token',
+      );
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        await tester.enterText(find.byKey(ValueKey(key)), 'password123');
+      }
+      tester.testTextInput.log.clear();
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reset-password-error')),
+        findsOneWidget,
+      );
+      expect(find.text('重新申請'), findsNothing);
+      for (final key in [
+        'reset-password-field',
+        'reset-password-confirm-field',
+      ]) {
+        expect(
+          tester
+              .widget<TextField>(
+                find.descendant(
+                  of: find.byKey(ValueKey(key)),
+                  matching: find.byType(TextField),
+                ),
+              )
+              .controller
+              ?.text,
+          'password123',
+        );
+      }
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).called(1);
+      expect(
+        tester.testTextInput.log.where(
+          (call) =>
+              call.method == 'TextInput.finishAutofillContext' &&
+              call.arguments == true,
+        ),
+        isEmpty,
+      );
+      when(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).thenAnswer((_) async => null);
+      await tester.tap(
+        find.byKey(const ValueKey('reset-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('reset-password-success')),
+        findsOneWidget,
+      );
+      verify(
+        () => mockAuthRepository.resetPassword(
+          token: 'reset-token',
+          password: 'password123',
+        ),
+      ).called(1);
+    });
+  }
+
   testWidgets('重設密碼會驗證兩次輸入並呼叫 resetPassword', (tester) async {
     when(
       () => mockAuthRepository.resetPassword(
@@ -826,10 +1021,20 @@ void main() {
       find.byKey(const ValueKey('reset-password-confirm-field')),
       'password123',
     );
+    tester.testTextInput.log.clear();
     await tester.tap(
       find.byKey(const ValueKey('reset-password-submit-button')),
     );
     await tester.pumpAndSettle();
+
+    expect(
+      tester.testTextInput.log.where(
+        (call) =>
+            call.method == 'TextInput.finishAutofillContext' &&
+            call.arguments == true,
+      ),
+      hasLength(1),
+    );
 
     verify(
       () => mockAuthRepository.resetPassword(
