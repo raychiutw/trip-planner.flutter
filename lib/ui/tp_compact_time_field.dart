@@ -194,9 +194,13 @@ class _TpCompactTimeFieldState extends State<TpCompactTimeField> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final display = widget.value?.format(context) ?? widget.emptyLabel;
-    return Row(
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: TpSpacing.s2,
+      runSpacing: TpSpacing.s2,
       children: [
-        Expanded(child: Text(widget.label, style: theme.textTheme.bodyLarge)),
+        Text(widget.label, style: theme.textTheme.bodyLarge),
         if (widget.onCleared != null && widget.value != null)
           IconButton(
             key: widget.clearKey,

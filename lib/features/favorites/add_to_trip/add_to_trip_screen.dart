@@ -1,3 +1,7 @@
+/// 收藏或外部地點加入行程：選擇目的行程、日期與時間，並保留可恢復的表單狀態。
+library;
+
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../api/api_error.dart';
 import '../../../api/providers.dart';
 import '../../../app/adaptive.dart';
+import '../../../app/adaptive_content.dart';
 import '../../../app/app_feedback.dart';
 import '../../../app/app_loading_skeleton.dart';
 import '../../../models/add_to_trip.dart';
@@ -16,6 +21,7 @@ import '../../../models/trip.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_app_bar.dart';
 import '../../../ui/tp_compact_time_field.dart';
+import '../../../ui/tp_state_view.dart';
 import '../../trip_detail/trip_providers.dart';
 import '../../trips/trip_card.dart';
 import '../../trips/trips_list_screen.dart';
@@ -219,19 +225,22 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   @override
   Widget build(BuildContext context) {
     final tripsAsync = ref.watch(myTripsProvider);
-    final trips = switch (tripsAsync) {
-      AsyncData<List<TripSummary>>(:final value) => value,
-      _ => const <TripSummary>[],
-    };
-    final tripId = _tripId ?? (trips.isEmpty ? null : trips.first.tripId);
+    final trips = tripsAsync.hasValue
+        ? tripsAsync.requireValue
+        : const <TripSummary>[];
+    final tripId = trips.any((trip) => trip.tripId == _tripId)
+        ? _tripId
+        : trips.firstOrNull?.tripId;
     final daysAsync = tripId == null
         ? null
         : ref.watch(tripDaysProvider(tripId));
-    final days = switch (daysAsync) {
-      AsyncData<List<TripDay>>(:final value) => value,
-      _ => const <TripDay>[],
-    };
-    final dayNum = _dayNum ?? (days.isEmpty ? null : days.first.dayNum);
+    final days = daysAsync?.hasValue ?? false
+        ? daysAsync!.requireValue
+        : const <TripDay>[];
+    // 日期選擇只屬於原行程；清單刷新移除該行程時不能帶到另一個 family。
+    final dayNum = _tripId == tripId && days.any((day) => day.dayNum == _dayNum)
+        ? _dayNum
+        : days.firstOrNull?.dayNum;
     final canSubmit =
         !_submitting && _timeValid && tripId != null && dayNum != null;
 
@@ -249,23 +258,34 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           primaryActionEnabled: canSubmit,
           onPrimaryAction: () => _submit(tripId!, dayNum!),
         ),
-        body: tripsAsync.when(
-          loading: () => const AppListLoadingSkeleton(
-            key: ValueKey('add-to-trip-loading'),
-          ),
-          error: (e, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(TpSpacing.s6),
-              child: Text('無法載入行程清單:$e', textAlign: TextAlign.center),
+        body: AppAdaptiveContent(
+          maxWidth: AppContentWidth.form,
+          child: tripsAsync.when(
+            skipLoadingOnReload: tripsAsync.retrying,
+            skipError: tripsAsync.hasValue,
+            loading: () => const AppListLoadingSkeleton(
+              key: ValueKey('add-to-trip-loading'),
             ),
-          ),
-          data: (trips) => _form(
-            context,
-            trips: trips,
-            tripId: tripId,
-            daysAsync: daysAsync,
-            days: days,
-            dayNum: dayNum,
+            error: (e, _) => SingleChildScrollView(
+              child: Semantics(
+                liveRegion: true,
+                child: TpStateView(
+                  kind: TpStateKind.error,
+                  title: '無法載入行程清單',
+                  actionLabel: '重試',
+                  onAction: () => ref.invalidate(myTripsProvider),
+                ),
+              ),
+            ),
+            data: (trips) => _form(
+              context,
+              trips: trips,
+              tripsError: tripsAsync.hasError,
+              tripId: tripId,
+              daysAsync: daysAsync,
+              days: days,
+              dayNum: dayNum,
+            ),
           ),
         ),
       ),
@@ -275,6 +295,7 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
   Widget _form(
     BuildContext context, {
     required List<TripSummary> trips,
+    required bool tripsError,
     required String? tripId,
     required AsyncValue<List<TripDay>>? daysAsync,
     required List<TripDay> days,
@@ -283,13 +304,22 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
     return ListView(
       padding: const EdgeInsets.all(TpSpacing.s4),
       children: [
-        DropdownButtonFormField<String>(
+        if (tripsError)
+          Semantics(
+            liveRegion: true,
+            child: TpStateView(
+              kind: TpStateKind.error,
+              title: '無法載入行程清單',
+              actionLabel: '重試',
+              onAction: () => ref.invalidate(myTripsProvider),
+            ),
+          ),
+        _SelectionField<String>(
           key: const ValueKey('add-to-trip-trip'),
-          initialValue: tripId,
-          decoration: const InputDecoration(labelText: '行程'),
-          items: [
-            for (final t in trips)
-              DropdownMenuItem(value: t.tripId, child: Text(t.displayTitle)),
+          label: '行程',
+          value: tripId,
+          options: [
+            for (final t in trips) (value: t.tripId, label: t.displayTitle),
           ],
           onChanged: (v) => setState(() {
             _tripId = v;
@@ -300,23 +330,48 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
         const SizedBox(height: TpSpacing.s4),
         if (daysAsync != null)
           daysAsync.when(
+            skipLoadingOnReload: daysAsync.retrying,
+            skipError: daysAsync.hasValue,
             loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('無法載入日程:$e'),
-            data: (_) => DropdownButtonFormField<int>(
-              key: const ValueKey('add-to-trip-day'),
-              initialValue: dayNum,
-              decoration: const InputDecoration(labelText: '日期'),
-              items: [
-                for (final d in days)
-                  DropdownMenuItem(
-                    value: d.dayNum,
-                    child: Text('DAY ${d.dayNum} · ${d.displayTitle}'),
+            error: (e, _) => Semantics(
+              liveRegion: true,
+              child: TpStateView(
+                kind: TpStateKind.error,
+                title: '無法載入日期',
+                actionLabel: '重試',
+                onAction: () => ref.invalidate(tripDaysProvider(tripId!)),
+              ),
+            ),
+            data: (_) => Column(
+              children: [
+                if (daysAsync.hasError)
+                  Semantics(
+                    liveRegion: true,
+                    child: TpStateView(
+                      kind: TpStateKind.error,
+                      title: '無法載入日期',
+                      actionLabel: '重試',
+                      onAction: () => ref.invalidate(tripDaysProvider(tripId!)),
+                    ),
                   ),
+                _SelectionField<int>(
+                  key: const ValueKey('add-to-trip-day'),
+                  label: '日期',
+                  value: dayNum,
+                  options: [
+                    for (final d in days)
+                      (
+                        value: d.dayNum,
+                        label: 'DAY ${d.dayNum} · ${d.displayTitle}',
+                      ),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _tripId = tripId;
+                    _dayNum = v;
+                    _dirty = true;
+                  }),
+                ),
               ],
-              onChanged: (v) => setState(() {
-                _dayNum = v;
-                _dirty = true;
-              }),
             ),
           ),
         const SizedBox(height: TpSpacing.s4),
@@ -351,6 +406,74 @@ class _AddToTripScreenState extends ConsumerState<AddToTripScreen> {
           ),
         const SizedBox(height: TpSpacing.s6),
       ],
+    );
+  }
+}
+
+/// 行程與日期共用選擇呈現，資料和目前值仍由表單持有。
+class _SelectionField<T> extends StatelessWidget {
+  const _SelectionField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final T? value;
+  final List<({T value, String label})> options;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = options
+        .where((option) => option.value == value)
+        .firstOrNull;
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(TpSpacing.tapMin),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.all(TpSpacing.s3),
+      ),
+      onPressed: options.isEmpty
+          ? null
+          : () async {
+              final result = await showAppSelectionSheet<T>(
+                context,
+                title: '選擇$label',
+                builder: (sheetContext, select) => ListView(
+                  children: [
+                    for (final option in options)
+                      ListTile(
+                        title: Text(option.label),
+                        selected: option.value == value,
+                        trailing: option.value == value
+                            ? const Icon(CupertinoIcons.check_mark)
+                            : null,
+                        onTap: () => select(option.value),
+                      ),
+                  ],
+                ),
+              );
+              if (result != null && context.mounted && result != value) {
+                onChanged(result);
+              }
+            },
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.labelLarge),
+                Text(selected?.label ?? '尚無$label'),
+              ],
+            ),
+          ),
+          const Icon(CupertinoIcons.chevron_down),
+        ],
+      ),
     );
   }
 }

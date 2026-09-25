@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,19 +79,520 @@ void main() {
 
   // 統一 override tripRepositoryProvider（myTripsProvider/tripDaysProvider 皆走它,
   // 避免 family instance override 語法不確定）。
-  Widget buildScoped(Widget home) {
+  Widget buildScoped(Widget home, {double textScale = 1}) {
     return ProviderScope(
       overrides: [
         tripRepositoryProvider.overrideWithValue(tripRepo),
         favoritesRepositoryProvider.overrideWithValue(favRepo),
         poiRepositoryProvider.overrideWithValue(poiRepo),
       ],
-      child: MaterialApp(theme: AppTheme.light(), home: home),
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: home,
+      ),
     );
   }
 
   Widget buildApp(AddToTripArgs args) =>
       buildScoped(AddToTripScreen(args: args));
+
+  testWidgets('預設重試期間行程讀取失敗仍可原地重試並選擇日期', (tester) async {
+    final recoveredTrips = StreamController<List<TripSummary>>.broadcast();
+    addTearDown(recoveredTrips.close);
+    var tripReads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      tripReads++;
+      return tripReads == 1
+          ? Stream.error(Exception('network unavailable'))
+          : recoveredTrips.stream;
+    });
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+
+    // 使用正式 ProviderScope 預設 retry；在第一個 200ms 自動重試前操作。
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(tripReads, 1);
+    expect(find.text('無法載入行程清單'), findsOneWidget);
+    expect(find.textContaining('network unavailable'), findsNothing);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    recoveredTrips.add(_trips);
+    await tester.pumpAndSettle();
+
+    expect(find.text('沖繩'), findsWidgets);
+    expect(find.text('DAY 1 · Day 1'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: 7,
+        tripId: 'okinawa',
+        dayNum: 1,
+        startTime: '10:00',
+        endTime: '11:00',
+      ),
+    ).called(1);
+    expect(tripReads, 2);
+  });
+
+  testWidgets('日期讀取失敗只重試所選行程並保留上游選擇', (tester) async {
+    const trips = [
+      ..._trips,
+      TripSummary(tripId: 'tokyo', name: 'tokyo', title: '東京'),
+    ];
+    const tokyoDays = [TripDay(id: 2, dayNum: 2, version: 0)];
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(trips));
+    var dayReads = 0;
+    final recoveredDays = StreamController<List<TripDay>>.broadcast();
+    addTearDown(recoveredDays.close);
+    when(() => tripRepo.watchDays('tokyo')).thenAnswer((_) {
+      dayReads++;
+      return dayReads == 1
+          ? Stream.error(Exception('days unavailable'))
+          : recoveredDays.stream;
+    });
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('東京').last);
+    // 不推進自動重試計時器，觀察第一個失敗。
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法載入日期'), findsOneWidget);
+    expect(find.textContaining('days unavailable'), findsNothing);
+    expect(dayReads, 1);
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    recoveredDays.add(tokyoDays);
+    await tester.pumpAndSettle();
+    expect(find.text('東京'), findsWidgets);
+    expect(find.text('DAY 2 · Day 2'), findsWidgets);
+    verify(tripRepo.watchMyTrips).called(1);
+    verify(() => tripRepo.watchDays('okinawa')).called(1);
+    expect(dayReads, 2);
+  });
+
+  testWidgets('已選行程與日期在兩層更新失敗及恢復後仍保留', (tester) async {
+    const trips = [
+      ..._trips,
+      TripSummary(tripId: 'tokyo', name: 'tokyo', title: '東京'),
+    ];
+    const days = [
+      TripDay(id: 2, dayNum: 1, version: 0),
+      TripDay(id: 3, dayNum: 2, version: 0),
+    ];
+    final tripUpdates = StreamController<List<TripSummary>>.broadcast();
+    final dayUpdates = StreamController<List<TripDay>>.broadcast();
+    addTearDown(tripUpdates.close);
+    addTearDown(dayUpdates.close);
+    var tripReads = 0;
+    var dayReads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      tripReads++;
+      return tripReads == 1 ? tripUpdates.stream : Stream.value(trips);
+    });
+    when(() => tripRepo.watchDays('tokyo')).thenAnswer((_) {
+      dayReads++;
+      return dayReads == 1 ? dayUpdates.stream : Stream.value(days);
+    });
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    tripUpdates.add(trips);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('東京').last);
+    // selection sheet 完成關閉後才回傳選擇，日期 stream 此時仍等待資料。
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    dayUpdates.add(days);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 2 · Day 2').last);
+    await tester.pumpAndSettle();
+
+    dayUpdates.addError(Exception('days update failed'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.byKey(const ValueKey('add-to-trip-day')), findsOneWidget);
+    expect(find.text('無法載入日期'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(tripReads, 1);
+
+    tripUpdates.addError(Exception('trips update failed'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.byKey(const ValueKey('add-to-trip-trip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-to-trip-day')), findsOneWidget);
+    expect(find.text('無法載入行程清單'), findsOneWidget);
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: 7,
+        tripId: 'tokyo',
+        dayNum: 2,
+        startTime: '10:00',
+        endTime: '11:00',
+      ),
+    ).called(1);
+    expect(dayReads, 2);
+    expect(tripReads, 2);
+  });
+
+  for (final size in [const Size(320, 568), const Size(1024, 768)]) {
+    testWidgets('$size 最大字級可讀取完整長行程名稱並選擇末項日期', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final trips = [
+        for (var i = 1; i <= 8; i++)
+          TripSummary(tripId: 'trip-$i', name: '東京親子自由行博物館公園美食探訪第 $i 組'),
+      ];
+      const days = [
+        TripDay(id: 1, dayNum: 1, date: '2026-09-25', version: 0),
+        TripDay(id: 2, dayNum: 2, date: '2026-09-26', version: 0),
+      ];
+      when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(trips));
+      when(
+        () => tripRepo.watchDays(any()),
+      ).thenAnswer((_) => Stream.value(days));
+      when(
+        () => favRepo.addFavoriteToTrip(
+          favoriteId: any(named: 'favoriteId'),
+          tripId: any(named: 'tripId'),
+          dayNum: any(named: 'dayNum'),
+          startTime: any(named: 'startTime'),
+          endTime: any(named: 'endTime'),
+        ),
+      ).thenAnswer((_) async {});
+      when(
+        () => tripRepo.recomputeTravel(
+          tripId: any(named: 'tripId'),
+          day: any(named: 'day'),
+        ),
+      ).thenAnswer((_) async {});
+      await tester.pumpWidget(
+        buildScoped(
+          const AddToTripScreen(
+            args: AddToTripFavorite(favoriteId: 7, displayName: '首里城'),
+          ),
+          textScale: 3.2,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
+      await tester.pumpAndSettle();
+      final lastTrip = find.text('東京親子自由行博物館公園美食探訪第 8 組');
+      await tester.scrollUntilVisible(
+        lastTrip,
+        200,
+        scrollable: find.byType(Scrollable).last,
+        maxScrolls: 50,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(lastTrip);
+      await tester.pumpAndSettle();
+      final dayPicker = find.byKey(const ValueKey('add-to-trip-day'));
+      await tester.ensureVisible(dayPicker);
+      await tester.tap(dayPicker);
+      await tester.pumpAndSettle();
+      final lastDay = find.text('DAY 2 · 2026-09-26');
+      await tester.scrollUntilVisible(
+        lastDay,
+        150,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(lastDay);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+      await tester.pumpAndSettle();
+      verify(
+        () => favRepo.addFavoriteToTrip(
+          favoriteId: 7,
+          tripId: 'trip-8',
+          dayNum: 2,
+          startTime: '10:00',
+          endTime: '11:00',
+        ),
+      ).called(1);
+    });
+  }
+
+  testWidgets('未手動操作時兩層讀取仍可依預設政策自動恢復', (tester) async {
+    var tripReads = 0;
+    var dayReads = 0;
+    when(tripRepo.watchMyTrips).thenAnswer((_) {
+      tripReads++;
+      return tripReads == 1
+          ? Stream.error(Exception('trips unavailable'))
+          : Stream.value(_trips);
+    });
+    when(() => tripRepo.watchDays('okinawa')).thenAnswer((_) {
+      dayReads++;
+      return dayReads == 1
+          ? Stream.error(Exception('days unavailable'))
+          : Stream.value(_days);
+    });
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法載入行程清單'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 201));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    expect(find.text('無法載入日期'), findsOneWidget);
+    expect(find.text('沖繩'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 201));
+    await tester.pumpAndSettle();
+    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('重試'), findsNothing);
+    expect(tripReads, 2);
+    expect(dayReads, 2);
+  });
+
+  testWidgets('日期重試未完成時切換行程不接受舊行程遲到結果', (tester) async {
+    const trips = [
+      ..._trips,
+      TripSummary(tripId: 'tokyo', name: 'tokyo', title: '東京'),
+    ];
+    when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(trips));
+    final lateDays = StreamController<List<TripDay>>.broadcast();
+    addTearDown(lateDays.close);
+    var dayReads = 0;
+    when(() => tripRepo.watchDays('tokyo')).thenAnswer((_) {
+      dayReads++;
+      return dayReads == 1
+          ? Stream.error(Exception('days unavailable'))
+          : lateDays.stream;
+    });
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('東京'));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    await tester.tap(find.text('重試'));
+    await tester.pump();
+    expect(lateDays.hasListener, isTrue);
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-trip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('沖繩'));
+    await tester.pumpAndSettle();
+    lateDays.add(const [TripDay(id: 99, dayNum: 9, version: 0)]);
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩'), findsOneWidget);
+    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('DAY 9 · Day 9'), findsNothing);
+    expect(find.text('無法載入日期'), findsNothing);
+    expect(dayReads, 2);
+  });
+
+  testWidgets('重新載入已移除所選日期時顯示並提交仍存在的第一天', (tester) async {
+    final updates = StreamController<List<TripDay>>.broadcast();
+    addTearDown(updates.close);
+    when(() => tripRepo.watchDays('okinawa')).thenAnswer((_) => updates.stream);
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump();
+    }
+    updates.add(const [..._days, TripDay(id: 2, dayNum: 2, version: 0)]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.pumpAndSettle();
+    updates.add(_days);
+    await tester.pumpAndSettle();
+    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    expect(find.text('尚無日期'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: 7,
+        tripId: 'okinawa',
+        dayNum: 1,
+        startTime: '10:00',
+        endTime: '11:00',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('重新載入已移除所選行程時使用新行程自己的第一天', (tester) async {
+    final updates = StreamController<List<TripSummary>>.broadcast();
+    addTearDown(updates.close);
+    when(tripRepo.watchMyTrips).thenAnswer((_) => updates.stream);
+    const days = [..._days, TripDay(id: 2, dayNum: 2, version: 0)];
+    when(() => tripRepo.watchDays(any())).thenAnswer((_) => Stream.value(days));
+    when(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: any(named: 'favoriteId'),
+        tripId: any(named: 'tripId'),
+        dayNum: any(named: 'dayNum'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => tripRepo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
+    ).thenAnswer((_) async {});
+    await tester.pumpWidget(
+      buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+    );
+    updates.add(const [
+      TripSummary(tripId: 'tokyo', name: 'tokyo', title: '東京'),
+      ..._trips,
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('DAY 2 · Day 2'));
+    await tester.pumpAndSettle();
+    updates.add(_trips);
+    await tester.pumpAndSettle();
+    expect(find.text('沖繩'), findsOneWidget);
+    expect(find.text('DAY 1 · Day 1'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('add-to-trip-submit')));
+    await tester.pumpAndSettle();
+    verify(
+      () => favRepo.addFavoriteToTrip(
+        favoriteId: 7,
+        tripId: 'okinawa',
+        dayNum: 1,
+        startTime: '10:00',
+        endTime: '11:00',
+      ),
+    ).called(1);
+  });
+
+  for (final emptyTrips in [true, false]) {
+    testWidgets('${emptyTrips ? '行程' : '日期'}重新載入為空後不能提交原選擇', (tester) async {
+      final trips = StreamController<List<TripSummary>>.broadcast();
+      final days = StreamController<List<TripDay>>.broadcast();
+      addTearDown(trips.close);
+      addTearDown(days.close);
+      when(tripRepo.watchMyTrips).thenAnswer((_) => trips.stream);
+      when(() => tripRepo.watchDays('okinawa')).thenAnswer((_) => days.stream);
+      await tester.pumpWidget(
+        buildApp(const AddToTripFavorite(favoriteId: 7, displayName: '首里城')),
+      );
+      trips.add(_trips);
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+      days.add(const [..._days, TripDay(id: 2, dayNum: 2, version: 0)]);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add-to-trip-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DAY 2 · Day 2'));
+      await tester.pumpAndSettle();
+      if (emptyTrips) {
+        trips.add(const []);
+      } else {
+        days.add(const []);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text(emptyTrips ? '尚無行程' : '尚無日期'), findsOneWidget);
+      final button = tester.widget<TpToolbarTextButton>(
+        find.byKey(const ValueKey('add-to-trip-submit')),
+      );
+      expect(button.onPressed, isNull);
+      verifyNever(
+        () => favRepo.addFavoriteToTrip(
+          favoriteId: any(named: 'favoriteId'),
+          tripId: any(named: 'tripId'),
+          dayNum: any(named: 'dayNum'),
+          startTime: any(named: 'startTime'),
+          endTime: any(named: 'endTime'),
+        ),
+      );
+    });
+  }
 
   testWidgets('route loader：favorite id 深連結會從收藏清單還原 args', (tester) async {
     when(favRepo.fetchFavorites).thenAnswer(
