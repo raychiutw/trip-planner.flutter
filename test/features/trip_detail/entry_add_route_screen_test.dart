@@ -77,6 +77,12 @@ Widget _buildScreen(
   String? initialRegion,
   bool useRepositoryDays = false,
 }) {
+  when(
+    () => repo.recomputeTravel(
+      tripId: any(named: 'tripId'),
+      day: any(named: 'day'),
+    ),
+  ).thenAnswer((_) async {});
   final router = GoRouter(
     routes: [
       GoRoute(

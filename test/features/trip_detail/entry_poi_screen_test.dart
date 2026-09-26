@@ -285,9 +285,18 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     when(
-      () => repo.recomputeTravel(tripId: any(named: 'tripId')),
+      () => repo.recomputeTravel(
+        tripId: any(named: 'tripId'),
+        day: any(named: 'day'),
+      ),
     ).thenAnswer((_) async {});
-    await _pump(tester, repo);
+    await _pump(
+      tester,
+      repo,
+      tripDays: const [
+        TripDay(id: 1, dayNum: 1, version: 1, timeline: [_entry]),
+      ],
+    );
 
     await tester.tap(find.byKey(const ValueKey('alt-setmaster-502')));
     await tester.pumpAndSettle();
@@ -314,7 +323,7 @@ void main() {
         entryPoisVersion: '4',
       ),
     ).called(1);
-    verify(() => repo.recomputeTravel(tripId: 't1')).called(1);
+    verify(() => repo.recomputeTravel(tripId: 't1', day: '1')).called(1);
   });
 
   testWidgets('設為正選跨區域時顯示距離警示', (tester) async {

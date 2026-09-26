@@ -584,6 +584,9 @@ void main() {
   testWidgets('新增模式：可帶 POI 分類與座標建立自訂停留點', (tester) async {
     final repo = _MockTripRepository();
     when(
+      () => repo.recomputeTravel(tripId: 't1', day: '2'),
+    ).thenAnswer((_) async {});
+    when(
       () => repo.addEntryToDay(
         tripId: any(named: 'tripId'),
         dayNum: any(named: 'dayNum'),

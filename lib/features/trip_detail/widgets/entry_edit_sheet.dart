@@ -13,6 +13,7 @@ import '../../../models/entry.dart';
 import '../../../models/poi_type.dart';
 import '../../../theme/tokens.dart';
 import '../../../ui/tp_compact_time_field.dart';
+import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
 /// 編輯/新增停留點的模式參數。
@@ -423,16 +424,6 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     _markTimeChanged(isStart);
   }
 
-  Future<void> _recomputeDay(int dayNum) async {
-    try {
-      await ref
-          .read(tripRepositoryProvider)
-          .recomputeTravel(tripId: widget.tripId, day: '$dayNum');
-    } catch (_) {
-      // 交通重算失敗不影響停留點新增結果。
-    }
-  }
-
   void _retryAfterStale() {
     if (!mounted) return;
     // 重試只重新觸發載入；在 _mergeExistingEntry 真正觀察到更高 version 前，
@@ -443,13 +434,10 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
   Future<bool> _submitForSheet() => _save();
 
   void _invalidateEntryCaches() {
-    ref.invalidate(tripDaysProvider(widget.tripId));
-    if (_isEdit) {
-      final entry = _existingEntry;
-      ref.invalidate(
-        entryDetailProvider((tripId: widget.tripId, entryId: entry.id)),
-      );
-    }
+    ref.read(entryMutationsProvider(widget.tripId).notifier).refreshAfter({
+      TripChange.days,
+      if (_isEdit) TripChange.entry,
+    }, entryId: _isEdit ? _existingEntry.id : null);
   }
 
   Future<void> _submitLegacy() async {
@@ -479,6 +467,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
     setState(() => _submitting = true);
     _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
+    final mutations = ref.read(entryMutationsProvider(widget.tripId).notifier);
     try {
       switch (widget.args) {
         case EntryEditExisting():
@@ -492,11 +481,7 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             startTime: _fmt(_start),
             endTime: _fmt(_end),
           );
-          try {
-            await repo.recomputeTravel(tripId: widget.tripId);
-          } catch (_) {
-            // Entry save succeeded; travel can self-heal on the next refresh.
-          }
+          await mutations.record(EntryMutation.updated, entryId: entry.id);
         case final EntryEditNew args:
           final dayNum = _selectedDayNum(args);
           final lat = _coordValue(_lat.text, min: -90, max: 90);
@@ -513,10 +498,9 @@ class _EntryEditSheetState extends ConsumerState<EntryEditSheet> {
             endTime: _fmt(_end),
             source: 'custom',
           );
-          await _recomputeDay(dayNum);
+          await mutations.record(EntryMutation.added, dayNum: dayNum);
       }
       if (!mounted) return false;
-      _invalidateEntryCaches();
       HapticFeedback.lightImpact();
       _dirty = false;
       _descriptionDirty = false;

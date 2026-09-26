@@ -8,6 +8,7 @@ import '../../../app/adaptive.dart';
 import '../../../models/entry.dart';
 import '../../../models/segment.dart';
 import '../../../theme/tokens.dart';
+import '../entry_mutations.dart';
 import '../trip_providers.dart';
 
 /// 開啟交通編輯 bottom sheet。
@@ -260,6 +261,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
     });
     _syncFormState();
     final repo = ref.read(tripRepositoryProvider);
+    final mutations = ref.read(entryMutationsProvider(widget.tripId).notifier);
     try {
       if (segment != null) {
         await repo.updateSegment(
@@ -288,8 +290,7 @@ class _TravelEditSheetState extends ConsumerState<TravelEditSheet> {
           noTravel: _noTravel,
         );
       }
-      ref.invalidate(tripDaysProvider(widget.tripId));
-      ref.invalidate(tripSegmentsProvider(widget.tripId));
+      await mutations.record(EntryMutation.segmentChanged);
       if (!mounted) return false;
       HapticFeedback.lightImpact();
       _dirty = false;

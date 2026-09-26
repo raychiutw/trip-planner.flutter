@@ -8,7 +8,7 @@ import '../../api/cache/cache_store.dart';
 import '../../api/providers.dart';
 import '../../app/adaptive.dart';
 import '../../theme/tokens.dart';
-import '../trip_detail/trip_providers.dart';
+import '../trip_detail/entry_mutations.dart';
 import 'offline_sync.dart';
 
 enum _ConflictChoice { ours, theirs }
@@ -30,14 +30,6 @@ Future<void> showConflictResolveSheet(
   } finally {
     controller.dispose();
   }
-}
-
-void _invalidateTripFamilies(WidgetRef ref) {
-  ref.invalidate(tripDetailProvider);
-  ref.invalidate(tripDaysProvider);
-  ref.invalidate(tripNotesProvider);
-  ref.invalidate(tripSegmentsProvider);
-  ref.invalidate(entryDetailProvider);
 }
 
 String _fieldLabel(String field) {
@@ -119,7 +111,7 @@ class _ConflictResolveFormState extends ConsumerState<_ConflictResolveForm> {
             continue;
         }
       }
-      _invalidateTripFamilies(ref);
+      invalidateTripFamilies(ref);
       return true;
     } on Exception {
       if (mounted) showAppNotice(context, '仍離線，稍後重試');
