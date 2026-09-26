@@ -151,12 +151,13 @@ void main() {
     testWidgets('捲到底時最後一張卡不被浮動 tab bar 蓋住', (tester) async {
       const inset = 100.0;
       // 清單必須長到溢出視窗,否則捲不動、最後一張卡停在畫面中段,斷言會假綠燈。
+      const longTitle = '跨越多個國家與城市的二百零一日長途旅行規劃與收藏紀錄';
       final longTripList = [
-        for (var index = 0; index < 20; index++)
+        for (var index = 0; index < 201; index++)
           TripSummary(
             tripId: 'trip-$index',
             name: 'trip-$index',
-            title: '行程 $index',
+            title: index == 200 ? longTitle : '行程 $index',
             totalDays: 3,
           ),
       ];
@@ -173,11 +174,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -50000));
       await tester.pumpAndSettle();
 
       final lastCard = tester.getRect(find.byType(TripCard).last);
       expect(lastCard.bottom, lessThanOrEqualTo(800 - inset));
+      expect(find.text(longTitle), findsOneWidget);
     });
   });
 
