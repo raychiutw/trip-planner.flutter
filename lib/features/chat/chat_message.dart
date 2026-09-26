@@ -95,7 +95,7 @@ List<ChatMessage> rowToMessages(TripRequest r) {
   }
   switch (r.status) {
     case RequestStatus.completed:
-      final reply = r.reply ?? '';
+      final reply = r.reply?.isNotEmpty == true ? r.reply! : '回覆尚未載入，請稍後重新整理。';
       final bad = isGarbledText(reply);
       out.add(
         ChatMessage(

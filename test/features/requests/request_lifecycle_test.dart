@@ -202,6 +202,35 @@ void main() {
     expect(waits, isEmpty, reason: '終態原因讀不到也不重新開始等待');
   });
 
+  test('SSE 完成後持續讀不到資料列會停止補讀，保留已確認終態', () async {
+    var reads = 0;
+    when(() => repo.fetchRequest(7)).thenAnswer((_) async {
+      reads++;
+      if (reads > 1) throw Exception('offline');
+      return _req(RequestStatus.processing);
+    });
+    final c = makeContainer();
+    final sub = c.listen(requestLifecycleProvider(7), (_, _) {});
+    await _flush();
+
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+    expect(sub.read(), isA<RequestTerminal>());
+    unawaited(c.read(requestLifecycleProvider(7).notifier).hydrateTerminal());
+    await _flush();
+    expect(reads, greaterThan(1), reason: '已嘗試補讀終態資料列');
+    var advanced = 0;
+    while (advanced < 10 && waits.length > advanced) {
+      waits[advanced++].complete();
+      await _flush();
+    }
+    expect(advanced, lessThan(10), reason: '永久錯誤必須停止排定讀取');
+    final stoppedAt = reads;
+    await _flush();
+    expect(reads, stoppedAt);
+    expect(sub.read(), isA<RequestTerminal>());
+  });
+
   test('回前景讀取途中收到 SSE failed，共用讀取補齊跨裝置停止原因', () async {
     final pending = Completer<TripRequest>();
     var reads = 0;

@@ -44,6 +44,7 @@ final class RequestTerminal extends RequestLifecycleState {
     required this.status,
     this.terminalReason,
     this.serverConfirmed = true,
+    this.authExpired = false,
     this.errorMessage,
     super.request,
   });
@@ -51,6 +52,7 @@ final class RequestTerminal extends RequestLifecycleState {
   final RequestStatus status;
   final TerminalReason? terminalReason;
   final bool serverConfirmed;
+  final bool authExpired;
 
   /// 終態事件的原始錯誤，交由各領域翻譯。
   final String? errorMessage;
@@ -78,6 +80,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   /// 不會出現兩條輪詢迴圈或舊 row 蓋到新 state。dispose 也算換 token。
   int _run = 0;
   bool _polling = false;
+  bool _hydratingTerminal = false;
 
   /// 同一時間只有一個 fetch 在飛:輪詢與回前景撞在一起就共用它。
   Future<TripRequest?>? _inflight;
@@ -96,6 +99,7 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   RequestLifecycleState build() {
     final run = ++_run;
     _polling = false;
+    _hydratingTerminal = false;
     _events = null;
     _inflight = null;
     _resumed = null;
@@ -158,13 +162,15 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       final current = state;
       if (current is RequestTerminal) {
         if (current.serverConfirmed &&
-            current.terminalReason == null &&
             current.status == row.status &&
-            row.terminalReason != null) {
+            row.status.isTerminal &&
+            (current.request != row ||
+                current.terminalReason != row.terminalReason)) {
           state = RequestTerminal(
             status: current.status,
-            terminalReason: row.terminalReason,
+            terminalReason: row.terminalReason ?? current.terminalReason,
             serverConfirmed: current.serverConfirmed,
+            authExpired: current.authExpired,
             errorMessage: current.errorMessage,
             request: row,
           );
@@ -178,15 +184,26 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       state = RequestInFlight(request: row, status: row.status);
       return row;
     } on ApiError catch (error) {
-      if (error.status == 401 && !_stale(run) && state is RequestInFlight) {
-        final current = state as RequestInFlight;
+      if (error.status == 401 && !_stale(run)) {
         _events?.cancel();
         _events = null;
-        state = RequestInFlight(
-          request: current.request,
-          status: current.status,
-          authExpired: true,
-        );
+        switch (state) {
+          case RequestInFlight current:
+            state = RequestInFlight(
+              request: current.request,
+              status: current.status,
+              authExpired: true,
+            );
+          case RequestTerminal current:
+            state = RequestTerminal(
+              status: current.status,
+              terminalReason: current.terminalReason,
+              serverConfirmed: current.serverConfirmed,
+              authExpired: true,
+              errorMessage: current.errorMessage,
+              request: current.request,
+            );
+        }
       }
       return null;
     } on Object {
@@ -248,6 +265,36 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       return;
     }
     await _readShared(run);
+  }
+
+  /// 需要完整終態資料列的畫面可請求補讀；最多三次，避免永久錯誤持續輪詢。
+  Future<void> hydrateTerminal() async {
+    if (_hydratingTerminal ||
+        state is! RequestTerminal ||
+        state.request?.status.isTerminal == true) {
+      return;
+    }
+    _hydratingTerminal = true;
+    final run = _run;
+    try {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        if (_stale(run) || state is! RequestTerminal) return;
+        final row = await _readShared(run);
+        if (_stale(run) ||
+            (state as RequestTerminal).authExpired ||
+            row?.status.isTerminal == true ||
+            attempt == 2) {
+          return;
+        }
+        await _wait(_pollDelay);
+        if (_resumed case final paused?) await paused.future;
+        _pollDelay = _pollDelay * 2 > kRequestPollCeiling
+            ? kRequestPollCeiling
+            : _pollDelay * 2;
+      }
+    } finally {
+      if (!_stale(run)) _hydratingTerminal = false;
+    }
   }
 
   /// SSE 收不到終結就改輪詢，等待由建構時注入的時鐘 adapter 決定。

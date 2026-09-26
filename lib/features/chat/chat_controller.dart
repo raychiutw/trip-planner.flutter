@@ -286,42 +286,50 @@ class ChatController extends Notifier<ChatState> {
       case RequestInFlight(authExpired: true):
         if (!_disposed) state = state.copyWith(authExpired: true);
       case RequestTerminal():
-        unawaited(_onTerminal(id, next));
+        if (next.authExpired && !_disposed) {
+          state = state.copyWith(authExpired: true);
+        }
+        _onTerminal(id, next);
+        if (next.status == RequestStatus.completed &&
+            next.serverConfirmed &&
+            next.request?.status.isTerminal != true) {
+          unawaited(
+            ref.read(requestLifecycleProvider(id).notifier).hydrateTerminal(),
+          );
+        }
       case RequestInFlight():
         break;
     }
   }
 
   TripRequest _withLifecycleTerminal(TripRequest row) {
-    if (!_watched.contains(row.id) || row.status.isTerminal) return row;
+    if (!_watched.contains(row.id)) return row;
     final lifecycle = ref.read(requestLifecycleProvider(row.id));
+    if (row.status.isTerminal) {
+      final hydrated = lifecycle.request;
+      return row.status == RequestStatus.completed &&
+              row.reply?.isNotEmpty != true &&
+              hydrated?.status == RequestStatus.completed &&
+              hydrated?.reply?.isNotEmpty == true
+          ? hydrated!
+          : row;
+    }
     return lifecycle is RequestTerminal
-        ? row.terminated(
-            status: lifecycle.status,
-            reason: lifecycle.terminalReason,
-          )
+        ? (lifecycle.request?.status.isTerminal == true
+              ? lifecycle.request!
+              : row.terminated(
+                  status: lifecycle.status,
+                  reason: lifecycle.terminalReason,
+                ))
         : row;
   }
 
-  /// SSE 不帶回覆，終結後補讀 row；讀不到時仍以已知終態讓畫面脫身。
-  Future<void> _onTerminal(int id, RequestTerminal terminal) async {
-    TripRequest? row = terminal.request;
-    if (terminal.serverConfirmed &&
-        (row == null || !row.status.isTerminal || row.reply == null)) {
-      try {
-        row = await _repo.fetchRequest(id);
-      } on ApiError catch (error) {
-        if (error.status == 401) {
-          if (!_disposed) state = state.copyWith(authExpired: true);
-        }
-      } on Exception {
-        // 暫時無法取得回覆，仍使用 lifecycle 的終態。
-      }
-    }
+  /// lifecycle 補齊終態資料後重新投影；SSE 本身不帶完整 row。
+  void _onTerminal(int id, RequestTerminal terminal) {
     if (_disposed) return;
     final current = state.requests.where((r) => r.id == id).firstOrNull;
     if (current == null) return;
-    row ??= current;
+    var row = terminal.request ?? current;
     if (!row.status.isTerminal) {
       row = row.terminated(
         status: terminal.status,

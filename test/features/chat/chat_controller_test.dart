@@ -179,6 +179,90 @@ void main() {
     },
   );
 
+  test('SSE 完成後補讀暫時失敗或仍在處理，稍後仍顯示回覆', () async {
+    final repo = _MockRepo();
+    final events = StreamController<TripRequestEvent>.broadcast();
+    final waits = <Completer<void>>[];
+    addTearDown(events.close);
+    when(() => repo.watchRequestEvents(17)).thenAnswer((_) => events.stream);
+    var pageReads = 0;
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async {
+      pageReads++;
+      return (
+        items: [
+          _req(
+            id: 17,
+            status: pageReads == 1
+                ? RequestStatus.processing
+                : RequestStatus.completed,
+            reply: pageReads == 3 ? '更新的回覆' : null,
+          ),
+        ],
+        hasMore: false,
+      );
+    });
+    var reads = 0;
+    when(() => repo.fetchRequest(17)).thenAnswer((_) async {
+      reads++;
+      return switch (reads) {
+        1 => _req(id: 17, status: RequestStatus.processing),
+        2 => throw const ApiError(
+          status: 503,
+          code: 'SYS_UPSTREAM_UNAVAILABLE',
+          message: '暫時無法讀取',
+        ),
+        3 => _req(id: 17, status: RequestStatus.processing),
+        _ => _req(id: 17, status: RequestStatus.completed, reply: '回覆完成'),
+      };
+    });
+    final c = ProviderContainer(
+      overrides: [
+        requestsRepositoryProvider.overrideWithValue(repo),
+        requestLifecycleProvider(17).overrideWith(
+          () => RequestLifecycle(
+            17,
+            wait: (_) {
+              final pending = Completer<void>();
+              waits.add(pending);
+              return pending.future;
+            },
+          ),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(chatControllerProvider('t'), (_, _) {});
+    await c.read(chatControllerProvider('t').notifier).loadInitial();
+    await _flush();
+
+    events.add(const TripRequestEvent(status: RequestStatus.completed));
+    await _flush();
+    expect(c.read(chatControllerProvider('t')).messages.last.text, isNotEmpty);
+
+    for (var tick = 0; tick < 5; tick++) {
+      if (c.read(chatControllerProvider('t')).messages.last.text == '回覆完成') {
+        break;
+      }
+      expect(waits.length, greaterThan(tick), reason: '尚未取得回覆時仍會安排補讀');
+      waits[tick].complete();
+      await _flush();
+    }
+    expect(c.read(chatControllerProvider('t')).messages.last.text, '回覆完成');
+
+    await c.read(chatControllerProvider('t').notifier).refreshLatest();
+    expect(c.read(chatControllerProvider('t')).messages.last.text, '回覆完成');
+    await c.read(chatControllerProvider('t').notifier).refreshLatest();
+    expect(c.read(chatControllerProvider('t')).messages.last.text, '更新的回覆');
+  });
+
   test('工單讀取 401 → authExpired', () async {
     final repo = _MockRepo();
     when(
