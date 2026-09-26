@@ -60,12 +60,13 @@ quality、前景、提高對比邊界及不透明降級。非媒體帳號入口�
   為 **1992 項全數通過**（15 分 28 秒），包含 HIG 十態與畫面證據集。
   修正後再跑 `flutter analyze --no-pub`，仍為 No issues found。
 
-## 真機驗證交接
+## 平台驗證範圍
 
 以上 headless 證據只涵蓋 App 自有填色、前景、幾何、語意與操作。
 Impeller 折射、原生圖磚與玻璃共存、邊緣光、thermal 降級與 raster jank
-均交由 [#330](https://github.com/raychiutw/trip-planner.flutter/issues/330)
-在所有玻璃切片整合後以當前版本真機重驗，並與上述基準版本分別標記。
+不由 headless 結果推論。[#330](https://github.com/raychiutw/trip-planner.flutter/issues/330)
+在所有玻璃切片整合後，記錄當前版本可執行的自動化／模擬器結果與未驗範圍；
+依使用者 2026-09-26 決議，真機檢驗不再是結票條件。
 
 ## 浮動 header 與固定 bar（#328）
 
@@ -128,8 +129,8 @@ Impeller 折射、原生圖磚與玻璃共存、邊緣光、thermal 降級與 ra
   `build/spec-328-full-restored.log`；此結果與前述聚焦測試、分析共同
   構成本切片的提交前驗證。
 
-這些是 App 自有填色、前景、幾何與操作證據。真機材質後驗仍依上一節
-交給 #330，未將舊 run 或 headless 像素解讀為本票真機驗收。
+這些是 App 自有填色、前景、幾何與操作證據。其餘平台可驗範圍仍依上一節
+交給 #330；舊 run 與 headless 像素不作新 build 的原生地圖證據。
 
 ## Root tab bar 與日期選擇器（#329）
 
@@ -169,8 +170,8 @@ root tab 的 inline／bottom 幾何、分支內容及套件 tap／drag 保留。
   為 **1996 項全數通過**（13 分 46 秒），包含畫面證據集的原 11 項案例
   及 HIG 十態矩陣。畫面案例仍使用原 45 秒時限，沒有跳過測試或放寬
   斷言；完整日誌保留於本機 `build/spec-329-full-final.log`。格式檢查
-  與 `git diff --check` 通過。這些結果只代表 headless 驗證，真機材質
-  後驗仍交由 #330，不以像素測試或歷史 build 代替。
+  與 `git diff --check` 通過。這些結果只代表 headless 驗證；#330 的平台
+  驗證不以像素測試或歷史 build 代替。
 
 ### 隔離環境診斷
 
@@ -245,27 +246,22 @@ adapter 全部保留。移除的只有已由語意 module 承接的組裝入口�
   `build/spec-330-full-final.log`。相較起點少一項是上述已接手保證的舊
   toolbar settings 測試；40 場景流程及完整 HIG 矩陣都在本次 suite 中通過。
   畫面證據集的 11 項案例維持原 45 秒時限，沒有跳過或放寬斷言。
-- 5 個 Dart 檔案格式檢查通過，`git diff --check` 通過。以上是目前工作樹
-  的自動化證據，不能取代下列真機後驗或 Standards／Spec 審查。
+- 5 個 Dart 檔案格式檢查通過，`git diff --check` 通過。以上是當時工作樹
+  的自動化證據，不能取代新 build 的平台驗證或 Standards／Spec 審查。
 
-### 當前版本真機證據尚未取得
+### 當前版本的平台證據與限制
 
-本切片在 feature branch 完成自動化後仍須等待合併，沿現有
-`mobile-e2e.yml` 的 master-only 流程取得新證據。不得拿起點 run
-35953925642（`b9729c1`／0.26.10+41）或本機 headless 結果標示後驗完成。
-商店上傳依 ADR-0002 保持獨立，不新增 workflow `needs` gate。
+使用者已移除真機檢驗；此處不再要求實體裝置、iOS release XCTest 或真機材質
+影片。當前整合分支 `f2371a28952da102b5957b44c14cb911843b67b7` 的
+`flutter analyze --no-pub` 零問題，完整 `flutter test --no-pub` 2251 項通過，
+包含 HIG 十態與跨畫面流程。後續 `23ccf96` 只修改調查文件。
 
-後驗需記錄完整 SHA、版本／build、Actions run／matrix、實體裝置／OS、
-release 或 debug 模式、明暗與實際觀察到的無障礙情境、XML 結果、影片／
-截圖位置與未驗項。新增六個停留點後共 40 場景，原 34 場景基準不改歸屬。
-
-現有 iOS lane 是 release XCTest；Android lane 是 debug，預設
-`MediumPhone.arm` 是虛擬裝置。Android 實體取證須明確選擇可用實體型號，
-並區分其結果與正式版、Play 簽章路徑。圖磚是否顯示要讀影片，不能只依
-`onMapReady`；wrapper 注入的無障礙值不證明 OS channel 或 VoiceOver／TalkBack。
-低幀率錄影與單筆 warmup p75 也不證明 Reduce Motion 動畫或持續 raster 效能。
-
-未驗範圍依 [現有裝置矩陣](liquid-glass-1.4.1-migration.md#尚未完成的裝置驗收)
-及 [人工證據格式](mobile-e2e.md#發布證據格式) 補齊：當前整合版的 iOS／Android
-材質與原生 PlatformView 共存、必要真機無障礙與不同配置、持續操作表現。
-取得並判讀必要證據前，**#330 與母票 #325 不標為完成**。
+iOS 26.5 模擬器的既有 `integration_test/app_smoke_test.dart` 1 項通過，
+但它使用 fake map canvas；普通 integration runner 的臨時 production canvas
+測試兩次均未收到 `onMapReady`，已移除，不宣稱原生地圖通過。
+[調查與限制](https://github.com/raychiutw/trip-planner.flutter/issues/387#issuecomment-5842315989)
+另有完整紀錄。Android `MediumPhone.arm` 的既有成功 run 只對應基準
+`b9729c1`，不能代替目前分支。`mobile-e2e.yml` 僅於 `master` 啟動，
+後續應以最終合併 SHA 跑可執行的 Android 虛擬裝置矩陣，記錄 SHA、OS、
+runner、明暗、字級、可觀察的操作結果與未驗範圍；商店上傳仍獨立。
+在取得並判讀當前整合版本的證據前，#330 與母票 #325 保持開啟。
