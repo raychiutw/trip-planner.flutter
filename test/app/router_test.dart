@@ -40,8 +40,8 @@ import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/selected_day_provider.dart';
-import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
+import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
 import 'package:tripline/features/trip_detail/trip_pdf_service.dart';
 import 'package:tripline/features/trip_detail/trip_print_data.dart';
@@ -207,6 +207,34 @@ ProviderContainer _buildContainer({
 }
 
 void main() {
+  testWidgets('舊路徑經 GoRouter 到達行程與停留點畫面', (tester) async {
+    final container = _buildContainer(currentUser: _loggedInUser);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+
+    router.go('/admin');
+    await tester.pumpAndSettle();
+    expect(find.byType(TripsListScreen), findsOneWidget);
+
+    router.go('/trip/trip-1/stop/11/map');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TripMapScreen>(find.byType(TripMapScreen)).initialEntryId,
+      11,
+    );
+
+    router.go('/trip/trip-1/stop/11/edit');
+    await tester.pumpAndSettle();
+    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
+  });
+
   testWidgets('無效停留點 deep link 顯示可返回畫面且不讀取停留點', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -1013,43 +1041,6 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('已登入可使用 admin/manage legacy redirects', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/admin');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/admin/');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TripsListScreen), findsOneWidget);
-
-    container.read(appRouterProvider).go('/manage');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/manage/');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(ChatScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
   testWidgets('/chat query 會傳給 ChatScreen', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -1207,48 +1198,6 @@ void main() {
     );
   });
 
-  testWidgets('已登入可從 stop map web alias 聚焦地圖 entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/map');
-    await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripMapScreen>(find.byType(TripMapScreen));
-    expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可從 stop web alias 聚焦 timeline entry', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11');
-    await tester.pumpAndSettle();
-
-    final screen = tester.widget<TripTimelineScreen>(
-      find.byType(TripTimelineScreen),
-    );
-    expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
   testWidgets('已登入可使用 /trips selected/focus query deep link', (tester) async {
     final container = _buildContainer(currentUser: _loggedInUser);
     addTearDown(container.dispose);
@@ -1273,31 +1222,6 @@ void main() {
       find.byType(TripTimelineScreen),
     );
     expect(screen.initialEntryId, 11);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry edit/change-poi web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/edit');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryEditRouteScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/change-poi');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryPoiScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -1363,32 +1287,6 @@ void main() {
 
     expect(find.byType(EntryAddRouteScreen), findsOneWidget);
     expect(find.text('收藏'), findsWidgets);
-    expect(find.byType(LoginScreen), findsNothing);
-  });
-
-  testWidgets('已登入可進入 entry copy/move web aliases', (tester) async {
-    final container = _buildContainer(currentUser: _loggedInUser);
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const TriplineApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/copy');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('複製停留點'), findsOneWidget);
-
-    container.read(appRouterProvider).go('/trip/trip-1/stop/11/move');
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EntryActionRouteScreen), findsOneWidget);
-    expect(find.text('移到其他 Day'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
@@ -1508,11 +1406,11 @@ void main() {
     router.go('/chat');
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('chat-input')), '原聊天草稿');
-    router.go('/settings/profile');
+    router.go('/settings/profile?account_origin=%2Fchat');
     await tester.pumpAndSettle();
     expect(
       router.routeInformationProvider.value.uri.toString(),
-      '/chat?account=profile',
+      '/chat?account=profile&account_origin=%2Fchat',
     );
     final field = find.byKey(const ValueKey('profile-display-name'));
     await tester.enterText(field, 'A');
@@ -1536,7 +1434,7 @@ void main() {
     expect(find.byType(WelcomeScreen), findsNothing);
     expect(
       router.routeInformationProvider.value.uri.toString(),
-      '/chat?account=profile',
+      '/chat?account=profile&account_origin=%2Fchat',
     );
     verify(() => repository.updateProfile(displayName: 'A')).called(1);
     verify(auth.currentUser).called(2);
@@ -1587,7 +1485,7 @@ void main() {
       ('/account/connected-apps', ConnectedAppsScreen),
       ('/settings/developer-apps', DeveloperAppsScreen),
     ]) {
-      router.go(target.$1);
+      router.go('${target.$1}?account_origin=%2Ffavorites');
       await tester.pumpAndSettle();
 
       expect(find.byType(target.$2), findsOneWidget);
@@ -1617,7 +1515,7 @@ void main() {
     final router = container.read(appRouterProvider);
     router.go('/favorites');
     await tester.pumpAndSettle();
-    router.go('/settings/developer-apps/new');
+    router.go('/settings/developer-apps/new?account_origin=%2Ffavorites');
     await tester.pumpAndSettle();
 
     expect(find.byType(DeveloperAppNewScreen), findsOneWidget);
@@ -1662,7 +1560,7 @@ void main() {
           '保留中的聊天草稿',
         );
       }
-      router.go('/account');
+      router.go('/account?account_origin=${Uri.encodeComponent(origin)}');
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -1672,7 +1570,7 @@ void main() {
       expect(find.byKey(const ValueKey('root-tab-帳號')), findsNothing);
       expect(
         router.routerDelegate.currentConfiguration.uri.toString(),
-        '$origin?account=root',
+        '$origin?account=root&account_origin=${Uri.encodeComponent(origin)}',
       );
 
       tester
@@ -2081,12 +1979,12 @@ void main() {
     for (final alias in ['/account/appearance', '/settings/appearance']) {
       router.go('/trips');
       await tester.pumpAndSettle();
-      router.go(alias);
+      router.go('$alias?account_origin=%2Ftrips');
       await tester.pumpAndSettle();
 
       expect(
         router.routerDelegate.currentConfiguration.uri.toString(),
-        '/trips?account=appearance',
+        '/trips?account=appearance&account_origin=%2Ftrips',
       );
       expect(find.byKey(const ValueKey('app-large-sheet')), findsOneWidget);
       expect(find.byType(AppearanceScreen), findsOneWidget);

@@ -103,10 +103,9 @@ compact `expandedColor`、不透明降級都用 `AppTheme.elevated`（深色 sur
 修正後真機證據待下一輪重取。
 
 - **改回第五 tab 不是加一個 branch 而已**,要同時動 shell 結構與所有 deep link ——
-  `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 全部建在
-  `accountSheetAlias` → `?account=<page>` 這條轉換上(`lib/app/router.dart:131`–`:180`、
-  `:300`–`:308`),shell 端則靠 `accountPage` / `accountReturnLocation` 兩個參數接手
-  (`lib/app/router.dart:330`–`:331`)。
+  `/account`、`/settings/*`、`/developer/apps*` 十餘條 alias 都由
+  `lib/app/legacy_aliases.dart` 的 `accountAliases` 資料表轉成來源頁上的
+  `?account=<page>`；shell 端靠 `accountPage` / `accountReturnLocation` 兩個參數接手。
 
 - **sheet 內只有一個 `Navigator`**(`sheetNavigatorKey`,`lib/app/adaptive.dart:763`),compact
   的近滿版 sheet 與 regular 的置中 form sheet 共用同一顆。設定子頁在同一個 stack push
@@ -122,8 +121,8 @@ compact `expandedColor`、不透明降級都用 `AppTheme.elevated`（深色 sur
   (`:107`–`:111`)。任何把 Account 改成蓋掉 shell 內容的實作(包含改回 branch)都會破壞它,
   改動前先確認這條還守得住。
 
-- **同一條 `/account` 在不同 branch 開,回程位置不同。** router 用 `accountSheetOrigin` 記住
-  最後一個非 Account 的 shell 內容位置(`lib/app/router.dart:46`–`:48`、`:60`–`:63`),關閉時
-  `router.go(_withoutAccount(uri))` 把 `account` query 拿掉回到原位
-  (`lib/features/shell/app_shell.dart:303`–`:308`)。這是刻意的 —— Account 沒有自己的「首頁」,
+- **同一條 `/account` 在不同 branch 開,回程位置不同。** 呼叫 alias 時以
+  `account_origin` query 帶入來源 shell URL；`accountSheetLocation` 只接受站內
+  shell 內容頁，並在目標 URL 保留來源。關閉時 `withoutAccount` 去掉帳號相關 query 回原位。
+  未帶合法來源的外部深連結回 `/trips`。Account 沒有自己的「首頁」,
   它永遠是某個位置上的一層覆蓋。
