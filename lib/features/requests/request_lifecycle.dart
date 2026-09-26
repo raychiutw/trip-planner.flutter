@@ -9,11 +9,11 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../models/trip_request.dart';
 
-/// 停止等待但伺服器沒有確認時的提示。畫面遷移到 lifecycle 後一律用這一份
-/// (健檢已遷;聊天與筆記在 #274 / #275 遷移時把自己那份換掉)。
+/// 停止等待但伺服器沒有確認時的提示，由共用 lifecycle 提供給畫面。
 const kStopWaitingUnconfirmedMessage = '已停止等待，但伺服器沒有確認。它可能仍在處理。';
 
 sealed class RequestLifecycleState {
@@ -25,10 +25,17 @@ sealed class RequestLifecycleState {
 
 /// 還在等(open / processing)。
 final class RequestInFlight extends RequestLifecycleState {
-  const RequestInFlight({super.request, this.status = RequestStatus.open});
+  const RequestInFlight({
+    super.request,
+    this.status = RequestStatus.open,
+    this.authExpired = false,
+  });
 
   /// 種子工單與 SSE 事件共同提供的目前進度。
   final RequestStatus status;
+
+  /// 讀取遇 401，等待已停止，畫面需要提示重新登入。
+  final bool authExpired;
 }
 
 /// 已終結。[serverConfirmed] 為 false 表示是本機先終結(停止等待沒送到)。
@@ -80,6 +87,10 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   Duration _pollDelay = kRequestPollInterval;
 
   bool _stale(int run) => run != _run;
+  bool get _authExpired => switch (state) {
+    RequestInFlight(authExpired: true) => true,
+    _ => false,
+  };
 
   @override
   RequestLifecycleState build() {
@@ -124,9 +135,11 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
 
   /// 讀一次 row;回 true = 已終結或已作廢(不用再等)。
   Future<bool> _refetch(int run) async {
-    if (_stale(run) || state is RequestTerminal) return true;
+    if (_stale(run) || state is RequestTerminal || _authExpired) {
+      return true;
+    }
     await _readShared(run);
-    return _stale(run) || state is RequestTerminal;
+    return _stale(run) || state is RequestTerminal || _authExpired;
   }
 
   Future<TripRequest?> _readShared(int run) {
@@ -164,6 +177,18 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
       }
       state = RequestInFlight(request: row, status: row.status);
       return row;
+    } on ApiError catch (error) {
+      if (error.status == 401 && !_stale(run) && state is RequestInFlight) {
+        final current = state as RequestInFlight;
+        _events?.cancel();
+        _events = null;
+        state = RequestInFlight(
+          request: current.request,
+          status: current.status,
+          authExpired: true,
+        );
+      }
+      return null;
     } on Object {
       // 補讀失敗不推翻已知終態；進行中的暫時性錯誤則繼續等待。
       return null;
@@ -171,7 +196,9 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
   }
 
   void _watchEvents(int run) {
-    if (_stale(run) || state is RequestTerminal) return;
+    if (_stale(run) || state is RequestTerminal || _authExpired) {
+      return;
+    }
     final Stream<TripRequestEvent> stream;
     try {
       stream = ref
@@ -225,10 +252,12 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
 
   /// SSE 收不到終結就改輪詢，等待由建構時注入的時鐘 adapter 決定。
   Future<void> _fallbackToPolling(int run) async {
-    if (_polling || _stale(run) || state is RequestTerminal) return;
+    if (_polling || _stale(run) || state is RequestTerminal || _authExpired) {
+      return;
+    }
     _polling = true;
     try {
-      while (!_stale(run) && state is! RequestTerminal) {
+      while (!_stale(run) && state is! RequestTerminal && !_authExpired) {
         await _wait(_pollDelay);
         if (_resumed case final paused?) {
           // 回前景那一下已經補讀過,醒來直接回去等(間隔已重設)。

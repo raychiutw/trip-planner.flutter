@@ -88,11 +88,17 @@ TripRequest _req({
 
 void main() {
   late _MockRequestsRepo reqRepo;
+  late StreamController<TripRequestEvent> requestEvents;
   late _MockTripRepo tripRepo;
   late _MockAuthRepo authRepo;
 
   setUp(() {
     reqRepo = _MockRequestsRepo();
+    requestEvents = StreamController<TripRequestEvent>.broadcast();
+    addTearDown(requestEvents.close);
+    when(
+      () => reqRepo.watchRequestEvents(any()),
+    ).thenAnswer((_) => requestEvents.stream);
     tripRepo = _MockTripRepo();
     authRepo = _MockAuthRepo();
     when(tripRepo.watchMyTrips).thenAnswer((_) => Stream.value(_trips));
@@ -179,20 +185,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     verify(() => reqRepo.stopWaiting(42)).called(1);
-
-    // 取消之後後端那筆會變終結 —— 讓輪詢自然收掉,否則 timer 留到 teardown。
-    when(() => reqRepo.fetchRequest(42)).thenAnswer(
-      (_) async => const TripRequest(
-        id: 42,
-        tripId: 'okinawa',
-        message: '幫我看行程',
-        status: RequestStatus.failed,
-        terminalReason: TerminalReason.cancelled,
-      ),
-    );
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(seconds: 1));
-    }
   });
 
   testWidgets('取消送不出去時仍換成終結態,但誠實說伺服器沒確認', (tester) async {
@@ -217,20 +209,6 @@ void main() {
       reason: '標不掉就是標不掉,不能假裝成功',
     );
     expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);
-
-    // 讓那筆的輪詢自然收掉,否則 timer 留到 teardown。
-    when(() => reqRepo.fetchRequest(42)).thenAnswer(
-      (_) async => const TripRequest(
-        id: 42,
-        tripId: 'okinawa',
-        message: '幫我看行程',
-        status: RequestStatus.failed,
-        terminalReason: TerminalReason.cancelled,
-      ),
-    );
-    for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(seconds: 1));
-    }
   });
 
   testWidgets('請求從進行中走到終結後,按鈕消失、換成終結說明', (tester) async {
@@ -256,8 +234,9 @@ void main() {
         terminalReason: TerminalReason.timedOut,
       ),
     );
+    requestEvents.add(const TripRequestEvent(status: RequestStatus.failed));
     for (var i = 0; i < 8; i++) {
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 100));
     }
 
     expect(find.byKey(const ValueKey('chat-stop-waiting-42')), findsNothing);

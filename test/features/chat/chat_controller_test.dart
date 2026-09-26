@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -7,6 +8,7 @@ import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/requests_repository.dart';
 import 'package:tripline/features/chat/chat_controller.dart';
+import 'package:tripline/features/requests/request_lifecycle.dart';
 import 'package:tripline/features/trip_detail/trip_providers.dart';
 import 'package:tripline/models/day.dart';
 import 'package:tripline/models/trip_request.dart';
@@ -37,7 +39,7 @@ TripRequest _req({
   createdAt: createdAt ?? '2026-06-0$id',
 );
 
-/// 排空 microtask/event queue,讓 unawaited 的 poll 走完（mock 立即回 → 不等 4s）。
+/// 排空 microtask/event queue，讓工單 lifecycle 與 row 投影完成。
 Future<void> _flush() async {
   for (var i = 0; i < 8; i++) {
     await Future<void>.delayed(Duration.zero);
@@ -45,11 +47,15 @@ Future<void> _flush() async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() {
     registerFallbackValue(<TripDay>[]);
   });
 
   ProviderContainer makeContainer(_MockRepo repo, {void Function()? onDays}) {
+    final events = StreamController<TripRequestEvent>.broadcast();
+    addTearDown(events.close);
+    when(() => repo.watchRequestEvents(any())).thenAnswer((_) => events.stream);
     final c = ProviderContainer(
       overrides: [
         requestsRepositoryProvider.overrideWithValue(repo),
@@ -119,7 +125,7 @@ void main() {
   );
 
   test(
-    'send：樂觀 temp → processing → poll completed → reply 可見 + tripDays invalidate',
+    'send：樂觀 temp → processing → lifecycle completed → reply 可見 + tripDays invalidate',
     () async {
       final repo = _MockRepo();
       when(
@@ -173,7 +179,7 @@ void main() {
     },
   );
 
-  test('poll 401 → authExpired', () async {
+  test('工單讀取 401 → authExpired', () async {
     final repo = _MockRepo();
     when(
       () => repo.fetchRequests(
@@ -201,6 +207,154 @@ void main() {
     await _flush();
 
     expect(c.read(chatControllerProvider('t')).authExpired, isTrue);
+  });
+
+  test('app 回前景會補讀思考中的工單與回覆', () async {
+    final repo = _MockRepo();
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: <TripRequest>[], hasMore: false));
+    when(
+      () => repo.sendRequest(
+        tripId: any(named: 'tripId'),
+        message: any(named: 'message'),
+      ),
+    ).thenAnswer((_) async => _req(id: 9, status: RequestStatus.processing));
+    var reads = 0;
+    when(() => repo.fetchRequest(9)).thenAnswer((_) async {
+      reads++;
+      return reads == 1
+          ? _req(id: 9, status: RequestStatus.processing)
+          : _req(id: 9, status: RequestStatus.completed, reply: '完成');
+    });
+
+    final c = makeContainer(repo);
+    final ctrl = ctrlOf(c);
+    await ctrl.loadInitial();
+    await ctrl.send('hi');
+    await _flush();
+    expect(c.read(chatControllerProvider('t')).requests.single.reply, isNull);
+
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+    await _flush();
+
+    expect(c.read(chatControllerProvider('t')).requests.single.reply, '完成');
+  });
+
+  test('停止等待未確認後重拉清單仍維持終態', () async {
+    final repo = _MockRepo();
+    final pending = _req(id: 9, status: RequestStatus.processing);
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: [pending], hasMore: false));
+    when(() => repo.fetchRequest(9)).thenAnswer((_) async => pending);
+    when(() => repo.stopWaiting(9)).thenThrow(Exception('offline'));
+
+    final c = makeContainer(repo);
+    final ctrl = ctrlOf(c);
+    await ctrl.loadInitial();
+    await _flush();
+    expect(
+      c.read(chatControllerProvider('t')).requests.single.status,
+      RequestStatus.processing,
+    );
+
+    final confirmed = await c
+        .read(requestLifecycleProvider(9).notifier)
+        .stopWaiting();
+    await _flush();
+    expect(confirmed, isFalse);
+    expect(
+      c.read(chatControllerProvider('t')).requests.single.status,
+      RequestStatus.failed,
+    );
+
+    await ctrl.refreshLatest();
+    expect(
+      c.read(chatControllerProvider('t')).requests.single.status,
+      RequestStatus.failed,
+    );
+  });
+
+  test('終態補讀遇 401 仍讓思考中的工單脫身', () async {
+    final repo = _MockRepo();
+    final pending = _req(id: 9, status: RequestStatus.processing);
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: [pending], hasMore: false));
+    var reads = 0;
+    when(() => repo.fetchRequest(9)).thenAnswer((_) async {
+      if (++reads == 1) return pending;
+      throw const ApiError(
+        status: 401,
+        code: 'AUTH_REQUIRED',
+        message: 'login',
+      );
+    });
+
+    final c = makeContainer(repo);
+    final events = StreamController<TripRequestEvent>.broadcast();
+    addTearDown(events.close);
+    when(() => repo.watchRequestEvents(9)).thenAnswer((_) => events.stream);
+    final ctrl = ctrlOf(c);
+    await ctrl.loadInitial();
+    await _flush();
+
+    events.add(const TripRequestEvent(status: RequestStatus.failed));
+    await _flush();
+
+    final state = c.read(chatControllerProvider('t'));
+    expect(state.authExpired, isTrue);
+    expect(state.requests.single.status, RequestStatus.failed);
+  });
+
+  test('共用 lifecycle 已終結時，新載入的工單立即呈現終態', () async {
+    final repo = _MockRepo();
+    final pending = _req(id: 9, status: RequestStatus.processing);
+    when(
+      () => repo.fetchRequests(
+        tripId: any(named: 'tripId'),
+        limit: any(named: 'limit'),
+        sort: any(named: 'sort'),
+        before: any(named: 'before'),
+        beforeId: any(named: 'beforeId'),
+      ),
+    ).thenAnswer((_) async => (items: [pending], hasMore: false));
+    when(
+      () => repo.fetchRequest(9),
+    ).thenAnswer((_) async => _req(id: 9, status: RequestStatus.failed));
+
+    final c = makeContainer(repo);
+    c.listen(requestLifecycleProvider(9), (_, _) {});
+    await _flush();
+    expect(c.read(requestLifecycleProvider(9)), isA<RequestTerminal>());
+
+    await ctrlOf(c).loadInitial();
+    await _flush();
+    expect(
+      c.read(chatControllerProvider('t')).requests.single.status,
+      RequestStatus.failed,
+    );
   });
 
   test('loadOlder：before/beforeId → prepend 更舊', () async {
