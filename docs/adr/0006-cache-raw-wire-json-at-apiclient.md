@@ -9,8 +9,8 @@ Tripline 的殺手情境是「人在國外、弱網或離線,要看自己的行�
 一個:**落地的是什麼形狀的東西,在哪一層攔截。**
 
 決定:快取存的是**後端回來的原始 wire JSON**(`Object?` —— 可能是 Map、List、純量),攔截點在
-`ApiClient`。`_send()` 是所有 request 的單一入口(`lib/api/api_client.dart:755`),GET 成功後在該處
-write-through(`api_client.dart:840-855`)、連線層失敗時在該處回退快取(`api_client.dart:777-789`)。
+`ApiClient`。`_send()` 是所有 request 的單一入口(`lib/api/api_client.dart`),GET 成功後在該處
+write-through、連線層失敗時在該處回退快取。
 持久層對 model 完全無感:drift 的回應表只有 `key` / `data` / `cachedAt` 三欄,`data` 是 JSON 文字
 (`lib/api/cache/drift_cache_store.dart:35-52`)。
 
@@ -34,7 +34,7 @@ write-through(`api_client.dart:840-855`)、連線層失敗時在該處回退快�
 SWR 的讀就有 7 處(`lib/api/trip_repository.dart:111`、`222`、`257`、`332`、`743`、`785`,加
 `favorites_repository.dart:26`),寫入另有 5 處。更關鍵的是,離線判定、429 retry、Bearer refresh、
 204 處理本來就集中在 `_send()`;快取一旦下放到 repository,「什麼算離線」這個判斷就得在每個
-呼叫點重複一次,而它其實只有一個正確答案(`api_client.dart:1026-1036`:連線層錯誤才算離線,
+呼叫點重複一次,而它其實只有一個正確答案(`api_client.dart` 的 `isOfflineError`:連線層錯誤才算離線,
 HTTP 4xx/5xx 是 server 有回應,不算)。
 
 **靠 riverpod provider 既有的記憶體快取** —— `StreamProvider.family` 本來就會快取,從 timeline 切到
@@ -53,7 +53,7 @@ map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看�
 - **request body 是 snake_case,快取是 camelCase,patcher 卡在中間要自己轉。** notes 的 `fields`
   直接來自 caller 送給後端的 body(`trip_repository.dart:377`),但要塞進快取就得先過
   `snakeToCamel`(`optimistic_patchers.dart:207-219`)。OCC 三方 merge 的 base / theirs 同樣是從
-  wire JSON 抽欄位再對齊(`lib/api/cache/rebase_merge.dart:41-76`、`api_client.dart:665-671`)。
+  wire JSON 抽欄位再對齊(`lib/api/cache/rebase_merge.dart`、`lib/api/cache/offline_sync_engine.dart`)。
   這層轉換是「存 wire JSON」的直接帳單。
 - **離線新增的資料要自己捏一個像 wire 的 row。** `_buildOptimisticEntry` 得補齊 `master`、
   `alternates`、`version`、`sortOrder` 等欄位(`optimistic_patchers.dart:118-146`),因為下游的
@@ -63,9 +63,9 @@ map 不會重打 API(`lib/features/trip_detail/trip_providers.dart:10-11`),看�
   key;反過來,舊快取缺新欄位時由 `fromJson` 的缺漏預設吸收(list → `[]`、`version` → `0`,見
   `CODING_STANDARDS.md` 〈Model 與 fromJson 解析規則〉)。sembast → drift 的搬遷也因此只需要搬佇列與衝突區,回應快取直接丟掉
   重抓(`lib/api/cache/cache_migration.dart:12-13`)。
-- **「快取內容 = wire JSON」是整個離線層的前提,不只是實作細節。** `getStream` 的 stale → fresh 兩段式
-  發射(`api_client.dart:192-253`)、`sendMutation` 的離線佇列(`api_client.dart:265-335`)、
-  `flushQueue` 的 409 rebase(`api_client.dart:422-522`)全部建在它上面 —— 核心不變式「任一 cache key
+- **「快取內容 = wire JSON」是整個離線層的前提,不只是實作細節。** `ApiClient.getStream` 的 stale → fresh 兩段式
+  發射、`OfflineSyncEngine.sendMutation` 的離線佇列與 `OfflineSyncEngine.flushQueue` 的 409 rebase
+  全部建在它上面 —— 核心不變式「任一 cache key
   的值 = server 真相 + 所有尚未 flush 的樂觀 patch」之所以能成立,正是因為 patch 的輸入與輸出跟 server
   回應是同一種形狀,可以反覆疊套而不需要來回 parse。要換成 typed 快取,這三塊都得重寫。
 - **本 ADR 目前是離線層唯一的常駐紀錄。** `docs/` 沒有離線章節,只有 `README.md:18` 與 `:36`

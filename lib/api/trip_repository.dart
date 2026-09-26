@@ -19,7 +19,6 @@ import '../models/trip_health.dart';
 import '../models/trip_poi_health.dart';
 import 'api_client.dart';
 import 'cache_read_policy.dart';
-import 'cache/cache_keys.dart';
 import 'cache/offline_op.dart';
 
 /// 行程 JSON 匯出結果，`content` 可直接寫入 `fileName`。
@@ -65,17 +64,6 @@ class TripRepository {
   TripRepository({required ApiClient client}) : _client = client;
 
   final ApiClient _client;
-
-  /// days 快取 key(離線 entry 樂觀 patch 的目標)。
-  String _daysKey(String tripId) => cacheKeyFor(
-    'GET',
-    '/trips/${Uri.encodeComponent(tripId)}/days',
-    const {'all': '1'},
-  );
-
-  /// notes 快取 key(離線 note 樂觀 patch 的目標)。
-  String _notesKey(String tripId) =>
-      cacheKeyFor('GET', '/trips/${Uri.encodeComponent(tripId)}/notes');
 
   /// 聚合 GET /notes 的 response 段名(pretrip/emergency 與 URL 段名不同)。
   String _notesSectionKey(NoteSection s) => switch (s) {
@@ -379,7 +367,7 @@ class TripRepository {
       'POST',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}',
       body: fields,
-      optimistic: OfflineOp('note.create', _notesKey(tripId), {
+      optimistic: OfflineOp('note.create', OfflineResource.tripNotes, tripId, {
         'sectionKey': _notesSectionKey(section),
         'fields': fields,
       }),
@@ -398,7 +386,7 @@ class TripRepository {
       'PATCH',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
       body: {...fields, 'expectedVersion': ?expectedVersion},
-      optimistic: OfflineOp('note.update', _notesKey(tripId), {
+      optimistic: OfflineOp('note.update', OfflineResource.tripNotes, tripId, {
         'sectionKey': _notesSectionKey(section),
         'rowId': rowId,
         'fields': fields,
@@ -415,7 +403,7 @@ class TripRepository {
     return _client.sendMutation(
       'DELETE',
       '/trips/${Uri.encodeComponent(tripId)}/notes/${section.name}/$rowId',
-      optimistic: OfflineOp('note.delete', _notesKey(tripId), {
+      optimistic: OfflineOp('note.delete', OfflineResource.tripNotes, tripId, {
         'sectionKey': _notesSectionKey(section),
         'rowId': rowId,
       }),
@@ -603,7 +591,7 @@ class TripRepository {
         'end_time': endTime,
         'source': source,
       },
-      optimistic: OfflineOp('entry.add', _daysKey(tripId), {
+      optimistic: OfflineOp('entry.add', OfflineResource.tripDays, tripId, {
         'dayNum': dayNum,
         'title': title,
         'description': description,
@@ -636,7 +624,7 @@ class TripRepository {
         'end_time': endTime,
         'expectedVersion': expectedVersion,
       },
-      optimistic: OfflineOp('entry.update', _daysKey(tripId), {
+      optimistic: OfflineOp('entry.update', OfflineResource.tripDays, tripId, {
         'entryId': entryId,
         'description': description,
         'startTime': startTime,

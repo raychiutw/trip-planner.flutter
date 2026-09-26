@@ -143,7 +143,7 @@ void main() {
   });
 
   final daysKey = cacheKeyFor('GET', '/trips/t/days', {'all': '1'});
-  OfflineOp addOp() => OfflineOp('entry.add', daysKey, {
+  OfflineOp addOp() => OfflineOp('entry.add', OfflineResource.tripDays, 't', {
     'dayNum': 1,
     'title': 'New',
     'tempId': -1,
@@ -301,10 +301,12 @@ void main() {
       'PATCH',
       '/trips/t/entries/201',
       body: const {'description': '第二版離線備註', 'expectedVersion': 2},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第二版離線備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第二版離線備註'},
+      ),
     );
     final queue = await cache.readQueue();
     expect(queue, hasLength(2));
@@ -413,10 +415,12 @@ void main() {
       'PATCH',
       entryPath,
       body: const {'description': '第二版較新備註', 'expectedVersion': 2},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第二版較新備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第二版較新備註'},
+      ),
     );
 
     expect(result, isNull, reason: '已有 pending 時不得讓較新的修改先直送 server');
@@ -461,10 +465,12 @@ void main() {
       'PATCH',
       secondEntryPath,
       body: const {'description': '第二景點離線備註', 'expectedVersion': 4},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 202,
-        'description': '第二景點離線備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 202, 'description': '第二景點離線備註'},
+      ),
     );
 
     expect(
@@ -524,10 +530,12 @@ void main() {
       'PATCH',
       entryPath,
       body: const {'description': '第二版較新備註'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第二版較新備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第二版較新備註'},
+      ),
     );
     for (var attempt = 0; attempt < 20; attempt++) {
       if (blockingAdapter.firstRequestStarted.isCompleted) break;
@@ -565,20 +573,24 @@ void main() {
       'PATCH',
       firstEntryPath,
       body: const {'description': '第一景點新版'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第一景點新版',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第一景點新版'},
+      ),
     );
     await blockingAdapter.firstRequestStarted.future;
     final secondSave = blockingClient.sendMutation(
       'PATCH',
       secondEntryPath,
       body: const {'description': '第二景點新版'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 202,
-        'description': '第二景點新版',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 202, 'description': '第二景點新版'},
+      ),
     );
     for (var attempt = 0; attempt < 20; attempt++) {
       if (blockingAdapter.requests.length > 1) break;
@@ -621,20 +633,24 @@ void main() {
       'PATCH',
       firstEntryPath,
       body: const {'description': '第一景點新版'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第一景點新版',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第一景點新版'},
+      ),
     );
     await transitionAdapter.firstRequestStarted.future;
     final secondSave = transitionClient.sendMutation(
       'PATCH',
       secondEntryPath,
       body: const {'description': '第二景點離線新版'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 202,
-        'description': '第二景點離線新版',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 202, 'description': '第二景點離線新版'},
+      ),
     );
     transitionAdapter.releaseFirstRequest.complete();
     await Future.wait([firstSave, secondSave]);
@@ -685,10 +701,12 @@ void main() {
       'PATCH',
       entryPath,
       body: const {'description': '第二版較新備註'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第二版較新備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第二版較新備註'},
+      ),
     );
     blockingAdapter.releaseFirstRequest.complete();
     await firstFlush;
@@ -744,10 +762,12 @@ void main() {
       'PATCH',
       entryPath,
       body: const {'description': '第二版離線備註'},
-      optimistic: OfflineOp('entry.update', daysKey, const {
-        'entryId': 201,
-        'description': '第二版離線備註',
-      }),
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 201, 'description': '第二版離線備註'},
+      ),
     );
     await raceCache.responseReadStarted.future;
 
@@ -837,8 +857,12 @@ void main() {
       {'dayNum': 1, 'timeline': <dynamic>[]},
     ]);
     // production 路徑:OfflineOp 不帶 tempId,由 sendMutation 入佇列時產生並存進 args。
-    OfflineOp prodAdd(String title) =>
-        OfflineOp('entry.add', daysKey, {'dayNum': 1, 'title': title});
+    OfflineOp prodAdd(String title) => OfflineOp(
+      'entry.add',
+      OfflineResource.tripDays,
+      't',
+      {'dayNum': 1, 'title': title},
+    );
     adapter.onPost(
       '/trips/t/days/1/entries',
       (s) => s.throws(503, _offline('/trips/t/days/1/entries')),

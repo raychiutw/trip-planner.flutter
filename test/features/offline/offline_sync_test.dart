@@ -152,7 +152,8 @@ void main() {
           body: const {'title': 'later'},
           optimistic: OfflineOp(
             'entry.add',
-            cacheKeyFor('GET', '/trips/t/days', const {'all': '1'}),
+            OfflineResource.tripDays,
+            't',
             const {'dayNum': 1, 'title': 'later'},
           ),
         );

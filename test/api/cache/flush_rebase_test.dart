@@ -1,99 +1,24 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripline/api/api_client.dart';
 import 'package:tripline/api/cache/cache_keys.dart';
 import 'package:tripline/api/cache/cache_store.dart';
-import 'package:tripline/api/session_store.dart';
+import 'package:tripline/api/cache/offline_op.dart';
+import 'package:tripline/api/cache/offline_sync_engine.dart';
 
-/// 依「method + path」路由、同一路由可序列回放(每次呼叫吐下一筆,最後一筆 sticky)
-/// 的假 adapter。flush rebase 需要:PATCH 先 409 再 200、其間插一個 GET /days,
-/// 且要對 GET 計數(驗 P1 去重)— http_mock_adapter 的單一 handler 無法序列回放,
-/// 故自製。連線錯誤以丟出的 DioException 表示。
-class RoutingSequencedAdapter implements HttpClientAdapter {
-  RoutingSequencedAdapter();
-
-  /// key = 'METHOD path' → 該路由的回應腳本(依序消費)。
-  final Map<String, List<Scripted>> _routes = {};
-
-  /// key = 'METHOD path' → 已收到幾次 request。
-  final Map<String, int> callCounts = {};
-
-  /// 全部請求(依時序),供斷言 body / 順序。
-  final List<RequestOptions> recorded = [];
-
-  void on(String method, String path, List<Scripted> script) {
-    _routes['$method $path'] = script;
-  }
-
-  int countOf(String method, String path) => callCounts['$method $path'] ?? 0;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    recorded.add(options);
-    final key = '${options.method} ${options.path}';
-    final n = (callCounts[key] ?? 0);
-    callCounts[key] = n + 1;
-    final script = _routes[key];
-    if (script == null || script.isEmpty) {
-      return ResponseBody.fromString(
-        jsonEncode({
-          'error': {'code': 'TEST_NO_ROUTE', 'message': 'no route for $key'},
-        }),
-        404,
-        headers: {
-          Headers.contentTypeHeader: [Headers.jsonContentType],
-        },
-      );
-    }
-    final scripted = script[n.clamp(0, script.length - 1)];
-    if (scripted.throwOffline) {
-      throw DioException(
-        requestOptions: options,
-        type: DioExceptionType.connectionError,
-      );
-    }
-    return ResponseBody.fromString(
-      jsonEncode(scripted.body),
-      scripted.status,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-class Scripted {
-  const Scripted.json(this.status, this.body) : throwOffline = false;
-  const Scripted.offline() : status = 0, body = null, throwOffline = true;
-  final int status;
-  final Object? body;
-  final bool throwOffline;
-}
+import 'scripted_send.dart';
 
 void main() {
-  late RoutingSequencedAdapter adapter;
+  late ScriptedSend adapter;
   late InMemoryCacheStore cache;
-  late ApiClient client;
+  late OfflineSyncEngine engine;
 
   setUp(() {
-    final dio = Dio(BaseOptions())..options.validateStatus = (_) => true;
-    adapter = RoutingSequencedAdapter();
-    dio.httpClientAdapter = adapter;
+    adapter = ScriptedSend();
     cache = InMemoryCacheStore();
-    client = ApiClient(
-      sessionStore: InMemorySessionStore(),
-      dio: dio,
-      cacheStore: cache,
+    // 引擎只認一個 send 函式與一個 store:不需要 dio,也不需要把整個 ApiClient 建起來。
+    engine = OfflineSyncEngine(
+      send: (method, path, {body, query}) =>
+          adapter.send(method, path, body: body, query: query),
+      store: cache,
     );
   });
 
@@ -181,7 +106,7 @@ void main() {
     base: baseFields,
   );
 
-  Map<String, dynamic> bodyOf(RequestOptions o) =>
+  Map<String, dynamic> bodyOf(SentRequest o) =>
       (o.data as Map).cast<String, dynamic>();
 
   test('1. STALE 無衝突 → 重抓 + 重送(帶新 version)+ remove + synced', () async {
@@ -206,12 +131,16 @@ void main() {
       Scripted.json(200, daysWithEntry(entryId: 5, title: '舊標題', version: 5)),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 1);
     expect(r.conflicts, isEmpty);
     expect(await cache.readQueue(), isEmpty);
     expect(await cache.readConflicts(), isEmpty);
+    expect(
+      adapter.recorded.singleWhere((request) => request.method == 'GET').query,
+      {'all': '1'},
+    );
     // 第二次 PATCH 的 expectedVersion 應被改為重抓到的 5。
     final patches = adapter.recorded.where((o) => o.method == 'PATCH').toList();
     expect(patches, hasLength(2));
@@ -245,7 +174,7 @@ void main() {
       ),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 0);
     expect(r.conflicts.map((m) => m.id), ['1']);
@@ -278,7 +207,7 @@ void main() {
     // 重抓連線錯誤。
     adapter.on('GET', '/trips/t/days', [const Scripted.offline()]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 0);
     expect(r.conflicts, isEmpty);
@@ -307,7 +236,7 @@ void main() {
       Scripted.json(200, daysWithEntry(entryId: 5, title: '舊標題', version: 5)),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 0);
     expect(r.conflicts, isEmpty);
@@ -337,7 +266,7 @@ void main() {
       }),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 0);
     expect(r.conflicts.map((m) => m.id), ['1']);
@@ -364,7 +293,7 @@ void main() {
       }),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 0);
     expect(r.conflicts.map((m) => m.id), ['1']);
@@ -415,7 +344,7 @@ void main() {
       }),
     ]);
 
-    final result = await client.flushQueue();
+    final result = await engine.flushQueue();
 
     expect(result.synced, 1);
     expect(result.conflicts.map((mutation) => mutation.id), ['last']);
@@ -483,7 +412,7 @@ void main() {
       ]),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 2);
     expect(r.conflicts, isEmpty);
@@ -555,7 +484,7 @@ void main() {
       ),
     ]);
 
-    final result = await client.flushQueue();
+    final result = await engine.flushQueue();
 
     expect(result.synced, 3);
     expect(result.conflicts, isEmpty);
@@ -598,7 +527,7 @@ void main() {
       }),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     expect(r.synced, 1);
     expect(r.conflicts, isEmpty);
@@ -653,7 +582,7 @@ void main() {
       ]),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     // 當衝突上報:不重送、不卡死,移出主佇列、入 conflict store。
     expect(r.synced, 0);
@@ -691,7 +620,7 @@ void main() {
       ]),
     ]);
 
-    final r = await client.flushQueue();
+    final r = await engine.flushQueue();
 
     // drop+report:上報、移出主佇列,但「不」進 conflict store。
     expect(r.synced, 0);
@@ -764,7 +693,7 @@ void main() {
         ]),
       ]);
 
-      final r = await client.flushQueue();
+      final r = await engine.flushQueue();
 
       // 無假衝突、自動 synced。
       expect(r.synced, 1);
@@ -815,7 +744,7 @@ void main() {
         }),
       ]);
 
-      final r = await client.flushQueue();
+      final r = await engine.flushQueue();
 
       expect(r.synced, 1);
       expect(r.conflicts, isEmpty);
@@ -832,4 +761,36 @@ void main() {
       expect(resendBody.containsKey('flight_no'), isFalse);
     },
   );
+
+  test('seam:離線 sendMutation 入佇列 + 樂觀 patch,重連 flush 用同一個 send 送出', () async {
+    await cache.writeResponse(
+      daysKey,
+      daysWithEntry(entryId: 5, title: '舊', version: 1),
+    );
+    adapter.on('PATCH', '/trips/t/entries/5', [
+      const Scripted.offline(),
+      const Scripted.json(200, {'ok': true}),
+    ]);
+
+    final result = await engine.sendMutation(
+      'PATCH',
+      '/trips/t/entries/5',
+      body: {'title': '新', 'expectedVersion': 1},
+      optimistic: OfflineOp(
+        'entry.update',
+        OfflineResource.tripDays,
+        't',
+        const {'entryId': 5, 'title': '新'},
+      ),
+    );
+    expect(result, isNull, reason: '離線 → 樂觀成功回 null');
+    expect(await cache.readQueue(), hasLength(1));
+    final patched = (await cache.readResponse(daysKey))!.data as List;
+    expect(((patched.first as Map)['timeline'] as List).first['title'], '新');
+
+    final flushed = await engine.flushQueue();
+    expect(flushed.synced, 1);
+    expect(await cache.readQueue(), isEmpty);
+    expect(adapter.countOf('PATCH', '/trips/t/entries/5'), 2);
+  });
 }

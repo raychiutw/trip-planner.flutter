@@ -102,7 +102,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 - SSE 串流版 `_getTextStream()` 走同一份決策；遇 429／攔截頁要先釋放回應串流再等待。改決策時驗證一般請求與 SSE 兩個站點。
 - 登入／註冊的 `postForResponse` 是 raw 帳密 POST，不自動重送憑證；`ApiClient` 統一將 429 轉 `ApiError` 並保留 `Retry-After`，將攔截頁轉 `SYS_UPSTREAM_UNAVAILABLE`。
 - 429／edge block **不重送 mutation**（`test/api/api_client_test.dart:228`、`:358`）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
-- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列（`lib/api/api_client.dart:265-275`），重連後由 `flushQueue` 依序重送。
+- 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列，重連後由 `OfflineSyncEngine.flushQueue` 依序重送（`lib/api/cache/offline_sync_engine.dart`）。
 - `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/retry_policy.dart`）。
 - 動到任何一條重試分支，同一個 PR 必須改 `test/api/api_client_test.dart` 或 `test/api/api_client_bearer_test.dart`。
 
@@ -154,7 +154,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   - `parseRequestStatus` 未知 → `processing`（`lib/models/trip_request.dart:7-12`），工單續 poll。
   - `parseNoteGenerationType` 未知 → `null`（`lib/models/note_section.dart:15-20`）。
 - 衍生欄位可以在 `fromJson` 內算，但 fallback 鏈要寫成註解可讀：停留點 `title` = `displayTitle` → 正選 POI 名稱 → `（未選擇景點）`（`lib/models/entry.dart:136-139`）。
-- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart:623-636`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `_tryRebase`（`lib/api/api_client.dart:541-575`），`expectedVersion` 在 rebase 時永遠保留並換成新值（`lib/api/api_client.dart:690-700`）。行程本身無 version，見上方後端契約細節。
+- **帶 `version` 的 model 走 OCC**：PATCH 必帶 `expectedVersion`（`lib/api/trip_repository.dart`）；409 `STALE_ENTRY` 時重抓 server 真相再套用，離線佇列的三方 rebase 走 `OfflineSyncEngine._tryRebase`，`expectedVersion` 由 `rebasedBody` 保留並換成新值（`lib/api/cache/offline_sync_engine.dart`、`lib/api/cache/flush_policy.dart`）。行程本身無 version，見上方後端契約細節。
 - 每個新 model 至少一個 `fromJson` 測試，且必須含 edge case：欄位缺漏、int↔double、0/1 bool。fixture 用後端實際輸出，不要用猜的。
 
 ## 畫面撰寫規範
