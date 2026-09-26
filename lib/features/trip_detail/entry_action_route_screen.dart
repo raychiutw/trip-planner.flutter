@@ -8,7 +8,7 @@ import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../theme/tokens.dart';
 import '../../ui/tp_app_bar.dart';
-import 'reorder_helpers.dart';
+import 'entry_mutations.dart';
 import 'trip_providers.dart';
 
 /// Web 相容的停留點跨日操作。
@@ -230,33 +230,17 @@ class _EntryActionRouteScreenState
             targetDayId: targetDayId,
           );
         case EntryRouteAction.move:
-          final sourceDay = days
-              .where(
-                (day) =>
-                    day.timeline.any((entry) => entry.id == widget.entryId),
-              )
-              .firstOrNull;
-          if (sourceDay == null) {
-            throw Exception('Entry is not present in the current itinerary');
-          }
-          final sourceIndex = sourceDay.timeline.indexWhere(
-            (entry) => entry.id == widget.entryId,
-          );
-          final targetEntries = days
-              .where((day) => day.id == targetDayId)
-              .firstOrNull
-              ?.timeline;
-          if (targetEntries == null) {
-            throw Exception('Target day is not present in the itinerary');
-          }
-          final plan = planEntryReorder(
-            {for (final day in days) day.id: day.timeline},
-            sourceDayId: sourceDay.id,
-            sourceIndex: sourceIndex,
+          final snapshot = {for (final day in days) day.id: day.timeline};
+          final outcome = planEntryReorder(
+            snapshot,
+            entryId: widget.entryId,
             targetDayId: targetDayId,
-            targetIndex: targetEntries.length,
-            idOf: (entry) => entry.id,
+            targetPosition: snapshot[targetDayId]?.length ?? 0,
           );
+          if (outcome is EntryReorderRejected) {
+            throw Exception('停留點位置已變動：${outcome.reason.name}');
+          }
+          final plan = (outcome as EntryReorderPlanned).plan;
           await repo.reorderEntries(
             tripId: widget.tripId,
             updates: plan.updates,

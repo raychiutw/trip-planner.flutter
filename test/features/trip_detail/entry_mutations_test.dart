@@ -29,6 +29,209 @@ const _entry = TimelineEntry(
 const _alternate = EntryPoiInfo(poiId: 102, name: '備選');
 
 void main() {
+  test('重排來源已不在快照時回傳原因，不送出 batch', () {
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[_entry],
+      },
+      entryId: 99,
+      expectedSourceDayId: 10,
+      targetDayId: 10,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderRejected>());
+    expect(
+      (result as EntryReorderRejected).reason,
+      EntryReorderRejection.entryMissing,
+    );
+  });
+
+  test('同日上移使用移動後的位置並重編連續順序', () {
+    const second = TimelineEntry(
+      id: 12,
+      sortOrder: 1,
+      title: '第二站',
+      version: 1,
+    );
+    const third = TimelineEntry(id: 13, sortOrder: 2, title: '第三站', version: 1);
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[_entry, second, third],
+      },
+      entryId: 13,
+      expectedSourceDayId: 10,
+      targetDayId: 10,
+      targetPosition: 1,
+    );
+
+    expect(result, isA<EntryReorderPlanned>());
+    final plan = (result as EntryReorderPlanned).plan;
+    expect(plan.entriesByDayId[10]!.map((entry) => entry.id), [11, 13, 12]);
+    expect(plan.updates, [
+      (id: 11, sortOrder: 0, dayId: 10),
+      (id: 13, sortOrder: 1, dayId: 10),
+      (id: 12, sortOrder: 2, dayId: 10),
+    ]);
+  });
+
+  test('同日下移也只傳移動後的位置', () {
+    const second = TimelineEntry(
+      id: 12,
+      sortOrder: 1,
+      title: '第二站',
+      version: 1,
+    );
+    const third = TimelineEntry(id: 13, sortOrder: 2, title: '第三站', version: 1);
+    final result =
+        planEntryReorder(
+              {
+                10: <TimelineEntry>[_entry, second, third],
+              },
+              entryId: 11,
+              expectedSourceDayId: 10,
+              targetDayId: 10,
+              targetPosition: 1,
+            )
+            as EntryReorderPlanned;
+
+    expect(result.plan.entriesByDayId[10]!.map((entry) => entry.id), [
+      12,
+      11,
+      13,
+    ]);
+  });
+
+  test('目的 Day 已消失時回傳拒絕，不修改快照', () {
+    final snapshot = {
+      10: <TimelineEntry>[_entry],
+    };
+    final result = planEntryReorder(
+      snapshot,
+      entryId: 11,
+      expectedSourceDayId: 10,
+      targetDayId: 20,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderRejected>());
+    expect(
+      (result as EntryReorderRejected).reason,
+      EntryReorderRejection.targetDayMissing,
+    );
+    expect(snapshot[10], [_entry]);
+  });
+
+  test('拖曳期間停留點已換 Day 時回傳來源變動', () {
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[],
+        20: <TimelineEntry>[_entry],
+      },
+      entryId: 11,
+      expectedSourceDayId: 10,
+      targetDayId: 20,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderRejected>());
+    expect(
+      (result as EntryReorderRejected).reason,
+      EntryReorderRejection.entryMovedToAnotherDay,
+    );
+  });
+
+  test('同日順序更新後仍按停留點 ID 在最新快照定位', () {
+    const second = TimelineEntry(
+      id: 12,
+      sortOrder: 0,
+      title: '第二站',
+      version: 1,
+    );
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[second, _entry],
+      },
+      entryId: 11,
+      expectedSourceDayId: 10,
+      targetDayId: 10,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderPlanned>());
+    expect(
+      (result as EntryReorderPlanned).plan.entriesByDayId[10]!.map(
+        (entry) => entry.id,
+      ),
+      [11, 12],
+    );
+  });
+
+  test('拖放的來源索引已過期時拒絕，避免依舊縫隙算錯位置', () {
+    const second = TimelineEntry(
+      id: 12,
+      sortOrder: 0,
+      title: '第二站',
+      version: 1,
+    );
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[second, _entry],
+      },
+      entryId: 11,
+      expectedSourceDayId: 10,
+      expectedSourceIndex: 0,
+      targetDayId: 10,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderRejected>());
+    expect(
+      (result as EntryReorderRejected).reason,
+      EntryReorderRejection.sourceOrderChanged,
+    );
+  });
+
+  test('跨日移動由計畫定位來源並產生兩天的 batch', () {
+    const other = TimelineEntry(id: 12, sortOrder: 0, title: '另一站', version: 1);
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[_entry],
+        20: <TimelineEntry>[other],
+      },
+      entryId: 11,
+      targetDayId: 20,
+      targetPosition: 0,
+    );
+
+    expect(result, isA<EntryReorderPlanned>());
+    final plan = (result as EntryReorderPlanned).plan;
+    expect(plan.entriesByDayId[10], isEmpty);
+    expect(plan.entriesByDayId[20]!.map((entry) => entry.id), [11, 12]);
+    expect(plan.affectedDayIds, {10, 20});
+    expect(plan.updates, [
+      (id: 11, sortOrder: 0, dayId: 20),
+      (id: 12, sortOrder: 1, dayId: 20),
+    ]);
+  });
+
+  test('目的位置不在移動後清單範圍時回傳拒絕', () {
+    final result = planEntryReorder(
+      {
+        10: <TimelineEntry>[_entry],
+      },
+      entryId: 11,
+      targetDayId: 10,
+      targetPosition: 2,
+    );
+
+    expect(result, isA<EntryReorderRejected>());
+    expect(
+      (result as EntryReorderRejected).reason,
+      EntryReorderRejection.targetPositionInvalid,
+    );
+  });
+
   late _MockRepo repo;
   final builds = <String, int>{};
 

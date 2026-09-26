@@ -1,4 +1,4 @@
-/// 停留點 mutation module:確認政策、交通重算範圍、快取失效表,只在這裡一份。
+/// 停留點 mutation module:重排計畫、確認政策、交通重算範圍、快取失效表,只在這裡一份。
 ///
 /// 畫面呼叫的是「設為正選」「重算交通」「宣告改了什麼」,不再各自決定要 invalidate
 /// 哪幾個 provider、重算失敗要怎麼講、要不要先確認。交通重算的停滯狀態也住在這裡
@@ -31,6 +31,99 @@ enum EntryMutation {
   added,
   poiUpdated,
   segmentChanged,
+}
+
+enum EntryReorderRejection {
+  entryMissing,
+  targetDayMissing,
+  targetPositionInvalid,
+  entryMovedToAnotherDay,
+  sourceOrderChanged,
+}
+
+typedef EntryReorderUpdate = ({int id, int sortOrder, int? dayId});
+
+typedef EntryReorderPlan = ({
+  Map<int, List<TimelineEntry>> entriesByDayId,
+  Set<int> affectedDayIds,
+  List<EntryReorderUpdate> updates,
+});
+
+/// 停留點重排的計畫結果或可辨識的拒絕。
+sealed class EntryReorderOutcome {
+  const EntryReorderOutcome();
+}
+
+/// 快照已變動或目標無效，呼叫端不得送出 batch。
+final class EntryReorderRejected extends EntryReorderOutcome {
+  const EntryReorderRejected(this.reason);
+
+  final EntryReorderRejection reason;
+}
+
+/// 可直接送出的連續排序 batch 與樂觀畫面快照。
+final class EntryReorderPlanned extends EntryReorderOutcome {
+  const EntryReorderPlanned(this.plan);
+
+  final EntryReorderPlan plan;
+}
+
+/// 依最新快照定位停留點並產生 batch；[targetPosition] 是移動後的零起算位置。
+/// 拖曳來源可提供 [expectedSourceDayId] 與 [expectedSourceIndex]；已過期時拒絕。
+EntryReorderOutcome planEntryReorder(
+  Map<int, List<TimelineEntry>> snapshot, {
+  required int entryId,
+  int? expectedSourceDayId,
+  int? expectedSourceIndex,
+  required int targetDayId,
+  required int targetPosition,
+}) {
+  if (!snapshot.containsKey(targetDayId)) {
+    return const EntryReorderRejected(EntryReorderRejection.targetDayMissing);
+  }
+  int? sourceDayId;
+  var sourceIndex = -1;
+  for (final day in snapshot.entries) {
+    final index = day.value.indexWhere((entry) => entry.id == entryId);
+    if (index < 0) continue;
+    sourceDayId = day.key;
+    sourceIndex = index;
+    break;
+  }
+  if (sourceDayId == null) {
+    return const EntryReorderRejected(EntryReorderRejection.entryMissing);
+  }
+  if (expectedSourceDayId != null && sourceDayId != expectedSourceDayId) {
+    return const EntryReorderRejected(
+      EntryReorderRejection.entryMovedToAnotherDay,
+    );
+  }
+  if (expectedSourceIndex != null && sourceIndex != expectedSourceIndex) {
+    return const EntryReorderRejected(EntryReorderRejection.sourceOrderChanged);
+  }
+  final maxPosition =
+      snapshot[targetDayId]!.length - (sourceDayId == targetDayId ? 1 : 0);
+  if (targetPosition < 0 || targetPosition > maxPosition) {
+    return const EntryReorderRejected(
+      EntryReorderRejection.targetPositionInvalid,
+    );
+  }
+  final entries = {
+    for (final day in snapshot.entries)
+      day.key: List<TimelineEntry>.of(day.value),
+  };
+  final moved = entries[sourceDayId]!.removeAt(sourceIndex);
+  entries[targetDayId]!.insert(targetPosition, moved);
+  final affected = {sourceDayId, targetDayId};
+  return EntryReorderPlanned((
+    entriesByDayId: entries,
+    affectedDayIds: affected,
+    updates: [
+      for (final dayId in affected.toList()..sort())
+        for (var index = 0; index < entries[dayId]!.length; index++)
+          (id: entries[dayId]![index].id, sortOrder: index, dayId: dayId),
+    ],
+  ));
 }
 
 /// 交通重算的 per-trip 狀態。

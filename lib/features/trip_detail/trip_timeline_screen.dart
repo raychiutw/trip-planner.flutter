@@ -31,7 +31,6 @@ import '../trips/collab/collab_screen.dart';
 import '../trips/edit/edit_trip_screen.dart';
 import '../trips/health/trip_health_screen.dart';
 import '../trips/share/share_screen.dart';
-import 'reorder_helpers.dart';
 import 'selected_day_provider.dart';
 import 'trip_days_lookup.dart';
 import 'entry_mutations.dart';
@@ -513,49 +512,29 @@ class _TimelineBodyState extends ConsumerState<_TimelineBody> {
   Future<void> _reorderEntry(
     _EntryDragData data,
     int targetDayId,
-    int targetIndex,
-  ) async {
+    int targetPosition, {
+    bool checkSourceIndex = false,
+  }) async {
     if (_reorderSubmitting) return;
     final tripId = widget.tripId;
     final days = widget.days;
     final repository = ref.read(tripRepositoryProvider);
     final before = _snapshotEntries();
-    EntryReorderPlan<TimelineEntry> plan;
-    try {
-      if (!before.containsKey(targetDayId)) {
-        throw StateError('target Day no longer exists');
-      }
-      int? currentSourceDayId;
-      var currentSourceIndex = -1;
-      for (final day in before.entries) {
-        final index = day.value.indexWhere(
-          (entry) => entry.id == data.entry.id,
-        );
-        if (index >= 0) {
-          currentSourceDayId = day.key;
-          currentSourceIndex = index;
-          break;
-        }
-      }
-      if (currentSourceDayId == null) {
-        throw StateError('entry no longer exists');
-      }
-      if (currentSourceDayId != data.sourceDayId) {
-        throw StateError('entry moved to another Day');
-      }
-      plan = planEntryReorder<TimelineEntry>(
-        before,
-        sourceDayId: currentSourceDayId,
-        sourceIndex: currentSourceIndex,
-        targetDayId: targetDayId,
-        targetIndex: targetIndex,
-        idOf: (entry) => entry.id,
-      );
-    } on Object {
-      if (mounted) {
-        showAppError(context, '行程內容已更新，請重新操作');
-      }
-      return;
+    final outcome = planEntryReorder(
+      before,
+      entryId: data.entry.id,
+      expectedSourceDayId: data.sourceDayId,
+      expectedSourceIndex: checkSourceIndex ? data.sourceIndex : null,
+      targetDayId: targetDayId,
+      targetPosition: targetPosition,
+    );
+    final EntryReorderPlan plan;
+    switch (outcome) {
+      case EntryReorderRejected():
+        if (mounted) showAppError(context, '行程內容已更新，請重新操作');
+        return;
+      case EntryReorderPlanned(plan: final planned):
+        plan = planned;
     }
     final after = plan.entriesByDayId;
     if (_sameEntryOrder(before, after)) return;
@@ -997,18 +976,6 @@ class _DaySelectorHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-/// 單日 entry reorder 的 batch updates（同天,dayId 留 null）。共用 [reorderedSortOrders]。
-List<({int id, int sortOrder, int? dayId})> computeReorderUpdates(
-  List<int> entryIds,
-  int oldIndex,
-  int newIndex,
-) {
-  return [
-    for (final u in reorderedSortOrders(entryIds, oldIndex, newIndex))
-      (id: u.id, sortOrder: u.sortOrder, dayId: null),
-  ];
-}
-
 /// 單日 section：day header → hotel 卡 → entries（拖曳排序 + 左滑刪除 + 點擊編輯）→ 新增鈕。
 class _DaySection extends ConsumerWidget {
   const _DaySection({
@@ -1050,8 +1017,9 @@ class _DaySection extends ConsumerWidget {
   final Future<void> Function(
     _EntryDragData data,
     int targetDayId,
-    int targetIndex,
-  )
+    int targetPosition, {
+    bool checkSourceIndex,
+  })
   onReorder;
   final Future<void> Function(_EntryDragData data) onMoveToDay;
   final Future<void> Function(TimelineEntry entry, int sourceDayId) onCopyToDay;
@@ -1085,6 +1053,17 @@ class _DaySection extends ConsumerWidget {
     );
   }
 
+  /// Drop target 的縫隙索引只在此轉為「移動後的位置」。
+  Future<void> _acceptDrop(_EntryDragData data, int targetDayId, int slot) =>
+      onReorder(
+        data,
+        targetDayId,
+        targetDayId == data.sourceDayId && slot > data.sourceIndex
+            ? slot - 1
+            : slot,
+        checkSourceIndex: true,
+      );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final segmentsAsync = ref.watch(tripSegmentsProvider(tripId));
@@ -1107,7 +1086,7 @@ class _DaySection extends ConsumerWidget {
             _EntryDropTarget(
               targetDayId: day.id,
               targetIndex: index,
-              onAccept: onReorder,
+              onAccept: _acceptDrop,
             ),
             _buildEntryRow(context, ref, index, segments, segmentsReady),
           ],
@@ -1115,7 +1094,7 @@ class _DaySection extends ConsumerWidget {
             targetDayId: day.id,
             targetIndex: timeline.length,
             empty: timeline.isEmpty,
-            onAccept: onReorder,
+            onAccept: _acceptDrop,
           ),
         ] else
           for (var index = 0; index < timeline.length; index++)
@@ -1202,6 +1181,7 @@ class _DaySection extends ConsumerWidget {
                         ),
                         day.id,
                         index - 1,
+                        checkSourceIndex: true,
                       ),
                     ),
               onMoveDown: index == timeline.length - 1
@@ -1214,7 +1194,8 @@ class _DaySection extends ConsumerWidget {
                           entry: entry,
                         ),
                         day.id,
-                        index + 2,
+                        index + 1,
+                        checkSourceIndex: true,
                       ),
                     ),
               onMoveToDay: dayCount > 1
