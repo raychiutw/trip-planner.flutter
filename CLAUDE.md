@@ -37,7 +37,7 @@ flutter run                                           # 連 prod API — 一律�
 
 ### Provider 鏈(riverpod 3.x)
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 用 `StreamProvider.family<_, String tripId>`(`lib/features/trip_detail/trip_providers.dart:14,30,40`,entry/segments 同款)— timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch(對應 web 版 TripLayout),SWR 先 emit 本機快取再 emit 網路。
+`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試 override 鏈上任一節點即可替換下游。行程詳情的 trip/days/notes 使用 `StreamProvider.family<_, String>`（`lib/features/trip_detail/trip_providers.dart:16,32,49`）；segments 同型，entry 使用 `(tripId, entryId)` 作為 key。timeline/map/notes 三畫面 watch 同一 family 實例共用 fetch（對應 web 版 TripLayout），SWR 先 emit 本機快取再 emit 網路。
 
 注意:flutter_riverpod 3.x 未匯出 `Override` 型別,測試的 overrides 直接以 list literal 傳入 `ProviderScope`。
 
@@ -47,7 +47,7 @@ flutter run                                           # 連 prod API — 一律�
 
 - 登入走 `postForResponse` 讀 `set-cookie`,解析 `tripline_session` 後存進 flutter_secure_storage
 - Cookie 模式由 `ApiClient` 統一帶 `Cookie:`;**mutating request 必帶 `Origin: kTriplineOrigin`**(缺少 → 403)。origin 是 `String.fromEnvironment('TRIPLINE_API_ORIGIN', ...)`(`lib/api/api_client.dart:21-24`),不得寫死字面值,本機後端靠 `--dart-define` 覆寫
-- Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`_authHeadersFor`,`lib/api/api_client.dart:946-968`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
+- Bearer 模式(`BearerTokenSource` 有 token)與 cookie 模式互斥:只帶 `Authorization: Bearer <token>`,**不送 Cookie/Origin**(`_authHeadersFor`,`lib/api/api_client.dart:508-529`)。兩種 header 都由 `ApiClient` 統一處理,不要繞過它用 raw dio 打 API
 - `currentUser()` 401 回 null 不 throw;登入後跳轉靠 router redirect(`refreshListenable` 橋接 authState 變化),LoginScreen 自己不導航
 
 ### ApiClient 行為規則(每條有對應測試,改動需同步測試)
@@ -67,7 +67,7 @@ Widget 取色一律走 `Theme.of(context).colorScheme`；柔褐 tint 是唯一�
 
 ### OCC
 
-帶 `version` 的 model:後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用,離線佇列走三方 rebase(`_tryRebase`,`lib/api/api_client.dart:541-575`;決策見 ADR-0007)。行程本身無 `version`,更新走 `PUT /trips/:id` 且不送 `expectedVersion`。
+帶 `version` 的 model:後端 PATCH 要 `expectedVersion`,409 `STALE_ENTRY` 時重抓再套用,離線佇列走三方 rebase(`OfflineSyncEngine._tryRebase`,`lib/api/cache/offline_sync_engine.dart`;決策見 ADR-0007)。行程本身無 `version`,更新走 `PUT /trips/:id` 且不送 `expectedVersion`。
 
 ## 測試慣例
 

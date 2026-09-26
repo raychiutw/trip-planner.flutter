@@ -87,13 +87,13 @@ flutter run                                           # 連 prod API；一律使
 
 `sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
 
-行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:14,30,40,48,59`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
+行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49,57,125`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
 
 Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 list literal 傳入 `ProviderScope`。
 
 ### 認證與 API 安全規則
 
-認證有 **cookie 與 Bearer 兩種互斥模式**，由 `_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 access token 二選一，repository 與畫面層都不得自己拼這些 header：
+認證有 **cookie 與 Bearer 兩種互斥模式**，由 `_authHeadersFor()`（`lib/api/api_client.dart:508-529`）依有無 access token 二選一，repository 與畫面層都不得自己拼這些 header：
 
 - **cookie 模式**（無 Bearer token）：後端使用瀏覽器導向的 session cookie 與 CSRF Origin allowlist，app 扮演瀏覽器。登入走 `postForResponse`（`lib/api/auth_repository.dart:101`）讀取 `set-cookie`，解析 `tripline_session` 並存入 `flutter_secure_storage`；之後每個 request 帶 `Cookie:`，**且非 `GET`／`HEAD` 的 mutating request 必帶 `Origin:`**，否則回 403。
 - **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。

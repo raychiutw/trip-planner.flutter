@@ -51,7 +51,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 行程詳情 family
 
-- `trip`／`days`／`notes`／`entry`／`segments` 一律用 **`StreamProvider.family`**，不是 `FutureProvider.family`（`lib/features/trip_detail/trip_providers.dart:14,30,40,48,59`）。
+- `trip`／`days`／`notes`／`entry`／`segments` 一律用 **`StreamProvider.family`**，不是 `FutureProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49,57,125`）。
   > 修正：早期 `AGENTS.md` 曾寫成 `FutureProvider.family`，那是過期敘述。改 `StreamProvider` 是為了 SWR 兩段式發射（stale → fresh，見同檔 `:11-13` 註解），改回 `FutureProvider` 會直接砍掉離線 stale 那一段。測試對應寫法是 `Stream.error(...)` / `Stream.value(...)`（`test/features/favorites/favorites_screen_test.dart:449-452`）。
 - timeline／map／notes 三畫面 watch **同一個 family 實例**共用 fetch：`trip_timeline_screen.dart:209-210`、`trip_map_screen.dart:129`、`trip_notes_screen.dart:141`。新畫面要行程資料時 watch 既有 family，**不得自行呼叫 `tripRepository.fetch*` 重打 API**。
 - 寫入後刷新一律 `ref.invalidate(tripXxxProvider(tripId))`，不是重呼叫 repository（範例：`lib/features/chat/chat_controller.dart:319-321`、`lib/features/trips/edit/edit_trip_controller.dart:244-245`）。
@@ -66,7 +66,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - **overrides 一律以 list literal inline 傳入 `ProviderScope`**：`overrides: [xxxProvider.overrideWithValue(mock)]`。flutter_riverpod 3.x 未匯出 `Override` 型別，不得宣告 `List<Override> overrides = ...` 抽成變數。實測全 repo 零 `List<Override>` / `<Override>[`。
 - **只驗證靜態 provider error 呈現時，關掉自動重試**：`ProviderScope(retry: (retryCount, error) => null, overrides: [...], child: ...)`。少了它，error 態會被自動重試蓋掉而 flake。驗證自動重試或手動／自動重試互動時，保留被測的 retry 政策，以可控制的來源事件及讀取次數驗證行為。
-  範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`（全 repo 現有 17 處）。
+  範例：`test/features/trips/collab/collab_screen_test.dart:34`、`test/features/favorites/favorites_screen_test.dart:446`、`test/features/trip_detail/trip_timeline_screen_test.dart:294`。
 - 只 override 到 repository 層，`api/` 測試用 `http_mock_adapter` + `InMemorySessionStore`，不碰 `SecureSessionStore`。
 
 ## API 層規範
@@ -78,7 +78,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 認證 header：兩種模式互斥
 
-`_authHeadersFor()`（`lib/api/api_client.dart:946-968`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
+`_authHeadersFor()`（`lib/api/api_client.dart:508-529`）依有無 Bearer token 二選一，repository 與畫面層都不得自己拼這些 header：
 
 - **Bearer 模式**（`BearerTokenSource` 回非空 token）：只帶 `Authorization: Bearer <token>`，**不送 `Cookie`、不送 `Origin`**（後端對「有 Bearer 且無 Origin」跳過 CSRF 檢查）。
 - **cookie 模式**（無 token）：`sessionStore` 有值才帶 `Cookie: tripline_session=<token>`；且方法非 `GET`／`HEAD` 時必帶 `Origin: <origin>` —— 缺這個 header 的 mutation 後端回 403。
@@ -313,7 +313,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 - 資料 provider 是 **`StreamProvider`**，override 要回 `Stream`，不是 `Future`：
   - `myTripsProvider`（`lib/features/trips/trips_list_screen.dart:157`）→ `myTripsProvider.overrideWith((ref) => Stream.value(fakeTrips))`（用例：`test/features/trips/trips_list_screen_test.dart:150`）。
-  - `tripDetailProvider` / `tripDaysProvider` / `tripNotesProvider` 是 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:14,30,40`）→ `tripDaysProvider.overrideWith((ref, tripId) => Stream.value(fakeDays))` 一次覆寫所有 key。
+  - `tripDetailProvider` / `tripDaysProvider` / `tripNotesProvider` 是 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:16,32,49`）→ `tripDaysProvider.overrideWith((ref, tripId) => Stream.value(fakeDays))` 一次覆寫所有 key。
 - 驗證行程清單或日期重試時，override `tripRepositoryProvider` 並控制 `watchMyTrips()`／`watchDays(tripId)` 的來源串流，保留正式 `myTripsProvider` → `myTripsRetryProvider`、`tripDaysProvider(tripId)` → `tripDaysRetryProvider(tripId)` 追蹤鏈。直接 override 資料 provider 會繞過 `StreamRetryCoordinator.track()`，使重試 Future 無法隨來源 error／done／取消完成；一般只驗證資料呈現的測試仍可直接 override 資料 provider。
 - flutter_riverpod 3.x 未匯出 `Override` 型別 —— overrides 直接在 `ProviderScope` / `ProviderContainer` 建構處以 list literal 傳入，不要宣告 `List<Override>` 變數。
 - 需要登入狀態的畫面：override `authStateProvider`，用一個 `extends AuthNotifier` 且只覆寫 `build()` 的假 notifier：
@@ -370,7 +370,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 > **注意三則常見誤述**（舊文件與早期 `CLAUDE.md`／`AGENTS.md` 都寫過，以本節為準）：
 > 1. 「資料 provider 是 `FutureProvider`,override 用 `overrideWith((ref) async => ...)`」—— 實際上 `myTripsProvider`、`tripDetailProvider`、`tripDaysProvider`、`tripNotesProvider` 都已改為 `StreamProvider`，override 必須回 `Stream`。
 > 2. 「測試完全不碰 `SecureSessionStore`」—— 實際上 `test/api/providers_test.dart:50` 有一支型別斷言測試合法引用它，規則收斂為「不呼叫其方法」。
-> 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 12 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
+> 3. 來源文件都寫「三層鏡像」。實際 `test/` 有 13 個頂層目錄，已補上 `app/`、`ui/`、`flows/`、`platform/`、`docs/` 的擺放規則。
 
 ## 測試不可假綠
 

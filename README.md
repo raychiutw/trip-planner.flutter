@@ -15,7 +15,7 @@
 - 未登入首頁（功能導覽、隱私權政策入口與登入後開始使用）
 
 **P1（已完成）**：收藏 + 探索、Entry CRUD 表單群、建立/編輯行程、AI 聊天、全域地圖、共編邀請。
-**P2（已完成）**：分享/列印/匯入、設定子頁、通知偏好 toggle、OAuth PKCE Bearer 認證（production `tripline-mobile` public client 已 provision）、離線快取。
+**P2（已完成）**：分享/列印/匯入、設定子頁、通知偏好 toggle、OAuth PKCE Bearer 認證 client、離線快取。現行發布工作流未傳入 `TRIPLINE_OAUTH_CLIENT_ID`，依該工作流建置時 OAuth 登入入口不顯示；正式 HTTPS callback 尚未由 Flutter 處理。
 
 ## 開發
 
@@ -43,9 +43,12 @@ lib/
 docs/
   adr/          # 架構決策與被拒方案（13 份）
   agents/       # agent 用的 issue tracker／triage labels／domain docs 設定
-  research/     # 升級前的套件選擇研究（歷史基準）與 Apple HIG 引用歸屬研究
+  research/     # 套件選擇、Apple HIG 與後端契約查核紀錄
+  evidence/     # 指定議題的畫面證據
+  verification/ # 互動與輔助使用驗證紀錄
   liquid-glass-1.4.1-migration.md # 1.4.1 遷移去留、真機驗收紀錄與未完成缺口
   mobile-e2e.md # Patrol／Firebase Test Lab 與發布 runbook
+  navigation-glass-semantic-validation.md # 導覽玻璃語意與平台驗證紀錄
 ```
 
 ## 文件
@@ -63,6 +66,9 @@ docs/
 | 查領域詞彙（停留點、正選／備選 POI、工單） | [CONTEXT.md](CONTEXT.md) |
 | 理解架構決策與被拒方案 | [docs/adr/](docs/adr/)（13 份） |
 | 查 Liquid Glass 1.4.1 遷移去留、真機驗收紀錄與未完成缺口 | [docs/liquid-glass-1.4.1-migration.md](docs/liquid-glass-1.4.1-migration.md) |
+| 查導覽玻璃語意與平台驗證紀錄 | [docs/navigation-glass-semantic-validation.md](docs/navigation-glass-semantic-validation.md) |
+| 查議題畫面證據與互動驗證紀錄 | [docs/evidence/](docs/evidence/) · [docs/verification/](docs/verification/) |
+| 查 Apple HIG 與後端契約研究 | [docs/research/](docs/research/) |
 | 跑 Patrol／Firebase Test Lab、發布 TestFlight／Google Play | [docs/mobile-e2e.md](docs/mobile-e2e.md) |
 | 設定 agent 的 issue tracker／triage labels／domain docs | [docs/agents/](docs/agents/) |
 | 看變更紀錄 | [CHANGELOG](CHANGELOG.md) |
