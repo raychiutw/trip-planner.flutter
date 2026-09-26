@@ -20,6 +20,7 @@ import '../models/trip_health.dart';
 import '../models/trip_poi_health.dart';
 import '../models/user.dart';
 import 'api_client.dart';
+import 'cache_read_policy.dart';
 import 'cache/cache_keys.dart';
 import 'cache/offline_op.dart';
 
@@ -193,8 +194,7 @@ class TripRepository {
   Future<TripHealthReport?> fetchHealthReport(String id) async {
     final body = await _client.get(
       '/trips/${Uri.encodeComponent(id)}/health-check',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return _optionalHealthReport(body);
   }
@@ -234,12 +234,9 @@ class TripRepository {
   /// GET /trips/:id/days（僅 day 摘要，不含 timeline）。
   Future<List<TripDay>> fetchDaySummaries(
     String id, {
-    bool fallbackToCache = true,
+    CacheReadPolicy policy = CacheReadPolicy.cached,
   }) async => _list(
-    await _client.get(
-      '/trips/${Uri.encodeComponent(id)}/days',
-      fallbackToCache: fallbackToCache,
-    ),
+    await _client.get('/trips/${Uri.encodeComponent(id)}/days', policy: policy),
     TripDay.fromJson,
   );
 
@@ -331,8 +328,7 @@ class TripRepository {
   Future<TripNotes> fetchFreshNotes(String id) async => _one(
     await _client.get(
       '/trips/${Uri.encodeComponent(id)}/notes',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     ),
     TripNotes.fromJson,
   );
@@ -494,8 +490,7 @@ class TripRepository {
   }) async {
     final body = await _client.get(
       '/trips/${Uri.encodeComponent(tripId)}/notes/${docType.pathSegment}/exclusions',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return TripNoteExclusion.listFromJson(
       body is Map ? Map<String, dynamic>.from(body) : const {},
@@ -524,8 +519,7 @@ class TripRepository {
   Future<TripNoteAiState> fetchNotesAiState(String tripId) async {
     final body = await _client.get(
       '/trips/${Uri.encodeComponent(tripId)}/notes/ai-state',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
     return TripNoteAiState.fromJson(
       body is Map ? Map<String, dynamic>.from(body) : const {},

@@ -8,6 +8,7 @@ import 'dart:io' show HttpDate;
 import 'package:dio/dio.dart';
 
 import 'api_error.dart';
+import 'cache_read_policy.dart';
 import 'cache/cache_keys.dart';
 import 'cache/cache_store.dart';
 import 'cache/offline_op.dart';
@@ -113,15 +114,13 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
     CancelToken? cancelToken,
-    bool writeCache = true,
-    bool fallbackToCache = true,
+    CacheReadPolicy policy = CacheReadPolicy.cached,
   }) => _send(
     'GET',
     path,
     query: query,
     cancelToken: cancelToken,
-    writeCache: writeCache,
-    fallbackToCache: fallbackToCache,
+    policy: policy,
   );
 
   Future<dynamic> head(
@@ -182,8 +181,7 @@ class ApiClient {
         'GET',
         path,
         query: query,
-        fallbackToCache: false,
-        writeCache: false,
+        policy: CacheReadPolicy.noStore,
       );
       if (store == null) {
         yield fresh;
@@ -589,7 +587,7 @@ class ApiClient {
   static final _tripIdRe = RegExp(r'/trips/([^/]+)/');
   String? _tripIdFromPath(String path) => _tripIdRe.firstMatch(path)?.group(1);
 
-  /// 依 type 重抓對應整包(entry→days?all=1;note→notes),writeCache:false
+  /// 依 type 重抓對應整包(entry→days?all=1;note→notes),noStore
   /// (重抓是「拿 server 真相做 merge」,不可覆寫已含 pending patch 的快取)。
   Future<Object?> _refetchFor(QueuedMutation m, String tripId) {
     if (m.type == 'entry.update') {
@@ -597,15 +595,13 @@ class ApiClient {
         'GET',
         '/trips/$tripId/days',
         query: {'all': 1},
-        writeCache: false,
-        fallbackToCache: false,
+        policy: CacheReadPolicy.noStore,
       );
     }
     return _send(
       'GET',
       '/trips/$tripId/notes',
-      writeCache: false,
-      fallbackToCache: false,
+      policy: CacheReadPolicy.noStore,
     );
   }
 
@@ -721,8 +717,7 @@ class ApiClient {
     Object? body,
     CancelToken? cancelToken,
     bool isRetryAttempt = false,
-    bool fallbackToCache = true,
-    bool writeCache = true,
+    CacheReadPolicy policy = CacheReadPolicy.cached,
     bool evictMutationCache = true,
   }) async {
     final auth = await _authHeadersFor(method);
@@ -739,7 +734,7 @@ class ApiClient {
     } on DioException catch (e) {
       // 連線層失敗(離線/逾時):GET 嘗試回退本機快取(getStream 的網路 leg 關閉此回退)
       final store = _cacheStore;
-      if (fallbackToCache &&
+      if (policy.readsCache &&
           method == 'GET' &&
           store != null &&
           _isOfflineError(e)) {
@@ -762,8 +757,7 @@ class ApiClient {
       body: body,
       cancelToken: cancelToken,
       isRetryAttempt: true,
-      fallbackToCache: fallbackToCache,
-      writeCache: writeCache,
+      policy: policy,
       evictMutationCache: evictMutationCache,
     );
     if ((statusCode == 429 || isEdgeBlockPage) &&
@@ -800,7 +794,7 @@ class ApiClient {
         responseData == null ||
         (responseData is String && responseData.isEmpty);
     if (method == 'GET') {
-      if (writeCache && !isEmpty) {
+      if (policy.writesCache && !isEmpty) {
         final store = _cacheStore;
         if (store != null) {
           await store.writeResponse(

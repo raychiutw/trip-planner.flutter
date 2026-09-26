@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/poi_repository.dart';
+import 'package:tripline/api/cache_read_policy.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
 import 'package:tripline/app/adaptive.dart';
@@ -70,7 +71,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => _days);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => _days);
     when(
       () => tripRepo.updateTrip(
@@ -606,7 +610,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.createDay(
@@ -841,7 +848,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.deleteDay(
@@ -944,7 +954,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.deleteDay(
@@ -1013,7 +1026,10 @@ void main() {
       () => tripRepo.fetchDaySummaries(any()),
     ).thenAnswer((_) async => summaries);
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async => summaries);
     when(
       () => tripRepo.createDay(
@@ -1076,7 +1092,10 @@ void main() {
       return fetchCount == 1 ? [..._days, dayToDelete] : _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       return fetchCount == 1 ? [..._days, dayToDelete] : _days;
@@ -1121,7 +1140,10 @@ void main() {
       return _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       if (fetchCount == 1) return [..._days, dayToDelete];
@@ -1180,7 +1202,10 @@ void main() {
       return _days;
     });
     when(
-      () => tripRepo.fetchDaySummaries(any(), fallbackToCache: false),
+      () => tripRepo.fetchDaySummaries(
+        any(),
+        policy: CacheReadPolicy.networkOnly,
+      ),
     ).thenAnswer((_) async {
       fetchCount++;
       if (fetchCount == 1) return [..._days, dayToDelete];

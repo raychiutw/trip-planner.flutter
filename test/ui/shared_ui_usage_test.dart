@@ -171,4 +171,17 @@ void main() {
     }
     expect(offenders, isEmpty, reason: '媒體背景是 scope,不是 widget 之間手傳的 bool。');
   });
+
+  test('features 不傳 transport 層的 cache bool', () {
+    final offenders = <String>[];
+    for (final entity in Directory('lib/features').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      if (RegExp(
+        r'\b(?:fallbackToCache|writeCache)\b',
+      ).hasMatch(entity.readAsStringSync())) {
+        offenders.add(entity.path);
+      }
+    }
+    expect(offenders, isEmpty);
+  });
 }

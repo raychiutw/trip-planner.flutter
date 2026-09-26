@@ -117,7 +117,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
   3. 都不符 → `code = 'HTTP_<status>'`、`message = 'HTTP <status>'`
 - `detail` 一律截斷到 200 字（`lib/api/api_error.dart:64-67`）。原始 body 保留在 `payload`，`409` 的 `conflictWith` 等結構化資訊從 `payload` 取（`lib/api/api_error.dart:21-22`）。
 - 204 與空 body（`null` 或空字串）一律回 `null`（`lib/api/api_client.dart:830-861`）。呼叫端回傳型別寫 `Future<void>` 或自行判 null，不得無條件 `as Map<String, dynamic>`。
-- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟（`lib/api/api_client.dart:777-789`）。因此「拿到資料」不代表這次連上了網 —— 需要保證新鮮度的 GET 要傳 `fallbackToCache: false`（例：`lib/api/trip_repository.dart:194-199`）。
+- GET 遇連線層失敗（離線／逾時）且有本機快取時回快取而不丟。因此「拿到資料」不代表這次連上了網。讀取政策由 `CacheReadPolicy` 成套表達：`cached` 可回退並寫入快取，`networkOnly` 只接受網路回應但成功後更新快取，`noStore` 不讀不寫。待確認的 Day 刪除摘要用 `networkOnly`；工單、授權與衝突恢復等不宜留存的讀取用 `noStore`。不得再以 `fallbackToCache`／`writeCache` 兩個 bool 組合政策。
 
 ### repository 方法
 
