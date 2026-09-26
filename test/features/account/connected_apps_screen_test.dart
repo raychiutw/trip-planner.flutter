@@ -7,17 +7,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/features/account/connected_apps_screen.dart';
 import 'package:tripline/models/oauth.dart';
 import 'package:tripline/theme/app_theme.dart';
 
-class MockTripRepository extends Mock implements TripRepository {}
+class MockAccountRepository extends Mock implements AccountRepository {}
 
 class MockAuthRepository extends Mock implements AuthRepository {}
 
 void main() {
-  late MockTripRepository mockTripRepository;
+  late MockAccountRepository mockAccountRepository;
   late MockAuthRepository mockAuthRepository;
 
   const connectedApp = ConnectedApp(
@@ -35,7 +35,7 @@ void main() {
       ProviderScope(
         retry: (retryCount, error) => null,
         overrides: [
-          tripRepositoryProvider.overrideWithValue(mockTripRepository),
+          accountRepositoryProvider.overrideWithValue(mockAccountRepository),
           authRepositoryProvider.overrideWithValue(mockAuthRepository),
         ],
         child: MaterialApp(
@@ -48,17 +48,17 @@ void main() {
   }
 
   setUp(() {
-    mockTripRepository = MockTripRepository();
+    mockAccountRepository = MockAccountRepository();
     mockAuthRepository = MockAuthRepository();
     when(
       mockAuthRepository.fetchAiAuthorization,
     ).thenAnswer((_) async => false);
     when(mockAuthRepository.authorizeAi).thenAnswer((_) async => true);
     when(
-      () => mockTripRepository.fetchConnectedApps(),
+      () => mockAccountRepository.fetchConnectedApps(),
     ).thenAnswer((_) async => const [connectedApp]);
     when(
-      () => mockTripRepository.revokeConnectedApp(any()),
+      () => mockAccountRepository.revokeConnectedApp(any()),
     ).thenAnswer((_) async {});
   });
 
@@ -83,7 +83,7 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(mockAuthRepository.authorizeAi).called(1);
-    verify(() => mockTripRepository.fetchConnectedApps()).called(2);
+    verify(() => mockAccountRepository.fetchConnectedApps()).called(2);
     expect(find.byKey(const ValueKey('ai-authorize-on')), findsOneWidget);
   });
 
@@ -111,7 +111,9 @@ void main() {
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '撤銷'));
     await tester.pumpAndSettle();
 
-    verify(() => mockTripRepository.revokeConnectedApp('tp_alpha')).called(1);
+    verify(
+      () => mockAccountRepository.revokeConnectedApp('tp_alpha'),
+    ).called(1);
     expect(find.text('已撤銷 Alpha App'), findsOneWidget);
     expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
   });
@@ -134,7 +136,7 @@ void main() {
 
     expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
     verify(
-      () => mockTripRepository.fetchConnectedApps(),
+      () => mockAccountRepository.fetchConnectedApps(),
     ).called(greaterThanOrEqualTo(3));
   });
 
@@ -148,7 +150,7 @@ void main() {
 
     expect(find.byKey(const Key('connected-app-row-tp_alpha')), findsNothing);
 
-    when(() => mockTripRepository.fetchConnectedApps()).thenAnswer(
+    when(() => mockAccountRepository.fetchConnectedApps()).thenAnswer(
       (_) async => const [
         ConnectedApp(
           clientId: 'tp_alpha',
@@ -173,7 +175,7 @@ void main() {
   testWidgets('撤銷 pending 期間鎖定操作，失敗時保留 app 與重試入口', (tester) async {
     final revokeCompleter = Completer<void>();
     when(
-      () => mockTripRepository.revokeConnectedApp('tp_alpha'),
+      () => mockAccountRepository.revokeConnectedApp('tp_alpha'),
     ).thenAnswer((_) => revokeCompleter.future);
     await pumpScreen(tester);
 
@@ -193,7 +195,9 @@ void main() {
       ),
       findsOneWidget,
     );
-    verify(() => mockTripRepository.revokeConnectedApp('tp_alpha')).called(1);
+    verify(
+      () => mockAccountRepository.revokeConnectedApp('tp_alpha'),
+    ).called(1);
 
     revokeCompleter.completeError(Exception('offline'));
     await tester.pumpAndSettle();
@@ -206,7 +210,7 @@ void main() {
 
   testWidgets('載入失敗仍保留返回與重試，空狀態可辨識', (tester) async {
     when(
-      () => mockTripRepository.fetchConnectedApps(),
+      () => mockAccountRepository.fetchConnectedApps(),
     ).thenAnswer((_) => Future<List<ConnectedApp>>.error(Exception('offline')));
     await pumpScreen(tester);
     await tester.pump(const Duration(milliseconds: 100));
@@ -216,7 +220,7 @@ void main() {
     expect(find.widgetWithText(TextButton, '重試'), findsOneWidget);
 
     when(
-      () => mockTripRepository.fetchConnectedApps(),
+      () => mockAccountRepository.fetchConnectedApps(),
     ).thenAnswer((_) async => const <ConnectedApp>[]);
     await tester.tap(find.widgetWithText(TextButton, '重試'));
     await tester.pumpAndSettle();

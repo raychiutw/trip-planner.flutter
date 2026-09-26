@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -24,6 +25,8 @@ import 'package:tripline/theme/app_theme.dart';
 import '../../fixtures/note_content_fixture.dart';
 
 class MockTripRepository extends Mock implements TripRepository {}
+
+class MockAccountRepository extends Mock implements AccountRepository {}
 
 class FakeTripPrintActions implements TripPrintActions {
   final printed = <TripPrintData>[];
@@ -51,6 +54,7 @@ class FakeAuthNotifier extends AuthNotifier {
 
 void main() {
   late MockTripRepository repository;
+  late MockAccountRepository accountRepository;
   late FakeTripPrintActions printActions;
 
   const sharedTrip = PublicTripShare(
@@ -140,6 +144,7 @@ void main() {
         retry: useDefaultRetry ? null : (retryCount, error) => null,
         overrides: [
           tripRepositoryProvider.overrideWithValue(repository),
+          accountRepositoryProvider.overrideWithValue(accountRepository),
           tripPrintActionsProvider.overrideWithValue(printActions),
           authStateProvider.overrideWith(() => FakeAuthNotifier(user)),
         ],
@@ -167,12 +172,13 @@ void main() {
 
   setUp(() {
     repository = MockTripRepository();
+    accountRepository = MockAccountRepository();
     printActions = FakeTripPrintActions();
     when(
       () => repository.fetchPublicTripShare(any()),
     ).thenAnswer((_) async => sharedTrip);
     when(
-      () => repository.clonePublicTripShare(any()),
+      () => accountRepository.clonePublicTripShare(any()),
     ).thenAnswer((_) async => 'cln-trip-1');
   });
 
@@ -442,10 +448,10 @@ void main() {
       if (user == null) {
         expect(find.text('login'), findsOneWidget);
         expect(find.text('/s/s1'), findsOneWidget);
-        verifyNever(() => repository.clonePublicTripShare(any()));
+        verifyNever(() => accountRepository.clonePublicTripShare(any()));
       } else {
         expect(find.text('trip cln-trip-1'), findsOneWidget);
-        verify(() => repository.clonePublicTripShare('s1')).called(1);
+        verify(() => accountRepository.clonePublicTripShare('s1')).called(1);
       }
     });
   }
@@ -457,7 +463,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('login'), findsOneWidget);
-    verifyNever(() => repository.clonePublicTripShare(any()));
+    verifyNever(() => accountRepository.clonePublicTripShare(any()));
   });
 
   testWidgets('已登入點複製會 clone 並導向新行程', (tester) async {
@@ -467,7 +473,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('public-share-clone')));
     await tester.pumpAndSettle();
 
-    verify(() => repository.clonePublicTripShare('s1')).called(1);
+    verify(() => accountRepository.clonePublicTripShare('s1')).called(1);
     expect(find.text('trip cln-trip-1'), findsOneWidget);
   });
 
@@ -475,7 +481,7 @@ void main() {
     const user = UserInfo(id: 'user-1', email: 'ray@example.com');
     final pending = Completer<String>();
     when(
-      () => repository.clonePublicTripShare(any()),
+      () => accountRepository.clonePublicTripShare(any()),
     ).thenAnswer((_) => pending.future);
     await pumpScreen(tester, user: user);
 
@@ -485,7 +491,7 @@ void main() {
     await tester.tap(clone, warnIfMissed: false);
     await tester.pump();
 
-    verify(() => repository.clonePublicTripShare('s1')).called(1);
+    verify(() => accountRepository.clonePublicTripShare('s1')).called(1);
     pending.complete('cln-trip-1');
     await tester.pumpAndSettle();
   });
@@ -493,7 +499,7 @@ void main() {
   testWidgets('複製失敗保留公開內容並向 screen reader 宣告', (tester) async {
     const user = UserInfo(id: 'user-1', email: 'ray@example.com');
     when(
-      () => repository.clonePublicTripShare(any()),
+      () => accountRepository.clonePublicTripShare(any()),
     ).thenThrow(Exception('clone failed'));
     await pumpScreen(tester, user: user);
 

@@ -12,6 +12,7 @@
 
 ### 改善
 
+- 帳號、通知、登入裝置、已連結應用、開發者應用及公開分享複製 API 集中由 `AccountRepository` 管理，行程 API 保留於 `TripRepository`。
 - Web 舊路徑改由 alias 資料表集中管理，登入導向改為可獨立驗證的政策函式；帳號 deep link 透過 `account_origin` query 保留來源頁，關閉後返回原頁。
 - 停留點所屬 Day 與每日停留點索引由行程日資料共用衍生；時間軸與地圖使用一致的行程標題回退規則。
 - 一般請求與 SSE 共用同一份 retry 決策，維持 GET／HEAD 暫時性失敗與 Bearer 401 的重送契約。

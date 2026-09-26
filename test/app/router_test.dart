@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/collab_repository.dart';
@@ -81,6 +82,8 @@ class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockTripRepository extends Mock implements TripRepository {}
 
+class _MockAccountRepository extends Mock implements AccountRepository {}
+
 class _MockCollabRepository extends Mock implements CollabRepository {}
 
 class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
@@ -117,6 +120,7 @@ ProviderContainer _buildContainer({
   bool disableAutomaticRetry = false,
 }) {
   final mockTripRepository = _MockTripRepository();
+  final mockAccountRepository = _MockAccountRepository();
   final mockCollabRepository = _MockCollabRepository();
   final mockFavoritesRepository = _MockFavoritesRepository();
   when(mockTripRepository.fetchMyTrips).thenAnswer((_) async => []);
@@ -197,6 +201,7 @@ ProviderContainer _buildContainer({
       if (printActions != null)
         tripPrintActionsProvider.overrideWithValue(printActions),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
+      accountRepositoryProvider.overrideWithValue(mockAccountRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
       tripMapCanvasBuilderProvider.overrideWithValue(fakeTripMapBuilder),
@@ -784,7 +789,7 @@ void main() {
       printActions: printActions,
     );
     addTearDown(container.dispose);
-    final repository = container.read(tripRepositoryProvider);
+    final repository = container.read(accountRepositoryProvider);
     when(
       () => repository.clonePublicTripShare('public-token'),
     ).thenAnswer((_) async => 'copied-trip');
@@ -1391,7 +1396,7 @@ void main() {
     );
     addTearDown(container.dispose);
     final pending = Completer<UserInfo>();
-    final repository = container.read(tripRepositoryProvider);
+    final repository = container.read(accountRepositoryProvider);
     when(
       () => repository.updateProfile(displayName: 'A'),
     ).thenAnswer((_) => pending.future);

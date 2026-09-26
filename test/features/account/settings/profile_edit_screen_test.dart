@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
-import 'package:tripline/api/trip_repository.dart';
+import 'package:tripline/api/account_repository.dart';
 import 'package:tripline/features/account/settings/profile_edit_screen.dart';
 import 'package:tripline/models/user.dart';
 import 'package:tripline/theme/app_theme.dart';
@@ -15,16 +15,16 @@ import 'package:tripline/ui/tp_app_bar.dart';
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
-class _MockTripRepo extends Mock implements TripRepository {}
+class _MockAccountRepo extends Mock implements AccountRepository {}
 
 void main() {
   late _MockAuthRepo authRepo;
-  late _MockTripRepo tripRepo;
+  late _MockAccountRepo accountRepo;
   late GoRouter router;
 
   setUp(() {
     authRepo = _MockAuthRepo();
-    tripRepo = _MockTripRepo();
+    accountRepo = _MockAccountRepo();
     when(() => authRepo.currentUser()).thenAnswer(
       (_) async =>
           const UserInfo(id: '1', email: 'me@x.com', displayName: '舊名字'),
@@ -64,7 +64,7 @@ void main() {
       retry: (_, _) => null,
       overrides: [
         authRepositoryProvider.overrideWithValue(authRepo),
-        tripRepositoryProvider.overrideWithValue(tripRepo),
+        accountRepositoryProvider.overrideWithValue(accountRepo),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
@@ -79,7 +79,7 @@ void main() {
 
   testWidgets('帶入目前名稱 + 改名儲存 → updateProfile', (tester) async {
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer(
       (_) async =>
           const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'),
@@ -129,11 +129,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('profile-save')));
     await tester.pumpAndSettle();
 
-    verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
+    verify(() => accountRepo.updateProfile(displayName: '新名字')).called(1);
   });
 
   testWidgets('名稱只差空白不需儲存，送出時去除首尾空白', (tester) async {
-    when(() => tripRepo.updateProfile(displayName: '新名字')).thenAnswer(
+    when(() => accountRepo.updateProfile(displayName: '新名字')).thenAnswer(
       (_) async =>
           const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'),
     );
@@ -145,13 +145,13 @@ void main() {
     await tester.pump();
     expect(tester.widget<TpToolbarTextButton>(save).onPressed, isNull);
     verifyNever(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     );
     await tester.enterText(field, '  新名字  ');
     await tester.pump();
     await tester.tap(save);
     await tester.pumpAndSettle();
-    verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
+    verify(() => accountRepo.updateProfile(displayName: '新名字')).called(1);
     expect(find.byType(ProfileEditScreen), findsNothing);
     expect(find.text('帳號首頁'), findsOneWidget);
   });
@@ -159,7 +159,7 @@ void main() {
   testWidgets('送出 A 後繼續輸入 B，成功只確認 A 並保留 B 的離頁保護', (tester) async {
     final pending = Completer<UserInfo>();
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer((_) => pending.future);
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -178,7 +178,7 @@ void main() {
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(find.text('捨棄未儲存的變更？'), findsOneWidget);
-    verify(() => tripRepo.updateProfile(displayName: 'A')).called(1);
+    verify(() => accountRepo.updateProfile(displayName: 'A')).called(1);
   });
 
   testWidgets('初載錯誤可重試，錯誤對讀屏持續宣告', (tester) async {
@@ -212,7 +212,7 @@ void main() {
   testWidgets('鍵盤與按鈕共用提交，顯示儲存進度，失敗保留草稿並可重試', (tester) async {
     final pending = Completer<UserInfo>();
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer((_) => pending.future);
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -224,7 +224,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.tap(find.byKey(const ValueKey('profile-save')));
     await tester.pump();
-    verify(() => tripRepo.updateProfile(displayName: '新名字')).called(1);
+    verify(() => accountRepo.updateProfile(displayName: '新名字')).called(1);
     expect(find.text('儲存中…'), findsOneWidget);
     await tester.tap(find.text('取消'));
     await tester.pump();
@@ -248,7 +248,7 @@ void main() {
       isTrue,
     );
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer(
       (_) async =>
           const UserInfo(id: '1', email: 'me@x.com', displayName: '新名字'),
@@ -261,7 +261,7 @@ void main() {
   testWidgets('離頁後成功只刷新帳號資料，不顯示通知或返回其他頁', (tester) async {
     final pending = Completer<UserInfo>();
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer((_) => pending.future);
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -291,7 +291,7 @@ void main() {
   testWidgets('成功後排程返回前的新輸入仍保留，不使用過期關閉許可', (tester) async {
     final pending = Completer<UserInfo>();
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer((_) => pending.future);
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -318,7 +318,7 @@ void main() {
   testWidgets('儲存後刷新帳號失敗仍保留後續草稿及重試出口', (tester) async {
     final pending = Completer<UserInfo>();
     when(
-      () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+      () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
     ).thenAnswer((_) => pending.future);
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
@@ -346,7 +346,7 @@ void main() {
     testWidgets('儲存${succeeds ? '成功' : '失敗'}後保留新草稿的游標與中文組字', (tester) async {
       final pending = Completer<UserInfo>();
       when(
-        () => tripRepo.updateProfile(displayName: any(named: 'displayName')),
+        () => accountRepo.updateProfile(displayName: any(named: 'displayName')),
       ).thenAnswer((_) => pending.future);
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();

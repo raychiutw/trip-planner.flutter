@@ -18,7 +18,7 @@ import '../../ui/tp_app_bar.dart';
 
 /// 開發者 OAuth apps 清單（GET /dev/apps）。
 final developerAppsProvider = FutureProvider<List<DeveloperApp>>((ref) {
-  return ref.watch(tripRepositoryProvider).fetchDeveloperApps();
+  return ref.watch(accountRepositoryProvider).fetchDeveloperApps();
 });
 
 /// 單一開發者 OAuth app，供編輯頁保留 loading/error 與返回出口。
@@ -26,7 +26,7 @@ final developerAppProvider = FutureProvider.family<DeveloperApp, String>((
   ref,
   clientId,
 ) {
-  return ref.watch(tripRepositoryProvider).fetchDeveloperApp(clientId);
+  return ref.watch(accountRepositoryProvider).fetchDeveloperApp(clientId);
 });
 
 class DeveloperAppsScreen extends ConsumerWidget {
@@ -507,7 +507,7 @@ class _DeveloperAppFormScreenState
       _errorText = null;
     });
     try {
-      final repository = ref.read(tripRepositoryProvider);
+      final repository = ref.read(accountRepositoryProvider);
       final editingApp = _app;
       if (editingApp != null) {
         final description = _trimmedOrNull(_descriptionController.text);
@@ -597,7 +597,9 @@ class _DeveloperAppFormScreenState
       _errorText = null;
     });
     try {
-      await ref.read(tripRepositoryProvider).suspendDeveloperApp(app.clientId);
+      await ref
+          .read(accountRepositoryProvider)
+          .suspendDeveloperApp(app.clientId);
       if (!mounted) return;
       ref.invalidate(developerAppsProvider);
       final container = ProviderScope.containerOf(context, listen: false);

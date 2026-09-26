@@ -44,7 +44,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### Provider 鏈
 
-`sessionStoreProvider`（`lib/api/providers.dart:22`）／`cacheStoreProvider`（同檔 `:31`）→ `apiClientProvider`（`:33`）→ `authRepositoryProvider`（`:45`）／`tripRepositoryProvider`（`:52`）／其餘 repository（`:56-74`）→ `authStateProvider`（`:156`，全 app 認證 SoT）→ `appRouterProvider`（`lib/app/router.dart:44`，經 `refreshListenable` 橋接 authState 變化，`lib/app/router.dart:52,58`）。
+`sessionStoreProvider`／`cacheStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`／其餘 repository；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`（經 `refreshListenable` 橋接 authState 變化）。
 
 - 測試 override 鏈上任一節點即可替換全部下游。**優先 override 最靠近被測畫面的那一節**：測 screen override repository provider，不要 override `apiClientProvider` 再去 mock HTTP。
 - production code 不得為了「方便測試」新增 provider。既有節點已足夠當 seam。

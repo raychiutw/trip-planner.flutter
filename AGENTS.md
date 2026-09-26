@@ -85,7 +85,7 @@ flutter run                                           # 連 prod API；一律使
 
 ### Provider 鏈（Riverpod 3.x）
 
-`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`tripRepositoryProvider` → `authStateProvider`（全 app 認證 SoT）→ `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
+`sessionStoreProvider` → `apiClientProvider` → `authRepositoryProvider`／`accountRepositoryProvider`／`tripRepositoryProvider`；`authRepositoryProvider` 與 `accountRepositoryProvider` 供 `authStateProvider`（全 app 認證 SoT）使用，後者再驅動 `appRouterProvider`。測試可 override 鏈上任一節點以替換下游。
 
 行程詳情的 trip／days／notes／entry／segments 使用 `StreamProvider.family`（`lib/features/trip_detail/trip_providers.dart:14,30,40,48,59`），不是 `FutureProvider.family` —— StreamProvider 才能做 SWR 兩段式發射（先 emit 本機快取 stale，再 emit 網路 fresh）。timeline／map／notes 三個畫面 watch 同一 family 實例共用 fetch，對應 web 版 TripLayout。
 
