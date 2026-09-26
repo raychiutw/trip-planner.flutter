@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tripline/api/api_error.dart';
 import 'package:tripline/api/auth_repository.dart';
 import 'package:tripline/api/providers.dart';
 import 'package:tripline/api/trip_repository.dart';
@@ -161,5 +164,124 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TripNotesScreen), findsOneWidget);
     expect(find.text('行程筆記'), findsOneWidget);
+  });
+
+  testWidgets('時間軸編輯撞 409 後保留草稿，確認新版才儲存並返回原行程', (tester) async {
+    final mockTrips = _MockTripRepository();
+    final entryChanges = StreamController<TimelineEntry>.broadcast();
+    addTearDown(entryChanges.close);
+    final submittedVersions = <int>[];
+    when(mockTrips.watchMyTrips).thenAnswer(
+      (_) => Stream.value(const [
+        TripSummary(
+          tripId: 'okinawa',
+          name: 'okinawa',
+          title: '沖繩家族之旅',
+          totalDays: 1,
+        ),
+      ]),
+    );
+    when(
+      () => mockTrips.watchTrip('okinawa'),
+    ).thenAnswer((_) => Stream.value(_trip));
+    when(
+      () => mockTrips.watchDays('okinawa'),
+    ).thenAnswer((_) => Stream.value(_days));
+    when(
+      () => mockTrips.watchEntry(tripId: 'okinawa', entryId: 11),
+    ).thenAnswer((_) => entryChanges.stream);
+    when(
+      () => mockTrips.updateEntry(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        expectedVersion: any(named: 'expectedVersion'),
+        description: any(named: 'description'),
+        startTime: any(named: 'startTime'),
+        endTime: any(named: 'endTime'),
+      ),
+    ).thenAnswer((invocation) async {
+      final version = invocation.namedArguments[#expectedVersion]! as int;
+      submittedVersions.add(version);
+      if (version == 0) {
+        throw const ApiError(
+          status: 409,
+          code: 'STALE_ENTRY',
+          message: 'stale',
+        );
+      }
+    });
+    when(
+      () => mockTrips.recomputeTravel(tripId: 'okinawa'),
+    ).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(_LoggedInAuthNotifier.new),
+          tripRepositoryProvider.overrideWithValue(mockTrips),
+          appNetworkAvailabilityProvider.overrideWithValue(
+            const Stream.empty(),
+          ),
+        ],
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('沖繩家族之旅'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-more-11')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('entry-edit-11')));
+    await tester.pumpAndSettle();
+    entryChanges.add(_days.single.timeline.single);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('entry-edit-desc')),
+      '我的沖繩草稿',
+    );
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    expect(submittedVersions, [0]);
+
+    entryChanges.add(
+      const TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        version: 1,
+        startTime: '10:00',
+        title: '那霸機場',
+        description: '協作者的新備註',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '我的沖繩草稿'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    expect(find.text('保留你的版本？'), findsOneWidget);
+    await tester.tap(find.text('繼續編輯'));
+    await tester.pumpAndSettle();
+    expect(submittedVersions, [0]);
+    expect(find.widgetWithText(TextField, '我的沖繩草稿'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('entry-edit-submit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保留我的版本'));
+    await tester.pumpAndSettle();
+    expect(submittedVersions, [0, 1]);
+    verify(
+      () => mockTrips.updateEntry(
+        tripId: 'okinawa',
+        entryId: 11,
+        expectedVersion: 1,
+        description: '我的沖繩草稿',
+        startTime: '10:00',
+        endTime: null,
+      ),
+    ).called(1);
+    expect(find.byKey(const ValueKey('entry-edit-desc')), findsNothing);
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+    expect(find.text('那霸機場'), findsOneWidget);
   });
 }
