@@ -564,6 +564,61 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('窄版大字與鍵盤下長備註及訂位資訊仍可編輯並送出', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    addTearDown(() => tester.view.viewInsets = FakeViewPadding.zero);
+
+    final repo = _MockTripRepository();
+    when(
+      () => repo.updateEntryPoi(
+        tripId: any(named: 'tripId'),
+        entryId: any(named: 'entryId'),
+        poiId: any(named: 'poiId'),
+        note: any(named: 'note'),
+        poiType: any(named: 'poiType'),
+        reservation: any(named: 'reservation'),
+      ),
+    ).thenAnswer((_) async {});
+    await _pump(tester, repo);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('poi-edit-master')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: '編輯 sheet 初始版面');
+    const note = '訂位備註包含多位旅伴與特殊需求，請櫃檯保留靠窗座位並確認抵達時間。';
+    const reservation =
+        'https://booking.example.com/reservations/very-long-booking-reference-1234567890';
+    await tester.enterText(find.byKey(const ValueKey('poi-note')), note);
+    await tester.enterText(
+      find.byKey(const ValueKey('poi-reservation')),
+      reservation,
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.byKey(const ValueKey('poi-save')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('poi-save')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => repo.updateEntryPoi(
+        tripId: 't1',
+        entryId: 11,
+        poiId: 501,
+        note: note,
+        poiType: 'attraction',
+        reservation: reservation,
+      ),
+    ).called(1);
+  });
+
   testWidgets('編輯資訊使用 form sheet，pending 鎖定且失敗保留全部輸入', (tester) async {
     final repo = _MockTripRepository();
     final firstAttempt = Completer<void>();

@@ -164,10 +164,13 @@ class EntryPoiScreen extends ConsumerWidget {
             ),
           ),
         const SizedBox(height: TpSpacing.s5),
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: TpSpacing.s2,
+          runSpacing: TpSpacing.s2,
           children: [
             Text('備選地點', style: theme.textTheme.titleMedium),
-            const Spacer(),
             TextButton.icon(
               key: const ValueKey('add-alternate'),
               onPressed: () => _addAlternate(context, ref, entry),
