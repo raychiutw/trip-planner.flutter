@@ -62,6 +62,21 @@ ResponseBody htmlBlockResponseBody() => ResponseBody.fromString(
   },
 );
 
+class _RefreshingSource implements BearerTokenSource {
+  String _token = 'old';
+  int refreshCalls = 0;
+
+  @override
+  Future<String?> accessToken() async => _token;
+
+  @override
+  Future<bool> refresh() async {
+    refreshCalls++;
+    _token = 'new';
+    return true;
+  }
+}
+
 void main() {
   late Dio dio;
   late DioAdapter dioAdapter;
@@ -456,6 +471,43 @@ void main() {
   });
 
   group('streaming GET', () {
+    test('Bearer 401 更新 token 後重新開啟事件串流一次', () async {
+      final adapter = SequencedResponseAdapter([
+        ResponseBody.fromString(
+          jsonEncode({
+            'error': {'code': 'AUTH_REQUIRED', 'message': 'login'},
+          }),
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        ),
+        ResponseBody.fromString(
+          'data: {"status":"completed"}\n\n',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['text/event-stream'],
+          },
+        ),
+      ]);
+      final source = _RefreshingSource();
+      final client = ApiClient(
+        sessionStore: sessionStore,
+        dio: Dio()..httpClientAdapter = adapter,
+        bearerSource: source,
+      );
+
+      final text = await client.getTextStream('/requests/7/events').join();
+
+      expect(text, 'data: {"status":"completed"}\n\n');
+      expect(source.refreshCalls, 1);
+      expect(adapter.recordedRequests, hasLength(2));
+      expect(
+        adapter.recordedRequests.last.headers['Authorization'],
+        'Bearer new',
+      );
+    });
+
     test('getTextStream 帶 Cookie/Accept，並解出文字 chunk', () async {
       await sessionStore.write('token123');
       final adapter = SequencedResponseAdapter([

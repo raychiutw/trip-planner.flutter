@@ -118,6 +118,73 @@ void main() {
     expect(calls, 1); // refresh 失敗 → 不重試
   });
 
+  test('Bearer 401 更新 token 後也會重送一般 POST', () async {
+    final dio = Dio();
+    final sentTokens = <String?>[];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          sentTokens.add(options.headers['Authorization'] as String?);
+          handler.resolve(
+            Response(
+              requestOptions: options,
+              statusCode: sentTokens.length == 1 ? 401 : 200,
+              data: sentTokens.length == 1
+                  ? {
+                      'error': {'code': 'AUTH', 'message': 'x'},
+                    }
+                  : {'ok': true},
+            ),
+          );
+        },
+      ),
+    );
+    final source = _FakeSource('old', refreshResult: true);
+    final client = ApiClient(
+      sessionStore: InMemorySessionStore(),
+      dio: dio,
+      bearerSource: source,
+    );
+
+    expect(await client.post('/x', body: const {}), {'ok': true});
+    expect(source.refreshCalls, 1);
+    expect(sentTokens, ['Bearer old', 'Bearer new']);
+  });
+
+  test('登入 raw POST 的 401 不刷新 Bearer，也不重放憑證', () async {
+    final dio = Dio();
+    var calls = 0;
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          calls++;
+          handler.resolve(
+            Response(
+              requestOptions: options,
+              statusCode: 401,
+              data: {
+                'error': {'code': 'LOGIN_INVALID', 'message': 'x'},
+              },
+            ),
+          );
+        },
+      ),
+    );
+    final source = _FakeSource('old', refreshResult: true);
+    final client = ApiClient(
+      sessionStore: InMemorySessionStore(),
+      dio: dio,
+      bearerSource: source,
+    );
+
+    await expectLater(
+      client.postForResponse('/oauth/login', body: const {}),
+      throwsA(isA<ApiError>().having((e) => e.status, 'status', 401)),
+    );
+    expect(calls, 1);
+    expect(source.refreshCalls, 0);
+  });
+
   test(
     '無 bearerSource → cookie 模式（mutation 帶 Origin,不帶 Authorization）',
     () async {

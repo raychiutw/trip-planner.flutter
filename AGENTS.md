@@ -106,7 +106,7 @@ Flutter Riverpod 3.x 未匯出 `Override` 型別；測試 overrides 直接用 li
 每條規則都有對應測試，改動時必須同步測試：
 
 1. 非 2xx → throw `ApiError`（三層 fallback 解析見 `api_error.dart`）。
-2. 三條分支共用「同參數重送一次」的 `retry()`（`lib/api/api_client.dart:795-806`），各自靠 `isRetryAttempt` 限制**最多一次**：①**429** 僅 `GET`／`HEAD`，讀 `Retry-After` 等待後重送（clamp 0–30 秒，缺漏回 1 秒）；②**edge block page**（2xx 非 204 但 `Content-Type` 含 `text/html` 的 CDN 攔截頁）重試條件與 429 完全相同，重送後仍是攔截頁則丟 `SYS_UPSTREAM_UNAVAILABLE`；③**Bearer 401** 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**（`POST`／`PATCH`／`DELETE` 一樣重送）。「mutation 絕不 retry」是錯的說法，只有 429／edge block 不重送 mutation。SSE 串流版 `_getTextStream()`（`lib/api/api_client.dart:884-911`）走同一組規則，改重試邏輯要兩處一起改。
+2. 一般請求與 SSE 串流共用 `retry_policy.dart` 的純決策，靠 `isRetryAttempt` 限制**最多重送一次**：①**429** 僅 `GET`／`HEAD`，讀 `Retry-After` 等待後重送（clamp 0–30 秒，缺漏回 1 秒）；②**edge block page**（2xx 非 204 但 `Content-Type` 含 `text/html` 的 CDN 攔截頁）重試條件與 429 相同，重送後仍是攔截頁則丟 `SYS_UPSTREAM_UNAVAILABLE`；③**Bearer 401** 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**（`POST`／`PATCH`／`DELETE` 一樣重送）。登入／註冊的 `postForResponse` 是帳密 POST，不自動重送；仍統一轉換 429 與攔截頁錯誤。「mutation 絕不 retry」是錯的說法，只有 429／edge block 不重送 mutation。
 3. 204／空 body → `null`。
 4. 路徑參數使用 `Uri.encodeComponent`。
 

@@ -73,7 +73,7 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### ApiClient 是唯一出口
 
-- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `postForRedirect` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
+- 所有 HTTP 存取一律走 `ApiClient` 的方法（`get` / `post` / `put` / `patch` / `delete` / `sendMutation` / `postForResponse` / `getTextStream`）。不得用 `client.dio` 自己發 request —— 繞過去就同時失去 Cookie／Bearer／Origin、錯誤轉換、重試與快取。
 - 只有需要 Dio 原生 request options 的 OAuth PKCE 流程可取 `client.dio`；需要讀 response headers（例如登入解 `set-cookie`）用 `postForResponse`（`lib/api/api_client.dart:106`），不是 raw dio。
 
 ### 認證 header：兩種模式互斥
@@ -93,19 +93,20 @@ features/ → ui/ → app/ → api/ → models/ → theme/
 
 ### 重試：三條分支共用「同參數重送一次」
 
-`_send()` 的三種重送共用同一個 `retry()`（`lib/api/api_client.dart:795-806`），每條都靠 `isRetryAttempt` 限制**最多一次**：
+`_send()` 與 `_getTextStream()` 共用 `lib/api/retry_policy.dart` 的 `decideRetry()` 純決策，由 `isRetryAttempt` 限制**最多一次**：
 
-1. **429** — 僅 `GET`／`HEAD`（`lib/api/api_client.dart:794`、`:807-815`）。讀 `Retry-After` 等待後重送一次。
-2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`lib/api/api_client.dart:723-733`），重試條件與 429 完全相同（同一個 `if`，`:807`）。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx（`lib/api/api_client.dart:735-739`、`:827-829`）。
-3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：`POST`／`PATCH`／`DELETE` 一樣會被重送一次（`lib/api/api_client.dart:816-823`）。`refresh()` 回 false → 直接丟 `ApiError(401)`（`test/api/api_client_bearer_test.dart:87`）。
+1. **429** — 僅 `GET`／`HEAD`。讀 `Retry-After` 等待後重送一次。
+2. **edge block page** — 2xx（非 204）但 `Content-Type` 含 `text/html` 視為 CDN 攔截頁（`ApiClient._isEdgeBlockPage`），重試條件與 429 相同。重送後仍是 block page → 丟 `ApiError(code: 'SYS_UPSTREAM_UNAVAILABLE')`，`status` 是原本那個 2xx。
+3. **Bearer 401** — `auth.useBearer` 且 `_bearerSource.refresh()` 回 true 才重送，**不分 method**：一般 `POST`／`PATCH`／`DELETE` 一樣會被重送一次。`refresh()` 回 false → 直接丟 `ApiError(401)`。
 
-- SSE 串流版 `_getTextStream()` 走同一組規則（`lib/api/api_client.dart:884-911`），改重試邏輯要兩處一起改。
+- SSE 串流版 `_getTextStream()` 走同一份決策；遇 429／攔截頁要先釋放回應串流再等待。改決策時驗證一般請求與 SSE 兩個站點。
+- 登入／註冊的 `postForResponse` 是 raw 帳密 POST，不自動重送憑證；`ApiClient` 統一將 429 轉 `ApiError` 並保留 `Retry-After`，將攔截頁轉 `SYS_UPSTREAM_UNAVAILABLE`。
 - 429／edge block **不重送 mutation**（`test/api/api_client_test.dart:228`、`:358`）；Bearer 401 refresh 則會。「mutation 絕不 retry」是錯的說法，不要寫進註解或文件。
 - 離線佇列重播**不是** retry：只有帶 `OfflineOp` 的 mutation 才進佇列（`lib/api/api_client.dart:265-275`），重連後由 `flushQueue` 依序重送。
-- `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/api_client.dart:702-721`）。
+- `parseRetryAfterSeconds`：delta-seconds 或 HTTP-date，一律 clamp 0–30 秒；缺漏／空／無效值回 1（`lib/api/retry_policy.dart`）。
 - 動到任何一條重試分支，同一個 PR 必須改 `test/api/api_client_test.dart` 或 `test/api/api_client_bearer_test.dart`。
 
-> **注意常見誤述**:「429 只 retry GET 一次;mutation 絕不 retry」是錯的說法,曾出現在多份舊文件裡。它漏了 edge block page 與 Bearer 401 兩條分支,且與 `lib/api/api_client.dart:816-823` 矛盾。看到這句話出現在註解或 PR 描述裡,以本節為準。
+> **注意常見誤述**：「429 只 retry GET 一次；mutation 絕不 retry」漏了 edge block page 與 Bearer 401。看到這句話出現在註解或 PR 描述裡，以本節為準。
 
 ### 錯誤與空 body
 

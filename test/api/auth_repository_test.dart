@@ -64,6 +64,61 @@ void main() {
   });
 
   group('login', () {
+    test('429 保留 Retry-After，且登入憑證不重送', () async {
+      dioAdapter.onPost(
+        '/oauth/login',
+        (server) => server.reply(
+          429,
+          {
+            'error': {'code': 'LOGIN_RATE_LIMITED', 'message': '請稍後再試'},
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'retry-after': ['7'],
+          },
+        ),
+        data: {'email': 'ray@example.com', 'password': 'secret'},
+      );
+
+      await expectLater(
+        authRepository.login(email: 'ray@example.com', password: 'secret'),
+        throwsA(
+          isA<ApiError>()
+              .having((error) => error.status, 'status', 429)
+              .having((error) => error.retryAfterSeconds, 'Retry-After', 7),
+        ),
+      );
+      expect(recordedRequests, hasLength(1));
+      expect(await sessionStore.read(), isNull);
+    });
+
+    test('edge block 回應顯示上游暫不可用，且不寫入 session', () async {
+      dioAdapter.onPost(
+        '/oauth/login',
+        (server) => server.reply(
+          200,
+          '<html>blocked</html>',
+          headers: {
+            Headers.contentTypeHeader: ['text/html; charset=utf-8'],
+          },
+        ),
+        data: {'email': 'ray@example.com', 'password': 'secret'},
+      );
+
+      await expectLater(
+        authRepository.login(email: 'ray@example.com', password: 'secret'),
+        throwsA(
+          isA<ApiError>().having(
+            (error) => error.code,
+            'code',
+            'SYS_UPSTREAM_UNAVAILABLE',
+          ),
+        ),
+      );
+      expect(await sessionStore.read(), isNull);
+      expect(recordedRequests, hasLength(1));
+    });
+
     test('解析 set-cookie 的 tripline_session 寫入 store 並回 UserInfo', () async {
       dioAdapter.onPost(
         '/oauth/login',
