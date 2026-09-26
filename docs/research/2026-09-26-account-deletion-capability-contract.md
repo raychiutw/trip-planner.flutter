@@ -43,6 +43,10 @@ Flutter [外部連結](../../lib/app/external_links.dart) 以 `url_launcher` 開
 
 **#380 狀態：research partial，等待外部正式環境證據。** 目前只能交付已釘版本的 UAT 能力契約及正式環境待驗項目，不能勾選「正式帳號種類、reauth／刪除能力與部署證據」已全部核實。
 
+## 2026-09-26 驗收範圍更正
+
+使用者已明確移除本批票的真機檢驗。上文提到的「真機驗收」與「裝置驗證」不再是 #389 的結票或上傳條件，亦未執行；#389 仍須以指定 build 的公開 widget／API 測試、HTTPS app link 與 iOS／Android association 設定、模擬器可取得的 callback 行為，以及正式部署與受控測試帳號交易證據，驗證同一帳號／grant 的 fresh-auth、拒絕、過期、重播與失敗回滾。此變更不放寬伺服器端重新驗證，也不把 UAT 契約視為正式環境已啟用。
+
 ## 可重現的唯讀查核
 
 ```sh
