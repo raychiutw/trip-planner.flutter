@@ -1017,6 +1017,36 @@ void main() {
       expect(find.text('detail:imported-trip'), findsOneWidget);
     });
 
+    testWidgets('取消匯入後保留行程清單且不呼叫 API', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripImportFilePickerProvider.overrideWithValue(
+              _FakeTripImportFilePicker(null),
+            ),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('trips-sort-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('trips-list-import-trigger')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('沖繩家族之旅'), findsOneWidget);
+      expect(find.text('匯入成功'), findsNothing);
+      verifyNever(() => mockTripRepository.importTripJson(any()));
+    });
+
     testWidgets('匯入無效 JSON 時錯誤持續可見並可重新選檔', (tester) async {
       await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();
@@ -1104,6 +1134,41 @@ void main() {
       expect(writer.suggestedName, 'okinawa.json');
       expect(writer.content, '{"schemaVersion":1}');
       expect(find.text('匯出成功'), findsOneWidget);
+    });
+
+    testWidgets('取消匯出後顯示取消而不誤報成功', (tester) async {
+      await _useWideSurface(tester);
+      final mockTripRepository = MockTripRepository();
+      final writer = _FakeTripExportFileWriter()..saved = false;
+      when(
+        () => mockTripRepository.watchMyTrips(),
+      ).thenAnswer((_) => Stream.value(fakeTrips));
+      when(() => mockTripRepository.exportTripJson(any())).thenAnswer(
+        (_) async => const TripJsonExport(
+          fileName: 'okinawa.json',
+          content: '{"schemaVersion":1}',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tripRepositoryProvider.overrideWithValue(mockTripRepository),
+            tripExportFileWriterProvider.overrideWithValue(writer),
+          ],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('匯出 JSON'));
+      await tester.pumpAndSettle();
+
+      expect(writer.saveCalls, 1);
+      expect(find.text('已取消匯出'), findsOneWidget);
+      expect(find.text('匯出成功'), findsNothing);
     });
 
     testWidgets('匯出寫檔失敗時錯誤持續可見並可重試', (tester) async {
