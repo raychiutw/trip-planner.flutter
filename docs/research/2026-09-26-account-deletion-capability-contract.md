@@ -39,13 +39,13 @@ Flutter [外部連結](../../lib/app/external_links.dart) 以 `url_launcher` 開
 
 [後端 PR #1351](https://github.com/raychiutw/trip-planner/pull/1351) 於 2026-09-25 18:15:07 UTC 合併到 **`uat`**，merge SHA `7c59a998c7306fed7ea2155435bd966032040459`。[Cloudflare check](https://github.com/raychiutw/trip-planner/runs/108194583724) 顯示該 SHA 的 preview 與 `uat.trip-planner-dby.pages.dev` 部署成功；[migration run](https://github.com/raychiutw/trip-planner/actions/runs/36172227242) 記錄 D1 `0096_mobile_oauth_callbacks.sql` 套用成功。2026-09-26 本次協作另收到後端代理回報：PR 尚未合併 `master`／production，且無正式 deployment SHA、fresh-auth 刪除 smoke 或核准上線日；這項回報沒有可公開重跑的來源，仍待正式部署系統佐證。可追溯的 PR、check 與 migration 證據只支持 UAT，**沒有正式 alias 的部署 SHA 或正式 D1 migration 證據**。正式密碼與 Google-only 刪除行為均未驗證；`GET /api/account` 未登入回 401，也不能讀出正式帳號組成或 provider 設定。
 
-#389 在宣稱可用前仍需取得：正式部署 SHA 與 D1 狀態、正式 Google provider 能力、受控測試帳號的密碼／Google-only／混合身分交易證據，以及允許、拒絕、過期、重播、跨帳號／grant、失敗回滾的驗證。Mobile 路徑另需 HTTPS app link、iOS／Android OS association、背景與冷啟動、發布 build flags、同 grant token refresh 和真機驗收；無對應 provider 的帳號須先有後端重新驗證契約，否則保留人工申請或阻擋。#380 的調查完成不代表 #389 的產品功能完成。
+#389 在宣稱可用前仍需取得：正式部署 SHA 與 D1 狀態、正式 Google provider 能力、受控測試帳號的密碼／Google-only／混合身分交易證據，以及允許、拒絕、過期、重播、跨帳號／grant、失敗回滾的驗證。Mobile 路徑另需 HTTPS app link、iOS／Android OS association、背景與冷啟動、發布 build flags、同 grant token refresh，以及可執行的模擬器 callback 驗證；無對應 provider 的帳號須先有後端重新驗證契約，否則保留人工申請或阻擋。#380 的調查完成不代表 #389 的產品功能完成。
 
 **#380 狀態：research partial，等待外部正式環境證據。** 目前只能交付已釘版本的 UAT 能力契約及正式環境待驗項目，不能勾選「正式帳號種類、reauth／刪除能力與部署證據」已全部核實。
 
 ## 2026-09-26 驗收範圍更正
 
-使用者已明確移除本批票的真機檢驗。上文提到的「真機驗收」與「裝置驗證」不再是 #389 的結票或上傳條件，亦未執行；#389 仍須以指定 build 的公開 widget／API 測試、HTTPS app link 與 iOS／Android association 設定、模擬器可取得的 callback 行為，以及正式部署與受控測試帳號交易證據，驗證同一帳號／grant 的 fresh-auth、拒絕、過期、重播與失敗回滾。此變更不放寬伺服器端重新驗證，也不把 UAT 契約視為正式環境已啟用。
+使用者已明確移除本批票的真機檢驗；先前要求的真機驗收不再是 #389 的結票或上傳條件，亦未執行。#389 仍須以指定 build 的公開 widget／API 測試、HTTPS app link 與 iOS／Android association 設定、模擬器可取得的 callback 行為，以及正式部署與受控測試帳號交易證據，驗證同一帳號／grant 的 fresh-auth、拒絕、過期、重播與失敗回滾。此變更不放寬伺服器端重新驗證，也不把 UAT 契約視為正式環境已啟用。
 
 ## 可重現的唯讀查核
 
