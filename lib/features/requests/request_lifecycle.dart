@@ -267,7 +267,8 @@ class RequestLifecycle extends Notifier<RequestLifecycleState> {
     await _readShared(run);
   }
 
-  /// 需要完整終態資料列的畫面可請求補讀；最多三次，避免永久錯誤持續輪詢。
+  /// 需要完整終態資料列的畫面可請求補讀。
+  /// ponytail: 最多補讀三次，避免永久錯誤持續輪詢；若後端支援重送終態資料，再改為事件驅動補齊。
   Future<void> hydrateTerminal() async {
     if (_hydratingTerminal ||
         state is! RequestTerminal ||
