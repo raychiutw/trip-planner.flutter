@@ -243,17 +243,19 @@ Widget _buildScreen(
   Future<bool> Function(TripMapLocationSettingsTarget)? locationSettingsOpener,
   MapRepository? mapRepository,
   ValueChanged<TripMapCanvasConfig>? onMapConfig,
+  TripMapPlatformController? nativeController,
   TextScaler textScaler = TextScaler.noScaling,
   EdgeInsets viewPadding = EdgeInsets.zero,
   List<TripSummary> trips = const [
     TripSummary(tripId: 'trip-1', name: 'okinawa', title: '沖繩家族旅行'),
   ],
+  Trip? detail,
   bool withRootTab = false,
   ThemeData? theme,
   GoogleMapsExternalLauncher externalLauncher =
       const GoogleMapsExternalLauncher(),
   bool renderSelectedTripMap = false,
-  SelectedTripDay? initialSelectedDay,
+  SelectedDay? initialSelectedDay,
   ValueListenable<bool>? branchActive,
 }) {
   final router = GoRouter(
@@ -272,6 +274,9 @@ Widget _buildScreen(
                 initialDayNum,
             mapBuilder: (config) {
               onMapConfig?.call(config);
+              if (nativeController != null) {
+                config.controller.attach(nativeController);
+              }
               return fakeTripMapBuilder(config);
             },
             locationService: locationService,
@@ -291,6 +296,9 @@ Widget _buildScreen(
             tripId: selectedTripId,
             mapBuilder: (config) {
               onMapConfig?.call(config);
+              if (nativeController != null) {
+                config.controller.attach(nativeController);
+              }
               return fakeTripMapBuilder(config);
             },
             locationService: locationService,
@@ -320,6 +328,10 @@ Widget _buildScreen(
           (ref, tripId) => daysStream ?? Stream.value(days),
         ),
       myTripsProvider.overrideWith((ref) => Stream.value(trips)),
+      tripDetailProvider.overrideWith(
+        (ref, tripId) =>
+            Stream.value(detail ?? Trip(id: tripId, name: 'okinawa')),
+      ),
       mapRepositoryProvider.overrideWithValue(
         mapRepository ?? _StubMapRepository(),
       ),
@@ -1247,7 +1259,7 @@ void main() {
     expect(_sharedDayNum(tester), 2);
   });
 
-  testWidgets('「全部」不寫入共用選取日', (tester) async {
+  testWidgets('選「全部」寫入獨立於未指定的共用狀態', (tester) async {
     await tester.pumpWidget(_buildScreen([_dayOne, _dayTwo]));
     await tester.pumpAndSettle();
 
@@ -1257,8 +1269,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 0);
-    // 地圖的空值是「全部」，時間軸的空值是「未指定 → 第一天」，不可混用。
-    expect(_sharedDayNum(tester), 2);
+    expect(
+      _containerOf(tester).read(selectedDayProvider).showsAllDaysFor('trip-1'),
+      isTrue,
+    );
   });
 
   testWidgets('背景分支處理到 days 重新 emit 也不寫入共用選取日', (tester) async {
@@ -1307,6 +1321,46 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(_mapSelectorTabIndex(tester), 2);
+  });
+
+  testWidgets('查詢參數缺席時可從共用「全部」還原地圖', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+        _dayTwo,
+      ], initialSelectedDay: const SelectedAllDays(tripId: 'trip-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
+  });
+
+  testWidgets('查詢日期優先於停留點深連結', (tester) async {
+    final nativeController = _FakeTripMapPlatformController();
+    await tester.pumpWidget(
+      _buildScreen(
+        [_dayOne, _dayTwo],
+        initialDayNum: 1,
+        initialEntryId: 21,
+        nativeController: nativeController,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 1);
+    expect(nativeController.moves, isNotEmpty);
+    expect(nativeController.moves.last.point.latitude, lessThan(26.3));
+  });
+
+  testWidgets('地圖行程標題採用詳情標題，與時間軸一致', (tester) async {
+    await tester.pumpWidget(
+      _buildScreen([
+        _dayOne,
+      ], detail: const Trip(id: 'trip-1', name: '沖繩', title: '完整行程標題')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('完整行程標題'), findsOneWidget);
   });
 
   testWidgets('深連結 day 優先於共用選取日', (tester) async {
@@ -1371,6 +1425,28 @@ void main() {
     expect(_mapSelectorTabIndex(tester), 0);
 
     active.value = false;
+    await tester.pumpAndSettle();
+    active.value = true;
+    await tester.pumpAndSettle();
+
+    expect(_mapSelectorTabIndex(tester), 0);
+  });
+
+  testWidgets('地圖選「全部」後，背景時間軸改日不會覆蓋地圖選取', (tester) async {
+    final active = ValueNotifier(true);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      _buildScreen([_dayOne, _dayTwo], branchActive: active),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部'));
+    await tester.pumpAndSettle();
+
+    active.value = false;
+    await tester.pumpAndSettle();
+    _containerOf(
+      tester,
+    ).read(selectedDayProvider.notifier).select(tripId: 'trip-1', dayNum: 2);
     await tester.pumpAndSettle();
     active.value = true;
     await tester.pumpAndSettle();

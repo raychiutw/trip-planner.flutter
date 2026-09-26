@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/providers.dart';
 import '../../app/app_feedback.dart';
+import '../../app/app_loading_skeleton.dart';
 import '../../models/day.dart';
 import '../../models/entry.dart';
 import '../../models/poi_type.dart';
@@ -24,6 +25,7 @@ import '../trips/trip_title_button.dart';
 import '../trips/trips_list_screen.dart';
 import 'google_poi_accessory_card.dart';
 import 'selected_day_provider.dart';
+import 'trip_days_lookup.dart';
 import 'trip_providers.dart';
 
 /// 行程地圖：Header 行程 action + 全部／DAY selector ＋ 地圖 adapter ＋ 底部 entry cards。
@@ -68,72 +70,96 @@ class TripMapScreen extends ConsumerStatefulWidget {
 }
 
 class _TripMapScreenState extends ConsumerState<TripMapScreen> {
-  /// 傳給地圖 view 的初始天數：路由查詢參數優先，缺席時才由共用選取日供值。
-  int? _initialDayNum;
-
-  /// 使用者在本畫面選了「全部」。「全部」不進共用狀態（空值在時間軸是另一個
-  /// 意思），所以切回前景時得靠這個旗標記得使用者的選擇 —— 不能拿共用值有沒有
-  /// 變動去反推，那推論會被任何一條也寫共用值的路徑弄髒。
-  bool _showingAllDays = false;
-  bool _wasActiveBranch = true;
+  SelectedDay? _displaySelection;
+  SelectedDay? _viewStartSelection;
+  SelectedDay? _lastObservedShared;
+  TripDaysIndex? _lastIndex;
 
   @override
   void initState() {
     super.initState();
-    _resolveInitialDayNum();
+    _lastObservedShared = ref.read(selectedDayProvider);
   }
 
   @override
   void didUpdateWidget(covariant TripMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tripId != widget.tripId ||
-        oldWidget.initialDayNum != widget.initialDayNum) {
-      _resolveInitialDayNum();
+        oldWidget.initialDayNum != widget.initialDayNum ||
+        oldWidget.initialEntryId != widget.initialEntryId) {
+      _displaySelection = null;
+      _viewStartSelection = null;
+      _lastObservedShared = ref.read(selectedDayProvider);
+      _lastIndex = null;
     }
   }
 
-  /// 換行程或換深連結日期時重新解析，順帶清掉上一段路由留下的「全部」。
-  void _resolveInitialDayNum() {
-    _showingAllDays = false;
-    _initialDayNum =
-        widget.initialDayNum ??
-        ref.read(selectedDayProvider).dayNumFor(widget.tripId);
-  }
-
-  /// 只有前景分支可寫入：StatefulShellRoute 以 Offstage + TickerMode 保活，
-  /// 背景分支雖然被 riverpod 暫停訂閱，仍會在「emit 落在切到背景的同一批」時以
-  /// 背景身分重建一次並處理到新的 days —— 那一格會把畫面內部的退位寫進共用狀態。
-  ///
-  /// 「全部」（空值）不進共用狀態：地圖的空值是「全部」，時間軸的空值是
-  /// 「未指定 → 第一天」，同一個空值兩種語意不可混用。
   void _publishSelectedDay(int? dayNum) {
-    if (!TickerMode.valuesOf(context).enabled) return;
-    _showingAllDays = dayNum == null;
-    if (dayNum == null) return;
-    ref
-        .read(selectedDayProvider.notifier)
-        .select(tripId: widget.tripId, dayNum: dayNum);
+    final selection = dayNum == null
+        ? SelectedAllDays(tripId: widget.tripId)
+        : SelectedTripDay(tripId: widget.tripId, dayNum: dayNum);
+    _displaySelection = selection;
+    _viewStartSelection = selection;
+    if (TickerMode.valuesOf(context).enabled) _lastObservedShared = selection;
+    ref.read(selectedDayProvider.notifier).publish(context, selection);
   }
 
   @override
   Widget build(BuildContext context) {
-    // valuesOf 會建立 InheritedWidget 相依：分支在前景／背景之間切換時本畫面會
-    // 重建，才接得住其他 tab 期間變動的共用選取日。
     final isActiveBranch = TickerMode.valuesOf(context).enabled;
-    if (isActiveBranch && !_wasActiveBranch && !_showingAllDays) {
-      final sharedDayNum = ref
-          .read(selectedDayProvider)
-          .dayNumFor(widget.tripId);
-      if (sharedDayNum != null) _initialDayNum = sharedDayNum;
+    final shared = ref.watch(selectedDayProvider);
+    final daysAsync = ref.watch(tripDaysIndexProvider(widget.tripId));
+    final index = switch (daysAsync) {
+      AsyncData(:final value) => value,
+      _ => _lastIndex,
+    };
+    if (index != null) {
+      _lastIndex = index;
+      _displaySelection ??= ref
+          .read(selectedDayProvider.notifier)
+          .resolveInitial(
+            tripId: widget.tripId,
+            index: index,
+            routeDayNum: widget.initialDayNum,
+            entryId: widget.initialEntryId,
+            allowAll: true,
+          );
+      _viewStartSelection ??= _displaySelection;
+      if (isActiveBranch && shared != _lastObservedShared) {
+        _lastObservedShared = shared;
+        final sharedDay = shared.dayNumFor(widget.tripId);
+        if (_displaySelection is! SelectedAllDays &&
+            sharedDay != null &&
+            index.days.any((day) => day.dayNum == sharedDay)) {
+          _displaySelection = shared;
+          _viewStartSelection = shared;
+        }
+      }
     }
-    _wasActiveBranch = isActiveBranch;
-    final daysAsync = ref.watch(tripDaysProvider(widget.tripId));
     final trips = switch (ref.watch(myTripsProvider)) {
       AsyncData(:final value) => value,
       _ => const <TripSummary>[],
     };
     final currentTrip = _findTripSummary(trips, widget.tripId);
+    final detail = switch (ref.watch(tripDetailProvider(widget.tripId))) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget mapView(TripDaysIndex index) => _TripMapView(
+      tripId: widget.tripId,
+      index: index,
+      initialEntryId: widget.initialEntryId,
+      initialSelection: _viewStartSelection,
+      mapBuilder: widget.mapBuilder,
+      locationService: widget.locationService,
+      locationSettingsOpener: widget.locationSettingsOpener,
+      externalLauncher: widget.externalLauncher,
+      onActiveDayChanged: (dayNum) {
+        _publishSelectedDay(dayNum);
+        widget.onActiveDayChanged?.call(dayNum);
+      },
+    );
     return AnnotatedRegion<SystemUiOverlayStyle>(
       key: const ValueKey('trip-map-status-style'),
       value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
@@ -146,9 +172,10 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             title: TripTitleButton(
               key: const ValueKey('trip-map-trip-picker'),
               currentTripId: widget.tripId,
-              currentTitle: currentTrip == null
-                  ? '行程'
-                  : _tripTitle(currentTrip),
+              currentTitle: tripDisplayTitle(
+                detail: detail,
+                summary: currentTrip,
+              ),
               trips: trips,
               onSelected: (selectedTripId) {
                 if (widget.onTripSelected != null) {
@@ -163,25 +190,19 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
             children: [
               Positioned.fill(
                 child: daysAsync.when(
-                  skipError: true,
-                  skipLoadingOnReload: true,
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator.adaptive()),
-                  error: (error, stackTrace) => const SizedBox.shrink(),
-                  data: (days) => _TripMapView(
-                    tripId: widget.tripId,
-                    days: days,
-                    initialEntryId: widget.initialEntryId,
-                    initialDayNum: _initialDayNum,
-                    mapBuilder: widget.mapBuilder,
-                    locationService: widget.locationService,
-                    locationSettingsOpener: widget.locationSettingsOpener,
-                    externalLauncher: widget.externalLauncher,
-                    onActiveDayChanged: (dayNum) {
-                      _publishSelectedDay(dayNum);
-                      widget.onActiveDayChanged?.call(dayNum);
-                    },
-                  ),
+                  skipError: false,
+                  skipLoadingOnReload: false,
+                  data: mapView,
+                  loading: () => switch (_lastIndex) {
+                    final TripDaysIndex index => mapView(index),
+                    null => const AppListLoadingSkeleton(),
+                  },
+                  error: (error, stackTrace) => switch (_lastIndex) {
+                    final TripDaysIndex index => mapView(index),
+                    null => ColoredBox(
+                      color: Theme.of(context).colorScheme.surface,
+                    ),
+                  },
                 ),
               ),
               if (daysAsync.hasError)
@@ -217,11 +238,6 @@ class _TripMapScreenState extends ConsumerState<TripMapScreen> {
       ),
     );
   }
-}
-
-String _tripTitle(TripSummary trip) {
-  final title = trip.title?.trim();
-  return title == null || title.isEmpty ? trip.name : title;
 }
 
 TripSummary? _findTripSummary(List<TripSummary> trips, String tripId) {
@@ -269,9 +285,9 @@ class _RouteSegment {
 class _TripMapView extends ConsumerStatefulWidget {
   const _TripMapView({
     required this.tripId,
-    required this.days,
+    required this.index,
     this.initialEntryId,
-    this.initialDayNum,
+    this.initialSelection,
     this.mapBuilder,
     this.locationService,
     this.locationSettingsOpener,
@@ -280,9 +296,9 @@ class _TripMapView extends ConsumerStatefulWidget {
   });
 
   final String tripId;
-  final List<TripDay> days;
+  final TripDaysIndex index;
   final int? initialEntryId;
-  final int? initialDayNum;
+  final SelectedDay? initialSelection;
   final TripMapCanvasBuilder? mapBuilder;
   final TripMapLocationService? locationService;
   final Future<bool> Function(TripMapLocationSettingsTarget)?
@@ -328,8 +344,9 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         TpSpacing.s6,
   );
 
-  /// 0 = 全部；i = 第 i 日（widget.days[i - 1]）。
+  /// 0 = 全部；i = 第 i 日（widget.index.days[i - 1]）。
   int _selectedTabIndex = 0;
+  late List<List<_MapStop>> _stopsByDay;
 
   /// fitCamera/move 只能在地圖 render 後呼叫。
   bool _mapIsReady = false;
@@ -342,6 +359,7 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   @override
   void initState() {
     super.initState();
+    _stopsByDay = _extractStops();
     _selectedTabIndex = _initialTabIndex();
     final initialStops = _stopsForTab(_selectedTabIndex);
     final initialPage = _initialStopPage(initialStops);
@@ -365,11 +383,23 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   @override
   void didUpdateWidget(covariant _TripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.index, widget.index)) {
+      _stopsByDay = _extractStops();
+    }
+    final selectedDayNum = _selectedTabIndex == 0
+        ? null
+        : oldWidget.index.days.elementAtOrNull(_selectedTabIndex - 1)?.dayNum;
+    final selectionChanged =
+        oldWidget.initialSelection != widget.initialSelection &&
+        (widget.initialSelection is SelectedAllDays
+            ? _selectedTabIndex != 0
+            : selectedDayNum !=
+                  widget.initialSelection.dayNumFor(widget.tripId));
     final refocus =
         oldWidget.tripId != widget.tripId ||
         oldWidget.initialEntryId != widget.initialEntryId ||
-        oldWidget.initialDayNum != widget.initialDayNum;
-    if (refocus || !identical(oldWidget.days, widget.days)) {
+        selectionChanged;
+    if (refocus || !identical(oldWidget.index, widget.index)) {
       var page = 0;
       if (refocus) {
         _selectedTabIndex = _initialTabIndex();
@@ -385,8 +415,12 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
         // 索引屬於舊清單；fresh 重排時以 dayNum 與 entryId 保留有效選取。
         final dayNum = _selectedTabIndex == 0
             ? null
-            : oldWidget.days.elementAtOrNull(_selectedTabIndex - 1)?.dayNum;
-        final dayIndex = widget.days.indexWhere((day) => day.dayNum == dayNum);
+            : oldWidget.index.days
+                  .elementAtOrNull(_selectedTabIndex - 1)
+                  ?.dayNum;
+        final dayIndex = widget.index.days.indexWhere(
+          (day) => day.dayNum == dayNum,
+        );
         _selectedTabIndex = dayNum == null
             ? 0
             : dayIndex < 0
@@ -420,16 +454,16 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   /// 所有 entries 都是 POI page 的資料來源。
-  List<List<_MapStop>> get _stopsByDay {
+  List<List<_MapStop>> _extractStops() {
     return [
-      for (final (dayIndex, day) in widget.days.indexed)
+      for (final (dayIndex, day) in widget.index.days.indexed)
         _extractDayStops(dayIndex, day),
     ];
   }
 
   List<_MapStop> _extractDayStops(int dayIndex, TripDay day) {
     return [
-      for (final entry in day.timeline)
+      for (final entry in widget.index.entriesForDay(day.dayNum))
         _MapStop(
           dayIndex: dayIndex,
           dayNum: day.dayNum,
@@ -467,26 +501,19 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   }
 
   int _initialTabIndex() {
-    final entryId = widget.initialEntryId;
-    if (entryId != null) {
-      for (final (dayIndex, dayStops) in _stopsByDay.indexed) {
-        if (dayStops.any((stop) => stop.entry.id == entryId)) {
-          return dayIndex + 1;
-        }
-      }
-    }
-    final initialDayNum = widget.initialDayNum;
+    if (widget.initialSelection is SelectedAllDays) return 0;
+    final initialDayNum = widget.initialSelection.dayNumFor(widget.tripId);
     if (initialDayNum != null) {
-      final index = widget.days.indexWhere(
+      final index = widget.index.days.indexWhere(
         (day) => day.dayNum == initialDayNum,
       );
       if (index >= 0) return index + 1;
     }
-    return widget.days.isEmpty ? 0 : 1;
+    return widget.index.days.isEmpty ? 0 : 1;
   }
 
   int? _dayNumForTab(int tabIndex) =>
-      tabIndex == 0 ? null : widget.days[tabIndex - 1].dayNum;
+      tabIndex == 0 ? null : widget.index.days[tabIndex - 1].dayNum;
 
   int _initialStopPage(List<_MapStop> stops) {
     final entryId = widget.initialEntryId;
@@ -498,10 +525,8 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
   _MapStop? _initialStop() {
     final entryId = widget.initialEntryId;
     if (entryId == null) return null;
-    for (final dayStops in _stopsByDay) {
-      for (final stop in dayStops) {
-        if (stop.entry.id == entryId) return stop;
-      }
+    for (final stop in _stopsForTab(_selectedTabIndex)) {
+      if (stop.entry.id == entryId) return stop;
     }
     return null;
   }
@@ -823,13 +848,14 @@ class _TripMapViewState extends ConsumerState<_TripMapView> {
               TpScopeOption(
                 value: 0,
                 label: '全部',
-                semanticsLabel: '全部，共 ${widget.days.length} 天',
+                semanticsLabel: '全部，共 ${widget.index.days.length} 天',
               ),
-              for (final (index, day) in widget.days.indexed)
+              for (final (index, day) in widget.index.days.indexed)
                 TpScopeOption(
                   value: index + 1,
                   label: 'Day ${day.dayNum}',
-                  semanticsLabel: '第 ${day.dayNum} 天，共 ${widget.days.length} 天',
+                  semanticsLabel:
+                      '第 ${day.dayNum} 天，共 ${widget.index.days.length} 天',
                   key: ValueKey('trip-map-day-${day.dayNum}'),
                 ),
             ],

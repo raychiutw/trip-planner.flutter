@@ -39,6 +39,7 @@ import 'package:tripline/features/trip_detail/entry_action_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_add_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_edit_route_screen.dart';
 import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
+import 'package:tripline/features/trip_detail/selected_day_provider.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
@@ -1964,6 +1965,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('trip-map-day-1')));
     await tester.pumpAndSettle();
+    expect(container.read(selectedDayProvider).dayNumFor('trip-1'), 1);
     await tester.tapAt(tester.getCenter(find.bySemanticsLabel('行程')));
     await tester.pumpAndSettle();
 

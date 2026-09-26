@@ -568,6 +568,13 @@ void main() {
     expect(_sharedDayNum(tester), 1);
   });
 
+  testWidgets('查詢日期優先於停留點深連結', (tester) async {
+    await _pumpTimeline(tester, initialDayNum: 1, initialEntryId: 22);
+    await tester.pumpAndSettle();
+
+    expect(_selectorDayNum(tester), 1);
+  });
+
   testWidgets('切換行程後不殘留前一個行程的共用選取日', (tester) async {
     await _pumpTimeline(
       tester,

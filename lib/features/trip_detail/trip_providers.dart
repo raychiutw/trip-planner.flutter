@@ -7,6 +7,7 @@ import '../../models/entry.dart';
 import '../../models/notes.dart';
 import '../../models/segment.dart';
 import '../../models/trip.dart';
+import 'trip_days_lookup.dart';
 
 /// 同一行程的詳情、日程、筆記共用此 scope（對應 web TripLayout 的共用 fetch），
 /// timeline / map / notes 三個分頁 watch 同一 family 實例即不會重複抓取。
@@ -36,6 +37,13 @@ final tripDaysProvider = StreamProvider.family<List<TripDay>, String>((
       .read(tripDaysRetryProvider(tripId))
       .track(() => repository.watchDays(tripId));
 });
+
+/// 與 days family 同生命週期的查找索引，stale／fresh 各衍生一次供畫面共用。
+final tripDaysIndexProvider =
+    Provider.family<AsyncValue<TripDaysIndex>, String>(
+      (ref, tripId) =>
+          ref.watch(tripDaysProvider(tripId)).whenData(TripDaysIndex.new),
+    );
 
 final tripNotesProvider = StreamProvider.family<TripNotes, String>((
   ref,
