@@ -67,3 +67,9 @@ curl --silent --show-error --max-time 12 --dump-header - 'https://uat.trip-plann
 後端 `POST /api/oauth/consent` 以 `getSessionUser` 讀取瀏覽器 cookie；`allow` 首次回應是導回同一 issuer 的 `/api/oauth/authorize`，由它再核發 code 並導向已註冊的第三方 callback；`deny` 只在驗證 exact redirect allowlist 後導向該 callback，帶 `error=access_denied` 與原 `state`。React `ConsentPage` 使用同一瀏覽器 session 的 HTML form 提交，讓瀏覽器完成後續 302。這兩條路徑的完成狀態屬於瀏覽器與原第三方 client，不是 Flutter 畫面的單次 POST 回應。
 
 Flutter `/oauth/consent` 沒有 app 內呼叫端，也沒有能保留原瀏覽器 session 的入口或接收任意第三方 callback 的 handler。#341 因此移除無法完成交易的原生同意畫面與 POST，保留該路由作安全退路：若連結被 OS 交給 Flutter，只提示返回原瀏覽器重試或返回行程列表，不顯示 query／`Location`，也不開啟使用者提供的 URI。Flutter 退路不宣稱同意或拒絕完成；兩者仍在原瀏覽器流程完成。
+
+### 正式部署核對：2026-09-26 08:25（台灣時間）
+
+`wrangler pages deployment list --project-name trip-planner` 顯示正式環境 `master` 的部署 ID 為 `74d9f4c1-4f07-4f04-b991-7c1dcc569ee6`，來源 commit `4a61aabbc7203ec98c1683ee16a8a169216196a8`。在後端 repository 對此 commit 執行 `git merge-base --is-ancestor 7c59a998c7306fed7ea2155435bd966032040459 4a61aabbc7203ec98c1683ee16a8a169216196a8` 回傳非零；已合併 UAT 的 #1351 不是這次正式部署的祖先。因此不能把 UAT 已核實的 HTTPS callback 契約視為正式環境已部署。正式 D1 redirect allowlist 也仍未取得直接證據。
+
+目前 Flutter 發布工作流未傳入 `TRIPLINE_OAUTH_CLIENT_ID`，所以以該工作流建置的 binary 會依原始碼契約隱藏 OAuth 入口；商店現有 binary 的實際旗標未核對。#335 可驗證關閉時隱藏入口與明確的已知服務名稱，#341 可驗證瀏覽器同意流程的安全返回提示，但兩者都不能宣稱正式 OAuth 交易或手機 callback 已上線。
