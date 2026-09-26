@@ -21,9 +21,9 @@ Future<void> _open(
   int? rowId,
   int? version,
   TripNotes notes = const TripNotes(),
+  Size size = const Size(1200, 3200),
 }) async {
-  // 加高測試視窗,讓多欄位表單 + 送出鈕都在畫面內（免捲動）。
-  tester.view.physicalSize = const Size(1200, 3200);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -63,6 +63,134 @@ void main() {
     registerFallbackValue(NoteSection.flights);
     registerFallbackValue(<String, dynamic>{});
   });
+
+  for (final (section, requiredKey, lastKey, latestNotes)
+      in <(NoteSection, String, String, TripNotes)>[
+        (
+          NoteSection.flights,
+          'airline',
+          'note-field-note',
+          const TripNotes(
+            flights: [
+              TripFlight(id: 5, sortOrder: 0, version: 4, airline: '原值'),
+            ],
+          ),
+        ),
+        (
+          NoteSection.lodgings,
+          'name',
+          'note-field-note',
+          const TripNotes(
+            lodgings: [
+              TripLodging(id: 5, sortOrder: 0, version: 4, name: '原值'),
+            ],
+          ),
+        ),
+        (
+          NoteSection.reservations,
+          'title',
+          'note-field-note',
+          const TripNotes(
+            reservations: [
+              TripReservation(id: 5, sortOrder: 0, version: 4, title: '原值'),
+            ],
+          ),
+        ),
+        (
+          NoteSection.pretrip,
+          'title',
+          'note-field-content',
+          const TripNotes(
+            pretripNotes: [
+              TripPretripNote(id: 5, sortOrder: 0, version: 4, title: '原值'),
+            ],
+          ),
+        ),
+        (
+          NoteSection.emergency,
+          'name',
+          'note-enum-kind-other',
+          const TripNotes(
+            emergencyContacts: [
+              TripEmergencyContact(id: 5, sortOrder: 0, version: 4, name: '原值'),
+            ],
+          ),
+        ),
+      ]) {
+    testWidgets('${section.name} 的失敗與 409 均保留草稿，重試可儲存', (tester) async {
+      final repo = _MockTripRepository();
+      var attempts = 0;
+      when(
+        () => repo.fetchFreshNotes('t1'),
+      ).thenAnswer((_) async => latestNotes);
+      when(
+        () => repo.updateNote(
+          any(),
+          tripId: any(named: 'tripId'),
+          rowId: any(named: 'rowId'),
+          fields: any(named: 'fields'),
+          expectedVersion: any(named: 'expectedVersion'),
+        ),
+      ).thenAnswer((_) async {
+        attempts++;
+        if (attempts == 1) {
+          throw const ApiError(status: 500, code: 'HTTP_500', message: '暫時失敗');
+        }
+        if (attempts == 2) {
+          throw const ApiError(
+            status: 409,
+            code: 'STALE_ENTRY',
+            message: '版本已更新',
+          );
+        }
+      });
+      await _open(
+        tester,
+        repo,
+        section: section,
+        initialFields: {requiredKey: '原值'},
+        rowId: 5,
+        version: 3,
+        size: const Size(390, 844),
+      );
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(() => tester.view.viewInsets = FakeViewPadding.zero);
+      await tester.pumpAndSettle();
+
+      final lastField = find.byKey(ValueKey(lastKey));
+      await tester.ensureVisible(lastField);
+      await tester.pumpAndSettle();
+      expect(lastField.hitTestable(), findsOneWidget);
+      await tester.enterText(
+        find.byKey(ValueKey('note-field-$requiredKey')),
+        '我的草稿',
+      );
+      for (final message in ['儲存失敗，請稍後再試', '已載入最新版本。你的草稿已保留，請再次儲存。']) {
+        await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
+        await tester.pumpAndSettle();
+        final banner = find.byKey(const ValueKey('note-edit-error'));
+        await tester.ensureVisible(banner);
+        await tester.pumpAndSettle();
+        expect(banner.hitTestable(), findsOneWidget);
+        expect(find.text(message), findsOneWidget);
+        expect(find.text('我的草稿'), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const ValueKey('note-edit-submit')));
+      await tester.pumpAndSettle();
+      expect(attempts, 3);
+      verify(
+        () => repo.updateNote(
+          section,
+          tripId: 't1',
+          rowId: 5,
+          fields: {requiredKey: '我的草稿'},
+          expectedVersion: 4,
+        ),
+      ).called(1);
+      expect(find.byKey(const ValueKey('note-edit-submit')), findsNothing);
+      expect(find.text('open').hitTestable(), findsOneWidget);
+    });
+  }
 
   testWidgets('create reservations：填欄位 + 選 enum → createNote', (tester) async {
     final repo = _MockTripRepository();
