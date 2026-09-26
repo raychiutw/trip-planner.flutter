@@ -10,6 +10,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../theme/app_theme.dart';
@@ -574,6 +575,20 @@ Future<T?> _showAppSheet<T>({
   );
 }
 
+Widget _withEscapeDismiss(Widget child, Future<void> Function() onEscape) =>
+    Focus(
+      autofocus: true,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent ||
+            event.logicalKey != LogicalKeyboardKey.escape) {
+          return KeyEventResult.ignored;
+        }
+        unawaited(onEscape());
+        return KeyEventResult.handled;
+      },
+      child: child,
+    );
+
 class _ThemeAwareAppSheet<T> extends StatefulWidget {
   const _ThemeAwareAppSheet({
     required this.controller,
@@ -706,40 +721,48 @@ class _ThemeAwareAppSheetState<T> extends State<_ThemeAwareAppSheet<T>> {
             opaqueColor: elevatedSurface,
           )
         : null;
-    return PopScope<T>(
-      canPop: _isClosing,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) unawaited(_handleSystemBack(result));
-      },
-      child: GlassModalSheetScaffold(
-        controller: widget.controller,
-        body: const SizedBox.expand(),
-        sheet: Theme(
-          data: theme.copyWith(colorScheme: elevatedScheme),
-          child: _sheet!,
-        ),
-        initialState: widget.initialState,
-        fullSize: appSheetLargeHeight(context),
-        // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
-        // 永遠視為尚未展開，阻止內容向上捲動。
-        detents: widget.resizable
-            ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
-            : const {GlassSheetDetent.large},
-        settings: settings,
-        expandedColor: elevatedSurface,
-        quality: quality,
-        padding: EdgeInsets.zero,
-        interactionScale: _reduceMotion ? 1 : packageDefaults.interactionScale,
-        stretch: _reduceMotion ? 0 : packageDefaults.stretch,
-        showDragIndicator: widget.resizable,
-        onStateChanged: (state) {
-          if (state == GlassSheetState.hidden) {
-            widget.controller.snapToState(widget.initialState, animate: false);
-            // 拖曳／外點與系統返回共用內層導覽保護；明確 Close 仍關閉整個乾淨 sheet。
-            unawaited(_handleSystemBack());
-          }
+    return _withEscapeDismiss(
+      PopScope<T>(
+        canPop: _isClosing,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) unawaited(_handleSystemBack(result));
         },
+        child: GlassModalSheetScaffold(
+          controller: widget.controller,
+          body: const SizedBox.expand(),
+          sheet: Theme(
+            data: theme.copyWith(colorScheme: elevatedScheme),
+            child: _sheet!,
+          ),
+          initialState: widget.initialState,
+          fullSize: appSheetLargeHeight(context),
+          // 固定 sheet 只提供一個 detent；同位置的 medium/large 會讓 1.x
+          // 永遠視為尚未展開，阻止內容向上捲動。
+          detents: widget.resizable
+              ? const {GlassSheetDetent.medium, GlassSheetDetent.large}
+              : const {GlassSheetDetent.large},
+          settings: settings,
+          expandedColor: elevatedSurface,
+          quality: quality,
+          padding: EdgeInsets.zero,
+          interactionScale: _reduceMotion
+              ? 1
+              : packageDefaults.interactionScale,
+          stretch: _reduceMotion ? 0 : packageDefaults.stretch,
+          showDragIndicator: widget.resizable,
+          onStateChanged: (state) {
+            if (state == GlassSheetState.hidden) {
+              widget.controller.snapToState(
+                widget.initialState,
+                animate: false,
+              );
+              // 拖曳／外點與系統返回共用內層導覽保護；明確 Close 仍關閉整個乾淨 sheet。
+              unawaited(_handleSystemBack());
+            }
+          },
+        ),
       ),
+      _handleSystemBack,
     );
   }
 }
@@ -890,42 +913,47 @@ class _RegularAppContentSheetState<T>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope<T>(
-      canPop: _closing,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) unawaited(_handleBack(result));
-      },
-      child: Dialog(
-        insetPadding: const EdgeInsets.all(TpSpacing.s4),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
-          child: SizedBox(
-            key: const ValueKey('app-regular-content-sheet'),
-            width: 560,
-            height: 720,
-            child: GlassContainer(
-              useOwnLayer: true,
-              clipBehavior: Clip.antiAlias,
-              settings: tpNavigationGlassSettings(context),
-              quality: tpGlassQuality(context),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  colorScheme: AppTheme.elevated(Theme.of(context).colorScheme),
-                ),
-                child: _AppContentSheet<T>(
-                  title: widget.title,
-                  contentBuilder: widget.contentBuilder,
-                  onClose: _close,
-                  navigatorKey: widget.navigatorKey,
-                  dismissible: widget.dismissible,
+    return _withEscapeDismiss(
+      PopScope<T>(
+        canPop: _closing,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) unawaited(_handleBack(result));
+        },
+        child: Dialog(
+          insetPadding: const EdgeInsets.all(TpSpacing.s4),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+            child: SizedBox(
+              key: const ValueKey('app-regular-content-sheet'),
+              width: 560,
+              height: 720,
+              child: GlassContainer(
+                useOwnLayer: true,
+                clipBehavior: Clip.antiAlias,
+                settings: tpNavigationGlassSettings(context),
+                quality: tpGlassQuality(context),
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: AppTheme.elevated(
+                      Theme.of(context).colorScheme,
+                    ),
+                  ),
+                  child: _AppContentSheet<T>(
+                    title: widget.title,
+                    contentBuilder: widget.contentBuilder,
+                    onClose: _close,
+                    navigatorKey: widget.navigatorKey,
+                    dismissible: widget.dismissible,
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+      _handleBack,
     );
   }
 }
