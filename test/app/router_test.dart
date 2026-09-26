@@ -823,6 +823,75 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
+  testWidgets('邀請登入後接受並從 Account 返回受邀行程', (tester) async {
+    final auth = _MockAuthRepository();
+    when(auth.currentUser).thenAnswer((_) async => null);
+    when(
+      () => auth.login(email: 'traveler@example.com', password: 'secret'),
+    ).thenAnswer((_) async => _loggedInUser);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+    );
+    addTearDown(container.dispose);
+    final collab = container.read(collabRepositoryProvider);
+    when(() => collab.acceptInvitation('raw-token')).thenAnswer(
+      (_) async =>
+          const InvitationAcceptResult(tripId: 'trip-1', tripTitle: '沖繩家庭旅行'),
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/invite?token=raw-token');
+    await tester.pumpAndSettle();
+    expect(find.byType(InviteScreen), findsOneWidget);
+    verify(() => collab.fetchInvitation('raw-token')).called(1);
+
+    await tester.tap(find.byKey(const ValueKey('invite-login')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      router.state.uri.queryParameters['redirect_after'],
+      '/invite?token=raw-token',
+    );
+    verifyNever(() => collab.acceptInvitation(any()));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'secret',
+    );
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.toString(), '/invite?token=raw-token');
+    expect(find.byKey(const ValueKey('invite-accept')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('invite-accept')));
+    await tester.pumpAndSettle();
+    verify(() => collab.acceptInvitation('raw-token')).called(1);
+    expect(router.state.uri.path, '/trips/trip-1');
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('account-avatar-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('app-large-sheet-close')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AccountScreen), findsNothing);
+    expect(router.state.uri.path, '/trips/trip-1');
+    expect(find.byType(TripTimelineScreen), findsOneWidget);
+  });
+
   testWidgets('cold-start public deep links do not show a fake Back', (
     tester,
   ) async {
