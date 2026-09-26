@@ -330,6 +330,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, '更新後的說明'), findsOneWidget);
 
+    entries.add(_entry);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '更新後的說明'), findsOneWidget);
+
     await tester.enterText(
       find.byKey(const ValueKey('entry-edit-desc')),
       '第二次更新',

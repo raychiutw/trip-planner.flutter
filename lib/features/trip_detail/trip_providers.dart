@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../api/providers.dart';
 import '../../app/stream_retry_coordinator.dart';
 import '../../models/day.dart';
@@ -62,6 +63,63 @@ final entryDetailProvider =
           .watch(tripRepositoryProvider)
           .watchEntry(tripId: key.tripId, entryId: key.entryId);
     });
+
+/// 編輯表單要的停留點來源:比種子(打開表單時那一版)新的 detail 才採用 ——
+/// SWR 會先吐舊快取,不能讓它把 OCC version 倒退;404 表示這個停留點已被刪除。
+typedef EntryEditSource = ({
+  TimelineEntry? fresher,
+  bool deleted,
+  Object? error,
+});
+
+class EntryEditSourceController extends Notifier<EntryEditSource> {
+  EntryEditSourceController(this.key);
+
+  final ({String tripId, int entryId, int seedVersion}) key;
+
+  @override
+  EntryEditSource build() {
+    final detail = entryDetailProvider((
+      tripId: key.tripId,
+      entryId: key.entryId,
+    ));
+    ref.listen(detail, (_, next) {
+      state = _newerSource(state, next);
+    });
+    return _newerSource((
+      fresher: null,
+      deleted: false,
+      error: null,
+    ), ref.read(detail));
+  }
+
+  EntryEditSource _newerSource(
+    EntryEditSource previous,
+    AsyncValue<TimelineEntry> next,
+  ) {
+    final value = next.value;
+    final error = next.error;
+    final newer =
+        value != null &&
+        value.version >= key.seedVersion &&
+        (previous.fresher == null ||
+            value.version >= previous.fresher!.version);
+    final deleted =
+        previous.deleted || error is ApiError && error.status == 404;
+    return (
+      fresher: newer ? value : previous.fresher,
+      deleted: deleted,
+      error: deleted && error == null ? previous.error : error,
+    );
+  }
+}
+
+final entryEditSourceProvider = NotifierProvider.autoDispose
+    .family<
+      EntryEditSourceController,
+      EntryEditSource,
+      ({String tripId, int entryId, int seedVersion})
+    >(EntryEditSourceController.new);
 
 /// 行程交通段（交通編輯用;含 segment id/version,供 travel pill 比對與 PATCH）。
 final tripSegmentsProvider = StreamProvider.family<List<TripSegment>, String>((
