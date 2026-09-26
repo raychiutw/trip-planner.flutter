@@ -42,6 +42,8 @@ import 'package:tripline/features/trip_detail/entry_poi_screen.dart';
 import 'package:tripline/features/trip_detail/trip_map_screen.dart';
 import 'package:tripline/features/trip_detail/trip_notes_screen.dart';
 import 'package:tripline/features/trip_detail/trip_print_screen.dart';
+import 'package:tripline/features/trip_detail/trip_pdf_service.dart';
+import 'package:tripline/features/trip_detail/trip_print_data.dart';
 import 'package:tripline/features/trip_detail/trip_timeline_screen.dart';
 import 'package:tripline/features/trips/audit/trip_audit_screen.dart';
 import 'package:tripline/features/trips/create/create_trip_screen.dart';
@@ -84,6 +86,16 @@ class _MockFavoritesRepository extends Mock implements FavoritesRepository {}
 
 class _MockRequestsRepository extends Mock implements RequestsRepository {}
 
+class _RecordingPrintActions implements TripPrintActions {
+  final printed = <TripPrintData>[];
+
+  @override
+  Future<void> print(TripPrintData data) async => printed.add(data);
+
+  @override
+  Future<void> sharePdf(TripPrintData data) async {}
+}
+
 const _loggedInUser = UserInfo(
   id: 'user-1',
   email: 'traveler@example.com',
@@ -99,6 +111,7 @@ ProviderContainer _buildContainer({
   List<TripDay>? days,
   AuthRepository? authRepository,
   RequestsRepository? requestsRepository,
+  TripPrintActions? printActions,
   bool resolveAuthFromRepository = false,
   bool disableAutomaticRetry = false,
 }) {
@@ -180,6 +193,8 @@ ProviderContainer _buildContainer({
         authStateProvider.overrideWith(() => _FakeAuthNotifier(currentUser)),
       if (requestsRepository != null)
         requestsRepositoryProvider.overrideWithValue(requestsRepository),
+      if (printActions != null)
+        tripPrintActionsProvider.overrideWithValue(printActions),
       tripRepositoryProvider.overrideWithValue(mockTripRepository),
       collabRepositoryProvider.overrideWithValue(mockCollabRepository),
       favoritesRepositoryProvider.overrideWithValue(mockFavoritesRepository),
@@ -724,6 +739,69 @@ void main() {
 
     expect(find.byType(PublicShareScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
+  });
+
+  testWidgets('公開分享可列印，登入後返回同一連結並複製行程', (tester) async {
+    final auth = _MockAuthRepository();
+    final printActions = _RecordingPrintActions();
+    when(auth.currentUser).thenAnswer((_) async => null);
+    when(
+      () => auth.login(email: 'traveler@example.com', password: 'secret'),
+    ).thenAnswer((_) async => _loggedInUser);
+    final container = _buildContainer(
+      currentUser: null,
+      authRepository: auth,
+      resolveAuthFromRepository: true,
+      printActions: printActions,
+    );
+    addTearDown(container.dispose);
+    final repository = container.read(tripRepositoryProvider);
+    when(
+      () => repository.clonePublicTripShare('public-token'),
+    ).thenAnswer((_) async => 'copied-trip');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TriplineApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final router = container.read(appRouterProvider);
+    router.go('/s/public-token');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('public-share-print')));
+    await tester.pumpAndSettle();
+    expect(printActions.printed, hasLength(1));
+    expect(printActions.printed.single.displayTitle, 'public-trip');
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      router.state.uri.queryParameters['redirect_after'],
+      '/s/public-token',
+    );
+    verifyNever(() => repository.clonePublicTripShare(any()));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('login-email-field')),
+      'traveler@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('login-password-field')),
+      'secret',
+    );
+    await tester.tap(find.byKey(const ValueKey('login-submit-button')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/s/public-token');
+    expect(find.byType(PublicShareScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('public-share-clone')));
+    await tester.pumpAndSettle();
+    verify(() => repository.clonePublicTripShare('public-token')).called(1);
+    expect(router.state.uri.path, '/trips/copied-trip');
   });
 
   testWidgets('未登入可進入邀請確認頁 /invite?token', (tester) async {
