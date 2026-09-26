@@ -486,12 +486,12 @@ class _AppUnsavedChangesGuardState extends State<AppUnsavedChangesGuard> {
       await _popOrCloseSheet();
       return;
     }
-    final discard = await showAppConfirm(
+    final discard = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '捨棄未儲存的變更？',
       message: '離開後，本次修改不會保留。',
       confirmLabel: '捨棄',
-      isDestructive: true,
     );
     if (!mounted || !discard) return;
     setState(() => _allowPop = true);
@@ -783,12 +783,12 @@ Future<T?> showAppSelectionSheet<T>(
         : () async {
             if (dismissalLocked?.value ?? false) return false;
             if (!(hasUnsavedChanges?.value ?? false)) return true;
-            return showAppConfirm(
+            return showAppDestructiveConfirm(
               context,
+              source: TpDestructiveConfirmSource.direct,
               title: '捨棄未儲存的變更？',
               message: '離開後，本次修改不會保留。',
               confirmLabel: '捨棄',
-              isDestructive: true,
             );
           },
     builder: (sheetContext, close) => Material(
@@ -997,12 +997,12 @@ Future<bool?> showAppFormSheet(
     canDismiss: () async {
       if (controller.isSubmitting) return false;
       if (!controller.isDirty) return true;
-      return showAppConfirm(
+      return showAppDestructiveConfirm(
         context,
+        source: TpDestructiveConfirmSource.direct,
         title: '捨棄未儲存的變更？',
         message: '離開後，本次修改不會保留。',
         confirmLabel: '捨棄',
-        isDestructive: true,
       );
     },
     builder: (sheetContext, close) {

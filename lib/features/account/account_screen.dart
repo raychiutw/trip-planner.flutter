@@ -93,12 +93,12 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
   /// 登出前確認，確認才呼叫 authStateProvider.logout()。
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final ok = await showAppConfirm(
+    final ok = await showAppDestructiveConfirm(
       context,
+      source: TpDestructiveConfirmSource.direct,
       title: '登出帳號',
       message: '確定要登出嗎？',
       confirmLabel: '登出',
-      isDestructive: true,
     );
     if (ok) {
       await ref.read(authStateProvider.notifier).logout();

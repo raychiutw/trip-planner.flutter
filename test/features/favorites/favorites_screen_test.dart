@@ -563,6 +563,14 @@ void main() {
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoDialogAction>(
+              find.widgetWithText(CupertinoDialogAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
       await tester.tap(find.text('保留'));
       await tester.pumpAndSettle();
 
@@ -940,17 +948,45 @@ void main() {
 
       expect(find.text('刪除「美麗海水族館」？'), findsOneWidget);
       expect(find.text('將從收藏移除「美麗海水族館」。刪除後無法復原。'), findsOneWidget);
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CupertinoAlertDialog),
-          matching: find.text('刪除'),
-        ),
-      );
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
       await tester.pumpAndSettle();
 
       verify(() => mockRepo.deleteFavorite(7)).called(1);
       expect(find.byKey(const ValueKey('favorite-card-7')), findsNothing);
       expect(find.text('復原'), findsNothing);
+    });
+
+    testWidgets('手機收藏選單刪除會顯示破壞性確認', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final repository = MockFavoritesRepository();
+      when(
+        repository.watchFavorites,
+      ).thenAnswer((_) => Stream.value(_favorites));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            favoritesRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: buildApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const ValueKey('favorite-card-7')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoActionSheetAction>(
+              find.widgetWithText(CupertinoActionSheetAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
     });
 
     testWidgets('長按選單取消刪除不會呼叫 API', (tester) async {
@@ -996,12 +1032,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('刪除'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(CupertinoAlertDialog),
-          matching: find.text('刪除'),
-        ),
-      );
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('favorite-card-7')), findsOneWidget);
@@ -1154,6 +1185,14 @@ void main() {
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
       expect(find.text('刪除 2 個收藏？'), findsOneWidget);
       expect(find.text('將刪除「美麗海水族館」、「暖暮拉麵」。刪除後無法復原。'), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoDialogAction>(
+              find.widgetWithText(CupertinoDialogAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
 
       await tester.tap(
         find.descendant(

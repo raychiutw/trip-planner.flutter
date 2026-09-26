@@ -1272,6 +1272,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoDialogAction>(
+              find.widgetWithText(CupertinoDialogAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
       await tester.tap(
         find.descendant(
           of: find.byType(CupertinoAlertDialog),
@@ -1285,9 +1293,7 @@ void main() {
       ).called(1);
     });
 
-    testWidgets('長按 → 選單 → AlertDialog 確認 → 呼叫 deleteTrip 並 refresh', (
-      tester,
-    ) async {
+    testWidgets('長按 → 選單 → 破壞性確認 → 呼叫 deleteTrip 並 refresh', (tester) async {
       await _useWideSurface(tester);
       final mockTripRepository = MockTripRepository();
       when(
@@ -1311,13 +1317,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('刪除行程'), findsOneWidget);
 
-      // 點「刪除行程」→ AlertDialog 確認
+      // 點「刪除行程」→ action sheet 確認
       await tester.tap(find.text('刪除行程'));
       await tester.pumpAndSettle();
-      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
 
       // 確認刪除 → 呼叫 repository.deleteTrip + 清單 refresh
-      await tester.tap(find.text('刪除'));
+      await tester.tap(find.widgetWithText(CupertinoActionSheetAction, '刪除'));
       await tester.pumpAndSettle();
 
       verify(
@@ -1325,6 +1331,35 @@ void main() {
       ).called(1);
       // 初載 + 刪除後 invalidate refresh = 2 次
       verify(() => mockTripRepository.watchMyTrips()).called(2);
+    });
+
+    testWidgets('手機長按選單刪除行程會顯示破壞性確認', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(500, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final repository = MockTripRepository();
+      when(repository.watchMyTrips).thenAnswer((_) => Stream.value(fakeTrips));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [tripRepositoryProvider.overrideWithValue(repository)],
+          child: buildRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('沖繩家族之旅'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除行程'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      expect(
+        tester
+            .widget<CupertinoActionSheetAction>(
+              find.widgetWithText(CupertinoActionSheetAction, '刪除'),
+            )
+            .isDestructiveAction,
+        isTrue,
+      );
     });
 
     testWidgets('刪除確認說明影響與不可復原，送出後鎖定卡片直到伺服器成功', (tester) async {

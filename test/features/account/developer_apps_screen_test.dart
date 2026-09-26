@@ -414,6 +414,14 @@ void main() {
     expect(find.text('刪除 Dev App？'), findsOneWidget);
     expect(find.textContaining('無法復原'), findsOneWidget);
     verifyNever(() => mockAccountRepository.suspendDeveloperApp(any()));
+    expect(
+      tester
+          .widget<CupertinoDialogAction>(
+            find.widgetWithText(CupertinoDialogAction, '刪除'),
+          )
+          .isDestructiveAction,
+      isTrue,
+    );
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();

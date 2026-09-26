@@ -214,13 +214,13 @@ class _NoteEditSheetState extends ConsumerState<NoteEditSheet> {
               freshRow.fields[key] != _baseFields[key] &&
               freshRow.fields[key] != fields[key],
         )) {
-      final overwrite = await showAppConfirm(
+      final overwrite = await showAppDestructiveConfirm(
         context,
+        source: TpDestructiveConfirmSource.direct,
         title: '保留你的修改？',
         message: '協作者也修改了相同欄位。繼續會以你的草稿覆蓋那些欄位。',
         confirmLabel: '保留我的修改',
         cancelLabel: '繼續編輯',
-        isDestructive: true,
       );
       if (!mounted || !overwrite) return false;
     }

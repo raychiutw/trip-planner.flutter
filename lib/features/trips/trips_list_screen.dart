@@ -590,7 +590,11 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
             ignoring: isDeleting,
             child: SwipeToDelete(
               dismissKey: ValueKey('trip-dismiss-${trip.tripId}'),
-              onDelete: () => _confirmAndDeleteTrip(context, trip),
+              onDelete: () => _confirmAndDeleteTrip(
+                context,
+                trip,
+                source: TpDestructiveConfirmSource.direct,
+              ),
               child: Stack(
                 children: [
                   TripCard(
@@ -708,24 +712,29 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       case _TripListAction.exportJson:
         await _exportTripToJson(trip);
       case _TripListAction.delete:
-        await _confirmAndDeleteTrip(context, trip);
+        await _confirmAndDeleteTrip(
+          context,
+          trip,
+          source: TpDestructiveConfirmSource.menu,
+        );
     }
   }
 
-  /// AlertDialog 二次確認 → deleteTrip → invalidate refresh。
+  /// 依觸發來源確認刪除 → deleteTrip → invalidate refresh。
   Future<void> _confirmAndDeleteTrip(
     BuildContext context,
-    TripSummary trip,
-  ) async {
+    TripSummary trip, {
+    required TpDestructiveConfirmSource source,
+  }) async {
     if (_deletingTripIds.contains(trip.tripId)) return;
-    final confirmedDelete = await showAppConfirm(
+    final confirmedDelete = await showAppDestructiveConfirm(
       context,
+      source: source,
       title: '刪除行程',
       message:
           '確定要刪除「${trip.displayTitle}」嗎？'
           '這會刪除其中所有行程日與景點。此動作無法復原。',
       confirmLabel: '刪除',
-      isDestructive: true,
     );
     if (!confirmedDelete || !context.mounted) return;
     await _deleteTrip(context, trip);

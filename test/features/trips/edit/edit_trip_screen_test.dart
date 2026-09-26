@@ -793,6 +793,14 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      tester
+          .widget<CupertinoDialogAction>(
+            find.widgetWithText(CupertinoDialogAction, '刪除'),
+          )
+          .isDestructiveAction,
+      isTrue,
+    );
 
     await tester.tap(find.widgetWithText(CupertinoDialogAction, '刪除'));
     await tester.pump();
