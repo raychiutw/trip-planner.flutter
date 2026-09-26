@@ -117,10 +117,7 @@ void main() {
     expect(find.text('行程更新通知'), findsOneWidget);
     expect(find.text('旅伴邀請'), findsOneWidget);
     expect(find.text('系統通知'), findsOneWidget);
-    expect(
-      find.text('這些選項是通知偏好；手機系統若關閉 Tripline 通知，仍不會收到通知。'),
-      findsOneWidget,
-    );
+    expect(find.text('這些選項是通知偏好；手機系統若關閉 Tripline 通知，仍不會收到通知。'), findsOneWidget);
     expect(find.byType(TpSettingsGroup), findsOneWidget);
     expect(find.byType(Card), findsNothing);
 
