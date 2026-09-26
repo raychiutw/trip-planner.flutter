@@ -99,6 +99,7 @@ Future<void> _pump(
   _MockTripRepository repo, {
   _MockPoiRepository? poiRepo,
   _MockFavoritesRepository? favoritesRepo,
+  TimelineEntry entry = _entry,
   List<TripDay> tripDays = const <TripDay>[],
   ReservationUrlLauncher reservationUrlLauncher = launchReservationUrl,
 }) async {
@@ -109,7 +110,7 @@ Future<void> _pump(
         entryDetailProvider((
           tripId: 't1',
           entryId: 11,
-        )).overrideWith((ref) => Stream.value(_entry)),
+        )).overrideWith((ref) => Stream.value(entry)),
         tripDaysProvider('t1').overrideWith((ref) => Stream.value(tripDays)),
         if (poiRepo != null) poiRepositoryProvider.overrideWithValue(poiRepo),
         if (favoritesRepo != null)
@@ -187,6 +188,54 @@ void main() {
     await tester.pump();
 
     expect(opened.single.toString(), 'https://book.example/abc');
+  });
+
+  testWidgets('窄版最大字級仍可開啟完整長訂位連結', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+
+    const url =
+        'https://book.example/reservations/very-long-reference-'
+        '0123456789abcdefghijklmnopqrstuvwxyz0123456789';
+    final opened = <Uri>[];
+    await _pump(
+      tester,
+      _MockTripRepository(),
+      entry: const TimelineEntry(
+        id: 11,
+        sortOrder: 0,
+        title: '首里城',
+        version: 2,
+        master: EntryPoiInfo(poiId: 501, name: '首里城公園'),
+        alternates: [
+          EntryPoiInfo(
+            poiId: 502,
+            name: '玉陵',
+            reservation: '已訂位 18:00，確認碼 ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            reservationUrl: url,
+          ),
+        ],
+      ),
+      reservationUrlLauncher: (value) async => opened.add(value),
+    );
+
+    final link = find.byKey(const ValueKey('poi-reservation-link-502'));
+    await tester.scrollUntilVisible(link, 300);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(link);
+    await tester.pump();
+    expect(opened.single.toString(), url);
+    final setMaster = find.byKey(const ValueKey('alt-setmaster-502'));
+    await tester.ensureVisible(setMaster);
+    await tester.pumpAndSettle();
+    await tester.tap(setMaster);
+    await tester.pumpAndSettle();
+    expect(find.text('設為正選？'), findsOneWidget);
   });
 
   testWidgets('訂位連結外開失敗持續顯示易懂錯誤且可重新開啟', (tester) async {
@@ -564,10 +613,10 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('窄版大字與鍵盤下長備註及訂位資訊仍可編輯並送出', (tester) async {
+  testWidgets('窄版最大字級與鍵盤下長備註及訂位資訊仍可編輯並送出', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    tester.platformDispatcher.textScaleFactorTestValue = 3.2;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearAllTestValues);
@@ -602,7 +651,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(find.byKey(const ValueKey('poi-save')));
+    for (final key in [
+      'poi-note',
+      'poi-type-attraction',
+      'poi-reservation',
+      'poi-save',
+    ]) {
+      await tester.ensureVisible(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey(key)).hitTestable(), findsOneWidget);
+    }
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('poi-save')));
     await tester.pumpAndSettle();

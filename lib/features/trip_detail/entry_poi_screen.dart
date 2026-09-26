@@ -518,6 +518,69 @@ class _PoiCard extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     final reservationUri = _safeReservationUri(poi.reservationUrl);
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          poi.name ?? '未命名地點',
+          semanticsLabel:
+              '${isMaster ? '正選地點' : '備選地點'}，${poi.name ?? '未命名地點'}',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          [
+            kPoiTypeLabels[poi.type] ?? 'POI',
+            if (poi.rating != null) '★ ${poi.rating!.toStringAsFixed(1)}',
+          ].join('  ·  '),
+          style: theme.textTheme.bodySmall?.copyWith(color: muted),
+        ),
+        if (poi.note != null && poi.note!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s1),
+            child: Text(
+              poi.note!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+            ),
+          ),
+        if (poi.reservation != null && poi.reservation!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: TpSpacing.s1),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    '訂位:${poi.reservation!}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                  ),
+                ),
+                if (reservationUri != null) ...[
+                  const SizedBox(width: TpSpacing.s1),
+                  IconButton(
+                    key: ValueKey('poi-reservation-link-${poi.poiId}'),
+                    tooltip: '開啟訂位連結',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: TpSpacing.tapMin,
+                      height: TpSpacing.tapMin,
+                    ),
+                    iconSize: 18,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    onPressed: () => _openReservationUrl(
+                      context,
+                      reservationUrlLauncher,
+                      reservationUri,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+    final largeText = MediaQuery.textScalerOf(context).scale(16) > 24;
     return Container(
       key: ValueKey('poi-card-${poi.poiId}'),
       margin: const EdgeInsets.only(bottom: TpSpacing.s2),
@@ -527,79 +590,21 @@ class _PoiCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(TpRadius.md),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
+      child: largeText
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                details,
+                Align(alignment: Alignment.centerRight, child: trailing),
+              ],
+            )
+          : Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  poi.name ?? '未命名地點',
-                  semanticsLabel:
-                      '${isMaster ? '正選地點' : '備選地點'}，${poi.name ?? '未命名地點'}',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  [
-                    kPoiTypeLabels[poi.type] ?? 'POI',
-                    if (poi.rating != null)
-                      '★ ${poi.rating!.toStringAsFixed(1)}',
-                  ].join('  ·  '),
-                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                ),
-                if (poi.note != null && poi.note!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Text(
-                      poi.note!,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                    ),
-                  ),
-                if (poi.reservation != null && poi.reservation!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: TpSpacing.s1),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '訂位:${poi.reservation!}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: muted,
-                            ),
-                          ),
-                        ),
-                        if (reservationUri != null) ...[
-                          const SizedBox(width: TpSpacing.s1),
-                          IconButton(
-                            key: ValueKey('poi-reservation-link-${poi.poiId}'),
-                            tooltip: '開啟訂位連結',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: TpSpacing.tapMin,
-                              height: TpSpacing.tapMin,
-                            ),
-                            iconSize: 18,
-                            icon: const Icon(Icons.open_in_new_rounded),
-                            onPressed: () => _openReservationUrl(
-                              context,
-                              reservationUrlLauncher,
-                              reservationUri,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                Expanded(child: details),
+                trailing,
               ],
             ),
-          ),
-          trailing,
-        ],
-      ),
     );
   }
 }
